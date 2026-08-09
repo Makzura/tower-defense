@@ -43,6 +43,9 @@ var World3D = (function () {
   var mapMesh = null;
   var mapKey = null;
   var bounds = null;
+  // Kept from the last build so the world pass can light the board's own
+  // emissive scenery in the map's colour without re-deriving the theme.
+  var mapPalette = null;
 
   var ROAD_WIDTH_UL = 21.875;
   // Mirrors js/game.js. Zones are authored in that space and `Maps.routesOf`
@@ -90,6 +93,7 @@ var World3D = (function () {
 
   function buildMapMesh(map, routePaths) {
     var P = paletteFor(map);
+    mapPalette = P;
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     routePaths.forEach(function (p) {
       p.points.forEach(function (pt) {
@@ -125,15 +129,48 @@ var World3D = (function () {
       var w = ul(z.w / AUTHORED_PX_PER_UL), d = ul(z.h / AUTHORED_PX_PER_UL);
       var cx = ul(z.x / AUTHORED_PX_PER_UL) + w / 2;
       var cy = ul(z.y / AUTHORED_PX_PER_UL) + d / 2;
-      GLGeometry.box(g, cx, cy, w, d, Math.max(1.5, Math.abs(h)),
-        h < 0 ? P.terrainEdge : P.panel, h < 0 ? -0.2 : 0.4);
-      GLGeometry.box(g, cx, cy, w + 7, d + 7, 1.4, P.metalDark,
-        h < 0 ? 0 : Math.abs(h) * 0.9);
+      var thickness = Math.max(1.5, Math.abs(h));
+      var z0 = h < 0 ? -0.2 : 0.4;
+      var slabTop = z0 + thickness;
+      GLGeometry.box(g, cx, cy, w, d, thickness,
+        h < 0 ? P.terrainEdge : P.panel, z0);
+      // A RIM around the slab, not a LID over it.
+      //
+      // This skirt used to be drawn both larger in x/y AND proud of the slab it
+      // surrounds -- for a deck the slab spanned z 0.4..9.4 and the skirt
+      // 8.1..9.5 -- so the skirt's top face covered the slab's completely.
+      // Every zone on every map therefore rendered as flat `metalDark` and
+      // `P.panel` was never visible anywhere in the game. Measured before the
+      // fix: three separate slab tops all read (27,47,60), which is metalDark
+      // through this pipeline to within 1/255; panel resolves to about
+      // (27,63,74).
+      //
+      // Sitting it BELOW the slab top gives back the panel face and turns the
+      // skirt into what its size always implied: an edge rail around a raised
+      // deck.
+      var rimH = 1.4;
+      GLGeometry.box(g, cx, cy, w + 7, d + 7, rimH, P.metalDark,
+        Math.max(0, slabTop - rimH - 0.6));
     });
 
     var roadWidth = ul(ROAD_WIDTH_UL);
     routePaths.forEach(function (p) {
       GLGeometry.road(g, p.points, roadWidth, 7, P.roadTop, P.roadSide);
+    });
+
+    // The authored scenery. Each map names nine props and until now the 3D
+    // board drew none of them, so every route ran across a bare plane while the
+    // 2D thumbnails showed a decorated one. They are baked into this static
+    // mesh rather than drawn as actors: they never move, never animate and
+    // never turn, so they cost one-off build time and nothing per frame.
+    //
+    // Placed in the SAME authored-pixel space as the zones above, so a prop
+    // sits where maps.js says it does relative to the deck it belongs to.
+    ((env && env.models) || []).forEach(function (m) {
+      if (!m || !m.kind) return;
+      GLGeometry.scenery(g, m.kind,
+        ul(m.x / AUTHORED_PX_PER_UL), ul(m.y / AUTHORED_PX_PER_UL),
+        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P);
     });
 
     bounds = { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
@@ -518,7 +555,14 @@ var World3D = (function () {
 
     var vp = camera.viewProjection();
     renderer.begin(vp);
+    // The board's scenery carries its own emission, so the map pass is drawn
+    // with the glow driven. Constant, not animated: these are installations
+    // that are simply switched on, and a breathing board would pull the eye off
+    // the things that actually change. Reset immediately so a tower that does
+    // not set its own glow cannot inherit the board's.
+    renderer.setGlow(1, mapPalette ? mapPalette.accent : null);
     renderer.draw(mapMesh, 0, 0, 0, 0, 1);
+    renderer.setGlow(0, null);
 
     var i;
     // Towers, enemies, recruits and bullets. Depth sorting is the GPU's job

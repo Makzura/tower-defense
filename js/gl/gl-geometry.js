@@ -20,13 +20,21 @@ var GLGeometry = (function () {
 
   // Accumulates triangles. Flat shading, so each triangle writes its own
   // normal three times: the duplication is the point, not an oversight.
+  //
+  // `emi` is the same per-vertex emission channel the Blender exporter emits,
+  // carried here so runtime-built geometry can own a lit surface too. Board
+  // scenery needs it: a reactor core or a holo plinth that glows because the
+  // GEOMETRY glows is occluded by whatever stands in front of it, which is the
+  // whole difference between a lamp and a sticker (see AGENTS.md, "Light comes
+  // from emissive materials, not from a sprite over the top").
   function Builder() {
     this.pos = [];
     this.nrm = [];
     this.col = [];
+    this.emi = [];
   }
 
-  Builder.prototype.tri = function (a, b, c, color) {
+  Builder.prototype.tri = function (a, b, c, color, emissive) {
     var ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
     var vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     var nx = uy * vz - uz * vy;
@@ -34,23 +42,25 @@ var GLGeometry = (function () {
     var nz = ux * vy - uy * vx;
     var l = Math.hypot(nx, ny, nz) || 1;
     nx /= l; ny /= l; nz /= l;
+    var e = emissive || 0;
     var v = [a, b, c];
     for (var i = 0; i < 3; i++) {
       this.pos.push(v[i][0], v[i][1], v[i][2]);
       this.nrm.push(nx, ny, nz);
       this.col.push(color[0], color[1], color[2]);
+      this.emi.push(e);
     }
     return this;
   };
 
   // Wound counter-clockwise seen from the side the normal points at, so back
   // faces cull correctly.
-  Builder.prototype.quad = function (a, b, c, d, color) {
-    return this.tri(a, b, c, color).tri(a, c, d, color);
+  Builder.prototype.quad = function (a, b, c, d, color, emissive) {
+    return this.tri(a, b, c, color, emissive).tri(a, c, d, color, emissive);
   };
 
   Builder.prototype.build = function (renderer) {
-    return renderer.mesh(this.pos, this.nrm, this.col);
+    return renderer.mesh(this.pos, this.nrm, this.col, this.emi);
   };
 
   Builder.prototype.count = function () { return this.pos.length / 3; };
@@ -58,7 +68,7 @@ var GLGeometry = (function () {
   // A sphere resting on z = 0 -- the 3D spelling of the 2D game's circle
   // enemies. Low-poly on purpose: the board's whole art style is faceted, and
   // a 12x8 sphere at 22 px reads identically to a 48x32 one.
-  function sphere(builder, cx, cy, r, color, lift, segments, rings) {
+  function sphere(builder, cx, cy, r, color, lift, segments, rings, emissive) {
     segments = segments || 12;
     rings = rings || 8;
     var zc = (lift || 0) + r;   // centre height: resting on the ground
@@ -74,9 +84,9 @@ var GLGeometry = (function () {
         }
         var a = at(phi0, th0), b = at(phi0, th1),
             c = at(phi1, th1), d = at(phi1, th0);
-        if (ring === 0) builder.tri(a, c, d, color);
-        else if (ring === rings - 1) builder.tri(a, b, c, color);
-        else builder.quad(a, b, c, d, color);
+        if (ring === 0) builder.tri(a, c, d, color, emissive);
+        else if (ring === rings - 1) builder.tri(a, b, c, color, emissive);
+        else builder.quad(a, b, c, d, color, emissive);
       }
     }
     return builder;
@@ -165,8 +175,18 @@ var GLGeometry = (function () {
       var lA = [a[0], a[1], lift], rA = [a[2], a[3], lift];
       var lB = [b[0], b[1], lift], rB = [b[2], b[3], lift];
       builder.quad(rA, rB, lB, lA, topColor);              // deck
-      builder.quad([a[0], a[1], 0], [b[0], b[1], 0], lB, lA, sideColor);
-      builder.quad(rA, rB, [b[2], b[3], 0], [a[2], a[3], 0], sideColor);
+      // KERBS, wound so their normals point OUTWARD.
+      //
+      // Both of these used to be wound the other way round, which put both
+      // normals on the inside of the ribbon. With CULL_FACE/BACK enabled in
+      // GLRenderer that culled every kerb on every frame, so the road had no
+      // sides at all and the "raised ribbon" this file's header describes has
+      // never actually been on screen -- it rendered as a painted stripe.
+      // Worked through for a road along +X, half-width 10, lift 7: the +Y kerb
+      // gave u x v = (0,-700,0), pointing back across the road, and the -Y kerb
+      // gave (0,+700,0), likewise inward.
+      builder.quad(lA, lB, [b[0], b[1], 0], [a[0], a[1], 0], sideColor);
+      builder.quad([a[2], a[3], 0], [b[2], b[3], 0], rB, rA, sideColor);
     }
     return builder;
   }
@@ -185,6 +205,173 @@ var GLGeometry = (function () {
     return builder;
   }
 
+  // A tapered capped column. The workhorse of the scenery vocabulary: a mast,
+  // a pylon, a reactor shell and a vent stack are all this shape with different
+  // ratios, which is what keeps ten prop kinds looking like one factory made
+  // them.
+  function frustum(builder, cx, cy, r0, r1, h, color, z0, verts, emissive) {
+    verts = verts || 8;
+    var zA = z0 || 0, zB = zA + h;
+    for (var s = 0; s < verts; s++) {
+      var t0 = Math.PI * 2 * s / verts, t1 = Math.PI * 2 * (s + 1) / verts;
+      var c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1);
+      builder.quad([cx + r0 * c0, cy + r0 * s0, zA], [cx + r0 * c1, cy + r0 * s1, zA],
+                   [cx + r1 * c1, cy + r1 * s1, zB], [cx + r1 * c0, cy + r1 * s0, zB],
+                   color, emissive);
+      if (r1 > 0.0001) {
+        builder.tri([cx, cy, zB], [cx + r1 * c0, cy + r1 * s0, zB],
+                    [cx + r1 * c1, cy + r1 * s1, zB], color, emissive);
+      }
+    }
+    return builder;
+  }
+
+  // A box standing on z0, centred on x/y, turned `rot` about its own axis.
+  // The authored scenery carries a rotation per prop and a board of props all
+  // facing due north reads as wallpaper.
+  function boxAt(builder, cx, cy, sx, sy, sz, color, z0, rot, emissive) {
+    var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
+    var hx = sx / 2, hy = sy / 2, zA = z0 || 0, zB = zA + sz;
+    function p(dx, dy, z) { return [cx + dx * co - dy * si, cy + dx * si + dy * co, z]; }
+    var a = p(-hx, -hy, zB), b = p(hx, -hy, zB), c = p(hx, hy, zB), d = p(-hx, hy, zB);
+    var e = p(-hx, -hy, zA), f = p(hx, -hy, zA), g2 = p(hx, hy, zA), h2 = p(-hx, hy, zA);
+    builder.quad(a, b, c, d, color, emissive);
+    builder.quad(e, f, b, a, color, emissive);
+    builder.quad(g2, h2, d, c, color, emissive);
+    builder.quad(f, g2, c, b, color, emissive);
+    builder.quad(h2, e, a, d, color, emissive);
+    return builder;
+  }
+
+  // --- board scenery -------------------------------------------------------
+  //
+  // The six maps each author nine props (js/maps.js ENVIRONMENTS[].models) and
+  // the 3D board used to ignore every one of them, so the board was a bare
+  // plane with a road on it. These are those props as real geometry.
+  //
+  // Every kind is built from the map's OWN palette, so a prop on Mana Coil is
+  // violet and the same prop on Sigil Lattice is green without a second table
+  // to keep in step. Value ladder per AGENTS.md: the biggest surface takes the
+  // darkest value, the ley accent is the only bright note, and the accent is
+  // EMISSIVE so it survives being in shadow.
+  //
+  // Baked into the static map mesh, so nine props cost no draw calls and no
+  // per-frame work at all.
+  var EMI = 2.6;
+
+  function scenery(builder, kind, cx, cy, size, rot, P) {
+    var r = size / 2;
+    var dark = P.metalDark, body = P.metal, trim = P.panel, ley = P.accent;
+
+    // Every prop stands on the same footing, which is what makes them a set.
+    frustum(builder, cx, cy, r * 0.92, r * 0.80, size * 0.10, dark, 0, 8);
+
+    switch (kind) {
+      case "antenna":
+        frustum(builder, cx, cy, r * 0.30, r * 0.10, size * 1.55, body, size * 0.10, 6);
+        frustum(builder, cx, cy, r * 0.62, r * 0.22, size * 0.20, dark, size * 0.10, 6);
+        // Dish: a shallow open cone, tipped by the prop's rotation.
+        frustum(builder, cx, cy, r * 0.06, r * 0.52, size * 0.26, trim, size * 1.42, 10);
+        frustum(builder, cx, cy, r * 0.16, r * 0.16, size * 0.05, ley, size * 1.68, 8, EMI);
+        break;
+
+      case "server":
+        boxAt(builder, cx, cy, size * 0.78, size * 0.54, size * 0.86, dark, size * 0.08, rot);
+        // Three lit slots. Thin, and the only bright thing on a dark rack.
+        for (var i = 0; i < 3; i++) {
+          boxAt(builder, cx, cy, size * 0.80, size * 0.10, size * 0.05, ley,
+            size * (0.24 + i * 0.22), rot, EMI);
+        }
+        boxAt(builder, cx, cy, size * 0.86, size * 0.60, size * 0.07, body, size * 0.90, rot);
+        break;
+
+      case "reactor":
+        frustum(builder, cx, cy, r * 0.86, r * 0.74, size * 0.30, dark, size * 0.08, 10);
+        frustum(builder, cx, cy, r * 0.50, r * 0.50, size * 0.44, ley, size * 0.36, 10, EMI);
+        frustum(builder, cx, cy, r * 0.80, r * 0.86, size * 0.30, dark, size * 0.78, 10);
+        frustum(builder, cx, cy, r * 0.92, r * 0.92, size * 0.07, body, size * 1.02, 10);
+        // Containment ribs, so the core reads as held rather than floating.
+        for (var k = 0; k < 4; k++) {
+          var a = rot + Math.PI * 2 * k / 4;
+          boxAt(builder, cx + Math.cos(a) * r * 0.74, cy + Math.sin(a) * r * 0.74,
+            size * 0.12, size * 0.12, size * 0.62, body, size * 0.30, a);
+        }
+        break;
+
+      case "console":
+        boxAt(builder, cx, cy, size * 0.90, size * 0.46, size * 0.34, dark, size * 0.08, rot);
+        // The screen leans back toward the camera and is the lit face.
+        boxAt(builder, cx - Math.sin(rot) * size * 0.10, cy + Math.cos(rot) * size * 0.10,
+          size * 0.80, size * 0.09, size * 0.36, trim, size * 0.40, rot);
+        boxAt(builder, cx - Math.sin(rot) * size * 0.10, cy + Math.cos(rot) * size * 0.10,
+          size * 0.66, size * 0.04, size * 0.26, ley, size * 0.45, rot, EMI);
+        break;
+
+      case "pylon":
+        frustum(builder, cx, cy, r * 0.56, r * 0.30, size * 1.30, body, size * 0.10, 6);
+        frustum(builder, cx, cy, r * 0.44, r * 0.44, size * 0.10, trim, size * 0.72, 6);
+        frustum(builder, cx, cy, r * 0.34, r * 0.02, size * 0.34, dark, size * 1.40, 6);
+        sphere(builder, cx, cy, r * 0.20, ley, size * 1.30, 8, 6, EMI);
+        break;
+
+      case "tank":
+        frustum(builder, cx, cy, r * 0.78, r * 0.78, size * 0.82, body, size * 0.08, 12);
+        frustum(builder, cx, cy, r * 0.84, r * 0.84, size * 0.06, dark, size * 0.26, 12);
+        frustum(builder, cx, cy, r * 0.84, r * 0.84, size * 0.06, dark, size * 0.62, 12);
+        frustum(builder, cx, cy, r * 0.70, r * 0.46, size * 0.20, dark, size * 0.90, 12);
+        boxAt(builder, cx, cy, size * 0.20, size * 0.06, size * 0.05, ley, size * 1.08, rot, EMI);
+        break;
+
+      case "vent":
+        frustum(builder, cx, cy, r * 0.88, r * 0.72, size * 0.30, dark, size * 0.06, 10);
+        frustum(builder, cx, cy, r * 0.46, r * 0.46, size * 0.40, body, size * 0.34, 10);
+        // Louvre stack, and the heat inside it.
+        frustum(builder, cx, cy, r * 0.30, r * 0.30, size * 0.10, ley, size * 0.40, 10, EMI * 0.7);
+        frustum(builder, cx, cy, r * 0.86, r * 0.86, size * 0.08, body, size * 0.72, 10);
+        frustum(builder, cx, cy, r * 0.72, r * 0.72, size * 0.06, dark, size * 0.80, 10);
+        break;
+
+      case "holo":
+        frustum(builder, cx, cy, r * 0.70, r * 0.56, size * 0.26, dark, size * 0.08, 8);
+        frustum(builder, cx, cy, r * 0.40, r * 0.40, size * 0.05, ley, size * 0.34, 8, EMI);
+        // The projection itself: a floating faceted shard, turned off-axis so it
+        // never reads as part of the plinth.
+        frustum(builder, cx, cy, r * 0.05, r * 0.34, size * 0.34, ley, size * 0.52, 6, EMI * 0.55);
+        frustum(builder, cx, cy, r * 0.34, r * 0.05, size * 0.34, ley, size * 0.86, 6, EMI * 0.55);
+        break;
+
+      case "battery":
+        boxAt(builder, cx, cy, size * 0.92, size * 0.62, size * 0.20, dark, size * 0.08, rot);
+        for (var b2 = 0; b2 < 3; b2++) {
+          var off = (b2 - 1) * size * 0.28;
+          var bx = cx + Math.cos(rot) * off, by = cy + Math.sin(rot) * off;
+          frustum(builder, bx, by, size * 0.11, size * 0.11, size * 0.52, body, size * 0.26, 8);
+          frustum(builder, bx, by, size * 0.13, size * 0.13, size * 0.06, ley, size * 0.76, 8, EMI);
+        }
+        break;
+
+      case "coil":
+        frustum(builder, cx, cy, r * 0.66, r * 0.52, size * 0.20, dark, size * 0.08, 10);
+        frustum(builder, cx, cy, r * 0.14, r * 0.14, size * 1.10, body, size * 0.20, 6);
+        // Three windings up the post, brightening toward the top so the eye
+        // travels up it.
+        for (var c2 = 0; c2 < 3; c2++) {
+          frustum(builder, cx, cy, r * (0.62 - c2 * 0.10), r * (0.62 - c2 * 0.10),
+            size * 0.12, trim, size * (0.30 + c2 * 0.30), 10);
+          frustum(builder, cx, cy, r * (0.66 - c2 * 0.10), r * (0.66 - c2 * 0.10),
+            size * 0.04, ley, size * (0.34 + c2 * 0.30), 10, EMI * (0.6 + c2 * 0.2));
+        }
+        sphere(builder, cx, cy, r * 0.17, ley, size * 1.22, 8, 6, EMI);
+        break;
+
+      default:
+        // An unknown kind still gets a body rather than nothing, so a new prop
+        // added to maps.js shows up as a block instead of silently vanishing.
+        boxAt(builder, cx, cy, size * 0.6, size * 0.6, size * 0.6, body, size * 0.08, rot);
+    }
+    return builder;
+  }
+
   return {
     Builder: Builder,
     hex: hex,
@@ -192,6 +379,11 @@ var GLGeometry = (function () {
     cylinder: cylinder,
     ground: ground,
     road: road,
-    box: box
+    box: box,
+    frustum: frustum,
+    boxAt: boxAt,
+    scenery: scenery,
+    SCENERY_KINDS: ["antenna", "server", "reactor", "console", "pylon",
+                    "tank", "vent", "holo", "battery", "coil"]
   };
 })();
