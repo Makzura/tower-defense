@@ -13,6 +13,42 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-09 (latest+1) — everything on the board was standing inside it.**
+
+Reported by the owner from two screenshots: a Rifleman built on a raised deck
+was buried to the knee in it, and a column of carriers was walking sunk into the
+road up to the axles.
+
+**THE BOARD HAS HAD REAL HEIGHT SINCE THE ZONES AND ROAD WERE EXTRUDED, AND
+NOTHING EVER TOLD THE ACTORS.** Every actor was drawn at `z = 0` while a deck
+top sits at 9.4 and the road ribbon at 7. The models were never wrong; they had
+no idea how high the floor under them was, because nothing could tell them.
+
+`gl-world.js` now stamps a coarse HEIGHT FIELD when it builds the map mesh, from
+the same numbers the geometry is built from, so the surface a body is drawn
+standing on and the surface actually built under it cannot drift apart.
+`ROAD_LIFT` became a named constant for exactly that reason — it was a bare `7`
+at its one call site. Highest surface wins, so where a route crosses a raised
+deck the actor rides the deck, which is the surface that is visible there.
+
+A lookup is two integer divides and an array read: **0.093 µs**, or 0.006 ms per
+frame with sixty actors, 0.03% of the frame budget. That is what makes it
+affordable per actor per frame instead of caching per entity and going stale the
+next time the map changes.
+
+One subtlety worth keeping: a cell counts as covered when its **centre** falls
+inside the stamped rect. Rounding outward instead grew every slab by up to a
+cell on each side, which put deck-height ground nearly twenty pixels out into
+open floor — and the level test below then answered for a deck that was not
+there.
+
+**A TOWER MAY NO LONGER BE BUILT ACROSS TWO LEVELS.** New rule, at the owner's
+request, and the one placement rule that is not pure geometry from the map data
+— it asks the renderer, because the renderer owns board height. See "Placement
+rules are derived, not hand-picked" in `AGENTS.md`. Guarded on
+`World3D.isEnabled()`, so the flat 2D fallback and the Node suites are
+unaffected; all five suites report their unchanged figures.
+
 **2026-08-09 (latest) — the board had no props, its decks were the wrong
 colour, and the road had no sides.**
 

@@ -334,9 +334,14 @@ js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
                      before export_mesh.py learned to emit a `world_fixed`
                      group. See "Building a model that looks like the ones that
                      already work"
-js/gl/gl-world.js   the world renderer: map mesh, actors, the projected overlay
-                     layer (range, cones, bars, chambers, stun, projectiles,
-                     impacts) and `screenToWorld`. The two seams game.js uses
+js/gl/gl-world.js   the world renderer: map mesh, board scenery, actors, the
+                     projected overlay layer (range, cones, bars, chambers,
+                     stun, projectiles, impacts) and `screenToWorld`. Also owns
+                     the HEIGHT FIELD -- a coarse grid stamped from the same
+                     numbers the map mesh is built from, so an actor is drawn
+                     standing on the surface that was actually built under it.
+                     `groundHeightAt` and `isLevelUnder` are the seams; the
+                     second is read by the placement rule
 js/gl/models/*.js   GENERATED geometry, one classic script per model. Do not
                      hand-edit; re-run tools/blender/export_mesh.py
 tools/blender/td_scene.py shared offline camera/light/material/render pipeline;
@@ -1125,6 +1130,21 @@ numbers here.
 = 10.9375 + 11.25 = 22.1875 u.l. for a gunner. That puts it exactly flush against the
 road edge, as close as physically possible. `ROAD_WIDTH_UL` also drives how the
 road is *drawn*, so the two can never disagree.
+
+**Not across two levels** (2026-08-09, at the owner's request). The 3D board has
+real height — a deck top sits at z 9.4, a bay at 5.4, the road ribbon at 7 — and
+a footprint that bridges an edge leaves the tower half planted and half hanging
+over the drop. There is no pose that reads correctly there: the model has one
+ground plane and the tile under it has two. `whyCannotBuild` samples the
+footprint's rim and centre through `World3D.isLevelUnder` and refuses the spot
+with **"not level here"** if they span more than 0.75.
+
+This is the one placement rule that is NOT pure geometry from the map data — it
+asks the renderer, because the renderer is what owns board height. It is guarded
+on `World3D.isEnabled()`, so with WebGL unavailable the world is flat, every
+spot is level, and the 2D fallback keeps exactly the rules it has always had.
+That guard is also why the Node suites are unaffected: the harness has no WebGL
+and never reaches the clause.
 
 **Not on each other:** two centres must be at least the **sum of the two
 footprint radii** apart — `type.FOOTPRINT_RADIUS_UL + existing.footprintRadiusUl`,
