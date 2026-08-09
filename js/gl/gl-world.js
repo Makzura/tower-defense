@@ -1429,26 +1429,63 @@ var World3D = (function () {
   // reference eases between them by how far along the shot is -- which is a
   // straight line in the world, aimed at the target, and not a curve draped
   // over the terrain.
+  // The towers visible to shotGround this frame, so a round can be anchored to
+  // whichever one fired it. Set by drawShots; never read by anything else.
+  var shotTowers = [];
+
   function shotGround(shot) {
-    var here = groundHeightAt(shot.x, shot.y);
-    var from = here, to = here, t = 0.5;
-    if (typeof shot.travelled === "number" && typeof shot.dirX === "number") {
-      from = groundHeightAt(shot.x - shot.dirX * shot.travelled,
-                            shot.y - shot.dirY * shot.travelled);
-      var reach = Math.max(1, shot.travelled + 1);
-      t = Math.max(0, Math.min(1, shot.travelled / reach));
+    // WHERE IT WAS FIRED FROM, remembered once. A piercing shot knows exactly,
+    // because it carries the heading and the distance it has run. A homing
+    // round carries no history, so it is stamped the first frame it is drawn,
+    // which is the frame it left the barrel.
+    //
+    // Presentation-only fields on a live round, the same trick `shotBody` and
+    // `liftUl` already use. Nothing reads them back.
+    if (shot._gz === undefined) {
+      var ox = shot.x, oy = shot.y;
+      if (typeof shot.travelled === "number" && typeof shot.dirX === "number") {
+        ox = shot.x - shot.dirX * shot.travelled;
+        oy = shot.y - shot.dirY * shot.travelled;
+      }
+      shot._gx = ox; shot._gy = oy;
+      // Anchored to the TOWER that fired it, not to the patch of ground under
+      // the muzzle. A muzzle hangs out past its own platform -- back-projecting
+      // one frame of flight put the origin on a deck's rim rather than its top,
+      // and a tower built near an edge would have dropped its shot a whole deck
+      // height the moment it fired.
+      var owner = null, best = Infinity;
+      for (var ti = 0; ti < shotTowers.length; ti++) {
+        var tw = shotTowers[ti];
+        var ddx = tw.x - ox, ddy = tw.y - oy;
+        var d2 = ddx * ddx + ddy * ddy;
+        var reach = (tw.footprintPx || 12) * 4;
+        if (d2 < best && d2 < reach * reach) { best = d2; owner = tw; }
+      }
+      shot._gz = owner ? groundHeightAt(owner.x, owner.y)
+                       : groundHeightAt(ox, oy);
     }
-    if (shot.target && shot.target.pos) {
-      to = groundHeightAt(shot.target.pos.x, shot.target.pos.y);
-      var dx = shot.target.pos.x - shot.x, dy = shot.target.pos.y - shot.y;
-      var left = Math.sqrt(dx * dx + dy * dy);
-      var gone = (typeof shot.travelled === "number") ? shot.travelled : left;
-      t = Math.max(0, Math.min(1, gone / Math.max(1, gone + left)));
-    }
-    return from + (to - from) * t;
+
+    // A PIERCING SHOT HOLDS ITS FIRING HEIGHT for the whole flight. It is a
+    // rail shot down a fixed heading through everything in the way; it has no
+    // single target to descend towards, and dipping to follow the floor under
+    // it is the exact bug this is here to stop.
+    if (!shot.target || !shot.target.pos) return shot._gz;
+
+    // A homing round is aimed at ONE body, so it eases from the height it left
+    // to the height that body is standing on, by how far along it is. Straight
+    // line, angled at the target.
+    var to = groundHeightAt(shot.target.pos.x, shot.target.pos.y);
+    var gx = shot.x - shot._gx, gy = shot.y - shot._gy;
+    var gone = Math.sqrt(gx * gx + gy * gy);
+    var lx = shot.target.pos.x - shot.x, ly = shot.target.pos.y - shot.y;
+    var left = Math.sqrt(lx * lx + ly * ly);
+    var span = gone + left;
+    var t = span > 0.001 ? gone / span : 1;
+    return shot._gz + (to - shot._gz) * (t < 0 ? 0 : (t > 1 ? 1 : t));
   }
 
   function drawShots(ctx, state) {
+    shotTowers = state.towers || [];
     for (var i = 0; i < state.bullets.length; i++) {
       var b = state.bullets[i];
       // A piercing shot travels a fixed heading and knows how far it has come;
