@@ -1417,7 +1417,36 @@ var World3D = (function () {
   var SHOT_LIFT_UL = 33;
 
   function shotLift(shot) {
+    // The height the round is DRAWN at. `_lift` is stamped from the firing
+    // tower's real muzzle when one can be identified -- see shotGround.
+    if (typeof shot._lift === "number") return shot._lift;
     return ul(typeof shot.liftUl === "number" ? shot.liftUl : SHOT_LIFT_UL);
+  }
+
+  // THE MUZZLE THIS ROUND ACTUALLY LEFT, in px above the tower's own ground.
+  //
+  // `liftUl` is a single number per weapon and it does not match the models:
+  // the bolt carries 33, while SNIPER_FX puts the a3 muzzle at Blender height
+  // 1.341, which is 42.6 px. Ten pixels on a fifty-five pixel model, and it
+  // reads exactly as the owner described -- the round hanging below the barrel
+  // that fired it.
+  //
+  // These tables are the authority the muzzle FLASH already uses, so taking the
+  // height from the same place is what stops the flash and the round it belongs
+  // to disagreeing about where the end of the gun is.
+  function muzzleLift(tower) {
+    var id = tower && tower.constructor && tower.constructor.ID;
+    var pt = null;
+    if (id === "longshot") {
+      var sg = sniperGroup(tower);
+      // The base body has no entry of its own; it shares a3's braced stance and
+      // rifle line, which is much closer than the generic constant is.
+      var fx = SNIPER_FX[sg] || SNIPER_FX.a3;
+      pt = fx && fx.muzzle;
+    } else if (id === "soldier") {
+      pt = RIFLEMAN_FX_MUZZLE[riflemanGroup(tower)];
+    }
+    return pt ? pt[2] * unitsToPx() : null;
   }
 
   // A SHOT FLIES A STRAIGHT LINE, ANGLED BETWEEN THE TWO HEIGHTS IT CONNECTS.
@@ -1463,6 +1492,10 @@ var World3D = (function () {
       }
       shot._gz = owner ? groundHeightAt(owner.x, owner.y)
                        : groundHeightAt(ox, oy);
+      // and the height of the muzzle it actually left, from the same table the
+      // flash uses, so the two cannot disagree.
+      var mz = owner ? muzzleLift(owner) : null;
+      if (mz !== null) shot._lift = mz;
     }
 
     // A PIERCING SHOT HOLDS ITS FIRING HEIGHT for the whole flight. It is a
