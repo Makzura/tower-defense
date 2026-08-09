@@ -362,6 +362,12 @@ tools/blender/td_mesh.py the same primitive vocabulary WITHOUT Blender, emitting
 tools/blender/tower_warbringer.py path A, four bodies, built through td_mesh.
                      `python tools/blender/tower_warbringer.py` rebuilds them
                      and prints the weapon-to-body clearance per frame
+tools/blender/tower_siphon.py the Siphon's five bodies (base/a3/a5/b3/b5), also
+                     through td_mesh, so it needs PYTHON AND NOT BLENDER. The
+                     hooded harvester: this is the one tower that carries the
+                     old-magician read, because the Warbringer's contract
+                     forbids it by name and the other two are a martyr and a
+                     gangster. Seven tiers share five bodies
 tools/blender/make_preview.py regenerates review sheets and inspectable .blend
                      files under tools/blender/preview/
 tools/blender/WARBRINGER_CONCEPT.md the design the Warbringer will be built
@@ -3475,6 +3481,26 @@ out — one extra draw call, no second mesh, nothing to configure.
 
 Getting this wrong is not cosmetic-only in one place: it also decides where a
 muzzle flash lands, because `gl-world.js::anchor()` applies the same yaw.
+
+**1b. In the projected overlay, z is a height above the BOARD — and who owns
+the reference decides whether a thing bends.**
+
+`project()` adds the ground height under the point, so a range ring, cone or
+fissure drapes over a raised deck instead of cutting through it. That is right
+for a decal lying on the board and **wrong for anything rigid or airborne**: a
+rail cannon's coils, muzzle and discharge are spread along a barrel that
+overhangs the deck edge, and sampling under each of them bent the weapon into a
+curve. A shot did worse — it inherited the terrain profile and flew a ski jump.
+
+So a caller that owns one object pins the reference for everything it draws with
+`withGround(z, fn)`:
+
+- **tower hardware** — the height the TOWER stands at, so a weapon stays rigid
+  however far it overhangs;
+- **a shot** — one reference per round, eased between the ground it left and the
+  ground its target is on, which is a straight line aimed at the target;
+- **a recruit** — its own, because it walks its own patch of road;
+- **ground decals** — no pin at all; per-point sampling is the point.
 
 **2. Light comes from emissive materials, not from a sprite over the top.**
 

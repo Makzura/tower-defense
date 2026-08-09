@@ -13,6 +13,52 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-09 (latest+2) — the Siphon gets a body, and the overlay layer learns
+the board has height.**
+
+**THE SIPHON IS NO LONGER A PLACEHOLDER CYLINDER.**
+`tools/blender/tower_siphon.py` builds five bodies — base/a3/a5/b3/b5 — against
+`td_mesh`, so it needs **Python and not Blender**. 2160–2632 tris each.
+
+**Why this is the tower that carries the wizard read.** The owner asked for the
+old magician style to survive somewhere in a project that is otherwise arcane
+tech. It cannot be the Warbringer — the model contract caps him by name, *"this
+must never become a wizard"*, because he is a smith. The Sniper is a martyr and
+the Rifleman a gangster. The Siphon is the only tower with no ballistics at all:
+it holds a beam on a body, drains it, banks the drain as gold, heals off it and
+at B5 refuses a death. So: a hooded robe, no face but two ley points, a focus
+ring held at arm's length, and a brass reservoir he cradles whose fill rises
+with the tier. He carries no weapon anywhere. The dais is a `world_fixed` child.
+
+Seven tiers share five bodies — 4 wears 3's, because a tier that buys a rate or
+a ratio does not change what a man is carrying.
+
+**EVERY z IN THE OVERLAY LAYER IS A HEIGHT ABOVE THE BOARD, NOT ABOVE ZERO.**
+Owner-reported against the previous entry: *"les effets, bullets laser charges
+ne montent pas avec le modele de la tour"*. Standing the models on the surface
+left the projected layer behind, so a tower on a 9.4 deck rose while its range
+ring, charge circle and muzzle anchors stayed on the floor. `project()` adds the
+ground height, and `ringPath` projects per point rather than through
+`camera.groundCircle`, which solves only against the flat plane.
+
+**AND THEN THE OPPOSITE MISTAKE, reported immediately after:** *"the effects and
+the bullets follow the curve, it's funny but very unrealistic"*. Sampling the
+ground under every point is right for a decal and wrong for anything rigid or
+airborne — a rail cannon's coils and muzzle are spread along a barrel that
+overhangs a deck edge, so the weapon's own hardware bent into a curve, and a
+shot in flight flew a ski jump over the terrain.
+
+**The rule that came out of it, and it is the one to keep:** a caller that owns
+one object pins the reference height for everything it draws (`withGround`).
+Tower hardware measures from the height the TOWER stands at, so a weapon stays
+rigid however far it overhangs. A shot fixes one reference per round, eased
+between the ground it left and the ground its target is on, so it flies a
+straight line aimed at the target. Recruits keep their own. Ground decals still
+sample per point — that is what makes a range ring drape over an edge.
+
+No regression: stress board 4.44 ms against a 6.00 ms ceiling. All five suites
+unchanged.
+
 **2026-08-09 (latest+1) — everything on the board was standing inside it.**
 
 Reported by the owner from two screenshots: a Rifleman built on a raised deck
