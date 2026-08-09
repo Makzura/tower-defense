@@ -365,6 +365,20 @@ var World3D = (function () {
     return !!tower.fullCircle;
   }
 
+  // The Siphon's five bodies. It has seven tiers and five models, so 4 wears
+  // 3's body -- the tier that adds a rate or a ratio does not change what he is
+  // carrying, and inventing a body for it would say something untrue.
+  function siphonGroup(tower) {
+    var bought = tower.core && tower.core.purchased;
+    var a = bought && bought.A ? bought.A : 0;
+    var b = bought && bought.B ? bought.B : 0;
+    if (a >= 5) return "a5";
+    if (a >= 3) return "a3";
+    if (b >= 5) return "b5";
+    if (b >= 3) return "b3";
+    return "base";
+  }
+
   function towerModel(tower) {
     if (!tower) return null;
     var id = tower.constructor && tower.constructor.ID;
@@ -372,6 +386,7 @@ var World3D = (function () {
     if (id === "soldier") name = "rifleman-" + riflemanGroup(tower);
     else if (id === "longshot") name = "sniper-" + sniperGroup(tower);
     else if (id === "smasher") name = "warbringer-" + warbringerGroup(tower);
+    else if (id === "siphon") name = "siphon-" + siphonGroup(tower);
     return (name && GLModels.has(name)) ? name : null;
   }
 
@@ -974,13 +989,60 @@ var World3D = (function () {
   //
   // A few hundred tiny objects a frame is nothing next to the gradients and
   // colour strings this file already builds per shot.
-  function project(x, y, z) {
-    return camera.worldToScreen(x, y, z || 0, null);
+  // EVERY z IN THIS LAYER IS A HEIGHT ABOVE THE BOARD, NOT ABOVE ZERO.
+  //
+  // Range rings, charge circles, muzzle anchors, beam endpoints, impact debris
+  // and hover-card crowns are all expressed as "so far up from the thing this
+  // is attached to". They were projected against the z = 0 plane, which was
+  // correct only while the board was flat and every actor stood at zero.
+  //
+  // Once actors were stood on the surface under them, a tower on a 9.4 deck
+  // rose and its own charge ring, muzzle flash and beam stayed on the floor
+  // below it -- reported as "les effets, bullets laser charges ne montent pas
+  // avec le modele de la tour". Adding the ground height here fixes all of them
+  // at once, because they all come through this one function, and it keeps
+  // being right for anything added later.
+  //
+  // The lookup is 0.093 microseconds; a 44-segment ring pays 4 of them.
+  //
+  // BUT ONLY THINGS LYING ON THE GROUND MAY SAMPLE IT PER POINT. A range ring
+  // should drape over a deck edge. A rail cannon should not: its coils, muzzle
+  // and discharge are spread along a barrel that overhangs that same edge, and
+  // sampling under each of them bent the weapon's own hardware into a curve.
+  // A shot in flight is worse -- it inherited the terrain profile and flew a
+  // ski jump. The owner's words: "the effects and the bullets follow the curve,
+  // it's funny but very unrealistic".
+  //
+  // So a caller that owns ONE object pins the reference height for everything
+  // it draws. Inside `withGround` every z is measured from that one surface, so
+  // hardware stays rigid and a shot flies a straight line, angled between the
+  // height it left and the height it is going to.
+  var groundRef = null;
+
+  function withGround(z, fn) {
+    var prev = groundRef;
+    groundRef = z;
+    try { fn(); } finally { groundRef = prev; }
   }
 
+  function project(x, y, z) {
+    var g = (groundRef !== null) ? groundRef : groundHeightAt(x, y);
+    return camera.worldToScreen(x, y, g + (z || 0), null);
+  }
+
+  // Projected per point rather than through camera.groundCircle, for the same
+  // reason: groundCircle solves against the flat z = 0 plane and cannot know
+  // that half of a range ring is lying on a raised deck. Per point, a ring
+  // drapes over the edge it crosses instead of cutting through it.
   function ringPath(ctx, x, y, radius, segments) {
-    var pts = camera.groundCircle(x, y, radius, segments || 44);
-    if (!pts) return false;
+    var n = segments || 44;
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var a = Math.PI * 2 * i / n;
+      var p = project(x + Math.cos(a) * radius, y + Math.sin(a) * radius, 0.4);
+      if (!p) return false;
+      pts.push(p.x, p.y);
+    }
     ctx.beginPath();
     ctx.moveTo(pts[0], pts[1]);
     for (var i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
@@ -1290,21 +1352,37 @@ var World3D = (function () {
     // Tower hardware lighting up, then the shots, then the cosmetic burst --
     // in that order so a blast never buries the one ring the player is
     // actively deciding with.
+    // A tower's own hardware is RIGID. Its coils, chambers, muzzle and
+    // discharge are spread along a weapon that can overhang a deck edge, so
+    // every one of them is measured from the height the TOWER stands at -- not
+    // from whatever happens to be under that particular part of the barrel,
+    // which bent the weapon into a curve.
     for (i = 0; i < state.towers.length; i++) {
       var fxT = state.towers[i];
       var fxId = fxT.constructor && fxT.constructor.ID;
-      if (fxId === "longshot") {
-        var fxGroup = sniperGroup(fxT);
-        drawSniperCharge(ctx, fxT, fxGroup, state.now);
-        if (fxGroup === "a5") drawKillStacks(ctx, fxT);
-        // From B3 the weapon reloads, and the pips are the only thing that
-        // says a tower which has stopped firing is busy rather than broken.
-        drawChambers(ctx, fxT);
-      } else if (fxId === "soldier") {
-        drawRiflemanFlash(ctx, fxT, riflemanGroup(fxT));
+      withGround(groundHeightAt(fxT.x, fxT.y), (function (t, id) {
+        return function () {
+          if (id === "longshot") {
+            var fxGroup = sniperGroup(t);
+            drawSniperCharge(ctx, t, fxGroup, state.now);
+            if (fxGroup === "a5") drawKillStacks(ctx, t);
+            // From B3 the weapon reloads, and the pips are the only thing that
+            // says a tower which has stopped firing is busy rather than broken.
+            drawChambers(ctx, t);
+          } else if (id === "soldier") {
+            drawRiflemanFlash(ctx, t, riflemanGroup(t));
+          }
+        };
+      })(fxT, fxId));
+      // A recruit walks its own road and is grounded on its own patch of it,
+      // so each one keeps its own reference rather than the tower's.
+      if (fxId === "soldier") {
         var rec = fxT.recruits;
         for (var rk = 0; rec && rk < rec.length; rk++) {
-          if (!rec[rk].dead) drawRecruitFlash(ctx, rec[rk]);
+          if (rec[rk].dead) continue;
+          withGround(groundHeightAt(rec[rk].x, rec[rk].y), (function (r) {
+            return function () { drawRecruitFlash(ctx, r); };
+          })(rec[rk]));
         }
       }
     }
@@ -1342,17 +1420,49 @@ var World3D = (function () {
     return ul(typeof shot.liftUl === "number" ? shot.liftUl : SHOT_LIFT_UL);
   }
 
+  // A SHOT FLIES A STRAIGHT LINE, ANGLED BETWEEN THE TWO HEIGHTS IT CONNECTS.
+  //
+  // Its reference height is fixed once per shot and used for its head, its
+  // tail, its lance body and its glow, so the whole round shares one plane
+  // instead of each piece sampling whatever it happens to be passing over.
+  // Where it came from and where it is going are at different heights, so the
+  // reference eases between them by how far along the shot is -- which is a
+  // straight line in the world, aimed at the target, and not a curve draped
+  // over the terrain.
+  function shotGround(shot) {
+    var here = groundHeightAt(shot.x, shot.y);
+    var from = here, to = here, t = 0.5;
+    if (typeof shot.travelled === "number" && typeof shot.dirX === "number") {
+      from = groundHeightAt(shot.x - shot.dirX * shot.travelled,
+                            shot.y - shot.dirY * shot.travelled);
+      var reach = Math.max(1, shot.travelled + 1);
+      t = Math.max(0, Math.min(1, shot.travelled / reach));
+    }
+    if (shot.target && shot.target.pos) {
+      to = groundHeightAt(shot.target.pos.x, shot.target.pos.y);
+      var dx = shot.target.pos.x - shot.x, dy = shot.target.pos.y - shot.y;
+      var left = Math.sqrt(dx * dx + dy * dy);
+      var gone = (typeof shot.travelled === "number") ? shot.travelled : left;
+      t = Math.max(0, Math.min(1, gone / Math.max(1, gone + left)));
+    }
+    return from + (to - from) * t;
+  }
+
   function drawShots(ctx, state) {
     for (var i = 0; i < state.bullets.length; i++) {
       var b = state.bullets[i];
       // A piercing shot travels a fixed heading and knows how far it has come;
       // a homing round has a target and no history. That, not a type check, is
       // what actually distinguishes them.
-      if (typeof b.travelled === "number" && typeof b.dirX === "number") {
-        drawPierceShot(ctx, b);
-      } else {
-        drawRound(ctx, b);
-      }
+      withGround(shotGround(b), (function (shot) {
+        return function () {
+          if (typeof shot.travelled === "number" && typeof shot.dirX === "number") {
+            drawPierceShot(ctx, shot);
+          } else {
+            drawRound(ctx, shot);
+          }
+        };
+      })(b));
     }
   }
 
