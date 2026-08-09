@@ -1,0 +1,13 @@
+#!/bin/sh
+# Opens index.html (sitting next to this .app) in the default browser.
+# $0 is <folder>/Play Tower Defense.app/Contents/MacOS/launcher
+# so three levels up is the folder holding the game.
+
+GAME_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+HTML="$GAME_DIR/index.html"
+
+if [ -f "$HTML" ]; then
+    open "$HTML"
+else
+    osascript -e 'display alert "Tower Defense" message "index.html was not found. Keep this app in the same folder as index.html and the js folder."'
+fi

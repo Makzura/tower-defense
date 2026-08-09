@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node tests/run.js)",
+      "Bash(node tests/content.test.js)",
+      "Bash(node tests/long-range-dps.test.js)",
+      "Bash(node tests/beam.test.js)",
+      "Bash(node tests/sandbox.smoke.js)",
+      "PowerShell(\\(Get-Command node -ErrorAction SilentlyContinue\\).Source; \\(Get-Command npm -ErrorAction SilentlyContinue\\).Source; Test-Path \"C:\\\\Program Files\\\\nodejs\\\\node.exe\")",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

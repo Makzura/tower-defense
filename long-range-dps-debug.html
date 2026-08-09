@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Longshot — debug scene (SUPERSEDED, use sandbox.html)</title>
+<!--
+  SUPERSEDED 2026-07-26 by sandbox.html.
+
+  This page was a static test bench: one Longshot standing in an empty
+  canvas shooting dummy targets that never moved. sandbox.html replaces it
+  with the real game (enemies walk the path to the base, towers shoot them,
+  leaks cost base HP) plus infinite cash, an on-demand enemy spawner, every
+  tower type in a left sidebar, and the same u.l. debug overlay.
+
+  Kept only because it could not be deleted from this session. Nothing
+  references it and nothing here is needed -- delete this file and
+  js/scene/long-range-dps-scene.js and tests/long-range-dps-scene.smoke.js
+  whenever convenient.
+-->
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #12131a;
+    overflow: hidden;
+    font: 13px system-ui, sans-serif;
+    color: #d8e0f0;
+  }
+  body {
+    display: flex;
+  }
+  #stage {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    display: block;
+    background: #1c1e26;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  #panel {
+    width: 340px;
+    flex: 0 0 auto;
+    background: #181a22;
+    border-left: 1px solid rgba(140,199,255,0.18);
+    padding: 14px;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  #panel h1 {
+    font-size: 15px;
+    margin: 0 0 2px 0;
+  }
+  #panel .sub {
+    color: #8a93ab;
+    margin-bottom: 12px;
+  }
+  #panel section {
+    margin-bottom: 14px;
+    border-top: 1px solid rgba(140,199,255,0.12);
+    padding-top: 10px;
+  }
+  #panel section h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8cb3e6;
+    margin: 0 0 6px 0;
+  }
+  table.stats { width: 100%; border-collapse: collapse; }
+  table.stats td { padding: 1px 0; }
+  table.stats td:first-child { color: #8a93ab; }
+  table.stats td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .flag-on { color: #7ee787; }
+  .flag-off { color: #4a5066; }
+  button {
+    font: 600 12px system-ui, sans-serif;
+    color: #dbe7ff;
+    background: rgba(140,199,255,0.12);
+    border: 1px solid rgba(140,199,255,0.4);
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    margin: 3px 4px 3px 0;
+  }
+  button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  button.danger {
+    background: rgba(228,140,255,0.14);
+    border-color: rgba(228,140,255,0.5);
+  }
+  #log {
+    height: 130px;
+    overflow-y: auto;
+    background: #10121a;
+    border: 1px solid rgba(140,199,255,0.12);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #a9b4cc;
+  }
+  #log div:first-child { color: #dbe7ff; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="scene" width="1280" height="720"></canvas>
+</div>
+
+<div id="panel">
+  <h1>Longshot — debug scene</h1>
+  <div class="sub">Long-range DPS tower, two-path upgrade tree. All distances below are in u.l. -- converted to pixels once, at the edge, via ul() (see js/units.js).</div>
+
+  <section>
+    <h2>Distance system</h2>
+    <div>
+      UNIT_LENGTH: <input id="unitLength" type="number" step="0.01" min="0.01" style="width:70px;"> px / u.l.
+    </div>
+    <div class="sub">This is how UNIT_LENGTH gets tuned: every shape below redraws at the new scale immediately. This page has its own copy of the constant, separate from the main game's (index.html) -- see js/scene/long-range-dps-scene.js.</div>
+  </section>
+
+  <section>
+    <h2>Upgrades</h2>
+    <div>
+      Path A: <span id="tierA">0</span>/5
+      <button id="buyA">Buy next A tier</button>
+    </div>
+    <div>
+      Path B: <span id="tierB">0</span>/5
+      <button id="buyB">Buy next B tier</button>
+    </div>
+    <div id="crosspathNote" class="sub" style="margin-top:6px;"></div>
+  </section>
+
+  <section>
+    <h2>Resolved stats</h2>
+    <table class="stats" id="statsTable"></table>
+  </section>
+
+  <section>
+    <h2>Flags</h2>
+    <div id="flagsList"></div>
+  </section>
+
+  <section>
+    <h2>Enemies (demo)</h2>
+    <button id="spawnNormal">+ Enemy</button>
+    <button id="spawnCamo">+ Camo enemy</button>
+    <button id="spawnFlying">+ Flying enemy</button>
+    <button id="clearEnemies">Clear</button>
+    <div class="sub">Tower auto-fires at valid targets each frame using the real fire()/pierce/execute pipeline. Click the canvas to re-aim the cone (10s cooldown, cone tiers only).</div>
+  </section>
+
+  <section>
+    <h2>Ability (B5)</h2>
+    <button id="triggerAbility">Trigger active ability</button>
+    <div class="sub">Section 7/5.5 TODOs: cooldown and the exact definition of "strongest enemy" are placeholders -- see js/systems/active-ability.js and js/towers/long-range-dps.config.js.</div>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</div>
+
+<!--
+  Classic scripts, no type="module" -- this project runs from file:// (see
+  AGENTS.md). Load order matters: config and systems before the runtime,
+  the runtime before the scene script that drives it.
+-->
+<script src="js/units.js"></script>
+<script src="js/towers/long-range-dps.config.js"></script>
+<script src="js/systems/stat-resolver.js"></script>
+<script src="js/systems/crosspath.js"></script>
+<script src="js/systems/range-filter.js"></script>
+<script src="js/systems/pierce.js"></script>
+<script src="js/systems/execute.js"></script>
+<script src="js/systems/damage-pipeline.js"></script>
+<script src="js/systems/buff-stacks.js"></script>
+<script src="js/systems/reload.js"></script>
+<script src="js/systems/active-ability.js"></script>
+<script src="js/systems/tower-stats.js"></script>
+<script src="js/systems/upgrade-effects.js"></script>
+<script src="js/towers/tower-runtime.js"></script>
+<script src="js/scene/long-range-dps-scene.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,1090 @@
+// ---------------------------------------------------------------------------
+// The index (screen === "index"): a field guide to every tower and enemy,
+// reached from the title menu. Two tabs -- Towers and Enemies.
+//
+// Nothing in here is WRITTEN DOWN a second time. The tower tab is built by
+// constructing a real instance of each roster tower and walking each upgrade
+// path on it: every tier's price, effects line and preview card are recorded
+// from the same panelActions() the in-game panel draws, with the instance
+// standing at the tier below -- so a card here shows the identical
+// before -> after the hover card shows in a run. The enemy tab reads
+// Enemy.TYPES and derives wave appearances from WAVES. Retune anything and
+// this screen follows; there is no copy to go stale.
+//
+// The preview instances are throwaway: parked off-screen, never in `towers`,
+// never updated, and advanced through the towers' own purchase/applyUpgrade
+// entry points BELOW the economy layer -- previewing is not buying, so the
+// player's cash is never touched. A gated tier (the Siphon's B5) is recorded
+// from its refused action and NOT applied, which keeps global one-per-game
+// state (death denial, the healing ledger) untouched too. A test pins that
+// opening the index changes nothing.
+// ---------------------------------------------------------------------------
+
+var Codex = (function () {
+  var tab = "towers";        // "towers" | "enemies"
+  var towerIndex = 0;        // which roster tower is open
+  var enemyIndex = 0;        // which enemy's detail panel is open
+  var pick = null;           // { branch, tier } -- the upgrade being previewed
+  var towerModels = null;    // built on open(), thrown away on the next open()
+  var enemyModels = null;
+
+  function roster() {
+    return BUILD_SLOTS.filter(function (t) { return t !== null; });
+  }
+
+  // --- building the tower models -------------------------------------------
+
+  // Advance a preview instance one tier along `action`'s branch, through the
+  // tower's own application entry point. Config towers expose purchase();
+  // the Smasher exposes applyUpgrade(). Both sit BELOW buyUpgrade in game.js,
+  // which is the point: buyUpgrade is the economy (validation, price, the
+  // player's wallet), and a codex preview must not go anywhere near it --
+  // the Smasher's performAction, for example, spends the real global cash.
+  function advance(t, action) {
+    if (typeof t.purchase === "function") {
+      var result = t.purchase(action.branch);
+      return result && result.ok;
+    }
+    t.applyUpgrade(action.upgradeId);
+    return true;
+  }
+
+  function walkBranch(Type, branch) {
+    var t = new Type(-1000, -1000, path);
+    var tiers = [];
+
+    // Hard cap well above any real path length, so a tower that failed to
+    // advance (or a future one with a cycle) cannot hang the menu.
+    for (var guard = 0; guard < 10; guard++) {
+      var action = t.panelActions().filter(function (a) {
+        return a.tone === "upgrade" && a.branch === branch;
+      })[0];
+      if (!action || action.upgradeId === null) break;    // maxed out
+
+      tiers.push({
+        id: action.upgradeId,
+        price: action.detail,          // "$850", or the gate's reason
+        effects: action.effects || "",
+        reason: action.reason || null,
+        // Resolved NOW, not kept as a thunk: the thunk reads the instance,
+        // and the next loop iteration mutates it. Eager resolution captures
+        // the honest tier-below -> tier before/after.
+        card: cardFor(action)
+      });
+
+      // A tier the tower itself refuses (the Siphon's B5 unlock gate) is
+      // still worth SHOWING -- the card explains the gate -- but must not be
+      // applied: applying would sidestep the refusal and, for B5, touch
+      // one-per-game global state.
+      if (action.reason) break;
+      if (!advance(t, action)) break;
+    }
+    return tiers;
+  }
+
+  function buildTowerModels() {
+    return roster().map(function (Type) {
+      var base = new Type(-1000, -1000, path);
+
+      // Drop the lifetime-total rows (damage dealt, kills): a specimen in a
+      // field guide has no history. Sliced by COUNT off the front rather than
+      // matched by label, so renaming a row cannot silently break this.
+      var totalRows = TowerStats.totals(base).length;
+
+      return {
+        type: Type,
+        name: Type.DISPLAY_NAME,
+        cost: Type.COST,
+        stats: base.statLines().slice(totalRows),
+        branches: (typeof base.panelActions === "function")
+          ? { A: walkBranch(Type, "A"), B: walkBranch(Type, "B") }
+          : null
+      };
+    });
+  }
+
+  // --- building the enemy models -------------------------------------------
+
+  function buildEnemyModels() {
+    return Object.keys(Enemy.TYPES).map(function (id) {
+      var type = Enemy.TYPES[id];
+      var waves = [];
+      var maxHp = type.health;
+      var maxTier = type.fractal ? type.fractal.defaultTier : null;
+
+      // Walked per GROUP, not per wave, since v0.4.7 -- a mixed wave contains
+      // two or three types and each of them has to be able to say it appears
+      // there. `waves` therefore no longer tiles the schedule one-to-one; a
+      // wave shows up in as many lists as it has types, which is the honest
+      // answer to "where do I meet this".
+      //
+      // And walked across EVERY difficulty, not just whichever one was
+      // selected most recently: several enemies are only reachable in Normal
+      // and Hard, and a field guide that hid them from an Easy player would be
+      // lying about the roster it claims to cover.
+      var wavesByDifficulty = {};
+      DIFFICULTY_ORDER.forEach(function (difficultyId) {
+        var found = [];
+        var easy = difficultyId === "easy";
+        DIFFICULTIES[difficultyId].waves.forEach(function (wave, i) {
+          var listed = false;
+          waveGroups(wave).forEach(function (g) {
+            if ((g.type || Enemy.DEFAULT_TYPE) !== id) return;
+            if (!listed) { found.push(i + 1); listed = true; }
+            // HP and tier ceilings come from EASY only, deliberately. The panel
+            // prints Easy's wave list beside them, and a Hard-derived 41 HP
+            // sitting next to a list of Easy waves would be two different
+            // campaigns reported as one. Normal and Hard scale the same bodies
+            // up, so the Easy figure is the honest floor for the route the
+            // numbers describe.
+            if (!easy) return;
+            maxHp = Math.max(maxHp, Enemy.healthOf(g.type, g.health, g.tier));
+            if (type.fractal && g.tier !== undefined) {
+              maxTier = Math.max(maxTier, g.tier);
+            }
+          });
+        });
+        wavesByDifficulty[difficultyId] = found;
+      });
+
+      // `waves` stays Easy's list: it is what the compact row and the detail
+      // panel print, and Easy is the campaign every player meets first. The
+      // complete answer sits beside it for anything that wants all three.
+      waves = wavesByDifficulty.easy;
+
+      var speed = Enemy.BASE_SPEED_ULPS * type.speedMultiplier;
+
+      // The sprite is a REAL enemy, drawn by its own draw() -- what the guide
+      // shows is what walks the road. Parked on this screen's coordinates and
+      // never updated.
+      var sprite = new Enemy(path, undefined, id);
+
+      return {
+        id: id,
+        name: type.displayName,
+        description: type.description || null,
+        sprite: sprite,
+        health: type.health,
+        maxHp: maxHp,
+        speed: speed,
+        multiplier: type.speedMultiplier,
+        // Measured against the reference route, the same yardstick the map
+        // cards use -- not whatever route happens to be loaded.
+        crossing: Maps.referenceLengthUl() / speed,
+        armor: type.armor || 0,
+        defense: type.defense || 0,
+        aoeDamageReduction: type.aoeDamageReduction || 0,
+        sizeScale: (type.sizeScale || 1) * sprite.fractalSizeScale,
+        isCamo: !!type.isCamo,
+        isFlying: !!type.isFlying,
+        // What it does to TOWERS, for the types that fight back. Read through
+        // Enemy.attacksOf, the same resolver attackTowers uses, so a retune
+        // shows here with no edit and the one-or-many form does not matter.
+        attack: Enemy.attacksOf(type)[0] || null,
+        attacks: Enemy.attacksOf(type),
+        attackCount: Enemy.attacksOf(type).length,
+        // The v0.4.7 mechanic blocks, read straight off the type so a retune
+        // shows in the guide with no edit here -- the same arrangement
+        // `attack` already had.
+        shield: type.shield || null,
+        revive: type.revive || null,
+        spawns: type.spawns || null,
+        fractal: type.fractal || null,
+        maxTier: maxTier,
+        phases: type.phases || null,
+        // v0.4.9's block: what this type does for the OTHER enemies on the
+        // road. Read straight off the type like every block above it.
+        support: type.support || null,
+        sprint: type.sprint || null,
+        noBounty: !!type.noBounty,
+        // What killing one at its roster health pays. Enemy.bountyOf is the
+        // same resolver the till and scaled waves use.
+        bounty: type.noBounty ? 0 : Enemy.bountyOf(type.id),
+        waves: waves,
+        wavesByDifficulty: wavesByDifficulty
+      };
+    });
+  }
+
+  // --- geometry ------------------------------------------------------------
+  //
+  // Shared by draw and the click handler, the same rule slotRect and
+  // inspectionLayout follow: one function per rectangle, so what is drawn and
+  // what is clickable can never disagree.
+
+  function tabRect(i) {
+    return { x: VIEW_WIDTH / 2 - 190 + i * 200, y: 78, w: 180, h: 38 };
+  }
+
+  function towerCardRect(i) {
+    return { x: 32, y: 148 + i * 86, w: 240, h: 76 };
+  }
+
+  var TREE_X = { A: 600, B: 780 };
+  var TREE_Y = 196;
+
+  function tierRect(branch, i) {
+    return { x: TREE_X[branch], y: TREE_Y + i * 54, w: 164, h: 46 };
+  }
+
+  // --- state ---------------------------------------------------------------
+
+  function open() {
+    // Rebuilt fresh every visit: thirty-odd throwaway instances cost nothing
+    // once, and a stale cache after a balance retune in the same session
+    // (the sandbox can change UNIT_LENGTH live) is a bug nobody would find.
+    towerModels = buildTowerModels();
+    enemyModels = buildEnemyModels();
+    enemyIndex = 0;
+    enemyScroll = 0;
+    pick = null;
+    screen = "index";
+  }
+
+  function onClick(x, y) {
+    if (pointInRect(x, y, tabRect(0))) { tab = "towers"; return; }
+    if (pointInRect(x, y, tabRect(1))) { tab = "enemies"; pick = null; return; }
+
+    if (tab === "enemies") {
+      // The VIEWPORT gates the rows, not the rows themselves. A scrolled list
+      // has rectangles above and below the box that are still perfectly valid
+      // rectangles; without this test a click on the tab strip above the list
+      // would land on whichever row happens to be sitting off the top of it.
+      if (!pointInRect(x, y, enemyListViewport())) return;
+      for (var enemyI = 0; enemyI < enemyModels.length; enemyI++) {
+        if (pointInRect(x, y, enemyCardRect(enemyI))) {
+          enemyIndex = enemyI;
+          return;
+        }
+      }
+      return;
+    }
+
+    for (var i = 0; i < towerModels.length; i++) {
+      if (pointInRect(x, y, towerCardRect(i))) {
+        towerIndex = i;
+        pick = null;
+        return;
+      }
+    }
+
+    var model = towerModels[towerIndex];
+    if (!model.branches) return;
+
+    ["A", "B"].forEach(function (branch) {
+      model.branches[branch].forEach(function (tier, i) {
+        if (pointInRect(x, y, tierRect(branch, i))) {
+          pick = { branch: branch, tier: i };
+        }
+      });
+    });
+  }
+
+  // --- drawing -------------------------------------------------------------
+
+  function drawTabs(ctx) {
+    ["Towers", "Enemies"].forEach(function (label, i) {
+      var r = tabRect(i);
+      var active = (i === 0) === (tab === "towers");
+      var hot = pointInRect(mouse.x, mouse.y, r);
+
+      ctx.fillStyle = active ? "rgba(140,199,255,0.18)"
+        : (hot ? "rgba(28,30,38,0.95)" : "rgba(28,30,38,0.85)");
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeStyle = active ? "rgba(170,215,255,0.95)" : "rgba(140,179,230,0.35)";
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "600 15px system-ui, sans-serif";
+      ctx.fillStyle = active ? "#cfe3ff" : "rgba(199,209,224,0.6)";
+      ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
+    });
+  }
+
+  function drawTowersTab(ctx) {
+    // The rail: one card per roster tower.
+    towerModels.forEach(function (model, i) {
+      var r = towerCardRect(i);
+      var active = i === towerIndex;
+      var hot = pointInRect(mouse.x, mouse.y, r);
+
+      ctx.fillStyle = active ? "rgba(255,215,110,0.10)"
+        : (hot ? "rgba(32,38,52,0.95)" : "rgba(22,25,34,0.9)");
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeStyle = active ? "rgba(255,215,110,0.85)" : "rgba(140,179,230,0.3)";
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+      model.type.drawIcon(ctx, r.x + 34, r.y + r.h / 2, 22);
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = "600 15px system-ui, sans-serif";
+      ctx.fillStyle = active ? "#ffd76e" : "#c7d1e0";
+      ctx.fillText(model.name, r.x + 64, r.y + r.h / 2 - 10);
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,215,110,0.75)";
+      ctx.fillText("$" + model.cost, r.x + 64, r.y + r.h / 2 + 10);
+    });
+
+    var model = towerModels[towerIndex];
+
+    // Stats column.
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "600 22px system-ui, sans-serif";
+    ctx.fillStyle = "#cfe3ff";
+    ctx.fillText(model.name, 300, 150);
+    ctx.font = "600 15px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,215,110,0.85)";
+    ctx.fillText("$" + model.cost, 300 + ctx.measureText(model.name).width + 60, 156);
+
+    var statW = 270;
+    model.stats.forEach(function (row, i) {
+      var ry = 196 + i * 22;
+      ctx.font = "600 13px system-ui, sans-serif";
+      var value = String(row[1]);
+      var valueW = ctx.measureText(value).width;
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#e6eefc";
+      ctx.fillText(value, 300 + statW, ry);
+      ctx.textAlign = "left";
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.65)";
+      ctx.fillText(fitText(ctx, row[0], statW - valueW - 10), 300, ry);
+    });
+
+    // The upgrade tree, or the honest absence of one.
+    if (!model.branches) {
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.55)";
+      ctx.fillText("No upgrade paths — the " + model.name.toLowerCase() +
+        " is the reference tower.", TREE_X.A, TREE_Y + 4);
+      return;
+    }
+
+    ["A", "B"].forEach(function (branch) {
+      ctx.font = "600 14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(140,230,157,0.85)";
+      ctx.textAlign = "center";
+      ctx.fillText("Path " + branch, TREE_X[branch] + 82, TREE_Y - 24);
+
+      model.branches[branch].forEach(function (tier, i) {
+        var r = tierRect(branch, i);
+        var active = pick && pick.branch === branch && pick.tier === i;
+        var hot = pointInRect(mouse.x, mouse.y, r);
+
+        ctx.fillStyle = active ? "rgba(108,230,133,0.20)"
+          : (hot ? "rgba(108,230,133,0.10)" : "rgba(108,230,133,0.05)");
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.lineWidth = active ? 2 : 1;
+        ctx.strokeStyle = active ? "rgba(140,230,157,0.95)"
+          : "rgba(108,230,133," + (tier.reason ? "0.25" : "0.45") + ")";
+        ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+        ctx.textAlign = "center";
+        ctx.font = "600 13px system-ui, sans-serif";
+        ctx.fillStyle = tier.reason ? "rgba(199,209,224,0.5)" : "#8ce69d";
+        ctx.fillText(tier.id, r.x + r.w / 2, r.y + 15);
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.fillStyle = "rgba(219,231,255,0.75)";
+        ctx.fillText(fitText(ctx, tier.price, r.w - 10), r.x + r.w / 2, r.y + 32);
+      });
+    });
+
+    // The preview card for the picked tier -- the same model the in-game
+    // hover card builds, drawn by the same code.
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    var cardX = 964;
+    if (pick) {
+      var card = model.branches[pick.branch][pick.tier].card;
+      if (card) {
+        var lines = tooltipLines(ctx, card);
+        var h = TOOLTIP_PAD * 2;
+        lines.forEach(function (line) { h += line.h; });
+        var cardY = Math.max(148, Math.min(TREE_Y, VIEW_HEIGHT - 16 - h));
+        drawCardBox({ x: cardX, y: cardY, w: TOOLTIP_WIDTH, h: h,
+          pad: TOOLTIP_PAD, lines: lines });
+      }
+    } else if (model.branches.A.length || model.branches.B.length) {
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.45)";
+      ctx.fillText("Click an upgrade to preview it.", cardX, TREE_Y + 4);
+    }
+  }
+
+  // The enemy tab is a roster beside one large detail panel.
+  //
+  // THE ROWS ARE 50 PIXELS AND THE LIST SCROLLS (2026-08-01, at the owner's
+  // request: "make the ennemies in the side bar bigger and make it so we can
+  // scroll, make it so that about 10 fits in the side bar at the same time").
+  // They were 26 and the whole roster was on screen at once, which fitted but
+  // was a directory rather than a field guide -- the sprite was a nine-pixel
+  // speck and the row had space for a name and two numbers.
+  //
+  // TEN ROWS IS THE UNIT OF THE LAYOUT, not a consequence of it. The viewport
+  // height below is DERIVED from the row count rather than typed in, so
+  // retuning ENEMY_ROW_H moves the box and the scroll clamp together and the
+  // three cannot disagree. At 50 + 3 that is 527 px of the detail panel's 539,
+  // which is why the two columns still bottom out level with each other.
+  //
+  // A taller row buys three things the compact one had no room for: the sprite
+  // at a size you can actually identify, the badge line (the ONE property that
+  // changes how the enemy has to be answered), and the speed beside the
+  // health -- so the list answers "what is this and how fast is it coming"
+  // without the detail panel.
+  var ENEMY_LIST_X = 24;
+  var ENEMY_LIST_Y = 140;
+  var ENEMY_LIST_W = 488;
+  var ENEMY_ROW_H = 50;
+  var ENEMY_ROW_GAP = 3;
+  var ENEMY_VISIBLE_ROWS = 10;
+  var ENEMY_LIST_H = ENEMY_VISIBLE_ROWS * (ENEMY_ROW_H + ENEMY_ROW_GAP) - ENEMY_ROW_GAP;
+
+  // Pixels scrolled off the top. Pixels rather than a row index on purpose:
+  // a wheel notch that moved a whole row would overshoot on a trackpad, and
+  // the clamp below is the only thing that has to know about rows.
+  var enemyScroll = 0;
+
+  function enemyListViewport() {
+    return { x: ENEMY_LIST_X, y: ENEMY_LIST_Y, w: ENEMY_LIST_W, h: ENEMY_LIST_H };
+  }
+
+  // How far the list can be scrolled before the last row is flush with the
+  // bottom of the viewport. Zero (never negative) when the roster fits, which
+  // is what makes the wheel a no-op on a short list rather than a way to push
+  // the whole thing off screen.
+  function enemyScrollMax() {
+    var content = enemyModels
+      ? enemyModels.length * (ENEMY_ROW_H + ENEMY_ROW_GAP) - ENEMY_ROW_GAP
+      : 0;
+    return Math.max(0, content - ENEMY_LIST_H);
+  }
+
+  function clampEnemyScroll() {
+    enemyScroll = Math.max(0, Math.min(enemyScrollMax(), enemyScroll));
+  }
+
+  // The row's rectangle IN SCREEN SPACE -- scroll already applied, so what is
+  // drawn and what is clickable stay the same rectangle (the rule every other
+  // piece of geometry on this screen follows). A row scrolled out of view
+  // simply has a y outside the viewport, and the click handler rejects it by
+  // testing the viewport first.
+  function enemyCardRect(i) {
+    return {
+      x: ENEMY_LIST_X,
+      y: ENEMY_LIST_Y + i * (ENEMY_ROW_H + ENEMY_ROW_GAP) - enemyScroll,
+      w: ENEMY_LIST_W,
+      h: ENEMY_ROW_H
+    };
+  }
+
+  // Scroll the roster under the cursor. The viewport test is what keeps the
+  // wheel from scrolling the list while the pointer is over the detail panel,
+  // where it means nothing.
+  function onWheel(x, y, deltaY) {
+    if (tab !== "enemies") return;
+    if (!pointInRect(x, y, enemyListViewport())) return;
+    enemyScroll += deltaY;
+    clampEnemyScroll();
+  }
+
+  function enemyDetailRect() {
+    return { x: 532, y: ENEMY_LIST_Y, w: VIEW_WIDTH - 556, h: 539 };
+  }
+
+  // The badge line: the ONE property that most changes how this enemy has to
+  // be ANSWERED, rather than how much of it there is. A chain rather than a
+  // stack -- there is room for exactly one line -- and the order is "can I
+  // shoot it" before "does it shoot back" before "what does it do for the
+  // enemies around it" before what it does when hurt.
+  function enemyBadge(model) {
+    if (model.isFlying) return ["FLYING — needs air reach", "rgba(160,225,255,0.95)"];
+    if (model.isCamo) return ["CAMO — needs detection", "rgba(190,255,205,0.9)"];
+    if (model.attack && model.attack.target === "highestDps")
+      return ["HUNTS YOUR BEST TOWER", "rgba(255,224,120,0.95)"];
+    if (model.attack && model.attack.stunSeconds)
+      return ["STUNS YOUR TOWERS", "rgba(255,224,120,0.95)"];
+    if (model.attack) return ["ATTACKS YOUR TOWERS", "rgba(255,150,100,0.95)"];
+    if (model.spawns) return ["BROOD: SHIELDED, $0", "rgba(150,230,190,0.95)"];
+    if (model.fractal) return ["SPLITS INTO FOUR LOWER TIERS", "rgba(132,255,192,0.95)"];
+    // The support types. A shield that stacks and a heal are different
+    // threats and get different lines: one makes the wave harder to start on,
+    // the other makes it harder to finish.
+    if (model.support && model.support.heal)
+      return ["HEALS WOUNDED — $0", "rgba(150,240,180,0.95)"];
+    if (model.support && model.support.shield && model.support.pick === "self")
+      return ["RESHIELDS ITSELF — $0", "rgba(255,205,130,0.95)"];
+    if (model.support && model.support.shield)
+      return ["SHIELDS THE WAVE — $0", "rgba(170,225,255,0.95)"];
+    if (model.sprint) return ["SPRINTS THE OPENING", "rgba(255,205,130,0.95)"];
+    if (model.shield && model.shield.onBreak)
+      return ["SHIELD → DOUBLE SPEED", "rgba(150,225,245,0.95)"];
+    if (model.revive) return ["GETS BACK UP ONCE", "rgba(255,236,170,0.95)"];
+    return null;
+  }
+
+  // The behaviour row: what this one DOES, in the same first-match-wins order
+  // the badge uses, falling back to what killing it pays.
+  //
+  // WRITTEN TIGHT ON PURPOSE, and the labels shorten on a narrow card. The
+  // value column is whatever the label leaves -- about 100 px on the
+  // six-column grid v0.4.9's roster forces -- so "Shields 10 strongest" is a
+  // label that clips its own value into uselessness. Every pair below was
+  // MEASURED against the real card width rather than eyeballed; if a future
+  // type makes one longer, measure it again rather than trusting the ellipsis
+  // to be graceful.
+  function enemyBehaviourRow(model, narrow) {
+    var a = model.attack;
+    if (a && a.stunSeconds && a.damage) {
+      return [narrow ? "Hits towers" : "Hits towers for",
+        a.damage + " +" + a.stunSeconds + "s stun / " + a.intervalSeconds + " s"];
+    }
+    if (a && a.stunSeconds) {
+      return ["Silences towers", a.stunSeconds + "s / " + a.intervalSeconds + " s"];
+    }
+    if (a) {
+      return [narrow ? "Hits towers" : "Hits towers for",
+        a.damage + " every " + a.intervalSeconds + " s"];
+    }
+
+    if (model.spawns) {
+      return ["Spawns", model.spawns.count + " × " +
+        Enemy.typeOf(model.spawns.type).displayName + " / " +
+        model.spawns.intervalSeconds + " s"];
+    }
+
+    if (model.fractal) {
+      return ["Splits on death", model.fractal.splitCount + " × next lower tier"];
+    }
+
+    // Everything a support pulse does, derived from the block rather than
+    // written out per type -- retune the interval and this follows.
+    var s = model.support;
+    if (s && s.heal) {
+      return ["Heals ×" + (s.targets || 1),
+        s.heal.perSecond + "/s for " + s.heal.seconds + " s / " +
+        s.intervalSeconds + " s"];
+    }
+    if (s && s.shield && s.pick === "self") {
+      return ["Own shield", s.shield + " / " + s.intervalSeconds + " s, no stack"];
+    }
+    if (s && s.shield) {
+      return ["Shields ×" + (s.targets || 1),
+        s.shield + " / " + s.intervalSeconds + " s, stacks"];
+    }
+
+    return ["Bounty", "$" + model.bounty];
+  }
+
+  function drawEnemiesGridLegacy(ctx) {
+    enemyModels.forEach(function (model, i) {
+      var r = enemyCardRect(i);
+
+      // The card gets NARROWER as the roster grows -- the grid is three rows
+      // and the columns follow from how many types there are, so v0.4.9's four
+      // extra types took the card from 238 px to 197. Rather than let the name
+      // clip, the sprite column and the type size shrink with it. One
+      // threshold, because there are only two layouts worth having: the roomy
+      // one and the one that still fits "Shieldbearer".
+      var narrow = r.w < 210;
+      var iconX = r.x + (narrow ? 32 : 46);
+      var textX = iconX + (narrow ? 24 : 50);
+      var textW = r.w - (textX - r.x) - 12;
+
+      ctx.fillStyle = "rgba(22,25,34,0.9)";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(140,179,230,0.3)";
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+      // The exhibit: the real sprite, enlarged. Scaling the context rather
+      // than the enemy keeps its draw() untouched. The scale is capped so the
+      // Midboss -- nearly twice a normal's radius before magnification -- does
+      // not burst out of its card; a Swarm speck still gets the full 2x.
+      var sx = iconX;
+      var sy = r.y + 62;
+      var zoom = Math.min(narrow ? 1.6 : 2, (narrow ? 20 : 26) / model.sprite.radiusPx());
+      model.sprite.pos = { x: sx, y: sy };
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-sx, -sy);
+      model.sprite.draw(ctx);
+      ctx.restore();
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.font = "600 " + (narrow ? 14 : 16) + "px system-ui, sans-serif";
+      ctx.fillStyle = "#cfe3ff";
+      ctx.fillText(fitText(ctx, model.name, textW), textX, r.y + 14);
+
+      var badge = enemyBadge(model);
+      if (badge) {
+        ctx.font = "600 " + (narrow ? 10 : 11) + "px system-ui, sans-serif";
+        ctx.fillStyle = badge[1];
+        ctx.fillText(fitText(ctx, badge[0], textW), textX, r.y + (narrow ? 34 : 36));
+      }
+
+      // The health row carries the shield and the second life, because both
+      // are health by any measure that matters -- they are what the player
+      // has to chew through, even though since 2026-07-30 only one of them
+      // pays. Neither gets a row of its own: the card is 168 px tall and five
+      // rows is what fits, which is the same headroom rule the inspection
+      // panel lives under.
+      var healthValue = model.shield
+        ? model.health + "+" + (model.health * model.shield.ratio) + " HP"
+        : model.health + " HP";
+      if (model.revive) healthValue += " ×" + (1 + model.revive.times);
+      if (model.maxHp > model.health) healthValue += "  (→ " + model.maxHp + ")";
+
+      // Rounded for display only: a speed multiplier of 0.55 lands on
+      // 27.500000000000004 in binary floating point, and a field guide should
+      // not print that at the player.
+      function ulps(n) { return Math.round(n * 100) / 100; }
+
+      // A type whose speed CHANGES shows both figures, in the order the player
+      // meets them, before the unit -- "45 → 90 u.l./s" reads as one
+      // measurement with a threshold in it, where a trailing "→ 1.8×" reads as
+      // a second, unrelated number. A sprint runs fast first and settles, so
+      // its pair is the other way round.
+      var speedValue;
+      if (model.sprint) {
+        speedValue = ulps(model.speed * model.sprint.speedMultiplier) + " → " +
+          ulps(model.speed) + " u.l./s";
+      } else if (model.shield && model.shield.onBreak &&
+                 model.shield.onBreak.speedMultiplier) {
+        speedValue = ulps(model.speed) + " → " +
+          ulps(model.speed * model.shield.onBreak.speedMultiplier) +
+          " u.l./s  (" + model.multiplier + "×)";
+      } else {
+        speedValue = ulps(model.speed) + " u.l./s  (" + model.multiplier + "×)";
+      }
+
+      var rows = [
+        ["Health", healthValue],
+        ["Speed", speedValue],
+        model.sprint
+          ? ["Sprints for", "the first " + model.sprint.untilUl + " u.l."]
+          : ["Crossing", "~" + Math.round(model.crossing) + " s"],
+        [narrow ? "Armor / def" : "Armor / defense", model.armor + " / " + model.defense + "%"],
+        enemyBehaviourRow(model, narrow)
+      ];
+      rows.forEach(function (row, j) {
+        var ry = r.y + 58 + j * 19;
+        ctx.font = "12px system-ui, sans-serif";
+        ctx.fillStyle = "rgba(199,209,224,0.65)";
+        var label = fitText(ctx, row[0], r.w * 0.5);
+        ctx.fillText(label, r.x + 14, ry);
+        // The value gets whatever the label left, MEASURED rather than
+        // assumed: on a seven-column grid the old fixed 118 px allowance was
+        // wider than the card's whole value column, so every stat clipped.
+        var room = r.w - 28 - ctx.measureText(label).width - 8;
+        ctx.textAlign = "right";
+        ctx.font = "600 12px system-ui, sans-serif";
+        ctx.fillStyle = "#e6eefc";
+        ctx.fillText(fitText(ctx, row[1], room), r.x + r.w - 14, ry);
+        ctx.textAlign = "left";
+      });
+
+      // Where the player meets it. A type with an EMPTY list is not a bug: the
+      // four v0.4.9 types are deliberately unscheduled, and saying so plainly
+      // is better than a bare "Waves" with nothing after it.
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillStyle = model.waves.length
+        ? "rgba(140,179,230,0.8)" : "rgba(199,209,224,0.45)";
+      ctx.fillText(fitText(ctx,
+        model.waves.length ? "Waves " + model.waves.join(", ") : "Sandbox only — no wave",
+        r.w - 28), r.x + 14, r.y + 58 + 5 * 19 + 3);
+    });
+  }
+
+  function roundStat(n) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function drawEnemySkin(ctx, model, x, y, maxRadius, zoomCap) {
+    var zoom = Math.min(zoomCap, maxRadius / model.sprite.radiusPx());
+    model.sprite.pos = { x: x, y: y };
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-x, -y);
+    model.sprite.draw(ctx, { hideBars: true });
+    ctx.restore();
+  }
+
+  function enemyEffectiveHealth(model) {
+    var total = model.health;
+    if (model.shield) total += model.health * model.shield.ratio;
+    if (model.revive) {
+      total += model.health * model.revive.times * model.revive.healFraction;
+    }
+    return roundStat(total);
+  }
+
+  function enemyVisibility(model) {
+    if (model.isFlying) return "Flying — needs air reach";
+    if (model.isCamo) return "Camouflaged — needs detection";
+    return "Ground — normally visible";
+  }
+
+  function summonCount(spec) {
+    if (!spec || !spec.groups) return 0;
+    return spec.groups.reduce(function (sum, group) { return sum + group.count; }, 0);
+  }
+
+  function attackDescription(attack) {
+    var target = attack.target === "highestDps"
+      ? "the highest-DPS tower" : "nearby towers";
+    var text = "Attacks " + target + " for " + (attack.damage || 0) +
+      " damage every " + attack.intervalSeconds + " s";
+    if (attack.stunSeconds) text += " and stuns for " + attack.stunSeconds + " s";
+    if (attack.windUpSeconds) text += " after a " + attack.windUpSeconds + " s wind-up";
+    if (attack.reachUl !== undefined) text += " within " + attack.reachUl + " u.l.";
+    else if (attack.target === "highestDps") text += " anywhere on the map";
+    if (attack.leap) {
+      text += "; leaps " + attack.leap.distanceUl + " u.l. and hits a " +
+        attack.leap.radiusUl + " u.l. area";
+    }
+    return text + ".";
+  }
+
+  function enemyDescriptions(model) {
+    var lines = [];
+    var hasMechanic = false;
+    if (model.description) lines.push(model.description);
+
+    if (model.isFlying) {
+      lines.push("Ground-only towers cannot target it; attacks need explicit air reach.");
+      hasMechanic = true;
+    } else if (model.isCamo) {
+      lines.push("Invisible to towers without camouflage detection.");
+      hasMechanic = true;
+    }
+
+    if (model.aoeDamageReduction) {
+      lines.push("Takes " + Math.round(model.aoeDamageReduction * 100) +
+        "% less damage from area attacks. Piercing and ordinary shots are unaffected.");
+      hasMechanic = true;
+    }
+
+    model.attacks.forEach(function (attack) {
+      lines.push(attackDescription(attack));
+      hasMechanic = true;
+    });
+
+    if (model.shield) {
+      var shieldHp = roundStat(model.health * model.shield.ratio);
+      var text = "Starts with " + shieldHp + " shield (" + model.shield.ratio +
+        "× base health) before its body can be hurt";
+      if (model.shield.onBreak && model.shield.onBreak.speedMultiplier) {
+        text += "; breaking it multiplies speed by " +
+          model.shield.onBreak.speedMultiplier + "×";
+      }
+      lines.push(text + ".");
+      hasMechanic = true;
+    }
+
+    if (model.revive) {
+      lines.push("Revives " + model.revive.times + " time at " +
+        Math.round(model.revive.healFraction * 100) + "% health" +
+        (model.revive.roots ? " and becomes permanently rooted where it fell." : "."));
+      hasMechanic = true;
+    }
+
+    if (model.spawns) {
+      var spawnType = Enemy.typeOf(model.spawns.type).displayName;
+      var spawnText = "Spawns " + model.spawns.count + " " + spawnType +
+        " every " + model.spawns.intervalSeconds + " s";
+      if (model.spawns.shieldRatio) {
+        spawnText += ", each with a " + model.spawns.shieldRatio + "× health shield";
+      }
+      if (model.spawns.noBounty) spawnText += " and a $0 bounty";
+      lines.push(spawnText + ". Damage to the brood still counts on towers.");
+      hasMechanic = true;
+    }
+
+    if (model.fractal) {
+      var tiers = [];
+      for (var tier = model.fractal.minTier; tier <= model.fractal.maxTier; tier++) {
+        tiers.push("T" + tier + " = " + Enemy.healthOf(model.id, undefined, tier) + " HP");
+      }
+      lines.push(tiers.join(", ") + ".");
+      lines.push("On death, T1–T5 split into four copies of the next lower tier; T0 dies normally. Every copy pays its own tier-scaled kill bounty.");
+      hasMechanic = true;
+    }
+
+    var support = model.support;
+    if (support && support.heal) {
+      lines.push("Every " + support.intervalSeconds + " s, heals the " +
+        support.targets + " most wounded enemies for " + support.heal.perSecond +
+        " HP/s over " + support.heal.seconds + " s.");
+      hasMechanic = true;
+    } else if (support && support.shield) {
+      var supportTarget = support.pick === "self" ? "itself" :
+        "the " + support.targets + " strongest enemies";
+      lines.push("Every " + support.intervalSeconds + " s, gives " + support.shield +
+        " shield to " + supportTarget + (support.stacks ? "; grants stack." :
+          "; this refreshes instead of stacking."));
+      hasMechanic = true;
+    }
+
+    if (model.sprint) {
+      lines.push("Moves at " + model.sprint.speedMultiplier + "× speed for the first " +
+        model.sprint.untilUl + " u.l., then returns to its listed speed.");
+      hasMechanic = true;
+    }
+
+    if (model.phases) {
+      model.phases.forEach(function (phase) {
+        var phaseText = "At " + Math.round(phase.atHealthFraction * 100) + "% health";
+        if (phase.shield) phaseText += ", gains " + phase.shield + " shield";
+        if (phase.speedMultiplier) phaseText += ", speed becomes " + phase.speedMultiplier + "×";
+        if (phase.attackIntervalMultiplier) {
+          phaseText += ", attacks recharge at " + phase.attackIntervalMultiplier + "× time";
+        }
+        if (phase.addAttack) phaseText += ", unlocks another attack";
+        var called = summonCount(phase.summon);
+        if (called) phaseText += " and summons " + called + " enemies";
+        lines.push(phaseText + ".");
+      });
+      hasMechanic = true;
+    }
+
+    if (!hasMechanic && !model.description) {
+      lines.push("No special ability. Its threat comes entirely from health and movement speed.");
+    }
+    return lines;
+  }
+
+  function drawEnemyList(ctx) {
+    var view = enemyListViewport();
+
+    ctx.textBaseline = "middle";
+    ctx.font = "600 10px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(199,209,224,0.55)";
+    ctx.textAlign = "left";
+    ctx.fillText("ENEMY", ENEMY_LIST_X + 62, ENEMY_LIST_Y - 10);
+    ctx.textAlign = "right";
+    ctx.fillText("HP", ENEMY_LIST_X + ENEMY_LIST_W - 84, ENEMY_LIST_Y - 10);
+    ctx.fillText("BOUNTY", ENEMY_LIST_X + ENEMY_LIST_W - 14, ENEMY_LIST_Y - 10);
+
+    // Everything below is drawn INSIDE the viewport. Without the clip a
+    // scrolled row would paint over the header above and off the bottom of the
+    // panel, which is the one way a scrolling list can look broken while being
+    // perfectly correct.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(view.x, view.y, view.w, view.h);
+    ctx.clip();
+
+    enemyModels.forEach(function (model, i) {
+      var r = enemyCardRect(i);
+      // Rows entirely outside the box cost nothing to skip and would otherwise
+      // each run a sprite draw the clip throws away.
+      if (r.y + r.h < view.y || r.y > view.y + view.h) return;
+
+      var active = i === enemyIndex;
+      var hot = pointInRect(mouse.x, mouse.y, r) &&
+        pointInRect(mouse.x, mouse.y, view);
+      ctx.fillStyle = active ? "rgba(140,199,255,0.18)" :
+        (hot ? "rgba(34,40,54,0.96)" :
+          (i % 2 ? "rgba(22,25,34,0.88)" : "rgba(27,30,40,0.88)"));
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeStyle = active ? "rgba(170,215,255,0.9)" : "rgba(140,179,230,0.18)";
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+      // The sprite gets its own column and a cap large enough for the Tyrant
+      // -- the same shape the detail panel's exhibit uses, so the thing in the
+      // list and the thing in the panel are recognisably one enemy.
+      drawEnemySkin(ctx, model, r.x + 30, r.y + r.h / 2, 18, 1.5);
+
+      var textX = r.x + 62;
+      var textW = r.w - (textX - r.x) - 96;
+
+      ctx.textAlign = "left";
+      ctx.font = "600 14px system-ui, sans-serif";
+      ctx.fillStyle = active ? "#e7f2ff" : "#c7d1e0";
+      ctx.fillText(fitText(ctx, model.name, textW), textX, r.y + 17);
+
+      // The badge, or the speed when a type has no single defining property.
+      // Never nothing: a blank second line on a 50 px row reads as a row that
+      // failed to load rather than as an ordinary enemy.
+      var badge = enemyBadge(model);
+      ctx.font = "600 10px system-ui, sans-serif";
+      ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.5)";
+      ctx.fillText(fitText(ctx, badge ? badge[0] : "STANDARD — no special ability",
+        textW), textX, r.y + 34);
+
+      ctx.textAlign = "right";
+      ctx.font = "600 13px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(230,238,252,0.9)";
+      ctx.fillText(String(model.health) + " HP", r.x + r.w - 84, r.y + 17);
+      ctx.font = "600 13px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,215,110,0.9)";
+      ctx.fillText("$" + model.bounty, r.x + r.w - 14, r.y + 17);
+
+      // Speed under the money, so the two columns each carry a "how much" and
+      // a "how fast" rather than the row being three numbers in a line.
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.55)";
+      ctx.fillText(Math.round(model.speed) + " u.l./s", r.x + r.w - 14, r.y + 35);
+    });
+
+    ctx.restore();
+
+    // The scrollbar, only when there is something to scroll. It is the only
+    // thing on screen that says the list continues past the bottom edge, so it
+    // is drawn OUTSIDE the clip and hard against the viewport's right edge.
+    var max = enemyScrollMax();
+    if (max > 0) {
+      var trackX = view.x + view.w + 6;
+      ctx.fillStyle = "rgba(140,179,230,0.12)";
+      ctx.fillRect(trackX, view.y, 5, view.h);
+
+      var thumbH = Math.max(28, view.h * (view.h / (view.h + max)));
+      var thumbY = view.y + (view.h - thumbH) * (enemyScroll / max);
+      ctx.fillStyle = "rgba(170,215,255,0.55)";
+      ctx.fillRect(trackX, thumbY, 5, thumbH);
+    }
+  }
+
+  function drawEnemyDetail(ctx, model) {
+    var r = enemyDetailRect();
+    ctx.fillStyle = "rgba(18,21,30,0.94)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(140,179,230,0.35)";
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+    drawEnemySkin(ctx, model, r.x + 64, r.y + 68, 38, 2.2);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "700 26px system-ui, sans-serif";
+    ctx.fillStyle = "#cfe3ff";
+    ctx.fillText(model.name, r.x + 122, r.y + 20);
+    var badge = enemyBadge(model);
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.6)";
+    ctx.fillText(badge ? badge[0] : "STANDARD ENEMY", r.x + 122, r.y + 58);
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(199,209,224,0.5)";
+    ctx.fillText("Select another enemy from the list to compare it.", r.x + 122, r.y + 82);
+
+    var effective = enemyEffectiveHealth(model);
+    var rows = [
+      ["Base health", model.health + " HP"],
+      ["Highest campaign HP", model.maxHp + " HP"],
+      ["Starting effective HP", effective + " HP"],
+      ["Kill bounty", "$" + model.bounty],
+      ["Movement speed", roundStat(model.speed) + " u.l./s (" + model.multiplier + "×)"],
+      ["Reference crossing", "~" + Math.round(model.crossing) + " s"],
+      ["Flat armor", String(model.armor)],
+      ["Defense", model.defense + "%"],
+      ["AoE reduction", Math.round(model.aoeDamageReduction * 100) + "%"],
+      ["Body size", model.sizeScale + "×"],
+      ["Visibility", enemyVisibility(model)],
+      ["Campaign waves", model.waves.length ? model.waves.join(", ") : "Sandbox only"]
+    ];
+    if (model.fractal) {
+      rows.splice(2, 0, ["Tier range",
+        "T" + model.fractal.minTier + "–T" + model.fractal.maxTier +
+        " (1–" + Enemy.healthOf(model.id, undefined, model.fractal.maxTier) + " HP)"]);
+    }
+
+    var columns = 2;
+    var perColumn = Math.ceil(rows.length / columns);
+    var statTop = r.y + 130;
+    var statColumnW = (r.w - 52) / columns;
+    rows.forEach(function (row, i) {
+      var col = Math.floor(i / perColumn);
+      var line = i % perColumn;
+      var x = r.x + 20 + col * (statColumnW + 12);
+      var y = statTop + line * 24;
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.58)";
+      ctx.fillText(row[0], x, y);
+      ctx.textAlign = "right";
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = "#e6eefc";
+      ctx.fillText(fitText(ctx, row[1], statColumnW * 0.58), x + statColumnW, y);
+    });
+
+    var behaviourY = r.y + 292;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "700 12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(140,199,255,0.9)";
+    ctx.fillText("BEHAVIOUR", r.x + 20, behaviourY);
+    behaviourY += 24;
+
+    ctx.font = "13px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(219,231,245,0.82)";
+    enemyDescriptions(model).forEach(function (description) {
+      if (behaviourY > r.y + r.h - 24) return;
+      var wrapped = wrapText(ctx, description, r.w - 40, 3);
+      wrapped.forEach(function (line) {
+        if (behaviourY > r.y + r.h - 20) return;
+        ctx.fillText(line, r.x + 20, behaviourY);
+        behaviourY += 18;
+      });
+      behaviourY += 7;
+    });
+  }
+
+  function drawEnemiesTab(ctx) {
+    drawEnemyList(ctx);
+    drawEnemyDetail(ctx, enemyModels[enemyIndex] || enemyModels[0]);
+  }
+
+  function draw(ctx) {
+    drawSelectBackdrop();
+    drawBackButton();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#cfe3ff";
+    ctx.font = "700 30px system-ui, sans-serif";
+    ctx.fillText("INDEX", VIEW_WIDTH / 2, 28);
+
+    drawTabs(ctx);
+    if (tab === "towers") drawTowersTab(ctx);
+    else drawEnemiesTab(ctx);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+  }
+
+  return {
+    open: open,
+    onClick: onClick,
+    onWheel: onWheel,
+    draw: draw,
+    // Read-only views for the tests, plus the geometry they click through --
+    // the same rectangles the screen draws, so a test clicks what a player
+    // clicks.
+    tabRect: tabRect,
+    towerCardRect: towerCardRect,
+    tierRect: tierRect,
+    enemyCardRect: enemyCardRect,
+    enemyListViewport: enemyListViewport,
+    enemyVisibleRows: function () { return ENEMY_VISIBLE_ROWS; },
+    enemyScrollMax: enemyScrollMax,
+    enemyDetailRect: enemyDetailRect,
+    state: function () {
+      return { tab: tab, towerIndex: towerIndex, enemyIndex: enemyIndex,
+        enemyScroll: enemyScroll, pick: pick };
+    },
+    models: function () {
+      return { towers: towerModels, enemies: enemyModels };
+    }
+  };
+})();
