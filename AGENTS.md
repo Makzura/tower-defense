@@ -239,10 +239,21 @@ file. Two consequences:
 - **No `fetch`, no `XMLHttpRequest`, no external asset loading.** Also blocked
   over `file://`.
 
-**Everything is drawn procedurally.** No images, no audio, no font files. Each
-entity has a `draw(ctx)` method using canvas primitives. This is what lets the
-game run from a bare folder. If art is added later, keeping this property will
-need real thought — probably inline SVG or base64 data URIs.
+**Nothing is fetched.** No audio, no font files, and nothing that needs a
+server. This is what lets the game run from a bare folder by double-click.
+
+This used to read "everything is drawn procedurally, no images", and that
+stopped being true: `assets/*.png` ships a full set of Blender-rendered sprite
+sheets, and they work from `file://` because they load through `Image()` rather
+than `fetch`. The rule that actually holds is the one above. Two ways to add
+art, both proven in the shipping build:
+
+- **Geometry**, either exported from Blender into `js/gl/models/*.js` or built
+  at runtime from `GLGeometry`'s primitives. Costs nothing to load.
+- **Sprite sheets** through `Image()`, as the 2D fallback pack does.
+
+What is still forbidden is `fetch`, `XMLHttpRequest` and anything requiring a
+build step or a server.
 
 **Keep `update()` free of DOM access.** Simulation and rendering stay separate.
 Any future replay, fast-forward, or headless balancing work depends on it.
@@ -311,7 +322,11 @@ js/gl/gl-camera.js  OrbitCamera: middle-drag orbit about the cursor, right-drag
                      pan, wheel zoom-to-cursor. Owns `viewport` (the game's
                      logical 1280x720 space) and the projection cache
 js/gl/gl-math.js    perspective, look-at, one multiply, ray/plane. Column-major
-js/gl/gl-geometry.js procedural primitives: ground, road, box, sphere, cylinder
+js/gl/gl-geometry.js procedural primitives: ground, road, box, boxAt, sphere,
+                     cylinder, frustum -- plus `scenery`, the ten authored board
+                     prop kinds, and a per-vertex EMISSIVE channel on Builder so
+                     runtime geometry can carry a lit surface like an exported
+                     model does
 js/gl/gl-models.js  the model registry the generated js/gl/models/*.js register
                      into; expands per-triangle data to per-vertex once, lazily
 js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
@@ -3416,8 +3431,11 @@ combination. It intentionally lives beside the gunner rather than inside it:
 ## Building a model that looks like the ones that already work
 
 The Arcane Sniper, the Rifleman and the four enemies set the bar. The Warbringer
-and the Siphon are still placeholder cylinders, and every future enemy has the
-same problem to solve. This is the contract. A model that meets it needs no
+now has all seven tiers built through `td_mesh` (no Blender needed for it). **The
+Siphon is still a placeholder cylinder**, fifteen of the nineteen enemy types
+are still untextured spheres, and so is the Tyrant — the wave-35 boss the whole
+campaign ends on. Every future enemy has the same problem to solve. This is the
+contract. A model that meets it needs no
 special-casing anywhere in the renderer; a model that skips a clause needs a
 patch in `js/gl/gl-parts.js`, which is a worse outcome for everyone.
 

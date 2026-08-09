@@ -13,6 +13,61 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-09 (latest) — the board had no props, its decks were the wrong
+colour, and the road had no sides.**
+
+Three findings from a visual quality pass over the whole project. All three are
+presentation only; no simulation value, collision volume, path or stat moved,
+and all five suites report the same figures as before (105/3, 182/30, 70/1,
+45/0, 2 sandbox failures).
+
+**THE SIX MAPS EACH AUTHOR NINE SCENERY PROPS AND THE 3D BOARD DREW NONE OF
+THEM.** `buildMapMesh` read `Maps.ENVIRONMENTS[id].zones` and never `.models`,
+so every route ran across a bare plane while the map chooser's own thumbnails
+showed a decorated one. `gl-geometry.js` gains a scenery vocabulary --
+`frustum`, `boxAt` and `scenery` -- covering all ten authored kinds (antenna,
+server, reactor, console, pylon, tank, vent, holo, battery, coil), and
+`buildMapMesh` bakes them into the STATIC map mesh. They never move, animate or
+turn, so nine props cost no draw calls and nothing per frame; measured cost is
++0.13 ms GPU at the light scene.
+
+Each prop is built from its own map's palette, so Mana Coil's props are violet
+and Sigil Lattice's are green with no second table to keep in step. Value ladder
+per the model contract: dark shell, ley accent as the only bright note.
+
+**`GLGeometry.Builder` now carries a per-vertex emissive channel**, the same one
+the Blender exporter emits, so runtime-built geometry can own a lit surface too.
+The map pass drives `uGlow` in the map's accent colour and resets it immediately
+afterwards. This is the emissive-geometry rule applied to the board: a reactor
+core glows and is occluded by whatever stands in front of it, rather than being
+a disc painted over the top.
+
+**EVERY ZONE IN THE GAME RENDERED AS `metalDark`, AND `P.panel` WAS NEVER
+VISIBLE ANYWHERE.** The skirt around a zone slab was drawn both larger in x/y
+AND proud of the slab -- for a deck the slab spanned z 0.4..9.4 and the skirt
+8.1..9.5 -- so the skirt's top face occluded the slab's completely. Measured
+before: three separate slab tops all read (27,47,60), which is `#132733` through
+this pipeline to within 1/255. They now read (26,63,81), and floor-to-slab
+luminance separation goes from **7.6% to 37.6%** -- out of the sub-8% "one dark
+blob" band this project has already been burned by once on the Rifleman's
+palette. The skirt is now a rim below the slab top rather than a lid over it,
+which is what its size always implied.
+
+**THE ROAD HAD NO SIDES, ON ANY MAP, EVER.** Both kerb quads in
+`GLGeometry.road` were wound with their normals pointing INWARD, and
+`CULL_FACE`/`BACK` is enabled in `GLRenderer`, so both were culled on every
+frame. Worked through for a road along +X at half-width 10 and lift 7: the +Y
+kerb's `u x v` came out (0,-700,0) and the -Y kerb's (0,+700,0), both pointing
+back across the ribbon. That file's own header promises "a raised ribbon with
+visible kerbs... real height, which is most of why the board reads as 3D the
+moment the camera tilts" -- none of which had ever been on screen. Both windings
+reversed; a kerb band now reads at luminance 36 against floor 41 and deck 71.
+
+The lesson worth keeping: **a culled face and an absent face look identical, and
+neither throws.** Winding is not checkable by looking at a still of the thing
+from one angle, which is how this survived. Cross-product the quad by hand, or
+turn `CULL_FACE` off for one frame and diff.
+
 **2026-08-09 (late) — the hammer came out of his chest, and the check that
 should have caught it was worthless.**
 
