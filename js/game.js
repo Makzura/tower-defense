@@ -2071,6 +2071,21 @@ function whyCannotBuild(x, y, type) {
     return "off the map";
   }
 
+  // NOT ACROSS TWO LEVELS.
+  //
+  // The board has real height -- raised decks, bays and the road ribbon -- and
+  // a footprint that bridges an edge puts the tower half on the deck and half
+  // hanging over the drop. There is no pose that reads correctly there, because
+  // the model has one ground plane and the tile under it has two.
+  //
+  // Asked of the 3D board, which owns the height, and only when it is running:
+  // with WebGL unavailable the world is flat and every spot is level, so the
+  // 2D fallback keeps exactly the placement rules it has always had.
+  if (typeof World3D !== "undefined" && World3D.isEnabled() &&
+      !World3D.isLevelUnder(x, y, ul(type.FOOTPRINT_RADIUS_UL))) {
+    return "not level here";
+  }
+
   return null;
 }
 

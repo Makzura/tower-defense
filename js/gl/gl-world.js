@@ -47,7 +47,128 @@ var World3D = (function () {
   // emissive scenery in the map's colour without re-deriving the theme.
   var mapPalette = null;
 
+  // WHAT AN ACTOR IS STANDING ON.
+  //
+  // The board has real height -- a deck top sits at z 9.4, the road ribbon at
+  // 7 -- but every actor used to be drawn at z 0, so a tower built on a deck
+  // sank to its knees in it and every enemy on the road walked buried up to the
+  // axles in the track. The models were never wrong; nothing ever told them how
+  // high the floor was under them.
+  //
+  // A coarse height grid, stamped once when the map mesh is built. A lookup is
+  // two integer divides and an array read, which is what makes it affordable to
+  // ask per actor per frame with a hundred enemies on the board. Rebuilt only
+  // when the map changes, exactly like the mesh it is derived from.
+  var heightField = null;
+  var HEIGHT_CELL = 6;
+
+  function buildHeightField(minX, minY, maxX, maxY, env, routePaths, roadWidth) {
+    var w = Math.max(1, Math.ceil((maxX - minX) / HEIGHT_CELL));
+    var h = Math.max(1, Math.ceil((maxY - minY) / HEIGHT_CELL));
+    var data = new Float32Array(w * h);          // 0 = bare floor
+    var f = { minX: minX, minY: minY, w: w, h: h, data: data };
+
+    // Highest surface wins. Where a raised deck and the road overlap, the deck
+    // is what is actually visible and so it is what a body rests on.
+    // A cell counts as covered when its CENTRE is inside the rect. Rounding
+    // outward instead grows every slab by up to a cell on each side, which put
+    // deck-height ground almost twenty pixels out into open floor and made the
+    // level test below answer for a deck that was not there.
+    function stampRect(x0, y0, x1, y1, z) {
+      var i0 = Math.max(0, Math.round((x0 - minX) / HEIGHT_CELL - 0.5));
+      var i1 = Math.min(w - 1, Math.round((x1 - minX) / HEIGHT_CELL - 0.5));
+      var j0 = Math.max(0, Math.round((y0 - minY) / HEIGHT_CELL - 0.5));
+      var j1 = Math.min(h - 1, Math.round((y1 - minY) / HEIGHT_CELL - 0.5));
+      for (var j = j0; j <= j1; j++) {
+        for (var i = i0; i <= i1; i++) {
+          var px = minX + (i + 0.5) * HEIGHT_CELL, py = minY + (j + 0.5) * HEIGHT_CELL;
+          if (px < x0 || px > x1 || py < y0 || py > y1) continue;
+          var k = j * w + i;
+          if (z > data[k]) data[k] = z;
+        }
+      }
+    }
+
+    // Zones, using the SAME tops the geometry above emits, so the height an
+    // actor stands at and the surface it is standing on cannot drift apart.
+    ((env && env.zones) || []).forEach(function (z) {
+      var zh = ZONE_HEIGHT[z.kind];
+      if (zh === undefined || !z.w || !z.h) return;
+      var zw = ul(z.w / AUTHORED_PX_PER_UL), zd = ul(z.h / AUTHORED_PX_PER_UL);
+      var cx = ul(z.x / AUTHORED_PX_PER_UL) + zw / 2;
+      var cy = ul(z.y / AUTHORED_PX_PER_UL) + zd / 2;
+      var thickness = Math.max(1.5, Math.abs(zh));
+      var top = (zh < 0 ? -0.2 : 0.4) + thickness;
+      stampRect(cx - zw / 2 - 3.5, cy - zd / 2 - 3.5,
+                cx + zw / 2 + 3.5, cy + zd / 2 + 3.5, top - 0.6);   // the rim
+      stampRect(cx - zw / 2, cy - zd / 2, cx + zw / 2, cy + zd / 2, top);
+    });
+
+    // The road, stamped as a real band rather than a bounding box, or every
+    // corner would raise a square of open floor beside it.
+    var half = roadWidth / 2;
+    routePaths.forEach(function (p) {
+      var pts = p.points;
+      for (var s = 0; s + 1 < pts.length; s++) {
+        var ax = pts[s].x, ay = pts[s].y, bx = pts[s + 1].x, by = pts[s + 1].y;
+        var dx = bx - ax, dy = by - ay;
+        var len2 = dx * dx + dy * dy;
+        var i0 = Math.max(0, Math.floor((Math.min(ax, bx) - half - minX) / HEIGHT_CELL));
+        var i1 = Math.min(w - 1, Math.ceil((Math.max(ax, bx) + half - minX) / HEIGHT_CELL));
+        var j0 = Math.max(0, Math.floor((Math.min(ay, by) - half - minY) / HEIGHT_CELL));
+        var j1 = Math.min(h - 1, Math.ceil((Math.max(ay, by) + half - minY) / HEIGHT_CELL));
+        for (var j = j0; j <= j1; j++) {
+          for (var i = i0; i <= i1; i++) {
+            var px = minX + (i + 0.5) * HEIGHT_CELL, py = minY + (j + 0.5) * HEIGHT_CELL;
+            var t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+            t = t < 0 ? 0 : (t > 1 ? 1 : t);
+            var qx = px - (ax + dx * t), qy = py - (ay + dy * t);
+            if (qx * qx + qy * qy > half * half) continue;
+            var k = j * w + i;
+            if (ROAD_LIFT > data[k]) data[k] = ROAD_LIFT;
+          }
+        }
+      }
+    });
+
+    return f;
+  }
+
+  // The height of the surface under (x, y). Presentation only -- nothing in the
+  // simulation reads it, and every distance the game measures is still flat.
+  function groundHeightAt(x, y) {
+    var f = heightField;
+    if (!f) return 0;
+    var i = Math.floor((x - f.minX) / HEIGHT_CELL);
+    var j = Math.floor((y - f.minY) / HEIGHT_CELL);
+    if (i < 0) i = 0; else if (i >= f.w) i = f.w - 1;
+    if (j < 0) j = 0; else if (j >= f.h) j = f.h - 1;
+    return f.data[j * f.w + i];
+  }
+
+  // Does a footprint sit on ONE level? A tower straddling a deck edge ends up
+  // half planted and half hanging in the air, which is the read the placement
+  // rule below exists to refuse. Samples the rim of the footprint as well as
+  // its centre, because a small tower can bridge an edge with its middle clear.
+  function levelUnder(x, y, radius) {
+    var lo = Infinity, hi = -Infinity;
+    for (var a = 0; a < 8; a++) {
+      var th = Math.PI * 2 * a / 8;
+      var z = groundHeightAt(x + Math.cos(th) * radius, y + Math.sin(th) * radius);
+      if (z < lo) lo = z;
+      if (z > hi) hi = z;
+    }
+    var c = groundHeightAt(x, y);
+    if (c < lo) lo = c;
+    if (c > hi) hi = c;
+    return { min: lo, max: hi, flat: (hi - lo) < 0.75 };
+  }
+
   var ROAD_WIDTH_UL = 21.875;
+  // How proud of the floor the road ribbon sits. Read by BOTH the mesh and the
+  // height field, so the surface an enemy is drawn standing on is the same
+  // number as the surface that was built under it.
+  var ROAD_LIFT = 7;
   // Mirrors js/game.js. Zones are authored in that space and `Maps.routesOf`
   // has already applied it to route points.
   var AUTHORED_PX_PER_UL = 1.04;
@@ -155,7 +276,7 @@ var World3D = (function () {
 
     var roadWidth = ul(ROAD_WIDTH_UL);
     routePaths.forEach(function (p) {
-      GLGeometry.road(g, p.points, roadWidth, 7, P.roadTop, P.roadSide);
+      GLGeometry.road(g, p.points, roadWidth, ROAD_LIFT, P.roadTop, P.roadSide);
     });
 
     // The authored scenery. Each map names nine props and until now the 3D
@@ -174,6 +295,8 @@ var World3D = (function () {
     });
 
     bounds = { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+    heightField = buildHeightField(minX, minY, maxX, maxY, env, routePaths,
+      roadWidth);
     return g.build(renderer);
   }
 
@@ -626,14 +749,16 @@ var World3D = (function () {
         // warbringerFullCircle) and is drawn at its authored facing forever.
         var drawYaw = warbringerFullCircle(t) ? 0 : (t.aim || 0);
         renderer.setGlow(towerGlow(t), towerGlowTint(t));
-        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, 0, frame);
+        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1,
+          groundHeightAt(t.x, t.y), frame);
         renderer.setGlow(0, null);
       } else {
         // Stand-in cylinder, breathing very slightly while its cooldown runs
         // so it reads as a live machine rather than scenery.
         var pulse = 1 + 0.02 * Math.sin((state.now || 0) * 4 + t.x * 0.01);
-        renderer.draw(towerCylinder(t).mesh, t.x + kx, t.y + ky, 0,
-          t.aim || 0, (t.footprintPx || 12) * 1.9 * pulse);
+        renderer.draw(towerCylinder(t).mesh, t.x + kx, t.y + ky,
+          groundHeightAt(t.x, t.y), t.aim || 0,
+          (t.footprintPx || 12) * 1.9 * pulse);
       }
 
       if (t.recruits) {
@@ -649,8 +774,8 @@ var World3D = (function () {
           var rFrames = rm && rm.frames.length ? rm.frames.length : 1;
           var rFrame = rc.holding ? 0
             : Math.floor((rc.progress || 0) / 26 * rFrames);
-          drawActor(recruitModel(rc), rc.x, rc.y, rc.facing, 1, 0, rFrame,
-            recruitPose(rc));
+          drawActor(recruitModel(rc), rc.x, rc.y, rc.facing, 1,
+            groundHeightAt(rc.x, rc.y), rFrame, recruitPose(rc));
         }
       }
     }
@@ -674,13 +799,15 @@ var World3D = (function () {
         var em = GLModels.get(renderer, model);
         var frames = em && em.frames.length ? em.frames.length : 1;
         var walk = Math.floor((e.progress || 0) / stride * frames);
-        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, 0, walk);
+        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11,
+          groundHeightAt(e.pos.x, e.pos.y), walk);
       } else {
         // Sphere types ROLL their bounce instead: squash on the ground beat,
         // stretch at the top, which is the one animation a ball actually has.
         var beat = Math.abs(Math.sin(phase));
         renderer.draw(enemySphere(e).mesh, e.pos.x, e.pos.y,
-          beat * radius * 0.22, yaw, radius * (0.94 + beat * 0.10));
+          groundHeightAt(e.pos.x, e.pos.y) + beat * radius * 0.22, yaw,
+          radius * (0.94 + beat * 0.10));
       }
     }
     // Projectiles are NOT drawn here. They were, as one grey cube each, until
@@ -2462,6 +2589,16 @@ var World3D = (function () {
     drawWorld: drawWorld,
     drawOverlays: drawOverlays,
     screenToWorld: screenToWorld,
+    // The board's height under a point, and whether a footprint sits on ONE
+    // level. Presentation-derived, but the placement rule reads the second one:
+    // a tower bridging a deck edge is half planted and half in mid-air, and
+    // that is a picture no amount of shading fixes. Both answer safely when
+    // there is no 3D board at all, so the 2D fallback keeps its old behaviour.
+    groundHeightAt: function (x, y) { return enabled ? groundHeightAt(x, y) : 0; },
+    isLevelUnder: function (x, y, radius) {
+      if (!enabled || !heightField) return true;
+      return levelUnder(x, y, radius).flat;
+    },
     resize: resize
   };
 })();
