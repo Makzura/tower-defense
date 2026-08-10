@@ -28,6 +28,25 @@ jobs:
         working-directory: TD_0.5.0
         run: node tools/ci-check.js
 
+      # Three winding bugs turned up during the visual pass and all three were
+      # found by eye: the road kerbs, td_mesh.ball and GLGeometry.sphere. With
+      # CULL_FACE/BACK an inward winding culls the near surface and shows the
+      # inside of the far one, which reads as a shading problem rather than a
+      # geometry one. Cheap to test, expensive to spot.
+      # Python only so the audit can reach the td_mesh half. Without it the tool
+      # degrades to auditing the JS primitives and says so, rather than passing
+      # silently on half the surface -- but half an audit is how ball stayed
+      # inside out through an entire art pass.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Primitives are wound outward
+        working-directory: TD_0.5.0
+        env:
+          PYTHON: python
+        run: node tools/check-winding.js
+
   models:
     # The generated geometry is only trustworthy if it is reproducible. Every
     # model under js/gl/models/ is emitted by a pure-Python script in
