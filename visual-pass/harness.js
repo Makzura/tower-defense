@@ -269,7 +269,9 @@
     // Wraps World3D.drawWorld rather than reaching inside it: by the time the
     // wrapper runs, the frame's view-projection is already bound and the
     // renderer will happily take more draws in the same pass.
-    showcase: function (items, gapPx) {
+    showcase: function (items, gapPx, opts) {
+      TDObs._showcaseGlow = (opts && opts.glow) || 0;
+      TDObs._showcaseTint = (opts && opts.tint) || null;
       if (!TDObs._showcaseHooked) {
         var orig = World3D.drawWorld;
         World3D.drawWorld = function (ctx, state) {
@@ -277,7 +279,20 @@
           var list = TDObs._showcase;
           if (list && list.length) {
             var r = World3D.renderer();
-            r.setGlow(1, null);
+            // GLOW OFF BY DEFAULT, and this was a real bug worth naming.
+            //
+            // This used to be setGlow(1, null). With no tint, the renderer
+            // falls back to GLRenderer.LEY (0.31,0.89,0.82) and ADDS it to
+            // every emissive vertex -- so every model in the row came out the
+            // same cool grey whatever its palette said, measured at R-B = -23
+            // across tiers that are meant to run from dull cloth to solid gold.
+            // Silhouette reviews survived it because they run on flat grey
+            // builds anyway; any COLOUR review through showcase was blind.
+            //
+            // Opt in per row instead, for the cases that genuinely want to see
+            // emission driven: TDObs.showcase(items, gap, { glow: 1 }).
+            var g = (TDObs._showcaseGlow || 0);
+            if (g) r.setGlow(g, TDObs._showcaseTint || null);
             for (var i = 0; i < list.length; i++) {
               var it = list[i];
               var m = GLModels.get(r, it.model);
@@ -285,7 +300,7 @@
               r.draw(m.gpu, it.x, it.y, it.z || 0, it.yaw || 0,
                      m.unitsToPx * (it.scale || 1));
             }
-            r.setGlow(0, null);
+            if (g) r.setGlow(0, null);
           }
           return out;
         };

@@ -368,14 +368,22 @@ var World3D = (function () {
   // The Siphon's five bodies. It has seven tiers and five models, so 4 wears
   // 3's body -- the tier that adds a rate or a ratio does not change what he is
   // carrying, and inventing a body for it would say something untrue.
+  // ELEVEN bodies, one per tier. The Siphon is the exception to the house rule
+  // that tiers 1 and 2 are crosspath marks over an unchanged body: its brief
+  // gives every tier its own state, because the whole arc IS the body -- path A
+  // is a petrification climbing from the fingertips inward and path B is a robe
+  // progressively opening. There is nothing to mark; there is only what he has
+  // become. So each tier resolves to its own model and none is shared.
   function siphonGroup(tower) {
     var bought = tower.core && tower.core.purchased;
     var a = bought && bought.A ? bought.A : 0;
     var b = bought && bought.B ? bought.B : 0;
-    if (a >= 5) return "a5";
-    if (a >= 3) return "a3";
-    if (b >= 5) return "b5";
-    if (b >= 3) return "b3";
+    // The higher branch wins, and A is checked first only because the two can
+    // never both exceed 2 -- the crosspath rule caps the secondary at tier 2.
+    if (a >= 3) return "a" + Math.min(a, 5);
+    if (b >= 3) return "b" + Math.min(b, 5);
+    if (a >= 1) return "a" + a;
+    if (b >= 1) return "b" + b;
     return "base";
   }
 

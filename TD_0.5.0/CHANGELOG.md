@@ -13,6 +13,31 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-10 — the Summoner's three effect modules are wired in.**
+
+`js/gl/blub-circles.js`, `js/gl/blub-projectiles.js` and `js/gl/blub-systems.js`
+had been written but were loaded by nothing and had never executed. They are now
+in both script lists (after `js/gl/gl-world.js`, and the two lists stay
+identical) and called from `js/gl/gl-world.js` at the sites each file documents:
+
+* `install()` binds both helper-taking modules and builds `BLUB_FX_API` once;
+  `ensureMap()` resets all three on a map change, so a new board keeps none of
+  the old one's splatters, circles or brass.
+* `drawWorld()` runs `BlubFXSystems.update` before anything is drawn, adds
+  `BlubFXCircles.descentLift` and `BlubFXShots.recoil` to a summoned body's own
+  transform, and draws `dyingBodies()` as real geometry between the tower loop
+  and the enemy loop.
+* `drawOverlays()` lays the ground group down in one bottom-to-top order —
+  death stains, shot decals, summoning circles, swarm threads — then the weaken
+  sigils immediately before the health bars, then the air group (`drawAir`,
+  `drawDeaths`) between `drawShots` and `drawEffects`. All at top level, never
+  inside a `withGround`: each module pins its own ground per mark.
+
+Nothing in the three files was modified; `js/blub.js` was not touched. Measured
+at 1280x720 on a 7-maxed-Summoner board (95 blubs, 100 enemies, 72 live circles,
+~95 threads): `draw()` 1.40 ms without the modules, 2.30 ms with them — **+0.90
+ms**, against the 6.0 ms ceiling in `visual-pass/PERF.md`.
+
 **2026-08-10 — the rail box becomes the switch, and five corrections around it.**
 
 All six from the owner, in one pass, and four of them are him catching something

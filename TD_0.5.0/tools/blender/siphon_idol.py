@@ -706,10 +706,16 @@ def _cowl(s, body, lk):
     # PANELS, not rods. Built as tapers first, the fall came out as a horn
     # standing off the back of the skull; cloth has to be WIDE ACROSS and THIN
     # THROUGH or it reads as hardware at any distance.
-    plate(s, "chute_0", (-0.048, -0.110, 1.448 + lift * 0.40),
+    # AND IT HAS TO TOUCH THE COWL. At y = -0.110 the top of the fall cleared
+    # the back of the hood by about 0.09, and from a quarter turn that gap read
+    # as a dark plank propped up behind the head -- the contact sheet showed a
+    # stick, not cloth. The panel now starts INSIDE the cowl shell and only its
+    # lower half is in open air, so the fall is attached at the point it falls
+    # from. The rear silhouette it buys is unchanged; the join is what moved.
+    plate(s, "chute_0", (-0.012, -0.022, 1.448 + lift * 0.40),
           (-0.30, -0.95, 0.0), (0.038, 0.164, 0.300), lk["cowl"], body,
           pitch=-0.46)
-    plate(s, "chute_1", (-0.122, -0.238, 1.226), (-0.40, -0.92, 0.0),
+    plate(s, "chute_1", (-0.092, -0.168, 1.238), (-0.40, -0.92, 0.0),
           (0.032, 0.128, 0.255), lk["cowl_fold"], body, pitch=-0.32)
 
     # THE OPENING. Darkness, never a face. Pushed a hair proud of the surface so
@@ -718,8 +724,15 @@ def _cowl(s, body, lk):
     face = _hood_surface(rings, VOID_DEG, 0.62)
     look = (math.cos(math.radians(VOID_DEG)), math.sin(math.radians(VOID_DEG)),
             0.0)
+    # SIZED TO BE SEEN. At 0.128 x 0.116 the opening was four pixels on a 57 px
+    # figure, and on the poor tiers -- where it is cloth_dark on cloth_worn and
+    # not purple on gold -- it vanished completely: base, a1, a2 and a3 all read
+    # as a blank cone with no face at all, which is the one thing a hood must
+    # not do. A hood's mouth is most of the front of the hood, so it is sized
+    # like one. The value break is the palette's darkest against its largest
+    # surface, and it is the only thing carrying "there is a head in there".
     plate(s, "hood_void", _add(face, look, 0.012), look,
-          (0.030, 0.128, 0.116), lk["void"], body, pitch=0.34)
+          (0.032, 0.168, 0.152), lk["void"], body, pitch=0.34)
     for n, (deg, t) in enumerate(((22.0, 0.20), (62.0, 0.13), (102.0, 0.22))):
         p = _hood_surface(rings, deg, t)
         lo = (math.cos(math.radians(deg)), math.sin(math.radians(deg)), 0.0)
@@ -827,11 +840,20 @@ def _sceptre(s, body, lk):
 def _foot(s, body, lk):
     """One bare foot under the short panel. It is the cheapest thing on the
     model and it does most of the "poor and human" work -- and it is the first
-    thing the gold takes."""
+    thing the gold takes.
+
+    IT NEEDS AN ANKLE. The open side of the hem is lifted 0.235 clear of the
+    ground, which is the whole point of the asymmetric hem -- but a foot alone
+    under that gap has 0.18 of empty air above it and reads, in the contact
+    sheet, as a loose brick lying on the tile beside the tower. The shin closes
+    the gap: it starts inside the foot and ends inside the cloth, so the eye
+    joins the two and the lifted hem becomes a leg showing rather than a hole."""
     if not lk["foot"]:
         return
-    td.box(s, "foot", (0.098, 0.140, 0.052), (0.128, 0.238, 0.030),
+    td.box(s, "foot", (0.098, 0.140, 0.052), (0.118, 0.222, 0.030),
            (0, 0, -0.24), lk["foot"], body)
+    taper(s, "ankle", (0.112, 0.206, 0.040), (0.096, 0.170, 0.268),
+          0.038, 0.030, lk["foot"], body, 4)
 
 
 # --- the ground: the gold pour, world_fixed ---------------------------------

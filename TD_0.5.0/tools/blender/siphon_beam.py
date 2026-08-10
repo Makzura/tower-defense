@@ -34,6 +34,13 @@
 #           twist also accumulates toward the tower
 #   SPOUT   the body itself swells at the tower end and ends in an intake
 #
+# and one thing it must NEVER say, which cost this file a rebuild: NOTHING MAY
+# POINT AWAY FROM THE TOWER. The first build put a four-pronged forward-raking
+# `bite` at the enemy end of five states, and at true scale that end is a
+# leaf-bladed spearhead -- one shape, larger and cleaner than every knot on the
+# shaft put together, saying the opposite of everything else in the model. Both
+# ends are now BLUNT and every barb rakes inward. See `bite` and `spout`.
+#
 # Every state uses at least two. `thread` -- the weakest state, the one a player
 # meets first with no explanation -- uses all four, quietly. FLOW_CUES is the
 # table, it is printed by main(), and a state with fewer than two entries is a
@@ -386,6 +393,28 @@ def _s(t):
     return max(0.0, min(1.0, 1.0 - t))
 
 
+def swallowed(t):
+    """SIZE OF A RIDER THAT HAS PASSED THE INTAKE, as a fraction.
+
+    Every rider -- knot, grain, constriction, link -- is authored a little PAST
+    t = 0 so the scroll loop has nothing to pop in from. That was fine while
+    they were small, and became the worst artefact in the lot the moment they
+    were made to GROW toward the tower: the last one sits beyond the mouth,
+    at the biggest radius the law can produce, unattached to the body, and a
+    capture of `thread`, `ramp` and `chain` all showed the same thing -- a pale
+    wedge floating past the tower end, which is exactly the free-standing icon
+    the socle forbids, and it was the largest single shape on the base beam.
+
+    It cannot simply be deleted (the loop needs it) and it must not merely
+    shrink everywhere (the growth toward the tower IS the cue). So it is EATEN:
+    full size right up to the mouth, then collapsing over the last fifth of a
+    knot spacing. The tower does not hold what it has swallowed.
+    """
+    if t >= 0.04:
+        return 1.0
+    return max(0.10, 1.0 - (0.04 - t) * 9.0)
+
+
 def law_radius(t, r_target, r_tower, power):
     """r(t) = r_target + (r_tower - r_target) * (1 - t)^power.
 
@@ -455,8 +484,14 @@ def knots(s, root, flows, pts, ts, spacing, radius_of, twist_of, mat, profile,
     enemy, and they are handed to `stretch` flow groups by position so a curved
     beam still scrolls along itself.
 
-    A knot is authored 30% proud of the body it rides, which is what makes it a
-    knot in a rope rather than a bulge in a tube.
+    A knot is authored proud of the body it rides, which is what makes it a
+    knot in a rope rather than a bulge in a tube -- and it is proud by MORE the
+    nearer the tower it is, so the growth is the body's taper and the knot's
+    own swelling multiplied together rather than the taper alone. Measured off
+    the built mesh, `thread`'s knots used to run 0.032 -> 0.057, a 1.8x that no
+    capture could show; they now run 0.021 -> 0.078, 3.7x, which is the
+    difference between a cue that is present in the numbers and one that is
+    present on the screen.
     """
     made = []
     span = t_from - t_to
@@ -465,10 +500,24 @@ def knots(s, root, flows, pts, ts, spacing, radius_of, twist_of, mat, profile,
         c = _sample(pts, ts, t)
         # The wedge runs along the local tangent: tail toward the target,
         # point toward the tower.
-        tan = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.02)),
-                         _sample(pts, ts, max(0.0, t - 0.02))))
-        r = radius_of(max(0.0, min(1.0, t))) * proud
-        half = spacing * 0.34
+        #
+        # SAMPLED UNCLAMPED. This used to read `min(1.0, t + 0.02)` and
+        # `max(0.0, t - 0.02)`, and the knots are deliberately authored PAST
+        # both ends of the run so the scroll loop has no pop-in -- so at
+        # t = 1.06 both clamps fired, the two samples came back in the wrong
+        # order and that knot's wedge pointed at the ENEMY. One knot in
+        # fourteen, at the end of the beam, pointing the wrong way. _sample
+        # extrapolates outside [0, 1] on purpose; let it.
+        tan = _norm(_sub(_sample(pts, ts, t + 0.02),
+                         _sample(pts, ts, t - 0.02)))
+        tc = max(0.0, min(1.0, t))
+        sw = swallowed(t)
+        r = radius_of(tc) * proud * (0.72 + 0.60 * (1.0 - tc)) * sw
+        # Its LENGTH goes with it. Shrinking only the radius left the swallowed
+        # knot as a hair-thin needle a knot-length long, sticking out past the
+        # intake -- less of a badge than the wedge was, but still a mark
+        # floating off the end of the beam, and a capture showed it plainly.
+        half = spacing * 0.34 * (0.28 + 0.72 * sw)
         tip = _add(c, _mul(tan, -half))
         tail = _add(c, _mul(tan, half))
         g = min(stretch - 1, int((1.0 - max(0.0, min(1.0, t))) * stretch))
@@ -552,45 +601,80 @@ def spout(s, node, origin, tan, r, mat, lip, vane, scale=1.0, vanes=3):
     number of them, at UNEVEN angles, of UNEQUAL length, all on the same side.
     A ring of four even vanes would put the whole intake back on the lathe.
     """
-    # KEPT DELIBERATELY SMALL. Built at 2.35x the body radius this was a flat
-    # disc facing the camera at the tower end, and a bright disc on a beam is
-    # exactly the interface indicator the socle forbids -- it stopped reading as
-    # matter the moment it got big enough to notice. At 1.8x it is a swelling in
-    # the line, which is what "like a spout" means and all it may mean.
-    a = _add(origin, _mul(tan, 0.020 * scale))
-    b = _add(origin, _mul(tan, 0.115 * scale))
-    collar(s, "spout_bell", _lerp(a, b, 0.5), tan, r * 1.80 * scale,
-           r * 1.05 * scale, _len(_sub(b, a)), mat, node, 7)
-    ring(s, "spout_lip", a, tan, r * 1.62 * scale, r * 0.28 * scale, lip, node,
+    # WHY THE VANES ARE SWEPT LIPS AND NOT BOXES ANY MORE. They were three flat
+    # plates standing r*1.55 OFF the line, and a capture of `thread` at the
+    # tower end showed exactly what that is on screen: a pale triangular shard
+    # floating beside the beam, unattached to anything, the single most
+    # icon-like element in the eight states. The socle forbids an icon at the
+    # tower end more sharply than anywhere else, because that is where the eye
+    # goes. They are now three lips SWEPT INTO the mouth -- they start out wide
+    # on the run side and are drawn down into the throat, so they read as
+    # matter being swallowed and the silhouette they make is a swelling rather
+    # than a badge.
+    #
+    # THE BELL IS ALSO LONGER. At 0.095 along the run it was a knurled boss,
+    # read as a spear's ferrule; over 0.150 it is a flare, which is what "like
+    # water at a spout" means. Still well inside REV_SPAN, which _check_revolved
+    # proves rather than trusts.
+    a = _add(origin, _mul(tan, 0.015 * scale))
+    b = _add(origin, _mul(tan, 0.165 * scale))
+    collar(s, "spout_bell", _lerp(a, b, 0.5), tan, r * 1.95 * scale,
+           r * 1.00 * scale, _len(_sub(b, a)), mat, node, 7)
+    ring(s, "spout_lip", a, tan, r * 1.70 * scale, r * 0.30 * scale, lip, node,
          8, 4)
-    # The vanes: uneven angles, uneven lengths, one side.
+    # The lips: uneven angles, uneven lengths, one side, and every one of them
+    # narrowing TOWARD the mouth so the taper is one more statement of flow.
     fu = _norm(_sub((0, 0, 1), _mul(tan, _dot((0, 0, 1), tan))))
     fv = _cross(tan, fu)
     for i, (ang, ln) in enumerate(
             [(0.42, 1.00), (1.35, 0.68), (2.55, 0.86)][:vanes]):
-        off = _add(_mul(fu, math.cos(ang) * r * 1.55 * scale),
-                   _mul(fv, math.sin(ang) * r * 1.55 * scale))
-        at = _add(_lerp(a, b, 0.42), off)
-        td.box(s, "spout_vane_%d" % i,
-               (r * 0.30 * scale, r * 1.1 * scale * ln, r * 2.0 * scale * ln),
-               at, (0.0, math.pi * 0.5 - math.asin(max(-1.0, min(1.0, tan[2]))),
-                    math.atan2(tan[1], tan[0]) + ang * 0.30), vane, node)
+        off = _add(_mul(fu, math.cos(ang) * r * scale),
+                   _mul(fv, math.sin(ang) * r * scale))
+        p0 = _add(_add(b, _mul(tan, 0.030 * scale * ln)), _mul(off, 1.70 * ln))
+        p1 = _add(_lerp(a, b, 0.45), _mul(off, 1.30 * ln))
+        p2 = _add(_add(a, _mul(tan, -0.020 * scale)), _mul(off, 0.45))
+        sweep(s, "spout_lip_%d" % i, [p0, p1, p2],
+              [r * 0.13 * scale * ln, r * 0.24 * scale * ln,
+               r * 0.30 * scale], [ang, ang + 0.5, ang + 1.1], "BEAD",
+              [vane, vane, vane], node)
 
 
-def bite(s, node, at, tan, r, mat, mat2, prongs=3, spread=1.7, length=1.9):
-    """THE TARGET END. Prongs of UNEQUAL length at UNEVEN angles, sunk into the
-    enemy. It is the only part of the beam that is not moving toward the tower,
-    and it is deliberately small: the socle forbids reading an impact here."""
+def bite(s, node, at, tan, r, mat, mat2, prongs=3, spread=1.7, length=1.15):
+    """THE TARGET END, AND IT RAKES BACKWARD.
+
+    THIS WAS THE WORST THING IN THE LOT AND IT IS WORTH WRITING DOWN. The
+    prongs used to project FORWARD -- `at + tan*r*1.9 + off` -- four of them
+    converging past the contact point. On a capture of `thread` at true scale
+    that end of the beam is a leaf-bladed SPEARHEAD, and a spearhead is a
+    direction: it said the tower was stabbing outward at the enemy, which is
+    the exact opposite of the one thing the socle says a player must read
+    unaided. It also made the whole state read as a weapon rather than a
+    siphon, and it came close to the forbidden impact indicator.
+
+    They now rake BACK toward the tower from a root just past the contact
+    point: barbs that have gone in and are being dragged inward, so the only
+    points at the far end lead the eye up the beam. Nothing projects past the
+    bite, so the silhouette there is BLUNT -- a taper that ends in a point is
+    an arrow whatever the knots on the shaft are doing.
+    """
     fu = _norm(_sub((0, 0, 1), _mul(tan, _dot((0, 0, 1), tan))))
     fv = _cross(tan, fu)
-    bead_ball(s, "bite_knot", r * 1.25, at, mat2, node, 6, 3)
+    # Pulled back behind the contact point, and smaller: it is a grip, not a
+    # head. Nothing here may be the biggest thing on the beam.
+    bead_ball(s, "bite_knot", r * 0.88, _add(at, _mul(tan, -r * 0.30)), mat2,
+              node, 6, 3)
     for i, (ang, ln) in enumerate([(0.30, 1.00), (2.10, 0.62), (3.90, 0.84),
                                    (5.10, 0.48)][:prongs]):
         off = _add(_mul(fu, math.cos(ang) * r * spread),
                    _mul(fv, math.sin(ang) * r * spread))
-        tip = _add(_add(at, _mul(tan, r * length * ln)), _mul(off, ln))
-        sweep(s, "bite_prong_%d" % i, [at, tip], [r * 0.72, r * 0.14],
-              [ang, ang + 0.4], "BEAD", [mat, mat], node)
+        root = _add(at, _mul(tan, r * 0.34))
+        mid = _add(_add(at, _mul(tan, -r * length * 0.45 * ln)),
+                   _mul(off, 0.75 * ln))
+        tip = _add(_add(at, _mul(tan, -r * length * 1.30 * ln)),
+                   _mul(off, 1.05 * ln))
+        sweep(s, "bite_prong_%d" % i, [root, mid, tip],
+              [r * 0.62, r * 0.40, r * 0.09], [ang, ang + 0.3, ang + 0.7],
+              "BEAD", [mat, mat, mat], node)
 
 
 # ---------------------------------------------------------------------------
@@ -626,7 +710,16 @@ def state_thread(s, node, root):
     n = 20
     ts = taus(n)
     pts = run_path(HANDS, TARGET, n, sag=0.030, sway=0.022)
-    rad = lambda t: law_radius(t, 0.0205, 0.0370, 2.6)
+    # THE POWER IS 1.35 AND IT USED TO BE 2.6, WHICH IS WHY THE SWELL DID NOT
+    # READ. (1 - t)^2.6 is still only 0.16 at the middle of the run: nine
+    # tenths of the beam sat at the target radius and the whole taper happened
+    # in the last quarter, so a capture showed a line of constant thickness
+    # with a lump on the end -- and a constant line with a lump on the end has
+    # no direction in it. At 1.35 the swell is 39% of the way by mid-run, which
+    # is a taper the eye can follow along the WHOLE beam. The endpoints moved
+    # with it (0.0180 at the enemy, 0.0400 at the hands) so the ratio is 2.2x
+    # rather than 1.8x while the thread stays as thin as the socle asks.
+    rad = lambda t: law_radius(t, 0.0180, 0.0400, 1.35)
     tw = lambda t: law_twist(t, 0.62, 1.0)
     radii = [rad(t) for t in ts]
     twists = [tw(t) for t in ts]
@@ -654,8 +747,8 @@ def state_thread(s, node, root):
           proud=1.55)
 
     tan = _norm(_sub(TARGET, HANDS))
-    spout(s, node, HANDS, tan, 0.0370, "skin_dark", "cloth_dark", "cloth_worn")
-    bite(s, node, TARGET, tan, 0.0205, "skin_dark", "cloth_dark", 3)
+    spout(s, node, HANDS, tan, 0.0400, "skin_dark", "cloth_dark", "cloth_worn")
+    bite(s, node, TARGET, tan, 0.0180, "skin_dark", "cloth_dark", 3)
     return flows
 
 
@@ -678,7 +771,11 @@ def state_ramp(s, node, root):
     n = 15
     ts = taus(n)
     pts = run_path(HANDS, TARGET, n, sag=0.024, sway=0.030)
-    rad = lambda t: law_radius(t, 0.0300, 0.0625, 1.8)
+    # 1.40 for the same reason `thread`'s is 1.35: the swell has to be spread
+    # along the run to be a direction rather than a lump. The twist keeps its
+    # steep 1.85 -- THAT one is supposed to pile up near the hands, and it is
+    # the property this state is named for.
+    rad = lambda t: law_radius(t, 0.0300, 0.0625, 1.40)
     tw = lambda t: law_twist(t, 3.40, 1.85)
     radii = [rad(t) for t in ts]
     twists = [tw(t) for t in ts]
@@ -770,8 +867,8 @@ def state_saturated(s, node, root):
     for i in range(hel_n):
         t = 1.04 - 1.10 * i / float(hel_n - 1)
         c = _sample(pts, ts, t)
-        tan = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
-                         _sample(pts, ts, max(0.0, t - 0.03))))
+        tan = _norm(_sub(_sample(pts, ts, t + 0.03),
+                         _sample(pts, ts, t - 0.03)))
         fu = _norm(_sub((0, 0, 1), _mul(tan, _dot((0, 0, 1), tan))))
         fv = _cross(tan, fu)
         tc = max(0.0, min(1.0, t))
@@ -938,15 +1035,15 @@ def state_gold(s, node, root):
         t = 1.05 - 1.11 * i / 14.0
         c = _sample(pts, ts, t)
         tc = max(0.0, min(1.0, t))
-        tan = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
-                         _sample(pts, ts, max(0.0, t - 0.03))))
+        tan = _norm(_sub(_sample(pts, ts, t + 0.03),
+                         _sample(pts, ts, t - 0.03)))
         fu = _norm(_sub((0, 0, 1), _mul(tan, _dot((0, 0, 1), tan))))
         fv = _cross(tan, fu)
         a = 0.9 + 2.3 * i
         k = rad(tc) * 0.95
         at = _add(c, _add(_mul(fu, math.cos(a) * k), _mul(fv, math.sin(a) * k)))
         g = min(3, int((1.0 - tc) * 4))
-        e = rad(tc) * (0.52 + 0.10 * (i % 3))
+        e = rad(tc) * (0.52 + 0.10 * (i % 3)) * swallowed(t)
         td.box(s, "grain_%d" % i, (e * 1.5, e, e * 0.8), at,
                (0.4 + i * 0.5, 0.3 * i, a), "gold" if i % 3 else "white_warm",
                flows[g].node)
@@ -1035,8 +1132,8 @@ def state_column(s, node, root):
     for i in range(8):
         t = 0.96 - 0.92 * i / 7.0
         c = _sample(pts, ts, t)
-        tanl = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
-                          _sample(pts, ts, max(0.0, t - 0.03))))
+        tanl = _norm(_sub(_sample(pts, ts, t + 0.03),
+                          _sample(pts, ts, t - 0.03)))
         fu = _norm(_sub((0, 0, 1), _mul(tanl, _dot((0, 0, 1), tanl))))
         fv = _cross(tanl, fu)
         for j, a0 in enumerate((0.42, 1.35, 2.35)):
@@ -1079,23 +1176,35 @@ def state_tendon(s, node, root):
     """
     n = 12
     ts = taus(n)
-    pts = run_path(HANDS, TARGET, n, sag=0.115, sway=0.085, kink=0.022,
+    # DEEPER THAN IT WAS. At sag 0.115 the capture showed a nearly level line
+    # with bumps on it -- the socle asks for "courbure lente de cable", and a
+    # cable under load hangs further than that. 0.150 down and 0.105 across is
+    # a curve you can see is a curve at a glance.
+    pts = run_path(HANDS, TARGET, n, sag=0.150, sway=0.105, kink=0.022,
                    kink_n=6.0)
-    rad = lambda t: law_radius(t, 0.0400, 0.0720, 1.45)
+    rad = lambda t: law_radius(t, 0.0400, 0.0720, 1.30)
     tw = lambda t: law_twist(t, 2.10, 1.20)
     radii = [rad(t) for t in ts]
     twists = [tw(t) for t in ts]
 
-    # THE SHEATH, IN BANDS. Eleven of them, each two stations long, with a real
-    # gap between: the windows are how the cords show through.
+    # THE SHEATH, IN BANDS, AND THE BANDS ARE NOT ALL THE SAME LENGTH.
+    #
+    # Eight equal bands at equal spacing is a segmented body, and the capture
+    # said so: it read as a caterpillar, not a tendon. Regular repetition is
+    # the thing that makes a shape into an animal. The lengths below repeat
+    # nothing and the windows between them are now WIDER than the shortest
+    # band, which is what makes the cords underneath the subject of this state
+    # rather than a detail hidden behind an opaque tube.
+    BANDS = (0.050, 0.079, 0.041, 0.070, 0.056, 0.086, 0.046, 0.065)
     for b in range(8):
-        t0 = 0.02 + b * 0.123
-        t1 = t0 + 0.076
+        t0 = 0.015 + b * 0.124
+        t1 = t0 + BANDS[b]
         bp, br, bt = [], [], []
         for k in range(3):
             t = t0 + (t1 - t0) * k / 2.0
             bp.append(_sample(pts, ts, t))
-            br.append(rad(t) * (1.16 if k == 1 else 1.00))
+            br.append(rad(t) * ((1.22 if b % 3 == 0 else 1.09)
+                                if k == 1 else 0.98))
             bt.append(tw(t))
         sweep(s, "sheath_%d" % b, bp, br, bt, "SHEATH",
               ["tendon", "membrane", "membrane"], node)
@@ -1103,9 +1212,16 @@ def state_tendon(s, node, root):
     # THE CORDS. Three, unequal, one alive. They are the body of this state --
     # BODY_STARTS records the largest, because it is the one that leaves the
     # hands.
+    # THE LIVE NERVE IS THE THICKEST OF THE THREE NOW, AND IT RIDES HIGHEST.
+    # It was 0.20 of the body radius at 0.44 of it out from the axis -- under
+    # the sheath, and at true scale simply not there. Path B's whole colour
+    # identity is a sick rose luminescence against oil black, and a capture of
+    # this state showed uniform mauve with no rose in it at all. At 0.34 thick
+    # and 0.64 out it sits IN the windows, which is where it has to be to be
+    # seen through them.
     for c, (phase, k_r, mat, thick) in enumerate(
-            [(0.0, 0.34, "abyss", 0.40), (2.2, 0.52, "rose_dim", 0.30),
-             (4.3, 0.44, "rose_sick", 0.20)]):
+            [(0.0, 0.30, "abyss", 0.46), (2.2, 0.56, "rose_dim", 0.28),
+             (4.3, 0.64, "rose_sick", 0.34)]):
         cp, cr = [], []
         for i, t in enumerate(ts):
             tan = _norm(_sub(pts[min(n - 1, i + 1)], pts[max(0, i - 1)]))
@@ -1129,20 +1245,25 @@ def state_tendon(s, node, root):
         t = 1.04 - 1.09 * i / 6.0
         tc = max(0.0, min(1.0, t))
         c = _sample(pts, ts, t)
-        tanl = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
-                          _sample(pts, ts, max(0.0, t - 0.03))))
+        tanl = _norm(_sub(_sample(pts, ts, t + 0.03),
+                          _sample(pts, ts, t - 0.03)))
         g = min(3, int((1.0 - tc) * 4))
-        ring(s, "constrict_%d" % i, c, tanl, rad(tc) * (0.92 + 0.34 * (1 - tc)),
-             rad(tc) * 0.26, "oil_black", flows[g].node, 6, 3)
+        sw = swallowed(t)
+        ring(s, "constrict_%d" % i, c, tanl,
+             rad(tc) * (0.86 + 0.46 * (1 - tc)) * sw,
+             rad(tc) * 0.20 * sw, "oil_black", flows[g].node, 6, 3)
         # One asymmetric nodule per constriction: a valve, on alternating sides.
         fu = _norm(_sub((0, 0, 1), _mul(tanl, _dot((0, 0, 1), tanl))))
         fv = _cross(tanl, fu)
         a = 1.1 + 1.9 * i
-        k = rad(tc) * 1.25
-        bead_ball(s, "nodule_%d" % i, rad(tc) * 0.34,
+        k = rad(tc) * 1.25 * sw
+        # Two rings, so the valve is a faceted bipyramid rather than a sphere:
+        # cheaper (this state was 24 triangles over the 1100 budget once the
+        # barbs were rebuilt) and, at a nodule's size, less round is better.
+        bead_ball(s, "nodule_%d" % i, rad(tc) * 0.34 * sw,
                   _add(c, _add(_mul(fu, math.cos(a) * k),
                                _mul(fv, math.sin(a) * k))),
-                  "rose_dim" if i % 2 else "membrane", flows[g].node, 4, 3)
+                  "rose_dim" if i % 2 else "membrane", flows[g].node, 4, 2)
 
     # THE VALVE at the hands: an offset bulb with two unequal ducts entering it.
     tan = _norm(_sub(pts[1], pts[0]))
@@ -1159,11 +1280,11 @@ def state_tendon(s, node, root):
                                       _mul(off, 0.35))],
               [0.026 * ln, 0.038], [ang, ang + 0.4], "BEAD",
               ["oil_black", "oil_black"], node)
-    bead_ball(s, "valve_nerve", 0.030, _add(HANDS, _mul(tan, 0.020)),
+    bead_ball(s, "valve_nerve", 0.044, _add(HANDS, _mul(tan, 0.020)),
               "rose_sick", node, 5, 3)
 
     bite(s, node, TARGET, _norm(_sub(pts[-1], pts[-3])), 0.0400, "abyss",
-         "rose_dim", 3, spread=2.1, length=2.2)
+         "rose_dim", 3, spread=2.1, length=1.40)
     return flows
 
 
@@ -1223,11 +1344,16 @@ def state_chain(s, node, root):
             t = 1.03 - 1.07 * i / float(cnt - 1)
             tc = max(0.0, min(1.0, t))
             c = _sample(pts, ts, t)
-            tanl = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
-                              _sample(pts, ts, max(0.0, t - 0.03))))
-            r = rad(tc) * 1.32
-            tip = _add(c, _mul(tanl, -spacing * 0.34))
-            tail = _add(c, _mul(tanl, spacing * 0.34))
+            tanl = _norm(_sub(_sample(pts, ts, t + 0.03),
+                              _sample(pts, ts, t - 0.03)))
+            # Only the trunk's links can pass the hands, so only segment 0
+            # needs swallowing -- but applying it everywhere costs nothing and
+            # means a re-authored chain cannot reintroduce the artefact.
+            sw = swallowed(t) if seg == 0 else 1.0
+            r = rad(tc) * 1.32 * sw
+            half = spacing * 0.34 * (0.28 + 0.72 * sw)
+            tip = _add(c, _mul(tanl, -half))
+            tail = _add(c, _mul(tanl, half))
             sweep(s, "link_%d_%d" % (seg, i), [tip, tail], [r * 0.16, r],
                   [tw(tc), tw(tc) + 0.55], "BEAD",
                   ["rose_dim" if i % 2 else "membrane"] * 2, fl.node)
@@ -1249,8 +1375,12 @@ def state_chain(s, node, root):
             fv = _cross(tan_out, fu)
             off = _add(_mul(fu, math.cos(ang) * r_target * 1.8 * ln),
                        _mul(fv, math.sin(ang) * r_target * 1.8 * ln))
+            # RAKED BACK, like the bite's barbs and for the same reason: a
+            # hook that points along the outgoing segment is an arrowhead
+            # aimed at the next enemy, and the chain is meant to be dragging
+            # everything inward, not spearing its way outward.
             sweep(s, "hook_%d_%d" % (seg, i),
-                  [b, _add(_add(b, _mul(tan_out, r_target * 1.4 * ln)), off)],
+                  [b, _add(_add(b, _mul(tan_out, -r_target * 1.4 * ln)), off)],
                   [r_target * 0.60, r_target * 0.12], [ang, ang + 0.5],
                   "BEAD", ["oil_black"] * 2, node)
 
@@ -1282,9 +1412,11 @@ GROW, SCROLL, CHEVRON, SPOUT = "grow", "scroll", "chevron", "spout"
 
 FLOW_CUES = {
     "thread": ([GROW, SCROLL, CHEVRON, SPOUT],
-               "knots grow 0.032->0.057 toward the hands, scroll one spacing "
-               "per loop, each a wedge pointing at the hands; the body swells "
-               "1.8x and ends in a spout"),
+               "knots grow 0.021->0.078 toward the hands (3.7x, and spread "
+               "along the whole run rather than piled in the last quarter), "
+               "scroll one spacing per loop, each a wedge pointing at the "
+               "hands; the body swells 2.2x into a flared intake and the "
+               "enemy end is BLUNT -- nothing points outward anywhere"),
     "ramp": ([GROW, SCROLL, CHEVRON, SPOUT],
              "twist accumulates as (1-t)^1.85 so the surface visibly turns "
              "faster near the hands; amber knots grow and climb; counter-ply "
@@ -1332,7 +1464,7 @@ SPEC_STATES = {
     "thread": {
         "profile": "THREAD", "sections": 20,
         "radius": {"formula": "r_target + (r_tower - r_target)*(1-t)^p",
-                   "r_target": 0.0205, "r_tower": 0.0370, "p": 2.6},
+                   "r_target": 0.0180, "r_tower": 0.0400, "p": 1.35},
         "twist": {"formula": "total*(1-t)^p", "total": 0.62, "p": 1.0},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.55,
                    "gain": 0.35, "p": 1.0, "toward": "tower"},
@@ -1346,9 +1478,9 @@ SPEC_STATES = {
     "ramp": {
         "profile": "ROPE", "sections": 15,
         "radius": {"formula": "lerp(thread, saturated, rampT); baked rampT=0.60",
-                   "r_target": 0.0300, "r_tower": 0.0625, "p": 1.8,
+                   "r_target": 0.0300, "r_tower": 0.0625, "p": 1.40,
                    "rampT": 0.60,
-                   "rampT_ends": {"0.0": [0.0205, 0.0370],
+                   "rampT_ends": {"0.0": [0.0180, 0.0400],
                                   "1.0": [0.0455, 0.0830]}},
         "twist": {"formula": "total*(1-t)^p", "total": 3.40, "p": 1.85},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.80,
@@ -1433,19 +1565,23 @@ SPEC_STATES = {
     "tendon": {
         "profile": "SHEATH", "sections": 12,
         "radius": {"formula": "r_target + (r_tower - r_target)*(1-t)^p",
-                   "r_target": 0.0400, "r_tower": 0.0720, "p": 1.45},
+                   "r_target": 0.0400, "r_tower": 0.0720, "p": 1.30},
         "twist": {"formula": "total*(1-t)^p", "total": 2.10, "p": 1.20},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.40,
                    "gain": 0.75, "p": 1.2, "toward": "tower"},
         "beads": {"spacing": 0.190, "count": 7, "shape": "constriction",
                   "mat": "oil_black",
                   "size_law": "r(t)*(0.92 + 0.34*(1-t)) -- peristaltic"},
-        "curve": {"sag": 0.115, "sway": 0.085, "kink": 0.022, "kink_n": 6.0},
-        "sheath": {"bands": 8, "gap": 0.047,
+        "curve": {"sag": 0.150, "sway": 0.105, "kink": 0.022, "kink_n": 6.0},
+        "sheath": {"bands": 8, "pitch": 0.124,
+                   "lengths": [0.050, 0.079, 0.041, 0.070, 0.056, 0.086,
+                               0.046, 0.065],
                    "why": "translucency is BUILT, not alpha: you see the cords "
-                          "through the windows"},
-        "cords": [["abyss", 0.34, 0.40], ["rose_dim", 0.52, 0.30],
-                  ["rose_sick", 0.44, 0.20]],
+                          "through the windows. The lengths are all different "
+                          "because eight equal bands read as a segmented "
+                          "animal, not as a sheath over a bundle."},
+        "cords": [["abyss", 0.30, 0.46], ["rose_dim", 0.56, 0.28],
+                  ["rose_sick", 0.64, 0.34]],
         "mats": ["tendon", "membrane", "oil_black", "abyss", "rose_dim",
                  "rose_sick"],
         "emits": True, "pulses": "transfer only (peristalsis)",

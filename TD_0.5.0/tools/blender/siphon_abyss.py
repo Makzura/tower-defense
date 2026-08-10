@@ -337,19 +337,23 @@ def _hem_raw(th):
     would have solved the slope problem too, but every one of them is even in
     u, which would make the hem mirror-symmetric about its own long axis. The
     cosine phases keep an odd component: the two flanks of the train come out
-    0.285 and 0.322, so they are not the same shape as each other.
+    0.345 and 0.382, so they are not the same shape as each other.
 
     THE sin^2 TERM IS WHAT MAKES IT A TRAIN RATHER THAN A SKIRT. It is zero at
     u = 0 and at u = pi as well, so it cannot touch the socle's numbers either,
-    and it pulls both flanks in by 0.105. Without it the flanks sat at 0.39 and
-    0.43, the plan view was a wide oval, and the figure read as a tent with the
-    disc under its hem showing as a plinth the man was standing on.
+    and it pulls both flanks in. Without it the flanks sat at 0.39 and 0.43,
+    the plan view was a wide oval, and the figure read as a tent.
     """
     u = th - TRAIN
-    return (0.505 + 0.155 * math.cos(u) - 0.105 * math.sin(u) ** 2
+    return (0.505 + 0.155 * math.cos(u) - 0.045 * math.sin(u) ** 2
             + math.sin(u) * (0.085 * math.cos(2.0 * u + 1.35)
                              + 0.062 * math.cos(3.0 * u - 1.90)
                              + 0.038 * math.cos(5.0 * u + 1.70)))
+
+
+def _top_raw(th):
+    return (1.0 + 0.150 * math.cos(2.0 * th) + 0.070 * math.cos(th)
+            + 0.060 * math.sin(3.0 * th + 0.80) - 0.050 * math.sin(th))
 
 
 HEM_PEAK = max(_hem_raw(math.tau * i / 1440.0) for i in range(1440))
@@ -357,28 +361,47 @@ if abs(HEM_PEAK - HEM_LONG) > 0.002:
     raise SystemExit("the hem's widest point is %.4f, not the socle's %.2f"
                      % (HEM_PEAK, HEM_LONG))
 
+# BOTH OUTLINES ARE NORMALISED TO MEAN 1, and this is not tidiness.
+#
+# `body_radius` blends the hem outline into the shoulder outline as it climbs.
+# Un-normalised, the hem's flank read 0.63 of its own scale and the shoulder's
+# flank read 1.20 of its own, so blending between them made the robe get WIDER
+# across as it went UP -- the skirt pinched at the ground and swelled at the
+# waist, and no width table could fix it because the width table was not the
+# thing doing it. With both profiles at mean 1, WIDTH is a true mean radius per
+# height and the taper is exactly the numbers in that table and nothing else.
+#
+# The socle's hem survives anyway: the mean of `_hem_raw` is 0.4825 in closed
+# form (every cos and every sin*cos term integrates to zero, leaving 0.505 less
+# half the sin^2 coefficient), so WIDTH's first entry IS that mean and the ring
+# comes out at 0.660 on the train and 0.350 in front by construction.
+HEM_MEAN = 0.505 - 0.045 * 0.5
+TOP_MEAN = 1.0
+
 
 def hem_unit(th):
-    return _hem_raw(th) / 0.505
+    return _hem_raw(th) / HEM_MEAN
 
 
 def top_unit(th):
     """The shoulder outline. Wide across x (cos 2th), and pushed off centre by
     terms that are ODD under x -> -x, so the two shoulders are not the same
-    width -- the left one reaches 0.294 and the right one 0.222."""
-    r = (1.0 + 0.200 * math.cos(2.0 * th) + 0.070 * math.cos(th)
-         + 0.060 * math.sin(3.0 * th + 0.80) - 0.050 * math.sin(th))
-    return r
+    width -- the left one reaches 0.259 and the right one 0.213."""
+    return _top_raw(th) / TOP_MEAN
 
 
-# THE 0.66 IS A TRAIN, NOT A FLARE. Read as a uniform taper -- 0.505 at the
-# hem still 0.455 a third of a metre up -- the robe came out a tent with a head
-# on it, 1.3 wide against 1.79 tall, and no amount of fold detail rescues those
-# proportions. The width now COLLAPSES in the first 0.18: the cloth pools on the
-# ground and the body above it is a body. The socle's two hem numbers are
-# untouched; what changed is how fast the model leaves them behind.
-WIDTH = [(0.020, 0.505), (0.075, 0.470), (0.180, 0.408), (0.420, 0.348),
-         (0.800, 0.290), (0.980, 0.258), (1.140, 0.236), (1.305, 0.215)]
+# THE MEAN RADIUS PER HEIGHT, now that both outlines are mean-1. It is monotone
+# non-increasing from hem to shoulder, which is the one property a garment has
+# to have and the first draft did not: the flanks dipped to 0.26 at knee height
+# and swelled back to 0.38 at the waist, so the robe read as a barrel standing
+# on a pancake.
+#
+# The 0.66 is a TRAIN, and a train is not a flare. It sweeps 0.66 -> 0.59 ->
+# 0.48 -> 0.33 -> 0.25 as it climbs, i.e. it is nearly all gone by the knee,
+# while the flanks fall gently from 0.345 to 0.24. That is a narrow figure with
+# a tail behind it rather than a cone, which is the whole of section 2's case.
+WIDTH = [(0.020, HEM_MEAN), (0.100, 0.452), (0.250, 0.400), (0.480, 0.318),
+         (0.800, 0.272), (0.980, 0.250), (1.140, 0.228), (1.305, 0.205)]
 
 # The centre of the shell, per height. It starts ON the axis at the hem -- the
 # socle measures 0.66 / 0.35 "depuis l'axe", so the bottom ring may not be
@@ -451,12 +474,12 @@ def hem_rise(th, zp):
     mean once you put them on a body, and the socle's two radii are the plan
     view of the same fact.
 
-    So the bottom edge climbs to 0.105 on the open side and sits at 0.020 on
+    So the bottom edge climbs to 0.082 on the open side and sits at 0.020 on
     the train. It costs nothing (it is a term in z, not a new ring), it is a
     third break in the vertical axis, and it is most of why the front and side
     views stopped agreeing with each other."""
     u = th - TRAIN
-    return 0.105 * (0.5 - 0.5 * math.cos(u)) * _smooth((0.34 - zp) / 0.26)
+    return 0.062 * (0.5 - 0.5 * math.cos(u)) * _smooth((0.34 - zp) / 0.26)
 
 
 def hem_notch(th, cfg):
@@ -522,13 +545,17 @@ def _fold_shader(thetas, zs, cfg, base, accent, on_crest):
     """Value follows the fold. On the worn cloth the VALLEYS go dark, which is
     a shadow; on the abyssal robe the CRESTS go light, which is a highlight --
     inverting it there is forced by the palette, since oil_black is already the
-    darkest thing in voie B and the largest surface has to keep it."""
+    darkest thing in voie B and the largest surface has to keep it.
+
+    The crest threshold is HIGHER than the valley one (0.58 against 0.42) for
+    the same reason: the highlight has to be a minority of the columns or the
+    accent becomes the field and the socle's value rule is inverted."""
     def shade(band, col):
         th = thetas[col]
         z = (zs[band] + zs[band + 1]) * 0.5
         v = fold_value(th, z) * (1.0 if fold_amp(th, z) > 0.008 else 0.0)
         if on_crest:
-            return accent if v > 0.42 else base
+            return accent if v > 0.58 else base
         return accent if v < -0.42 else base
     return shade
 
@@ -551,7 +578,12 @@ def _edge_fold(s, name, rings, col, inset, mat, parent):
 # THE PIECES
 # ---------------------------------------------------------------------------
 
-SKIRT_Z = [0.020, 0.075, 0.180, 0.420, 0.800]
+# The first band is 0.032 tall and nothing else. It is the FRAYED LIP, and
+# `hem_fray` is the lightest value in the base palette -- run across a band
+# 0.08 deep it covered the whole sweep of the train in the brightest thing on
+# the model, and the figure appeared to be standing on a cream plinth. The
+# socle calls it "ourlet effiloche": an edge, not a surface.
+SKIRT_Z = [0.020, 0.052, 0.250, 0.480, 0.800]
 BODICE_Z = [0.800, 0.980, 1.140, 1.305]
 SEG = 16                               # 16 columns carries the 5- and 3-crest
                                        # folds with three samples per crest and
@@ -563,7 +595,11 @@ def robe(s, body, cfg):
     spec = body_spec(cfg)
 
     rings, thetas = _rings(SKIRT_Z, spec, SEG)
-    shade = _fold_shader(thetas, SKIRT_Z, cfg, m["cloth"], m["fold"],
+    # The skirt gets its OWN, quieter fold accent. It is the largest surface
+    # and its facets are the largest on the model, so one lit column at the
+    # silhouette edge is a triangle the size of a forearm -- in `membrane` it
+    # stopped reading as a fold and started reading as a plank leaning on him.
+    shade = _fold_shader(thetas, SKIRT_Z, cfg, m["cloth"], m["fold_low"],
                          cfg["crest"])
 
     def skirt_shade(band, col):
@@ -745,7 +781,7 @@ def hood(s, body, cfg):
     # of the model is exactly the socle's height at every tier.
     swung = spec["post"]((HOOD_TIP[0], HOOD_TIP[1], lift(HOOD_TIP[2], cfg["rise"])))
     top = lift(HEIGHT_BASE, cfg["rise"])
-    tip = (swung[0], swung[1], top - 0.006)
+    tip = (swung[0], swung[1], top - 0.010)
     # A SWEPT TUBE IS TALLER THAN ITS PATH. Its rings stand perpendicular to
     # the path, so a near-horizontal run of radius 0.072 reaches 0.057 above
     # the centreline -- which is exactly how the model came out 0.021 over the
@@ -753,18 +789,21 @@ def hood(s, body, cfg):
     # the crown it grows out of, and the middle vertex is held down too.
     c = _centroid(urings[-1])
     crown = (c[0], c[1], c[2] - 0.048)
-    mid = _lerp3(crown, tip, 0.55)
-    mid = (mid[0], mid[1], min(mid[2], top - 0.045))
-    _path_loft(s, "hood_point", [crown, mid, tip],
-               [0.072, 0.040, 0.010], m["hood"], body, 4, 1.25, 0.80)
-    # THE FALL, and it actually hangs. A flap of cloth off the point, wide in x
-    # and thin in y, reaching 0.33 behind the axis and down to the shoulder
-    # blades -- a mass that exists in the side view and is completely hidden by
-    # the head in the front one, which is what the 90-degree test is asking for.
-    fall_end = spec["post"]((-0.088, -0.330, lift(1.235, cfg["rise"])))
-    _path_loft(s, "hood_fall",
-               [tip, _lerp3(tip, fall_end, 0.42), fall_end],
-               [0.036, 0.105, 0.068], m["hood_in"], body, 4, 1.70, 0.42)
+    rise = _lerp3(crown, tip, 0.55)
+    rise = (rise[0], rise[1], min(rise[2], top - 0.052))
+    # THE POINT AND THE FALL ARE ONE PIECE OF CLOTH, on one path. Built as two
+    # lofts meeting at the tip they pinched from 0.010 to 0.036 across the join
+    # and read from three sides as a pair of ears. A hood's peak and the fabric
+    # hanging off the back of it are the same fold: it rises to the point and
+    # then drops 0.33 behind the axis to the shoulder blades -- a mass that is
+    # the whole side view and is entirely hidden by the head from the front.
+    fall_end = spec["post"]((-0.092, -0.320, lift(1.245, cfg["rise"])))
+    fall_mid = _lerp3(tip, fall_end, 0.44)
+    # Wide across, thin front-to-back. Run narrow it was a rabbit's ear: a
+    # pointed hood's peak is a FOLD of cloth and has to have the width of one.
+    _path_loft(s, "hood_crest", [crown, rise, tip, fall_mid, fall_end],
+               [0.086, 0.062, 0.040, 0.098, 0.060], m["hood"], body, 4,
+               1.55, 0.60)
 
     # THE INSIDE. A second, smaller shell so the opening looks into DEPTH.
     inner = {
@@ -831,11 +870,11 @@ def face(s, body, cfg, spec):
 # of the figure and has no counterpart on the other.
 #
 # It is here for a reason a comment should state plainly: with the robe alone
-# the mirror score sat on 0.925 against a 0.92 limit, because a robe is broadly
-# a bilateral thing however you shape its hem. The sash is the cheapest honest
-# answer -- 40 triangles, in period for a poor man's garment, and it reads as a
-# diagonal from the front and as a lump on one shoulder from the side, so it
-# earns its place on the 90-degree test as well.
+# the mirror score would not come down, because a robe is broadly a bilateral
+# thing however you shape its hem. The sash is the cheapest honest answer --
+# 40 triangles, in period for a poor man's garment, and it reads as a diagonal
+# from the front and as a lump on one shoulder from the side, so it earns its
+# place on the 90-degree test as well.
 SASH = [(-0.290, 0.010, 0.855), (-0.045, 0.200, 0.965),
         (0.135, 0.196, 1.145), (0.290, 0.010, 1.295),
         (0.095, -0.235, 0.985)]
@@ -853,24 +892,42 @@ def sash(s, body, cfg):
 
 def cowl(s, body, cfg):
     """A short cape over the shoulders whose LOWER EDGE is uneven -- it hangs
-    0.10 further down on one side than the other. Cheap, and it does more for
-    the 90-degree test than anything else on the upper body."""
+    0.14 further down on one side than the other. Cheap, and it does more for
+    the 90-degree test than anything else on the upper body.
+
+    FROM b3 IT OPENS WITH THE ROBE. Left closed it draped straight across the
+    chest gap and the entire b3 reveal -- the lamellae, the rose, the whole
+    point of the tier -- was behind a cape nobody could see past. A garment
+    that falls open falls open all the way up; the cowl carries the same arc
+    the bodice does, inset 8 degrees so its edges frame the lapels rather than
+    landing on them.
+    """
     m = cfg["mat"]
+    warp = lambda th, z: ((0.100 * math.cos(th - 2.39)
+                           - 0.042 * math.cos(2.0 * th - 0.6))
+                          * _smooth((1.245 - z) / 0.165))
     spec = {
         "axis": axis,
         "radius": lambda th, z: body_radius(th, min(z, 1.305), cfg) + 0.078,
-        "z": lambda th, z: (lift(z, cfg["rise"]) + zwarp(th, 1.305)
-                            + (0.108 * math.cos(th + 0.75)
-                               - 0.040 * math.cos(2.0 * th - 0.6)
-                               if z < 1.20 else 0.0)),
+        "z": lambda th, z: lift(z, cfg["rise"]) + zwarp(th, 1.305) + warp(th, z),
         "post": None,
     }
-    zs = [1.090, 1.220, 1.302]
-    rings, thetas = _rings(zs, spec, SEG)
-    # No top cap: it would sit under the hood collar and never be seen.
-    _loft(s, "cowl", rings, m["cowl"], body, True,
+    zs = [1.060, 1.200, 1.302]
+    if not cfg["chest_open"]:
+        rings, thetas = _rings(zs, spec, SEG)
+        _loft(s, "cowl", rings, m["cowl"], body, True,
+              face_mat=_fold_shader(thetas, zs, cfg, m["cowl"], m["fold"],
+                                    cfg["crest"]))
+        return
+    g0, g1 = cfg["chest_gap"]
+    inset = math.radians(8.0)
+    n = 12
+    rings, thetas = _rings(zs, spec, n, g1 + inset, g0 - inset + math.tau)
+    _loft(s, "cowl", rings, m["cowl"], body, closed=False,
           face_mat=_fold_shader(thetas, zs, cfg, m["cowl"], m["fold"],
                                 cfg["crest"]))
+    _edge_fold(s, "cowl_edge_l", rings, 0, 0.050, m["lining"], body)
+    _edge_fold(s, "cowl_edge_r", rings, n - 1, 0.050, m["lining"], body)
 
 
 # --- arms, hands, tendons ---------------------------------------------------
@@ -903,6 +960,16 @@ SLEEVE_L_EMPTY = [SH_L, (0.286, 0.140, 1.190), (0.268, 0.226, 1.062),
 SLEEVE_R_EMPTY = [SH_R, (-0.250, 0.116, 1.140), (-0.236, 0.198, 1.014),
                   (-0.212, 0.232, 0.898)]
 SLEEVE_EMPTY_R = [0.112, 0.102, 0.092, 0.074]
+
+# b5's sleeves are ROOTED AT b5's SHOULDER. `lift` raises the robe's own top
+# ring to 1.582, and a sleeve still hanging off 1.320 came out of the middle of
+# the chest -- an empty sleeve has to leave the garment at the shoulder or it is
+# not a sleeve. The cuffs stay near where they were, so the sleeve simply gets
+# longer, which is the tier: the robe grew and there is less and less in it.
+SLEEVE_L_B5 = [(0.250, 0.050, 1.582), (0.286, 0.140, 1.396),
+               (0.268, 0.226, 1.176), (0.238, 0.268, 1.006)]
+SLEEVE_R_B5 = [(-0.200, 0.028, 1.522), (-0.250, 0.116, 1.344),
+               (-0.236, 0.198, 1.128), (-0.212, 0.232, 0.958)]
 
 
 def sleeves(s, body, cfg):
@@ -993,10 +1060,10 @@ TENDONS_B4 = [
 # at exactly 50 degrees apart, at exactly the same radius, at exactly the same
 # height. Nothing about it is violent and nothing about it is right.
 TENDONS_B5 = [
-    _tendon([(0.216, 0.190, 1.240), (0.284, 0.318, 1.080),
+    _tendon([(0.268, 0.222, 1.186), (0.286, 0.330, 1.062),
              (0.230, 0.452, 0.958), (0.126, 0.430, 1.016),
              (0.094, 0.348, 1.050)], 0.032, 0.013),
-    _tendon([(-0.226, 0.170, 1.196), (-0.276, 0.302, 1.026),
+    _tendon([(-0.238, 0.196, 1.140), (-0.278, 0.310, 1.012),
              (-0.202, 0.424, 0.930), (-0.090, 0.408, 1.000),
              (-0.006, 0.352, 1.038)], 0.030, 0.012),
 ]
@@ -1046,7 +1113,8 @@ def vein_socket(s, fixed, cfg):
 # ---------------------------------------------------------------------------
 
 MAT_WORN = {                       # b1, b2 -- he is still, mostly, a man
-    "cloth": "cloth_worn", "fold": "cloth_dark", "hem": "hem_fray",
+    "cloth": "cloth_worn", "fold": "cloth_dark", "fold_low": "cloth_dark",
+    "hem": "hem_fray",
     "hem_alt": "cloth_dark", "lining": "cloth_dark", "cowl": "cloth_dark",
     "hood": "cloth_worn", "hood_in": "cloth_dark", "sleeve": "cloth_worn",
     "skin": "skin", "skin_dk": "skin_dark", "shadow": "abyss",
@@ -1060,9 +1128,15 @@ MAT_WORN = {                       # b1, b2 -- he is still, mostly, a man
 }
 
 MAT_OPEN = dict(MAT_WORN)          # b3 -- the abyss takes the largest surface
+# The fold accent is MEMBRANE, not abyss. oil_black is #14101C and abyss is
+# #2A1B3D: side by side at 55 px that is not a value step, it is one black, and
+# the whole robe went to a silhouette with no form in it. membrane #4A4250 is
+# the first thing in voie B a light can actually land on, and at the 0.58 crest
+# threshold it stays a minority of the surface.
 MAT_OPEN.update({
-    "cloth": "oil_black", "fold": "abyss", "hem": "membrane",
-    "hem_alt": "oil_black", "lining": "membrane", "cowl": "oil_black",
+    "cloth": "oil_black", "fold": "membrane", "fold_low": "abyss",
+    "hem": "membrane",
+    "hem_alt": "oil_black", "lining": "abyss", "cowl": "oil_black",
     "hood": "oil_black", "hood_in": "abyss", "sleeve": "oil_black",
     "skin": "skin_dark", "skin_dk": "skin_dark", "core": "rose_sick",
     "sash": "membrane", "under": "oil_black",
@@ -1129,8 +1203,8 @@ TIERS = {
                                            math.radians(128.0)),
                vein=True, crest=True, lit_face=True, has_hands=False,
                mat=MAT_ABYSS, tendons=TENDONS_B5,
-               sleeve_l=(SLEEVE_L_EMPTY, SLEEVE_EMPTY_R),
-               sleeve_r=(SLEEVE_R_EMPTY, SLEEVE_EMPTY_R)),
+               sleeve_l=(SLEEVE_L_B5, SLEEVE_EMPTY_R),
+               sleeve_r=(SLEEVE_R_B5, SLEEVE_EMPTY_R)),
 }
 
 ORDER = ["b1", "b2", "b3", "b4", "b5"]
@@ -1370,9 +1444,8 @@ def main():
     print("building the Siphon, voie B -- l'abime (%s)"
           % ("SILHOUETTE" if flat else "full"))
     print("  hem  train %.3f  open %.3f  widest %.3f  flanks %.3f / %.3f"
-          % (0.505 * hem_unit(TRAIN), 0.505 * hem_unit(TRAIN + math.pi),
-             HEM_PEAK, 0.505 * hem_unit(TRAIN + math.pi / 2),
-             0.505 * hem_unit(TRAIN - math.pi / 2)))
+          % (_hem_raw(TRAIN), _hem_raw(TRAIN + math.pi), HEM_PEAK,
+             _hem_raw(TRAIN + math.pi / 2), _hem_raw(TRAIN - math.pi / 2)))
 
     total, radii, passes = 0, [], []
     for tier in ORDER:

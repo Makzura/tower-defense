@@ -376,9 +376,9 @@ var SiphonBeamSpec = {
    "sections": 20,
    "radius": {
     "formula": "r_target + (r_tower - r_target)*(1-t)^p",
-    "r_target": 0.0205,
-    "r_tower": 0.037,
-    "p": 2.6
+    "r_target": 0.018,
+    "r_tower": 0.04,
+    "p": 1.35
    },
    "twist": {
     "formula": "total*(1-t)^p",
@@ -423,7 +423,7 @@ var SiphonBeamSpec = {
     "chevron",
     "spout"
    ],
-   "flowReads": "knots grow 0.032->0.057 toward the hands, scroll one spacing per loop, each a wedge pointing at the hands; the body swells 1.8x and ends in a spout"
+   "flowReads": "knots grow 0.021->0.078 toward the hands (3.7x, and spread along the whole run rather than piled in the last quarter), scroll one spacing per loop, each a wedge pointing at the hands; the body swells 2.2x into a flared intake and the enemy end is BLUNT -- nothing points outward anywhere"
   },
   "ramp": {
    "profile": "ROPE",
@@ -432,12 +432,12 @@ var SiphonBeamSpec = {
     "formula": "lerp(thread, saturated, rampT); baked rampT=0.60",
     "r_target": 0.03,
     "r_tower": 0.0625,
-    "p": 1.8,
+    "p": 1.4,
     "rampT": 0.6,
     "rampT_ends": {
      "0.0": [
-      0.0205,
-      0.037
+      0.018,
+      0.04
      ],
      "1.0": [
       0.0455,
@@ -743,7 +743,7 @@ var SiphonBeamSpec = {
     "formula": "r_target + (r_tower - r_target)*(1-t)^p",
     "r_target": 0.04,
     "r_tower": 0.072,
-    "p": 1.45
+    "p": 1.3
    },
    "twist": {
     "formula": "total*(1-t)^p",
@@ -758,7 +758,7 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.3122,
+    "spacing": 0.3153,
     "count": 7,
     "shape": "constriction",
     "mat": "oil_black",
@@ -766,31 +766,41 @@ var SiphonBeamSpec = {
     "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
-    "sag": 0.115,
-    "sway": 0.085,
+    "sag": 0.15,
+    "sway": 0.105,
     "kink": 0.022,
     "kink_n": 6.0
    },
    "sheath": {
     "bands": 8,
-    "gap": 0.047,
-    "why": "translucency is BUILT, not alpha: you see the cords through the windows"
+    "pitch": 0.124,
+    "lengths": [
+     0.05,
+     0.079,
+     0.041,
+     0.07,
+     0.056,
+     0.086,
+     0.046,
+     0.065
+    ],
+    "why": "translucency is BUILT, not alpha: you see the cords through the windows. The lengths are all different because eight equal bands read as a segmented animal, not as a sheath over a bundle."
    },
    "cords": [
     [
      "abyss",
-     0.34,
-     0.4
+     0.3,
+     0.46
     ],
     [
      "rose_dim",
-     0.52,
-     0.3
+     0.56,
+     0.28
     ],
     [
      "rose_sick",
-     0.44,
-     0.2
+     0.64,
+     0.34
     ]
    ],
    "mats": [
