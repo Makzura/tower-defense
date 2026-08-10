@@ -522,26 +522,32 @@ var SiphonFXGround = (function () {
       }
     }
 
-    // THE DELTA. Where the vein arrives it splays into fingers reaching for the
-    // road's exit and dives under it -- the road mask cuts them at the kerb, so
-    // what is on screen is a hand gripping the ground beside the base.
+    // THE DELTA -- where the vein reaches the base and goes under the road.
+    //
+    // NOT A FAN FROM THE END POINT. That is what this was first, three fingers
+    // radiating from the terminus, and at the right-hand edge of the board it
+    // drew an arrowhead pointing off the map -- an icon, which section 8 forbids
+    // outright, and one that says "exit" rather than "this is where your life
+    // goes in". Instead the last tenth of the trunk FRAYS: three short roots
+    // leave it sideways at three different stations, head under the road, and
+    // are cut at the kerb by the same mask that cuts the trunk. Three parallel
+    // dives, staggered, with no common origin to read as a point.
     var delta = [];
-    var toRoadX = term.roadX - term.x, toRoadY = term.roadY - term.y;
-    var aRoad = Math.atan2(toRoadY, toRoadX);
     var nd = 3;
-    // Just long enough that the straightest fingers reach the kerb and are cut
-    // by the road mask -- which is the whole point of them. The vein does not
-    // stop beside the road, it goes UNDER it, and the fingers are where that
-    // reads. A wider, longer fan was tried and read as an arrowhead pointing
-    // off the edge of the board, which is precisely the icon section 8 forbids.
-    var dl = (term.off - b.half + 6) * (tierB >= 5 ? 1.05 : (tierB >= 4 ? 0.9 : 0.75));
+    var reach = (term.off - b.half + 10) * (tierB >= 5 ? 1.0 : (tierB >= 4 ? 0.88 : 0.74));
     for (var g2 = 0; g2 < nd; g2++) {
-      var da = aRoad + (g2 - (nd - 1) / 2) * 0.34;
-      var dd = dl * (0.7 + 0.5 * Math.abs(noise(seed, 101 + g2)));
+      var sm3 = 0.885 + g2 * 0.045;
+      var id3 = sampleIndex(trunk, sm3);
+      var dx3 = trunk.wx[id3 * 2], dy3 = trunk.wx[id3 * 2 + 1];
+      // Toward the road: the opposite of the offset that put the terminus clear
+      // of it, turned a little per finger so they are not three copies.
+      var da = Math.atan2(-term.py, -term.px) + (g2 - 1) * 0.22 +
+        noise(seed, 111 + g2) * 0.12;
+      var dd = reach * (0.8 + 0.35 * Math.abs(noise(seed, 101 + g2)));
       delta.push(strand([
-        term.x, term.y,
-        term.x + Math.cos(da) * dd * 0.5, term.y + Math.sin(da) * dd * 0.5,
-        term.x + Math.cos(da) * dd, term.y + Math.sin(da) * dd
+        dx3, dy3,
+        dx3 + Math.cos(da) * dd * 0.45, dy3 + Math.sin(da) * dd * 0.45,
+        dx3 + Math.cos(da) * dd, dy3 + Math.sin(da) * dd
       ], zBase, b, 0));
     }
 

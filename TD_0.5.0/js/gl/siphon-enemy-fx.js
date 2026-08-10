@@ -112,11 +112,12 @@
 //   * ZERO COST WHEN NOTHING IS ENLISE. `bog()` returns on a count check
 //     before it touches the Map, so a board with no Siphon on it pays one
 //     integer compare per enemy per frame and nothing else.
-//   * ONE PROJECTION PER TRAIL, not one per stamp. The ground basis is
-//     measured ONCE per frame at the board centre and every stamp is then
-//     placed with two multiply-adds -- the same trick blub-systems.js uses
-//     for its decals, and the same argument: over a mark thirty pixels long
-//     the perspective difference from the board centre is invisible.
+//   * THREE PROJECTIONS PER TRAIL, not two per stamp. The ground's basis is
+//     measured at each trail's own anchor and every stamp is then placed with
+//     two multiply-adds. A board-centre basis shared by the whole frame is
+//     cheaper still and is what blub-systems.js does, but it is only valid
+//     near where it was measured -- see the note on PROBE for the measurement
+//     that showed it collapsing the ribbon.
 //   * ONE FILLED RIBBON per trail (two at full quality: the drag, plus a
 //     faint sheen over its freshest third). At 100 enlises that is 100
 //     projections and 200 fills of a 16-point path -- measured against
@@ -325,7 +326,6 @@ var SiphonFXEnemy = (function () {
     if (records) records.clear();
     while (live.length) retire(live.pop());
     token = -1;
-    frameToken = -1;
     counts.records = counts.trails = counts.gilds = counts.stamps = 0;
   }
 
@@ -602,10 +602,12 @@ var SiphonFXEnemy = (function () {
 
   // --- the ground layer -----------------------------------------------------
 
+  // The ribbon's own ground frame, refilled per trail. Module-level so no
+  // object is allocated per body per frame.
+  var rAx = 1, rAy = 0, rBx = 0, rBy = 1, rOx = 0, rOy = 0, rX = 0, rY = 0;
+
   function drawTrails(ctx, state) {
     if (!api || !live.length) return;
-    var now = state ? (state.now || 0) : 0;
-    if (!ensureFrame(now)) return;
 
     var drawn = 0;
     ctx.save();
@@ -613,15 +615,21 @@ var SiphonFXEnemy = (function () {
       var rec = live[i];
       if (rec.count < 2 && !(rec.count === 1 && rec.e)) continue;
 
-      // ONE projection for the whole ribbon: the newest stamp, which is the
-      // patch of road the body is standing on.
+      // The anchor is the newest stamp -- the patch of road the body is
+      // standing on -- and the frame is measured right there.
       var newest = rec.stamps[(rec.head - 1 + TRAIL_N) % TRAIL_N];
-      var p = api.project(newest.x, newest.y, 0.35);
+      rX = newest.x; rY = newest.y;
+      var p = api.project(rX, rY, 0.35);
       if (!p) continue;
-      var k = (p.scale || 1) / fScale;
-      var ax = newest.x, ay = newest.y;
+      var qx = api.project(rX + PROBE, rY, 0.35);
+      if (!qx) continue;
+      var qy = api.project(rX, rY + PROBE, 0.35);
+      if (!qy) continue;
+      rOx = p.x; rOy = p.y;
+      rAx = (qx.x - p.x) / PROBE; rAy = (qx.y - p.y) / PROBE;
+      rBx = (qy.x - p.x) / PROBE; rBy = (qy.y - p.y) / PROBE;
 
-      if (!ribbon(ctx, rec, p, k, ax, ay, rec.count, 1)) continue;
+      if (!ribbon(ctx, rec, rec.count, 1)) continue;
       ctx.fillStyle = TRAIL_DRAG;
       ctx.fill();
       drawn++;
@@ -631,7 +639,7 @@ var SiphonFXEnemy = (function () {
       // has dried. First thing `quality()` drops.
       if (quality >= 0.75 && rec.count >= 3) {
         var fresh = rec.count < 4 ? rec.count : (rec.count >> 1);
-        if (ribbon(ctx, rec, p, k, ax, ay, fresh, 0.62)) {
+        if (ribbon(ctx, rec, fresh, 0.62)) {
           ctx.fillStyle = TRAIL_CORE;
           ctx.fill();
         }
@@ -642,39 +650,39 @@ var SiphonFXEnemy = (function () {
   }
 
   // The ribbon as ONE path: up one side from the oldest stamp to the newest,
-  // then back down the other. `n` stamps from the head; `scale` narrows it for
-  // the sheen pass so the second fill sits inside the first.
-  function ribbon(ctx, rec, p, k, ax, ay, n, scale) {
+  // then back down the other. `n` stamps from the head; `narrow` pulls the
+  // second fill inside the first.
+  function ribbon(ctx, rec, n, narrow) {
     if (n < 2) return false;
-    var i, s, sx, sy, hw, dx, dy;
+    var i, s, hw, dx, dy;
     ctx.beginPath();
     // Oldest -> newest along the left edge.
     for (i = n - 1; i >= 0; i--) {
       s = rec.stamps[(rec.head - 1 - i + TRAIL_N * 2) % TRAIL_N];
       if (s.age >= TRAIL_LIFE_S) continue;
-      hw = s.w * scale * (0.35 + 0.65 * (1 - s.age / TRAIL_LIFE_S));
-      dx = s.x - ax + s.nx * hw;
-      dy = s.y - ay + s.ny * hw;
-      sx = p.x + (dx * fAx + dy * fBx) * k;
-      sy = p.y + (dx * fAy + dy * fBy) * k;
-      if (i === n - 1) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+      hw = s.w * narrow * (0.35 + 0.65 * (1 - s.age / TRAIL_LIFE_S));
+      dx = s.x - rX + s.nx * hw;
+      dy = s.y - rY + s.ny * hw;
+      if (i === n - 1) {
+        ctx.moveTo(rOx + dx * rAx + dy * rBx, rOy + dx * rAy + dy * rBy);
+      } else {
+        ctx.lineTo(rOx + dx * rAx + dy * rBx, rOy + dx * rAy + dy * rBy);
+      }
     }
     // The head of the ribbon is the body's own feet, so the drag is attached
     // to the thing dragging rather than starting a stamp behind it.
     if (rec.e && rec.e.pos) {
-      dx = rec.e.pos.x - ax; dy = rec.e.pos.y - ay;
-      ctx.lineTo(p.x + (dx * fAx + dy * fBx) * k,
-                 p.y + (dx * fAy + dy * fBy) * k);
+      dx = rec.e.pos.x - rX; dy = rec.e.pos.y - rY;
+      ctx.lineTo(rOx + dx * rAx + dy * rBx, rOy + dx * rAy + dy * rBy);
     }
     // Newest -> oldest along the right edge.
     for (i = 0; i < n; i++) {
       s = rec.stamps[(rec.head - 1 - i + TRAIL_N * 2) % TRAIL_N];
       if (s.age >= TRAIL_LIFE_S) continue;
-      hw = s.w * scale * (0.35 + 0.65 * (1 - s.age / TRAIL_LIFE_S));
-      dx = s.x - ax - s.nx * hw;
-      dy = s.y - ay - s.ny * hw;
-      ctx.lineTo(p.x + (dx * fAx + dy * fBx) * k,
-                 p.y + (dx * fAy + dy * fBy) * k);
+      hw = s.w * narrow * (0.35 + 0.65 * (1 - s.age / TRAIL_LIFE_S));
+      dx = s.x - rX - s.nx * hw;
+      dy = s.y - rY - s.ny * hw;
+      ctx.lineTo(rOx + dx * rAx + dy * rBx, rOy + dx * rAy + dy * rBy);
     }
     ctx.closePath();
     return true;
