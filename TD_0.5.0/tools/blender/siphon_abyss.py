@@ -313,34 +313,42 @@ def _path_loft(s, name, pts, radii, mat, parent, seg=6, sx=1.0, sy=1.0,
 # THE BODY SURFACE. Everything below is a term of r(theta, z); see the header.
 # ---------------------------------------------------------------------------
 
-def _hem_raw(th, ripple=1.0):
+def _hem_raw(th):
+    """The hem outline in polar form, and every term of it is load-bearing.
+
+    THE TWO SOCLE NUMBERS SURVIVE EXACTLY, by construction and not by fitting.
+    The lobes are multiplied by sin(u), which is zero at the train (u = 0) and
+    zero straight opposite it (u = pi), so `0.505 + 0.155 cos u` alone decides
+    those two directions: 0.660 on the train and 0.350 on the open side.
+
+    THE PHASES ARE CHOSEN SO THE LOBE SUM IS ~ZERO AT u = 0. A first version
+    used round phases, the lobes came in with a positive slope at the train,
+    and the widest point of the hem slid 43 degrees off it -- which then forced
+    a normaliser that shrank the lobes to 6% of themselves and left an outline
+    that was very nearly an offset circle. With c(0) = -0.006 the maximum stays
+    where the socle put it and the lobes keep their full amplitude.
+
+    THEY ARE DELIBERATELY NOT AN EVEN FUNCTION OF u. Pure sin(u)*sin(nu) terms
+    would have solved the slope problem too, but every one of them is even in
+    u, which would make the hem mirror-symmetric about its own long axis. The
+    cosine phases keep an odd component: the outline is 0.390 at u = +90 and
+    0.427 at u = -90, so the two flanks of the train are different shapes.
+    """
     u = th - TRAIN
-    r = 0.505 + 0.155 * math.cos(u)
-    r += ripple * math.sin(u) * (0.055 * math.cos(2.0 * u + 0.70)
-                                 + 0.038 * math.cos(3.0 * u - 1.10)
-                                 + 0.026 * math.cos(5.0 * u))
-    return r
+    return (0.505 + 0.155 * math.cos(u)
+            + math.sin(u) * (0.085 * math.cos(2.0 * u + 1.35)
+                             + 0.062 * math.cos(3.0 * u - 1.90)
+                             + 0.038 * math.cos(5.0 * u + 1.70)))
 
 
-# The ripple is multiplied by sin(u), which is ZERO at the train and zero
-# straight opposite it -- so the socle's 0.66 and 0.35 survive the lobes
-# exactly. It is then scaled once, here, so the train stays the widest point of
-# the hem rather than being overtaken by a lobe beside it.
-def _fit_ripple():
-    scale = 1.0
-    for _ in range(40):
-        peak = max(_hem_raw(math.tau * i / 720.0, scale) for i in range(720))
-        if peak <= 0.5051 + 0.155:
-            return scale
-        scale *= 0.92
-    return scale
-
-
-RIPPLE = _fit_ripple()
+HEM_PEAK = max(_hem_raw(math.tau * i / 1440.0) for i in range(1440))
+if abs(HEM_PEAK - HEM_LONG) > 0.002:
+    raise SystemExit("the hem's widest point is %.4f, not the socle's %.2f"
+                     % (HEM_PEAK, HEM_LONG))
 
 
 def hem_unit(th):
-    return _hem_raw(th, RIPPLE) / 0.505
+    return _hem_raw(th) / 0.505
 
 
 def top_unit(th):
@@ -505,7 +513,9 @@ def _edge_fold(s, name, rings, col, inset, mat, parent):
 
 SKIRT_Z = [0.020, 0.090, 0.300, 0.550, 0.800]
 BODICE_Z = [0.800, 0.980, 1.140, 1.305]
-SEG = 18
+SEG = 16                               # 16 columns carries the 5- and 3-crest
+                                       # folds with three samples per crest and
+                                       # keeps the body inside its tri budget.
 
 
 def robe(s, body, cfg):
@@ -541,7 +551,7 @@ def robe(s, body, cfg):
                                 cfg["crest"]))
     g0, g1 = cfg["chest_gap"]
     open_z = [BODICE_Z[1], BODICE_Z[2], BODICE_Z[3]]
-    n = 14
+    n = 12
     orings, oth = _rings(open_z, spec, n, g1, g0 + math.tau)
     _loft(s, "lapels", orings, m["cloth"], body, closed=False,
           face_mat=_fold_shader(oth, open_z, cfg, m["cloth"], m["fold"],
@@ -553,7 +563,7 @@ def robe(s, body, cfg):
     top = orings[-1]
     _path_loft(s, "collar_bridge", [top[-1], _lerp3(top[-1], top[0], 0.5),
                                     top[0]],
-               [0.030, 0.042, 0.030], m["lining"], body, 5, 1.0, 0.55)
+               [0.030, 0.042, 0.030], m["lining"], body, 4, 1.0, 0.55)
 
 
 def cavity(s, body, cfg):
@@ -572,8 +582,8 @@ def cavity(s, body, cfg):
         "z": lambda th, z: lift(z, cfg["rise"]) + zwarp(th, z),
         "post": None,
     }
-    zs = [0.900, 1.060, 1.220, 1.330]
-    rings, _ = _rings(zs, cav, 8)
+    zs = [0.900, 1.110, 1.330]
+    rings, _ = _rings(zs, cav, 6)
     _loft(s, "cavity", rings, m["void"], body, True, cap_bottom=m["void"],
           cap_top=m["void"])
 
@@ -589,14 +599,15 @@ def cavity(s, body, cfg):
     td.ellipsoid(s, "core_glow", (0.085, 0.055, 0.085),
                  (cx + math.cos(mid) * (depth - 0.075),
                   cy + math.sin(mid) * (depth - 0.075), lift(1.140, cfg["rise"])),
-                 m["core"], body, (0.0, 0.0, 0.0), 6, 3)
+                 m["core"], body, (0.0, 0.0, 0.0), 5, 2)
 
 
 # --- the hood ---------------------------------------------------------------
 
 HOOD_COLLAR = 1.325
 HOOD_CROWN = 1.755
-HOOD_TIP = (-0.030, -0.175, 1.790)
+HOOD_TIP = (-0.088, -0.180, 1.790)     # back AND across: the point does not
+                                       # sit in the plane of symmetry either
 GAP_MID = math.radians(79.0)         # 11 degrees off the facing, before yaw
 GAP_HALF = math.radians(39.0)
 
@@ -646,7 +657,7 @@ def hood_spec(cfg):
 def hood(s, body, cfg):
     m = cfg["mat"]
     spec = hood_spec(cfg)
-    n = 14
+    n = 12
 
     lo = [HOOD_COLLAR, 1.420]
     rings, _ = _rings(lo, spec, n)
@@ -656,7 +667,7 @@ def hood(s, body, cfg):
     # over: the arc's own centre is 11 degrees off the facing, and the entire
     # hood is then yawed by `hood_yaw` on top of that.
     mid = [1.420, 1.530, 1.640]
-    o = 10
+    o = 9
     orings, _ = _rings(mid, spec, o, GAP_MID + GAP_HALF,
                        GAP_MID - GAP_HALF + math.tau)
     _loft(s, "hood_face", orings, m["hood"], body, closed=False)
@@ -670,14 +681,21 @@ def hood(s, body, cfg):
     # THE POINT, and it leans BACK. Then the FALL: a flat flap of cloth hanging
     # off the point down the spine, wide in x and thin in y, which no rotation
     # of anything can produce.
-    tip = spec["post"]((HOOD_TIP[0], HOOD_TIP[1], lift(HOOD_TIP[2], cfg["rise"])))
+    #
+    # The tip's z is PINNED rather than transformed. Sending it through the
+    # hood's pitch made the model's overall height a function of how far out of
+    # step the hood was that tier, so b3 stood 1.80 and b1 stood 1.79 for no
+    # reason a brief could defend. Only x and y follow the hood now; the crown
+    # of the model is exactly the socle's height at every tier.
+    swung = spec["post"]((HOOD_TIP[0], HOOD_TIP[1], lift(HOOD_TIP[2], cfg["rise"])))
+    tip = (swung[0], swung[1], lift(HEIGHT_BASE, cfg["rise"]) - 0.008)
     crown = _centroid(urings[-1])
     _path_loft(s, "hood_point", [crown, _lerp3(crown, tip, 0.55), tip],
-               [0.072, 0.048, 0.016], m["hood"], body, 6, 1.25, 0.80)
+               [0.072, 0.048, 0.010], m["hood"], body, 5, 1.25, 0.80)
     fall_end = spec["post"]((-0.062, -0.238, lift(1.400, cfg["rise"])))
     _path_loft(s, "hood_fall",
                [tip, _lerp3(tip, fall_end, 0.45), fall_end],
-               [0.040, 0.095, 0.062], m["hood_in"], body, 6, 1.70, 0.42)
+               [0.040, 0.095, 0.062], m["hood_in"], body, 5, 1.70, 0.42)
 
     # THE INSIDE. A second, smaller shell so the opening looks into DEPTH.
     inner = {
@@ -685,7 +703,7 @@ def hood(s, body, cfg):
         "radius": lambda th, z: hood_radius(th, z) * 0.80,
         "z": spec["z"], "post": spec["post"],
     }
-    irings, _ = _rings([1.380, 1.500, 1.620, 1.700], inner, 8)
+    irings, _ = _rings([1.380, 1.540, 1.700], inner, 7)
     _loft(s, "hood_lining", irings, m["hood_in"], body, True,
           cap_bottom=m["hood_in"], cap_top=m["hood_in"])
 
@@ -704,27 +722,27 @@ def face(s, body, cfg, spec):
 
     if cfg["lit_face"]:
         td.ellipsoid(s, "face_opening", (0.150, 0.062, 0.185), at,
-                     m["face"], body, (0.0, 0.0, yaw), 8, 4)
+                     m["face"], body, (0.0, 0.0, yaw), 6, 3)
         td.ellipsoid(s, "face_halo", (0.205, 0.030, 0.245),
                      (at[0] - math.sin(yaw) * 0.010,
                       at[1] + math.cos(yaw) * 0.010, at[2]),
-                     m["glow"], body, (0.0, 0.0, yaw), 8, 4)
+                     m["glow"], body, (0.0, 0.0, yaw), 6, 2)
         return
 
     # THE SECOND SHADOW. One dark mass fills the hood; a second, smaller and
     # darker, sits inside it -- offset, tilted, and lit down one edge only. Two
     # heads' worth of shadow in a hood that holds one head.
     td.ellipsoid(s, "shadow_first", (0.190, 0.150, 0.225), at,
-                 m["hood_in"], body, (0.0, 0.0, yaw), 8, 4)
+                 m["hood_in"], body, (0.0, 0.0, yaw), 7, 3)
     off = (at[0] - math.cos(yaw) * 0.052 - math.sin(yaw) * 0.022,
            at[1] - math.sin(yaw) * 0.052 + math.cos(yaw) * 0.022,
            at[2] - 0.028)
     td.ellipsoid(s, "shadow_second", (0.120, 0.098, 0.152), off,
-                 m["shadow"], body, (0.16, 0.0, yaw + 0.34), 8, 4)
+                 m["shadow"], body, (0.16, 0.0, yaw + 0.34), 6, 3)
     # The only living thing in the palette, and it is a crescent down one side.
     td.ellipsoid(s, "shadow_rim", (0.026, 0.026, 0.115),
                  (off[0] + math.cos(yaw) * 0.062, off[1] + math.sin(yaw) * 0.062,
-                  off[2] + 0.010), m["glow"], body, (0.0, 0.0, yaw), 5, 3)
+                  off[2] + 0.010), m["glow"], body, (0.0, 0.0, yaw), 5, 2)
 
 
 def cowl(s, body, cfg):

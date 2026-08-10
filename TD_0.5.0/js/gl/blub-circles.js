@@ -175,7 +175,18 @@ var BlubFXCircles = (function () {
   var GLOBAL_FLOOR = 0.62;
 
   // --- budget ---------------------------------------------------------------
-  var MAX_ACTIVE = 64;
+  //
+  // MAX_ACTIVE is a safety rail, not the working limit: three lines at the
+  // 0.5 s interval floor is six bodies a second per summoner, so two seconds
+  // of life is twelve circles per summoner and a board would need ten maxed
+  // Summoners to reach this. MAX_DRAWN is the number that actually bites, and
+  // it bounds the projection work at 48 x 3 = 144 `project()` calls whatever
+  // happens. Above it the OLDEST circles stop being drawn -- chosen over
+  // cutting everybody's life short, because "exactly two seconds" is the
+  // brief's promise and a circle in its last third has already said what it
+  // had to say.
+  var MAX_ACTIVE = 128;
+  var MAX_DRAWN = 48;
   var SEG_BUDGET = 900;
   var TIER_COST = [5, 12, 30];
   var BURST_PRIME = 12;        // more new summons than this in ONE frame is a
@@ -195,6 +206,7 @@ var BlubFXCircles = (function () {
   var lastBeat = -1;           // the frame stamp we last advanced on
   var armed = false;           // the first frame primes rather than fires
   var serial = 0;
+  var optimistic = 0;          // descentLift guesses made this frame
 
   var cellCount = supported ? new Int16Array(GRID_W * GRID_H) : null;
   var cellNewest = supported ? new Int16Array(GRID_W * GRID_H) : null;
@@ -239,13 +251,14 @@ var BlubFXCircles = (function () {
       ? lastTime / 1000 : -1;
     var dt;
     if (stamp >= 0) {
-      if (lastBeat < 0) { lastBeat = stamp; return; }
+      if (lastBeat < 0) { lastBeat = stamp; optimistic = 0; return; }
       if (stamp === lastBeat) return;
       dt = stamp - lastBeat;
       lastBeat = stamp;
     } else {
       dt = (typeof dtHint === "number" && dtHint > 0) ? dtHint : 1 / 60;
     }
+    optimistic = 0;                              // a new frame, a new guess
     if (dt > 0.25) dt = 0.25;                    // the loop's own clamp
 
     if (typeof paused !== "undefined" && paused) return;
@@ -709,14 +722,35 @@ var BlubFXCircles = (function () {
 
   // --- the frame ------------------------------------------------------------
 
-  // ctx        the 2D overlay context, in the game's logical space
+  // TWO CALL SHAPES, because the sibling FX modules in this pass are wired
+  // through a bound api object and a lone `draw(ctx, project, state)` in the
+  // middle of that would be the odd one out:
+  //
+  //   BlubFXCircles.bind({ project: project, withGround: withGround,
+  //                        groundHeightAt: groundHeightAt });
+  //   BlubFXCircles.draw(ctx, state);
+  //
+  //   BlubFXCircles.draw(ctx, project, state, withGround);   // equivalent
+  //
   // project    gl-world's own `project(x, y, z)` -- z is a height ABOVE the
   //            surface, and it already carries the board's ground height
   // state      the render state drawOverlays is handed (towers, dt)
   // withGround gl-world's `withGround(z, fn)`, optional: when present the
   //            circle's basis is pinned to one surface height so it stays a
   //            clean ellipse beside a raised deck
-  function draw(ctx, project, state, withGround) {
+  var bound = null;
+
+  function bind(api) { bound = api || null; }
+
+  function draw(ctx, a, b, c) {
+    var project, state, withGround;
+    if (typeof a === "function") {
+      project = a; state = b; withGround = c;
+    } else {
+      state = a;
+      project = bound && bound.project;
+      withGround = bound && bound.withGround;
+    }
     if (!supported || !ctx || typeof project !== "function") return;
 
     beat(state && state.dt);
@@ -732,9 +766,11 @@ var BlubFXCircles = (function () {
     _proj = project;
     var vw = (typeof VIEW_WIDTH === "number") ? VIEW_WIDTH : 1e6;
     var vh = (typeof VIEW_HEIGHT === "number") ? VIEW_HEIGHT : 1e6;
-    var ground = (typeof World3D !== "undefined" && World3D.groundHeightAt)
-      ? World3D.groundHeightAt : null;
+    var ground = (bound && bound.groundHeightAt) ||
+      ((typeof World3D !== "undefined" && World3D.groundHeightAt)
+        ? World3D.groundHeightAt : null);
     var budget = SEG_BUDGET;
+    var drawn = 0;
     var i, r, t;
 
     // Pass 1 -- project, cull, and hand out detail. NEWEST FIRST, so a budget
@@ -743,6 +779,7 @@ var BlubFXCircles = (function () {
     for (i = records.length - 1; i >= 0; i--) {
       r = records[i];
       r.vis = false;
+      if (drawn >= MAX_DRAWN) continue;      // and not even projected
       _px = r.x; _py = r.y; _pr = r.radius;
       if (withGround && ground) withGround(ground(r.x, r.y), basis);
       else basis();
@@ -760,6 +797,7 @@ var BlubFXCircles = (function () {
 
       r.tier = tier;
       r.vis = true;
+      drawn++;
       r.cx = _cx; r.cy = _cy;
       r.ax = _ax; r.ay = _ay;
       r.bx = _bx; r.by = _by;
@@ -823,8 +861,19 @@ var BlubFXCircles = (function () {
       // standing. Never seen means it was summoned this very step and the
       // harvest in draw() has not run yet -- it is at the top of its descent,
       // which is the honest answer for this frame.
-      if (seen.has(blub)) return 0;
-      return armed ? liftOf(blub) : 0;
+      //
+      // THE TWO GUARDS ARE BOTH ABOUT A ONE-FRAME POP. `drawWorld` runs before
+      // `drawOverlays`, so this is asked about a body the harvest has not
+      // classified yet, and answering optimistically for something that is
+      // never going to get a circle stands it in mid-air for exactly one frame
+      // before it snaps back down. `eligible` covers the fused monster blub;
+      // the counter covers a scene load, where a whole fleet appears at once
+      // and the harvest is about to prime it away -- past a dozen askers in
+      // one frame this stops guessing and lets them stand.
+      if (!armed || seen.has(blub) || !eligible(blub)) return 0;
+      if (optimistic >= BURST_PRIME) return 0;
+      optimistic++;
+      return liftOf(blub);
     }
     var d = r.voie ? B_DESCENT : A_DESCENT;
     var u = (clock - r.born) / d;
@@ -844,6 +893,7 @@ var BlubFXCircles = (function () {
   }
 
   return {
+    bind: bind,
     draw: draw,
     descentLift: descentLift,
     descentProgress: descentProgress,

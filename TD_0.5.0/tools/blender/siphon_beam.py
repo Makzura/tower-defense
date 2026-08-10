@@ -478,6 +478,24 @@ def knots(s, root, flows, pts, ts, spacing, radius_of, twist_of, mat, profile,
     return made
 
 
+def _arc(pts):
+    return sum(_len(_sub(pts[i + 1], pts[i])) for i in range(len(pts) - 1))
+
+
+def spacing_of(pts, t_from, t_to, count):
+    """THE ONE NUMBER THAT MAKES THE LOOP SEAMLESS, and it is derived rather
+    than typed.
+
+    A flow group translates by exactly one knot spacing over FRAMES frames, so
+    frame FRAMES is frame 0 with every knot in the next knot's slot. That is
+    only true if the translation and the gap between knots are the same number.
+    Written by hand they were not -- thread's eleven knots over a t-span of 1.11
+    on a 1.90 run sit 0.211 apart, and the loop was being translated 0.170, so
+    it stepped 20% short every cycle and the scroll juddered. It is now measured
+    off the polyline the knots were actually placed on."""
+    return _arc(pts) * (t_from - t_to) / float(count - 1)
+
+
 def _sample(pts, ts, t):
     """Point on the polyline at parameter t. Stations are dense enough that a
     straight interpolation between them is the curve."""
@@ -600,7 +618,7 @@ def state_thread(s, node, root):
     right colour by argument, not by default: what is coming up this thread is a
     living thing's life, and it is the only part of the tower that shows it.
     """
-    n = 16
+    n = 20
     ts = taus(n)
     pts = run_path(HANDS, TARGET, n, sag=0.030, sway=0.022)
     rad = lambda t: law_radius(t, 0.0205, 0.0370, 2.6)
@@ -625,8 +643,9 @@ def state_thread(s, node, root):
     sweep(s, "thread_ply", off, [r * 0.42 for r in radii], twists, "BEAD",
           ["hem_fray"] * n, node)
 
-    flows = [Flow(s, root, i, _sub(TARGET, HANDS), 0.170) for i in range(4)]
-    knots(s, root, flows, pts, ts, 0.170, rad, tw, "hem_fray", "BEAD", 11)
+    sp = spacing_of(pts, 1.06, -0.05, 14)
+    flows = [Flow(s, root, i, _sub(TARGET, HANDS), sp) for i in range(4)]
+    knots(s, root, flows, pts, ts, sp, rad, tw, "hem_fray", "BEAD", 14)
 
     tan = _norm(_sub(TARGET, HANDS))
     spout(s, node, HANDS, tan, 0.0370, "skin_dark", "cloth_dark", "cloth_worn")
@@ -675,8 +694,9 @@ def state_ramp(s, node, root):
     sweep(s, "ramp_ply", off, [r * 0.40 for r in radii],
           [-t2 for t2 in twists], "BEAD", ["gold_dark"] * n, node)
 
-    flows = [Flow(s, root, i, _sub(TARGET, HANDS), 0.150) for i in range(4)]
-    knots(s, root, flows, pts, ts, 0.150, rad, tw, "amber", "BEAD", 12)
+    sp = spacing_of(pts, 1.06, -0.05, 13)
+    flows = [Flow(s, root, i, _sub(TARGET, HANDS), sp) for i in range(4)]
+    knots(s, root, flows, pts, ts, sp, rad, tw, "amber", "BEAD", 13)
 
     tan = _norm(_sub(TARGET, HANDS))
     spout(s, node, HANDS, tan, 0.0625, "brass", "gold_dark", "ochre_cloth")
@@ -754,7 +774,12 @@ def state_saturated(s, node, root):
         hpts.append(_add(c, _add(_mul(fu, math.cos(a) * k),
                                  _mul(fv, math.sin(a) * k))))
         hrad.append(rad(tc) * 0.26)
-    flows = [Flow(s, root, i, _sub(TARGET, HANDS), 0.128) for i in range(3)]
+    # The screw's MEAN pitch: 9 turns over the run. It is a mean and not the
+    # pitch, because the pitch deliberately tightens toward the hands and a
+    # variable-pitch screw cannot be scrolled seamlessly by a rigid translation.
+    # The baked loop is therefore an approximation of this one state and the
+    # spec's scroll law is the truth; every other state's loop is exact.
+    flows = [Flow(s, root, 0, _sub(TARGET, HANDS), _arc(pts) / 9.0)]
     sweep(s, "sat_helix", hpts, hrad, [0.0] * hel_n, "BEAD",
           ["amber"] * hel_n, flows[0].node)
 
@@ -826,9 +851,28 @@ def state_seeking(s, node, root):
         sweep(s, "grope_%d" % i, fpts, frad, [a * 0.0 for a in range(fn)],
               "BEAD", ["cloth_dark"] * fn, node)
 
+    # A SECOND STRAND, COME LOOSE. It parted somewhere along the run and now
+    # hangs below the first, still tied at both ends -- which is the difference
+    # between a beam that has been dropped and one that was drawn slack on
+    # purpose. It is also why this state has no straight edge anywhere.
+    ln = 14
+    lpts, lrad = [], []
+    for i in range(ln):
+        u = i / float(ln - 1)
+        t = 0.10 + 0.72 * u
+        c = _sample(pts, ts, t)
+        w = math.sin(math.pi * u)
+        lpts.append((c[0] + 0.055 * w, c[1] - 0.030 * w,
+                     c[2] - 0.145 * w - 0.02 * math.sin(u * 9.0) * w))
+        lrad.append(rad(t) * 0.34)
+    sweep(s, "loose_strand", lpts, lrad, [tw(0.10 + 0.72 * (i / float(ln - 1)))
+                                          for i in range(ln)], "BEAD",
+          ["cloth_dark"] * ln, node)
+
     # Sparse knots, and NONE in the last third: the far end has nothing in it.
-    flows = [Flow(s, root, i, _sub(free, HANDS), 0.205) for i in range(4)]
-    knots(s, root, flows, pts, ts, 0.205, rad, tw, "hem_fray", "BEAD", 7,
+    sp = spacing_of(pts, 0.66, -0.05, 9)
+    flows = [Flow(s, root, i, _sub(free, HANDS), sp) for i in range(4)]
+    knots(s, root, flows, pts, ts, sp, rad, tw, "hem_fray", "BEAD", 9,
           t_from=0.66, t_to=-0.05)
 
     spout(s, node, HANDS, _norm(_sub(pts[1], pts[0])), 0.0330, "cloth_dark",
@@ -854,7 +898,7 @@ def state_gold(s, node, root):
     toward the ring, and they climb it. Origin is RING: A3 is where the sceptre
     arrives and where the beam stops coming out of the hands.
     """
-    n = 15
+    n = 18
     ts = taus(n)
     pts = run_path(RING, TARGET, n, sag=0.016, sway=-0.026)
     rad = lambda t: law_radius(t, 0.0420, 0.0820, 1.55)
@@ -880,11 +924,12 @@ def state_gold(s, node, root):
     sweep(s, "gold_seam", seam, [r * 0.30 for r in radii], twists, "BEAD",
           ["gold"] * n, node)
 
-    flows = [Flow(s, root, i, _sub(TARGET, RING), 0.145) for i in range(4)]
+    sp = spacing_of(pts, 1.05, -0.06, 15)
+    flows = [Flow(s, root, i, _sub(TARGET, RING), sp) for i in range(4)]
     # THE GRAINS. Boxes, rolled off-axis, GROWING toward the ring. Cast metal,
     # picked up and carried -- not a particle effect.
-    for i in range(13):
-        t = 1.05 - 1.11 * i / 12.0
+    for i in range(15):
+        t = 1.05 - 1.11 * i / 14.0
         c = _sample(pts, ts, t)
         tc = max(0.0, min(1.0, t))
         tan = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
@@ -946,11 +991,13 @@ def state_column(s, node, root):
     _body(s, node, "column", pts, radii, twists, "FLUTE", mats)
 
     tan = _norm(_sub(pts[-1], pts[0]))
-    # THE ASTRAGALS between drums.
-    for i, t in enumerate((0.80, 0.60, 0.40, 0.20)):
+    # THE ASTRAGALS between drums. Three, not four: the drum nearest the enemy
+    # runs into the plinth without a moulding, which is another place this is
+    # not the same object end to end.
+    for i, t in enumerate((0.78, 0.55, 0.30)):
         c = _sample(pts, ts, t)
         ring(s, "astragal_%d" % i, c, tan, rad(t) * 1.10, rad(t) * 0.15,
-             "gold", node, 9, 4)
+             "gold", node, 8, 4)
 
     # THE CAPITAL, at the ring end. Echinus, then an abacus set at 18 degrees
     # with unequal overhangs -- the piece that makes this masonry.
@@ -977,9 +1024,10 @@ def state_column(s, node, root):
     # THE FLUTE CHEVRONS. Small notches sunk in the grooves, every one of them
     # pointing at the capital. Chevrons IN THE MATTER, which is what the socle
     # permits and an overlay is not.
-    flows = [Flow(s, root, i, _sub(pts[-1], pts[0]), 0.150) for i in range(4)]
-    for i in range(11):
-        t = 0.96 - 0.92 * i / 10.0
+    sp = spacing_of(pts, 0.96, 0.04, 8)
+    flows = [Flow(s, root, i, _sub(pts[-1], pts[0]), sp) for i in range(4)]
+    for i in range(8):
+        t = 0.96 - 0.92 * i / 7.0
         c = _sample(pts, ts, t)
         tanl = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
                           _sample(pts, ts, max(0.0, t - 0.03))))
@@ -1023,7 +1071,7 @@ def state_tendon(s, node, root):
     toward the tower" made out of muscle. These are transfer pulses and they are
     the only pulses this file contains.
     """
-    n = 18
+    n = 14
     ts = taus(n)
     pts = run_path(HANDS, TARGET, n, sag=0.115, sway=0.085, kink=0.022,
                    kink_n=6.0)
@@ -1034,9 +1082,9 @@ def state_tendon(s, node, root):
 
     # THE SHEATH, IN BANDS. Eleven of them, each two stations long, with a real
     # gap between: the windows are how the cords show through.
-    for b in range(11):
-        t0 = 0.02 + b * 0.089
-        t1 = t0 + 0.055
+    for b in range(9):
+        t0 = 0.02 + b * 0.109
+        t1 = t0 + 0.070
         bp, br, bt = [], [], []
         for k in range(3):
             t = t0 + (t1 - t0) * k / 2.0
@@ -1069,16 +1117,17 @@ def state_tendon(s, node, root):
 
     # THE CONSTRICTIONS -- peristalsis. Rings that travel toward the hands and
     # are LARGER the nearer they are, so the swallowing reads without a pulse.
-    flows = [Flow(s, root, i, _sub(TARGET, HANDS), 0.190) for i in range(4)]
-    for i in range(9):
-        t = 1.04 - 1.09 * i / 8.0
+    sp = spacing_of(pts, 1.04, -0.05, 8)
+    flows = [Flow(s, root, i, _sub(TARGET, HANDS), sp) for i in range(4)]
+    for i in range(8):
+        t = 1.04 - 1.09 * i / 7.0
         tc = max(0.0, min(1.0, t))
         c = _sample(pts, ts, t)
         tanl = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
                           _sample(pts, ts, max(0.0, t - 0.03))))
         g = min(3, int((1.0 - tc) * 4))
         ring(s, "constrict_%d" % i, c, tanl, rad(tc) * (0.92 + 0.34 * (1 - tc)),
-             rad(tc) * 0.26, "oil_black", flows[g].node, 7, 4)
+             rad(tc) * 0.26, "oil_black", flows[g].node, 6, 3)
         # One asymmetric nodule per constriction: a valve, on alternating sides.
         fu = _norm(_sub((0, 0, 1), _mul(tanl, _dot((0, 0, 1), tanl))))
         fv = _cross(tanl, fu)
@@ -1087,7 +1136,7 @@ def state_tendon(s, node, root):
         bead_ball(s, "nodule_%d" % i, rad(tc) * 0.34,
                   _add(c, _add(_mul(fu, math.cos(a) * k),
                                _mul(fv, math.sin(a) * k))),
-                  "rose_dim" if i % 2 else "membrane", flows[g].node, 5, 3)
+                  "rose_dim" if i % 2 else "membrane", flows[g].node, 4, 3)
 
     # THE VALVE at the hands: an offset bulb with two unequal ducts entering it.
     tan = _norm(_sub(pts[1], pts[0]))
@@ -1537,9 +1586,19 @@ def _check_revolved(name, meshes, run_dir):
     return worst, who
 
 
+SOURCE_TOL = 0.12       # a spout's width: anything starting inside this is
+                        # leaving the origin, wherever exactly it is pinned
+
+
 def _check_single_source(name, origin, starts):
-    """`chain` bounces; it does not fork. One body may leave the origin."""
-    at = [p for p in starts if _len(_sub(p, origin)) < 1e-6]
+    """`chain` bounces; it does not fork. One body may leave the origin.
+
+    Measured with a tolerance rather than exactly, because `tendon`'s bundle is
+    pinned by its core cord, which sits a fibre's width off the origin -- and a
+    second cord starting a fibre's width away is still the same line leaving the
+    hands. Two SEPARATE runs would be metres apart at the far end and both
+    inside the tolerance here, which is exactly what this is for."""
+    at = [p for p in starts if _len(_sub(p, origin)) < SOURCE_TOL]
     if len(at) != 1:
         raise SystemExit("%s: %d bodies leave the origin -- the beam must not "
                          "split at the source" % (name, len(at)))

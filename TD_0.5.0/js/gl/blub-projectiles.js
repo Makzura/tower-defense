@@ -496,7 +496,7 @@ var BlubFXShots = (function () {
     var d = Math.sqrt(dx * dx + dy * dy) || 1;
     var ux = dx / d, uy = dy / d;
     var spec = b.laser || { widthUl: 10 };
-    var halfW = ul(spec.widthUl || 10) / 2;
+    var halfW = U(spec.widthUl || 10) / 2;
     var r = b.footprintPx || 12;
 
     var i = take(lances, lanceAt); lanceAt = (i + 1) % LANCE_CAP;
@@ -550,16 +550,25 @@ var BlubFXShots = (function () {
       // HITSCAN.  The line is whole on the first frame and the impact happens
       // now, not at the end of a flight -- which is the single clearest way the
       // machines read as a different weapon from the creatures.
-      var rec = spawnShot(b, prof, mx, my, mz, g0, tr.x, tr.y, g1, 0, 0, st.seed);
-      rec.wide = 1;
+      spawnShot(b, prof, mx, my, mz, g0, tr.x, tr.y, g1, 0, 0, st.seed);
       spawnFlash(mx, my, mz, g0, ux, uy, prof.flash, prof.flashC, prof.flashLife,
         prof.kick ? 1 : 0, r);
       if (prof.casing && detail > 0.4) spawnCasing(mx, my, mz, g0, ux, uy, prof.casingSize);
-      // The spark and the scorch pinpoint: straight ticks and a dark dot, both
-      // gone inside 0.13 s.  Nothing wet, nothing round, nothing that stays.
-      spawnDecal(tr.x, tr.y, prof.spark, prof.sparkLife, C.sparkC, C.scorch,
+
+      // The impact: straight ticks for a tenth of a second, then a dark
+      // pinpoint that stays a little longer.  One record, two phases -- nothing
+      // wet, nothing round, nothing that spreads.
+      var mark = spawnDecal(tr.x, tr.y, prof.spark, 0.42, C.sparkC, C.scorch,
         0.55, 1, 0, (st.seed + b.attacksMade) >>> 0, prof.scorch);
+      mark.sub = prof.sparkLife;
+
+      // The chassis shoves itself backwards, and leaves that on the ground.
       st.kick = prof.recoil;
+      if (prof.kick && detail >= 0.5) {
+        var kick = spawnDecal(b.x - ux * r * 0.85, b.y - uy * r * 0.85, r * 0.85,
+          0.34, C.scorch, C.scorch, 0.26, 2, 0, st.seed, 0);
+        kick.ang = Math.atan2(uy, ux);
+      }
       return;
     }
 
@@ -577,7 +586,7 @@ var BlubFXShots = (function () {
       // The Hungry Blub's puddle is drawn at the unit's REAL splash radius, read
       // off the live blub rather than typed here, so the wet patch and the
       // damage it stands for cannot drift apart.
-      if (prof.puddle) one.wide = ul(b.splashUl || 8);
+      if (prof.puddle) one.wide = U(b.splashUl || 8);
       return;
     }
 
@@ -675,6 +684,8 @@ var BlubFXShots = (function () {
       budget--;
       spawnFor(b, tr, state);
     }
+    // Nothing past the count may keep a dead blub alive by reference.
+    for (var k = superbN; k < SUPERB_CAP; k++) superbs[k] = null;
   }
 
   // Idempotent per frame: both public draw calls run it, so the module still
@@ -752,10 +763,12 @@ var BlubFXShots = (function () {
   }
 
   // The machines' mark: a dark pinpoint where the round went in.  Deliberately
-  // NOT a splat -- it is small, hard-edged, and it does not spread.
+  // NOT a splat -- it is small, hard-edged, and it does not spread.  Its radius
+  // is FIXED for its whole life, which is the other half of the contrast: an
+  // organic splat grows as it lands and a bullet hole does not.
   function drawScorch(d) {
     var t = d.t / d.life;
-    var a = 0.34 * (1 - t) * crowd;
+    var a = 0.32 * (1 - t * t) * crowd;
     if (a < 0.012 || !d.wide) return;
     if (!groundFrame(d.x, d.y, d.wide)) return;
     var ctx = X;
@@ -765,6 +778,26 @@ var BlubFXShots = (function () {
     ctx.fillStyle = d.col2;
     ctx.beginPath();
     ctx.arc(0, 0, 1, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // The Mechablub MK2 and the SuperBlub shove the ground when they fire: one
+  // smeared mark behind the feet, along the recoil, fading in a third of a
+  // second.  It is the only evidence of recoil that survives without the
+  // renderer agreeing to move the mesh (see `recoil` below for that half).
+  function drawKick(d) {
+    var t = d.t / d.life;
+    var a = d.a0 * (1 - t) * crowd;
+    if (a < 0.015) return;
+    if (!groundFrame(d.x, d.y, d.r)) return;
+    var ctx = X;
+    ctx.save();
+    ctx.transform(FR.a, FR.b, FR.c, FR.d, FR.e, FR.f);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = d.col;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.90 + 0.40 * t, 0.34 + 0.16 * t, d.ang, 0, TAU);
     ctx.fill();
     ctx.restore();
   }
@@ -806,26 +839,6 @@ var BlubFXShots = (function () {
     ctx.globalAlpha = 1;
   }
 
-  // The Mechablub MK2 and the SuperBlub shove the ground when they fire.  Two
-  // short marks behind the feet -- the only evidence of recoil that survives
-  // without touching the model.
-  function drawKick(f) {
-    var t = f.t / f.life;
-    var a = 0.30 * (1 - t) * crowd;
-    if (a < 0.02) return;
-    var r = f.r * 0.9;
-    if (!groundFrame(f.x - f.ux * r * 0.9, f.y - f.uy * r * 0.9, r)) return;
-    var ctx = X;
-    ctx.save();
-    ctx.transform(FR.a, FR.b, FR.c, FR.d, FR.e, FR.f);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = C.scorch;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 0.85 + 0.35 * t, 0.42 + 0.2 * t, 0, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-  }
-
   // --- drawing: the air pass ----------------------------------------------
 
   // Scratch for the projection callbacks, so nothing allocates a closure inside
@@ -863,14 +876,23 @@ var BlubFXShots = (function () {
     // The trail, first, so the body sits on it.  The Cyberblub's is the long
     // one and the only one that is a different colour from its own skin -- the
     // energised spit §10 asks for.
-    if (p.tail > 0 && detail >= 0.5) {
-      var bt = t - p.tail;
-      if (bt > 0) {
-        var bx = r.x0 + (r.x1 - r.x0) * bt;
-        var by = r.y0 + (r.y1 - r.y0) * bt;
-        var bz = r.z0 + (r.z1 - r.z0) * bt + r.apex * 4 * bt * (1 - bt);
-        var tail = projectPinned(bx, by, bz, r.g0 + (r.g1 - r.g0) * bt);
-        if (tail) {
+    //
+    // ITS TAIL POINT ALSO GIVES THE BODY ITS ANGLE, which is why it is computed
+    // even when the trail is not drawn: the squash has to follow the heading ON
+    // SCREEN, and under an orbited camera that is not the world heading. Taking
+    // it from a point the shot has actually been costs nothing extra here and
+    // one whole projection per shot per frame if it is asked for separately.
+    var ang = 0, sq = 1;
+    var bt = t - (p.tail > 0 ? p.tail : 0.06);
+    if (bt > 0) {
+      var bx = r.x0 + (r.x1 - r.x0) * bt;
+      var by = r.y0 + (r.y1 - r.y0) * bt;
+      var bz = r.z0 + (r.z1 - r.z0) * bt + r.apex * 4 * bt * (1 - bt);
+      var tail = projectPinned(bx, by, bz, r.g0 + (r.g1 - r.g0) * bt);
+      if (tail) {
+        var vx = head.x - tail.x, vy = head.y - tail.y;
+        if (vx * vx + vy * vy > 2.5) { ang = Math.atan2(vy, vx); sq = 0.74; }
+        if (p.tail > 0 && detail >= 0.5) {
           ctx.lineCap = "round";
           ctx.globalAlpha = a * (p.trail ? 0.55 : 0.32);
           ctx.strokeStyle = p.trail ? C.cTrail : p.skin;
@@ -881,20 +903,6 @@ var BlubFXShots = (function () {
           ctx.stroke();
           ctx.lineCap = "butt";
         }
-      }
-    }
-
-    // The body.  Squashed along the direction it is travelling on screen, which
-    // is what makes a thrown thing look thrown rather than hovering.
-    var ang = 0, sq = 1;
-    if (r.dist > 1) {
-      // Heading on SCREEN, taken from the two endpoints of the arc rather than
-      // from the world heading -- under an orbited camera they are not the same
-      // angle and the wrong one makes the squash read as a wobble.
-      var e0 = projectPinned(r.x0, r.y0, r.z0, r.g0);
-      if (e0) {
-        var vx = head.x - e0.x, vy = head.y - e0.y;
-        if (vx * vx + vy * vy > 4) { ang = Math.atan2(vy, vx); sq = 0.74; }
       }
     }
 
@@ -1036,7 +1044,7 @@ var BlubFXShots = (function () {
   // circle -- the shockwave shape belongs to gl-world's own blasts and using it
   // here would put a bullet strike in the same visual family as an explosion.
   function drawSpark(d) {
-    var t = d.t / d.life;
+    var t = d.t / d.sub;                            // the hot phase only
     var p = A.project(d.x, d.y, 9);
     if (!p || offScreen(p.x, p.y, 60)) return;
     var ctx = X;
@@ -1096,7 +1104,6 @@ var BlubFXShots = (function () {
   // exactly that -- so what persists is a thin core and the flat ground mark.
   function drawLance(L) {
     var t = L.t / L.life;
-    var a = A.project ? null : null;
     var head = projectPinned(L.x, L.y, L.z, L.g);
     if (!head) return;
 
@@ -1211,17 +1218,19 @@ var BlubFXShots = (function () {
     // and at top level, NOT inside a withGround: a decal is placed on its own
     // ground and pins its own reference.
     drawGround: function (ctx, state, api) {
-      tick(state);
+      // BOUND BEFORE TICKED, and that order is load-bearing: harvesting a new
+      // shot asks the renderer for the ground height under the blub and under
+      // its target, and an unbound module would answer 0 for both -- putting
+      // every shot fired from a raised deck at the height of the floor.
       if (!bind(ctx, api)) return;
+      tick(state);
       var i;
       for (i = 0; i < DECAL_CAP; i++) {
         var d = decals[i];
         if (!d.on) continue;
-        if (d.kind === 0) drawSplat(d); else drawScorch(d);
-      }
-      for (i = 0; i < FLASH_CAP; i++) {
-        var f = flashes[i];
-        if (f.on && f.kick) drawKick(f);
+        if (d.kind === 0) drawSplat(d);
+        else if (d.kind === 1) drawScorch(d);
+        else drawKick(d);
       }
       for (i = 0; i < LANCE_CAP; i++) {
         if (lances[i].on) drawLanceGround(lances[i]);
@@ -1236,8 +1245,8 @@ var BlubFXShots = (function () {
     // drawShots is where it is: shots go over the hardware that fired them and
     // under the cosmetic burst layer.
     drawAir: function (ctx, state, api) {
-      tick(state);
       if (!bind(ctx, api)) return;
+      tick(state);                                 // a no-op if drawGround ran
       var i;
       for (i = 0; i < SHOT_CAP; i++) {
         var r = shots[i];
@@ -1247,7 +1256,7 @@ var BlubFXShots = (function () {
       for (i = 0; i < FLASH_CAP; i++) if (flashes[i].on) drawFlash(flashes[i]);
       for (i = 0; i < DECAL_CAP; i++) {
         var d = decals[i];
-        if (d.on && d.kind === 1) drawSpark(d);
+        if (d.on && d.kind === 1 && d.t < d.sub) drawSpark(d);
       }
       for (i = 0; i < CASING_CAP; i++) if (casings[i].on) drawCasing(casings[i]);
       for (i = 0; i < LANCE_CAP; i++) if (lances[i].on) drawLance(lances[i]);

@@ -200,14 +200,14 @@ var BlubFXSystems = (function () {
 
   var MAX_DEATHS = 24;
   var MAX_DECALS = 48;
-  // More than this many blubs leaving `towers` in ONE frame is not a wave of
-  // deaths, it is a bulk removal -- restartGame() emptying the array, or a
-  // board teardown. Coagulation is already silent (Blub.dissolve goes through
-  // sellTower, which sets `removed`), so this guard exists for the restart
-  // case, where every body is still alive and simply stopped being on a board.
-  // Twenty-four simultaneous genuine deaths is already beyond anything the
-  // summon intervals can produce.
-  var BULK_DROP = 12;
+  // A BACKSTOP, NOT THE TEARDOWN TEST. The teardown test is the owner check in
+  // update() -- restartGame() empties `towers`, so a body that vanished
+  // alongside its own summoner did not die, the board did. This number only
+  // catches something pathological that the owner test cannot explain, and it
+  // sits above anything the summon intervals can actually produce: three
+  // hundred Mini Blubs at 3/s spend roughly fifteen charges in a frame, of
+  // which two or three are somebody's last.
+  var BULK_DROP = 32;
 
   // --- state ----------------------------------------------------------------
   //
@@ -227,6 +227,7 @@ var BlubFXSystems = (function () {
   // Scratch, reused every frame. Nothing here is allocated in a loop.
   var live = [];
   var gone = [];
+  var hosts = [];          // the summoners standing this frame -- see update()
 
   // --- the shared ground frame ---------------------------------------------
   //
@@ -343,9 +344,17 @@ var BlubFXSystems = (function () {
     var i, b, rec;
 
     var list = state.towers;
+    hosts.length = 0;
     for (i = 0; i < list.length; i++) {
       b = list[i];
-      if (!b || !b.isSummon) continue;
+      if (!b) continue;
+      if (!b.isSummon) {
+        // The summoners standing right now. A board is never carrying more
+        // than a handful, so this is a short array and a linear scan, not a
+        // second Map.
+        if (b.constructor && b.constructor.ID === "blub") hosts.push(b);
+        continue;
+      }
       rec = watch.get(b);
       if (rec) {
         rec.x = b.x; rec.y = b.y; rec.aim = b.aim; rec.seen = now;
@@ -359,13 +368,24 @@ var BlubFXSystems = (function () {
       if (r.seen !== now) gone.push(key);
     });
 
-    // A bulk disappearance is a board being torn down, not a fleet dying.
     var bulk = gone.length > BULK_DROP;
     for (i = 0; i < gone.length; i++) {
       b = gone[i];
       rec = watch.get(b);
       watch["delete"](b);
-      if (bulk || b.removed === true) continue;   // silent: sold, merged, reset
+      // SILENT REMOVALS, and there are three of them.
+      //
+      //   removed          the sell button, and Coagulation absorbing its own
+      //                    fleet -- Blub.dissolve goes through sellTower for
+      //                    exactly this reason, so a merge is one event and not
+      //                    a hundred simultaneous bursts.
+      //   owner gone       restartGame() empties `towers`, so a body that
+      //                    vanished together with its own summoner did not die;
+      //                    the board did. A blub whose summoner is destroyed by
+      //                    an enemy keeps standing and keeps shooting, so this
+      //                    test never mistakes a real death for a teardown.
+      //   bulk             the backstop above, for anything neither explains.
+      if (bulk || b.removed === true || !hosted(b)) continue;
       spawnDeath(b, rec);
     }
 
@@ -388,6 +408,15 @@ var BlubFXSystems = (function () {
         }
       }
     }
+  }
+
+  // Is this body's summoner still on the board? A blub with no `owner` at all
+  // is not something this file has an opinion about, so it is treated as
+  // hosted -- the fallback is to draw the death, never to swallow it.
+  function hosted(b) {
+    if (!b.owner) return true;
+    for (var i = 0; i < hosts.length; i++) if (hosts[i] === b.owner) return true;
+    return false;
   }
 
   // Which colour family a body belongs to: 0 path A, 1 path B, 2 uncommitted,
@@ -737,6 +766,11 @@ var BlubFXSystems = (function () {
       var radius = (e.radiusPx ? e.radiusPx() : 11) * 1.18;
       var k = enterGround(ctx, p, radius);
       var lw = 1 / k;
+      // DETAIL THE PLAYER CANNOT RESOLVE IS DETAIL NOT WORTH DRAWING. Zoomed
+      // out, or on a Swarm tick eight pixels across, the rune's legs and the
+      // capped ring are sub-pixel clutter -- so below this the mark keeps only
+      // the two shapes that carry the reading, the track and the fill.
+      var detailed = radius * (p.scale || 1) > 9;
 
       // The track the fill runs in -- always a whole circle, so "how much of
       // it is lit" is answerable at a glance instead of by estimating an arc
@@ -749,16 +783,18 @@ var BlubFXSystems = (function () {
 
       // The rune's three legs, so this reads as a mark someone put there and
       // not as another status ring.
-      ctx.beginPath();
-      for (var g = 0; g < 3; g++) {
-        var a = -1.5708 + g * 2.0944;
-        var ca = Math.cos(a), sa = Math.sin(a);
-        ctx.moveTo(ca * 0.62, sa * 0.62);
-        ctx.lineTo(ca * 1.22, sa * 1.22);
+      if (detailed) {
+        ctx.beginPath();
+        for (var g = 0; g < 3; g++) {
+          var a = -1.5708 + g * 2.0944;
+          var ca = Math.cos(a), sa = Math.sin(a);
+          ctx.moveTo(ca * 0.62, sa * 0.62);
+          ctx.lineTo(ca * 1.22, sa * 1.22);
+        }
+        ctx.strokeStyle = rung(SIG_LEG, open);
+        ctx.lineWidth = lw * 1.2;
+        ctx.stroke();
       }
-      ctx.strokeStyle = rung(SIG_LEG, open);
-      ctx.lineWidth = lw * 1.2;
-      ctx.stroke();
 
       // THE FILL. From twelve o'clock, clockwise, exactly fraction/CAP of the
       // circle. This is the whole readout.
@@ -780,7 +816,7 @@ var BlubFXSystems = (function () {
 
       // CAPPED. +100% is the ceiling DamageAmp enforces and the one moment in
       // this readout worth marking, so the mark closes on itself.
-      if (fill > 0.999) {
+      if (detailed && fill > 0.999) {
         ctx.beginPath();
         ctx.arc(0, 0, 1.3, 0, 6.283185);
         ctx.strokeStyle = rung(SIG_FILL, open * 0.7);

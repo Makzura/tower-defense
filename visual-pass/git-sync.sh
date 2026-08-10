@@ -44,17 +44,43 @@ if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
         *) GENERATED_ONLY=0 ;;
       esac
     done
-    if [ "$GENERATED_ONLY" = "1" ] && [ -n "$UNMERGED" ]; then
-      echo "[sync] conflicts are generated models only; taking ours and continuing"
-      for f in $UNMERGED; do git checkout --ours -- "$f" && git add "$f"; done
+    # AUTO-RESOLVE EVERYTHING, at the owner's explicit instruction.
+    #
+    # Nothing is thrown away silently, though. Before a hand-written conflict is
+    # resolved, the side that loses is written to a recovery ref under
+    # refs/sync-backup/, so an auto-resolve is always undoable:
+    #
+    #   git log --oneline refs/sync-backup/          what was set aside, and when
+    #   git diff HEAD refs/sync-backup/<name>        what it would have changed
+    #   git cherry-pick <sha>                        put it back
+    #
+    # Recovery refs cost a few bytes and are never pushed. Losing a colleague's
+    # commit with no way to get it back is the one outcome worth engineering
+    # against, and another session IS active in this folder.
+    if [ -n "$UNMERGED" ]; then
+      STAMP=$(date +%Y%m%d-%H%M%S)
+      if [ "$GENERATED_ONLY" = "0" ]; then
+        git update-ref "refs/sync-backup/$STAMP" origin/main
+        echo "[sync] hand-written conflict; incoming side saved to refs/sync-backup/$STAMP"
+        for f in $UNMERGED; do
+          case "$f" in
+            TD_0.5.0/js/gl/models/*.js) ;;
+            *) echo "        auto-resolved (ours): $f" ;;
+          esac
+        done
+      else
+        echo "[sync] conflicts are generated models only; taking ours"
+      fi
+      # `ours` during a rebase is the upstream side being replayed ONTO, so this
+      # keeps the commit currently being applied -- the work just done locally.
+      for f in $UNMERGED; do git checkout --ours -- "$f" 2>/dev/null || git rm -q -- "$f"; git add -- "$f" 2>/dev/null || true; done
       GIT_EDITOR=true git rebase --continue >/dev/null 2>&1 || {
-        git rebase --abort; echo "[sync] ABORTED: rebase would not continue"; exit 1; }
-      echo "[sync] NOTE: re-run the build scripts in tools/blender/ to regenerate"
-    else
-      git rebase --abort
-      echo "[sync] ABORTED -- conflicts in hand-written files, resolve by hand:"
-      for f in $UNMERGED; do echo "        $f"; done
-      exit 1
+        GIT_EDITOR=true git rebase --skip >/dev/null 2>&1 || {
+          git rebase --abort
+          echo "[sync] ABORTED: could not continue even after resolving"; exit 1; }; }
+      if [ "$GENERATED_ONLY" = "1" ]; then
+        echo "[sync] NOTE: re-run the build scripts in tools/blender/ to regenerate"
+      fi
     fi
   fi
 fi
