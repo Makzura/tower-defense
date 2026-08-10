@@ -296,8 +296,8 @@ var BlubFXSystems = (function () {
 
   function reset() {
     if (watch) watch.clear();
-    while (deaths.length) pool.push(deaths.pop());
-    while (decals.length) pool.push(decals.pop());
+    while (deaths.length) retire(deaths.pop());
+    while (decals.length) retire(decals.pop());
     dying.length = 0;
     token = -1;
     frameToken = -1;
@@ -308,6 +308,17 @@ var BlubFXSystems = (function () {
       b: null, kind: 0, tint: 0, x0: 0, y0: 0, x1: 0, y1: 0,
       r: 8, dist: 0, t: 0, rot: 0, blastR: 0, yaw: 0
     };
+  }
+
+  // DROP THE BODY BEFORE THE RECORD IS REUSED. A pooled record that kept its
+  // `b` would hold a dead blub -- and through its `owner`, a whole summoner and
+  // that summoner's fleet -- alive for as long as the pool lived. The decal
+  // never had the reference in the first place (see spawnDecal); this is the
+  // death record giving it up the moment its picture is over.
+  function retire(rec) {
+    if (!rec) return;
+    rec.b = null;
+    pool.push(rec);
   }
 
   // Game seconds since the last frame. REAL elapsed time scaled by the speed
@@ -398,13 +409,13 @@ var BlubFXSystems = (function () {
         if (d.t >= span) {
           spawnDecal(d);
           deaths.splice(i, 1);
-          pool.push(d);
+          retire(d);
         }
       }
       for (i = decals.length - 1; i >= 0; i--) {
         decals[i].t += dt;
         if (decals[i].t >= (decals[i].kind ? MK2_DECAL_S : DECAL_S)) {
-          pool.push(decals.splice(i, 1)[0]);
+          retire(decals.splice(i, 1)[0]);
         }
       }
     }
@@ -432,9 +443,11 @@ var BlubFXSystems = (function () {
   function spawnDeath(b, rec) {
     if (!b || !rec) return;
     if (deaths.length >= MAX_DEATHS) {
-      // The oldest picture is the one the player has already read.
+      // The oldest picture is the one the player has already read. It skips
+      // straight to its stain rather than being dropped, so a body that died
+      // still leaves the mark that says so.
       spawnDecal(deaths[0]);
-      pool.push(deaths.shift());
+      retire(deaths.shift());
     }
     var d = record();
     d.b = b;
@@ -473,7 +486,7 @@ var BlubFXSystems = (function () {
 
   function spawnDecal(d) {
     if (!d) return;
-    if (decals.length >= MAX_DECALS) pool.push(decals.shift());
+    if (decals.length >= MAX_DECALS) retire(decals.shift());
     var c = record();
     c.b = null;                     // the decal outlives the body; drop the ref
     c.kind = d.kind;
@@ -495,26 +508,41 @@ var BlubFXSystems = (function () {
   // silhouette work the rest of this pass is about, and a leap the player has
   // to ANTICIPATE has to be a body they can see travelling.
   //
-  // Returns a reused array. Do not hold it across frames.
+  // Returns a REUSED array of REUSED records -- valid until the next call, and
+  // never to be held across frames. `n` is how many of `dying` are live; the
+  // slots past it are last frame's, kept so this allocates nothing at all.
+  var slots = [];
+  var dyingCount = 0;
+
+  function dyingSlot() {
+    if (slots.length <= dyingCount) {
+      slots.push({ blub: null, x: 0, y: 0, yaw: 0, scale: 1, lift: 0, glow: 0 });
+    }
+    var s = slots[dyingCount++];
+    dying.push(s);
+    return s;
+  }
+
   function dyingBodies() {
+    dyingCount = 0;
     dying.length = 0;
+    var slot;
     for (var i = 0; i < deaths.length; i++) {
       var d = deaths[i];
       if (d.kind === 0) {
         if (d.t >= INFLATE_S) continue;           // it has burst; nothing left
         var p = d.t / INFLATE_S;
         var e = p * p * (3 - 2 * p);              // smoothstep: swell, not ramp
-        dying.push({
-          blub: d.b, x: d.x1, y: d.y1, yaw: d.yaw,
-          // Over-pressure. 1.8x is enough to read at a Mini Blub's ten pixels
-          // and still not swallow whatever is standing beside it.
-          scale: 1 + 0.80 * e,
-          lift: 0,
-          // Lit from INSIDE, through the model's own emissive channel -- the
-          // house rule (DIRECTION.md): light comes off the geometry, never off
-          // a disc pasted over it.
-          glow: 1.55 * e * e
-        });
+        slot = dyingSlot();
+        slot.blub = d.b; slot.x = d.x1; slot.y = d.y1; slot.yaw = d.yaw;
+        // Over-pressure. 1.8x is enough to read at a Mini Blub's ten pixels
+        // and still not swallow whatever is standing beside it.
+        slot.scale = 1 + 0.80 * e;
+        slot.lift = 0;
+        // Lit from INSIDE, through the model's own emissive channel -- the
+        // house rule (DIRECTION.md): light comes off the geometry, never off a
+        // disc pasted over it.
+        slot.glow = 1.55 * e * e;
       } else {
         if (d.t >= LEAP_S) continue;              // it has landed
         var q = d.t / LEAP_S;
@@ -522,15 +550,14 @@ var BlubFXSystems = (function () {
         // with a floor under it, so a short hop still visibly leaves the ground
         // and a long one is unmistakable from across the board.
         var arc = Math.max(26, d.dist * 0.45);
-        dying.push({
-          blub: d.b,
-          x: d.x0 + (d.x1 - d.x0) * q,
-          y: d.y0 + (d.y1 - d.y0) * q,
-          yaw: d.yaw,
-          scale: 1 + 0.12 * Math.sin(Math.PI * q),
-          lift: arc * 4 * q * (1 - q),
-          glow: 0.25 + 1.45 * q * q
-        });
+        slot = dyingSlot();
+        slot.blub = d.b;
+        slot.x = d.x0 + (d.x1 - d.x0) * q;
+        slot.y = d.y0 + (d.y1 - d.y0) * q;
+        slot.yaw = d.yaw;
+        slot.scale = 1 + 0.12 * Math.sin(Math.PI * q);
+        slot.lift = arc * 4 * q * (1 - q);
+        slot.glow = 0.25 + 1.45 * q * q;
       }
     }
     return dying;

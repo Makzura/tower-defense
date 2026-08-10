@@ -116,20 +116,25 @@ var BlubFXShots = (function () {
 
   var PROFILES = {
     // --- family A: it is thrown, and it is wet ---------------------------
+    // SPLAT RADII ARE DELIBERATELY MODEST.  These three units have no splash --
+    // their damage lands on one body -- so a wide mark would be a lie about
+    // reach, and it would also out-size the Hungry Blub's puddle, which is the
+    // one organic impact that really does cover an area.  The ladder that has to
+    // hold is: pellet tick < gob splat < puddle.
     blub1: { mode: ORGANIC, life: 0.30, arcK: 0.42, arcMin: 26, arcMax: 78,
       body: 3.3, tail: 0.055, pellets: 1, spread: 0,
       skin: C.aSkin, core: C.aCore, rim: C.aRim, wet: C.aWet,
-      splat: 6.5, splatLife: 0.62, splatA: 0.26, flecks: 3,
+      splat: 4.4, splatLife: 0.62, splatA: 0.26, flecks: 3,
       muzzle: [0.55, 1.15] },
     blub2: { mode: ORGANIC, life: 0.30, arcK: 0.42, arcMin: 28, arcMax: 84,
       body: 4.1, tail: 0.055, pellets: 1, spread: 0,
       skin: C.aSkin, core: C.aCore, rim: C.aRim, wet: C.aWet,
-      splat: 8.5, splatLife: 0.70, splatA: 0.28, flecks: 4,
+      splat: 5.4, splatLife: 0.70, splatA: 0.28, flecks: 4,
       muzzle: [0.55, 1.15] },
     blub3: { mode: ORGANIC, life: 0.31, arcK: 0.44, arcMin: 30, arcMax: 90,
       body: 5.0, tail: 0.06, pellets: 1, spread: 0,
       skin: C.aSkin, core: C.aCore, rim: C.aRim, wet: C.aWet,
-      splat: 10.5, splatLife: 0.78, splatA: 0.30, flecks: 5,
+      splat: 6.4, splatLife: 0.78, splatA: 0.30, flecks: 5,
       muzzle: [0.55, 1.18] },
 
     // --- the minis: a hail, on a machine-gun cadence -----------------------
@@ -165,7 +170,7 @@ var BlubFXShots = (function () {
     cyber: { mode: ORGANIC, life: 0.17, arcK: 0.30, arcMin: 16, arcMax: 52,
       body: 3.2, tail: 0.10, pellets: 1, spread: 0, trail: true,
       skin: C.cSkin, core: C.cCore, rim: C.cTrail, wet: C.cWet,
-      splat: 5.5, splatLife: 0.40, splatA: 0.24, flecks: 3,
+      splat: 4.6, splatLife: 0.40, splatA: 0.24, flecks: 3,
       muzzle: [0.60, 1.10] },
 
     // --- the machines: nothing travels, everything is straight -------------
@@ -319,7 +324,11 @@ var BlubFXShots = (function () {
   var NOSTATE = { seen: null, kick: 0, kickAt: 0, seed: 1 };
 
   function fxState(b) {
-    if (!STATE) return NOSTATE;
+    // The fallback record is SHARED, so the only field it can honestly carry is
+    // one derived from the blub in front of it. `kick` is meaningless there and
+    // `recoil` returns 0 for that reason; `seed` still has to vary or every
+    // splat on the board would be the same shape.
+    if (!STATE) { NOSTATE.seed = seedOf(b); return NOSTATE; }
     var s = STATE.get(b);
     if (!s) { s = { seen: null, kick: 0, kickAt: 0, seed: seedOf(b) }; STATE.set(b, s); }
     return s;
@@ -464,11 +473,11 @@ var BlubFXShots = (function () {
     return (typeof ul === "function") ? ul(v) : v * 1.04;
   }
 
-  function spawnFlash(x, y, z, g, ux, uy, size, col, life, kick, r) {
+  function spawnFlash(x, y, z, g, ux, uy, size, col, life, kick) {
     var i = take(flashes, flashAt); flashAt = (i + 1) % FLASH_CAP;
     var f = flashes[i];
     f.on = 1; f.t = 0; f.life = life; f.x = x; f.y = y; f.z = z; f.g = g;
-    f.ux = ux; f.uy = uy; f.size = size; f.col = col; f.kick = kick || 0; f.r = r || 10;
+    f.ux = ux; f.uy = uy; f.size = size; f.col = col; f.kick = kick || 0;
   }
 
   function spawnCasing(x, y, z, g, ux, uy, size) {
@@ -485,6 +494,20 @@ var BlubFXShots = (function () {
     c.vz = 52 + rnd() * 26;
     c.spin = (2 + rnd() * 5) * side;
     c.size = size;
+  }
+
+  // How far a ray from inside the board runs before it leaves it. The board IS
+  // VIEW_WIDTH x VIEW_HEIGHT -- the same space every path, tower and enemy
+  // position in this game is authored in.
+  function rayExit(x, y, ux, uy) {
+    var w = (typeof VIEW_WIDTH === "number") ? VIEW_WIDTH : 1280;
+    var h = (typeof VIEW_HEIGHT === "number") ? VIEW_HEIGHT : 720;
+    var t = 1e9;
+    if (ux > 1e-6) t = Math.min(t, (w - x) / ux);
+    else if (ux < -1e-6) t = Math.min(t, -x / ux);
+    if (uy > 1e-6) t = Math.min(t, (h - y) / uy);
+    else if (uy < -1e-6) t = Math.min(t, -y / uy);
+    return (t > 0 && t < 1e9) ? t : 400;
   }
 
   // The lance.  Everything expensive about it is done ONCE, here: the enemies it
@@ -506,12 +529,21 @@ var BlubFXShots = (function () {
     L.z = r * 1.05; L.g = groundAt(b.x, b.y);
     L.ux = ux; L.uy = uy;
     // The simulation's reach is 4000 px, which is off every board and behind the
-    // camera from most angles.  Clamped to something drawable; the perforation
-    // read comes from the ticks and the ground scorch, not from the far end.
-    L.len = 1500;
+    // camera from most angles.  Cut at the edge of the board instead, plus a
+    // little, so the lance covers exactly the ground it can hit anything on and
+    // then leaves -- rather than laying a scorch mark across the empty space
+    // past the map, which is where a flat 1500 px put it.
+    L.len = rayExit(L.x, L.y, ux, uy) + 40;
+    if (L.len < 200) L.len = 200;
+    if (L.len > 1800) L.len = 1800;
     L.halfW = halfW;
 
     // WHO IT WENT THROUGH.  Same geometry as fireLaser, read-only, once.
+    //
+    // The distances are stored FROM THE MUZZLE, not from the blub's centre: the
+    // drawn beam starts at the muzzle, and on a SuperBlub that is fifty pixels
+    // of difference -- enough to put every tick off the body it belongs to.
+    var lead = r * 0.9;
     var n = 0;
     var enemies = (state && state.enemies) ? state.enemies : null;
     for (var k = 0; enemies && k < enemies.length && n < LANCE_HITS; k++) {
@@ -523,7 +555,8 @@ var BlubFXShots = (function () {
       var off = Math.abs(ex * uy - ey * ux);
       var rad = e.radiusPx ? e.radiusPx() : 11;
       if (off > halfW + rad) continue;
-      L.hits[n++] = along;
+      if (along - lead < 0) continue;              // inside the muzzle itself
+      L.hits[n++] = along - lead;
     }
     L.nHits = n;
   }
@@ -552,7 +585,7 @@ var BlubFXShots = (function () {
       // machines read as a different weapon from the creatures.
       spawnShot(b, prof, mx, my, mz, g0, tr.x, tr.y, g1, 0, 0, st.seed);
       spawnFlash(mx, my, mz, g0, ux, uy, prof.flash, prof.flashC, prof.flashLife,
-        prof.kick ? 1 : 0, r);
+        prof.kick ? 1 : 0);
       if (prof.casing && detail > 0.4) spawnCasing(mx, my, mz, g0, ux, uy, prof.casingSize);
 
       // The impact: straight ticks for a tenth of a second, then a dark
@@ -715,19 +748,49 @@ var BlubFXShots = (function () {
     ctx.save();
     ctx.transform(FR.a, FR.b, FR.c, FR.d, FR.e, FR.f);
     var pts = SPLAT_SHAPES[d.seed & 3];
+    var k;
+
+    // THE PUDDLE'S SEEP.  The Hungry Blub is the only organic unit with a real
+    // splash, and its frame radius is that splash exactly -- so the bright mark
+    // is honest about reach while a thin wet halo past it, at well under half
+    // the alpha, is what makes it read as the WIDE impact §10 asks for. Nothing
+    // else in the file gets one, which is what keeps the ladder legible.
+    if (d.wide > 0) {
+      ctx.globalAlpha = a * 0.38;
+      ctx.fillStyle = d.col;
+      ctx.beginPath();
+      ctx.moveTo(pts[0] * grow * 1.6, pts[1] * grow * 1.6);
+      for (k = 2; k < pts.length; k += 2) {
+        ctx.lineTo(pts[k] * grow * 1.6, pts[k + 1] * grow * 1.6);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // The mark itself, FILLED AND THEN STROKED OFF THE SAME PATH -- the rim is
+    // what stops a translucent green blob reading as a range circle, and
+    // rebuilding a nine-sided path to draw it would double this decal's cost
+    // for nothing.
     ctx.beginPath();
     ctx.moveTo(pts[0] * grow, pts[1] * grow);
-    for (var k = 2; k < pts.length; k += 2) ctx.lineTo(pts[k] * grow, pts[k + 1] * grow);
+    for (k = 2; k < pts.length; k += 2) ctx.lineTo(pts[k] * grow, pts[k + 1] * grow);
     ctx.closePath();
     ctx.globalAlpha = a;
     ctx.fillStyle = d.col;
     ctx.fill();
+    if (t < 0.7) {
+      ctx.globalAlpha = a * (1 - t / 0.7) * 0.7;
+      ctx.strokeStyle = d.col2;
+      ctx.lineWidth = 0.09;
+      ctx.stroke();
+    }
 
     // A wet centre while it is fresh, so a splat has a middle rather than being
     // one flat colour -- and it dries from the inside, which is what the second
     // fill is for.
     if (t < 0.55) {
       ctx.globalAlpha = a * (1 - t / 0.55) * 0.85;
+      ctx.fillStyle = d.col;
       ctx.beginPath();
       ctx.arc(0, 0, 0.46 * grow, 0, TAU);
       ctx.fill();
@@ -747,18 +810,6 @@ var BlubFXShots = (function () {
       }
     }
 
-    // The rim, last, and only while wet: a dark edge is what stops a translucent
-    // green disc reading as a range circle.
-    if (t < 0.7) {
-      ctx.globalAlpha = a * (1 - t / 0.7) * 0.7;
-      ctx.strokeStyle = d.col2;
-      ctx.lineWidth = 0.09;
-      ctx.beginPath();
-      ctx.moveTo(pts[0] * grow, pts[1] * grow);
-      for (var m = 2; m < pts.length; m += 2) ctx.lineTo(pts[m] * grow, pts[m + 1] * grow);
-      ctx.closePath();
-      ctx.stroke();
-    }
     ctx.restore();
   }
 
@@ -882,8 +933,13 @@ var BlubFXShots = (function () {
     // SCREEN, and under an orbited camera that is not the world heading. Taking
     // it from a point the shot has actually been costs nothing extra here and
     // one whole projection per shot per frame if it is asked for separately.
+    //
+    // A PELLET DOES NOT PAY FOR ANY OF IT.  Below ~2 screen pixels the squash,
+    // the highlight and the rim are all sub-pixel, so a hail of Mini Blub shot
+    // costs one projection and one fill each -- which is what keeps three
+    // hundred of them off the frame budget.
     var ang = 0, sq = 1;
-    var bt = t - (p.tail > 0 ? p.tail : 0.06);
+    var bt = (rad > 2.0) ? t - (p.tail > 0 ? p.tail : 0.06) : -1;
     if (bt > 0) {
       var bx = r.x0 + (r.x1 - r.x0) * bt;
       var by = r.y0 + (r.y1 - r.y0) * bt;
@@ -906,30 +962,30 @@ var BlubFXShots = (function () {
       }
     }
 
+    // The body, and its rim off the SAME path.  Organic shots are the only
+    // things in this file with an outline; it is the cheapest way to keep a
+    // bright board from swallowing them, and it is why they never need to be
+    // brighter to be seen -- which is exactly the §17 trade.
     ctx.globalAlpha = a * 0.92;
     ctx.fillStyle = p.skin;
     ctx.beginPath();
     ctx.ellipse(head.x, head.y, rad, rad * sq, ang, 0, TAU);
     ctx.fill();
-
-    // A lit crown offset towards the top of the screen: one highlight, no
-    // gradient, and it is what stops the body reading as a flat disc.
-    ctx.globalAlpha = a * 0.8;
-    ctx.fillStyle = p.core;
-    ctx.beginPath();
-    ctx.arc(head.x - rad * 0.22, head.y - rad * 0.30, rad * 0.42, 0, TAU);
-    ctx.fill();
-
-    // The rim.  Organic shots are the only things in this file with an outline;
-    // it is the cheapest way to keep a bright board from swallowing them, and it
-    // is why they never need to be brighter to be seen.
     if (rad > 1.6) {
       ctx.globalAlpha = a * 0.55;
       ctx.strokeStyle = p.rim;
       ctx.lineWidth = Math.max(0.8, rad * 0.16);
-      ctx.beginPath();
-      ctx.ellipse(head.x, head.y, rad, rad * sq, ang, 0, TAU);
       ctx.stroke();
+    }
+
+    // A lit crown offset towards the top of the screen: one highlight, no
+    // gradient, and it is what stops the body reading as a flat disc.
+    if (rad > 2.2) {
+      ctx.globalAlpha = a * 0.8;
+      ctx.fillStyle = p.core;
+      ctx.beginPath();
+      ctx.arc(head.x - rad * 0.22, head.y - rad * 0.30, rad * 0.42, 0, TAU);
+      ctx.fill();
     }
   }
 
@@ -1156,15 +1212,20 @@ var BlubFXShots = (function () {
       var tickA = life * life * crowd;
       ctx.strokeStyle = C.lanceHot;
       ctx.lineWidth = Math.max(1, 1.8 * px);
+      ctx.globalAlpha = tickA * (0.55 + 0.45 * burst);
       for (var i = 0; i < L.nHits; i++) {
-        var f = L.hits[i] / len;
-        if (f > 1) continue;
-        var cx = head.x + dx * f, cy = head.y + dy * f;
+        var along = L.hits[i];
+        if (along > len) continue;
+        // PROJECTED, not interpolated between the two screen ends. Perspective
+        // is not linear along a 1500 px ray -- lerping the screen points put a
+        // tick tens of pixels off the body it is supposed to be marking, which
+        // is the one thing this mark exists to get right.
+        var at = projectPinned(L.x + L.ux * along, L.y + L.uy * along, L.z, L.g);
+        if (!at) continue;
         var s = w * (0.85 + 0.5 * burst);
-        ctx.globalAlpha = tickA * (0.55 + 0.45 * burst);
         ctx.beginPath();
-        ctx.moveTo(cx - nx * s, cy - ny * s);
-        ctx.lineTo(cx + nx * s, cy + ny * s);
+        ctx.moveTo(at.x - nx * s, at.y - ny * s);
+        ctx.lineTo(at.x + nx * s, at.y + ny * s);
         ctx.stroke();
       }
     }

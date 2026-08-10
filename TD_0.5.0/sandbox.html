@@ -329,6 +329,14 @@
 <script src="js/gl/gl-parts.js"></script>
 <script src="js/gl/gl-models.js"></script>
 <script src="js/gl/gl-world.js"></script>
+<!-- The Summoner's three effect modules. Presentation only: each one reads the
+     live objects, keeps its own records beside them and draws. They are called
+     from gl-world.js through bound helper objects, and every entry point
+     no-ops if bind() never ran -- so they load AFTER it and the order between
+     the three does not matter. -->
+<script src="js/gl/blub-circles.js"></script>
+<script src="js/gl/blub-projectiles.js"></script>
+<script src="js/gl/blub-systems.js"></script>
 <script src="js/gl/models/sniper-base.js"></script>
 <script src="js/gl/models/sniper-a3.js"></script>
 <script src="js/gl/models/sniper-a4.js"></script>

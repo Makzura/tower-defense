@@ -699,6 +699,29 @@ var World3D = (function () {
       height: typeof VIEW_HEIGHT === "number" ? VIEW_HEIGHT : 720
     };
     enabled = true;
+
+    // THE SUMMONER'S EFFECT MODULES, handed the helpers they cannot reach.
+    //
+    // Done here rather than at their own load time because `renderer` and
+    // `camera` do not exist until this function has run -- every one of these
+    // helpers is a closure over them. Guarded with typeof so a build that ships
+    // without the three files installs exactly as it did before, and each
+    // module's own entry points no-op until its bind() has been called.
+    if (typeof BlubFXCircles !== "undefined") {
+      BlubFXCircles.bind({
+        project: project,
+        withGround: withGround,
+        groundHeightAt: groundHeightAt
+      });
+    }
+    if (typeof BlubFXSystems !== "undefined") {
+      BlubFXSystems.bind({
+        project: project, ringPath: ringPath,
+        drawGroundRing: drawGroundRing, drawGroundArc: drawGroundArc,
+        drawShockwave: drawShockwave, drawDebrisFan: drawDebrisFan,
+        groundHeightAt: groundHeightAt
+      });
+    }
     return true;
   }
 
@@ -706,6 +729,12 @@ var World3D = (function () {
     var key = (map ? map.id : "none") + ":" + routePaths.length;
     if (key === mapKey && mapMesh) return;
     mapKey = key;
+    // A NEW BOARD KEEPS NONE OF THE OLD ONE'S PICTURES. The death splatters and
+    // the watch list are keyed on bodies that no longer exist, and the shot
+    // pools would open the run with the previous one's brass on the floor.
+    if (typeof BlubFXSystems !== "undefined") BlubFXSystems.reset();
+    if (typeof BlubFXShots !== "undefined") BlubFXShots.reset();
+    if (typeof BlubFXCircles !== "undefined") BlubFXCircles.reset();
     mapMesh = buildMapMesh(map, routePaths);
     camera.bounds = bounds;
     camera.fitBounds(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
@@ -740,6 +769,11 @@ var World3D = (function () {
     resize();
     ensureMap(state.map, state.paths);
     camera.update(state.dt || 1 / 60);
+    // ONE DIFF PASS, once per frame, before anything is drawn: which blubs are
+    // still standing and which vanished since the last frame. It is idempotent
+    // on `state.now`, so it does not matter that drawOverlays also touches the
+    // module later in the same frame.
+    if (typeof BlubFXSystems !== "undefined") BlubFXSystems.update(state);
 
     var vp = camera.viewProjection();
     renderer.begin(vp);
@@ -815,6 +849,27 @@ var World3D = (function () {
         var drawYaw = warbringerFullCircle(t) ? 0 : (t.aim || 0);
         renderer.setGlow(towerGlow(t), towerGlowTint(t));
         var tz = groundHeightAt(t.x, t.y);
+        // A SUMMONED BODY ARRIVES FROM ABOVE, AND THE MACHINES SHOVE BACK.
+        //
+        // Both are heights and offsets added to a transform this loop already
+        // computes, so neither needs a second draw call or a second mesh. The
+        // descent is a height ABOVE THE SURFACE -- the module never looks at
+        // the height field, which is why it is added to `tz` here and nowhere
+        // else -- and it returns 0 for any body that is not mid-arrival, so
+        // this is one unconditional addition.
+        if (t.isSummon) {
+          if (typeof BlubFXCircles !== "undefined") {
+            tz += BlubFXCircles.descentLift(t);
+          }
+          if (typeof BlubFXShots !== "undefined") {
+            var bkick = BlubFXShots.recoil(t);
+            if (bkick) {
+              kx -= Math.cos(t.aim || 0) * bkick * 3.5;
+              ky -= Math.sin(t.aim || 0) * bkick * 3.5;
+              tz += bkick * 1.5;
+            }
+          }
+        }
         drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame);
         // Crosspath marks, drawn OVER an unchanged body at the same transform.
         // Authored around their own seat, so they need no offset here -- and
@@ -852,6 +907,23 @@ var World3D = (function () {
           drawActor(recruitModel(rc), rc.x, rc.y, rc.facing, 1,
             groundHeightAt(rc.x, rc.y), rFrame, recruitPose(rc));
         }
+      }
+    }
+    // A DYING BLUB IS STILL REAL GEOMETRY. js/game.js pulled it out of `towers`
+    // the moment its last charge was spent -- the ground is already free and a
+    // replacement may already be standing on it -- but the object still exists
+    // and towerModel() still resolves its mesh, so the swell and the MK2's leap
+    // are the model itself rather than a canvas blob standing in for it.
+    if (typeof BlubFXSystems !== "undefined") {
+      var dying = BlubFXSystems.dyingBodies();
+      for (i = 0; i < dying.length; i++) {
+        var db = dying[i];
+        var dm = towerModel(db.blub);
+        if (!dm) continue;
+        renderer.setGlow(db.glow, null);
+        drawActor(dm, db.x, db.y, db.yaw, db.scale,
+          groundHeightAt(db.x, db.y) + db.lift, 0);
+        renderer.setGlow(0, null);
       }
     }
     for (i = 0; i < state.enemies.length; i++) {
@@ -1090,6 +1162,21 @@ var World3D = (function () {
     return camera.worldToScreen(x, y, g + (z || 0), null);
   }
 
+  // WHAT THE SUMMONER'S EFFECT MODULES ARE HANDED.
+  //
+  // `project`, `withGround` and `groundHeightAt` live inside this closure and
+  // there is no other way to reach them, so js/gl/blub-projectiles.js takes
+  // them through an object. Built ONCE, beside the other module-level tables,
+  // because a fresh literal per frame is the only allocation the bridge would
+  // otherwise have -- and it is passed on every one of three hundred blubs'
+  // worth of drawing. The field is named `groundAt` because that is the name
+  // that file asks for.
+  var BLUB_FX_API = {
+    project: project,
+    withGround: withGround,
+    groundAt: groundHeightAt
+  };
+
   // Projected per point rather than through camera.groundCircle, for the same
   // reason: groundCircle solves against the flat z = 0 plane and cannot know
   // that half of a range ring is lying on a raised deck. Per point, a ring
@@ -1275,6 +1362,31 @@ var World3D = (function () {
         t === state.inspected ? 2 : 1.5);
     }
 
+    // THE SUMMONER'S GROUND LAYER, in the order it has to lie in.
+    //
+    // Everything here is flat on the board, so it goes down before any of the
+    // interface below it and in one bottom-to-top order: the stain a body left
+    // when it died, then what its neighbours have been throwing at the road,
+    // then the circle a NEW body is arriving in -- the freshest event on top of
+    // the oldest -- and finally the swarm threads, which are the only thing in
+    // the group that is not on the ground at all.
+    //
+    // AT TOP LEVEL, NOT INSIDE A withGround(): every one of these modules pins
+    // its own ground reference per mark, and an outer one would flatten a whole
+    // board's worth of decals onto whichever surface happened to be current.
+    if (typeof BlubFXSystems !== "undefined") {
+      BlubFXSystems.drawDecals(ctx, state);
+    }
+    if (typeof BlubFXShots !== "undefined") {
+      BlubFXShots.drawGround(ctx, state, BLUB_FX_API);
+    }
+    if (typeof BlubFXCircles !== "undefined") {
+      BlubFXCircles.draw(ctx, state);
+    }
+    if (typeof BlubFXSystems !== "undefined") {
+      BlubFXSystems.drawThreads(ctx, state);
+    }
+
     // THE FRACTURED RING UNDER A FULL-CIRCLE WARBRINGER.
     //
     // From A4 he stops turning and covers 360 degrees, and this ring IS that
@@ -1389,6 +1501,14 @@ var World3D = (function () {
         "rgba(255,215,110,0.9)", null);
     }
 
+    // THE WEAKEN SIGIL, at the feet of every enemy carrying DamageAmp stacks.
+    // Immediately before the bars, so a mark that answers "how much more damage
+    // does this thing take" never lands on top of the bar that answers a
+    // different question.
+    if (typeof BlubFXSystems !== "undefined") {
+      BlubFXSystems.drawSigils(ctx, state);
+    }
+
     // Health bars, for anything hurt. Recruits included: they are friendly
     // bodies that take damage and die, and the 2D pack drew their bar inside
     // SoldierRecruit.draw -- which the 3D branch replaces, so it went missing.
@@ -1475,6 +1595,16 @@ var World3D = (function () {
       }
     }
     drawShots(ctx, state);
+    // A blub's shot is a shot, so it goes exactly where the others go: over the
+    // hardware that fired it and under the cosmetic burst layer. The death
+    // burst then sits between the two -- it is an event, and the damage popups
+    // go over it.
+    if (typeof BlubFXShots !== "undefined") {
+      BlubFXShots.drawAir(ctx, state, BLUB_FX_API);
+    }
+    if (typeof BlubFXSystems !== "undefined") {
+      BlubFXSystems.drawDeaths(ctx, state);
+    }
     drawEffects(ctx);
 
     // The build preview: where the tower would go, and whether it may.

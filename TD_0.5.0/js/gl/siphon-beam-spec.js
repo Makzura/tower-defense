@@ -373,7 +373,7 @@ var SiphonBeamSpec = {
  "states": {
   "thread": {
    "profile": "THREAD",
-   "sections": 16,
+   "sections": 20,
    "radius": {
     "formula": "r_target + (r_tower - r_target)*(1-t)^p",
     "r_target": 0.0205,
@@ -393,11 +393,12 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.17,
-    "count": 11,
+    "spacing": 0.1442,
+    "count": 14,
     "proud": 1.3,
     "profile": "BEAD",
-    "mat": "hem_fray"
+    "mat": "hem_fray",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": 0.03,
@@ -422,7 +423,7 @@ var SiphonBeamSpec = {
     "chevron",
     "spout"
    ],
-   "flowReads": "knots grow 0.027->0.048 toward the hands, scroll one spacing per loop, each a wedge pointing at the hands; the body swells 1.8x and ends in a spout"
+   "flowReads": "knots grow 0.032->0.057 toward the hands, scroll one spacing per loop, each a wedge pointing at the hands; the body swells 1.8x and ends in a spout"
   },
   "ramp": {
    "profile": "ROPE",
@@ -457,11 +458,12 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.15,
-    "count": 12,
+    "spacing": 0.1563,
+    "count": 13,
     "proud": 1.3,
     "profile": "BEAD",
-    "mat": "amber"
+    "mat": "amber",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": 0.024,
@@ -510,11 +512,12 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.128,
+    "spacing": 0.1875,
     "helix": true,
     "turns": 9.0,
     "pitch_law": "(1-t)^1.5",
-    "mat": "amber"
+    "mat": "amber",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": 0.012,
@@ -564,11 +567,12 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.205,
-    "count": 7,
+    "spacing": 0.1246,
+    "count": 9,
     "t_from": 0.66,
     "profile": "BEAD",
-    "mat": "hem_fray"
+    "mat": "hem_fray",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": 0.3,
@@ -599,7 +603,7 @@ var SiphonBeamSpec = {
   },
   "gold": {
    "profile": "INGOT",
-   "sections": 15,
+   "sections": 18,
    "radius": {
     "formula": "r_target + (r_tower - r_target)*(1-t)^p",
     "r_target": 0.042,
@@ -619,12 +623,13 @@ var SiphonBeamSpec = {
     "toward": "ring"
    },
    "beads": {
-    "spacing": 0.145,
-    "count": 13,
+    "spacing": 0.1362,
+    "count": 15,
     "shape": "box",
     "mat": "gold",
     "accent": "white_warm",
-    "size_law": "r(t)*(0.52..0.62)"
+    "size_law": "r(t)*(0.52..0.62)",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": 0.016,
@@ -695,11 +700,14 @@ var SiphonBeamSpec = {
     "toward": "ring"
    },
    "beads": {
-    "spacing": 0.15,
-    "count": 33,
-    "flutes": 3,
+    "spacing": 0.2291,
+    "rings": 8,
+    "perRing": 3,
+    "count": 24,
+    "spacingIsPer": "ring, not chevron",
     "mat": "gold",
-    "accent": "white_warm"
+    "accent": "white_warm",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": -0.085,
@@ -726,11 +734,11 @@ var SiphonBeamSpec = {
     "chevron",
     "spout"
    ],
-   "flowReads": "the drums step WIDER toward the capital; 33 flute chevrons all point at the capital and climb the grooves; the capital IS the swelling"
+   "flowReads": "the drums step WIDER toward the capital; 24 flute chevrons all point at the capital and climb the grooves; the capital IS the swelling"
   },
   "tendon": {
    "profile": "SHEATH",
-   "sections": 18,
+   "sections": 12,
    "radius": {
     "formula": "r_target + (r_tower - r_target)*(1-t)^p",
     "r_target": 0.04,
@@ -750,11 +758,12 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.19,
-    "count": 9,
+    "spacing": 0.3122,
+    "count": 7,
     "shape": "constriction",
     "mat": "oil_black",
-    "size_law": "r(t)*(0.92 + 0.34*(1-t)) -- peristaltic"
+    "size_law": "r(t)*(0.92 + 0.34*(1-t)) -- peristaltic",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": 0.115,
@@ -763,8 +772,8 @@ var SiphonBeamSpec = {
     "kink_n": 6.0
    },
    "sheath": {
-    "bands": 11,
-    "gap": 0.034,
+    "bands": 8,
+    "gap": 0.047,
     "why": "translucency is BUILT, not alpha: you see the cords through the windows"
    },
    "cords": [
@@ -840,16 +849,17 @@ var SiphonBeamSpec = {
    },
    "beads": {
     "spacing": [
-     0.115,
-     0.135,
-     0.155
+     0.2,
+     0.2226,
+     0.3206
     ],
     "count": [
-     8,
      7,
-     6
+     6,
+     5
     ],
-    "profile": "BEAD"
+    "profile": "BEAD",
+    "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
     "sag": [

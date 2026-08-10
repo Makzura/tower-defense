@@ -438,8 +438,21 @@ var BlubFXCircles = (function () {
     for (i = 0; i < records.length; i++) {
       r = records[i];
       c = cellOf(r.x, r.y);
-      r.crowd = cellCount[c];
-      var d = 1 / (1 + CROWD_K * (r.crowd - 1));
+      // THE FOUR NEIGHBOURS COUNT HALF. Without them the grid's own edges are
+      // visible in the result: two circles five pixels apart but on opposite
+      // sides of a cell boundary each read a crowd of one and both draw at
+      // full strength, while two circles fifty pixels apart inside one cell
+      // both dim. Half-weighting the orthogonal neighbours makes the meter a
+      // smooth function of where the body actually landed, which is what it
+      // was always trying to measure.
+      var col = c % GRID_W;
+      var near = cellCount[c];
+      if (col > 0) near += 0.5 * cellCount[c - 1];
+      if (col < GRID_W - 1) near += 0.5 * cellCount[c + 1];
+      if (c >= GRID_W) near += 0.5 * cellCount[c - GRID_W];
+      if (c < GRID_W * (GRID_H - 1)) near += 0.5 * cellCount[c + GRID_W];
+      r.crowd = near;
+      var d = 1 / (1 + CROWD_K * (near - 1));
       if (d < DIM_FLOOR) d = DIM_FLOOR;
       if (cellNewest[c] === i) d += (1 - d) * FRESH_LIFT;
       r.dim = d * gdim;
@@ -562,7 +575,9 @@ var BlubFXCircles = (function () {
     //    arrive as the head passes them, which is what makes it read as being
     //    cut rather than switched on.
     if (tier > 0) {
-      var slots = tier < 2 ? 6 : (r.radius > 34 ? 12 : 8);
+      // Fewer, larger marks. Twelve glyphs on a 25 px circle is a dotted line;
+      // eight at a size the eye can resolve reads as something inscribed.
+      var slots = tier < 2 ? 6 : (r.radius > 34 ? 10 : 8);
       local(ctx, r, r.ang);
       ctx.beginPath();
       arcAt(ctx, 0.62, 0, swept * 0.985);
@@ -570,7 +585,7 @@ var BlubFXCircles = (function () {
         for (var i = 0; i < slots; i++) {
           var a = (i + 0.5) * (TAU / slots);
           if (a > swept) break;
-          glyph(ctx, GLYPHS[(r.seed >>> (i & 7)) & 3], a, 0.80, 0.11);
+          glyph(ctx, GLYPHS[(r.seed >>> (i & 7)) & 3], a, 0.805, 0.135);
         }
       }
       ctx.restore();
@@ -666,25 +681,33 @@ var BlubFXCircles = (function () {
     // 2. The grid, counter-turning at half rate. Dropped first on the way out,
     //    which is what makes the retract read as a shutdown sequence rather
     //    than a fade.
+    //
+    // THE MIDDLE IS LEFT EMPTY, and that is a correction rather than a style:
+    // the first build ran three concentric rings and eight full-length spokes
+    // and the result was a spiderweb across the exact patch of ground the unit
+    // is descending into. Section 17 forbids an effect that hides what matters,
+    // and at game size -- a Cyberblub's circle is about thirty pixels across --
+    // a web is not a hologram, it is a smudge. Two rings in the outer third and
+    // spokes that stop well short of the centre read as machined AND leave the
+    // body legible, at about half the ink.
     if (tier > 0 && ret < 0.67) {
       local(ctx, r, r.ang2 + jump * 0.5);
       ctx.beginPath();
-      arcAt(ctx, 0.82 * rs, 0, swept);
-      arcAt(ctx, 0.58 * rs, 0.05, swept);
-      if (tier > 1) arcAt(ctx, 0.34 * rs, 0.1, swept);
-      var sn = tier > 1 ? 8 : 4;
+      arcAt(ctx, 0.86 * rs, 0, swept);
+      arcAt(ctx, 0.62 * rs, 0.05, swept);
+      var sn = tier > 1 ? 6 : 3;
       for (var s = 0; s < sn; s++) {
         var sa = s * (TAU / sn);
         if (sa > swept) break;
-        spoke(ctx, sa, 0.18 * rs, 0.94 * rs);
+        spoke(ctx, sa, 0.50 * rs, 0.94 * rs);
       }
       // The machined dial. Only on circles big enough for it to be anything
       // other than a smear.
-      if (tier > 1 && r.radius > 26) {
-        for (var q = 0; q < 24; q++) {
-          var qa = q * (TAU / 24);
+      if (tier > 1 && r.radius > 30) {
+        for (var q = 0; q < 20; q++) {
+          var qa = q * (TAU / 20);
           if (qa > swept) break;
-          spoke(ctx, qa, 0.88 * rs, 0.96 * rs);
+          spoke(ctx, qa, 0.90 * rs, 0.97 * rs);
         }
       }
       ctx.restore();

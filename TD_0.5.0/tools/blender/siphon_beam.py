@@ -446,7 +446,7 @@ def flow_pose(flows):
 
 
 def knots(s, root, flows, pts, ts, spacing, radius_of, twist_of, mat, profile,
-          count, t_from=1.06, t_to=-0.05, tag="k", stretch=4):
+          count, t_from=1.06, t_to=-0.05, tag="k", stretch=4, proud=1.30):
     """THE KNOTS -- the chevrons that carry the flow direction.
 
     Each is a wedge swept from a tiny face at its TOWER side to a full one at
@@ -467,7 +467,7 @@ def knots(s, root, flows, pts, ts, spacing, radius_of, twist_of, mat, profile,
         # point toward the tower.
         tan = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.02)),
                          _sample(pts, ts, max(0.0, t - 0.02))))
-        r = radius_of(max(0.0, min(1.0, t))) * 1.30
+        r = radius_of(max(0.0, min(1.0, t))) * proud
         half = spacing * 0.34
         tip = _add(c, _mul(tan, -half))
         tail = _add(c, _mul(tan, half))
@@ -552,19 +552,24 @@ def spout(s, node, origin, tan, r, mat, lip, vane, scale=1.0, vanes=3):
     number of them, at UNEVEN angles, of UNEQUAL length, all on the same side.
     A ring of four even vanes would put the whole intake back on the lathe.
     """
+    # KEPT DELIBERATELY SMALL. Built at 2.35x the body radius this was a flat
+    # disc facing the camera at the tower end, and a bright disc on a beam is
+    # exactly the interface indicator the socle forbids -- it stopped reading as
+    # matter the moment it got big enough to notice. At 1.8x it is a swelling in
+    # the line, which is what "like a spout" means and all it may mean.
     a = _add(origin, _mul(tan, 0.020 * scale))
     b = _add(origin, _mul(tan, 0.115 * scale))
-    collar(s, "spout_bell", _lerp(a, b, 0.5), tan, r * 2.35 * scale,
-           r * 1.15 * scale, _len(_sub(b, a)), mat, node, 7)
-    ring(s, "spout_lip", a, tan, r * 2.30 * scale, r * 0.34 * scale, lip, node,
+    collar(s, "spout_bell", _lerp(a, b, 0.5), tan, r * 1.80 * scale,
+           r * 1.05 * scale, _len(_sub(b, a)), mat, node, 7)
+    ring(s, "spout_lip", a, tan, r * 1.62 * scale, r * 0.28 * scale, lip, node,
          8, 4)
     # The vanes: uneven angles, uneven lengths, one side.
     fu = _norm(_sub((0, 0, 1), _mul(tan, _dot((0, 0, 1), tan))))
     fv = _cross(tan, fu)
     for i, (ang, ln) in enumerate(
             [(0.42, 1.00), (1.35, 0.68), (2.55, 0.86)][:vanes]):
-        off = _add(_mul(fu, math.cos(ang) * r * 1.9 * scale),
-                   _mul(fv, math.sin(ang) * r * 1.9 * scale))
+        off = _add(_mul(fu, math.cos(ang) * r * 1.55 * scale),
+                   _mul(fv, math.sin(ang) * r * 1.55 * scale))
         at = _add(_lerp(a, b, 0.42), off)
         td.box(s, "spout_vane_%d" % i,
                (r * 0.30 * scale, r * 1.1 * scale * ln, r * 2.0 * scale * ln),
@@ -645,7 +650,8 @@ def state_thread(s, node, root):
 
     sp = spacing_of(pts, 1.06, -0.05, 14)
     flows = [Flow(s, root, i, _sub(TARGET, HANDS), sp) for i in range(4)]
-    knots(s, root, flows, pts, ts, sp, rad, tw, "hem_fray", "BEAD", 14)
+    knots(s, root, flows, pts, ts, sp, rad, tw, "hem_fray", "BEAD", 14,
+          proud=1.55)
 
     tan = _norm(_sub(TARGET, HANDS))
     spout(s, node, HANDS, tan, 0.0370, "skin_dark", "cloth_dark", "cloth_worn")
@@ -794,8 +800,8 @@ def state_saturated(s, node, root):
                _add(c, (0.0, 0.0, rad(t) * 1.5)),
                (0, 0, 0.5 + i * 0.7), "brass", node)
 
-    spout(s, node, HANDS, tan, 0.0830, "gold_dark", "white_warm", "ochre_cloth",
-          scale=1.35)
+    spout(s, node, HANDS, tan, 0.0830, "gold_dark", "amber", "ochre_cloth",
+          scale=1.10)
     bite(s, node, TARGET, tan, 0.0455, "gold_dark", "brass", 4, spread=2.0)
     return flows
 
@@ -946,8 +952,8 @@ def state_gold(s, node, root):
                flows[g].node)
 
     tan = _norm(_sub(TARGET, RING))
-    spout(s, node, RING, tan, 0.0820, "gold", "white_warm", "gold_dark",
-          scale=1.20)
+    spout(s, node, RING, tan, 0.0820, "gold", "gold", "gold_dark",
+          scale=1.00)
     bite(s, node, TARGET, tan, 0.0420, "gold_dark", "amber", 4, spread=1.9)
     return flows
 
@@ -1071,7 +1077,7 @@ def state_tendon(s, node, root):
     toward the tower" made out of muscle. These are transfer pulses and they are
     the only pulses this file contains.
     """
-    n = 14
+    n = 12
     ts = taus(n)
     pts = run_path(HANDS, TARGET, n, sag=0.115, sway=0.085, kink=0.022,
                    kink_n=6.0)
@@ -1082,9 +1088,9 @@ def state_tendon(s, node, root):
 
     # THE SHEATH, IN BANDS. Eleven of them, each two stations long, with a real
     # gap between: the windows are how the cords show through.
-    for b in range(9):
-        t0 = 0.02 + b * 0.109
-        t1 = t0 + 0.070
+    for b in range(8):
+        t0 = 0.02 + b * 0.123
+        t1 = t0 + 0.076
         bp, br, bt = [], [], []
         for k in range(3):
             t = t0 + (t1 - t0) * k / 2.0
@@ -1117,10 +1123,10 @@ def state_tendon(s, node, root):
 
     # THE CONSTRICTIONS -- peristalsis. Rings that travel toward the hands and
     # are LARGER the nearer they are, so the swallowing reads without a pulse.
-    sp = spacing_of(pts, 1.04, -0.05, 8)
+    sp = spacing_of(pts, 1.04, -0.05, 7)
     flows = [Flow(s, root, i, _sub(TARGET, HANDS), sp) for i in range(4)]
-    for i in range(8):
-        t = 1.04 - 1.09 * i / 7.0
+    for i in range(7):
+        t = 1.04 - 1.09 * i / 6.0
         tc = max(0.0, min(1.0, t))
         c = _sample(pts, ts, t)
         tanl = _norm(_sub(_sample(pts, ts, min(1.0, t + 0.03)),
@@ -1142,7 +1148,7 @@ def state_tendon(s, node, root):
     tan = _norm(_sub(pts[1], pts[0]))
     _rev(td.ellipsoid(s, "valve", (0.150, 0.115, 0.105),
                       _add(HANDS, _mul(tan, 0.055)), "tendon", node,
-                      (0.0, 0.5, math.atan2(tan[1], tan[0])), 8, 4))
+                      (0.0, 0.5, math.atan2(tan[1], tan[0])), 6, 4))
     for i, (ang, ln) in enumerate([(0.7, 1.0), (3.4, 0.62)]):
         fu = _norm(_sub((0, 0, 1), _mul(tan, _dot((0, 0, 1), tan))))
         fv = _cross(tan, fu)
@@ -1207,11 +1213,12 @@ def state_chain(s, node, root):
 
         # One flow group PER SEGMENT: each scrolls along its own chord by its
         # own spacing, which is the only way a bent line scrolls without the
-        # knots leaving it.
-        spacing = 0.115 + 0.020 * seg
+        # knots leaving it. Three groups, three spacings, three directions --
+        # and the links still travel one continuous way, toward the hands.
+        cnt = 7 - seg
+        spacing = spacing_of(pts, 1.03, -0.04, cnt)
         fl = Flow(s, root, seg, _sub(b, a), spacing)
         flows.append(fl)
-        cnt = 8 - seg
         for i in range(cnt):
             t = 1.03 - 1.07 * i / float(cnt - 1)
             tc = max(0.0, min(1.0, t))
@@ -1275,7 +1282,7 @@ GROW, SCROLL, CHEVRON, SPOUT = "grow", "scroll", "chevron", "spout"
 
 FLOW_CUES = {
     "thread": ([GROW, SCROLL, CHEVRON, SPOUT],
-               "knots grow 0.027->0.048 toward the hands, scroll one spacing "
+               "knots grow 0.032->0.057 toward the hands, scroll one spacing "
                "per loop, each a wedge pointing at the hands; the body swells "
                "1.8x and ends in a spout"),
     "ramp": ([GROW, SCROLL, CHEVRON, SPOUT],
@@ -1295,7 +1302,7 @@ FLOW_CUES = {
              "toward the ring; cast grains grow 0.022->0.043 and climb; the "
              "bar swells 2x into the ring collar"),
     "column": ([GROW, SCROLL, CHEVRON, SPOUT],
-               "the drums step WIDER toward the capital; 33 flute chevrons all "
+               "the drums step WIDER toward the capital; 24 flute chevrons all "
                "point at the capital and climb the grooves; the capital IS the "
                "swelling"),
     "tendon": ([GROW, SCROLL, CHEVRON],
@@ -1323,13 +1330,13 @@ def _law(fn, *a):
 
 SPEC_STATES = {
     "thread": {
-        "profile": "THREAD", "sections": 16,
+        "profile": "THREAD", "sections": 20,
         "radius": {"formula": "r_target + (r_tower - r_target)*(1-t)^p",
                    "r_target": 0.0205, "r_tower": 0.0370, "p": 2.6},
         "twist": {"formula": "total*(1-t)^p", "total": 0.62, "p": 1.0},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.55,
                    "gain": 0.35, "p": 1.0, "toward": "tower"},
-        "beads": {"spacing": 0.170, "count": 11, "proud": 1.30,
+        "beads": {"spacing": 0.211, "count": 14, "proud": 1.30,
                   "profile": "BEAD", "mat": "hem_fray"},
         "curve": {"sag": 0.030, "sway": 0.022, "kink": 0.0},
         "mats": ["skin", "skin_dark", "cloth_worn", "hem_fray"],
@@ -1346,7 +1353,7 @@ SPEC_STATES = {
         "twist": {"formula": "total*(1-t)^p", "total": 3.40, "p": 1.85},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.80,
                    "gain": 1.60, "p": 1.85, "toward": "tower"},
-        "beads": {"spacing": 0.150, "count": 12, "proud": 1.30,
+        "beads": {"spacing": 0.163, "count": 13, "proud": 1.30,
                   "profile": "BEAD", "mat": "amber"},
         "curve": {"sag": 0.024, "sway": 0.030, "kink": 0.0},
         "mats": ["brass", "ochre_cloth", "gold_dark", "amber", "hem_fray"],
@@ -1377,7 +1384,7 @@ SPEC_STATES = {
                   "total": 1.10, "p": 0.8},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.30,
                    "gain": 0.20, "p": 1.0, "toward": "tower"},
-        "beads": {"spacing": 0.205, "count": 7, "t_from": 0.66,
+        "beads": {"spacing": 0.101, "count": 9, "t_from": 0.66,
                   "profile": "BEAD", "mat": "hem_fray"},
         "curve": {"sag": 0.300, "sway": 0.160, "kink": 0.030, "kink_n": 3.0,
                   "reach": 0.55, "sweeps": True,
@@ -1389,13 +1396,13 @@ SPEC_STATES = {
                 "filaments of unequal length"},
 
     "gold": {
-        "profile": "INGOT", "sections": 15,
+        "profile": "INGOT", "sections": 18,
         "radius": {"formula": "r_target + (r_tower - r_target)*(1-t)^p",
                    "r_target": 0.0420, "r_tower": 0.0820, "p": 1.55},
         "twist": {"formula": "total*(1-t)^p", "total": 1.15, "p": 1.30},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.70,
                    "gain": 1.00, "p": 1.55, "toward": "ring"},
-        "beads": {"spacing": 0.145, "count": 13, "shape": "box",
+        "beads": {"spacing": 0.150, "count": 15, "shape": "box",
                   "mat": "gold", "accent": "white_warm",
                   "size_law": "r(t)*(0.52..0.62)"},
         "curve": {"sag": 0.016, "sway": -0.026, "kink": 0.0},
@@ -1413,7 +1420,8 @@ SPEC_STATES = {
         "twist": {"formula": "0.22 + 0.30*(1-t)", "total": 0.52},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.45,
                    "gain": 0.90, "p": 1.2, "toward": "ring"},
-        "beads": {"spacing": 0.150, "count": 33, "flutes": 3,
+        "beads": {"spacing": 0.150, "rings": 8, "perRing": 3, "count": 24,
+                  "spacingIsPer": "ring, not chevron",
                   "mat": "gold", "accent": "white_warm"},
         "curve": {"sag": -0.085, "sway": -0.020, "kink": 0.0,
                   "note": "it ARCHES: a column carries load"},
@@ -1423,17 +1431,17 @@ SPEC_STATES = {
                 "one console bracket with no partner"},
 
     "tendon": {
-        "profile": "SHEATH", "sections": 18,
+        "profile": "SHEATH", "sections": 12,
         "radius": {"formula": "r_target + (r_tower - r_target)*(1-t)^p",
                    "r_target": 0.0400, "r_tower": 0.0720, "p": 1.45},
         "twist": {"formula": "total*(1-t)^p", "total": 2.10, "p": 1.20},
         "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.40,
                    "gain": 0.75, "p": 1.2, "toward": "tower"},
-        "beads": {"spacing": 0.190, "count": 9, "shape": "constriction",
+        "beads": {"spacing": 0.190, "count": 7, "shape": "constriction",
                   "mat": "oil_black",
                   "size_law": "r(t)*(0.92 + 0.34*(1-t)) -- peristaltic"},
         "curve": {"sag": 0.115, "sway": 0.085, "kink": 0.022, "kink_n": 6.0},
-        "sheath": {"bands": 11, "gap": 0.034,
+        "sheath": {"bands": 8, "gap": 0.047,
                    "why": "translucency is BUILT, not alpha: you see the cords "
                           "through the windows"},
         "cords": [["abyss", 0.34, 0.40], ["rose_dim", 0.52, 0.30],
@@ -1454,7 +1462,7 @@ SPEC_STATES = {
         "twist": {"formula": "(1.6 + 0.5*seg)*(1-t)^1.25"},
         "scroll": {"formula": "arc-length along the whole chain, target->tower",
                    "base": 0.50, "gain": 0.90, "p": 1.25, "toward": "tower"},
-        "beads": {"spacing": [0.115, 0.135, 0.155], "count": [8, 7, 6],
+        "beads": {"spacing": [0.166, 0.184, 0.238], "count": [7, 6, 5],
                   "profile": "BEAD"},
         "curve": {"sag": [0.055, 0.085, 0.070],
                   "sway": [0.055, -0.075, 0.060], "kink": 0.014},
@@ -1466,8 +1474,17 @@ SPEC_STATES = {
 }
 
 
+MEASURED = {}       # state -> the scroll step the built mesh actually used
+
+
 def spec():
-    """The whole specification, ready to hand to a renderer."""
+    """The whole specification, ready to hand to a renderer.
+
+    `beads.spacing` is OVERWRITTEN from MEASURED, which build_state fills in
+    with the step the mesh was really built at. Typed by hand into the table
+    below it was wrong for all eight states -- the spacing is a consequence of
+    the knot count and the run's arc length, not a free parameter -- and a spec
+    that disagrees with the mesh beside it is worse than no spec."""
     out = {
         "unitsToPx": PX_PER_UNIT,
         "origins": {"HANDS": list(HANDS), "RING": list(RING)},
@@ -1502,6 +1519,13 @@ def spec():
         d["model"] = "siphon-beam-" + name
         d["flowCues"] = FLOW_CUES[name][0]
         d["flowReads"] = FLOW_CUES[name][1]
+        if name in MEASURED:
+            beads = dict(d["beads"])
+            beads["spacing"] = MEASURED[name]
+            beads["spacingNote"] = ("measured off the built mesh at a %g u.l. "
+                                    "run; scale it with the real distance"
+                                    % CANON_UL)
+            d["beads"] = beads
         out["states"][name] = d
     return out
 
@@ -1805,6 +1829,29 @@ Z_LIMIT = 0.92
 RUN_LIMIT = 0.94
 
 
+def control_revolved(flat):
+    """THE CONTROL, and the reason the numbers above mean anything.
+
+    A test that everything passes is not a test. This builds the forbidden
+    thing on purpose -- a `td.frustum` laid from the hands to the target, which
+    is exactly what socle section 7 records the last Siphon being deleted for --
+    and runs it through the identical rotation test. It must score near 1.000
+    on the RUN axis, because it genuinely is a surface of revolution about it.
+
+    If this control ever stops scoring high, the test has broken and every PASS
+    above it is worthless. It is printed beside the states for that reason."""
+    s = td.Scene(palette(flat))
+    root = s.node("root")
+    node = s.node("beam", parent=root)
+    d = _sub(TARGET, HANDS)
+    rot, length = _axis(HANDS, TARGET)
+    td.frustum(s, "lazy_cone", 0.055, 0.028, length, _lerp(HANDS, TARGET, 0.5),
+               "cloth_worn", node, 12, rot)
+    td.ball(s, "lazy_ball", 0.062, HANDS, "skin", node, 12, 6)
+    model = td.build(s, "control-revolved")
+    return rotation_test("control", model, d, HANDS)
+
+
 # ---------------------------------------------------------------------------
 
 def build_state(name, fn, path, origin, flat):
@@ -1814,6 +1861,8 @@ def build_state(name, fn, path, origin, flat):
     root = s.node("root")
     node = s.node("beam", parent=root)
     flows = fn(s, node, root)
+    steps = sorted(set(round(f.step, 4) for f in flows))
+    MEASURED[name] = steps[0] if len(steps) == 1 else steps
     model = td.build(s, "siphon-beam-" + name, FRAMES, flow_pose(flows))
     return model, s, list(REVOLVED), list(BODY_STARTS)
 
@@ -1896,12 +1945,24 @@ def main():
           "i.e. a")
     print("  surface of revolution. Limits: Z < %.2f, RUN < %.2f."
           % (Z_LIMIT, RUN_LIMIT))
+    cz, cr = control_revolved(flat)
     print("    worst about Z   : %.3f  (%s)"
           % (max(r[2] for r in results),
              max(results, key=lambda r: r[2])[0]))
     print("    worst about RUN : %.3f  (%s)"
           % (max(r[3] for r in results),
              max(results, key=lambda r: r[3])[0]))
+    print("    CONTROL, a td.frustum from the hands to the target -- the exact")
+    print("    shape socle section 7 says the last Siphon was deleted for:")
+    print("            about Z   : %.3f" % cz)
+    print("            about RUN : %.3f   <-- a surface of revolution scores 1"
+          % cr)
+    if cr < 0.98:
+        raise SystemExit("the control is not detected as a revolution (%.3f); "
+                         "the test is broken and every PASS is worthless" % cr)
+    print("    The control is caught, so the test discriminates. Every state "
+          "sits\n    at least %.2f below it on the RUN axis."
+          % (cr - max(r[3] for r in results)))
     print("    RESULT: %s" % ("PASS -- no state repeats itself at 90 degrees, "
                               "on either axis" if not bad else
                               "FAIL -- see the flagged rows above"))
