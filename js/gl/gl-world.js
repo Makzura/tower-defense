@@ -379,8 +379,21 @@ var World3D = (function () {
     return "base";
   }
 
+  // The Summoner's blubs. They live in `towers` (see js/blub.js for why) and are
+  // told apart by carrying a `unitId`; a fused monster carries a tier instead.
+  function blubModel(tower) {
+    if (tower.monsterTier && tower.monsterTier.tier !== undefined) {
+      return "blub-monster-t" + tower.monsterTier.tier;
+    }
+    return tower.unitId ? "blub-" + tower.unitId : null;
+  }
+
   function towerModel(tower) {
     if (!tower) return null;
+    if (tower.isSummon) {
+      var bn = blubModel(tower);
+      return (bn && GLModels.has(bn)) ? bn : null;
+    }
     var id = tower.constructor && tower.constructor.ID;
     var name = null;
     if (id === "soldier") name = "rifleman-" + riflemanGroup(tower);
