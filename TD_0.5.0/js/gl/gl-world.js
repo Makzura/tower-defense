@@ -388,11 +388,48 @@ var World3D = (function () {
     return tower.unitId ? "blub-" + tower.unitId : null;
   }
 
+  // THE SUMMONER HIMSELF. Seven bodies for ten tiers: A1/A2 and B1/B2 change
+  // what he is WEARING, not what he is, so they are crosspath marks composited
+  // over an unchanged body (see summonerMarks) rather than bodies of their own.
+  // That is also what keeps the marks superposable, which is the rule.
+  function summonerGroup(tower) {
+    if (typeof tower.hasUpgrade !== "function") return "base";
+    if (tower.hasUpgrade("A5")) return "a5";
+    if (tower.hasUpgrade("A4")) return "a4";
+    if (tower.hasUpgrade("A3")) return "a3";
+    if (tower.hasUpgrade("B5")) return "b5";
+    if (tower.hasUpgrade("B4")) return "b4";
+    if (tower.hasUpgrade("B3")) return "b3";
+    return "base";
+  }
+
+  // The four marks he can be wearing, as their own models drawn over the body.
+  // A1/A2 ride on a path B build and B1/B2 on a path A build -- that is what a
+  // crosspath IS -- so the test is simply "bought, and not already the body".
+  var SUMMONER_MARKS = ["a1", "a2", "b1", "b2"];
+
+  function summonerMarks(tower) {
+    if (typeof tower.hasUpgrade !== "function") return null;
+    var out = null;
+    for (var i = 0; i < SUMMONER_MARKS.length; i++) {
+      var m = SUMMONER_MARKS[i];
+      if (!tower.hasUpgrade(m.toUpperCase())) continue;
+      var name = "summoner-mark-" + m;
+      if (!GLModels.has(name)) continue;
+      (out || (out = [])).push(name);
+    }
+    return out;
+  }
+
   function towerModel(tower) {
     if (!tower) return null;
     if (tower.isSummon) {
       var bn = blubModel(tower);
       return (bn && GLModels.has(bn)) ? bn : null;
+    }
+    if (tower.constructor && tower.constructor.ID === "blub") {
+      var sn = "summoner-" + summonerGroup(tower);
+      return GLModels.has(sn) ? sn : null;
     }
     var id = tower.constructor && tower.constructor.ID;
     var name = null;
@@ -777,8 +814,18 @@ var World3D = (function () {
         // warbringerFullCircle) and is drawn at its authored facing forever.
         var drawYaw = warbringerFullCircle(t) ? 0 : (t.aim || 0);
         renderer.setGlow(towerGlow(t), towerGlowTint(t));
-        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1,
-          groundHeightAt(t.x, t.y), frame);
+        var tz = groundHeightAt(t.x, t.y);
+        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame);
+        // Crosspath marks, drawn OVER an unchanged body at the same transform.
+        // Authored around their own seat, so they need no offset here -- and
+        // because they are separate models the body underneath is literally the
+        // same vertices with or without them, which is the rule they exist to
+        // satisfy rather than a discipline to remember.
+        var marks = (t.constructor && t.constructor.ID === "blub")
+          ? summonerMarks(t) : null;
+        for (var mi = 0; marks && mi < marks.length; mi++) {
+          drawActor(marks[mi], t.x + kx, t.y + ky, drawYaw, 1, tz, 0);
+        }
         renderer.setGlow(0, null);
       } else {
         // Stand-in cylinder, breathing very slightly while its cooldown runs
