@@ -1,0 +1,65 @@
+--- TD_0.5.0/js/gl/gl-world.js	2026-08-10 22:52:46.580600400 +0300
++++ visual-pass/tmp/gl-world-hp.js	2026-08-10 23:47:17.023526500 +0300
+@@ -769,6 +769,7 @@
+     if (typeof BlubFXSystems !== "undefined") BlubFXSystems.reset();
+     if (typeof BlubFXShots !== "undefined") BlubFXShots.reset();
+     if (typeof BlubFXCircles !== "undefined") BlubFXCircles.reset();
++    if (typeof BlubFXHealth !== "undefined") BlubFXHealth.reset();
+     mapMesh = buildMapMesh(map, routePaths);
+     camera.bounds = bounds;
+     camera.fitBounds(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
+@@ -884,6 +885,7 @@
+         drawYaw += authoredFrontOffset(model);
+         renderer.setGlow(towerGlow(t), towerGlowTint(t));
+         var tz = groundHeightAt(t.x, t.y);
++        var bscale = 1;
+         // A SUMMONED BODY ARRIVES FROM ABOVE, AND THE MACHINES SHOVE BACK.
+         //
+         // Both are heights and offsets added to a transform this loop already
+@@ -905,7 +907,12 @@
+             }
+           }
+         }
+-        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame);
++        if (t.isSummon && typeof BlubFXHealth !== "undefined") {
++          var bp = BlubFXHealth.pose(t, state.now);
++          kx += bp.dx; ky += bp.dy; drawYaw += bp.dyaw;
++          bscale = bp;
++        }
++        drawActor(model, t.x + kx, t.y + ky, drawYaw, bscale, tz, frame);
+         // Crosspath marks, drawn OVER an unchanged body at the same transform.
+         // Authored around their own seat, so they need no offset here -- and
+         // because they are separate models the body underneath is literally the
+@@ -1078,7 +1085,9 @@
+       renderer.draw(prims.block, x, y, lift || 0, yaw || 0, 34);
+       return;
+     }
+-    var size = m.unitsToPx * (scale || 1);
++    var uni = (typeof scale === "number" || !scale) ? (scale || 1) : 0;
++    var size  = m.unitsToPx * (uni || scale.xy || 1);
++    var sizeZ = m.unitsToPx * (uni || scale.z  || 1);
+     // WHAT IS BOLTED TO THE MAP DOES NOT TURN WITH THE WEAPON.
+     //
+     // A5 is a floating cannon on an installed foundation and B5 is a man
+@@ -1100,6 +1109,7 @@
+       renderer.bind(m.gpu);
+       bound = true;
+       GLMath.modelYaw(fixedMat, x, y, lift || 0, 0, size);
++      fixedMat[10] = sizeZ;
+       if (fixed > 0) renderer.drawRange(fixedMat, 0, fixed);
+       if (fixedGroup >= 0) {
+         renderer.drawRange(fixedMat, m.groups[fixedGroup].first,
+@@ -1109,11 +1119,13 @@
+ 
+     if (!m.frames.length) {
+       GLMath.modelYaw(instanceMat, x, y, lift || 0, yaw || 0, size);
++      instanceMat[10] = sizeZ;
+       if (!bound) renderer.bind(m.gpu);
+       renderer.drawRange(instanceMat, fixed, m.gpu.count - fixed);
+       return;
+     }
+     GLMath.modelYaw(instanceMat, x, y, lift || 0, yaw || 0, size);
++    instanceMat[10] = sizeZ;
+     var pose = m.frames[((frame | 0) % m.frames.length + m.frames.length) %
+       m.frames.length];
+     if (!bound) renderer.bind(m.gpu);

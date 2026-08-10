@@ -12,8 +12,8 @@
 //
 //   2. THE GILDING AT CONTACT (voie A). Where the golden beam touches, the
 //      contact point lightly gilds the enemy's surface. A tint at one point,
-//      not a coat of paint: the gild is a warm light landing where the beam
-//      lands, clipped to the body so it cannot become a halo.
+//      not a coat of paint: a warm light landing where the beam lands, sized
+//      to die out inside the silhouette so it can never become a halo.
 //
 // WHAT THIS FILE DELIBERATELY DOES NOT DRAW. The brief lists these and says
 // that adding one is an error, not an improvement, so they are named here to
@@ -118,26 +118,41 @@
 //     cheaper still and is what blub-systems.js does, but it is only valid
 //     near where it was measured -- see the note on PROBE for the measurement
 //     that showed it collapsing the ribbon.
-//   * ONE FILLED RIBBON per trail (two at full quality: the drag, plus a
-//     faint sheen over its freshest third). At 100 enlises that is 100
-//     projections and 200 fills of a 16-point path -- measured against
-//     gl-world's own overlay pass, which already builds gradients and colour
-//     strings per shot, this is the cheaper half of that layer.
+//   * ONE FILLED RIBBON per trail, two below 2x backing store (the drag, plus
+//     the wet core over its freshest half). Fill rate is the axis PERF.md
+//     names as sensitive, and it is the only thing here that grows with
+//     resolution, so drawTrails governs itself: above 2x logical the core
+//     fill is dropped. See the note on it for the numbers that forced it.
 //   * NO STRING BUILDING AND NO ALLOCATION IN A FRAME. Every colour is a
 //     constant declared at load; strength is applied through ctx.globalAlpha,
 //     not by composing "rgba(...)" per stamp. Records and their stamps are
 //     pooled and capped (MAX_RECORDS), so a pathological board drops the
 //     surplus rather than growing an array.
-//   * FILL RATE IS THE SENSITIVE AXIS AT 4K, and everything here is small:
-//     a trail is a ribbon roughly one body wide, a gild is a disc smaller
-//     than the body it is clipped to. There is no full-screen pass, no soft
-//     shadow and no large translucent overlay in this file.
+//   * NOTHING HERE IS A FULL-SCREEN PASS, a soft shadow or a large
+//     translucent overlay. A trail is a ribbon narrower than the body that
+//     leaves it; a gild is a disc smaller than the body it lands on.
 //   * THE GILD IS BOUNDED BY THE MECHANIC, not by a cap. Path A never buys
 //     maxTargets: base 1, and a crosspath can only reach B2 (+1). So a
 //     gilding Siphon holds at most 2 enemies, and seven of them at most 14 --
 //     which is why the gild can afford a real radial gradient per contact.
-//   * `quality(k)` drops the sheen first, then trail length, if a later
-//     measurement ever needs the headroom back.
+//   * `quality(k)` drops the wet core first, if a later measurement ever
+//     needs the headroom back.
+//
+// MEASURED, not asserted. The stress board of PERF.md -- 100 enemies, seven
+// max-tier Siphons, and 89 bodies enlises AT ONCE -- through TDObs, with the
+// module's three calls turned on and off on ALTERNATING frames so drift
+// cannot masquerade as cost, 200 samples each:
+//
+//   | backing store | draw() median, on | off  | delta |
+//   |---------------|-------------------|------|-------|
+//   | 1280x720      | 2.3 ms            | 1.5  | +0.8  |
+//   | 3840x2160     | 1.9 ms            | 1.5  | +0.4  |
+//
+// GPU-fenced over the same board: 1.42 ms/frame at 720p and 1.56 at 4K,
+// against ceilings of 6.0 and 14.0. 4K costs LESS than 720p because that is
+// where the governor drops the second fill. Before the governor the same
+// board measured +2.0 ms median at 4K, which is most of the allowance the
+// entire visual pass has.
 // ---------------------------------------------------------------------------
 
 var SiphonFXEnemy = (function () {
@@ -609,6 +624,21 @@ var SiphonFXEnemy = (function () {
   function drawTrails(ctx, state) {
     if (!api || !live.length) return;
 
+    // THE FILL-RATE GOVERNOR, and it is here because this is the one thing in
+    // the file that scales with resolution. The HUD canvas takes a backing
+    // store of up to three times logical (js/game.js MAX_CANVAS_SCALE, native
+    // 4K), and PERF.md names fill rate as the sensitive axis for exactly that
+    // reason. Measured on the stress board -- 100 enemies, seven B4 Siphons,
+    // 88 trails at once -- the two fills cost +0.50 ms of `draw()` at 720p and
+    // +2.0 ms at 4K, which is most of the allowance the whole pass has.
+    //
+    // So above 2x the wet core is dropped and the drag alone is drawn. It is
+    // the right thing to lose: at that resolution the mark is being magnified
+    // anyway, and what carries it is the value against the road, not the
+    // second tone inside it.
+    var wide = ctx.canvas &&
+      ctx.canvas.width > 2 * (typeof VIEW_WIDTH === "number" ? VIEW_WIDTH : 1280);
+
     var drawn = 0;
     ctx.save();
     for (var i = 0; i < live.length; i++) {
@@ -637,7 +667,7 @@ var SiphonFXEnemy = (function () {
       // The freshest half again, narrower and darker: what the body has just
       // dragged through is still wet, and what it dragged through a second ago
       // has dried. First thing `quality()` drops.
-      if (quality >= 0.75 && rec.count >= 3) {
+      if (!wide && quality >= 0.75 && rec.count >= 3) {
         var fresh = rec.count < 4 ? rec.count : (rec.count >> 1);
         if (ribbon(ctx, rec, fresh, 0.62)) {
           ctx.fillStyle = TRAIL_CORE;
@@ -747,7 +777,7 @@ var SiphonFXEnemy = (function () {
     drawTrails: drawTrails,
     drawGild: drawGild,
     // The quality lever, 0..1, if a later measurement needs the headroom.
-    // Below 0.75 the sheen pass stops entirely.
+    // Below 0.75 the wet-core fill stops entirely.
     quality: function (k) {
       if (k !== undefined) quality = Math.max(0, Math.min(1, k));
       return quality;

@@ -131,6 +131,16 @@ HEIGHT_TOP = 2.08                    # the socle's other end, at b5
 # untouched at every tier. Nothing here widens anything.
 HEIGHT = {"b1": 1.790, "b2": 1.790, "b3": 1.870, "b4": 1.960, "b5": 2.080}
 
+# The ladder is checked against the socle here rather than trusted, because the
+# two things a ramp can get wrong are both cheap to test: it can leave the
+# socle's endpoints, and it can go backwards.
+_RUNGS = [HEIGHT[t] for t in ("b1", "b2", "b3", "b4", "b5")]
+if _RUNGS[0] != HEIGHT_BASE or _RUNGS[-1] != HEIGHT_TOP:
+    raise SystemExit("the ladder runs %.3f -> %.3f, the socle says %.2f -> %.2f"
+                     % (_RUNGS[0], _RUNGS[-1], HEIGHT_BASE, HEIGHT_TOP))
+if any(b < a for a, b in zip(_RUNGS, _RUNGS[1:])):
+    raise SystemExit("the ladder goes backwards: %s" % _RUNGS)
+
 HEM_LONG = 0.66                      # the train, from the axis
 HEM_SHORT = 0.35                     # the open side, from the axis
 SHOULDER_LIFT = 0.06                 # left shoulder above right

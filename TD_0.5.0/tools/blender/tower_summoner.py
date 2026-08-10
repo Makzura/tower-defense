@@ -80,9 +80,102 @@ def palette(flat):
 # Shared blub anatomy.
 #
 # A blub is a GELATINOUS DROP: wide and heavy at the base, narrowing to a
-# rounded top, never a sphere. `drop` is that body and every unit on path A is
-# a variation of it, which is what makes them read as one family at a glance.
+# rounded top, never a sphere.
+#
+# THREE PROPORTIONS, NOT ONE -- and this is the whole point of the file.
+# Revue 1 measured FIVE of the ten units (mini2, blub1, blub2, hungry, cyber)
+# sharing a single circular outline at >= 0.85 shape IoU, and said in as many
+# words that fixing the pairs one at a time would only move the confusion. It
+# also gave the reason no detail pass can work: at true game scale mini1 is
+# 10 x 13 px, so an appendage is one or two pixels and is simply not there in
+# pure shadow. The separation therefore has to be the ANIMAL, not a bump on it:
+#
+#   TALL   narrow footprint, tall in Z ....... blub1, mini1, cyber
+#   LOW    wide footprint, flattened in Z .... blub2, mini2, hungry
+#   RIG    machine outlines, already passing . blub3, mecha, mecha2, superb
+#
+# Proportion is what survives at 10 px. Contour is what survives when a review
+# normalises the size away, so within each proportion the outline differs in
+# KIND as well: a smooth egg (blub1) against a spire (mini1) against a masted
+# drop (cyber); a crested carapace (blub2) against a flat slab lid (mini2)
+# against a sprawl with daylight under it (hungry). Two units on the same
+# footprint -- hungry and cyber, both 25 -- have nothing BUT this to tell them
+# apart, which is why 1.40 radii tall is set against 2.55.
+#
+# THE FOOTPRINTS THEMSELVES NEVER MOVE. They are gameplay (js/blub.js
+# UNITS[].footprintUl) and every radius below still comes from R().
 # ---------------------------------------------------------------------------
+
+# A profile is DATA -- (lower, upper, share of height), bottom to top, in units
+# of r -- so that two silhouettes can be compared by reading two lists instead
+# of by counting hand-placed solids.
+# EGG stays broad to 88% of its height on purpose. A profile that tapers to a
+# needle puts almost no AREA up high, and "blub1 is 92% contained in blub2" is
+# an area measurement -- a tall unit only escapes a wide one if there is
+# something of it up there to escape with.
+EGG = [(0.42, 0.82, 0.13), (0.82, 0.96, 0.17), (0.96, 0.95, 0.22),
+       (0.95, 0.86, 0.20), (0.86, 0.66, 0.16), (0.66, 0.22, 0.12)]
+SPIRE = [(0.84, 0.88, 0.18), (0.88, 0.70, 0.26), (0.70, 0.44, 0.28),
+         (0.44, 0.08, 0.28)]
+SQUAT = [(0.88, 1.10, 0.34), (1.10, 1.16, 0.36), (1.16, 0.94, 0.30)]
+
+
+def _stack(s, name, cx, cy, r, height, rings, mat, parent, segs=12, z0=0.0):
+    """Build one of the profiles above as a run of frusta, bottom to top."""
+    z = z0
+    for i, (lo, hi, share) in enumerate(rings):
+        seg = height * share
+        td.frustum(s, "%s%d" % (name, i), r * lo, r * hi, seg,
+                   (cx, cy, z + seg * 0.5), mat, parent, segs)
+        z += seg
+    return z - z0
+
+
+def radius_at(rings, r, height, z):
+    """The profile's radius at a height -- so a mouth can be laid ON the head
+    instead of guessed at and left floating in front of it."""
+    t = 0.0
+    for lo, hi, share in rings:
+        if z <= (t + share) * height or share == rings[-1][2]:
+            k = min(1.0, max(0.0, (z / height - t) / share))
+            return r * (lo + (hi - lo) * k)
+        t += share
+    return r * rings[-1][1]
+
+
+def maw(s, cx, cy, z, r_head, gape, parent, span=2.10, tiles=6, teeth=5):
+    """THE MOUTH -- a feature OF a head, never a hole through one.
+
+    The owner reported this twice: "the mini blub and hungry blub are
+    unreadable because they're open from behind". The old jaws were two wide
+    plates flared apart with a dark ellipsoid pushed between them, and the
+    ellipsoid was WIDER than the plates -- so from every angle the outline was
+    an open clamshell with a dark blob in it and there was no head above the
+    gape. Adding the cavity closed the see-through hole and left the cause
+    alone, which is why the second report said the same thing as the first.
+
+    So the mouth is laid ON the head's own curve: a band of dark tiles at
+    `r_head`, spanning `span` radians of the front and `gape` tall. It cannot
+    widen the silhouette because it never leaves the surface; it cannot be seen
+    through because there is solid head behind it; and the head closes over the
+    top of it. The shape reads as a head first and the mouth as the dark in it.
+    """
+    step = span / tiles
+    w = 2.0 * r_head * math.sin(step * 0.5) * 1.32
+    for i in range(tiles):
+        a = math.pi * 0.5 + span * (-0.5 + (i + 0.5) / tiles)
+        td.box(s, "maw", (w, r_head * 0.18, gape),
+               (cx + math.cos(a) * r_head * 0.95,
+                cy + math.sin(a) * r_head * 0.95, z),
+               (0, 0, a + math.pi * 0.5), "dark", parent)
+    for i in range(teeth):
+        a = math.pi * 0.5 + span * 0.84 * (-0.5 + (i + 0.5) / teeth)
+        for sz in (1, -1):
+            td.box(s, "tooth", (w * 0.34, r_head * 0.18, gape * 0.40),
+                   (cx + math.cos(a) * r_head * 1.00,
+                    cy + math.sin(a) * r_head * 1.00, z + sz * gape * 0.30),
+                   (0, 0, a + math.pi * 0.5), "tooth", parent)
+
 
 def drop(s, name, cx, cy, r, height, mat, parent, squash=1.0, segs=12):
     """The body. `squash` is the live HP deflation hook -- 1.0 is full and
@@ -105,11 +198,13 @@ def drop(s, name, cx, cy, r, height, mat, parent, squash=1.0, segs=12):
     return h
 
 
-def face(s, cx, cy, z, r, parent, kind, flat, scale=1.0):
+def face(s, cx, cy, z, r, parent, kind, flat, scale=1.0, front=0.80):
     """Every blub has a face, and it is the unit's whole personality. `scale`
-    is the B-path gag: the machine grows and the face inside it shrinks."""
+    is the B-path gag: the machine grows and the face inside it shrinks.
+    `front` is how far out the body's own surface is at this height -- a body
+    that is no longer a sphere needs to be told, or the eyes sink into it."""
     e = r * 0.20 * scale
-    fy = cy + r * 0.80                      # on the front of the body
+    fy = cy + r * front                     # on the front of the body
     if kind == "happy":                     # Blub I: deux points, bouche ronde
         for sx in (-1, 1):
             td.ball(s, "eye", e * 0.55, (cx + sx * r * 0.34, fy, z), "eye", parent, 8, 5)
@@ -129,14 +224,15 @@ def face(s, cx, cy, z, r, parent, kind, flat, scale=1.0):
         td.box(s, "jaw", (r * 0.66, e * 0.4, e * 0.44), (cx, fy * 0.98, z - r * 0.42),
                (0, 0, 0), "dark", parent)
     elif kind == "one_eye":                 # Mini I: un oeil, presque que la bouche
-        td.ball(s, "eye", e * 1.5, (cx, fy, z + r * 0.30), "eye", parent, 8, 5)
-        td.frustum(s, "maw", r * 0.72, r * 0.52, r * 0.50, (cx, cy + r * 0.20, z - r * 0.20),
-                   "dark", parent, 10)
+        # The maw that used to live here is gone: the mouth is now `maw()`, laid
+        # on the body's own surface by whoever owns the body. A face must not
+        # also be a hole -- that was the bug.
+        td.ball(s, "eye", e * 1.30, (cx, fy, z), "eye", parent, 8, 5)
+        td.box(s, "lid", (r * 0.50, e * 0.5, e * 0.34), (cx, fy, z + e * 0.72),
+               (0, 0, 0), "moss_dark", parent)
     elif kind == "two_eye":                 # Mini II: deux yeux, toujours frenetique
         for sx in (-1, 1):
-            td.ball(s, "eye", e * 1.0, (cx + sx * r * 0.30, fy, z + r * 0.28), "eye", parent, 8, 5)
-        td.frustum(s, "maw", r * 0.70, r * 0.50, r * 0.46, (cx, cy + r * 0.20, z - r * 0.20),
-                   "dark", parent, 10)
+            td.ball(s, "eye", e * 0.90, (cx + sx * r * 0.34, fy, z), "eye", parent, 8, 5)
     elif kind == "teeth":                   # Hungry: yeux minuscules, dents partout
         for sx in (-1, 1):
             td.ball(s, "eye", e * 0.34, (cx + sx * r * 0.26, fy, z + r * 0.44), "eye", parent, 6, 4)
@@ -157,12 +253,11 @@ def face(s, cx, cy, z, r, parent, kind, flat, scale=1.0):
         td.ball(s, "mouth", e * 0.26, (cx, fy, z - e * 0.5), "dark", parent, 6, 4)
 
 
-def teeth_ring(s, cx, cy, z, r, parent, count, size):
-    for i in range(count):
-        a = math.pi * (0.15 + 0.70 * i / max(1, count - 1))
-        td.box(s, "tooth", (size, size, size * 2.2),
-               (cx + math.cos(a) * r * 0.78, cy + math.sin(a) * r * 0.78, z),
-               (0, 0, a), "tooth", parent)
+# `teeth_ring` used to live here: a crown of teeth standing PROUD of the body
+# on a radius of its own. Revue 1 measured what that is worth at true scale --
+# "la couronne dentelee et les pattes ne font qu'une frange de 1 px" -- and the
+# same crown is what made the gape read as a separate open thing rather than as
+# part of a head. Teeth now belong to `maw()`, on the head's own surface.
 
 
 # ---------------------------------------------------------------------------
@@ -175,18 +270,53 @@ FACE_SCALE = {                 # the gag, and it only goes down
 
 
 def unit_blub1(s, body, flat):
-    # A tall, utterly smooth drop and NOTHING else. Its lack of appendages is
-    # its silhouette, so it only works if the body is tall enough to be a shape.
-    r = R(10); h = drop(s, "b", 0, 0, r, r * 2.30, "moss", body)
-    face(s, 0, 0, h * 0.58, r, body, "happy", flat)
+    # TALL. Bete et content, and utterly smooth: no crust, no mast, no
+    # appendage. Its lack of appendages is its silhouette -- which only works if
+    # the body itself is a shape, so it now stands 3.10 radii high on a base
+    # only 1.9 radii across. That, and not a detail, is what tells it from
+    # Blub II, who has gone the other way and crouched under his rock.
+    r = R(10)
+    h = _stack(s, "b", 0, 0, r, r * 3.70, EGG, "moss", body)
+    face(s, 0, 0, h * 0.56, r, body, "happy", flat, front=0.94)
 
 
 def unit_blub2(s, body, flat):
-    r = R(13); h = drop(s, "b", 0, 0, r, r * 2.05, "moss", body)
-    face(s, 0, 0, h * 0.58, r, body, "brow", flat)
-    # une croute de pierre sur le dos
-    td.frustum(s, "crust", r * 0.72, r * 0.44, h * 0.42, (0, -r * 0.34, h * 0.70),
-               "stone", body, 8, (0.42, 0, 0))
+    # LOW. "Idem, une croute de pierre sur le dos" -- and the crust is finally
+    # doing the silhouette work. Revue 1: blub1 was 92% CONTAINED in blub2,
+    # "one egg at two sizes", because the crust sat flush on the back and never
+    # reached the outline. So Blub II now hunkers DOWN under his rock (which is
+    # also the joke: il se croit costaud), the carapace flares into two plates
+    # well outside the body, and it narrows to a single crest -- the profile is
+    # a T, not a bigger egg, and nothing tall fits inside it.
+    r = R(13)
+    # The blub is a pancake and the ROCK is most of the animal: below a third of
+    # the height it is as wide as the plates reach, above that it is nothing but
+    # a crest a fifth of that width. That T is what a tall smooth egg cannot be
+    # rescaled into, and it is also what a tall egg escapes SIDEWAYS out of --
+    # which is the only way an area measure like containment really moves.
+    # A lens, not a frustum stack: BROADER THAN IT IS DEEP. A body that is round
+    # in plan is exactly as wide from the side as from the front, so "wide and
+    # low" quietly becomes "tall" the moment the unit turns 90 degrees and the
+    # width folds into depth. This one stays low from every yaw.
+    td.ellipsoid(s, "b", (r * 2.16, r * 1.30, r * 0.86), (0, -r * 0.02, r * 0.42),
+                 "moss", body, (0, 0, 0), 10, 5)
+    face(s, 0, 0, r * 0.44, r * 0.88, body, "brow", flat, front=0.68)
+    for sx in (-1, 1):
+        td.box(s, "crust_plate", (r * 1.16, r * 1.10, r * 0.26),
+               (sx * r * 0.94, -r * 0.02, r * 0.40), (0, sx * -0.34, 0),
+               "stone", body)
+        td.box(s, "crust_lip", (r * 0.32, r * 0.88, r * 0.20),
+               (sx * r * 1.42, -r * 0.02, r * 0.26), (0, sx * -0.34, 0),
+               "stone_dark", body)
+    # The crest is thin in DEPTH as well as in width -- a blade, not a hump --
+    # so it is a narrow stem of the T from the side as much as from the front.
+    td.box(s, "crust_ridge", (r * 0.58, r * 0.94, r * 0.36),
+           (0, -r * 0.10, r * 0.86), (-0.06, 0, 0), "stone", body)
+    td.box(s, "crust_crown", (r * 0.40, r * 0.66, r * 0.26),
+           (0, -r * 0.14, r * 1.14), (-0.06, 0, 0), "stone", body)
+    for fy in (-0.28, 0.04):
+        td.frustum(s, "crust_spike", r * 0.13, r * 0.03, r * 0.16,
+                   (0, r * fy, r * 1.30), "stone_dark", body, 4, (0, 0, 0.5))
 
 
 def unit_blub3(s, body, flat):
@@ -200,100 +330,166 @@ def unit_blub3(s, body, flat):
                (sx * r * 0.80, -r * 0.06, h * 0.90), (0, sx * -0.38, 0), "stone_dark", body)
 
 
-def _mini_body(s, body, r):
-    """PRESQUE ENTIEREMENT BOUCHE (section 7). Revue 1 failed because these were
-    drops with a mouth drawn on; the mouth has to BE the silhouette. So: a wide
-    gaping maw taking most of the height, a stub of body behind it, and short
-    legs -- a profile no full-size blub can be confused with."""
-    h = r * 1.55
-    # the stub of a body, tucked low and behind
-    td.frustum(s, "stub", r * 0.46, r * 0.34, h * 0.34, (0, -r * 0.36, h * 0.20),
-               "moss_dark", body, 8)
-    # the maw: two flared cups facing forward, held open
-    td.frustum(s, "maw_low", r * 0.52, r * 1.02, h * 0.34, (0, r * 0.12, h * 0.24),
-               "moss", body, 10, (0.22, 0, 0))
-    td.frustum(s, "maw_up", r * 1.00, r * 0.56, h * 0.34, (0, r * 0.20, h * 0.72),
-               "moss", body, 10, (-0.26, 0, 0))
-    # THE THROAT, and it is not decoration. The two jaw halves flare apart, so
-    # without something closing the gap between them you look straight THROUGH
-    # the unit into the board behind it -- the owner's report was that the minis
-    # and the Hungry Blub "are unreadable because they're open from behind".
-    # An open mouth with no throat is a hole, not a mouth. Dark, so the teeth in
-    # front of it read as teeth.
-    td.ellipsoid(s, "throat", (r * 1.32, r * 1.10, h * 0.62), (0, r * 0.02, h * 0.50),
-                 "dark", body, (0, 0, 0), 10, 6)
-    teeth_ring(s, 0, r * 0.06, h * 0.44, r, body, 6, r * 0.13)
-    teeth_ring(s, 0, r * 0.10, h * 0.62, r, body, 6, r * 0.12)
-    for sx in (-1, 1):
-        td.tube(s, "leg", r * 0.10, (sx * r * 0.34, -r * 0.20, h * 0.22),
-                (sx * r * 0.44, -r * 0.24, 0), "moss_dark", body, 6)
-    return h
-
+# THE TWO MINIS SHARE NOTHING BUT A FOOTPRINT.
+#
+# Revue 1 measured them at 0.951 / 0.921 / 0.986 raw IoU across three yaws, with
+# 96.9% of mini1 inside mini2, and named the reason the previous fix failed: the
+# "caillou pose de travers" that was supposed to separate them weighs one to two
+# pixels at 10 x 12, so "il n'existe pas en ombre chinoise". They therefore no
+# longer share a body function at all. Mini I is a SPIRE and Mini II is a SLAB,
+# and the difference is visible before any detail is.
+#
+# The body radius stays R(10) * 0.78: it is the reconstructed body radius
+# summoner_unit_marks.py seats its marks on, and the GAMEPLAY footprint is
+# still the full 10 from UNIT_FOOTPRINT.
 
 def unit_mini1(s, body, flat):
+    # TALL. "Presque entierement bouche" (section 7) -- but the owner's report
+    # is the correction to that: all mouth cannot mean no head, or the thing is
+    # a blob with a bite out of it and it is open from behind. So Mini I is a
+    # spire, full width where it meets the ground and tapering to a point, with
+    # the gape cut into the wide bottom half and a real head standing above it.
     r = R(10) * 0.78
-    h = _mini_body(s, body, r)
-    face(s, 0, 0, h * 0.86, r, body, "one_eye", flat)
+    h = _stack(s, "b", 0, 0, r, r * 3.05, SPIRE, "moss", body, segs=10)
+    zm = h * 0.22
+    maw(s, 0, 0, zm, radius_at(SPIRE, r, h, zm), r * 0.40, body,
+        span=2.30, tiles=6, teeth=5)
+    ze = h * 0.54
+    face(s, 0, 0, ze, r, body, "one_eye", flat,
+         front=radius_at(SPIRE, r, h, ze) / r)
+    for sx in (-1, 1):                       # les pattes, courtes, sous le corps
+        td.tube(s, "leg", r * 0.11, (sx * r * 0.44, -r * 0.06, h * 0.12),
+                (sx * r * 0.66, -r * 0.10, 0), "moss_dark", body, 6)
 
 
 def unit_mini2(s, body, flat):
+    # LOW -- the exact opposite proportion, which is the only lever that exists
+    # at this size. Mini II is a wide crouching grin under a flat stone lid, so
+    # the top of its silhouette is a straight line where Mini I comes to a
+    # point, and it is wider than it is tall where Mini I is the reverse.
     r = R(10) * 0.78
-    h = _mini_body(s, body, r)
-    face(s, 0, 0, h * 0.86, r, body, "two_eye", flat)
-    # Un caillou posé sur la tête -- an angular block set askew, so it survives
-    # as a notch in the profile rather than melting into a round head.
-    td.box(s, "pebble", (r * 0.62, r * 0.52, r * 0.40), (0, -r * 0.14, h * 1.02),
-           (0.22, 0, 0.5), "stone", body)
+    h = _stack(s, "b", 0, 0, r, r * 0.78, SQUAT, "moss", body, segs=10)
+    zm = h * 0.38
+    maw(s, 0, 0, zm, radius_at(SQUAT, r, h, zm), r * 0.32, body,
+        span=2.60, tiles=7, teeth=6)
+    ze = h * 0.84
+    face(s, 0, 0, ze, r, body, "two_eye", flat,
+         front=radius_at(SQUAT, r, h, ze) / r)
+    # Le caillou est devenu un couvercle: a slab across the WHOLE head, set
+    # askew. A pebble on top was a 2 px notch; a lid is the top edge itself.
+    # It is square in plan and turned, so it is just as wide from the side as
+    # from the front -- an aspect ratio that only exists at one yaw is not one.
+    td.box(s, "slab", (r * 2.00, r * 2.00, r * 0.30), (0, -r * 0.04, h + r * 0.12),
+           (0.08, 0, 0.42), "stone", body)
+    td.box(s, "slab_chip", (r * 0.76, r * 0.54, r * 0.18),
+           (r * 0.58, -r * 0.22, h + r * 0.26), (0, 0, 0.42), "stone_dark", body)
+    for sx in (-1, 1):                       # pattes ecartees, bien en dehors
+        for fy in (-0.50, 0.42):
+            td.tube(s, "leg", r * 0.12, (sx * r * 0.74, r * fy, h * 0.34),
+                    (sx * r * 1.14, r * fy, 0), "moss_dark", body, 6)
 
 
 def unit_hungry(s, body, flat):
-    # Une machoire sur pattes, corps reduit. The jaw IS the silhouette.
-    # Revue 1 failed here: two stacked frusta of near-equal radius read as one
-    # mass, not as a jaw. The gape has to be wide and the body has to be a
-    # REMNANT behind it -- the brief's words are "une machoire sur pattes, corps
-    # reduit", and the proportion was the wrong way round.
+    # "Une machoire sur pattes, corps reduit." LOW and SPRAWLING -- 1.40 radii
+    # tall on a 2.30-radii stance -- because the Cyberblub has the SAME
+    # footprint of 25 and revue 1 measured them at 0.877 shape IoU with 93%
+    # containment: size cannot separate them, so proportion has to.
+    #
+    # The head is a HEAD. The old one was two frusta hinged 45 degrees apart
+    # with a dark ellipsoid wider than either of them wedged in between, which
+    # is what the owner kept reporting: an open clamshell, nothing above the
+    # gape, and daylight through it from behind. Here the skull is one solid
+    # block with a cranium on top of it, the jaw is a second solid under it with
+    # an underbite that juts past the skull, and the gape between them is a
+    # narrow dark line that is strictly smaller than both in every direction.
+    # The long legs are what give this unit the one thing nothing else in the
+    # family has: HOLES in its outline.
     r = R(25)
-    # what is left of the body: a small sac slung behind the jaw
-    td.frustum(s, "gut", r * 0.40, r * 0.54, r * 0.52, (0, -r * 0.52, r * 0.46),
+    # ce qui reste du corps: a sac slung low at the back, a remnant, and set
+    # BELOW the skull line so there is a step in the profile behind the head.
+    td.frustum(s, "gut", r * 0.44, r * 0.32, r * 0.38, (0, -r * 0.62, r * 0.62),
                "moss", body, 10)
-    # LOWER jaw, dropped and flared forward
-    td.frustum(s, "jaw_low", r * 0.44, r * 1.06, r * 0.52, (0, r * 0.22, r * 0.30),
-               "moss_dark", body, 12, (0.30, 0, 0))
-    # UPPER jaw, hinged well open -- the gape is the silhouette
-    td.frustum(s, "jaw_up", r * 1.04, r * 0.40, r * 0.54, (0, r * 0.30, r * 1.06),
-               "moss", body, 12, (-0.46, 0, 0))
-    # THE GULLET. Same reason as the minis: a gape this wide with nothing behind
-    # it is a hole through the model, and at 50 px across it was the single most
-    # unreadable thing on the board. Closing it also gives the two teeth rings
-    # something dark to bite against, which is what makes them read as teeth
-    # rather than as white specks.
-    td.ellipsoid(s, "gullet", (r * 1.44, r * 1.16, r * 0.92), (0, r * 0.06, r * 0.72),
-                 "dark", body, (0, 0, 0), 12, 7)
-    teeth_ring(s, 0, r * 0.14, r * 0.56, r, body, 8, r * 0.13)
-    teeth_ring(s, 0, r * 0.20, r * 0.94, r, body, 8, r * 0.12)
-    face(s, 0, -r * 0.30, r * 1.14, r * 0.62, body, "teeth", flat)
-    # pattes, longues, sous la gueule
+    td.frustum(s, "gut_cap", r * 0.32, r * 0.10, r * 0.14, (0, -r * 0.62, r * 0.86),
+               "moss", body, 10)
+    # LA MACHOIRE -- and it is the animal. Three plates of falling width make a
+    # WEDGE in plan: broad at the hinge, tapering to a snout. A stack of equal
+    # boxes is a crate, which is what the first attempt at this looked like.
+    td.box(s, "jaw", (r * 1.90, r * 0.92, r * 0.34), (0, -r * 0.04, r * 0.52),
+           (0.05, 0, 0), "moss_dark", body)
+    td.box(s, "jaw_mid", (r * 1.32, r * 0.82, r * 0.28), (0, r * 0.60, r * 0.50),
+           (0.05, 0, 0), "moss_dark", body)
+    td.box(s, "snout", (r * 0.72, r * 0.52, r * 0.22), (0, r * 1.10, r * 0.48),
+           (0.05, 0, 0), "moss_dark", body)
+    # LE CRANE: the same wedge again, narrower, set back and ABOVE the mouth
+    # line, under a dome. The owner's report was that there was no head above
+    # the gape; this is the head above the gape.
+    td.box(s, "skull", (r * 1.68, r * 0.88, r * 0.30), (0, -r * 0.08, r * 0.94),
+           (-0.08, 0, 0), "moss", body)
+    td.box(s, "skull_mid", (r * 1.14, r * 0.78, r * 0.24), (0, r * 0.56, r * 0.90),
+           (-0.08, 0, 0), "moss", body)
+    td.box(s, "muzzle", (r * 0.62, r * 0.46, r * 0.18), (0, r * 1.02, r * 0.86),
+           (-0.08, 0, 0), "moss", body)
+    td.ellipsoid(s, "cranium", (r * 1.44, r * 1.06, r * 0.62),
+                 (0, -r * 0.12, r * 1.04), "moss", body, (0, 0, 0), 10, 5)
+    # LA GUEULE: the dark line between the two wedges. Narrower and shallower
+    # than both of them in x and in y, so it cannot reach the outline from any
+    # angle and there is solid blub behind it -- no hole, at any yaw.
+    td.box(s, "gullet", (r * 1.54, r * 1.30, r * 0.14), (0, r * 0.26, r * 0.72),
+           (0, 0, 0), "dark", body)
+    for i in range(7):                       # les dents, DANS la gueule
+        x = r * 1.20 * (-0.5 + (i + 0.5) / 7.0)
+        td.box(s, "tooth", (r * 0.13, r * 0.16, r * 0.15),
+               (x, r * 0.88, r * 0.76), (0, 0, 0), "tooth", body)
+        td.box(s, "tooth", (r * 0.13, r * 0.16, r * 0.14),
+               (x + r * 0.09, r * 0.90, r * 0.67), (0, 0, 0), "tooth", body)
+    face(s, 0, 0, r * 1.14, r * 0.62, body, "teeth", flat, front=1.00)
+    # pattes: ECARTEES et sous le crane, et le corps est PORTE. The jaw hangs
+    # clear of the ground, so the daylight between the legs is the only pierced
+    # outline in the ten -- and a hole is the one contour feature that survives
+    # being normalised into somebody else's bounding box.
     for sx in (-1, 1):
-        for fy in (-0.42, 0.30):
-            td.tube(s, "leg", r * 0.10, (sx * r * 0.52, r * fy, r * 0.40),
-                    (sx * r * 0.78, r * fy, 0), "moss_dark", body, 6)
+        for fy in (-0.34, 0.42):
+            td.tube(s, "leg", r * 0.11, (sx * r * 0.56, r * fy, r * 0.46),
+                    (sx * r * 0.90, r * fy * 1.10, 0), "moss_dark", body, 6)
+            td.box(s, "foot", (r * 0.26, r * 0.38, r * 0.10),
+                   (sx * r * 0.90, r * fy * 1.10, r * 0.05), (0, 0, 0),
+                   "moss_dark", body)
 
 
 def unit_cyber(s, body, flat):
-    # Blub avec des greffes: still a blub, already wired.
-    r = R(25); h = drop(s, "b", 0, 0, r, r * 1.45, "blue_gel", body)
-    face(s, 0, 0, h * 0.60, r, body, "visor_up", flat, FACE_SCALE["cyber"])
-    td.box(s, "visor", (r * 0.86, r * 0.30, r * 0.16), (0, r * 0.60, h * 0.80),
+    # TALL. Un blub avec des greffes -- still a blub, already wired, and now
+    # measurably not the Hungry Blub: same footprint of 25, 2.55 radii tall
+    # against 1.40, drawn UP where the Hungry Blub is drawn out. The mast is
+    # what a grafted thing has that a grown thing does not, and it is the one
+    # hard vertical in the A-to-B crossover.
+    r = R(25)
+    h = _stack(s, "b", 0, 0, r * 0.90, r * 2.10, EGG, "blue_gel", body)
+    face(s, 0, 0, h * 0.56, r, body, "visor_up", flat, FACE_SCALE["cyber"],
+         front=0.84)
+    td.box(s, "visor", (r * 0.82, r * 0.32, r * 0.15), (0, r * 0.60, h * 0.72),
            (0.42, 0, 0), "chrome", body)
+    # le mat: the graft that breaks the top of the profile
+    td.frustum(s, "mast", r * 0.20, r * 0.08, r * 0.54, (0, -r * 0.10, r * 2.28),
+               "chrome", body, 6)
+    td.torus(s, "mast_ring", r * 0.18, r * 0.05, (0, -r * 0.10, r * 2.36),
+             (0, 0, 0), "cyan", body, 8, 5)
+    td.ball(s, "mast_lamp", r * 0.14, (0, -r * 0.10, r * 2.60), "cyan", body, 8, 5)
     for sx in (-1, 1):
-        td.box(s, "graft", (r * 0.30, r * 0.44, r * 0.50),
-               (sx * r * 0.72, -r * 0.10, h * 0.52), (0, 0, 0), "chrome_dk", body)
-        td.tube(s, "vein", r * 0.055, (sx * r * 0.60, -r * 0.10, h * 0.30),
-                (sx * r * 0.24, r * 0.30, h * 0.74), "cyan", body, 5)
+        # greffes d'epaule: hard rectilinear boxes on a round body, and they
+        # stay INSIDE the width the profile already has. A grafted thing is
+        # read by its verticals, not by how far it sticks out.
+        td.box(s, "graft", (r * 0.30, r * 0.46, r * 0.76),
+               (sx * r * 0.78, -r * 0.06, h * 0.58), (0, sx * 0.14, 0),
+               "chrome_dk", body)
+        td.box(s, "graft_plate", (r * 0.14, r * 0.40, r * 0.46),
+               (sx * r * 0.92, -r * 0.06, h * 0.72), (0, sx * 0.14, 0),
+               "chrome", body)
+        td.tube(s, "vein", r * 0.055, (sx * r * 0.70, -r * 0.06, h * 0.40),
+                (sx * r * 0.16, r * 0.32, h * 0.86), "cyan", body, 5)
     # heritage obligatoire de la voie B (section 4): pierre gravee + lichen
     td.box(s, "heritage_stone", (r * 0.44, r * 0.16, r * 0.32),
-           (-r * 0.52, r * 0.36, h * 0.30), (0, 0, 0), "stone", body)
-    td.ball(s, "heritage_lichen", r * 0.16, (r * 0.50, r * 0.30, h * 0.22),
+           (-r * 0.46, r * 0.62, h * 0.26), (0, 0, 0), "stone", body)
+    td.ball(s, "heritage_lichen", r * 0.16, (r * 0.44, r * 0.56, h * 0.18),
             "lichen", body, 6, 4)
 
 
