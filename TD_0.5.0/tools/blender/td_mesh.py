@@ -181,18 +181,28 @@ def ball(scene, name, radius, location=(0, 0, 0), mat=None, parent=None,
                       math.sin(phi) * math.sin(th) * radius,
                       math.cos(phi) * radius))
     v.append((0, 0, -radius))
+    # WOUND OUTWARD. Every one of these three loops used to run the other way,
+    # so a ball's normals all pointed at its own centre -- and with
+    # CULL_FACE/BACK enabled in GLRenderer the front of every sphere was culled
+    # and you saw the inside of the far wall instead. Every head, shoulder, eye,
+    # ball joint and glow orb in the game was inside out.
+    #
+    # Audited rather than eyeballed: for a convex solid the outward normal must
+    # satisfy dot(n, face_centre - centroid) > 0. Before this change ball and
+    # ellipsoid scored 0 outward / 120 inward; box, cyl, frustum and tube were
+    # already correct, which is why only the round parts looked wrong.
     top, bottom = 0, len(v) - 1
     for s in range(segments):
-        f.append((top, 1 + (s + 1) % segments, 1 + s))
+        f.append((top, 1 + s, 1 + (s + 1) % segments))
     for r in range(rings - 2):
         base = 1 + r * segments
         for s in range(segments):
             a = base + s
             b = base + (s + 1) % segments
-            f.append((a, b, b + segments, a + segments))
+            f.append((a, a + segments, b + segments, b))
     base = 1 + (rings - 2) * segments
     for s in range(segments):
-        f.append((bottom, base + s, base + (s + 1) % segments))
+        f.append((bottom, base + (s + 1) % segments, base + s))
     return scene.add(Mesh(name, _place(v, location, rotation=(0, 0, 0)),
                           f, mat, parent))
 

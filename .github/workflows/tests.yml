@@ -34,7 +34,20 @@ jobs:
     # tools/blender/ -- no Blender needed for these ones -- so CI rebuilds them
     # and fails if the tree moves. That is what stops a hand-edit to a generated
     # file surviving unnoticed.
-    runs-on: ubuntu-latest
+    #
+    # WINDOWS, and not by preference. The first run of this job failed on ubuntu
+    # with about twenty files differing by exactly ONE LINE each. That is not a
+    # content change: coordinates come out of math.cos/math.sin, whose last unit
+    # in the last place differs between the Windows CRT and glibc, and td_mesh
+    # prints through "%g" at six significant figures. A value sitting on a
+    # rounding boundary lands on either side of it depending on the libm, so one
+    # digit moves in one number in a file of tens of thousands.
+    #
+    # The art is authored on Windows, so Windows is the reference platform and
+    # this job asks the question that actually matters: does re-running the build
+    # script reproduce what was committed? Comparing against a different libm
+    # asks a subtly different question and answers it wrong.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +68,13 @@ jobs:
           python siphon_beam.py
 
       - name: The rebuild must be byte-identical
+        shell: bash
         run: |
+          # Line endings would otherwise be the whole diff on Windows: git checks
+          # out CRLF and Python writes LF, so every file would look rewritten.
+          git config core.autocrlf false
+          git rm -q --cached -r TD_0.5.0/js/gl/models >/dev/null
+          git checkout -- TD_0.5.0/js/gl/models
           if ! git diff --quiet -- TD_0.5.0/js/gl/models; then
             echo "Regenerating the models changed the tree."
             echo "Either a generated file was hand-edited, or a build script is"

@@ -84,9 +84,20 @@ var GLGeometry = (function () {
         }
         var a = at(phi0, th0), b = at(phi0, th1),
             c = at(phi1, th1), d = at(phi1, th0);
-        if (ring === 0) builder.tri(a, c, d, color, emissive);
-        else if (ring === rings - 1) builder.tri(a, b, c, color, emissive);
-        else builder.quad(a, b, c, d, color, emissive);
+        // WOUND OUTWARD. Every one of these three windings was reversed, so a
+        // sphere's normals all pointed at its own centre. With CULL_FACE/BACK
+        // enabled the near wall was culled and what you actually saw was the
+        // inside of the far wall -- which is why the sphere enemies and the
+        // Tyrant read as hollow shells lit from the wrong side.
+        //
+        // Audited, not eyeballed: for a convex solid an outward normal must
+        // satisfy dot(n, face_centre - centroid) > 0. This scored 0 outward /
+        // 168 inward before the change. cylinder, box and frustum in this same
+        // file were already correct, which is why only the round things looked
+        // wrong. td_mesh.ball carried the identical bug offline.
+        if (ring === 0) builder.tri(a, d, c, color, emissive);
+        else if (ring === rings - 1) builder.tri(a, c, b, color, emissive);
+        else builder.quad(a, d, c, b, color, emissive);
       }
     }
     return builder;
