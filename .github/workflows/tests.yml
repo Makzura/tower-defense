@@ -68,6 +68,14 @@ jobs:
     # asks a subtly different question and answers it wrong.
     runs-on: windows-latest
     steps:
+      # BEFORE checkout, not after. GitHub's Windows runners default to
+      # core.autocrlf=true, so the checkout would write CRLF while td_mesh
+      # writes LF -- and then every single model file looks rewritten and the
+      # diff is meaningless. Setting it here means the working tree is LF from
+      # the start and the only differences left are real ones.
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -89,11 +97,6 @@ jobs:
       - name: The rebuild must be byte-identical
         shell: bash
         run: |
-          # Line endings would otherwise be the whole diff on Windows: git checks
-          # out CRLF and Python writes LF, so every file would look rewritten.
-          git config core.autocrlf false
-          git rm -q --cached -r TD_0.5.0/js/gl/models >/dev/null
-          git checkout -- TD_0.5.0/js/gl/models
           if ! git diff --quiet -- TD_0.5.0/js/gl/models; then
             echo "Regenerating the models changed the tree."
             echo "Either a generated file was hand-edited, or a build script is"
