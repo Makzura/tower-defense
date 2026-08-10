@@ -13,3 +13,8 @@ __MACOSX/
 # Obsidian vault config that lives in this folder but is not the game
 .obsidian/
 *.canvas
+
+# Another session's git worktrees; not part of the game
+.claude/worktrees/
+**/.claude/worktrees/
+visual-pass/tmp/
