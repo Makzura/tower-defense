@@ -9,3 +9,7 @@ __MACOSX/
 
 # Blender autosaves
 *.blend1
+
+# Obsidian vault config that lives in this folder but is not the game
+.obsidian/
+*.canvas
