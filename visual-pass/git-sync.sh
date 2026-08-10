@@ -25,17 +25,18 @@ if ! git remote get-url origin >/dev/null 2>&1; then
   echo "[sync] no remote; nothing to do"; exit 0
 fi
 
-git fetch -q origin main 2>/dev/null || { echo "[sync] fetch failed (offline?); leaving local"; exit 0; }
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git fetch -q origin "$BRANCH" 2>/dev/null || { echo "[sync] no upstream $BRANCH yet; pushing"; git push -q -u origin "$BRANCH" && echo "[sync] pushed $(git rev-parse --short HEAD)"; exit 0; }
 
 LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse origin/main 2>/dev/null || echo "")
-BASE=$(git merge-base HEAD origin/main 2>/dev/null || echo "")
+REMOTE=$(git rev-parse origin/$BRANCH 2>/dev/null || echo "")
+BASE=$(git merge-base HEAD origin/$BRANCH 2>/dev/null || echo "")
 
 if [ "$LOCAL" = "$REMOTE" ]; then echo "[sync] already in sync"; exit 0; fi
 
 if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
   echo "[sync] remote has diverged; rebasing"
-  if ! git rebase origin/main >/dev/null 2>&1; then
+  if ! git rebase origin/$BRANCH >/dev/null 2>&1; then
     UNMERGED=$(git diff --name-only --diff-filter=U)
     GENERATED_ONLY=1
     for f in $UNMERGED; do
@@ -60,7 +61,7 @@ if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
     if [ -n "$UNMERGED" ]; then
       STAMP=$(date +%Y%m%d-%H%M%S)
       if [ "$GENERATED_ONLY" = "0" ]; then
-        git update-ref "refs/sync-backup/$STAMP" origin/main
+        git update-ref "refs/sync-backup/$STAMP" origin/$BRANCH
         echo "[sync] hand-written conflict; incoming side saved to refs/sync-backup/$STAMP"
         for f in $UNMERGED; do
           case "$f" in
@@ -85,4 +86,4 @@ if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
   fi
 fi
 
-git push -q origin main && echo "[sync] pushed $(git rev-parse --short HEAD)"
+git push -q origin "$BRANCH" && echo "[sync] pushed $(git rev-parse --short HEAD)"
