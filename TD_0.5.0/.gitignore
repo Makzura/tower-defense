@@ -1,0 +1,5 @@
+﻿__MACOSX/
+.DS_Store
+*.blend1
+tools/blender/__pycache__/
+

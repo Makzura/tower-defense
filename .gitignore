@@ -1,5 +1,11 @@
-﻿__MACOSX/
+﻿# macOS archive junk that shipped inside the zip
+__MACOSX/
 .DS_Store
-*.blend1
-tools/blender/__pycache__/
+**/.DS_Store
 
+# Python bytecode from the model build scripts
+**/__pycache__/
+*.pyc
+
+# Blender autosaves
+*.blend1
