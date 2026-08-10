@@ -68,12 +68,63 @@
   // The gunner (Tower) was removed on 2026-07-30 with its deletion from the
   // game. The sandbox's promise is that what you learn here is true in the
   // shipping game, so a tower nobody can build must not be on this bar either.
-  var ROSTER = [Smasher, LongshotTower, BeamTower, Soldier];
+  // The Summoner joined on 2026-08-09 with the rest of the game. Same promise
+  // as the line above about the gunner, pointed the other way: a tower you CAN
+  // build in the shipping game has to be on this bar, or the workbench stops
+  // being a truthful preview of it.
+  var ROSTER = [Smasher, LongshotTower, BeamTower, Soldier, BlubTower];
 
   function installRoster() {
     for (var i = 0; i < ROSTER.length; i++) {
       BUILD_SLOTS[i] = ROSTER[i];
     }
+  }
+
+  // --- the extended speed ladder -------------------------------------------
+
+  // 5x AND 10x, ON TOP OF THE GAME'S OWN 1x/2x/3x (2026-08-09, at the owner's
+  // request). The shipping ladder is deliberately untouched: this appends to
+  // it, so the sandbox button cycles 1 → 2 → 3 → 5 → 10 → 1 and every
+  // multiple the game ships with keeps its place in the order.
+  //
+  // It is done by EXTENDING THE GAME'S ARRAY rather than by replacing the
+  // button, because the whole point of gameSpeed's design is that speed is
+  // applied in exactly one place -- how many fixed steps frame() runs, never a
+  // scaled dt (see the note on GAME_SPEEDS in js/game.js). A sandbox-only
+  // second implementation would be a second place for that to be got wrong,
+  // and the workbench would stop being a truthful preview of the loop.
+  //
+  // Why the workbench and not the game: a sandbox exists to reach a board state
+  // quickly, and at 10x a two-minute wave is twelve seconds. In a real run the
+  // same button is a difficulty setting, because nobody can react at 10x.
+  var SANDBOX_SPEEDS = [5, 10, 20];
+
+  function installSpeeds() {
+    SANDBOX_SPEEDS.forEach(function (speed) {
+      if (GAME_SPEEDS.indexOf(speed) === -1) GAME_SPEEDS.push(speed);
+    });
+    GAME_SPEEDS.sort(function (a, b) { return a - b; });
+  }
+
+  // --- a base that does not end the experiment -----------------------------
+
+  // 100 000, against the game's 100 (2026-08-10, at the owner's request).
+  //
+  // A workbench needs leaks to be a READING rather than an ending. The whole
+  // point of the page is to let a wave through and watch what a tower does
+  // about it, and at 100 base HP a single Brute ends the session -- which turns
+  // every measurement into a race and makes the loss overlay the thing you
+  // spend your time dismissing.
+  //
+  // It moves BASE_MAX_HP rather than `baseHp`, so restartGame() -- which sets
+  // the live value from the constant -- keeps it across every restart the
+  // sidebar offers. It is still a real number and can still reach zero, so the
+  // loss path itself remains testable here.
+  var SANDBOX_BASE_HP = 100000;
+
+  function installBase() {
+    BASE_MAX_HP = SANDBOX_BASE_HP;
+    baseHp = SANDBOX_BASE_HP;
   }
 
   // --- sidebar: towers ------------------------------------------------------
@@ -687,6 +738,8 @@
     startRun(Maps.byId(Maps.DEFAULT_ID));
 
     installRoster();
+    installSpeeds();
+    installBase();
     installHooks();
     wire();
 
@@ -702,7 +755,8 @@
     // deployed.
     if (typeof Effects !== "undefined") Effects.reset();
 
-    log("sandbox ready — infinite cash, waves off, map " +
+    log("sandbox ready — infinite cash, waves off, base " +
+      BASE_MAX_HP + " HP, speeds " + GAME_SPEEDS.join("/") + "×, map " +
       Math.round(path.length / UNIT_LENGTH) + " u.l. long");
   });
 

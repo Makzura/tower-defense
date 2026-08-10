@@ -1186,6 +1186,13 @@ Enemy.prototype.bounty = function () {
 };
 
 Enemy.prototype.update = function (dt) {
+  // Weakening stacks age here, on this enemy's own clock. See
+  // js/systems/damage-amp.js for why each stack keeps its own five seconds
+  // rather than sharing one refreshed window. Guarded by typeof so an enemy
+  // stepped in a fixture that does not load the module behaves as it always
+  // did -- with no amplification at all.
+  if (typeof DamageAmp !== "undefined") DamageAmp.tick(this, dt);
+
   if (this.stunTimer > 0) {
     this.stunTimer -= dt;
     if (this.stunTimer <= 0) this.stunTimer = 0;
@@ -1565,6 +1572,15 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
     // hitting it again would waste the swing, exactly as a bullet landing on
     // a dead enemy does.
     if (t.isDestroyed && t.isDestroyed()) continue;
+    // SUMMONS ARE NOT TARGETS. The Summoner's blubs live in `towers` because
+    // that is what makes them occupy space and take stuns (see js/blub.js), but
+    // the owner's brief is flat about it: "les blubs ne peuvent pas etre cibles
+    // ni attaques par les ennemis". Excluding them HERE rather than at each
+    // attack is what keeps `targets` honest as well -- an aimed shot that took
+    // "the two highest-DPS towers" must not spend one of them on a blub it
+    // cannot hurt. The one exception says so itself: a fused monster blub sets
+    // `enemyTargetable`.
+    if (t.isSummon && !t.enemyTargetable) continue;
     var dx = t.x - origin.x;
     var dy = t.y - origin.y;
     var d = dx * dx + dy * dy;
@@ -1712,6 +1728,31 @@ Enemy.prototype.resolveAttack = function (spec, towers) {
       TowerHealth.stun(target, spec.stunSeconds);
     }
   }
+
+  // A SHOCKWAVE STUNS SUMMONS, AND ONLY STUNS THEM.
+  //
+  // The brief keeps both halves: blubs cannot be attacked, but "les blubs
+  // subissent les stuns de zone infliges par les ennemis". So they are absent
+  // from the candidate list above -- no damage, and they never soak an aimed
+  // shot meant for a real tower -- and an AREA attack sweeps them separately
+  // here for its stun alone.
+  //
+  // Only a leap qualifies. An aimed shot picks one tower by name and has no
+  // area to speak of, so making it silence the blubs beside its victim would be
+  // inventing reach the attack does not have.
+  if (spec.leap && spec.stunSeconds > 0 && typeof TowerHealth !== "undefined") {
+    var wave = ul(spec.leap.radiusUl);
+    for (var s = 0; s < towers.length; s++) {
+      var summon = towers[s];
+      if (!summon.isSummon || summon.enemyTargetable) continue;
+      if (summon.isDestroyed && summon.isDestroyed()) continue;
+      var sdx = summon.x - this.pos.x;
+      var sdy = summon.y - this.pos.y;
+      if (sdx * sdx + sdy * sdy > wave * wave) continue;
+      TowerHealth.stun(summon, spec.stunSeconds);
+    }
+  }
+
   return hits.length ? hits[0].tower : null;
 };
 
@@ -1793,6 +1834,23 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
   // their full damage.
   if (damageKind === "aoe" && this.type.aoeDamageReduction) {
     effective *= Math.max(0, 1 - this.type.aoeDamageReduction);
+  }
+
+  // THE WEAKENING DEBUFF, applied AFTER mitigation and resistance and before
+  // anything is taken off.
+  //
+  // After, because the debuff is "+X% degats subis" -- how much damage this
+  // body actually takes -- rather than a bigger swing that armor then eats. A
+  // brute with 5 flat armor hit for 6 takes 1, and at +100% it takes 2, not 7.
+  // Applying it before mitigation would have made the same debuff worth twelve
+  // times as much against an unarmoured swarm as against the armour it is
+  // meant to help crack.
+  //
+  // It lives here, in the one door every damage source in the game comes
+  // through, because the brief is explicit that it raises damage from ALL
+  // sources and not just from the tower that applied it.
+  if (typeof DamageAmp !== "undefined") {
+    effective *= DamageAmp.multiplier(this);
   }
 
   // The shield soaks first, and a hit bigger than what is left SPILLS THROUGH

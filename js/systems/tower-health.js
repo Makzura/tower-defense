@@ -105,8 +105,17 @@ var TowerHealth = (function () {
   // LONGEST STUN WINS and a shorter one cannot cut a longer one short. Same
   // rule as Enemy.applySlow, for the same reason: two sources landing in the
   // same second must not be able to make the effect weaker than one of them.
+  // `stunImmune` is checked HERE rather than at each of the places that stun,
+  // for exactly the reason the rest of this module exists: the boss's aimed
+  // shot, its landing shockwave and the summoner's own monster leap all reach
+  // for TowerHealth.stun, and an immunity implemented at the call sites would
+  // be three chances to forget it. Only one thing sets the flag today -- a tier
+  // 4 monster blub, which the owner's brief makes "totalement immunise aux
+  // etourdissements" -- and a tower that never sets it behaves exactly as it
+  // did before the flag existed.
   function stun(tower, seconds) {
     if (!(seconds > 0)) return;
+    if (tower.stunImmune) return;
     if (!(tower.stunTimer > 0) || seconds > tower.stunTimer) {
       tower.stunTimer = seconds;
     }

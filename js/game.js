@@ -951,12 +951,32 @@ var MAX_FRAME_TIME = 0.25;
 // so the same board would play differently at speed. It does not: three steps
 // at 3x are bit-for-bit the three steps 1x would have run over three times as
 // long.
+// THE SHIPPING LADDER IS 1x/2x/3x, AND THE SANDBOX EXTENDS IT (2026-08-09, at
+// the owner's request: 5x and 10x "on top of the actual game speed changing
+// button"). js/sandbox/sandbox.js appends to this array; the button, the loop
+// and the tests all read the array rather than the literal, so extending it is
+// one line there and nothing here.
+//
+// Why the workbench gets them and the game does not: a sandbox exists to reach
+// a board state quickly, and 10x turns a two-minute wait into twelve seconds.
+// In a real run the same button would be a difficulty setting -- at 10x a
+// player cannot react to anything, so offering it is offering a way to lose
+// without meaning to.
+//
+// The frame clamp is what makes a big multiplier safe rather than a hazard:
+// `elapsed` is capped at MAX_FRAME_TIME BEFORE the multiply, so the very worst
+// case at 10x is 2.5 s of simulation in one frame (150 fixed steps) after a
+// stall, not the minutes a stalled tab could otherwise bank.
 var GAME_SPEEDS = [1, 2, 3];
 var gameSpeed = 1;
 
 // NOT reset by restartGame(). Speed is a pacing preference the player set for
 // themselves, like a volume knob, not part of the run -- being dropped back to
 // 1x by every restart is the kind of thing that gets a feature sworn at.
+//
+// A speed that is no longer in the ladder falls back to the first entry rather
+// than sticking: `indexOf` returns -1, and -1 + 1 is 0. That is the honest
+// behaviour if a page ever narrows the list under a running game.
 function cycleGameSpeed() {
   var i = GAME_SPEEDS.indexOf(gameSpeed);
   gameSpeed = GAME_SPEEDS[(i + 1) % GAME_SPEEDS.length];
@@ -1707,6 +1727,11 @@ function onClick(event) {
   // The inspection panel floats above the map, so its buttons outrank
   // whatever happens to be underneath them. Actions before Sell, both
   // before the map -- anything drawn on top must consume clicks first.
+  //
+  // The blub rail sits beside the panel and is the same kind of thing: chrome
+  // drawn over the board that must eat the click rather than let a tower be
+  // built under it.
+  if (inspected && hitsBlubRail(p.x, p.y)) return;
   if (inspected && runPanelAction(p.x, p.y)) return;
 
   // EVERYTHING ABOVE THIS LINE IS INTERFACE and reads SCREEN coordinates --
@@ -1784,6 +1809,15 @@ function sellTower(tower, options) {
   // splice keeps the remaining towers in pathProgress order, so the claim
   // priority described in Tower.prototype.update survives a sale.
   towers.splice(index, 1);
+
+  // A tower that belongs to something else tells its owner it has gone. Only
+  // the Summoner's blubs do (js/blub.js): they are in `towers` AND in their
+  // summoner's fleet, and a body sold through its own panel was leaving the
+  // first list while staying in the second -- still counted in the blub count,
+  // the pooled HP, the swarm buff and the next Coagulation's tier, while being
+  // unable to shoot or be clicked.
+  if (typeof tower.onRemoved === "function") tower.onRemoved();
+
   if (!options || options.refund !== false) cash += sellValue(tower);
 
   if (inspected === tower) inspected = null;
@@ -1837,6 +1871,73 @@ function actionSlotAt(L, x, y) {
     if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) return s;
   }
   return null;
+}
+
+// Which box of the inspected tower's blub rail is under this point, or null.
+// One hit test, used by the click handler AND by the hover card, so what you
+// can click and what you can hover are the same rectangles -- the same rule
+// actionSlotAt follows for the panel's own buttons.
+function railBoxAt(x, y) {
+  if (!inspected || typeof inspected.railLines !== "function") return null;
+
+  var L = inspectionLayout(inspected);
+  for (var i = 0; i < L.rail.length; i++) {
+    var box = L.rail[i];
+    if (x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) {
+      return box;
+    }
+  }
+  return null;
+}
+
+// A click on a rail box STARTS OR STOPS that summon line, and reports true so
+// the caller stops there -- a box drawn over the map must eat its click rather
+// than let a tower be built underneath it.
+//
+// It opened a second panel view until 2026-08-10, and the owner's verdict was
+// that this "creates an unknown behavior": clicking something that looked like
+// a switch handed you another screen with a different switch on it. The box IS
+// the switch now, and its base stats moved to the hover card -- hovering is the
+// gesture that cannot change anything, which makes it the right one for
+// reading.
+//
+// A box below A3 is still drawn and still counts down, because what a tower is
+// making and when is worth knowing from the first one; the tower simply refuses
+// the click, and the box's own card says why. The refusal comes from the tower
+// rather than from a tier test here, so game.js never learns which upgrade buys
+// what.
+function hitsBlubRail(x, y) {
+  var box = railBoxAt(x, y);
+  if (!box) return false;
+  if (typeof inspected.clickLine === "function") inspected.clickLine(box.line.lineId);
+  return true;
+}
+
+// Press the open panel's upgrade button for `branch`, as though it had been
+// clicked. Returns true if there was one to press.
+//
+// IT GOES THROUGH runPanelAction AT THE BUTTON'S OWN CENTRE rather than calling
+// performAction directly, and that is the whole point of writing it this way:
+// the keyboard shortcut is then not a second implementation of "buy the next
+// tier" that can drift from the mouse. It inherits the context object, the
+// refusal rule (a disabled or maxed button consumes the press and does
+// nothing), and `refreshBlockReason` -- none of which a shortcut author would
+// think to reproduce, and all of which have been got wrong here before.
+//
+// `L.upgrades` is the flattened VIEW inspectionLayout already builds of those
+// buttons, carrying each one's branch letter, so this needs to know nothing
+// about any tower's action ids. All five types tag their upgrade actions with
+// `branch`, including the two config-driven adapters.
+function pressUpgradeButton(branch) {
+  if (!inspected) return false;
+
+  var L = inspectionLayout(inspected);
+  for (var i = 0; i < L.upgrades.length; i++) {
+    var u = L.upgrades[i];
+    if (u.branch !== branch) continue;
+    return runPanelAction(u.x + u.w / 2, u.y + u.h / 2);
+  }
+  return false;
 }
 
 function runPanelAction(x, y) {
@@ -1946,9 +2047,35 @@ function onKeyDown(event) {
     return;
   }
 
-  if (inspected && (event.key === "Delete" || event.key === "Backspace")) {
-    sellTower(inspected);
-    return;
+  // PANEL SHORTCUTS -- live only while a panel is open, which is what keeps
+  // three ordinary letters off the rest of the keyboard (2026-08-10, at the
+  // owner's request: X to sell, O for path A, P for path B).
+  //
+  // They sit ABOVE the camera keys deliberately, and none of the three is one:
+  // panning is WASD and the arrows (see CAMERA_KEY_AXES), so `s` was never
+  // available for Sell and `x` is the key that was. O and P are simply adjacent
+  // to it and to each other, in path order, which is what a shortcut for "the
+  // left button" and "the right button" wants to be.
+  //
+  // Delete and Backspace keep selling, as they always have.
+  if (inspected) {
+    var panelKey = (event.key || "").toLowerCase();
+
+    if (panelKey === "x" || event.key === "Delete" || event.key === "Backspace") {
+      sellTower(inspected);
+      return;
+    }
+    // Through the button, not around it -- see pressUpgradeButton. A branch
+    // that is maxed, locked out or unaffordable swallows the press and does
+    // nothing, exactly as clicking it would.
+    if (panelKey === "o") {
+      pressUpgradeButton("A");
+      return;
+    }
+    if (panelKey === "p") {
+      pressUpgradeButton("B");
+      return;
+    }
   }
 
   // Camera keys. Held rather than tapped, so they set a flag that update()
@@ -2008,11 +2135,23 @@ function selectedType() {
   return selectedSlot === null ? null : BUILD_SLOTS[selectedSlot];
 }
 
+// WHATEVER IS DRAWN ON TOP WINS, which is the rule onClick and the inspection
+// panel already follow for enemies over recruits.
+//
+// Only one pair of things on this board can genuinely overlap: a Summoner and
+// the monster blub Coagulation puts down ON it (js/blub.js -- the brief says
+// "le monster blub apparait a l'emplacement de la tour"). Everything else is
+// kept apart by the footprint rule, so this preference costs a flag test and
+// decides exactly one case: clicking the fused pair opens the monster, which is
+// the thing the player can see and the thing they may want to sell.
 function towerAt(x, y) {
+  var hit = null;
   for (var i = 0; i < towers.length; i++) {
-    if (towers[i].containsPoint(x, y)) return towers[i];
+    if (!towers[i].containsPoint(x, y)) continue;
+    if (towers[i].isSummon) return towers[i];
+    if (!hit) hit = towers[i];
   }
-  return null;
+  return hit;
 }
 
 function refreshBlockReason() {
@@ -2053,6 +2192,14 @@ function whyCannotBuild(x, y, type) {
   }
 
   for (var i = 0; i < towers.length; i++) {
+    // A TOWER AT ZERO HAS ALREADY RELEASED ITS GROUND. The destroyed sweep in
+    // update() runs once a step, so a tower (or a spent blub -- see js/blub.js)
+    // that died after it is still sitting in this array with its footprint. The
+    // owner's brief asks for this to be one rule for everything on the board:
+    // "une petite animation de mort est jouee, mais l'emplacement est libere
+    // instantanement... doit etre la meme pour toutes les tours du jeu."
+    // BlubTower.spotIsFree skips them for the same reason.
+    if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
     // Two footprints may touch but not overlap, so the gap is the sum of the
     // two radii -- which is what makes this work for mixed tower sizes.
     var gap = ul(type.FOOTPRINT_RADIUS_UL + towers[i].footprintRadiusUl);
@@ -3516,12 +3663,18 @@ function drawSpeedButton() {
   var colour = fast ? "#ffd76e" : "rgba(199,209,224,0.80)";
   var cy = r.y + r.h / 2;
 
-  // One chevron per multiple, packed from the left.
+  // One chevron per multiple, packed from the left -- CAPPED, because the
+  // sandbox's ladder goes to 10x (see GAME_SPEEDS) and ten chevrons do not fit
+  // in a 78 px button beside the number they are decorating. Three is where the
+  // shipping ladder ends, so the cap is invisible in the game and the workbench
+  // reads "≫ 10×" rather than a solid bar of arrowheads. The NUMBER is the
+  // precise statement; the chevrons only ever meant "faster than 1x".
   var chevronW = 7;
   var chevronH = 12;
+  var chevrons = Math.min(gameSpeed, 3);
   var x = r.x + 11;
   ctx.fillStyle = colour;
-  for (var i = 0; i < gameSpeed; i++) {
+  for (var i = 0; i < chevrons; i++) {
     ctx.beginPath();
     ctx.moveTo(x, cy - chevronH / 2);
     ctx.lineTo(x + chevronW, cy);
@@ -3671,10 +3824,47 @@ function inspectionLayout(tower) {
   // they carry descriptions.
   var w = describes ? 268 : (actions.length > 0 ? 232 : 190);
 
-  // Actions pair up -- unless they describe themselves, in which case each
-  // one owns a row.
-  var actionRows = describes ? actions.length : Math.ceil(actions.length / 2);
-  var actionsBlock = actionRows > 0 ? actionRows * (actionH + gap) : 0;
+  // A COMPACT ACTION IS A SWITCH, NOT A PURCHASE, and it opts out of the
+  // full-width rule above by saying so (`action.compact`).
+  //
+  // The Summoner (js/blub.js) is why this exists. A finished path A carries six
+  // action rows -- two upgrades, three summon-line toggles and Coagulation --
+  // and at 60 px each that pushes the panel through the build bar, which
+  // sandbox.smoke.js pins against. A toggle's whole text is a unit name and the
+  // word ON, so it needs a third of that room and can share a row with the next
+  // one. Nothing else in the game sets the flag, and an action list without it
+  // lays out exactly as it did before this existed.
+  //
+  // Rows are PLANNED here, before the panel's height is known, because the
+  // height is what they add up to. Placement below walks the same plan, so what
+  // is measured and what is drawn cannot disagree.
+  var COMPACT_ACTION_H = 34;
+  var plan = [];
+  var pi;
+  if (describes) {
+    for (pi = 0; pi < actions.length; pi++) {
+      var planned = actions[pi];
+      var last = plan.length ? plan[plan.length - 1] : null;
+      if (planned.compact && last && last.compact && last.items.length === 1) {
+        last.items.push(planned);
+        continue;
+      }
+      plan.push({
+        items: [planned],
+        h: planned.compact ? COMPACT_ACTION_H : actionH,
+        compact: !!planned.compact
+      });
+    }
+  } else {
+    // Two columns, exactly as before: pairs, with a lone final button going
+    // full width.
+    for (pi = 0; pi < actions.length; pi += 2) {
+      plan.push({ items: actions.slice(pi, pi + 2), h: actionH, compact: false });
+    }
+  }
+
+  var actionsBlock = 0;
+  for (pi = 0; pi < plan.length; pi++) actionsBlock += plan[pi].h + gap;
 
   var targetingBlock = hasTargeting ? buttonH + gap : 0;
 
@@ -3707,37 +3897,44 @@ function inspectionLayout(tower) {
 
   var actionTop = rowY;
 
-  var placed = actions.map(function (action, i) {
-    var row = describes ? i : Math.floor(i / 2);
-    var col = describes ? 0 : i % 2;
-    var full = describes || ((i === actions.length - 1) && (col === 0));
+  var placed = [];
+  var cursorY = actionTop;
+  plan.forEach(function (row) {
+    row.items.forEach(function (action, col) {
+      // A row holding one item takes the full width, whether that is a lone
+      // final button in the two-column mode or a described action in the
+      // one-per-row mode. Two items split it.
+      var full = row.items.length === 1;
 
-    var slot = {
-      action: action,
-      x: x + pad + (col === 1 ? halfW + gap : 0),
-      y: actionTop + row * (actionH + gap),
-      w: full ? innerW : halfW,
-      h: actionH
-    };
-
-    // An ability may carry a compact ON/OFF switch inside its own button. This
-    // one rectangle is shared by drawing, clicking and hover-card hit testing.
-    if (action.toggle) {
-      var tW = 46, tH = 15, inset = 5;
-      slot.toggle = {
-        x: slot.x + slot.w - inset - tW,
-        y: slot.y + inset,
-        w: tW,
-        h: tH,
-        id: action.toggle.id,
-        abilityId: action.toggle.abilityId,
-        label: action.toggle.label,
-        on: !!action.toggle.on,
-        tooltip: action.toggle.tooltip
+      var slot = {
+        action: action,
+        x: x + pad + (col === 1 ? halfW + gap : 0),
+        y: cursorY,
+        w: full ? innerW : halfW,
+        h: row.h
       };
-    }
 
-    return slot;
+      // An ability may carry a compact ON/OFF switch inside its own button.
+      // This one rectangle is shared by drawing, clicking and hover-card hit
+      // testing.
+      if (action.toggle) {
+        var tW = 46, tH = 15, inset = 5;
+        slot.toggle = {
+          x: slot.x + slot.w - inset - tW,
+          y: slot.y + inset,
+          w: tW,
+          h: tH,
+          id: action.toggle.id,
+          abilityId: action.toggle.abilityId,
+          label: action.toggle.label,
+          on: !!action.toggle.on,
+          tooltip: action.toggle.tooltip
+        };
+      }
+
+      placed.push(slot);
+    });
+    cursorY += row.h + gap;
   });
 
   // `upgrades` is a VIEW of the upgrade buttons, not a second list: same
@@ -3760,12 +3957,53 @@ function inspectionLayout(tower) {
       };
     });
 
+  // THE BLUB RAIL: a column of boxes BESIDE the panel, one per thing this tower
+  // is producing. Only the Summoner has one (js/blub.js), and it is duck-typed
+  // like everything else here -- a tower that does not answer `railLines` gets
+  // an empty rail and no geometry at all.
+  //
+  // It is laid out HERE, with the panel, for the reason `slotRect` exists: the
+  // rectangles that get drawn and the rectangles that get clicked have to be
+  // the same rectangles, and there is exactly one function that decides them.
+  //
+  // Left of the panel by default, because that is where the owner asked for it
+  // and because the panel is already flipped to whichever side of the tower has
+  // room -- so "left" is the side away from the tower more often than not. It
+  // moves to the right when the panel is hard against the left edge, which is
+  // the same flip the panel itself does one level up, for the same reason.
+  var rail = [];
+  if (typeof tower.railLines === "function") {
+    var lines = tower.railLines();
+    var railW = 108, railH = 44, railGap = 6;
+
+    var railX = x - railGap - railW;
+    if (railX < 12) railX = x + w + railGap;
+    railX = Math.max(12, Math.min(railX, VIEW_WIDTH - 12 - railW));
+
+    // Aligned with the top of the panel's rows rather than with its very top:
+    // the title sits above them and the rail has no title to line up with.
+    var railY = y + pad;
+    var railBlock = lines.length * railH + Math.max(0, lines.length - 1) * railGap;
+    railY = Math.max(12, Math.min(railY, BAR_Y - 12 - railBlock));
+
+    rail = lines.map(function (line, i) {
+      return {
+        line: line,
+        x: railX,
+        y: railY + i * (railH + railGap),
+        w: railW,
+        h: railH
+      };
+    });
+  }
+
   return {
     x: x, y: y, w: w, h: h,
     pad: pad, rowH: rowH, titleH: titleH, rows: rows,
     targeting: targeting,
     actions: placed,
     upgrades: upgrades,
+    rail: rail,
     sell: { x: x + pad, y: y + h - pad - buttonH, w: innerW, h: buttonH }
   };
 }
@@ -3837,6 +4075,13 @@ function cardFor(action) {
 // Disabled buttons are INCLUDED on purpose -- a refused upgrade is exactly
 // when a player wants to know why, and the button only has room for "locked".
 function hoveredCard(L) {
+  // The blub rail first, because it is drawn outside the panel and so cannot
+  // collide with anything below -- and because reading a summon line's numbers
+  // is now what hovering a box is FOR, since clicking one switches it (see
+  // hitsBlubRail).
+  var box = railBoxAt(mouse.x, mouse.y);
+  if (box) return { anchor: box, model: box.line.card };
+
   var tb = L.targeting;
   if (tb && pointInRect(mouse.x, mouse.y, tb)) {
     var mode = inspected.targeting;
@@ -4041,6 +4286,107 @@ function fitText(context, text, maxWidth) {
 // Stats for the tower the player clicked: damage, range, cooldown and the DPS
 // those two imply, plus a Sell button. The tower computes the rows; this only
 // lays them out.
+// The blub rail: one box per summon line, beside the panel, from the geometry
+// inspectionLayout already decided.
+//
+// GREY, and that is the whole point of the colour. Every other rectangle in
+// this panel is an offer -- green buys a tier, violet fires an ability, gold is
+// a live reading -- and these are none of those: they are the things the tower
+// is currently making. A grey box says "status, not shop" before a word of it
+// is read, which is what the owner asked for.
+//
+// Each box carries the same clock twice: a BAR that fills left to right as the
+// cycle runs, full on the frame the next body appears, and the seconds beside
+// it. The bar is for glancing at while you watch the road; the number is for
+// when you need to know whether "nearly full" means one second or twenty.
+function drawBlubRail(L) {
+  if (!L.rail || !L.rail.length) return;
+
+  L.rail.forEach(function (box) {
+    var line = box.line;
+    var over = mouse.x >= box.x && mouse.x <= box.x + box.w &&
+      mouse.y >= box.y && mouse.y <= box.y + box.h;
+
+    // LIT WHILE IT PRODUCES, DIM WHEN IT DOES NOT, and that pair is the whole
+    // readout (2026-08-10, at the owner's request). A running line is a bright
+    // box with a bright border; a stopped one drops to a grey outline on the
+    // panel's own background. No word has to be read to tell them apart, which
+    // is the point of a rail you glance at while watching the road.
+    var body = line.on ? "212,220,232" : "108,114,126";
+
+    ctx.fillStyle = line.on ? "rgba(44,50,60,0.94)" : "rgba(24,26,32,0.88)";
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+
+    // The fill. Drawn UNDER the border and the text, and kept dim, because a
+    // bar loud enough to compete with the label makes the box harder to read
+    // the fuller it gets -- and it is fullest exactly when you are looking.
+    var fill = Math.max(0, Math.min(1, line.progress));
+    if (fill > 0) {
+      ctx.fillStyle = "rgba(" + body + "," + (line.on ? 0.2 : 0.07) + ")";
+      ctx.fillRect(box.x, box.y, box.w * fill, box.h);
+      // A bright leading edge, so a nearly-empty bar still reads as a bar and
+      // the moment it completes is seen rather than inferred.
+      if (fill > 0.012 && fill < 0.995) {
+        ctx.fillStyle = "rgba(" + body + "," + (line.on ? 0.8 : 0.25) + ")";
+        ctx.fillRect(box.x + box.w * fill - 1, box.y, 2, box.h);
+      }
+    }
+
+    ctx.lineWidth = line.on ? 2 : 1;
+    ctx.strokeStyle = "rgba(" + body + "," +
+      (line.on ? (over ? 1 : 0.8) : (over ? 0.7 : 0.35)) + ")";
+    ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.fillStyle = line.on ? "#eef2f8" : "rgba(199,209,224,0.42)";
+    ctx.fillText(fitText(ctx, line.name, box.w - 34), box.x + 6, box.y + 17);
+
+    // BLOCKED says the bar is full and the board is not: there is nowhere to
+    // put the next one, and it will land the instant a space opens. Without it
+    // a full bar that never empties reads as a broken timer.
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillStyle = line.blocked
+      ? "rgba(255,196,120,0.95)"
+      : "rgba(199,209,224," + (line.on ? 0.7 : 0.4) + ")";
+    ctx.fillText(!line.on ? "stopped"
+      : (line.blocked ? "no room" : line.secondsLeft.toFixed(1) + " s"),
+      box.x + 6, box.y + 33);
+
+    // How many of this type are standing right now, hard right. The other half
+    // of the question the bar asks: one is "when is the next one", this is
+    // "how many did that get me".
+    ctx.textAlign = "right";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,215,110," + (line.alive ? 0.95 : 0.3) + ")";
+    ctx.fillText("×" + line.alive, box.x + box.w - 6, box.y + 33);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+  });
+}
+
+// The keyboard shortcut for a panel button, drawn small and dim against its
+// right-hand edge (2026-08-10). A shortcut nobody can see is half a feature,
+// and the button is where the player is already looking.
+//
+// Drawn HERE from the layout rather than folded into each button's label,
+// because the label is built by the tower and there are five of them: putting
+// "  (O)" into `panelActions` would be five copies of a fact that belongs to
+// the keyboard handler. It is also why the letter is passed in rather than
+// derived -- onKeyDown owns the mapping, and this only renders it.
+function drawKeyHint(rect, key, bright) {
+  ctx.save();
+  ctx.font = "600 10px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(199,209,224," + (bright ? 0.75 : 0.4) + ")";
+  ctx.fillText(key, rect.x + rect.w - 7, rect.y + rect.h / 2 + 1);
+  ctx.restore();
+}
+
 function drawInspection() {
   if (!inspected) return;
 
@@ -4161,6 +4507,35 @@ function drawInspection() {
 
     ctx.fillStyle = "rgba(" + rgb + "," + alphaFill + ")";
     ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
+
+    // AN ACTION MAY FILL AS ITS CLOCK RUNS. `action.progress` is 0..1 and
+    // sweeps the button's own rectangle left to right; full means the thing the
+    // button describes happens NOW. The Summoner's summon lines use it, so the
+    // player can see the next blub coming instead of counting seconds
+    // (2026-08-09, at the owner's request).
+    //
+    // It is drawn as the button's BACKGROUND rather than as a strip along one
+    // edge, for the reason a compact action exists at all: these rectangles are
+    // 34 px tall with two lines of text in them, and a bar thin enough to fit
+    // under that text is too thin to read across the panel. A sweep is legible
+    // at a glance and costs no height.
+    //
+    // Kept deliberately dim and UNDER the border and the label -- it is a
+    // background, and a fill loud enough to compete with the text would make
+    // the button harder to read the fuller it got.
+    if (typeof a.progress === "number" && a.progress > 0) {
+      var fill = Math.max(0, Math.min(1, a.progress));
+      ctx.fillStyle = "rgba(" + rgb + "," + (a.enabled ? 0.3 : 0.12) + ")";
+      ctx.fillRect(slot.x, slot.y, slot.w * fill, slot.h);
+
+      // A bright leading edge, so a nearly-empty bar is still visibly a bar and
+      // the moment it completes is visible rather than inferred.
+      if (fill > 0.01 && fill < 0.995) {
+        ctx.fillStyle = "rgba(" + rgb + "," + (a.enabled ? 0.85 : 0.3) + ")";
+        ctx.fillRect(slot.x + slot.w * fill - 1, slot.y, 2, slot.h);
+      }
+    }
+
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(" + rgb + "," + alphaLine + ")";
     ctx.strokeRect(slot.x + 0.5, slot.y + 0.5, slot.w - 1, slot.h - 1);
@@ -4193,6 +4568,13 @@ function drawInspection() {
       });
     }
 
+    // The keyboard shortcut, on the two buttons that have one. Upgrade buttons
+    // never carry an auto pill (only abilities do), so the right-hand edge is
+    // free.
+    if (a.tone === "upgrade" && (a.branch === "A" || a.branch === "B")) {
+      drawKeyHint(slot, a.branch === "A" ? "O" : "P", over);
+    }
+
     // Draw the ability's auto switch last so it sits above its parent button.
     if (slot.toggle) {
       var g = slot.toggle;
@@ -4222,6 +4604,8 @@ function drawInspection() {
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
 
+  drawBlubRail(L);
+
   // Sell button. Red-tinted because it destroys something, but it pays out,
   // so the amount is shown in the same gold used for cash everywhere else.
   var b = L.sell;
@@ -4238,8 +4622,9 @@ function drawInspection() {
   ctx.textBaseline = "middle";
   ctx.font = "600 13px system-ui, sans-serif";
   ctx.fillStyle = hovering ? "#ffd76e" : "#e8b96a";
-  ctx.fillText(fitText(ctx, "Sell  $" + sellValue(t), b.w - 10),
+  ctx.fillText(fitText(ctx, "Sell  $" + sellValue(t), b.w - 26),
     b.x + b.w / 2, b.y + b.h / 2 + 1);
+  drawKeyHint(b, "X", hovering);
 
   ctx.textBaseline = "top";
   ctx.textAlign = "left";

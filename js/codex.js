@@ -49,17 +49,100 @@ var Codex = (function () {
     return true;
   }
 
+  // A TIER MAY BE GATED ON THE OTHER BRANCH, and the field guide has to walk
+  // past that gate rather than stopping at it.
+  //
+  // One tier in the game does this: the Summoner's B3 carries
+  // `requiresOther: "A2"`, because the Cyberblub is an evolution of the Blub
+  // III (js/blub.js). A player going down path B buys A1 and A2 first and then
+  // continues, so a guide that stopped at B3 would hide B4 and B5 entirely --
+  // and the tiers it DID show would be measured on a tower that no real path-B
+  // build ever looks like.
+  //
+  // Read STRUCTURALLY off the upgrade table, never parsed out of the refusal
+  // text: "needs A2" is a sentence for a player, not an interface. A tower type
+  // with no `UPGRADES` array, or a tier with no `requiresOther`, comes through
+  // here untouched, so every existing tower walks exactly as it did.
+  function satisfyCrossBranchGate(t, Type, upgradeId) {
+    var table = Type.UPGRADES;
+    if (!table || typeof t.applyUpgrade !== "function") return false;
+
+    var row = null;
+    for (var i = 0; i < table.length; i++) {
+      if (table[i].id === upgradeId) row = table[i];
+    }
+    if (!row || !row.requiresOther) return false;
+    if (t.hasUpgrade && t.hasUpgrade(row.requiresOther)) return false;
+
+    // Buy the chain the gate sits on top of, cheapest tier first. Bounded by
+    // the table's own length, so a table that somehow cycles cannot hang the
+    // menu -- the same reason walkBranch has a guard at all.
+    var chain = [];
+    var id = row.requiresOther;
+    for (var guard = 0; guard < table.length && id; guard++) {
+      var needed = null;
+      for (var j = 0; j < table.length; j++) if (table[j].id === id) needed = table[j];
+      if (!needed || (t.hasUpgrade && t.hasUpgrade(needed.id))) break;
+      chain.unshift(needed.id);
+      id = needed.requires;
+    }
+
+    if (!chain.length) return false;
+    chain.forEach(function (tierId) { t.applyUpgrade(tierId); });
+    return true;
+  }
+
+  // Does this refusal name another tier of the SAME tower that could be bought
+  // right now? "needs A2" on the Summoner's B3 is not a wall, it is a ROUTE --
+  // the Cyberblub is an evolution of the Blub III, so a path-B player buys A1
+  // and A2 on the way. Contrast the Siphon's B5, whose gate is a run-state
+  // condition a specimen in a field guide can never satisfy; that one names no
+  // tier, so it does not match here and the walk still stops at it.
+  //
+  // Returns the tier id to buy first, or null.
+  function prerequisiteFor(t, reason) {
+    var named = /^needs ([AB][1-5])$/.exec(reason || "");
+    if (!named) return null;
+    if (typeof t.whyCannotUpgrade !== "function") return null;
+    return t.whyCannotUpgrade(named[1]) === null ? named[1] : null;
+  }
+
   function walkBranch(Type, branch) {
     var t = new Type(-1000, -1000, path);
     var tiers = [];
 
     // Hard cap well above any real path length, so a tower that failed to
-    // advance (or a future one with a cycle) cannot hang the menu.
-    for (var guard = 0; guard < 10; guard++) {
+    // advance (or a future one with a cycle) cannot hang the menu. It allows
+    // for the cross-branch tiers a route may have to buy on the way as well as
+    // for the five it is listing.
+    for (var guard = 0; guard < 16; guard++) {
       var action = t.panelActions().filter(function (a) {
         return a.tone === "upgrade" && a.branch === branch;
       })[0];
       if (!action || action.upgradeId === null) break;    // maxed out
+
+      // Take the route rather than reporting the wall. Without this the
+      // Summoner's path B ended at B3 -- "needs A2" -- and B4 and B5 were
+      // absent from the index entirely, which is the one thing the index exists
+      // to prevent. The tiers below it are then previewed against a tower that
+      // owns A1 and A2, which is honest: that is the only tower that can ever
+      // own them.
+      var prereq = prerequisiteFor(t, action.reason);
+      if (prereq) {
+        t.applyUpgrade(prereq);
+        continue;
+      }
+
+      // Clear a cross-branch gate BEFORE reading the tier, so its price, its
+      // effects line and its card are all measured on the tower a real buyer
+      // would be holding. Re-ask for the action afterwards: satisfying the gate
+      // changed the instance the previous one was measured against.
+      if (action.reason && satisfyCrossBranchGate(t, Type, action.upgradeId)) {
+        action = t.panelActions().filter(function (a) {
+          return a.tone === "upgrade" && a.branch === branch;
+        })[0];
+        if (!action || action.upgradeId === null) break;
+      }
 
       tiers.push({
         id: action.upgradeId,

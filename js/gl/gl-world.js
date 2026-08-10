@@ -1342,6 +1342,34 @@ var World3D = (function () {
     }
     for (i = 0; i < state.enemies.length; i++) bar(ctx, state.enemies[i], "enemy");
 
+    // THE SUMMONER'S PERMANENT READOUT (js/blub.js). Its blub count and the
+    // charges they add up to are drawn over the tower all run, because the
+    // pooled figure is what a player aims a Coagulation with -- and the 2D pass
+    // that draws it lives in BlubTower.draw, which this branch replaces. Same
+    // gap the recruit hover readout had, same fix: the STRING comes from the
+    // tower, and only the placement is done here.
+    for (i = 0; i < state.towers.length; i++) {
+      var sm = state.towers[i];
+      if (typeof sm.counterLabel !== "function") continue;
+      var tag = project(sm.x, sm.y, towerCrown(sm) + 14);
+      if (!tag) continue;
+
+      var text = sm.counterLabel();
+      ctx.font = "600 11px system-ui, sans-serif";
+      var tw = ctx.measureText(text).width + 10;
+      ctx.fillStyle = "rgba(18,22,20,0.85)";
+      ctx.fillRect(tag.x - tw / 2, tag.y - 8, tw, 15);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(160,200,150,0.45)";
+      ctx.strokeRect(tag.x - tw / 2 + 0.5, tag.y - 7.5, tw - 1, 14);
+      ctx.fillStyle = "#d6efc8";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, tag.x, tag.y);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+    }
+
     // The readouts for whatever is being pointed at, over the bars.
     if (state.hoveredEnemy && !state.hoveredEnemy.dead) {
       drawEnemyCard(ctx, state.hoveredEnemy);

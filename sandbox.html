@@ -250,6 +250,7 @@
 <!-- Mitigation is global: every damage source goes through Enemy.takeDamage,
      which applies it. Must load before enemy.js. -->
 <script src="js/systems/mitigation.js"></script>
+<script src="js/systems/damage-amp.js"></script>
 <script src="js/enemy.js"></script>
 <script src="js/bullet.js"></script>
 <!-- Targeting MODES (which enemy to shoot). Must load before the towers. -->
@@ -301,6 +302,7 @@
 <!-- The Soldier: the Rifleman. See index.html -- this block
      must stay identical to that one. -->
 <script src="js/soldier.js"></script>
+<script src="js/blub.js"></script>
 <script src="js/maps.js"></script>
 <!-- Cosmetic feedback, same as index.html. game.js guards every reference
      with typeof, so the sandbox would also run without it. -->

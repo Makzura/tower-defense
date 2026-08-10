@@ -15,8 +15,13 @@ that mix three or four types at once; a clear bonus of a tenth of each wave;
 **six decorated maps** — the four authored routes plus deterministic Shifting
 Ley and two-entrance Twin Confluence, each with its own non-interactive
 procedural scenery;
-**four towers in five build slots** — Warbringer, Arcane Sniper, Siphon and the
- Rifleman, the $300 burst-fire/automatic starter unit (three were renamed
+**five towers in five build slots, which is now FULL** — Warbringer, Arcane
+Sniper, Siphon, the Rifleman, the $300 burst-fire/automatic starter unit, and
+the **Summoner** (2026-08-10, the $450 tower that never fires: it plants blubs
+whose hit points are their ammunition, and they shoot for it — see its own
+section). A sixth TYPE is fine, since the armoury already picks which five of
+the owned types are equipped; a sixth SLOT is a decision about the bar's shape
+ (three of the first four were renamed
 and redrawn on 2026-07-30 for a robot fantasy/magic theme, and the Siphon was
 renamed to "Siphon" and back again the same day; **the code still uses
 the old names for files, ids and constructors** — see the "Tower names" section
@@ -27,7 +32,8 @@ of that file. Towers
 that have hit points, die at zero, and can be stunned; meta coins that
 persist between runs and buy towers in an armoury; a title menu (with an Escape
 pause menu mid-run); an index screen documenting every tower, upgrade and
-enemy; and player-controlled pacing — a 1×/2×/3× speed toggle, a ten-second
+enemy; and player-controlled pacing — a 1×/2×/3× speed toggle (the sandbox
+extends the same ladder to 5×, 10× and 20×), a ten-second
 pause before wave 1 with a Start button on it, and a between-wave break that
 arrives three seconds after you call it in, five after you clear the board, and
 ninety if you do neither. See the change log.
@@ -98,16 +104,28 @@ states. Every rendering claim in the change log below was settled that way, and
 several "obvious" visual tests turned out to prove nothing (see the map-fixed
 note in the 2026-08-09 entry). Do not accept a screenshot glance as proof.
 
-**Run the test suite:** all five, none of which import each other. These are the
-current measured results after the 2026-08-05 enemy-model/shield pass:
+**Run the test suite:** all six, none of which import each other. These are the
+current measured results, taken on 2026-08-10 after the Summoner landed:
 
 ```
 node tests/run.js                 105 pass / 3 fail   core game and difficulty
 node tests/content.test.js        182 pass / 30 fail  content, visuals and index
 node tests/long-range-dps.test.js  70 pass / 1 fail   the Longshot spec
 node tests/beam.test.js            45 pass / 0 fail   the beam acceptance list
+node tests/blub.test.js            47 pass / 0 fail   the Summoner acceptance list
 node tests/sandbox.smoke.js       2 failures          sandbox integration
 ```
+
+**The content line dipped to `181 / 31` for part of 2026-08-09 and is back.**
+Adding the Summoner broke one codex test twice over, and both halves were real:
+its path B stopped at B3 (the cross-branch `needs A2` gate truncated the walk,
+so B4 and B5 were missing from the index), and the same test's *first*
+assertion — "the gunner has no upgrade paths" — had been wrong since
+2026-07-30, when the gunner was deleted and every roster entry shifted down a
+slot, leaving it asserting that the **Warbringer** has no upgrade tree. Both
+are fixed. **Diff the failure NAMES rather than the totals** if these numbers
+ever look wrong: that is what found the second one, which no total could have
+shown.
 
 The failure groups are unchanged from the checkout baseline. The extra two
 core passes and four content passes cover B5's fourth-round impact, moving
@@ -297,6 +315,16 @@ js/smasher.js       Smasher: melee AoE, two upgrade branches, Path A's
 js/soldier.js       Soldier: the $300 burst/automatic starter, two upgrade
                      branches, and SoldierRecruit -- stop-to-shoot walking
                      units B4 calls in and B5 strengthens; NOT towers
+js/blub.js          BlubTower ("Summoner", id `blub`): the $450 tower that
+                     never fires, its ten summon types, the swarm buff, the
+                     weakening debuff and Coagulation -- plus Blub, one
+                     summoned unit, which IS in `towers` (see that file's
+                     header for the six things that buys) and whose hit points
+                     are its ammunition
+js/systems/damage-amp.js  timed "+X% damage taken" stacks that each expire on
+                     their own clock. Read by Enemy.takeDamage, so it raises
+                     damage from EVERY source; written only by the Summoner's
+                     A4 today
 js/effects.js       cosmetic feedback: death bursts, cash popups, base-hit
                      flash, wave banner, earthquake camera shake and temporary
                      floor fissures. Presentation ONLY -- the simulation never
@@ -446,6 +474,8 @@ js/sandbox/sandbox.js                that page's wiring and schedule controls
                                       (hooks game.js, never edits it)
 tests/long-range-dps.test.js         54 tests -- run standalone, not part of run.js
 tests/beam.test.js                   42 tests -- the beam spec's acceptance list
+tests/blub.test.js                   46 tests -- one per numbered item in the
+                                      Summoner's brief, plus the blub rail
 tests/sandbox.smoke.js               boots sandbox.html against a stubbed DOM
 tools/price-upgrades.js              the DPS model behind the upgrade prices
                                       (not loaded by the game or the suite)
@@ -1483,7 +1513,37 @@ clamps the panel inside the canvas and above the build bar.
 Selection state is two variables: `selectedSlot` (index or `null`) and
 `inspected` (a `Tower` or `null`). They are independent — inspecting a tower
 does not disarm the bar. Number keys `1`–`5` arm a slot; `Escape` clears both
-(and cancels aiming); `Delete`/`Backspace` sells the inspected tower.
+(and cancels aiming).
+
+**Three panel shortcuts, live only while a panel is open** (2026-08-10, at the
+owner's request), plus `Delete`/`Backspace`, which have always sold:
+
+| key | does |
+|---|---|
+| `X` | sell the inspected tower — or destroy the inspected blub, which pays $0 |
+| `O` | buy the next tier on **path A** |
+| `P` | buy the next tier on **path B** |
+
+Two things make these safe to be bare letters. They are gated on `inspected`,
+so outside a panel they are ordinary keys; and **none of them is a camera key** —
+panning is WASD and the arrows (`CAMERA_KEY_AXES`), which is why `S` was never
+available for Sell and `X` is the key that was. `O` and `P` are adjacent to it
+and to each other, in path order.
+
+**`O` and `P` press the BUTTON; they do not reimplement it.** `pressUpgradeButton`
+finds the branch's rectangle in `inspectionLayout(...).upgrades` — the flattened
+view that already carries each button's branch letter, which every one of the
+five tower types sets, adapters included — and calls `runPanelAction` at its
+centre. So a shortcut inherits the context object, `refreshBlockReason`, and the
+rule that a maxed, locked-out or unaffordable button swallows the press and does
+nothing. A shortcut that called `performAction` directly would be a second
+implementation of "buy the next tier", free to drift from the mouse.
+
+**The letters are drawn on the buttons** (`drawKeyHint`), dim and against the
+right-hand edge, from the layout rather than folded into any tower's label: the
+keyboard handler owns the mapping, and five copies of "  (O)" in five
+`panelActions` would be five places for it to go stale. Upgrade buttons never
+carry an auto pill — only abilities do — so that edge is free.
 
 **Placing a tower disarms the slot** (changed 2026-07-27, at the owner's
 request). One click, one tower: the next click on open ground clears the
@@ -3300,6 +3360,453 @@ already follow. `drawRecruitHover` returns early when `enemyAt` finds anything.
 
 ---
 
+## The Summoner — a tower that never fires
+
+Added 2026-08-09 against a fully-specified brief (concept, both upgrade tables,
+every unit's stats, the two crowd mechanics, Coagulation's five tiers and
+twenty-eight numbered acceptance tests). `js/blub.js`, **$450**, id `blub`,
+constructor `BlubTower`, display name **Summoner**. Its units are **blubs**, and
+the brief's names for them are kept exactly: Blub I/II/III, Mini Blub I/II,
+Hungry Blub, Cyberblub, Mechablub, Mechablub MK2, SuperBlub, Monster Blub.
+
+**A blub's hit points ARE its ammunition.** Every attack spends one and at zero
+it dies. That is the whole economy of this tower and the reason nothing in it
+has a magazine, a reload or a lifetime timer: a Blub I with 10 charges makes
+exactly ten attacks for exactly 20 damage, and both halves are pinned.
+
+### A blub is IN `towers`, and that is the structural decision
+
+Everything else follows from it. A blub is **not** a recruit (`js/soldier.js`),
+which lives on its parent and is deliberately not a tower. The brief asks for
+units that occupy space under the tower packing rule, that cannot be built on
+top of, that open a stats panel when clicked, that carry HP and die, and that
+eat area stuns — and `towers` already provides every one of those:
+
+| what the brief asks for | what `towers` already does |
+|---|---|
+| blubs never overlap anything | `whyCannotBuild` compares footprint radii |
+| click one for a stats panel | `towerAt` → `inspected` → `inspectionLayout` |
+| a sell button paying $0 | `sellValue` reads `totalSpent`, which is 0 |
+| area stuns land on them | `TowerHealth.tickStun` in the main loop |
+| death animation, ground freed at once | the destroyed sweep + `Effects.towerDestroyed` |
+| nothing survives a restart | `restartGame()` clears `towers` |
+
+**`isSummon` is the flag that takes back the one thing `towers` should not
+give them: enemy attention.** `Enemy.attackCandidates` skips summons, so no
+enemy targets one and — the subtler half — an aimed shot that takes the two
+highest-DPS towers can never spend one of its picks on a blub it cannot hurt.
+The single exception says so itself by setting `enemyTargetable` (a tier 3+
+monster blub).
+
+**Zone stuns are applied separately, and only stuns.** The brief keeps both
+halves — blubs cannot be attacked, but *"les blubs subissent les stuns de zone"* —
+so `resolveAttack` sweeps summons within a **leap's** radius for its stun alone,
+after the ordinary hit loop. Only a leap qualifies: an aimed shot picks one
+tower by name and has no area, so silencing the blubs beside its victim would be
+inventing reach it does not have.
+
+### Attacks are INSTANT, not projectiles
+
+A deliberate departure from every other shooting tower here, for two reasons
+that are both about ammunition:
+
+- **A charge must not be spent on a corpse.** Blubs pass `skipClaimed` to
+  `Targeting.pick` like everyone else, but a bullet only claims while it is in
+  the air. With instant resolution the enemy is already dead when the next blub
+  in the same step looks at it — strictly better than a claim, and free.
+- **Half the roster does not fire a bullet at all.** The Hungry Blub splashes,
+  the SuperBlub fires a piercing lance every tenth attack, the Mechablub MK2
+  detonates when it dies, and a monster blub can hit the whole map. Instant
+  damage through `TowerScore.apply` is how the Warbringer's blast already works.
+
+Every blub credits its damage and kills **to the Summoner**, the way the
+Warbringer's chain blast is credited to the Warbringer that caused it. A blub's
+own panel is a readout, not a scoreboard.
+
+### Where a blub appears
+
+A **random point inside the tower's range**, then the free point **nearest the
+enemy path** if nothing random lands, then **nothing at all** — and a cycle that
+places nothing is not an error.
+
+**A BLOCKED LINE WAITS AT FULL; IT DOES NOT START OVER** (2026-08-10, at the
+owner's correction). The brief said the cycle "reprend normalement au cycle
+suivant", and that was worse in play than it sounds: on a full board every line
+spent its whole interval counting down to another failure, so the moment a blub
+finally died the board sat empty for up to thirty seconds. The timer now **holds
+at zero** — the rail bar pins full and the box says "no room" rather than lying
+about a countdown — and the next step places the body, so a space that opens is
+filled on the frame it opens. Same hold-at-zero rule an idle rifle follows for
+its cooldown, and a test pins both halves.
+
+**The randomness is a seeded xorshift on the tower, not `Math.random`.** Same
+reason lane offsets and the boss's attack cycle are not random: a run that
+cannot be replayed cannot be tested. It is seeded from the tower's own position,
+so two Summoners on one board lay out differently.
+
+**The overlap rule is the only placement rule applied.** Blubs are checked
+against every tower and every other blub by the sum of the footprint radii, and
+against the map edges — but *not* against the road. The brief lists only
+overlap ("la règle est identique à celle appliquée aux tours" is about that
+rule), and a blub standing in the road has precedent: a Rifleman's recruits
+already do. Enemies walk through them without collision.
+
+**A destroyed body has already released its ground**, in `BlubTower.spotIsFree`
+*and* in `whyCannotBuild`. The main loop's sweep runs once a step, so without
+this a blub that spent its last charge would hold its footprint until the next
+frame — and the brief asks for instant release as **one rule for every tower in
+the game**, which is why the change is in the shared validator and not only in
+the summoner.
+
+### The units
+
+| unit | dmg | atk/s | charges | range | interval | footprint |
+|---|---:|---:|---:|---:|---:|---:|
+| Blub I | 2 | 1.0 | 10 | 100 | 20 s | 10 |
+| Blub II | 4 | 1.25 | 15 | 125 | 18 s | 13 |
+| Blub III | 6 | 1.5 | 20 | 150 | 15 s | 20 |
+| Mini Blub I | 2 | 3.0 | 6 | 100 | 4 s | 10 |
+| Mini Blub II | 3 | 3.0 | 12 | 115 | 3.5 s | 10 |
+| Hungry Blub | 20 | 0.75 | 35 | 130 | 15 s | 25 |
+| Cyberblub | 12 | 2.0 | 40 | 200 | 20 s | 25 |
+| Mechablub | 35 | 2.5 | 75 | 175 | 25 s | 30 |
+| Mechablub MK2 | 100 | 2.0 | 80 | 150 | 30 s | 40 |
+| SuperBlub | 200 | 1.25 | **51** | 300 | 100 s | 50 |
+
+**Targeting is always `first` and there is no cycle button.** The brief:
+*"toujours le premier ennemi dans leur portée. Aucune logique de ciblage
+alternative."* The mode therefore lives on a `view` object rather than on the
+blub, because `inspectionLayout` draws the targeting cycle for anything carrying
+a string `targeting`, and offering a choice the unit does not have is a button
+that lies.
+
+**THREE SUMMON LINES, each on its own independent clock**: `main`, `mini` and
+`heavy`. The third is shared between the branches on purpose — A4 gives it the
+Hungry Blub and B5 the SuperBlub, and no tower can hold both, so a fourth line
+would be a timer that is always dead.
+
+**A tier swap applies to FUTURE summons only**, and so do B1's and B2's flat
+bonuses. That falls out of the design rather than being enforced: a blub is
+handed finished numbers at birth by `BlubTower.summonStats`, exactly as a
+recruit is, and never looks at an upgrade flag again.
+
+### Path A — the swarm
+
+| tier | cost | tower HP | tower range | what it does |
+|---|---:|---:|---:|---|
+| A1 | 550 | +25 | +25 | Blub I → Blub II |
+| A2 | 1100 | +75 | +15 | Blub II → Blub III · unlocks the swarm buff |
+| A3 | 3500 | +100 | — | adds the Mini Blub I line · unlocks the toggles |
+| A4 | 6500 | +250 | — | Mini I → Mini II · adds the Hungry Blub · swarm cap to 100% · unlocks the weakening debuff |
+| A5 | 40000 | +5000 | +135 | unlocks Coagulation |
+
+Cumulative: $52 100, 5 550 HP, 250 u.l. of range. A test pins every row.
+
+### Path B — the machines
+
+| tier | cost | tower HP | tower range | what it does |
+|---|---:|---:|---:|---|
+| B1 | 250 | +5 | — | +1 damage to every summon |
+| B2 | 300 | — | — | +1 charge to every summon · −1 s on every interval |
+| B3 | 1600 | +100 | — | Blub III → Cyberblub. **Requires A2** |
+| B4 | 4500 | +250 | +35 | Cyberblub → Mechablub · −1 s more |
+| B5 | 8500 | +1250 | — | Mechablub → MK2 · adds the SuperBlub · −3 s more |
+
+Interval reductions are cumulative: −1 s at B2, −2 s at B4, −5 s at B5, applied
+to **every** line. **`BlubTower.MIN_INTERVAL_SECONDS` = 0.5 floors all of them.**
+The brief asks for a floor rather than letting a number run to zero, and a zero
+interval is not a fast tower — it is an infinite loop inside one step.
+
+**B3 REQUIRES A2, and no other tower in this game has a gate like it.** The
+Cyberblub is an evolution of the Blub III, so a path-B player must buy A1 and A2
+first. `requiresOther` carries it structurally and `whyCannotUpgrade` reports it
+after the path lock — telling a locked-out player to go and buy something that
+cannot help them would be the wrong order. **The index screen walks past the
+gate rather than stopping at it** (`satisfyCrossBranchGate` in js/codex.js): a
+guide that stopped at B3 would hide B4 and B5 entirely, and the tiers it did
+show would be measured on a tower no real path-B build ever looks like.
+
+### The swarm buff (A2)
+
+Every living blub gives every **other** blub of the same Summoner **+5% damage
+and +5% attack speed**. Capped at +50% (A2) and +100% (A4) — eleven and
+twenty-one blubs respectively, since a blub never buffs itself. Recomputed
+continuously from the fleet, and only from **this** tower's fleet.
+
+### The weakening debuff (A4)
+
+Every enemy hit by a blub of this Summoner takes **+0.1% damage from all
+sources for 5 s**, stacking to **+100%**, with **each stack keeping its own five
+seconds**. `js/systems/damage-amp.js` owns it.
+
+**It is not `js/systems/buff-stacks.js`, and the difference is the point.** That
+tracker is a count of stacks sharing one refreshed window (the Sniper's kill
+stacks); a new stack pushes the whole thing out. This one must decay a thousand
+hits as a thousand separate timers. Making one module do both would have been
+two behaviours behind one name.
+
+**Applied AFTER mitigation, in `Enemy.takeDamage`.** It is *damage taken*, not a
+bigger swing that armor then eats: a brute hit for 6 through 5 flat armor takes
+1, and at +100% it takes 2, not 7. Before mitigation the same debuff would have
+been worth twelve times as much against an unarmoured swarm as against the
+armour it exists to help crack.
+
+### The special units
+
+**Hungry Blub — 4% COMPOUNDING, and this is the one place the brief contradicts
+itself.** Its prose says damage grows by "4% de sa valeur de base, cumulatif",
+which reads additive; its acceptance test says the unit deals **1473** across
+its 35 charges. Additive growth totals 1176. `20 × (1.04³⁵ − 1) / 0.04 = 1472.95`.
+The numbered test is the exact figure, so compounding is what shipped — flagged
+here rather than quietly reconciled. **The attack counter advances last**, so
+the first attack lands the table value and the growth is what it leaves behind;
+incrementing first put the lifetime total 4% over.
+
+**SuperBlub — the lance is free, which is what buys exactly five of them.** Its
+51 charges are deliberately not a round number (the brief says so). Every tenth
+attack fires a piercing lance instead, at a **fixed 400 damage**, and costs no
+charge — so 51 charges pay for 51 ordinary attacks and five lances fall among
+the 56 it makes. With B2's extra charge it is 52 and 57, and still five lances,
+which is why the test asserts the relationship rather than the number.
+
+**Mechablub MK2 — the one exception to "blubs never move".** When its last
+charge is spent it hops to the nearest enemy, or to the road if none is in
+reach, and detonates for a **fixed 250** in 25 u.l. The move belongs to the
+death animation, on a body already being swept off the board.
+
+**Both fixed figures are fixed absolutely** — never touched by B1, the swarm
+buff, or anything else. They are the only two damage numbers in the game that
+ignore everything, so they are the only two that live outside `attackDamage()`.
+
+### Coagulation (A5)
+
+A manual ability on a **300 s** cooldown. Every living blub merges into one
+**monster blub**, which never moves.
+
+**WHERE IT STANDS DEPENDS ON WHETHER IT IS THE TOWER** (2026-08-10, at the
+owner's correction: *"for t 0 1 and 2 the monster should not replace the tower
+and now it does, only t 3 and 4 should, and should be placed as near as possible
+to the track"*). Below tier 3 the merge produces one big blub and **the tower
+carries on summoning beside it**, so putting it on the tower was wrong twice
+over: it hid the thing still doing the work, and it made a body that has to
+shoot stand wherever the tower happened to be built rather than where it can
+reach. T0–T2 take the free spot **nearest the road that is still inside the tower's
+range**. At **T3 and T4 the monster IS the tower**: it has fused with it,
+summoning has stopped, and the two are one thing in one place.
+
+**"Inside the range" is the half that had to be corrected twice** (2026-08-10).
+The first version let the nearest-the-road sweep run out to several times the
+range so it could hug the track from anywhere, and the result was a monster
+standing well outside the circle its own tower draws — which reads as a bug
+whatever the reasoning behind it. The owner's words: *"make sure monster blub
+spawns like a normal blub inside the range when T 0 1 or 2."* The range is the
+tower's promise about where its blubs appear and a merge does not get to break
+it. Nothing is lost by bounding it: Coagulation needs A5, and A5 puts the range
+at 250 u.l., so there is always somewhere for a 35 u.l. body to stand. That overlap is the only one on the board, and it is why `towerAt`
+prefers a summon — clicking the fused pair opens the monster.
+
+- **HP is the CURRENT total, not the maximum.** A blub that has already fired
+  brings less, which is the whole tactical shape of it: you merge a fresh fleet,
+  not a spent one. This is why the tower shows its pooled HP permanently.
+- **Damage is the raw sum.** B1's flat +1 is part of each blub's resolved damage
+  and is included; the swarm buff and a Hungry Blub's compounding are live
+  multipliers on top of that and are not.
+- **A later Coagulation absorbs the existing monster** — it is in `this.blubs`
+  like everything else, so it needs no special case beyond being counted.
+- **Absorbed blubs are removed immediately**, through `Blub.dissolve()` rather
+  than through the ordinary death path. A merge is not a death: leaving them to
+  the destroyed sweep would hold their footprints for the rest of the step —
+  which is exactly the ground the monster needs — and fire a hundred death
+  bursts for something nobody killed.
+- **THE LEAP IS AN ATTACK, NOT A HEARTBEAT** (2026-08-10, at the owner's
+  correction: *"the bounce should activate like an attack, only when there is
+  ennemies"*). It fired on a bare timer, and a tier 2 leap costs 20 charges — so
+  a monster standing on an empty board spent 20 every 15 seconds into nothing
+  and eventually killed itself between waves. It now fires only when there is
+  something inside its reach, and the clock **holds at zero** otherwise, so the
+  blow lands the instant a wave arrives and waiting costs nothing.
+  `jumpTargets()` is the ONE reach test, used both to decide whether it fires
+  and to apply it, so the damage and the stun cannot land on different bodies.
+
+| tier | pooled HP | range | atk/s | area | footprint |
+|---|---|---|---:|---|---:|
+| T0 | < 500 | 150 | 1.0 | — | 25 |
+| T1 | 500–999 | 175 | 1.25 | 3 | 30 |
+| T2 | 1000–3499 | 200 | 1.5 | 8 | 35 |
+| T3 | ≥ 3500 | global | 2.5 | 15 | 50 |
+| T4 | **exactly 6666** | global | 5.0 | global | 100 |
+
+**Tier 4 is an exact threshold and is tested FIRST.** 6 665 and 6 667 are tier
+3; 6 666 is not. Ordering the check ahead of tier 3's `>= 3500` is the only
+thing that makes that true, so it is written as an explicit first case rather
+than as a range.
+
+**The tier is decided once, at the merge, and never moves again** — a tier 3
+monster that eats its way past 6 666 does not become a tier 4.
+
+- **T2** leaps every 15 s: full area damage, 2 s stun, 20 charges, 0.5 s of not
+  attacking.
+- **T3** fuses with the tower. Summoning **stops**, reach goes global, the leap
+  hits for ×3 map-wide with a 3 s stun, and every kill the Summoner scores adds
+  **+1 charge and +1 damage permanently**. It can now be attacked by enemies.
+- **T4** is T3 with a 4 s leap at ×10, and **total stun immunity** — enforced by
+  a `stunImmune` check inside `TowerHealth.stun`, so the boss's aimed shot, its
+  shockwave and the monster's own leap cannot each forget it.
+- **A monster at 0 returns the tower to A4** and summoning resumes. A5 is not
+  refunded and Coagulation is not lost; what is lost is the fusion.
+
+**WHERE IT STANDS DEPENDS ON WHETHER IT IS THE TOWER** (2026-08-10, at the
+owner's correction: *"for t 0 1 and 2 the monster should not replace the tower
+and now it does, only t 3 and 4 should, and should be placed as near as possible
+to the track"*).
+
+Below tier 3 the merge produces one big blub and **the tower carries on
+summoning beside it**, so putting it on the tower was wrong twice over: it hid
+the thing still doing the work, and it made a body that has to shoot stand
+wherever the tower happened to be built rather than where it can reach. It goes
+to the free spot **nearest the road** instead — `findRoadSpot`, the same
+deterministic sweep a blocked summon falls back to, given room to look past the
+tower's own range because this is one body that gets one chance to be placed.
+
+From tier 3 the monster **is** the tower: fused, summoning stopped for good, two
+things standing in one place. That is also why `towerAt` prefers a summon —
+clicking the fused pair opens the monster, which is the thing you can see.
+
+### The blub rail
+
+**One grey box per summon line, in a column beside the panel** (2026-08-09, at
+the owner's request: *"separated grey color boxes on the left of the panel, one
+per blub type"*). They were three compact rows inside the panel for a few hours
+first; the rail is better and the reason is worth keeping.
+
+**Why beside and not inside.** These are not actions on the tower, they are its
+*contents* — three things it is making, each with its own clock. As panel rows
+they competed for height with the upgrade buttons, needed a layout exemption to
+fit at all, and read as three more things to buy. As a rail they cost the panel
+no height and the **grey says "status, not shop"** before a word is read: every
+other rectangle on that panel is an offer (green buys a tier, violet fires an
+ability, gold is a live reading) and these are none of those.
+
+**THE BOX IS THE SWITCH** (revised 2026-08-10). It first *opened* a second panel
+view with a Producing/Stop button inside it, and the owner's verdict was that
+clicking a box *"creates an unknown behavior"*: you clicked a thing that looked
+like a switch and got a different screen with another switch on it. His
+correction is what shipped — *"from a3 onward make the greybox highlighted while
+they produce and if they are left clicked they dim and stop production"*.
+
+So: **lit while it produces, dim when it does not**, and a left click flips it.
+No word has to be read to tell the two apart, which is the point of a column you
+glance at while watching the road. One click, one meaning.
+
+**A3 buys the switches**, and a box below it is still drawn and still counts
+down — what a tower is making and when is worth knowing from the first one. It
+simply refuses the click, and its card says why. The refusal comes from the
+tower (`clickLine` returns `"needs A3"`), so `game.js` never learns which tier
+buys what.
+
+**The base stats moved to the hover card.** Hovering is the gesture that cannot
+change anything, which makes it the right one for reading, and it is where every
+other explain-this-before-you-touch-it in this game already lives. The card
+carries the type's resolved numbers plus its **lifetime damage** — what one will
+do if it spends every charge, which is the figure that actually compares two
+lines: a Mini Blub II is 36 and a Cyberblub 480, and neither the damage nor the
+rate says so alone.
+
+**Each box carries the same clock twice.** A bar fills left to right as the
+cycle runs and is **full on the frame the next body appears**; the seconds sit
+beside it. The bar is for glancing at, the number for when "nearly full" needs
+to mean one second rather than twenty. A box also shows `×N`, how many of that
+type are standing — the other half of the same question. A **stopped line holds
+its bar where it stands** rather than emptying it, which is the honest picture
+of what the switch does to the clock.
+
+**NO ROOM MEANS WAIT, NOT SKIP** (2026-08-10, at the owner's request). When the
+cycle runs out and there is nowhere to put the body, the timer **holds at zero**:
+the bar stays full, the box says *no room*, and the blub lands on the first step
+a space opens. The brief originally said the cycle simply came round again, and
+that was worse in play than it sounds — on a full board every line spent its
+whole interval counting down to another failure, so a space that opened sat
+empty for up to a whole cycle.
+
+**A tier that shortens a cycle brings the next body closer.** A1/A2 swap the unit
+for one on a faster cycle and B2/B4/B5 subtract seconds outright, so a running
+clock is clamped to the new interval by `clampTimersToCycle`. **It is called from
+`applyUpgrade`, never from `recalcStats`** — and that distinction cost a test to
+find. `previewUpgrade` measures a tier by setting its flag, recalculating and
+setting it back, so anything in `recalcStats` that touches live state runs every
+time the cursor crosses an upgrade button: with the clamp there, merely laying
+out the panel previewed A1's 18 s cycle, clamped the live 20 s clock to 18, and
+left it there. Same trap the HP grant documents, and the same answer — only a
+purchase may move live numbers.
+
+**A fused tower has an empty rail.** From tier 3 the monster blub *is* the tower
+and nothing is being produced, so three frozen bars would say the opposite of
+what is happening. It comes back when the monster dies.
+
+The tower answers **what** is on the rail (`railLines`); `inspectionLayout`
+decides **where**; `railBoxAt` is the one hit test both the click handler and the
+hover card go through, so what you can click and what you can hover are the same
+rectangles — the same division, and the same one-rectangle rule, that `slotRect`
+has for the build bar. `hitsBlubRail` consumes the click before a tower can be
+built under it.
+
+The tower itself still shows its **blub count and pooled current HP
+permanently**, on the panel and over the tower — the pooled figure is what a
+player aims a Coagulation with. A blub on the board has its own panel too, one
+click away on the map, and its Sell button pays exactly $0.
+
+**A BLUB DESTROYED THROUGH ITS PANEL LEAVES THE FLEET** (2026-08-10). `sellTower`
+calls `onRemoved`, which sets `removed`, which `isDestroyed` reports — so every
+reader that already went through `livingBlubs()` is correct at once. Without it a
+sold blub was gone from `towers`, unable to shoot or be clicked, while still
+counting in its summoner's blub count, its pooled HP, the swarm buff every other
+blub drew on, and the next Coagulation's tier. One flag, one place.
+
+**`action.compact` was added to `inspectionLayout`**: 34 px instead of the
+full-width 60 px an upgrade description needs, two to a row. Nothing sets it
+today — it survives the rail's rewrite because the layout it enables is the
+right one for any future one-word button, and because rows are now **planned
+before the panel height is known** and placed by walking that same plan, so what
+is measured and what is drawn cannot disagree. `action.progress` is the other
+shared addition: 0..1, swept across a button as its own clock runs.
+
+**A summon wins a click over the tower underneath it** (`towerAt`). Only one
+pair of things on this board can genuinely overlap — a Summoner and the monster
+blub Coagulation puts on it — and it resolves to the thing the player can see,
+the same "whatever is drawn on top wins" rule the enemy/recruit hover follows.
+
+### What it reports, and why
+
+`attackDamage()` returns its **whole fleet's damage per second** and
+`attacksPerSecond()` returns **1**, so the product is that figure. Those two
+exist for one caller: `Enemy.towerDps`, i.e. the Tyrant's aimed shot. A tower
+answering zero would be permanently invisible to the one attack in the game that
+goes looking for the board's best piece, which is not a property this tower
+should have. **The panel does not print them** through `TowerStats.damage` /
+`attackSpeed` — an "Attack speed 1.00/s" row on a tower that never attacks is a
+lie — and prints its own fleet rows instead.
+
+### Not a starter
+
+It is a **90-coin purchase** in `js/meta.js`, not part of the opening kit. That
+was a decision, not an omission: `starter: true` would put a tower producing
+free damage forever into the starting hand, and *a fresh profile cannot win* is
+the premise the whole meta loop rests on — the one `tools/measure-starter-kit.js`
+exists to keep checking. If the owner wants it in the opening hand it is one
+field plus a re-run of that tool.
+
+**It fills the fifth build slot**, which had been empty since the gunner was
+deleted. The bar is now genuinely full, and a sixth type needs a decision about
+the bar's shape — the armoury's Inventory tab already chooses which five of the
+owned types are equipped, so "full" is a statement about the bar, not the roster.
+
+**The sandbox keeps its own roster list** (`ROSTER` in `js/sandbox/sandbox.js`),
+which is NOT derived from the meta catalogue — a workbench has no coins to spend.
+A tower added to the game has to be added there too, or the sandbox stops being
+a truthful preview of it. A test pins it.
+
+---
+
 ## The auto-ability switch
 
 2026-07-30, at the owner's request: *"add an auto ability button on every tower
@@ -3712,7 +4219,9 @@ no mechanic was moved to match the description.
 | Wave call triggers | the Send button, an empty board, or the 90 s running out | `callNextWave` in game.js |
 | Auto-send waves | off by default; calls every break in the frame it opens | `autoSkipWaves`, `toggleAutoSkipWaves` in game.js |
 | Boss banner | a named bar at the top for any type flagged `showHealthBanner` | `drawBossBar`, `bossBarEnemies` in game.js |
-| Game speed | 1x / 2x / 3x, cycled from the bottom-right button, not run state | `GAME_SPEEDS`, `gameSpeed`, `cycleGameSpeed` in game.js |
+| Game speed | 1x / 2x / 3x in the game, **1/2/3/5/10/20 in the sandbox**, cycled from the bottom-right button, not run state. The sandbox APPENDS to the same array rather than replacing the button, so speed stays applied in exactly one place | `GAME_SPEEDS`, `gameSpeed`, `cycleGameSpeed` in game.js; `installSpeeds` in sandbox.js |
+| Speed button chevrons | capped at 3; the NUMBER is the precise statement, so 10x reads as three chevrons and "10×" rather than a bar of arrowheads | `drawSpeedButton` |
+| Sandbox base HP | **100 000**, against the game's 100, so a leak is a reading rather than an ending. Moves `BASE_MAX_HP`, so it survives every restart | `installBase` in js/sandbox/sandbox.js |
 | Run-over buttons | Restart (R/Enter), Choose another route (M), Main menu (Escape) | `restartButtonRect`, `changeMapButtonRect`, `mainMenuButtonRect` |
 | Victory | all waves naturally deployed + board clear + base standing | `allWavesDeployed`, `victory` in game.js |
 | Wave banner | 2.4 s, on each wave's first spawn | `BANNER_SECONDS` in js/effects.js |
@@ -3732,7 +4241,7 @@ no mechanic was moved to match the description.
 | Tower HP | Rifleman 80 (110 with B2), Warbringer 150, Arcane Sniper / Siphon from their stat tables (the deleted gunner was 60) | `Soldier.BASE_HP`, `Smasher.BASE_HP`, `config.base.hp` |
 | Angry attack | 20 damage, 47.5 u.l. reach, every 2.5 s, nearest tower only | `Enemy.TYPES.angry.attack` |
 | Meta payout | 2 per wave cleared, +60 for a clear | `MetaProgress.coinsForRun` |
-| Store prices | Arcane Sniper 40 coins, Siphon 150; Warbringer and Rifleman are the starting kit | `CATALOGUE` in js/meta.js |
+| Store prices | Arcane Sniper 40 coins, **Summoner 90**, Siphon 150; Warbringer and Rifleman are the starting kit | `CATALOGUE` in js/meta.js |
 | Save key | `towerDefense.meta.v1` in localStorage | `MetaProgress.STORAGE_KEY` |
 | Default enemy HP | 4 | `Enemy.BASE_HEALTH` |
 | Enemy speed | 50 u.l./s (~37 s crossing) | `Enemy.BASE_SPEED_ULPS` |
@@ -3795,8 +4304,31 @@ no mechanic was moved to match the description.
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
 | Easy run purse | ~$42 443 = 13 498 effective HP x $3 + $1 349 bounties + $600 stake | derived; asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
-| Build slots | 5, FOUR FILLED since the gunner was deleted: Warbringer, Arcane Sniper, Siphon, Rifleman | `BUILD_SLOTS` in game.js |
-| Tower prices | Rifleman $300, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
+| Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
+| Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |
+| Summoner full B | $17 250 all in with the A1/A2 gate, 1 805 tower HP, 150 u.l. range; Mechablub MK2 + SuperBlub | `BlubTower.UPGRADES` |
+| Blub ammunition | hit points ARE charges: one per attack, dead at zero. A Blub I makes 10 attacks for 20 damage | `Blub.prototype.resolveAttack` |
+| Blub placement | a seeded-random point in the tower's range, else the free point nearest the road. NO ROOM holds the bar full and places on the first step a space opens | `findSpawnPoint`, `findRoadSpot`, `update` |
+| Summon interval floor | 0.5 s, after path B's cumulative −5 s | `BlubTower.MIN_INTERVAL_SECONDS` |
+| Swarm buff | +5% damage and attack speed per OTHER living blub of the same tower; cap +50% (A2), +100% (A4) | `BlubTower.swarmBonusFor` |
+| Weakening debuff | +0.1% damage taken per blub hit, 5 s each, independent expiry, cap +100%, ALL sources | `DamageAmp`, applied in `Enemy.takeDamage` |
+| Hungry Blub | 4% COMPOUNDING per attack; 1473 damage across its 35 charges (the brief's prose says additive — see its section) | `BlubTower.UNITS.hungry` |
+| SuperBlub | a free piercing lance every 10th attack, 400 fixed damage; 51 charges buys exactly 5 | `BlubTower.UNITS.superb` |
+| Mechablub MK2 | on death it hops to the nearest enemy and detonates for a fixed 250 in 25 u.l. | `BlubTower.UNITS.mecha2` |
+| Coagulation | 300 s; merges every living blub's CURRENT charges and raw damage into one monster blub. T0-T2 stands beside the tower, as near the road as it can get **without leaving the tower's range**; T3+ stands ON it | `BlubTower.prototype.coagulate`, `findRoadSpot` |
+| Panel shortcuts | while a panel is open: **X** sells, **O** buys the next path A tier, **P** the next path B tier. Delete/Backspace still sell. None is a camera key; all go through the real button | `onKeyDown`, `pressUpgradeButton`, `drawKeyHint` |
+| Monster tiers | T0 <500, T1 500, T2 1000, T3 3500 (fuses the tower, targetable, +1/kill), T4 **exactly 6666** (stun-immune) | `BlubTower.MONSTER_TIERS` |
+| Summons and enemies | never targeted (`isSummon`), but a LEAP's shockwave still stuns them | `Enemy.attackCandidates`, `Enemy.resolveAttack` |
+| Destroyed footprint | released the instant HP hits zero, before the sweep — one rule for every tower | `whyCannotBuild`, `BlubTower.spotIsFree` |
+| Blub rail | one grey box per summon line beside the panel: a bar that fills to the next spawn, the seconds, and how many of that type are alive. LIT while producing, DIM when not | `BlubTower.railLines`, `inspectionLayout` `.rail`, `drawBlubRail` |
+| Blub rail click | left click STARTS OR STOPS that line, from A3 on; below A3 it is refused. Base stats are on the HOVER card. A fused tower has no rail | `clickLine`, `railBoxAt`, `blubTypeCard` |
+| Sandbox speeds | 5x, 10x and 20x appended to the shipping ladder, so the button cycles 1/2/3/5/10/20. The chevrons cap at three; the number is the statement | `SANDBOX_SPEEDS`, `installSpeeds` in js/sandbox/sandbox.js |
+| Sandbox base HP | 100 000, against the game's 100, and it survives a restart because the CONSTANT moves | `SANDBOX_BASE_HP`, `installBase` in js/sandbox/sandbox.js |
+| Blub removed by hand | selling one through its panel takes it out of the fleet, the pooled HP, the swarm buff and the next merge | `sellTower` -> `Blub.onRemoved` -> `isDestroyed` |
+| Summon clock vs cycle | a tier that shortens an interval clamps the running timer to it -- from applyUpgrade, NEVER from recalcStats | `BlubTower.clampTimersToCycle` |
+| Compact panel actions | `action.compact` — 34 px, two per row, so six action rows still fit | `inspectionLayout` in game.js |
+| Build slots | 5, ALL FIVE FILLED since 2026-08-09: Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner | `BUILD_SLOTS` in game.js |
+| Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 200–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
 | Screens | menu → difficulty + route chooser / index → play | `screen` in game.js |
 | Pause menu | Escape only, no HUD button | `paused`, `drawPauseMenu` |
 | Build slot size | 76 px, 10 px gap | `SLOT_SIZE`, `SLOT_GAP` |

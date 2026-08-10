@@ -214,8 +214,69 @@ check("every tower type is in the build bar",
   sandbox.BUILD_SLOTS[1] === sandbox.LongshotTower &&
   sandbox.BUILD_SLOTS[2] === sandbox.BeamTower &&
   sandbox.BUILD_SLOTS[3] === sandbox.Soldier &&
-  sandbox.BUILD_SLOTS[4] === null,
+  // The Summoner took the last slot on 2026-08-09. The sandbox's roster is its
+  // own list (ROSTER in js/sandbox/sandbox.js) rather than the meta catalogue,
+  // so a tower added to the game has to be added there too or the workbench
+  // stops being a truthful preview of it -- which is exactly what this line is
+  // for.
+  sandbox.BUILD_SLOTS[4] === sandbox.BlubTower,
   "slots = " + sandbox.BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; }).join(", "));
+
+// --- the extended speed ladder ---------------------------------------------
+//
+// 5x and 10x on top of the game's 1x/2x/3x (2026-08-09). The workbench EXTENDS
+// the shipping array rather than replacing the control, so the order the button
+// cycles through has to still contain every multiple the game ships with, in
+// its original order -- that is what these two lines are really pinning.
+
+check("the sandbox adds 5x, 10x and 20x to the speed ladder",
+  sandbox.GAME_SPEEDS.join(",") === "1,2,3,5,10,20",
+  "speeds = " + sandbox.GAME_SPEEDS.join(","));
+
+check("the speed button cycles through all six and wraps",
+  (function () {
+    var seen = [];
+    // Seven presses from 1x: six distinct speeds and then back to the start.
+    for (var i = 0; i < 7; i++) seen.push(sandbox.cycleGameSpeed());
+    return seen.join(",") === "2,3,5,10,20,1,2";
+  })(),
+  "cycle = " + sandbox.gameSpeed + "x");
+
+// --- a base that does not end the experiment -------------------------------
+
+check("the sandbox base has 100 000 HP, and keeps it across a restart",
+  (function () {
+    if (sandbox.BASE_MAX_HP !== 100000 || sandbox.baseHp !== 100000) return false;
+    // It moves the CONSTANT, so restartGame -- which sets the live value from
+    // it -- carries it. Setting only `baseHp` would have lasted until the first
+    // press of the sidebar's restart.
+    sandbox.baseHp = 5;
+    sandbox.restartGame();
+    return sandbox.baseHp === 100000;
+  })(),
+  "base = " + sandbox.baseHp + " / " + sandbox.BASE_MAX_HP);
+
+// Left where it started, so nothing below runs at 10x by accident.
+while (sandbox.gameSpeed !== 1) sandbox.cycleGameSpeed();
+
+check("a fast frame runs many fixed steps and never a scaled one",
+  (function () {
+    // The whole design of gameSpeed is that the STEP never changes, only how
+    // many of them run (see the note on GAME_SPEEDS in js/game.js). At 10x a
+    // frame must therefore be ten ordinary 1/60 s steps, not one big one.
+    var steps = [];
+    var realUpdate = sandbox.update;
+    sandbox.update = function (dt) { steps.push(dt); };
+    sandbox.gameSpeed = 20;
+    sandbox.lastTime = 0;
+    sandbox.accumulator = 0;
+    sandbox.frame(1000 / 60);           // one real frame at 60 fps
+    sandbox.update = realUpdate;
+    sandbox.gameSpeed = 1;
+    var uniform = steps.every(function (dt) { return dt === sandbox.FIXED_STEP; });
+    return steps.length === 20 && uniform;
+  })(),
+  "steps per frame at 20x");
 
 check("the wave schedule is off and the board starts empty",
   sandbox.enemies.length === 0 && sandbox.waveIndex === sandbox.WAVES.length);
@@ -1069,12 +1130,17 @@ step(1 / 60);
 check("re-enabling the top-up restores infinite gold", sandbox.cash >= 999999,
   "cash = " + sandbox.cash);
 
-// Base HP, in both directions, with no ceiling.
-elements.baseHpInput.value = "10000";
+// Base HP, in both directions, with no ceiling. The figure has to sit ABOVE
+// BASE_MAX_HP for this to prove anything, and the sandbox raised that to
+// 100 000 on 2026-08-10 -- so the old 10 000 stopped being above the maximum
+// and started being a fifth of it. Written off the constant rather than as a
+// literal, so it cannot go stale the same way twice.
+var overMax = sandbox.BASE_MAX_HP * 2 + 1;
+elements.baseHpInput.value = String(overMax);
 elements.setBaseHp.fire("click");
 check("base HP can be set above its starting maximum",
-  sandbox.baseHp === 10000 && sandbox.baseHp > sandbox.BASE_MAX_HP,
-  "baseHp = " + sandbox.baseHp);
+  sandbox.baseHp === overMax && sandbox.baseHp > sandbox.BASE_MAX_HP,
+  "baseHp = " + sandbox.baseHp + " against a max of " + sandbox.BASE_MAX_HP);
 
 // Setting it clears a lost run rather than leaving a healthy base frozen.
 run("gameOver = true; baseHp = 0;");

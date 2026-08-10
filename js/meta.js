@@ -92,6 +92,24 @@ var MetaProgress = (function () {
       starter: true,
       blurb: "$300 Rifleman, three shots a burst. Its B path becomes " +
              "automatic and calls in stop-to-shoot recruits."
+    },
+    // A COIN PURCHASE, NOT A STARTER, and that was a decision rather than an
+    // omission. `starter: true` would put a tower that produces free damage
+    // forever into the opening kit, and the premise the whole meta loop rests
+    // on -- a fresh profile CANNOT win, which tools/measure-starter-kit.js
+    // exists to keep checking -- is measured against the kit as it stands. If
+    // the owner wants this in the opening hand it is one field, plus a re-run
+    // of that tool.
+    //
+    // Priced between the Arcane Sniper (40) and the Siphon (150): it is more
+    // than a first unlock and less than the run-defining one.
+    {
+      id: "blub",
+      global: "BlubTower",
+      price: 90,
+      starter: false,
+      blurb: "$450 Summoner. It never fires — it plants blubs, whose hit points " +
+             "ARE their ammunition, and they shoot for it."
     }
   ];
 

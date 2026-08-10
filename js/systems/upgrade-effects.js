@@ -99,6 +99,14 @@ var UpgradeEffects = {
     defenseFlatPierce: "defense pierce",
     recruits: "recruits",
 
+    swarmBuff: "swarm buff",
+    miniBlubs: "mini blubs",
+    summonToggle: "summon toggles",
+    hungryBlub: "hungry blub",
+    weakenDebuff: "weakening",
+    superBlub: "superblub",
+    coagulation: "coagulation",
+
     // The third spelling (see grantsOf): a plain stat flag rather than a named
     // mechanic. `camoDetection` and `seesCamo` are the same promise made by
     // two configs in two vocabularies, so they get the same words.
@@ -263,6 +271,49 @@ var UpgradeEffects = {
           "where it met the wave. An enemy that walks through one spends the recruit's " +
           "remaining health as damage and kills it. " + p.cooldownSeconds + " s cooldown.";
       }
+    },
+
+    // The Summoner's six (js/blub.js). Each one is a sentence rather than a
+    // number for the same reason the rest are: the figures live in
+    // BlubTower.UNITS and BlubTower.UPGRADES, and repeating them here would be
+    // a second source of truth for the first retune to break.
+    swarmBuff: {
+      text: "Every living blub gives each OTHER blub of this summoner +5% damage " +
+        "and +5% attack speed. Capped at +50% here, which is eleven blubs on the " +
+        "board; A4 raises the ceiling to +100%. Blubs called by a different " +
+        "summoner do not count."
+    },
+    miniBlubs: {
+      text: "A second summon line starts up alongside the first: small, fast " +
+        "blubs on their own short cycle, independent of everything else this " +
+        "tower is calling."
+    },
+    summonToggle: {
+      text: "Each summon line gets its own ON/OFF switch on this panel. A line " +
+        "switched off stops producing; blubs already on the board keep going."
+    },
+    hungryBlub: {
+      text: "A third summon line: one heavy blub that hits an area and grows " +
+        "4% stronger with every attack it makes, compounding, for as long as " +
+        "its charges last. The bonus belongs to that one body and dies with it."
+    },
+    weakenDebuff: {
+      text: "Every enemy hit by a blub of this summoner takes +0.1% damage from " +
+        "ALL sources for 5 seconds, stacking to +100%. Each hit carries its own " +
+        "five seconds and expires on its own."
+    },
+    superBlub: {
+      text: "A second line for the machine branch: one enormous blub with the " +
+        "longest reach on the board, which fires a piercing lance instead of " +
+        "its ordinary shot every tenth attack. The lance is free -- it costs no " +
+        "charge -- so it gets exactly five of them."
+    },
+    coagulation: {
+      text: "A button on this panel: every living blub merges into one monster " +
+        "blub at the tower, pooling their CURRENT charges and their raw damage. " +
+        "The pooled total picks its tier, permanently. From tier 3 the tower " +
+        "fuses with it and stops summoning; tier 4 needs a pool of exactly 6666. " +
+        "300 s cooldown."
     },
 
     seesCamo: {

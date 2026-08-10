@@ -1252,9 +1252,11 @@ test("every built tower type is in the build bar", function (t) {
   // The Longshot and the Siphon were reachable only through sandbox.html
   // until 2026-07-28. Both are fully built and fully tested, so hiding them
   // from the actual game was the bug this pins shut. The Soldier took the
-  // last remaining slot on 2026-07-29, so the bar is now full: a sixth type
-  // needs a decision about the bar's shape, and this line is where that
-  // decision will surface.
+  // fourth slot on 2026-07-29 and the Summoner took the fifth, so the bar is
+  // now genuinely full: a SIXTH type needs a decision about the bar's shape,
+  // and this line is where that decision will surface. Note that the armoury's
+  // Inventory tab already picks which five of the owned types are equipped, so
+  // "full" is a decision about the BAR and not about the roster.
   var names = h.game.BUILD_SLOTS.map(function (type) {
     return type === null ? null : type.DISPLAY_NAME;
   });
@@ -1269,7 +1271,7 @@ test("every built tower type is in the build bar", function (t) {
   // a placeholder awaiting deletion since the reskin. What this line pins is
   // the ORDER of what remains, and that did not move.
   t.deep(names,
-    ["Warbringer", "Arcane Sniper", "Siphon", "Rifleman", null],
+    ["Warbringer", "Arcane Sniper", "Siphon", "Rifleman", "Summoner"],
     "build bar roster");
 
   // Every slot must satisfy the constructor contract the bar relies on, or
@@ -1337,9 +1339,16 @@ test("every tower type can be placed, inspected and sold in the real game", func
   // enemies, every tower type claiming targets against each other. Counted off
   // the bar rather than typed, so the number cannot go stale the next time a
   // type is added.
+  //
+  // SUMMONS ARE EXCLUDED FROM THE COUNT, and that is the point rather than a
+  // dodge: the Summoner's blubs live in `towers` (see js/blub.js) and it plants
+  // its first one at the 20 s mark, so a raw length would grow here for a
+  // reason that has nothing to do with what this line asserts -- that no BUILT
+  // tower died during the run.
   var built = h.game.BUILD_SLOTS.filter(function (type) { return type !== null; }).length;
   h.step(20);
-  t.eq(h.game.towers.length, built, "all of them survive a shared run");
+  var standing = h.game.towers.filter(function (t2) { return !t2.isSummon; }).length;
+  t.eq(standing, built, "all of them survive a shared run");
   h.draw();
   t.ok(true, "a frame with every tower type draws");
 });

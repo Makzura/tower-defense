@@ -3713,10 +3713,19 @@ test("the tower tab lists the shipping roster, walked from the real upgrade acti
     });
   });
 
-  // The gunner honestly has no tree; the other three have five tiers a path,
-  // each carrying the same preview card the in-game hover would show.
-  t.eq(m.towers[0].branches, null, "the gunner has no upgrade paths");
-  m.towers.slice(1).forEach(function (tower) {
+  // EVERY tower in the bar has five tiers a path, each carrying the same
+  // preview card the in-game hover would show.
+  //
+  // This used to skip entry 0 and assert it had no tree at all, because entry 0
+  // was the gunner -- the one buildable type that never had upgrades. The
+  // gunner was deleted on 2026-07-30 and everything shifted down a slot, so the
+  // line had been asserting that the WARBRINGER has no upgrade paths ever
+  // since. Corrected 2026-08-10, when the Summoner filled the fifth slot and
+  // this test had to be read again.
+  m.towers.forEach(function (tower) {
+    t.ok(tower.branches !== null, tower.name + " has an upgrade tree");
+  });
+  m.towers.forEach(function (tower) {
     ["A", "B"].forEach(function (branch) {
       t.eq(tower.branches[branch].length, 5, tower.name + " path " + branch + " has 5 tiers");
       tower.branches[branch].forEach(function (tier) {
