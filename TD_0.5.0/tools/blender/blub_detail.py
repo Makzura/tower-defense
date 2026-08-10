@@ -37,9 +37,19 @@
 # Revue 1 measured the b1 crosspath marks at 3-7 px of added coverage and called
 # them effectively invisible, and it was right. So on the small units nothing
 # painted on the surface can work: every piece here is sized to BREAK THE OUTLINE
-# or to swap a big block of VALUE, and `main()` prints, per unit, how far the
-# detail stands proud of the body surface in u.l. and in screen px. Anything
-# under ~2 px of protrusion is reported as decoration and judged as such.
+# or to swap a big block of VALUE, and `main()` prints, per unit, the bump out of
+# the flank, the growth in width and in height, and the share of the detail's own
+# surface brighter than the body -- in screen px, so an invisible piece is caught
+# at build time and not after a capture.
+#
+# MEASURED IN THE GAME, at that viewport, over four yaws, with the detail drawn
+# over the body exactly as the runtime would draw it. Worst yaw per unit, as
+# pixels of the rendered unit the detail changes, against a body of the size in
+# brackets: mini1 11 (93), mini2 12 (116), blub1 38 (219), blub2 85 (214),
+# blub3 88 (553), hungry 93 (698), cyber 65 (811), mecha 76 (690), mecha2 124
+# (1974), superb 148 (2942). The floor is 11 px and 6 % of the unit; the b1 marks
+# that failed the review were 3-7 px. Mean luminance over the body's footprint
+# falls on all ten and rises on none -- that is the value ladder, measured.
 #
 # THE ONE THING THE DETAIL LAYER CAN DO ABOUT THE PROPORTION FAILURE. Revue 1:
 # "five of ten units share one circular outline at >= 0.85 shape IoU ... the
@@ -437,7 +447,7 @@ def detail_blub1(s, det, B):
     # deliberately unequal -- a drop that bulges the same amount all round is
     # still a circle.
     for i, (yaw, k, ov, aw, tv) in enumerate((
-            (2.55, 0.30, 0.50, 0.56, 0.44),
+            (2.55, 0.30, 0.38, 0.48, 0.40),
             (4.20, 0.56, 0.42, 0.44, 0.36),
             (5.55, 0.76, 0.34, 0.36, 0.28))):
         _lump(s, "wobble_%d" % i, B, det, B.top_z * k, yaw,
@@ -525,18 +535,40 @@ def detail_blub3(s, det, B):
     jaw = B.anchor("jaw", "mouth")
     jz = (jaw[0][2] + jaw[1][2]) * 0.5 if jaw else ez - r * 0.42
 
-    # THE CUT JAW: a hard flat block, wider than the mouth, with a shadow under
-    # it. Square corners on a body made of nothing but curves is the read.
-    _chip(s, "jaw", B, det, 0.0, jz, r * 0.24, r * 0.78, r * 0.20, "dark",
-          sink=0.34)
-    _chip(s, "jaw_shadow", B, det, 0.0, jz - r * 0.19,
-          r * 0.20, r * 0.70, r * 0.14, "moss_dark", tilt=0.30, sink=0.40)
+    # THE CUT JAW: a hard flat block UNDER the mouth the body already models,
+    # with a shadow under that. Square corners on a body made of nothing but
+    # curves is the read. It sits BELOW the mouth and does not touch it -- a
+    # first pass put a second dark bar across the mouth itself and the two
+    # merged into a grille.
+    _chip(s, "jaw", B, det, 0.0, jz - r * 0.17, r * 0.24, r * 0.74, r * 0.18,
+          "dark", sink=0.30)
+    _chip(s, "jaw_shadow", B, det, 0.0, jz - r * 0.33,
+          r * 0.20, r * 0.66, r * 0.13, "moss_dark", tilt=0.30, sink=0.40)
 
-    # A GORGET across the chest between the shoulders, and its lip below it.
-    _chip(s, "gorget", B, det, 0.0, jz + r * 0.44,
-          r * 0.20, r * 0.92, r * 0.22, "stone", sink=0.46)
-    _chip(s, "gorget_lip", B, det, 0.0, jz + r * 0.31,
-          r * 0.22, r * 0.84, r * 0.09, "stone_dark", sink=0.40)
+    # COLLAR TABS, one under each pauldron, and this is the third seat they have
+    # had. A gorget across the chest in `stone` was at EYE HEIGHT on this body
+    # and one value ABOVE the moss: the render showed a bright bar across the
+    # face like a bandage, and it was the brightest thing on the unit, which is
+    # exactly what the value ladder forbids. Dropped to chest height in
+    # `stone_dark` it stopped being bright and started being a bar lying on the
+    # ground -- at this camera pitch the bottom of a body is where the shadow
+    # is, and a horizontal band there detaches from it.
+    #
+    # A collar is not a band anyway. Two short tabs seated under the pauldrons
+    # the body already builds are fitted armour, they sit at the height a collar
+    # belongs at, and they cross nothing.
+    for i, (plo, phi) in enumerate(B.named("pauldron")[:2]):
+        sx = 1.0 if (plo[0] + phi[0]) > 0 else -1.0
+        _lump(s, "collar_tab", B, det, plo[2] - r * 0.10,
+              math.pi / 2 - sx * 0.86,
+              r * 0.24, r * 0.42, r * 0.34, "stone_dark", sink=0.44)
+
+    # ONE BACK PLATE. Every other piece here is on the face or the shoulders,
+    # and a summon turns to aim: measured over four yaws the detail changed 29 %
+    # of the unit's pixels from the front and 7 % from behind. The spine plate
+    # is what the player sees when the blub is walking away.
+    _lump(s, "spine", B, det, B.top_z * 0.52, -math.pi / 2,
+          r * 0.22, r * 0.54, r * 0.60, "stone_dark", sink=0.52)
 
     # THE SHOULDER RIMS. Seated off the pauldron the body already built, so if
     # the pauldrons move the rims move with them.
@@ -584,11 +616,15 @@ def detail_mini1(s, det, B):
     mz, mr = _mini_maw(B)
     ex, ez = B.eyes()
 
+    # 0.52 r of socket was measured and looked at: it covered the head and read
+    # as a hole punched through the unit rather than as an eye. A socket has to
+    # be a RING around the eyeball the body built, and the speck of chalk inside
+    # it is what turns a dark patch into something that is looking at you.
     ey = B.front(ez, 0.0)
-    td.frustum(s, "eye_socket", r * 0.52, r * 0.46, r * 0.08,
+    td.frustum(s, "eye_socket", r * 0.36, r * 0.32, r * 0.07,
                (0.0, ey + r * 0.02, ez), "dark", det, 6, (math.pi / 2, 0, 0))
-    td.box(s, "eye_glint", (r * 0.12, r * 0.06, r * 0.12),
-           (r * 0.16, ey + r * 0.12, ez + r * 0.16), (0, 0, 0), "chalk", det)
+    td.box(s, "eye_glint", (r * 0.11, r * 0.05, r * 0.11),
+           (r * 0.11, ey + r * 0.10, ez + r * 0.11), (0, 0, 0), "chalk", det)
 
     # RAGGED EDGES, all upward, all different lengths, none at a matching yaw.
     # `lift` tips each piece so it stands off the spire instead of lying along
@@ -632,11 +668,16 @@ def detail_mini2(s, det, B):
     td.box(s, "eye_small", (r * 0.18, r * 0.08, r * 0.18),
            (ex, B.front(ez, ex) + r * 0.02, ez), (0, 0, 0), "dark", det)
 
-    # THREE FRILLS, uneven, all on the flanks and all under the lid.
+    # FOUR FRILLS, uneven, all on the flanks and all under the lid. The fourth
+    # exists because of a measurement and not a taste: with three, the yaw that
+    # showed the fewest of them changed only 7 screen px of the unit, which is
+    # inside the band Revue 1 called effectively invisible. Four means no
+    # quarter-turn is blank.
     for i, (yaw, k, out, tall) in enumerate((
             (0.08, 0.44, 0.50, 0.34),
             (math.pi - 0.14, 0.56, 0.44, 0.28),
-            (math.pi + 0.62, 0.36, 0.34, 0.24))):
+            (math.pi + 0.62, 0.36, 0.34, 0.24),
+            (math.pi * 1.62, 0.50, 0.40, 0.26))):
         _lump(s, "frill_%d" % i, B, det, B.top_z * k, yaw,
               r * out, r * 0.24, r * tall, "moss_dark",
               roll=0.5 * i, sink=0.30)
@@ -703,7 +744,7 @@ def detail_hungry(s, det, B):
     else:
         gcy, gcz = -r * 0.66, r * 0.58
     for i, (yaw, dz, out, across, tall) in enumerate((
-            (math.pi * 1.50, -0.34, 0.44, 0.72, 0.48),
+            (math.pi * 1.50, -0.08, 0.46, 0.74, 0.50),
             (math.pi * 1.36, 0.02, 0.34, 0.54, 0.40),
             (math.pi * 1.64, 0.30, 0.26, 0.42, 0.30))):
         _lump(s, "gorge_%d" % i, B, det, gcz + r * dz, yaw,
@@ -746,9 +787,12 @@ def detail_cyber(s, det, B):
     # TWO PANELS LET INTO THE GEL, each in its own seam. The seam is the
     # darkest value in the mark and it is what the plate reads against; a plate
     # with no seam is a sticker.
+    # One forward, one round the BACK: over four yaws the front pair changed
+    # 23 % of this unit's pixels from the front and 1 % from behind, and a summon
+    # spends half its life walking away from the player.
     for i, (yaw, k, wide, tall) in enumerate((
-            (math.pi * 0.18, 0.40, 0.52, 0.46),
-            (math.pi * 0.80, 0.30, 0.42, 0.36))):
+            (math.pi * 0.18, 0.40, 0.46, 0.42),
+            (math.pi * 1.36, 0.32, 0.42, 0.36))):
         z = top * k
         _lump(s, "seam_%d" % i, B, det, z, yaw,
               r * 0.16, r * (wide + 0.16), r * (tall + 0.14), "dark",
@@ -791,14 +835,20 @@ def detail_mecha(s, det, B):
         vz = (visor[0][2] + visor[1][2]) * 0.5
         vy = visor[1][1]
 
-    # THE COCKPIT: hood, frame, pane. Stacked forward along +Y in that order so
-    # each one is in front of the last and nothing z-fights.
-    td.box(s, "cockpit_frame", (r * 0.56, r * 0.12, r * 0.26),
-           (0.0, vy + r * 0.05, vz), (0, 0, 0), "chrome_dk", det)
-    td.box(s, "cockpit_pane", (r * 0.40, r * 0.10, r * 0.14),
-           (0.0, vy + r * 0.10, vz), (0, 0, 0), "cyan_dim", det)
-    td.box(s, "cockpit_hood", (r * 0.64, r * 0.30, r * 0.12),
-           (0.0, vy + r * 0.02, vz + r * 0.20), (-0.34, 0, 0), "chrome_dk", det)
+    # THE COCKPIT IS A FRAME, NOT A LID.
+    #
+    # The first version put a chrome frame and a cyan_dim pane straight over the
+    # visor -- and the render showed what that costs: the pane covered the blue
+    # pilot dome, so "a machine built around a blub" lost the blub. The whole
+    # point of this unit is that you can see the creature inside it.
+    #
+    # So: two posts either side and a hood over the top, and the middle stays
+    # OPEN. Same three solids, and the pilot still shows through.
+    for sx in (-1, 1):
+        td.box(s, "cockpit_post", (r * 0.10, r * 0.14, r * 0.30),
+               (sx * r * 0.25, vy + r * 0.04, vz), (0, 0, 0), "chrome_dk", det)
+    td.box(s, "cockpit_hood", (r * 0.64, r * 0.22, r * 0.10),
+           (0.0, vy + r * 0.04, vz + r * 0.34), (-0.22, 0, 0), "chrome_dk", det)
 
     # VENTS on the chest: two louvres, cut deep enough to be shadow rather than
     # a grey line.
@@ -863,11 +913,17 @@ def detail_mecha2(s, det, B):
     else:
         ay = armour[1][1]
         az = (armour[0][2] + armour[1][2]) * 0.5
-    for i in range(3):
-        td.box(s, "chevron_%d" % i, (r * 0.34, r * 0.12, r * 0.44),
-               (r * (-0.42 + 0.42 * i), ay + r * 0.05, az),
-               (0.0, 0.0, 0.62 if i % 2 == 0 else -0.62),
-               "steel_bru" if i % 2 == 0 else "dark", det)
+    # Four slats, leaning alternately, in brushed steel and shadow. The tilt is
+    # about Y and that is the fix, not a detail: rotated about Z the slats turned
+    # in the GROUND plane, where the camera cannot see a lean at all, and the
+    # three of them read as one dark rectangle punched out of the hull. About Y
+    # they lean in the screen plane and the alternation reads as striping.
+    for i in range(4):
+        lit = i % 2 == 0
+        td.box(s, "chevron_%d" % i,
+               (r * (0.30 if lit else 0.11), r * 0.12, r * 0.40),
+               (r * (-0.36 + 0.24 * i), ay + r * 0.05, az + r * 0.06),
+               (0.0, 0.55, 0.0), "steel_bru" if lit else "dark", det)
 
     # PIPES UNDER TENSION, and the clamps at their feet.
     hz = (hull[0][2] + hull[1][2]) * 0.5 if hull else r * 0.50
@@ -944,11 +1000,18 @@ def detail_superb(s, det, B):
     hull = B.anchor("hull")
     if hull is not None:
         hx = max(hull[1][0], -hull[0][0])
-        hy = hull[1][1]
         hz = (hull[0][2] + hull[1][2]) * 0.5
+        tall = (hull[1][2] - hull[0][2]) * 0.62
+        # On the FLANKS, not on the front: the porthole owns the front face, and
+        # ribs there were competing with the one thing this unit exists to show.
         for sx in (-1, 1):
-            td.box(s, "rib", (r * 0.14, r * 0.16, (hull[1][2] - hull[0][2]) * 0.62),
-                   (sx * hx * 0.58, hy + r * 0.05, hz), (0, 0, 0), "dark", det)
+            td.box(s, "rib", (r * 0.10, (hull[1][1] - hull[0][1]) * 0.78, tall),
+                   (sx * (hx + r * 0.04), (hull[0][1] + hull[1][1]) * 0.5, hz),
+                   (0, 0, 0), "dark", det)
+        # And one plate on the BACK. From behind, the detail changed exactly
+        # zero pixels of this unit before this piece existed.
+        td.box(s, "back_plate", (hx * 1.10, r * 0.12, tall * 0.86),
+               (0.0, hull[0][1] - r * 0.04, hz), (0, 0, 0), "chrome_dk", det)
 
 
 DETAILS = [

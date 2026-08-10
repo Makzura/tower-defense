@@ -100,7 +100,8 @@ def palette(flat):
 # drop (cyber); a crested carapace (blub2) against a flat slab lid (mini2)
 # against a sprawl with daylight under it (hungry). Two units on the same
 # footprint -- hungry and cyber, both 25 -- have nothing BUT this to tell them
-# apart, which is why 1.40 radii tall is set against 2.55.
+# apart, so one sprawls and one stands: measured at true game scale they come
+# out 36 x 32 px and 35 x 37 px, from 34 x 31 and 33 x 29 when they were twins.
 #
 # THE FOOTPRINTS THEMSELVES NEVER MOVE. They are gameplay (js/blub.js
 # UNITS[].footprintUl) and every radius below still comes from R().
@@ -136,7 +137,7 @@ def radius_at(rings, r, height, z):
     instead of guessed at and left floating in front of it."""
     t = 0.0
     for lo, hi, share in rings:
-        if z <= (t + share) * height or share == rings[-1][2]:
+        if z <= (t + share) * height:
             k = min(1.0, max(0.0, (z / height - t) / share))
             return r * (lo + (hi - lo) * k)
         t += share
@@ -178,8 +179,13 @@ def maw(s, cx, cy, z, r_head, gape, parent, span=2.10, tiles=6, teeth=5):
 
 
 def drop(s, name, cx, cy, r, height, mat, parent, squash=1.0, segs=12):
-    """The body. `squash` is the live HP deflation hook -- 1.0 is full and
-    taut, lower is slumped and wider, which the runtime drives per instance."""
+    """The classic drop, and now BLUB III'S ALONE. It used to be every A-path
+    body, which is exactly how five units ended up sharing one outline; the
+    others are built from the profiles above. It stays because blub3 passed
+    revue 1 on this shape and there is no reason to move a unit that passed.
+
+    `squash` is the live HP deflation hook -- 1.0 is full and taut, lower is
+    slumped and wider, which the runtime drives per instance."""
     h = height * squash
     wide = r * (1.0 + (1.0 - squash) * 0.35)
     # Four stacked frusta rather than a ball: a NARROW foot, a heavy low belly,
@@ -298,25 +304,25 @@ def unit_blub2(s, body, flat):
     # in plan is exactly as wide from the side as from the front, so "wide and
     # low" quietly becomes "tall" the moment the unit turns 90 degrees and the
     # width folds into depth. This one stays low from every yaw.
-    td.ellipsoid(s, "b", (r * 2.16, r * 1.30, r * 0.86), (0, -r * 0.02, r * 0.42),
+    td.ellipsoid(s, "b", (r * 1.86, r * 1.24, r * 1.06), (0, -r * 0.02, r * 0.50),
                  "moss", body, (0, 0, 0), 10, 5)
-    face(s, 0, 0, r * 0.44, r * 0.88, body, "brow", flat, front=0.68)
+    face(s, 0, 0, r * 0.54, r * 0.88, body, "brow", flat, front=0.64)
     for sx in (-1, 1):
-        td.box(s, "crust_plate", (r * 1.16, r * 1.10, r * 0.26),
-               (sx * r * 0.94, -r * 0.02, r * 0.40), (0, sx * -0.34, 0),
+        td.box(s, "crust_plate", (r * 1.20, r * 1.08, r * 0.26),
+               (sx * r * 0.96, -r * 0.04, r * 0.44), (0, sx * -0.30, 0),
                "stone", body)
-        td.box(s, "crust_lip", (r * 0.32, r * 0.88, r * 0.20),
-               (sx * r * 1.42, -r * 0.02, r * 0.26), (0, sx * -0.34, 0),
+        td.box(s, "crust_lip", (r * 0.32, r * 0.86, r * 0.20),
+               (sx * r * 1.46, -r * 0.04, r * 0.30), (0, sx * -0.30, 0),
                "stone_dark", body)
     # The crest is thin in DEPTH as well as in width -- a blade, not a hump --
     # so it is a narrow stem of the T from the side as much as from the front.
-    td.box(s, "crust_ridge", (r * 0.58, r * 0.94, r * 0.36),
-           (0, -r * 0.10, r * 0.86), (-0.06, 0, 0), "stone", body)
-    td.box(s, "crust_crown", (r * 0.40, r * 0.66, r * 0.26),
-           (0, -r * 0.14, r * 1.14), (-0.06, 0, 0), "stone", body)
-    for fy in (-0.28, 0.04):
+    td.box(s, "crust_ridge", (r * 0.62, r * 0.96, r * 0.34),
+           (0, -r * 0.12, r * 0.98), (-0.06, 0, 0), "stone", body)
+    td.box(s, "crust_crown", (r * 0.42, r * 0.68, r * 0.24),
+           (0, -r * 0.16, r * 1.24), (-0.06, 0, 0), "stone", body)
+    for fy in (-0.30, 0.02):
         td.frustum(s, "crust_spike", r * 0.13, r * 0.03, r * 0.16,
-                   (0, r * fy, r * 1.30), "stone_dark", body, 4, (0, 0, 0.5))
+                   (0, r * fy, r * 1.40), "stone_dark", body, 4, (0, 0, 0.5))
 
 
 def unit_blub3(s, body, flat):
@@ -351,10 +357,10 @@ def unit_mini1(s, body, flat):
     # the gape cut into the wide bottom half and a real head standing above it.
     r = R(10) * 0.78
     h = _stack(s, "b", 0, 0, r, r * 3.05, SPIRE, "moss", body, segs=10)
-    zm = h * 0.22
-    maw(s, 0, 0, zm, radius_at(SPIRE, r, h, zm), r * 0.40, body,
-        span=2.30, tiles=6, teeth=5)
-    ze = h * 0.54
+    zm = h * 0.24
+    maw(s, 0, 0, zm, radius_at(SPIRE, r, h, zm), r * 0.64, body,
+        span=2.80, tiles=7, teeth=6)
+    ze = h * 0.56
     face(s, 0, 0, ze, r, body, "one_eye", flat,
          front=radius_at(SPIRE, r, h, ze) / r)
     for sx in (-1, 1):                       # les pattes, courtes, sous le corps
@@ -368,21 +374,21 @@ def unit_mini2(s, body, flat):
     # the top of its silhouette is a straight line where Mini I comes to a
     # point, and it is wider than it is tall where Mini I is the reverse.
     r = R(10) * 0.78
-    h = _stack(s, "b", 0, 0, r, r * 0.78, SQUAT, "moss", body, segs=10)
-    zm = h * 0.38
-    maw(s, 0, 0, zm, radius_at(SQUAT, r, h, zm), r * 0.32, body,
-        span=2.60, tiles=7, teeth=6)
-    ze = h * 0.84
+    h = _stack(s, "b", 0, 0, r * 1.10, r * 0.86, SQUAT, "moss", body, segs=10)
+    zm = h * 0.42
+    maw(s, 0, 0, zm, radius_at(SQUAT, r * 1.10, h, zm), r * 0.42, body,
+        span=2.80, tiles=7, teeth=6)
+    ze = h * 0.86
     face(s, 0, 0, ze, r, body, "two_eye", flat,
-         front=radius_at(SQUAT, r, h, ze) / r)
+         front=radius_at(SQUAT, r * 1.10, h, ze) / r)
     # Le caillou est devenu un couvercle: a slab across the WHOLE head, set
     # askew. A pebble on top was a 2 px notch; a lid is the top edge itself.
     # It is square in plan and turned, so it is just as wide from the side as
     # from the front -- an aspect ratio that only exists at one yaw is not one.
-    td.box(s, "slab", (r * 2.00, r * 2.00, r * 0.30), (0, -r * 0.04, h + r * 0.12),
+    td.box(s, "slab", (r * 2.24, r * 2.24, r * 0.26), (0, -r * 0.04, h + r * 0.10),
            (0.08, 0, 0.42), "stone", body)
-    td.box(s, "slab_chip", (r * 0.76, r * 0.54, r * 0.18),
-           (r * 0.58, -r * 0.22, h + r * 0.26), (0, 0, 0.42), "stone_dark", body)
+    td.box(s, "slab_chip", (r * 0.74, r * 0.52, r * 0.16),
+           (r * 0.62, -r * 0.24, h + r * 0.22), (0, 0, 0.42), "stone_dark", body)
     for sx in (-1, 1):                       # pattes ecartees, bien en dehors
         for fy in (-0.50, 0.42):
             td.tube(s, "leg", r * 0.12, (sx * r * 0.74, r * fy, h * 0.34),
@@ -463,17 +469,17 @@ def unit_cyber(s, body, flat):
     # what a grafted thing has that a grown thing does not, and it is the one
     # hard vertical in the A-to-B crossover.
     r = R(25)
-    h = _stack(s, "b", 0, 0, r * 0.90, r * 2.10, EGG, "blue_gel", body)
+    h = _stack(s, "b", 0, 0, r * 0.90, r * 1.88, EGG, "blue_gel", body)
     face(s, 0, 0, h * 0.56, r, body, "visor_up", flat, FACE_SCALE["cyber"],
          front=0.84)
     td.box(s, "visor", (r * 0.82, r * 0.32, r * 0.15), (0, r * 0.60, h * 0.72),
            (0.42, 0, 0), "chrome", body)
     # le mat: the graft that breaks the top of the profile
-    td.frustum(s, "mast", r * 0.20, r * 0.08, r * 0.54, (0, -r * 0.10, r * 2.28),
+    td.frustum(s, "mast", r * 0.20, r * 0.08, r * 0.50, (0, -r * 0.10, r * 2.02),
                "chrome", body, 6)
-    td.torus(s, "mast_ring", r * 0.18, r * 0.05, (0, -r * 0.10, r * 2.36),
+    td.torus(s, "mast_ring", r * 0.18, r * 0.05, (0, -r * 0.10, r * 2.10),
              (0, 0, 0), "cyan", body, 8, 5)
-    td.ball(s, "mast_lamp", r * 0.14, (0, -r * 0.10, r * 2.60), "cyan", body, 8, 5)
+    td.ball(s, "mast_lamp", r * 0.14, (0, -r * 0.10, r * 2.32), "cyan", body, 8, 5)
     for sx in (-1, 1):
         # greffes d'epaule: hard rectilinear boxes on a round body, and they
         # stay INSIDE the width the profile already has. A grafted thing is

@@ -13,6 +13,90 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-11 — the ten blub units get a detail layer (pass 3).**
+
+New `tools/blender/blub_detail.py` builds ten add-on meshes, `blub-detail-<unit>`,
+composited over untouched bodies the way `summoner_unit_marks.py` composites the
+crosspath marks. Ten script tags added to `index.html`. Nothing else was edited:
+no body, no simulation value, no footprint. 1144 triangles for the ten, worst 144
+against a budget of 150.
+
+The owner's report was that the bodies "have very little identity and coolness" —
+pass 1 silhouette plus a flat palette, with pass 3 never run. One beat per unit:
+blub1 a brow and cheek folds and a wobble; blub2 the crust lashed on with straps
+and a buckle; blub3 a cut jaw and collar tabs under the pauldrons; the two Minis
+ragged, mini1 upward and mini2 sideways; the Hungry Blub gums, a drool ledge and
+a gorge that runs backwards; the Cyberblub gaskets where the grafts enter the gel,
+inset panels and a suture; the Mechablub rivets, vents and a cockpit frame; the
+MK2 tank straps, chevrons and pipes under tension; and the SuperBlub's porthole
+rebuilt so the tiny frightened blub inside it is legible — its face was authored
+with eyes 0.07 screen pixels across, so the gag the whole B path rests on did not
+exist on screen.
+
+**Two invariants this establishes, both now in the file header.**
+
+1. *A detail layer READS its bodies, it does not copy them.* The script imports
+   `tower_summoner`, rebuilds each body into a throwaway scene and ray-probes the
+   triangles: `radial()`, `front()`, `top()` are casts against the real mesh, and
+   seats are taken from the body's own named solids. The bodies were re-profiled
+   twice while this was being written and the details followed. `main()` prints
+   every anchor that had to fall back, so a rename shows up on the next build.
+2. *A detail on a small unit must move the OUTLINE or swap a block of VALUE.*
+   Revue 1 measured the b1 marks at 3–7 px and called them invisible. Every unit
+   here changes at least 11 px and 6 % of its own pixels at its worst of four
+   yaws, measured at the review's reference viewport (1278 × 719), and mean
+   luminance over the body's footprint goes DOWN on all ten — the value ladder,
+   measured rather than asserted.
+
+**2026-08-11 — the ten blub units are rebuilt on three proportions, not one.**
+
+`tools/blender/tower_summoner.py` only. No simulation value moved: the ground
+radii still print 10/13/20/10/10/25/25/30/40/50 from `js/blub.js`
+`UNITS[].footprintUl`, which was not edited.
+
+`visual-pass/SUMMONER-REVUE1.md` failed the units and said why: **five of the
+ten** (mini2, blub1, blub2, hungry, cyber) shared one circular outline at
+>= 0.85 shape IoU, so correcting the three worst pairs one at a time would only
+have moved the confusion. At true scale mini1 is 10 x 13 px, so an appendage is
+one pixel; the separation had to be the animal. Every A-path body used to come
+out of one `drop()`. Now there are three profiles as data (`EGG`, `SPIRE`,
+`SQUAT`) plus `_stack`, and the family splits into TALL (blub1, mini1, cyber)
+against LOW (blub2, mini2, hungry). `drop()` survives for blub3 alone, which
+passed revue 1 on that shape. Measured at the review's reference scale
+(viewport 1278 x 719 equivalent; superb 68 x 66, mecha2 69 x 38):
+
+| pair | raw IoU 0/45/90 | shape IoU | blub1 inside blub2 |
+|---|---|---|---|
+| mini1 / mini2 | 0.951/0.921/0.986 → **0.603/0.615/0.592** | — → 0.780 max | — |
+| blub1 / blub2 | 0.639/0.668/0.606 → **0.321/0.412/0.685** | 0.895 → **0.764** max | 0.922 → **0.504** (0.737 worst yaw) |
+| hungry / cyber | 0.862/0.785/0.785 → **0.751/0.648/0.634** | 0.877 → **0.740** max | — |
+
+No pair among the ten now reaches 0.85 shape IoU at all; the seven-entry
+`>= 0.85` list in the review is empty.
+
+**The mouths, reported twice by the owner** ("the mini blub and hungry blub are
+unreadable because they're open from behind"). The dark throat cavities added
+last time closed the see-through hole and left the cause alone: the jaws were
+wide plates flared apart with an ellipsoid WIDER than them wedged between, so
+the outline was an open clamshell with no head above the gape. New rule, in
+`maw()`: **the mouth never touches the outline.** It is a band of dark tiles
+laid on the head's own curve at `radius_at()`, with the teeth on the same
+surface — it cannot widen the silhouette, cannot be seen through, and the head
+closes over it. `teeth_ring()` is gone; the review had already measured its
+crown as "une frange de 1 px". The Hungry Blub's head is now two wedges of
+falling width (jaw under skull, prognathous) under a domed cranium, with the
+gape a dark line strictly smaller than both in x and y. Checked at four yaws in
+silhouette: no daylight through either unit from any angle.
+
+Colour build committed (not the silhouette build — that mistake shipped 46 grey
+models once). Verified on a fresh page load: 10/10 registered, 3 to 10 palette
+entries each, mean chroma 31.4 over 8885 model pixels, 2.8% achromatic and that
+is the stone and the chrome. `node tools/check-winding.js`: all 12 primitives
+outward — no new primitive was added, only `td_mesh`'s existing ones.
+
+Screen area now rises with the footprint across the whole family: 108, 134, 232
+(fp 10), 249 (13), 612 (20), 824 and 832 (25), 858 (30), 2046 (40), 3095 (50).
+
 **2026-08-10 — the Summoner's three effect modules are wired in.**
 
 `js/gl/blub-circles.js`, `js/gl/blub-projectiles.js` and `js/gl/blub-systems.js`

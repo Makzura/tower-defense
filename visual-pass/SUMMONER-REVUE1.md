@@ -386,3 +386,285 @@ donc « échelle réelle du jeu » n'est pas une propriété de la caméra seule
 fenêtre qui grandit change le px-par-unité sans rien dire. Toute mesure de
 silhouette doit citer son viewport, sans quoi deux revues ne sont pas
 comparables.
+
+---
+
+# Revue 1 — units, second pass : ÉCHEC (d'un cheveu, et pour une paire nouvelle)
+
+Rejeu de la moitié « unités » de la Revue 1 après le travail des trois agents.
+**Le défaut de fond signalé par la Revue 1 est corrigé.** Les cinq paires
+demandées passent toutes. La revue ne se clôt quand même pas : une paire
+*nouvelle* — **blub3 / cyber** — est passée au-dessus du seuil, et blub3 était
+une unité **RÉUSSITE** à la revue précédente. C'est donc une régression, pas un
+reliquat.
+
+## Viewport et calibration — pourquoi ces chiffres sont comparables aux précédents
+
+* Canvas **2220 × 1249** (et non 1278 × 719). `drawWorld()` appelle `resize()` à
+  chaque frame : la distance a donc été compensée `2021,363 × 1249/719 =
+  3511,38`, exactement la méthode de la Revue 1.
+* Silhouettes **extraites par différentiel de frames** sur le canvas GL (frame
+  avec le modèle moins frame sans), seuil de différence 12/765.
+* **La calibration est prouvée sur des modèles que personne n'a touchés** —
+  invocateurs et tiers de créature (horodatage 22:58, antérieur au chantier de
+  00:18) :
+
+| mesure | cette passe | Revue 1 | écart |
+|---|---|---|---|
+| `summoner-base` boîte / aire | 34 × 38 / 446 | 33 × 37 / 420 | +1 px, +6 % |
+| invocateurs base/a3 IoU brut | 0,614 | 0,61 | +0,004 |
+| invocateurs base/b3 | 0,561 | 0,548 | +0,013 |
+| invocateurs b3/b4 | 0,555 | 0,523 | +0,032 |
+| créature t1/t2 | 0,649 | 0,638 | +0,011 |
+| créature t0/t1 | 0,465 | 0,459 | +0,006 |
+| créature t2/t3 | 0,384 | 0,394 | −0,010 |
+
+Mon extraction est donc **très légèrement plus généreuse** (+1 px par côté,
++0,01 d'IoU en moyenne). À retenir pour lire le cas limite plus bas : un 0,853
+chez moi vaut ~0,84 avec le réglage de la Revue 1.
+
+* L'IoU de forme est stable : recalculé à N = 32/48/64/96/128, l'étalement par
+  paire est **≤ 0,020**. Le cas limite n'est pas un artefact de rééchantillonnage.
+* Captures ouvertes et jugées : `R1b-units-silhouettes`, `R1b-small-16x`,
+  `R1b-pair-mini1-mini2`, `R1b-pair-blub1-blub2`, `R1b-pair-hungry-cyber`,
+  `R1b-pair-blub3-cyber`, `R1b-units-colour`.
+
+## Les dix unités — boîte et aire à l'échelle réelle, yaw 0
+
+| unité | rayon | boîte px | aire px | l/h | Revue 1 |
+|---|---|---|---|---|---|
+| mini1 | 10 | 10 × 15 | 106 | **0,67** | 10 × 13 / 86 |
+| mini2 | 10 | 16 × 12 | 132 | **1,33** | 10 × 12 / 86 |
+| blub1 | 10 | 14 × 22 | 234 | **0,64** | 13 × 15 / 148 |
+| blub2 | 13 | 28 × 13 | 251 | **2,15** | 17 × 18 / 230 |
+| blub3 | 20 | 30 × 26 | 609 | 1,15 | 28 × 25 / 576 |
+| hungry | 25 | 34 × 32 | 822 | 1,06 | 33 × 29 / 745 |
+| cyber | 25 | 34 × 37 | 816 | 0,92 | 32 × 29 / 692 |
+| mecha | 30 | 35 × 29 | 841 | 1,21 | 34 × 29 / 791 |
+| mecha2 | 40 | 68 × 38 | 2029 | 1,79 | 66 × 37 / 1883 |
+| superb | 50 | 66 × 66 | 3048 | 1,00 | 67 × 65 / 2928 |
+
+**Le profil franchement non circulaire réclamé par la Revue 1 existe** : les
+rapports l/h des petites vont de **0,64 (blub1, œuf dressé)** à **2,15 (blub2,
+dalle plate)**, un facteur 3,4. Avant, les cinq « galets » étaient tous entre
+0,9 et 1,15.
+
+## 1. Chaque unité est-elle identifiable sans couleur ? — OUI
+
+Jugé sur `R1b-small-16x` et `R1b-units-silhouettes` (masques de readback, noir
+sur blanc, zoom 16×) — pas sur l'intention.
+
+| unité | verdict | ce qui la désigne en ombre chinoise |
+|---|---|---|
+| mini1 | ✓ | flèche étroite, pointe franche au sommet, plus haute que large |
+| mini2 | ✓ | motte basse et large, encoche sur le flanc droit |
+| blub1 | ✓ | œuf haut et lisse, aucun appendice — c'est sa définition |
+| blub2 | ✓ | **dalle horizontale surmontée d'une bosse dorsale** — rien d'autre dans la famille ne ressemble à ça |
+| blub3 | ~ | les deux oreilles se lisent à yaw 0 ; **elles disparaissent à yaw 45/90** où il redevient une masse ronde |
+| hungry | ✓ | pattes qui sortent sous le corps, bourrelets latéraux de 3-6 px |
+| cyber | ✓ | dôme à pointe unique, épaules encochées |
+| mecha | ✓ | créneaux, lit machine |
+| mecha2 | ✓ | châssis large à créneaux |
+| superb | ✓ | colosse au bras levé |
+
+## 2. Deux silhouettes se confondent-elles ? — OUI, une seule, et elle est neuve
+
+### Les cinq paires demandées — toutes PASSENT
+
+IoU de **forme** (taille retirée) à yaw 0 / 45 / 90, et IoU **brut** :
+
+| paire | forme y0 / y45 / y90 | max | Revue 1 | brut y0/45/90 | verdict |
+|---|---|---|---|---|---|
+| mini1 / mini2 | 0,801 / 0,739 / 0,756 | **0,801** | 0,986 (brut) | 0,619 / 0,607 / 0,621 | **PASSE** |
+| blub1 / blub2 | 0,760 / 0,574 / 0,807 | **0,807** | 0,895 | 0,322 / 0,428 / 0,728 | **PASSE** |
+| hungry / cyber | 0,727 / 0,671 / 0,690 | **0,727** | 0,877 | 0,752 / 0,643 / 0,643 | **PASSE** |
+| blub1 / cyber | 0,780 / 0,843 / 0,838 | **0,843** | 0,898 | 0,284 / 0,283 / 0,299 | passe, de peu |
+| blub2 / cyber | 0,780 / 0,613 / 0,726 | **0,780** | 0,882 | 0,219 / 0,261 / 0,232 | **PASSE** |
+
+Les trois paires nommées par la Revue 1 sont réellement réparées, et pas de
+justesse :
+
+* **mini1 / mini2** — la correction demandée était « une proportion d'ensemble,
+  pas un détail de 2 px ». C'est ce qui a été fait : 0,67 contre 1,33 de rapport
+  l/h. L'IoU brut tombe de **0,986 → 0,621**. Sur `R1b-pair-mini1-mini2` la
+  pointe de mini1 dépasse le corps de mini2 de 3 px et les lobes de mini2
+  débordent de 2-3 px de chaque côté, à l'échelle réelle.
+* **blub1 / blub2** — l'œuf inclus dans l'œuf a disparu : la contenance
+  blub1-dans-blub2 tombe de **92,2 % → 75,6 %**. blub2 est devenu une dalle
+  (28 × 13) là où blub1 est un œuf dressé (14 × 22).
+* **hungry / cyber** — 0,877 → **0,727**, la plus grosse marge de la famille.
+  Cyber a pris de la hauteur (29 → 37 px) et le Hungry de la largeur.
+
+### La grappe circulaire de cinq unités — DISSOUTE
+
+Les sept paires que la Revue 1 listait au-dessus de 0,85 sont toutes redescendues :
+
+```
+blub1/cyber   0,898 -> 0,843      blub2/hungry  0,876 -> 0,756
+blub1/blub2   0,895 -> 0,807      blub1/hungry  0,874 -> 0,825
+blub2/cyber   0,882 -> 0,780      mini2/cyber   0,853 -> 0,822
+hungry/cyber  0,877 -> 0,727
+```
+
+C'est exactement la correction n° 4 de la Revue 1, et elle est acquise.
+
+### Mais quatre paires sont au-dessus de 0,85 — et une seule compte
+
+Balayage complet des 45 paires :
+
+| paire | forme max | brut max | rayons | confusion réelle ? |
+|---|---|---|---|---|
+| **blub3 / cyber** | **0,853** | **0,721** | **20 / 25** | **OUI** |
+| mini1 / blub3 | 0,868 | 0,189 | 10 / 20 | non — 106 px contre 609 px d'aire |
+| blub3 / mecha2 | 0,867 | 0,300 | 20 / 40 | non — 30×26 contre 68×38 |
+| mecha / mecha2 | 0,851 | 0,414 | 30 / 40 | non — mecha2 fait le double de large |
+
+L'IoU de forme retire la taille *par construction* : sur des unités que trois
+crans de rayon séparent, il ne dit plus rien de ce que le joueur voit, et l'IoU
+brut le confirme (0,19 à 0,41). **blub3 / cyber est le seul cas où les deux
+métriques accusent en même temps.**
+
+### blub3 / cyber — le motif exact du rejet précédent, sur un couple neuf
+
+```
+forme  0,778 / 0,846 / 0,853   (yaw 0 / 45 / 90)
+brut   0,715 / 0,721 / 0,715   -- élevé aux TROIS yaws
+contenance : 99,5 % de blub3 est à l'intérieur de cyber
+rayons 20 et 25 -- un seul cran d'écart
+```
+
+Sur `R1b-pair-blub3-cyber` le rouge (blub3) est **avalé** par le bleu (cyber) :
+à yaw 45 et 90 il ne reste de blub3 qu'une frange de 1-2 px sous le ventre. Les
+oreilles qui faisaient passer blub3 à la revue précédente **ne sortent du
+contour qu'à yaw 0** ; dès que l'unité tourne — et elle tourne, elle vise — il
+redevient la masse ronde de cyber en plus petit.
+
+C'est mot pour mot le grief que la Revue 1 opposait à blub1/blub2 (« deux
+contours qui ne diffèrent que par l'échelle sont le même contour »), et à
+hungry/cyber son IoU brut était de 0,862 / 0,785 / 0,785 : **blub3/cyber est
+plus régulièrement élevé en brut (0,715 aux trois yaws) que la paire qui avait
+fait échouer la revue.**
+
+Réserve d'honnêteté : à 0,853 la paire est **au seuil**, et ma calibration mesure
+~+0,01 haut, donc au réglage exact de la Revue 1 elle vaudrait ~0,84. Ce n'est
+pas sur les 0,003 que repose le rejet — c'est sur la **conjonction** brut 0,72
+aux trois yaws + contenance 99,5 % + rayons voisins, qu'aucune des quatre autres
+paires « > 0,85 » ne présente.
+
+### Contenance — deux cas anormaux
+
+Une petite unité tient dans une grande : c'est banal et non signifiant. Les deux
+qui le sont :
+
+* **blub3 dans cyber, 99,5 %** — rayons voisins (20 / 25). Traité ci-dessus.
+* **blub2 dans blub1, 95,2 % à yaw 90** — et c'est une **inversion de
+  hiérarchie** : blub2 (rayon 13) rend 11 × 19 px / 186 px d'aire, contre
+  14 × 22 / 234 pour blub1 (rayon **10**). La plus grosse empreinte occupe **79 %**
+  de la surface écran de la plus petite. La dalle de blub2 est superbe de face et
+  se met de chant à yaw 90, où elle devient un poteau étroit.
+
+## 3. Les rapports de taille sont-ils exacts ? — OUI
+
+`js/blub.js` (`UNITS[].footprintUl`) et `UNIT_FOOTPRINT` de `tower_summoner.py`
+concordent et n'ont pas bougé d'une unité :
+
+```
+blub1 10   blub2 13   blub3 20   mini1 10   mini2 10
+hungry 25  cyber 25   mecha 30   mecha2 40  superb 50
+```
+
+`js/blub.js` porte encore son horodatage d'origine (10 août 20:06) : **aucune
+valeur de simulation n'a été touchée.**
+
+L'aire écran reste monotone avec le rayon — 106, 132, 234, 251, 609, 822, 816,
+841, 2029, 3048 — la seule inversion étant hungry/cyber, qui partagent le
+rayon 25. Deux remarques de *lecture*, qui ne sont pas des dérives d'empreinte :
+
+1. blub2 (r 13) mesure 28 px de large contre 30 px pour blub3 (r 20) : à yaw 0 la
+   dalle est presque aussi large qu'une unité de rayon 20.
+2. L'inversion blub2 / blub1 à yaw 90 décrite au § 2.
+3. superb (r 50) reste à 66 px de large contre 68 pour mecha2 (r 40) — inchangé
+   depuis la Revue 1, la hiérarchie passe par la hauteur et l'aire.
+
+## 4. Le défaut de livraison : la couche « detail » n'est pas dessinée
+
+Indépendant des silhouettes, et il faut le dire parce qu'un script entier et dix
+modèles en dépendent.
+
+`tools/blender/blub_detail.py` construit dix modèles `blub-detail-<unit>` ;
+`index.html` les charge (lignes 198-207, modifié à 00:03). **Rien ne les
+dessine.** Le chemin de rendu est sans ambiguïté :
+
+* `js/gl/gl-world.js:396` — `blubModel()` retourne `"blub-" + tower.unitId`, et
+  rien d'autre ;
+* la boucle de superposition (lignes 914-918) est gardée par
+  `t.constructor.ID === "blub"`, c'est-à-dire **l'invocateur lui-même**, pas ses
+  invocations, et elle n'itère que sur `summonerMarks()` → `summoner-mark-*` ;
+* `gl-world.js` porte l'horodatage **22:52**, antérieur au build des details
+  (00:26) : le renderer n'a jamais été modifié pour les prendre.
+
+Conséquence mesurée — et c'est le point important pour la revue : **les
+brancher ne sauverait pas la paire.**
+
+| unité | px ajoutés au CONTOUR | unité | px ajoutés au CONTOUR |
+|---|---|---|---|
+| mini1 | +4 | hungry | +85 |
+| mini2 | +13 | cyber | **−3** (entièrement à l'intérieur du corps) |
+| blub1 | +13 | mecha | +76 |
+| blub2 | +23 | mecha2 | +12 |
+| blub3 | **+9** | superb | +33 |
+
+En superposant corps + detail comme le runtime le ferait :
+`blub3/cyber 0,853 → 0,842` (toujours au seuil), et **deux paires empirent** :
+`mini1/mini2 0,801 → 0,812`, `blub1/blub2 0,807 → 0,814`.
+
+L'en-tête de `blub_detail.py` annonce des couvertures de 11 à 148 px : ce sont
+les pixels que le detail **modifie** (ré-ombrage compris), pas ceux qu'il
+**ajoute au contour**. Les deux mesures sont légitimes, une seule porte sur la
+silhouette. **Ce sont les corps qui ont réparé la famille, pas la couche detail.**
+
+## 5. Contrôles de livraison
+
+| contrôle | résultat |
+|---|---|
+| 46/46 modèles en couleur sur disque | ✓ — minimum **2 entrées** de palette, chroma max la plus basse **0,0862** (`blub-mark-a2-*`). **Zéro gris, zéro manquant, zéro palette unique.** |
+| 10 modèles `blub-detail-*` (nouveaux, hors des 46) | ✓ colorés aussi, 2 à 4 entrées |
+| build couleur committé | ✓ — `R1b-units-colour` ouverte : blubs vert mousse, cyber bleu, mecha acier à anneaux cyan, superb colosse sombre |
+| `node tools/check-winding.js` | ✓ **exit 0**, 12 primitives (`gl-geometry` + `td_mesh`), **toutes vers l'extérieur**, aucune nouvelle primitive |
+| empreintes de jeu | ✓ inchangées, `js/blub.js` non modifié |
+
+## Verdict
+
+**ÉCHEC** — mais un échec d'un seul point, et pas celui de la revue précédente.
+
+Ce qui est acquis, et qui était le motif du rejet : la grappe de cinq unités à
+contour circulaire est dissoute (sept paires redescendues, la pire de 0,898 à
+0,843) ; les cinq paires demandées passent toutes sous 0,85 ; le profil
+franchement non circulaire existe enfin (l/h de 0,64 à 2,15) ; les empreintes
+n'ont pas bougé ; la couleur et le winding sont propres.
+
+Ce qui bloque : **blub3 / cyber**, forme **0,853**, brut **0,715 / 0,721 /
+0,715**, contenance **99,5 %**, rayons **20 et 25**. blub3 était une RÉUSSITE à
+la Revue 1 : la correction a déplacé la confusion au lieu de la supprimer, ce
+que la Revue 1 avait explicitement annoncé comme risque.
+
+### À corriger avant de rejouer
+
+1. **blub3 doit garder son identité hors de yaw 0.** Ses oreilles ne sortent du
+   contour que de face ; à 45° et 90° il n'en reste rien. Il lui faut un relief
+   qui dépasse le profil de ≥ 3 px **sous tous les yaws** — ou un rapport l/h
+   qui s'écarte de cyber (aujourd'hui 1,15 contre 0,92, trop proche).
+2. **Ou faire bouger cyber** : il a gagné 8 px de hauteur dans cette passe et
+   c'est ce qui l'a amené sur blub3. Sa pointe unique est un bon départ ; elle
+   doit peser plus que 2 px.
+3. **Brancher ou retirer la couche detail.** Dix modèles et un script de 56 ko
+   sont chargés par `index.html` et jamais dessinés. Si elle doit vivre, il faut
+   une liste de superposition pour `tower.isSummon` dans `gl-world.js` à côté de
+   `summonerMarks` — mais mesurer d'abord : telle quelle elle dégrade
+   mini1/mini2 et blub1/blub2.
+4. **L'inversion blub2 / blub1 à yaw 90** : la dalle de rayon 13 rend plus petite
+   que l'œuf de rayon 10. À reprendre en épaisseur, pas en empreinte.
+
+*Mesures : canvas 2220 × 1249, distance compensée 3511,38 (référence 1278 × 719),
+caméra de jeu par défaut, silhouettes par différentiel de frames, IoU de forme à
+N = 64 vérifié stable de N = 32 à 128.*
