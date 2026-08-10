@@ -48,9 +48,18 @@
 # ---------------------------------------------------------------------------
 # THE FOOTPRINT NEVER GROWS. Game footprint is 15 u.l. at every tier. The hem
 # is 0.66 / 0.35 at b1 and 0.66 / 0.35 at b5; `audit()` asserts the maximum
-# horizontal radius of the whole model is identical across all five. The only
-# growth is +0.29 of HEIGHT at b5, applied by `lift()`, which is zero at the
-# hem by construction.
+# horizontal radius of the whole model is identical across all five. ALL the
+# growth is HEIGHT, applied by `lift()`, which is zero at the hem by
+# construction so the ground plan cannot move whatever the tier does.
+#
+# AND THE HEIGHT CLIMBS ONE TIER AT A TIME. The socle fixes two numbers, 1.790
+# at the base and 2.080 at b5, and nothing in between. The first build spent
+# the whole 0.29 in a single step at b5 and stood 1.790 / 1.791 / 1.792 /
+# 1.792 / 2.081 -- four tiers a millimetre apart and then a jump, which is
+# exactly the "saut brutal entre deux paliers" revue 2 asks about. `HEIGHT`
+# below spends it over the last three tiers instead, on voie A's own schedule
+# (+0.08, +0.09, +0.12), so a player upgrading sees the figure lengthen every
+# time from b3 on rather than four times nothing and then a lurch.
 #
 # ---------------------------------------------------------------------------
 # PATH B IS THE INVERSE TRAJECTORY. He does not harden, he OPENS.
@@ -107,8 +116,21 @@ def R(footprint_ul):
 
 FOOTPRINT_UL = 15.0                  # fixed at every tier, per beam.config.js
 GROUND_R = R(FOOTPRINT_UL)           # 0.4717
-HEIGHT_BASE = 1.79                   # base / b1..b4
-HEIGHT_TOP = 2.08                    # b5 -- the only growth, and it is VERTICAL
+HEIGHT_BASE = 1.79                   # the socle's base, and b1 / b2
+HEIGHT_TOP = 2.08                    # the socle's other end, at b5
+
+# THE LADDER BETWEEN THE TWO. The socle pins the ends and says nothing about
+# the middle, so the middle is a choice -- and the choice is voie A's, because
+# the tiers of one tower have to read as the same tower getting taller whichever
+# path the player took. A climbs 1.790 -> 1.870 -> 1.960 -> 2.080 from a3; B
+# climbs on the same steps, +0.080, +0.090, +0.120.
+#
+# It is the same total growth as before, 0.29, and it is still entirely
+# VERTICAL: every one of these numbers goes through `lift()`, which is zero
+# below z 0.35, so the hem, the ground plan and the 15 u.l. footprint are
+# untouched at every tier. Nothing here widens anything.
+HEIGHT = {"b1": 1.790, "b2": 1.790, "b3": 1.870, "b4": 1.960, "b5": 2.080}
+
 HEM_LONG = 0.66                      # the train, from the axis
 HEM_SHORT = 0.35                     # the open side, from the axis
 SHOULDER_LIFT = 0.06                 # left shoulder above right
@@ -352,7 +374,14 @@ def _hem_raw(th):
 
 
 def _top_raw(th):
-    return (1.0 + 0.150 * math.cos(2.0 * th) + 0.070 * math.cos(th)
+    # THE cos(th) TERM IS THE ONLY ODD ONE UNDER x -> -x, so it alone decides
+    # how differently the two shoulders read, and it is 0.130 rather than the
+    # 0.070 it was built with. Every term here integrates to zero over the
+    # circle whatever its coefficient, so TOP_MEAN stays exactly 1 and the
+    # width table below still means what it says -- this cost nothing anywhere
+    # else in the file, which is why it is the second lever the mirror gate
+    # was answered with rather than the first.
+    return (1.0 + 0.150 * math.cos(2.0 * th) + 0.130 * math.cos(th)
             + 0.060 * math.sin(3.0 * th + 0.80) - 0.050 * math.sin(th))
 
 
@@ -386,7 +415,7 @@ def hem_unit(th):
 def top_unit(th):
     """The shoulder outline. Wide across x (cos 2th), and pushed off centre by
     terms that are ODD under x -> -x, so the two shoulders are not the same
-    width -- the left one reaches 0.259 and the right one 0.213."""
+    width -- the left one reaches 0.271 and the right one 0.200."""
     return _top_raw(th) / TOP_MEAN
 
 
@@ -407,15 +436,30 @@ WIDTH = [(0.020, HEM_MEAN), (0.100, 0.452), (0.250, 0.400), (0.480, 0.318),
 # socle measures 0.66 / 0.35 "depuis l'axe", so the bottom ring may not be
 # offset -- then swings to -x at the hip and leans forward above the waist at
 # exactly tan(8 deg): (0.068 - 0.014) / (1.305 - 0.920) = 0.1403 = tan 7.99.
+# That column of the table is the socle's and is not touched by anything below.
 #
-# There is a LATERAL component too, +0.050 over the same span. The socle fixes
-# the forward tilt and it is untouched -- 8 degrees is the component in the yz
-# plane and that is what the number means -- but nothing says the lean has to
-# be in that plane alone, and a purely fore-aft lean is invisible from the
-# front, which is the one view the mirror test judges hardest.
+# There is a LATERAL component too, and it is the largest single thing keeping
+# this model off the mirror gate. The socle fixes the forward tilt -- 8 degrees
+# is the component in the yz plane and that is all the number means -- but
+# nothing says the lean has to lie in that plane, and a lean that does is
+# invisible from the two views that matter most.
+#
+# IT USED TO BE +0.050 AND AIMED THE WRONG WAY. Lean (dx, dy) = (0.050, 0.054)
+# points at bearing 47 degrees. The train points at 247, so the old lean ran
+# almost exactly along the line of sight of the view that sights down the
+# train -- and that view is precisely where the worst-case mirror score lives,
+# because looking along the train puts the train on the centreline where it
+# cannot break anything. The model's biggest asymmetry cancelled itself in the
+# one frame that was hardest to pass: 0.929 at b1, 0.930 at b3.
+#
+# It is +0.103 now, hip to crown, and the hip has been pushed a little further
+# to -x to keep the S rather than turn the figure into a stick leaning over.
+# The lean off the vertical goes from 10.8 degrees to 13.1 -- so the change is
+# a quarter more lean, not a new posture -- but it is a quarter more lean in a
+# direction the train view can see, and that is worth 0.09 of mirror IoU.
 AXIS = [(0.020, (0.000, 0.000)), (0.300, (-0.014, -0.030)),
-        (0.660, (-0.028, -0.020)), (0.920, (-0.008, 0.014)),
-        (1.160, (0.022, 0.048)), (1.305, (0.042, 0.068))]
+        (0.660, (-0.030, -0.020)), (0.920, (0.006, 0.014)),
+        (1.160, (0.062, 0.048)), (1.305, (0.095, 0.068))]
 
 
 def axis(z):
@@ -461,11 +505,40 @@ def zwarp(th, z):
 
 
 def lift(z, rise):
-    """b5's +0.29. Zero at the hem by construction, so the footprint cannot
-    move; full above 1.55, so the growth lands in the torso and the hood."""
+    """THE TIER'S GROWTH, and the only growth there is. Zero at the hem by
+    construction, so the footprint cannot move; full above 1.55, so what a tier
+    buys is torso and hood and never ground.
+
+    It is one curve driven by one number, so b3's +0.08, b4's +0.17 and b5's
+    +0.29 are the SAME stretch at three depths rather than three shapes. That
+    is what makes the ramp read as a progression: the figure lengthens in the
+    same place each time, a little further."""
     if rise == 0.0:
         return z
     return z + rise * _smooth((z - 0.35) / 1.20)
+
+
+def raise_path(pts, rise, tip=0.45):
+    """Carry a hand-authored polyline up with the robe it hangs off.
+
+    The sleeve paths are written against the UNRAISED body -- `SLEEVE_L` starts
+    on `SH_L`, which is the shoulder at rise 0. Once a tier lifts the shell, a
+    sleeve still rooted at 1.320 leaves a garment whose top ring is at 1.474,
+    i.e. it comes out of the middle of the chest. So the root gets the full
+    lift and the far end gets a fraction of it: an empty sleeve hangs from the
+    shoulder and its cuff stays roughly where it was, which is the tier -- the
+    robe grew and there is less and less in it.
+
+    The 0.45 is not a new invention. b5's sleeves used to be a second, hand
+    written table (`SLEEVE_L_B5`), and its four vertices sat at 1.00, 0.91,
+    0.62 and 0.42 of the full lift. One linear taper from 1.00 to 0.45
+    reproduces that table to within 0.02 at every vertex, so the table is gone
+    and every tier now gets its sleeves from the same rule."""
+    if rise == 0.0:
+        return pts
+    n = len(pts) - 1 or 1
+    return [(x, y, z + (lift(z, rise) - z) * _lerp(1.0, tip, i / float(n)))
+            for i, (x, y, z) in enumerate(pts)]
 
 
 def hem_rise(th, zp):
@@ -692,8 +765,12 @@ def cavity(s, body, cfg):
 
 HOOD_COLLAR = 1.325
 HOOD_CROWN = 1.755
-HOOD_TIP = (-0.088, -0.180, 1.790)     # back AND across: the point does not
-                                       # sit in the plane of symmetry either
+HOOD_TIP = (0.080, -0.180, 1.790)      # back AND across: the point does not
+                                       # sit in the plane of symmetry either.
+                                       # It rides with `hood_axis` below -- it
+                                       # is 0.105 off the crown's own centre,
+                                       # the same offset it always had, on the
+                                       # other side of a crown that has moved.
 GAP_MID = math.radians(79.0)         # 11 degrees off the facing, before yaw
 GAP_HALF = math.radians(39.0)
 
@@ -718,12 +795,26 @@ def hood_radius(th, zp):
 
 
 def hood_axis(zp):
-    """The hood FALLS BACKWARD as it rises: its centre walks to -y, so the
-    crown overhangs the shoulder blades and the profile from the side is a
-    completely different animal from the profile from the front."""
+    """The hood FALLS BACKWARD AND SIDEWAYS as it rises: its centre walks to -y
+    and to +x, so the crown overhangs the shoulder blades and hangs off one of
+    them, and the profile from the side is a completely different animal from
+    the profile from the front.
+
+    THE +0.090 ACROSS IS NEW AND IT IS THE TIER'S OWN IDEA, not a fudge factor.
+    b1's whole premise is that the hood did not turn when he did; a hood that
+    lags is also a hood that has slipped, and a heavy cowl that has slipped
+    sits over one shoulder, not squarely on the crown. It used to walk -0.024
+    across, which is a twentieth of the head's own width -- visually nothing,
+    and worth nothing on the mirror gate either. At +0.090 the topmost fifth of
+    the silhouette stands off the body's centreline in every view that is not
+    looking straight down the shift, which is the third of the three answers to
+    the worst-case mirror test and the only one that acts above the shoulders.
+
+    `HOOD_TIP` moved with it. The point keeps the offset from the crown it
+    always had; what changed is where the crown is."""
     t = _clamp((zp - HOOD_COLLAR) / (HOOD_CROWN - HOOD_COLLAR))
     cx, cy = axis(1.305)
-    return (cx - 0.024 * t * t, cy - 0.150 * t * t)
+    return (cx + 0.090 * t * t, cy - 0.150 * t * t)
 
 
 def hood_spec(cfg):
@@ -774,14 +865,15 @@ def hood(s, body, cfg):
     # off the point down the spine, wide in x and thin in y, which no rotation
     # of anything can produce.
     #
-    # The tip's z is PINNED rather than transformed. Sending it through the
-    # hood's pitch made the model's overall height a function of how far out of
-    # step the hood was that tier, so b3 stood 1.80 and b1 stood 1.79 for no
-    # reason a brief could defend. Only x and y follow the hood now; the crown
-    # of the model is exactly the socle's height at every tier.
+    # The tip's z is PINNED TO THE LADDER rather than transformed. Sending it
+    # through the hood's pitch made the model's overall height a function of how
+    # far out of step the hood was that tier, so b3 stood 1.80 and b1 stood 1.79
+    # for no reason a brief could defend -- and a height ramp cannot be read as
+    # a ramp if the noise on it is the size of a step. Only x and y follow the
+    # hood; the crown of the model is this tier's rung and nothing else.
     swung = spec["post"]((HOOD_TIP[0], HOOD_TIP[1], lift(HOOD_TIP[2], cfg["rise"])))
-    top = lift(HEIGHT_BASE, cfg["rise"])
-    tip = (swung[0], swung[1], top - 0.010)
+    top = HEIGHT[cfg["tier"]]
+    tip = (swung[0], swung[1], top - 0.015)
     # A SWEPT TUBE IS TALLER THAN ITS PATH. Its rings stand perpendicular to
     # the path, so a near-horizontal run of radius 0.072 reaches 0.057 above
     # the centreline -- which is exactly how the model came out 0.021 over the
@@ -790,7 +882,7 @@ def hood(s, body, cfg):
     c = _centroid(urings[-1])
     crown = (c[0], c[1], c[2] - 0.048)
     rise = _lerp3(crown, tip, 0.55)
-    rise = (rise[0], rise[1], min(rise[2], top - 0.052))
+    rise = (rise[0], rise[1], min(rise[2], top - 0.057))
     # THE POINT AND THE FALL ARE ONE PIECE OF CLOTH, on one path. Built as two
     # lofts meeting at the tip they pinched from 0.010 to 0.036 across the join
     # and read from three sides as a pair of ears. A hood's peak and the fabric
@@ -961,15 +1053,10 @@ SLEEVE_R_EMPTY = [SH_R, (-0.250, 0.116, 1.140), (-0.236, 0.198, 1.014),
                   (-0.212, 0.232, 0.898)]
 SLEEVE_EMPTY_R = [0.112, 0.102, 0.092, 0.074]
 
-# b5's sleeves are ROOTED AT b5's SHOULDER. `lift` raises the robe's own top
-# ring to 1.582, and a sleeve still hanging off 1.320 came out of the middle of
-# the chest -- an empty sleeve has to leave the garment at the shoulder or it is
-# not a sleeve. The cuffs stay near where they were, so the sleeve simply gets
-# longer, which is the tier: the robe grew and there is less and less in it.
-SLEEVE_L_B5 = [(0.250, 0.050, 1.582), (0.286, 0.140, 1.396),
-               (0.268, 0.226, 1.176), (0.238, 0.268, 1.006)]
-SLEEVE_R_B5 = [(-0.200, 0.028, 1.522), (-0.250, 0.116, 1.344),
-               (-0.236, 0.198, 1.128), (-0.212, 0.232, 0.958)]
+# EVERY SLEEVE ABOVE IS WRITTEN AGAINST THE UNRAISED BODY, and `raise_path`
+# takes it up to whatever the tier is. b3, b4 and b5 all lift now, so there is
+# no tier where a sleeve may be left hanging off rise-0 shoulders and no second
+# hand-written table for the tier that happens to be tallest.
 
 
 def sleeves(s, body, cfg):
@@ -1039,6 +1126,14 @@ def _tendon(pts, r0, r1):
     return (pts, [_lerp(r0, r1, i / float(n - 1)) for i in range(n)])
 
 
+# TENDONS DO NOT GO UP WITH THE ROBE, and that is a decision rather than an
+# oversight. A sleeve is part of the garment and has to hang from the shoulder
+# the garment actually has, so `raise_path` carries it; a tendon is the thing
+# INSIDE the garment reaching out through it, and where it chooses to come out
+# is not a property of how tall the cloth is. Two of them end at the beam
+# origin, which the socle freezes at 1.045 and which may not move for any
+# reason -- so a tendon that followed the tier would drag HANDS with it.
+#
 # Two settle to bracket HANDS -- they end 0.06-0.08 off it on either side, so
 # the beam still leaves the gap between them and not a limb.
 TENDONS_B4 = [
@@ -1149,15 +1244,24 @@ MAT_ABYSS.update({
 })
 
 
-def _cfg(**kw):
+def _cfg(tier, **kw):
+    """One tier's configuration. `rise` is NOT a per-tier opinion -- it is read
+    out of `HEIGHT`, so the only place the ramp exists is that one table and a
+    tier cannot quietly disagree with the height `audit()` will hold it to."""
     base = dict(
-        rise=0.0, hood_yaw=0.0, hood_pitch=0.0, chest_open=False,
+        hood_yaw=0.0, hood_pitch=0.0, chest_open=False,
         chest_gap=(math.radians(48.0), math.radians(116.0)),
         pushes=[], crest=False, vein=False, lit_face=False, extra_joint=False,
         tendons=[], has_hands=True, mat=MAT_WORN,
         sleeve_l=(SLEEVE_L, SLEEVE_L_R), sleeve_r=(SLEEVE_R, SLEEVE_R_R),
     )
     base.update(kw)
+    rise = HEIGHT[tier] - HEIGHT_BASE
+    base["tier"] = tier
+    base["rise"] = rise
+    for side in ("sleeve_l", "sleeve_r"):
+        pts, radii = base[side]
+        base[side] = (raise_path(pts, rise), radii)
     return base
 
 
@@ -1166,12 +1270,13 @@ TIERS = {
     # and tipped BACK 5.7 while the torso leans FORWARD 8: it is not where a
     # head that turned with him would be, and the cowl underneath still points
     # the way he does, which is the seam that gives it away. Two shadows in it.
-    "b1": _cfg(hood_yaw=math.radians(-16.0), hood_pitch=math.radians(5.7)),
+    "b1": _cfg("b1", hood_yaw=math.radians(-16.0),
+               hood_pitch=math.radians(5.7)),
 
     # b2 -- THE EXTRA JOINT, and the cloth pushed taut from inside at two
     # places that have nothing to do with each other. The hood has moved AGAIN,
     # and the other way: it is not settling, it is keeping its own time.
-    "b2": _cfg(hood_yaw=math.radians(13.0), hood_pitch=math.radians(3.0),
+    "b2": _cfg("b2", hood_yaw=math.radians(13.0), hood_pitch=math.radians(3.0),
                extra_joint=True,
                sleeve_l=(SLEEVE_L_X, SLEEVE_L_XR),
                pushes=[(math.radians(28.0), 1.055, 0.42, 0.130, 0.055),
@@ -1179,13 +1284,16 @@ TIERS = {
 
     # b3 -- THE ROBE OPENS. The abyss takes over the largest surface, the hands
     # go one value darker, and the vein root appears in the ground behind him.
-    "b3": _cfg(hood_yaw=math.radians(-11.0), hood_pitch=math.radians(2.0),
+    # It is also the first tier that GROWS: +0.080, all of it above the waist.
+    "b3": _cfg("b3", hood_yaw=math.radians(-11.0), hood_pitch=math.radians(2.0),
                chest_open=True, vein=True, crest=True, mat=MAT_OPEN,
                pushes=[(math.radians(300.0), 1.020, 0.44, 0.140, 0.038)]),
 
     # b4 -- THE FACE IS AN OPENING AND THE HANDS ARE GONE. Both sleeves hang
     # empty and shut; four tendons come out through the fabric above the cuffs.
-    "b4": _cfg(hood_yaw=math.radians(-6.0), hood_pitch=math.radians(1.0),
+    # +0.090 more of height, and the empty sleeves are what shows it: they hang
+    # from a shoulder that has risen off cuffs that have barely moved.
+    "b4": _cfg("b4", hood_yaw=math.radians(-6.0), hood_pitch=math.radians(1.0),
                chest_open=True, chest_gap=(math.radians(42.0),
                                            math.radians(124.0)),
                vein=True, crest=True, lit_face=True, has_hands=False,
@@ -1194,17 +1302,18 @@ TIERS = {
                sleeve_r=(SLEEVE_R_EMPTY, SLEEVE_EMPTY_R),
                pushes=[(math.radians(318.0), 0.960, 0.46, 0.150, 0.032)]),
 
-    # b5 -- ONLY THE ROBE, AND WHAT INHABITS IT. +0.29 of height and not one
-    # millimetre of ground. The hood has nearly stopped lagging and three
-    # tendons have settled at 50-degree intervals; the stillness is the point.
-    "b5": _cfg(rise=HEIGHT_TOP - HEIGHT_BASE,
-               hood_yaw=math.radians(-3.0), hood_pitch=math.radians(0.5),
+    # b5 -- ONLY THE ROBE, AND WHAT INHABITS IT. The last +0.120, for 0.29 of
+    # height over the three tiers and not one millimetre of ground. The hood has
+    # nearly stopped lagging and three tendons have settled at 50-degree
+    # intervals; the stillness is the point.
+    "b5": _cfg("b5", hood_yaw=math.radians(-3.0),
+               hood_pitch=math.radians(0.5),
                chest_open=True, chest_gap=(math.radians(40.0),
                                            math.radians(128.0)),
                vein=True, crest=True, lit_face=True, has_hands=False,
                mat=MAT_ABYSS, tendons=TENDONS_B5,
-               sleeve_l=(SLEEVE_L_B5, SLEEVE_EMPTY_R),
-               sleeve_r=(SLEEVE_R_B5, SLEEVE_EMPTY_R)),
+               sleeve_l=(SLEEVE_L_EMPTY, SLEEVE_EMPTY_R),
+               sleeve_r=(SLEEVE_R_EMPTY, SLEEVE_EMPTY_R)),
 }
 
 ORDER = ["b1", "b2", "b3", "b4", "b5"]
@@ -1234,111 +1343,161 @@ def build_body(tier, flat):
 
 
 # ---------------------------------------------------------------------------
-# THE 360-DEGREE TEST, RUN RATHER THAN PROMISED.
+# THE 360-DEGREE TEST -- THE IDOL'S TEST, NOT A SECOND ONE.
 #
 # The brief: rotate the model through 360 degrees; if two angles 90 degrees
-# apart give the same silhouette it has failed and must be rebuilt. So the
-# model is rasterised into a silhouette at 24 yaws and every 90-degree pair is
-# scored by intersection over union. A cylinder, a cone, or a cone with a ball
-# on it all score 1.00 and are rejected here.
+# apart give the same silhouette it has failed and must be rebuilt. The mirror
+# score is the other half of section 2 -- "la silhouette est asymetrique
+# gauche/droite" -- the same measure against the silhouette's own reflection,
+# which is exactly the failure a 90-degree test alone would miss.
 #
-# The mirror score is the second half of section 2 -- "la silhouette est
-# asymetrique gauche/droite" -- and is the same measure against the silhouette's
-# own reflection, which is exactly the failure a left/right symmetric figure
-# would show and a 90-degree test alone would miss.
+# EVERYTHING BELOW IS `siphon_idol.py`'s TEST, COPIED WHOLE: 36 yaws so that 90
+# degrees lands on a sample, an 88 x 120 grid, two elevations -- 0, which is the
+# strictest case because there is no foreshortening to hide behind, and 35,
+# which is the one the game actually draws -- and both statistics taken as the
+# WORST case over every view. Quarter turn under 0.85, mirror under 0.88.
+#
+# IT USED TO BE A DIFFERENT TEST, AND THAT WAS THE PROBLEM. Voie B rasterised
+# 24 yaws at one elevation and gated the mirror on the MEAN at 0.90, printing
+# the worst as a remark; voie A gated the WORST at 0.88. Two paths of one tower
+# held to two statistics, and no reading in one file could be compared with a
+# reading in the other. The old comment defended the mean on the grounds that
+# the worst case "is not a defect" -- any figure whose asymmetry has a dominant
+# direction looks symmetric when you sight along that direction, and here that
+# is the train's own bearing. The observation is true. It is not a licence:
+# the answer to a view that reads symmetric is to put something in that view,
+# not to drop it from the average. On the day the worst-case gate was adopted
+# four of the five tiers failed it, at 0.895 to 0.929, and every one of them
+# was fixed in the geometry -- see `AXIS`, `_top_raw` and `hood_axis`, which
+# carry the three changes and the reason for each.
+#
+# The duplication is deliberate. Neither file may import the other: a build
+# script that needs a sibling to run is a build script that eventually stops
+# running, and these two are run separately by different people. The price is
+# that this block and the idol's must be changed together, which is cheaper
+# than the price of the two paths drifting apart again.
 # ---------------------------------------------------------------------------
 
-YAWS = 24
-REVOLUTION_LIMIT = 0.90
-MIRROR_LIMIT = 0.90
-GRID_W = 64
+GRID_W, GRID_H = 88, 120
+YAWS = 36                                  # 10 degree steps; 90 lands exactly
+QUARTER = YAWS // 4
+IOU_QUARTER_MAX = 0.85
+IOU_MIRROR_MAX = 0.88
 
 
-def _stamp(pos, yaw, box, w, h):
-    ca, sa = math.cos(-yaw), math.sin(-yaw)
-    u0, v0, du, dv = box
-    cells = set()
-    n = len(pos) // 9
-    for t in range(n):
-        i = t * 9
-        p = []
-        for k in range(3):
-            x, y, z = pos[i + k * 3], pos[i + k * 3 + 1], pos[i + k * 3 + 2]
-            p.append(((x * ca - y * sa - u0) / du, (z - v0) / dv))
-        (ax, ay), (bx, by), (cx, cy) = p
-        lo_x = max(0, int(min(ax, bx, cx)))
-        hi_x = min(w - 1, int(max(ax, bx, cx)) + 1)
-        lo_y = max(0, int(min(ay, by, cy)))
-        hi_y = min(h - 1, int(max(ay, by, cy)) + 1)
-        area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-        if abs(area) < 1e-9:
-            for px, py in p:
-                cells.add((int(px), int(py)))
+def _group_tris(model, group=""):
+    pos = model["positions"]
+    first, count = 0, len(pos) // 3
+    for g in model["groups"]:
+        if g["name"] == group:
+            first, count = g["first"], g["count"]
+            break
+    out = []
+    for t in range(count // 3):
+        v = first + t * 3
+        out.append(tuple((pos[(v + k) * 3], pos[(v + k) * 3 + 1],
+                          pos[(v + k) * 3 + 2]) for k in range(3)))
+    return out
+
+
+def _fill(grid, p0, p1, p2):
+    pts = sorted((p0, p1, p2), key=lambda p: p[1])
+    (x0, y0), (x1, y1), (x2, y2) = pts
+    for (px, py) in pts:                   # never lose a sliver entirely
+        ix, iy = int(px), int(py)
+        if 0 <= ix < GRID_W and 0 <= iy < GRID_H:
+            grid[iy * GRID_W + ix] = 1
+    if y2 - y0 < 1e-9:
+        return
+    for y in range(max(0, int(y0)), min(GRID_H - 1, int(y2) + 1) + 1):
+        yc = y + 0.5
+        if yc < y0 or yc > y2:
             continue
-        inv = 1.0 / area
-        for gy in range(lo_y, hi_y + 1):
-            py = gy + 0.5
-            for gx in range(lo_x, hi_x + 1):
-                px = gx + 0.5
-                w0 = ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) * inv
-                w1 = ((px - ax) * (cy - ay) - (py - ay) * (cx - ax)) * inv
-                if w0 >= -0.02 and w1 >= -0.02 and w0 + w1 <= 1.02:
-                    cells.add((gx, gy))
-        for px, py in p:
-            if 0 <= px < w and 0 <= py < h:
-                cells.add((int(px), int(py)))
-    return cells
+        xa = x0 + (x2 - x0) * (yc - y0) / (y2 - y0)
+        if yc < y1:
+            xb = x1 if y1 - y0 < 1e-9 else x0 + (x1 - x0) * (yc - y0) / (y1 - y0)
+        else:
+            xb = x1 if y2 - y1 < 1e-9 else x1 + (x2 - x1) * (yc - y1) / (y2 - y1)
+        lo, hi = (xa, xb) if xa <= xb else (xb, xa)
+        i0 = max(0, int(math.ceil(lo - 0.5)))
+        i1 = min(GRID_W - 1, int(math.floor(hi - 0.5)))
+        row = y * GRID_W
+        for x in range(i0, i1 + 1):
+            grid[row + x] = 1
+
+
+def _silhouettes(tris, elev_deg):
+    """One binary outline per yaw, all projected with the SAME fixed scale so
+    the comparison between two of them means something."""
+    rad = max((math.hypot(p[0], p[1]) for tri in tris for p in tri), default=1.0)
+    ztop = max((p[2] for tri in tris for p in tri), default=1.0)
+    zbot = min((p[2] for tri in tris for p in tri), default=0.0)
+    e = math.radians(elev_deg)
+    sx = (GRID_W - 4) / (2.0 * rad * 1.02)
+    sy = (GRID_H - 4) / max(1e-6, (ztop - zbot) * math.cos(e)
+                            + 2.0 * rad * math.sin(e) * 1.02)
+    scale = min(sx, sy)
+    out = []
+    for k in range(YAWS):
+        phi = math.tau * k / YAWS
+        ca, sa = math.cos(phi), math.sin(phi)
+        grid = bytearray(GRID_W * GRID_H)
+        for tri in tris:
+            flat = []
+            for p in tri:
+                u = -sa * p[0] + ca * p[1]
+                w = ca * p[0] + sa * p[1]
+                v = -math.sin(e) * w + math.cos(e) * p[2]
+                flat.append((GRID_W * 0.5 + u * scale,
+                             GRID_H - 2.0 - (v - zbot * math.cos(e)) * scale))
+            _fill(grid, flat[0], flat[1], flat[2])
+        out.append(grid)
+    return out
 
 
 def _iou(a, b):
-    if not a and not b:
-        return 1.0
-    return len(a & b) / float(len(a | b) or 1)
+    inter = union = 0
+    for i in range(GRID_W * GRID_H):
+        x, y = a[i], b[i]
+        if x or y:
+            union += 1
+            if x and y:
+                inter += 1
+    return (inter / union) if union else 1.0
+
+
+def _mirror(g):
+    m = bytearray(GRID_W * GRID_H)
+    for y in range(GRID_H):
+        row = y * GRID_W
+        for x in range(GRID_W):
+            if g[row + x]:
+                m[row + (GRID_W - 1 - x)] = 1
+    return m
 
 
 def rotation_test(model):
-    pos = model["positions"]
-    maxr, lo, hi = 0.0, 1e9, -1e9
-    for i in range(0, len(pos), 3):
-        x, y, z = pos[i], pos[i + 1], pos[i + 2]
-        maxr = max(maxr, math.hypot(x, y))
-        lo = min(lo, z)
-        hi = max(hi, z)
-    w = GRID_W
-    du = 2.0 * maxr / w
-    h = max(8, int((hi - lo) / du))
-    box = (-maxr, lo, du, (hi - lo) / h)
-    shots = [_stamp(pos, math.tau * i / YAWS, box, w, h) for i in range(YAWS)]
+    """(worst quarter-turn IoU, worst mirror IoU, worst 60-degree IoU, passed).
 
-    quarter = YAWS // 4
-    worst90 = max(_iou(shots[i], shots[(i + quarter) % YAWS])
-                  for i in range(YAWS))
-
-    # LEFT/RIGHT. Each silhouette against its own reflection in the tower's
-    # axis. Scored as a MEAN over the 24 yaws and separately at yaw 0, the
-    # facing the tower is drawn at, and NOT as the worst case -- because the
-    # worst case is not a defect. Any figure whose asymmetry has a dominant
-    # direction looks symmetric when that direction points at the camera; sight
-    # along the train and the train lands on the centreline. Gating on that
-    # would fail every asymmetric object ever built, so the worst is printed
-    # and the typical view is judged.
-    mirrors = [_iou(sh, set((w - 1 - c, r) for c, r in sh)) for sh in shots]
-    mir_mean = sum(mirrors) / len(mirrors)
-    mir_front = mirrors[0]
-    mir_worst = max(mirrors)
-
-    # The flattest reading of all: the most alike any two views 60 degrees or
-    # further apart get. A revolution puts this at 1.00 too, whatever the
-    # 90-degree pairs happen to do. Reported, not gated.
+    The first two are the gates and they are the idol's, to the constant. The
+    third is reported and not gated: the most alike any two views 60 degrees or
+    further apart ever get, which is the flattest reading of all -- a surface of
+    revolution sits at 1.00 there whatever its 90-degree pairs happen to do.
+    """
+    tris = _group_tris(model, "")
+    worst_q = worst_m = worst_any = 0.0
     step = max(1, YAWS // 6)
-    worstany = 0.0
-    for i in range(YAWS):
-        for j in range(i + step, YAWS):
-            if min(j - i, YAWS - (j - i)) >= step:
-                worstany = max(worstany, _iou(shots[i], shots[j]))
-    ok = (worst90 <= REVOLUTION_LIMIT and mir_mean <= MIRROR_LIMIT
-          and mir_front <= MIRROR_LIMIT)
-    return ok, worst90, mir_mean, mir_front, mir_worst, worstany
+    for elev in (0.0, 35.0):
+        sil = _silhouettes(tris, elev)
+        for k in range(YAWS):
+            worst_q = max(worst_q, _iou(sil[k], sil[(k + QUARTER) % YAWS]))
+            worst_m = max(worst_m, _iou(sil[k], _mirror(sil[k])))
+        for i in range(YAWS):
+            for j in range(i + step, YAWS):
+                if min(j - i, YAWS - (j - i)) >= step:
+                    worst_any = max(worst_any, _iou(sil[i], sil[j]))
+    return worst_q, worst_m, worst_any, (worst_q < IOU_QUARTER_MAX
+                                         and worst_m < IOU_MIRROR_MAX)
 
 
 # --- the rest of the checks, asserted rather than remembered ----------------
@@ -1387,11 +1546,13 @@ def audit(tier, model, scene):
         raise SystemExit("%s uses materials outside the socle: %s"
                          % (name, stray))
 
-    # 1. HEIGHT. 1.79 everywhere but b5, 2.08 at b5, and nothing else.
+    # 1. HEIGHT. Exactly the rung of the ladder this tier is on -- the socle's
+    #    1.79 at the bottom, its 2.08 at b5, and the three steps in between
+    #    actually taken rather than promised.
     _lo, hi, maxr = _extent(model)
-    want = HEIGHT_TOP if tier == "b5" else HEIGHT_BASE
+    want = HEIGHT[tier]
     if abs(hi[2] - want) > 0.008:
-        raise SystemExit("%s stands %.3f, the socle says %.2f"
+        raise SystemExit("%s stands %.3f, the ladder says %.3f"
                          % (name, hi[2], want))
 
     # 2. THE FOOTPRINT NEVER GROWS. The hem envelope is the socle's 0.66 and
@@ -1447,36 +1608,44 @@ def main():
           % (_hem_raw(TRAIN), _hem_raw(TRAIN + math.pi), HEM_PEAK,
              _hem_raw(TRAIN + math.pi / 2), _hem_raw(TRAIN - math.pi / 2)))
 
-    total, radii, passes = 0, [], []
+    total, radii, passes, heights = 0, [], [], []
     for tier in ORDER:
         model, scene = build_body(tier, flat)
         maxr = audit(tier, model, scene)
         td.write_js(model, "siphon-%s.js" % tier)
         lo, hi, _r = _extent(model)
-        ok, w90, mmean, mfront, mworst, wany = rotation_test(model)
+        wq, wm, wany, ok = rotation_test(model)
         passes.append(ok)
         radii.append(maxr)
+        heights.append(hi[2])
         total += model["triangles"]
         print("  siphon-%s %4d tris  h %.3f  span %.2f x %.2f  r %.3f  |  "
-              "90deg %.3f   mirror mean %.3f front %.3f worst %.3f   "
-              "any60 %.3f  %s"
+              "quarter %.3f  mirror %.3f  any60 %.3f  %s"
               % (tier, model["triangles"], hi[2], hi[0] - lo[0], hi[1] - lo[1],
-                 maxr, w90, mmean, mfront, mworst, wany,
-                 "PASS" if ok else "FAIL"))
+                 maxr, wq, wm, wany, "PASS" if ok else "FAIL"))
 
     if max(radii) - min(radii) > 0.005:
         raise SystemExit("the footprint moved between tiers: %s"
                          % ["%.3f" % r for r in radii])
 
+    # REVUE 2 ASKS WHETHER THE PROGRESSION IS CONTINUOUS. So it is printed as
+    # steps rather than as heights: four tiers of 0.001 followed by one of 0.29
+    # is what this line exists to make impossible to miss again.
+    steps = [heights[i + 1] - heights[i] for i in range(len(heights) - 1)]
     print("  %d models, %d triangles total" % (len(ORDER), total))
+    print("  HEIGHT LADDER  %s"
+          % "  ".join("%s %.3f" % (t, h) for t, h in zip(ORDER, heights)))
+    print("    steps        %s   (all vertical; the plan is identical)"
+          % "  ".join("%+.3f" % d for d in steps))
     print("  footprint %.0f u.l. = %.4f u at EVERY tier; hem envelope %.3f u"
           % (FOOTPRINT_UL, GROUND_R, max(radii)))
-    print("  ROTATION TEST (%d yaws, %dx grid): %s"
-          % (YAWS, GRID_W, "ALL FIVE PASS" if all(passes) else "FAILED"))
-    print("    gates: any two views 90deg apart <= %.2f IoU (a cone scores"
-          " 1.00);" % REVOLUTION_LIMIT)
-    print("           mirror mean AND mirror at the facing <= %.2f."
-          % MIRROR_LIMIT)
+    print("  ROTATION TEST (%d yaws x 2 elevations, %dx%d grid): %s"
+          % (YAWS, GRID_W, GRID_H, "ALL FIVE PASS" if all(passes) else "FAILED"))
+    print("    gates, and they are siphon_idol.py's to the constant:")
+    print("      worst quarter-turn IoU < %.2f (a surface of revolution: 1.00)"
+          % IOU_QUARTER_MAX)
+    print("      worst MIRROR IoU       < %.2f -- worst case, not the mean"
+          % IOU_MIRROR_MAX)
     print("  BEAM ORIGIN (read by the rayon lot, never retyped):")
     print("    HANDS      %.3f %.3f %.3f   -- all five path B tiers" % HANDS)
     print("    VEIN_ROOT  %.3f %.3f %.3f   -- world_fixed, b3 b4 b5" % VEIN_ROOT)

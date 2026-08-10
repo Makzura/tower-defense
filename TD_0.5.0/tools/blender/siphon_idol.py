@@ -439,20 +439,148 @@ HOOD_SHARE = [0.0, 0.10, 0.35, 0.62]       # how the +0.29 is spent up the cowl
 HOOD_FOLD = [0.0, 0.9, 0.1, 0.0, 0.8, 0.2, 0.0, 0.9, 0.15, 0.6]
 VOID_DEG = 62.0
 
+# ---------------------------------------------------------------------------
+# THE COWL WAS STILL A CONE, and the whole-model test could not see it.
+#
+# The table above varies the radius by bearing -- 0.110 to 0.158 on the bottom
+# ring -- and that felt like enough. It is not. A 1.3:1 plan spread on a form
+# that shrinks monotonically to a point IS a witch hat: at 55 px the eye reads
+# the profile, and the profile was the same from every bearing. Measured, the
+# cowl shell and its point ALONE scored 0.925 at a quarter turn and 0.870
+# mirrored -- a fail on both counts against this file's own 0.85 / 0.88, and at
+# a5 the worst of the six because `squeeze` narrows the head into an ever
+# cleaner cone as he draws up.
+#
+# The whole-model test never caught it because the robe's train is most of the
+# outline: siphon-a5 scored 0.75 / 0.71 with a cone sitting on top of it. So
+# there is now a SECOND gate, `cowl_rotation_test`, run on the cowl in
+# isolation. A part cannot hide inside a passing whole.
+#
+# Five things break it, and all five cost ZERO triangles -- they move vertices
+# the loft already owns, the same trade BULGES makes on the robe:
+#
+#   * A CREST. A ridge of cloth running up the back of the hood, aimed at 205
+#     and dying at 278, with a second smaller swell at 320. It climbs the rings
+#     (CREST_Z) so it is nothing at the neck -- where the shoulder shelf must
+#     stay wider, that is the recorded lesson -- and full at the two upper
+#     rings, where there is no shoulder to fuse with. It rides OUTSIDE
+#     `squeeze`, so as a5 draws the head in the crest stays: the spire becomes
+#     a BLADE, thin from the front and deep from the side, not a needle.
+#   * A SCOOP. The mouth bearings (34-108) are pulled in AND dropped in z, so
+#     the brow overhangs a hollow instead of a plain cone face. The opening is
+#     an event in the outline now, not a plate stuck on a smooth surface.
+#   * A LEAN. The upper ring centres walk BACKWARD as the apex walks FORWARD,
+#     so the fall is short and near-vertical down the face and long and raking
+#     down the back. A cone falls the same on every side; this one does not.
+#   * The POINT is taken OFF THE AXIS. It already overhung by 0.078; at a5 it
+#     now overhangs the top ring's centre by 0.20 horizontally against 0.21 of
+#     rise, which is a hooked tip, not an apex. APEX_DRAW is spent with `lift`,
+#     so the hook is the tier arc: the hood draws up into a spire as he becomes
+#     an idol, and it is a spire that LEANS.
+#   * A SLUMP -- and this is the one that actually did the work. See below.
+#
+# TRIED AND REJECTED: widening the whole cowl to get the spread. That is the
+# first build's failure verbatim -- the cowl swallowed the shoulders and the
+# figure became one unbroken cone from hem to spike, which the 360 test happily
+# passes because the OUTLINE still varies. The spread has to be local and it
+# has to be above the shelf.
+CREST_AMP = 0.105
+HOOD_CREST = [0.08, 0.00, 0.00, 0.10, 0.42, 0.86, 1.00, 0.78, 0.22, 0.44]
+CREST_Z = [0.06, 0.42, 1.00, 0.96]
+HOOD_SCOOP = [0.30, 0.92, 1.00, 0.55, 0.08, 0.00, 0.00, 0.00, 0.00, 0.10]
+SCOOP_R = [0.018, 0.040, 0.026, 0.008]
+SCOOP_Z = [0.000, 0.062, 0.034, 0.000]
+HOOD_LEAN = [(0.000, 0.000), (0.004, -0.012), (-0.014, -0.040),
+             (-0.026, -0.070)]
+APEX_DRAW = (0.052, 0.082)
+LIFT_FULL = HEIGHT_A5 - HEIGHT_BASE        # 0.29, the socle's only growth
+
+# THE SLUMP, and everything above it was not enough without this.
+#
+# A crest, a scoop, a lean and an off-axis point took the quarter turn from
+# 0.925 to 0.812 -- but the MIRROR half only moved 0.907 -> 0.886, still a fail
+# against 0.88. A hood built as "narrow at the face, deep at the back" is
+# symmetric LEFT AND RIGHT by construction: the radius table above is near-even
+# about the 71/251 axis (0.118 at both 34 and 108; 0.146 and 0.140 at 172 and
+# 320), the scoop sits on 72, the crest on 205, and EVERY RING SHARES THAT
+# PLANE. Piling more features onto the plan cannot help while they all share
+# it -- see the two rejected attempts below, one of which is the obvious move.
+#
+# What removes the plane is making the cowl's own AXIS non-planar. A mirror
+# plane has to contain the whole curve the ring centres describe; a curve that
+# lies in no plane can be contained by none. HOOD_SLUMP walks the centres
+# +X at the head, back through the middle and -X at the crown -- an S in plan,
+# so the stack of centres is a skew curve, not a straight leaning line. It is
+# always on, at every tier, because a cowl at base is cloth pulled over a head
+# leaning 8 degrees forward and it should never have sat straight.
+#
+# Measured, on the cowl alone, base then a5:
+#     crest+scoop+lean+point      0.812 / 0.886   0.698 / 0.767
+#     + swellings, no slump       0.809 / 0.888   0.698 / 0.783
+#     + slump, no swellings       0.754 / 0.793   0.655 / 0.682
+#     + both (shipped)            0.746 / 0.785   0.656 / 0.687
+HOOD_SLUMP = [(0.000, 0.000), (0.030, -0.004), (-0.006, 0.016),
+              (-0.034, 0.000)]
+
+# TRIED AND REJECTED, worth recording because it is the obvious move: DRIFTING
+# the crest and the scoop round the head with height, the way the robe drifts
+# its creases. It made every number WORSE (base mirror 0.886 -> 0.916, quarter
+# 0.812 -> 0.848). Turning a profile does not remove a symmetry plane, it turns
+# the plane; and swinging the deep back of the hood towards the flank rounded
+# the plan out, which cost more than the drift bought.
+#
+# TRIED, KEPT, AND HONESTLY WORTH LITTLE: localised swellings, the robe's own
+# BULGES machinery aimed at one bearing and one height. The ablation above is
+# what they are worth on the numbers -- 0.008, i.e. nothing. They are kept
+# because they are cloth bunched at the temple and a fold caught low on the
+# other side, they cost zero triangles, and at close range that relief is the
+# difference between cloth and a shell. They are NOT what broke the plane, and
+# a later reader should not think they were.
+HOOD_SWELL = [
+    (150.0, 1.520, 0.050, 34.0, 0.170),    # cloth bunched on the -X temple
+    (40.0, 1.330, 0.038, 28.0, 0.130),     # a fold gathered low on the +X side
+    (352.0, 1.700, 0.026, 24.0, 0.120),    # a nick high on the +X shoulder
+]
+
+
+def _hood_swell(a, z):
+    total = 0.0
+    for (deg, z0, amp, asig, zsig) in HOOD_SWELL:
+        d = (math.degrees(a) - deg + 180.0) % 360.0 - 180.0
+        total += amp * math.exp(-(d / asig) ** 2) * math.exp(-((z - z0)
+                                                               / zsig) ** 2)
+    return total
+
 
 def _hood_rings(lift):
+    t = lift / LIFT_FULL                   # 0 at base, 1 at a5
     out = []
     for k, (zb, cx, cy, tilt, radii) in enumerate(HOOD_RINGS):
-        squeeze = 1.0 - (0.26 if k == 3 else 0.10 if k == 2 else 0.0) * \
-            (lift / 0.29)
+        squeeze = 1.0 - (0.26 if k == 3 else 0.10 if k == 2 else 0.0) * t
+        sx, sy = HOOD_SLUMP[k]
+        lx, ly = HOOD_LEAN[k]
+        cx, cy = cx + sx + lx * t, cy + sy + ly * t
         ring = []
         for i in range(len(HOOD_DEG)):
             a = math.radians(HOOD_DEG[i])
-            r = radii[i] * squeeze
-            z = zb + HOOD_SHARE[k] * lift + tilt * (0.5 + 0.5 * math.cos(a))
+            z = (zb + HOOD_SHARE[k] * lift
+                 + tilt * (0.5 + 0.5 * math.cos(a))
+                 - SCOOP_Z[k] * HOOD_SCOOP[i])
+            r = (radii[i] * squeeze
+                 + CREST_AMP * HOOD_CREST[i] * CREST_Z[k] * (1.0 + 0.30 * t)
+                 - SCOOP_R[k] * HOOD_SCOOP[i]
+                 + _hood_swell(a, z))
             ring.append((cx + r * math.cos(a), cy + r * math.sin(a), z))
         out.append(ring)
     return out
+
+
+def _hood_apex(lift):
+    """The point. It is not over the cowl and it never was meant to be."""
+    t = lift / LIFT_FULL
+    return (HOOD_APEX[0] + APEX_DRAW[0] * t,
+            HOOD_APEX[1] + APEX_DRAW[1] * t,
+            HOOD_APEX[2] + lift)
 
 
 def _hood_surface(rings, deg, t):
@@ -683,22 +811,35 @@ def _accents(s, body, lk, rings):
                   lk["glint"], body, 4)
 
 
-def _cowl(s, body, lk):
-    """A point, a fall and an off-centre opening -- the brief's three
-    requirements, and none of them survives a revolution. The bottom ring
-    carries the shoulder break; the apex overhangs forward and to the +X side;
-    the chute runs down the BACK; the opening sits at 62 degrees while the
-    cowl's own narrowest bearing is 72."""
+def _cowl_shell(s, body, lk):
+    """The cowl's own closed surface: the loft and the point it closes to, and
+    nothing else. It is separated out because it is the thing that has to stand
+    up to `cowl_rotation_test` ALONE -- the chute and the lip plates below are
+    real geometry and they do move the outline, but a cowl that only passes
+    with them attached is still a cone with decoration on it, which is exactly
+    how a cone got past the whole-model test."""
     lift = lk["height"] - HEIGHT_BASE
     rings = _hood_rings(lift)
     _shell(s, "cowl", rings, lk["cowl"], lk["cowl_fold"], HOOD_FOLD, body)
 
-    # The point. A fan onto a single apex vertex -- not a dome, not a ball.
-    apex = (HOOD_APEX[0], HOOD_APEX[1], HOOD_APEX[2] + lift)
+    # The point. A fan onto a single apex vertex -- not a dome, not a ball, and
+    # NOT over the middle of the ring it springs from.
+    apex = _hood_apex(lift)
     top = rings[-1]
     verts = [apex] + list(top)
     faces = [(0, 1 + i, 1 + (i + 1) % len(top)) for i in range(len(top))]
     s.add(td.Mesh("cowl_point", verts, faces, lk["cowl"], body))
+    return rings, lift
+
+
+def _cowl(s, body, lk):
+    """A point, a fall and an off-centre opening -- the brief's three
+    requirements, and none of them survives a revolution. The bottom ring
+    carries the shoulder break; the point is carried OFF the axis by APEX_DRAW,
+    so at a5 it overhangs the top ring's centre by 0.20 against 0.21 of rise;
+    the fall down the back is the crest plus the chute; the opening sits at 62
+    degrees while the cowl's own narrowest bearing is 72."""
+    rings, lift = _cowl_shell(s, body, lk)
 
     # The chute: cloth falling off the point down the back, two segments so it
     # bends. It is the single biggest thing keeping the rear silhouette from
@@ -1055,6 +1196,25 @@ def rotation_test(model):
                               and worst_m < IOU_MIRROR_MAX)
 
 
+# THE SECOND GATE, and it exists because the first one was not enough.
+#
+# The whole-model test above is dominated by the robe: the train is most of the
+# outline from most bearings, so siphon-a5 scored a comfortable 0.75 / 0.71
+# while the thing sitting on top of the shoulders was, measured on its own,
+# 0.925 / 0.870 -- a cone. At close range the cowl IS the read, and "the whole
+# passes" is not an answer to "that part is a witch hat".
+#
+# So every part big enough to carry the silhouette on its own gets tested on
+# its own. This one runs the identical rasteriser and the identical thresholds
+# over the cowl shell and its point, with the chute, the lip and the void
+# removed -- decoration must not be able to launder the form underneath it.
+def cowl_rotation_test(tier, flat=False):
+    lk = LOOKS[tier]
+    s = td.Scene(palette(flat))
+    _cowl_shell(s, s.node("body", parent=s.node("root")), lk)
+    return rotation_test(td.build(s, "siphon-cowl-" + tier))
+
+
 # --- the socle's other invariants, also checked rather than trusted ----------
 
 def _extent(model, group=None):
@@ -1151,8 +1311,9 @@ def main():
     total = 0
     base_rad = None
     exported = {}
-    print("  %-12s %5s %6s %6s  %-7s %-7s %s"
-          % ("model", "tris", "height", "radius", "quarter", "mirror", "360"))
+    print("  %-12s %5s %6s %6s  %-7s %-7s  %-7s %-7s %s"
+          % ("model", "tris", "height", "radius", "quarter", "mirror",
+             "cowl q", "cowl m", "360"))
     for tier in TIERS:
         model, _scene, origins = build_body(tier, flat)
         lo, hi, rad = audit(tier, model, origins)
@@ -1166,13 +1327,19 @@ def main():
             raise SystemExit("siphon-%s FAILED the 360 test: quarter %.2f, "
                              "mirror %.2f -- it is a surface of revolution, "
                              "rebuild it" % (tier, q, m))
+        cq, cm, cok = cowl_rotation_test(tier, flat)
+        if not cok:
+            raise SystemExit("siphon-%s COWL FAILED the 360 test on its own: "
+                             "quarter %.2f, mirror %.2f -- the model passes "
+                             "and the head is still a cone, rebuild the cowl"
+                             % (tier, cq, cm))
         td.write_js(model, "siphon-%s.js" % tier)
         total += model["triangles"]
         exported[tier] = ("RING" if LOOKS[tier]["sceptre"] else "HANDS",
                           origins["RING"] if LOOKS[tier]["sceptre"]
                           else origins["HANDS"])
-        print("  siphon-%-5s %5d %6.3f %6.3f  %-7.2f %-7.2f %s"
-              % (tier, model["triangles"], hi[2], rad, q, m, "PASS"))
+        print("  siphon-%-5s %5d %6.3f %6.3f  %-7.2f %-7.2f  %-7.2f %-7.2f %s"
+              % (tier, model["triangles"], hi[2], rad, q, m, cq, cm, "PASS"))
 
     print("  %d models, %d triangles total" % (len(TIERS), total))
     print("  footprint %.1f u.l. = radius %.4f, IDENTICAL at every tier; the "
@@ -1181,6 +1348,10 @@ def main():
     print("  360 test: %d yaws x 2 elevations (0 and 35 deg), worst IoU at a "
           "quarter turn must stay under %.2f (a cone scores 1.00)"
           % (YAWS, IOU_QUARTER_MAX))
+    print("  the same test is run a SECOND time on the cowl shell and its "
+          "point ALONE, because the robe's train was hiding a witch hat: the "
+          "a5 cowl measured 0.925 / 0.870 on its own while siphon-a5 as a "
+          "whole measured 0.75 / 0.71")
 
     print("  BEAM ORIGINS, measured off the built geometry -- the beam lot "
           "READS these, it never retypes them:")
