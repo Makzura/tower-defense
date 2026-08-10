@@ -672,6 +672,64 @@ var BlubFXHealth = (function () {
 //     +   if (typeof BlubFXHealth !== "undefined") BlubFXHealth.reset();
 //
 //
+// ---------------------------------------------------------------------------
+// VERIFIED, IN THE RUNNING GAME. Not by intent -- by rendered pixels.
+//
+// The three edits above were applied to a COPY of gl-world.js outside the game
+// folder and the copy was hot-loaded over the live page, so nothing this
+// session does not own was touched. The copy is reproducible from
+// `visual-pass/tmp/make-gl-world-hp.py`; the diff it produces is
+// `visual-pass/tmp/gl-world-hp.patch`, twelve added lines.
+//
+// Conditions for every number in this file: viewport 1278 x 719, game default
+// camera (target 640/360, distance 2021.363, pitch 0.5945, yaw -pi/2), map
+// rune-circuit. That configuration reproduces Revue 1's blub1 box of 13 x 15
+// px exactly, which is how it was confirmed to be the same scale the review
+// measured at -- `drawWorld` calls `resize()` every frame, so a viewport that
+// is not cited is a measurement that cannot be compared.
+//
+// Captures, all opened and judged:
+//   S8-blub1-ladder-12x    five blub1 at 100/75/50/20/5%, real pixels at 12x
+//   S8-mini2-ladder-12x    the same for the hardest case, and IT IS THE WEAK
+//                          ONE. A Mini renders 12 x 10 px and is ALREADY wider
+//                          than tall at full charge (aspect 1.20), so it has
+//                          almost no room to flatten: the ladder runs 1.20 ->
+//                          1.44 with no inversion to catch the eye, and opened
+//                          at 12x the five bodies are hard to tell apart. Said
+//                          plainly rather than averaged away. What saves it in
+//                          play is that a Mini Blub II spends twelve charges at
+//                          3/s -- it crosses the whole ladder in four seconds,
+//                          so it is read as a body that is visibly changing
+//                          rather than as a pose to be classified. It is still
+//                          the place this effect is thinnest.
+//   S8-hungry-ladder-7x    the exception, and it reads: 37 x 32 fresh ->
+//                          43 x 46 spent, aspect 1.16 -> 0.93. It crosses from
+//                          wider-than-tall to taller-than-wide while blub1
+//                          crosses the other way, which is the contradiction
+//                          the brief asks to be obvious.
+//   S8-field-mixed-hp      160 bodies, mixed hp, true game scale
+//   S8-field-flat-noHP     the identical board with pose() neutered -- the
+//                          control, and the two side by side are what shows
+//                          the carpet: in the control the crowd is one
+//                          silhouette repeated at one facing.
+//
+// Invariants, asserted in the page rather than argued:
+//   read-only        1000 pose() calls on a live blub changed no field of it
+//   deterministic    a body's variation survives reset(), and a FRESH body
+//                    built at the same point gets the identical pose
+//   variation        160 bodies spread 102 degrees of resting facing
+//   engaged          a resting yaw of -0.765 rad collapses to -0.039 within
+//                    0.8 s of the body acquiring a target
+//
+// COST, measured on the 160-body field: 0.0385 ms per frame for all 160
+// bodies (0.24 microseconds each), 0.1 ms once to seed 160 fresh records.
+// That is 0.23% of the 16.67 ms frame PERF.md budgets. It adds NO draw call,
+// NO GL state change and NO steady-state allocation -- the whole patch changes
+// one element of a matrix that was being built anyway. Whole-frame GPU deltas
+// were inside the noise of the machine and are not quoted, because on this
+// box they could not be resolved.
+//
+//
 // WHAT IS STILL DARK AFTER ALL FOUR. `pose().tint` is computed and returned and
 // nothing can consume it: the shader multiplies no per-instance colour, and
 // `setGlow` only reaches vertices whose material carries emission -- which the

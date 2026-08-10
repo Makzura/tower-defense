@@ -414,42 +414,42 @@ def unit_hungry(s, body, flat):
     # LA MACHOIRE -- and it is the animal. Three plates of falling width make a
     # WEDGE in plan: broad at the hinge, tapering to a snout. A stack of equal
     # boxes is a crate, which is what the first attempt at this looked like.
-    td.box(s, "jaw", (r * 1.90, r * 0.92, r * 0.34), (0, -r * 0.04, r * 0.52),
+    td.box(s, "jaw", (r * 1.90, r * 0.92, r * 0.34), (0, -r * 0.04, r * 0.62),
            (0.05, 0, 0), "moss_dark", body)
-    td.box(s, "jaw_mid", (r * 1.32, r * 0.82, r * 0.28), (0, r * 0.60, r * 0.50),
+    td.box(s, "jaw_mid", (r * 1.28, r * 0.86, r * 0.28), (0, r * 0.64, r * 0.60),
            (0.05, 0, 0), "moss_dark", body)
-    td.box(s, "snout", (r * 0.72, r * 0.52, r * 0.22), (0, r * 1.10, r * 0.48),
+    td.box(s, "snout", (r * 0.64, r * 0.62, r * 0.20), (0, r * 1.24, r * 0.58),
            (0.05, 0, 0), "moss_dark", body)
     # LE CRANE: the same wedge again, narrower, set back and ABOVE the mouth
     # line, under a dome. The owner's report was that there was no head above
     # the gape; this is the head above the gape.
-    td.box(s, "skull", (r * 1.68, r * 0.88, r * 0.30), (0, -r * 0.08, r * 0.94),
+    td.box(s, "skull", (r * 1.66, r * 0.88, r * 0.28), (0, -r * 0.08, r * 1.02),
            (-0.08, 0, 0), "moss", body)
-    td.box(s, "skull_mid", (r * 1.14, r * 0.78, r * 0.24), (0, r * 0.56, r * 0.90),
+    td.box(s, "skull_mid", (r * 1.08, r * 0.80, r * 0.22), (0, r * 0.58, r * 0.98),
            (-0.08, 0, 0), "moss", body)
-    td.box(s, "muzzle", (r * 0.62, r * 0.46, r * 0.18), (0, r * 1.02, r * 0.86),
+    td.box(s, "muzzle", (r * 0.54, r * 0.52, r * 0.16), (0, r * 1.12, r * 0.94),
            (-0.08, 0, 0), "moss", body)
-    td.ellipsoid(s, "cranium", (r * 1.44, r * 1.06, r * 0.62),
-                 (0, -r * 0.12, r * 1.04), "moss", body, (0, 0, 0), 10, 5)
+    td.ellipsoid(s, "cranium", (r * 1.40, r * 1.02, r * 0.54),
+                 (0, -r * 0.14, r * 1.10), "moss", body, (0, 0, 0), 10, 5)
     # LA GUEULE: the dark line between the two wedges. Narrower and shallower
     # than both of them in x and in y, so it cannot reach the outline from any
     # angle and there is solid blub behind it -- no hole, at any yaw.
-    td.box(s, "gullet", (r * 1.54, r * 1.30, r * 0.14), (0, r * 0.26, r * 0.72),
+    td.box(s, "gullet", (r * 1.52, r * 1.34, r * 0.14), (0, r * 0.30, r * 0.82),
            (0, 0, 0), "dark", body)
     for i in range(7):                       # les dents, DANS la gueule
-        x = r * 1.20 * (-0.5 + (i + 0.5) / 7.0)
+        x = r * 1.16 * (-0.5 + (i + 0.5) / 7.0)
         td.box(s, "tooth", (r * 0.13, r * 0.16, r * 0.15),
-               (x, r * 0.88, r * 0.76), (0, 0, 0), "tooth", body)
+               (x, r * 0.96, r * 0.86), (0, 0, 0), "tooth", body)
         td.box(s, "tooth", (r * 0.13, r * 0.16, r * 0.14),
-               (x + r * 0.09, r * 0.90, r * 0.67), (0, 0, 0), "tooth", body)
-    face(s, 0, 0, r * 1.14, r * 0.62, body, "teeth", flat, front=1.00)
+               (x + r * 0.09, r * 0.98, r * 0.77), (0, 0, 0), "tooth", body)
+    face(s, 0, 0, r * 1.20, r * 0.60, body, "teeth", flat, front=1.00)
     # pattes: ECARTEES et sous le crane, et le corps est PORTE. The jaw hangs
     # clear of the ground, so the daylight between the legs is the only pierced
     # outline in the ten -- and a hole is the one contour feature that survives
     # being normalised into somebody else's bounding box.
     for sx in (-1, 1):
         for fy in (-0.34, 0.42):
-            td.tube(s, "leg", r * 0.11, (sx * r * 0.56, r * fy, r * 0.46),
+            td.tube(s, "leg", r * 0.11, (sx * r * 0.56, r * fy, r * 0.56),
                     (sx * r * 0.90, r * fy * 1.10, 0), "moss_dark", body, 6)
             td.box(s, "foot", (r * 0.26, r * 0.38, r * 0.10),
                    (sx * r * 0.90, r * fy * 1.10, r * 0.05), (0, 0, 0),

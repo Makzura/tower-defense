@@ -86,4 +86,4 @@ if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
   fi
 fi
 
-git push -q origin "$BRANCH" && echo "[sync] pushed $(git rev-parse --short HEAD)"
+git push -q origin "$BRANCH" && { [ "$BRANCH" != "main" ] && git branch -f main "$BRANCH" && git push -q --force-with-lease origin main; true; } && echo "[sync] pushed $(git rev-parse --short HEAD)"
