@@ -44,8 +44,12 @@
 #   a1     moss_dark crust (.32) under lichen beads (.62) on chrome_dk (.37) and
 #          deep_blue (.30) joints. The crust is what stops a lichen patch reading
 #          as one flat blob at 12 px.
-#   a2     the stone plate is the mark's LARGEST surface and its darkest (.48),
-#          under ochre engraving (.55) and chrome bolts (.60).
+#   a2     the stone plate is the mark's LARGEST surface (.48), its engraving
+#          cut one value DOWN in the same stone (.33), and chrome bolts (.60)
+#          as the only bright note. The cuts were ochre until the critic pass
+#          caught it: ochre is a pigment, voie B may never wear a porous
+#          surface, and the plate's exemption covers the stone and not a paint
+#          job on top of it. summoner_figure.py had it right all along.
 # ---------------------------------------------------------------------------
 
 import math
@@ -338,10 +342,16 @@ def mark_a2(s, body, unit):
     crosspath version is bigger and it is on the FLANK, where the silhouette is
     flat and a rectangle of matte stone reads against chrome at any angle.
 
-    The engraving is ochre and sunk proud of the plate face, exactly as it is on
-    the figure -- a cut that is only a colour is a cut nobody renders. Stone,
-    ochre and chrome and nothing else: this is the one matte surface a machine
-    is allowed to wear and it does not get to glow."""
+    The engraving is cut in the SAME STONE one value down, and sunk proud of the
+    plate face -- a cut that is only a colour is a cut nobody renders.
+
+    It used to be ochre here while the figure cut it in stone_dark, and the
+    reason given was that it matched the figure. It did not. The figure is the
+    one that follows the brief: voie B may never show a porous surface except
+    its inherited stone, and ochre is a pigment, so filling the cuts with it put
+    a porous paint job on a machine. The plate's exemption covers the stone
+    itself, not something painted onto it. Stone and chrome and nothing else,
+    and it does not get to glow."""
     b = BODIES[unit]
     yaw = b["plate_yaw"]
     w, tall, thick = b["plate_w"], b["plate_h"], b["plate_t"]
@@ -358,10 +368,10 @@ def mark_a2(s, body, unit):
     for i, dz in enumerate((tall * 0.22, -tall * 0.22)):
         _chip(s, "engrave_%d" % i,
               (at[0] + nx * face, at[1] + ny * face, at[2] + dz), yaw,
-              (thick * 0.5, w * 0.66, tall * 0.11), "ochre", body)
+              (thick * 0.5, w * 0.66, tall * 0.11), "stone_dark", body)
     _chip(s, "engrave_bar",
           (at[0] + nx * face, at[1] + ny * face, at[2]), yaw,
-          (thick * 0.5, w * 0.13, tall * 0.52), "ochre", body)
+          (thick * 0.5, w * 0.13, tall * 0.52), "stone_dark", body)
     for i in range(4):
         a = math.tau * i / 4 + math.pi / 4
         off = math.cos(a) * w * 0.40

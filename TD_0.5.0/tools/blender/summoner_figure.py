@@ -485,7 +485,13 @@ POSES = {
 def _seats(tier):
     p = POSES[tier]
     hip = _lerp(p["pelvis"], p["chest"], 0.16)
-    lx, ly, _ = _norm(p["look"])
+    # The HORIZONTAL projection of the look, normalised on its own. Normalising
+    # the full 3-D vector made the lateral offset 0.235 * hypot(lx, ly), so a
+    # steeply-pitched pose kept almost none of it -- a5 looks (0.1, 0.42, -0.9)
+    # and got 0.102, which buried more than half the grimoire inside the torso.
+    # The seat is a position ON the hip, so only the ground-plane direction of
+    # the body can decide which side of it the book hangs from.
+    lx, ly, _ = _norm((p["look"][0], p["look"][1], 0.0))
     return {
         "circle": (0.0, 0.0, 0.0),                       # a1: the ground ring
         "hip": (hip[0] + 0.235 * ly, hip[1] - 0.235 * lx, hip[2] - 0.02),
@@ -859,7 +865,11 @@ def mark_b2(s, body, fixed):
            (0, 0, 0.30), "cyan_dim", body)
     td.box(s, "hud_tick", (0.050, 0.016, 0.018), (-0.072, 0.188, 0.046),
            (0, 0, 0.30), "cyan", body)
-    td.ball(s, "hud_emitter", 0.030, (-0.128, 0.075, 0.100), "white_hot", body,
+    # CYAN, not white_hot. b2 is a path B crosspath mark, so it is worn by the
+    # path A bodies -- and the brief's only exemption to "la Voie A ne doit
+    # jamais emettre de lumiere froide" is the CYAN of the b1/b2 marks.
+    # white_hot was the brightest cold light in the palette and sat outside it.
+    td.ball(s, "hud_emitter", 0.030, (-0.128, 0.075, 0.100), "cyan", body,
             5, 3)
     td.ball(s, "temple_lichen", 0.030, (0.122, 0.030, 0.075), "lichen", body,
             5, 3)
