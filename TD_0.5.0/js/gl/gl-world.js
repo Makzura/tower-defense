@@ -429,6 +429,32 @@ var World3D = (function () {
     return out;
   }
 
+  // WHICH WAY IS FORWARD ON A MODEL, and a correction that should not be
+  // permanent.
+  //
+  // The game's convention is FORWARD = +X. anchorWorld proves it: with
+  // pt = [forward, side, height] it computes
+  //   x = tower.x + (cos(aim) * pt[0] - sin(aim) * pt[1]) * k
+  // so at aim 0 the forward component lands on +X. Every Blender-authored model
+  // (sniper, rifleman, recruits, the four enemies) follows that.
+  //
+  // The models authored during the visual pass do not. tower_summoner.py puts
+  // every face on +Y (`fy = cy + r * 0.80`), and SIPHON-SOCLE.md states
+  // "+Y = devant" -- which propagated the same error into the Siphon lots. The
+  // symptom is the one the owner reported: a blub turning to attack faces
+  // ninety degrees off its target.
+  //
+  // Correcting it HERE rather than in the geometry is a stopgap, taken because
+  // five agents currently own those build scripts and editing them underneath
+  // would collide. The real fix is to author front on +X and delete this
+  // function; until then this keeps the board correct and keeps the mistake in
+  // one visible place instead of spread through the draw path.
+  var FRONT_PLUS_Y = /^(blub-|summoner-|siphon-)/;
+
+  function authoredFrontOffset(model) {
+    return (model && FRONT_PLUS_Y.test(model)) ? -Math.PI / 2 : 0;
+  }
+
   function towerModel(tower) {
     if (!tower) return null;
     if (tower.isSummon) {
@@ -855,6 +881,7 @@ var World3D = (function () {
         // A full-circle Warbringer has stopped tracking (see
         // warbringerFullCircle) and is drawn at its authored facing forever.
         var drawYaw = warbringerFullCircle(t) ? 0 : (t.aim || 0);
+        drawYaw += authoredFrontOffset(model);
         renderer.setGlow(towerGlow(t), towerGlowTint(t));
         var tz = groundHeightAt(t.x, t.y);
         // A SUMMONED BODY ARRIVES FROM ABOVE, AND THE MACHINES SHOVE BACK.
