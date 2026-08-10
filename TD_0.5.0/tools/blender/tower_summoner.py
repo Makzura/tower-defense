@@ -214,6 +214,14 @@ def _mini_body(s, body, r):
                "moss", body, 10, (0.22, 0, 0))
     td.frustum(s, "maw_up", r * 1.00, r * 0.56, h * 0.34, (0, r * 0.20, h * 0.72),
                "moss", body, 10, (-0.26, 0, 0))
+    # THE THROAT, and it is not decoration. The two jaw halves flare apart, so
+    # without something closing the gap between them you look straight THROUGH
+    # the unit into the board behind it -- the owner's report was that the minis
+    # and the Hungry Blub "are unreadable because they're open from behind".
+    # An open mouth with no throat is a hole, not a mouth. Dark, so the teeth in
+    # front of it read as teeth.
+    td.ellipsoid(s, "throat", (r * 1.32, r * 1.10, h * 0.62), (0, r * 0.02, h * 0.50),
+                 "dark", body, (0, 0, 0), 10, 6)
     teeth_ring(s, 0, r * 0.06, h * 0.44, r, body, 6, r * 0.13)
     teeth_ring(s, 0, r * 0.10, h * 0.62, r, body, 6, r * 0.12)
     for sx in (-1, 1):
@@ -254,6 +262,13 @@ def unit_hungry(s, body, flat):
     # UPPER jaw, hinged well open -- the gape is the silhouette
     td.frustum(s, "jaw_up", r * 1.04, r * 0.40, r * 0.54, (0, r * 0.30, r * 1.06),
                "moss", body, 12, (-0.46, 0, 0))
+    # THE GULLET. Same reason as the minis: a gape this wide with nothing behind
+    # it is a hole through the model, and at 50 px across it was the single most
+    # unreadable thing on the board. Closing it also gives the two teeth rings
+    # something dark to bite against, which is what makes them read as teeth
+    # rather than as white specks.
+    td.ellipsoid(s, "gullet", (r * 1.44, r * 1.16, r * 0.92), (0, r * 0.06, r * 0.72),
+                 "dark", body, (0, 0, 0), 12, 7)
     teeth_ring(s, 0, r * 0.14, r * 0.56, r, body, 8, r * 0.13)
     teeth_ring(s, 0, r * 0.20, r * 0.94, r, body, 8, r * 0.12)
     face(s, 0, -r * 0.30, r * 1.14, r * 0.62, body, "teeth", flat)
