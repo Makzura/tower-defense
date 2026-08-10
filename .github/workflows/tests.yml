@@ -1,0 +1,66 @@
+# The game needs nothing but a browser, and the suites need nothing but Node --
+# no install step, no lockfile, no cache. That is a deliberate property of this
+# project (see the "No software, no toolchain" constraint in AGENTS.md), so this
+# workflow keeps it: checkout, node, run.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Regression gate, not a perfection gate. This project ships with known
+      # failures that predate the checkout; requiring a clean run would make CI
+      # permanently red and therefore ignored. tools/ci-check.js fails only when
+      # failures rise or tests disappear, and reports improvements so the
+      # baseline can be tightened deliberately.
+      - name: Suites against the measured baseline
+        working-directory: TD_0.5.0
+        run: node tools/ci-check.js
+
+  models:
+    # The generated geometry is only trustworthy if it is reproducible. Every
+    # model under js/gl/models/ is emitted by a pure-Python script in
+    # tools/blender/ -- no Blender needed for these ones -- so CI rebuilds them
+    # and fails if the tree moves. That is what stops a hand-edit to a generated
+    # file surviving unnoticed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Rebuild the td_mesh-authored models
+        working-directory: TD_0.5.0/tools/blender
+        run: |
+          python tower_warbringer.py
+          python tower_summoner.py
+          python summoner_figure.py
+          python summoner_creature.py
+          python summoner_unit_marks.py
+          python siphon_idol.py
+          python siphon_abyss.py
+          python siphon_beam.py
+
+      - name: The rebuild must be byte-identical
+        run: |
+          if ! git diff --quiet -- TD_0.5.0/js/gl/models; then
+            echo "Regenerating the models changed the tree."
+            echo "Either a generated file was hand-edited, or a build script is"
+            echo "not deterministic. Both matter: the models are the shipped art."
+            git diff --stat -- TD_0.5.0/js/gl/models
+            exit 1
+          fi
+          echo "All regenerated models are byte-identical."
