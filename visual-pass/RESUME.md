@@ -74,9 +74,19 @@ vein appears at **B3** (where `lifesteal` unlocks) and the Midas gauge is **A5**
 | lot | state |
 |---|---|
 | L2 abyss (b1-b5) | built and reviewed, holds the no-cylinder rule |
-| L3 beam (8 states) | built, **never looked at** |
+| L3 beam (8 states) | built, and now **looked at** — see LOG.md |
 | L1 idol (base, a1-a5) | **FAILED** — see below |
 | L4 ground effects, L5 enemy effects, L6 the B5 sequence | not started |
+
+**The ritual circle renders and its beams now leave it.** Verified on screen,
+captures opened. `plan()` never returned the `.origin` the beam module tested
+for, so every rim anchor and chain assignment was being discarded; the beam
+module now consumes the arms instead. Beam counts confirmed 1/1/2/3/4/5 by B
+tier, chaining confirmed at B5. Two more rig faults were found and fixed first
+(the render clock never advanced under the harness; the 2D canvas was 300x150,
+so the whole overlay layer was painted off the edge of it). Full detail, the
+measurements, and the open visual findings — the cords are much too wide, the
+gesture does not read at true game scale — are in `LOG.md`.
 
 **L1 failed its own validator and refused to write:**
 `siphon-base FAILED the 360 test: quarter 0.88, mirror 0.86 -- it is a surface of
