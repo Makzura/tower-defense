@@ -40,8 +40,8 @@
 #    anywhere else in the game: `attacksPerSecond()` carries the swarm bonus, so
 #    a Mini Blub's 0.333 s becomes 0.238 s with a full fleet around it, and any
 #    animation authored in seconds would be 40 % too long the moment the tower
-#    is played well. `--check` prints the budget it buys: the slowest pose any
-#    unit can hold, at its own rate, with and without a full swarm. See the
+#    is played well. Every build prints the budget it buys -- the slowest pose
+#    any unit can hold, at its own rate, with and without a full swarm. See the
 #    block above `strip_phase` for the exact mapping and the runtime patch.
 #
 # 2. THE SHOT IS THE DISCONTINUITY. Phase 0 is the instant the gob left, so the
@@ -58,9 +58,10 @@
 #    correction into the node's own location, so a group at rest contributes
 #    nothing at all, td_mesh's group-local storage collapses to world space, and
 #    THE VERTICES ON DISK ARE THE ONES THE UN-ANIMATED BUILD WROTE. Not "close
-#    enough": `--check` diffs the animated build's frame 0 against a frames=0
-#    build of the same scene, triangle for triangle, and fails the build on a
-#    single differing coordinate. The three profiles, the maw laid on the head's
+#    enough": `check_rest_pose` diffs the animated build's frame 0 against a
+#    frames=0 build of the same scene, triangle for triangle, and fails the
+#    build on a single differing coordinate -- on every build, not behind a
+#    flag. The three profiles, the maw laid on the head's
 #    curve by radius_at(), the ten footprints and the empty >= 0.85 shape-IoU
 #    family are all properties of frame 0, and this is what makes it arithmetic
 #    rather than a promise that none of them moved.
@@ -439,6 +440,18 @@ def rest(*nodes):
 # `attacksMade` are already what js/blub.js publishes. Nothing else in the draw
 # path changes -- BlubFXShots.recoil keeps its positional kick, which is meant
 # to be seen ON TOP of the MK2's chassis rotation and not instead of it.
+#
+# THIS BLOCK IS A PATCH, NOT A DESCRIPTION, AND IT IS ONE GREP TO CHECK:
+#
+#     grep -c BLUB_CYCLE js/gl/gl-world.js        # 0 means every blub is frozen
+#
+# A blub has neither `gearPhase` nor `swingProgress`, so if the branch above is
+# missing the tower loop leaves `frame` at 0 and all ten of these strips are
+# dead weight on disk -- the models animate perfectly in review and the game
+# shows nothing. There is no visible symptom to notice: a frozen blub looks
+# exactly like a correct rest pose, which is the whole reason frame 0 IS the
+# rest pose. Nine frames on disk and a still board is the failure, and the count
+# above is the only thing that distinguishes it.
 def strip_phase(frame):
     """(band, phase) for a strip frame, or None for the rest frame.
 
@@ -548,15 +561,31 @@ MINI1_BUZZ = [
     (0.07, -0.035, 0.03, -0.06, -0.03),
     (0.13, -0.015, -0.02, -0.12, -0.04),   # the intake
 ]
+
+# MINI II'S ACCENT IS A LUNGE, NOT A TWIST, and that is the correction here.
+# The paragraph above is the design and it was true of Mini I; it was NOT true
+# of these numbers. Measured off the built strip: frame 1 travelled 4.0 px
+# against a buzz floor of 2.0-2.4, and the intake reached 2.2 -- exactly the
+# floor. On the strip (blubverify-mini2-strip) there is no pose you could point
+# at and call the shot. Both accents were invisible inside the shudder, which is
+# the one failure this paragraph exists to prevent.
+#
+# The reason is anatomy, not amplitude. Mini I is a spire, so ROTATION carries
+# it: 0.20 rad about the foot swings a 24 px point through 4 px. Mini II is a
+# slab 12 px tall, and the same rotation moves nothing -- which is why the twin
+# with the same rate, the same footprint and a comparable table came out at half
+# the accent. So Mini II's shot and intake move the body BODILY, on `push`,
+# where its proportion cannot swallow them, and the buzz between them is quieted
+# a little so the floor they stand on is lower.
 MINI2_BUZZ = [
-    (-0.13, 0.010, 0.09, 0.22, 0.07),      # the shot
-    (-0.05, 0.075, -0.08, 0.06, 0.02),
-    (0.05, -0.070, 0.09, -0.07, -0.02),
-    (-0.02, 0.085, -0.07, 0.04, 0.02),
-    (0.04, -0.080, 0.08, -0.06, -0.02),
-    (-0.02, 0.070, -0.09, 0.05, 0.01),
-    (0.05, -0.060, 0.07, -0.07, -0.02),
-    (0.09, -0.020, -0.04, -0.13, -0.03),   # the intake
+    (-0.20, 0.010, 0.03, 0.40, 0.11),      # the shot -- a lunge, 3 px of it
+    (-0.04, 0.060, -0.06, 0.05, 0.02),
+    (0.04, -0.055, 0.06, -0.05, -0.02),
+    (-0.02, 0.065, -0.05, 0.03, 0.02),
+    (0.03, -0.060, 0.06, -0.05, -0.02),
+    (-0.02, 0.055, -0.06, 0.04, 0.01),
+    (0.04, -0.050, 0.05, -0.05, -0.02),
+    (0.15, -0.020, -0.02, -0.30, -0.05),   # the intake -- the only pose back
 ]
 
 
@@ -811,6 +840,24 @@ def unit_hungry(s, body, flat):
                "moss", sac, 10)
     td.frustum(s, "gut_cap", r * 0.32, r * 0.10, r * 0.14, (0, -r * 0.62, r * 0.86),
                "moss", sac, 10)
+    # THE NECK, AND IT IS WHY THE PISTON READS AS A SWELLING AT ALL.
+    #
+    # Reviewed frame by frame (blubverify-hungry-piston) the sac used to come
+    # OFF: the gut's front face sits at -0.18 r and the jaw it slides out of
+    # ends at -0.50 r, so a stroke of 0.43 r opened 0.11 r -- nearly three
+    # screen pixels -- of black sky between the animal and its own stomach at
+    # the two shot frames. It did not read as inflating, it read as a part
+    # falling off, which is worse than no piston at all.
+    #
+    # So the sac gets a shaft that is BURIED at rest and only ever emerges into
+    # the gap it is there to fill. It is strictly inside the union of the gut
+    # (a circle of ~0.37 r about y = -0.62 r at this height) and the jaw
+    # (|x| <= 0.95 r, y in [-0.50, 0.42], z in [0.45, 0.79]), so it contributes
+    # NOTHING to the frame-0 silhouette the revue measured -- verified by
+    # differential, not asserted: hungry's mask is the same 34 x 31 box and the
+    # same area before and after, and all 45 pair IoUs are unchanged.
+    td.box(s, "gut_neck", (r * 0.48, r * 0.75, r * 0.24),
+           (0, -r * 0.325, r * 0.62), (0, 0, 0), "moss", sac)
     # LA MACHOIRE -- and it is the animal. Three plates of falling width make a
     # WEDGE in plan: broad at the hinge, tapering to a snout. A stack of equal
     # boxes is a crate, which is what the first attempt at this looked like.
@@ -874,6 +921,12 @@ def unit_hungry(s, body, flat):
     # The piston: out on the shot, drawn flush again as it reloads, and PAST
     # flush -- sucked in -- on the intake, so the swell has something to swell
     # from. Same past-neutral rule as every other unit here.
+    #
+    # The stroke is unchanged; what changed is that `gut_neck` now spans it, so
+    # the sac stays part of the animal at full extension. The RISE is what came
+    # down -- 0.30 lifted the shaft clean out of the jaw's own z band before the
+    # cranium could cover it, and the swell was never in the height anyway: it
+    # is 0.43 r of length off the back of a thing 2.3 r long.
     PUMP = [(0.00, 0.44), (0.14, 0.48), (0.34, 0.24), (0.55, 0.10),
             (0.78, -0.06), (1.00, -0.15)]
 
@@ -888,7 +941,7 @@ def unit_hungry(s, body, flat):
                   keys(t, LOB_LIFT) * 0.60 * r))
         k = keys(t, PUMP)
         set_pose(sac, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0),
-                 (0.0, -k * 0.90 * r, k * 0.30 * r))
+                 (0.0, -k * 0.90 * r, k * 0.18 * r))
     return pose
 
 
@@ -992,10 +1045,28 @@ def unit_mecha(s, body, flat):
     # ejected casings are blub-projectiles' job and are deliberately not here:
     # a casing baked into the mesh would fly on a fixed path whatever the
     # unit's facing, and it would still be flying with the unit dead.
-    NOD = [(0.00, 0.09), (0.12, 0.12), (0.30, -0.03), (0.50, 0.01),
-           (0.70, 0.00), (0.88, -0.02), (1.00, -0.05)]
+    #
+    # THE BRACE, and it is a correction. Reviewed frame by frame at 30 px
+    # (blubverify-mecha-strip) the first version of these two curves put FIVE of
+    # the eight poses inside 1.6 px of rest -- f4 through f8, 200 ms of a 400 ms
+    # interval in which the machine was a photograph -- and then jumped 9.4 px
+    # into the recoil with nothing in front of it. Measured off the built strip,
+    # not judged: max vertex travel from rest ran 9.4, 10.3, 4.1, 1.5, 0.6, 0.2,
+    # 0.6, 1.6 px. A coil of 1.6 against a release of 9.4 is not the file's
+    # "coils past neutral on the intake", it is a decay to zero, and it is the
+    # one unit here that failed its own rule.
+    #
+    # The release is untouched -- phase 0 and the 0.10/0.12 extreme are the same
+    # numbers -- because the recoil itself always read. What is new is the back
+    # half: a counter-nod at 0.30/0.48, then the hull settles ONTO ITS FRONT
+    # FOOT and the barrels creep out past neutral, so the last two poses before
+    # the shot are a machine leaning into the round it is about to fire. The
+    # rebound is now roughly two thirds of the release, which is the ratio the
+    # three Blubs have always had.
+    NOD = [(0.00, 0.09), (0.12, 0.12), (0.30, -0.05), (0.48, 0.02),
+           (0.66, -0.02), (0.84, -0.07), (1.00, -0.13)]
     RUN = [(0.00, -0.16), (0.10, -0.18), (0.28, -0.07), (0.46, -0.01),
-           (0.64, 0.00), (0.86, 0.02), (1.00, 0.05)]
+           (0.64, 0.03), (0.84, 0.09), (1.00, 0.16)]
 
     def pose(frame):
         ph = strip_phase(frame)
@@ -1061,12 +1132,22 @@ def unit_mecha2(s, body, flat):
     # cycle behind the hull, at nearly double the amplitude, so they are still
     # swinging when the chassis has settled. Nothing else in the file is left
     # moving after its cause has stopped.
-    NOD = [(0.00, 0.13), (0.11, 0.17), (0.28, -0.05), (0.46, 0.02),
-           (0.64, 0.00), (0.86, -0.04), (1.00, -0.08)]
-    SHOVE = [(0.00, -0.17), (0.11, -0.20), (0.28, 0.05), (0.46, -0.02),
-             (0.64, 0.00), (0.86, 0.04), (1.00, 0.08)]
+    #
+    # Same correction as the Mechablub above, and for the same measured reason:
+    # f5 and f6 came out 1.7 and 0.5 px from rest on a body 68 px wide, and the
+    # deepest pose of the wind-up reached 4.2 px against a 19.8 px release. On
+    # the strip (blubverify-mecha2-windup) f6 and f7 are the rest pose and f8 is
+    # a hair off it. So the tail of all three curves is deepened until the MK2
+    # visibly HAULS ITSELF FORWARD to reload -- 0.17 r of shove is under seven
+    # pixels, against the eight it slams back on the shot -- and the tanks, which
+    # are driven by the difference of NOD across an eighth of a cycle, get a
+    # bigger swing everywhere for free.
+    NOD = [(0.00, 0.13), (0.11, 0.17), (0.28, -0.06), (0.46, 0.03),
+           (0.64, -0.02), (0.84, -0.09), (1.00, -0.15)]
+    SHOVE = [(0.00, -0.17), (0.11, -0.20), (0.28, 0.06), (0.46, -0.03),
+             (0.64, 0.02), (0.84, 0.10), (1.00, 0.17)]
     RUN = [(0.00, -0.20), (0.09, -0.23), (0.26, -0.09), (0.44, -0.02),
-           (0.62, 0.00), (0.86, 0.02), (1.00, 0.05)]
+           (0.62, 0.02), (0.84, 0.07), (1.00, 0.12)]
     LAG = 0.125
 
     def pose(frame):
