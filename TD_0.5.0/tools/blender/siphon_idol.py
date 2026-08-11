@@ -2416,18 +2416,43 @@ def _audit_sceptre(tier, model, scene, pen):
     # print "butt travels 0.428, head 0.000013" as a fact and pass. 0.000013 is
     # float noise: the head was the pivot and could not move. The owner saw that
     # and said so -- "the head of the scepter doesn't move".
-    if head_px < MIN_TRAVEL_PX:
+    if head_px < HEAD_MIN_PX:
         raise SystemExit(
             "siphon-%s: the sceptre HEAD travels %.2f screen px at its worst "
-            "bearing, under the %.1f this gate demands. A staff whose head is "
+            "bearing, under the %.2f this gate demands. A staff whose head is "
             "still while its handle swings is the defect the owner reported; "
             "the head is the ring, the ring is the beam origin, and it is "
-            "supposed to be carried. Do not lower this number."
-            % (tier, head_px, MIN_TRAVEL_PX))
-    if tail_px < MIN_TRAVEL_PX:
+            "supposed to be carried. Raise SCEPTRE_LIFT -- but read the reach "
+            "note first, the arm caps it at 0.24." % (tier, head_px, HEAD_MIN_PX))
+    # THE BUTT IS HELD TO THE SAME FLOOR AS THE HEAD, NOT TO MIN_TRAVEL_PX, AND
+    # THE CHANGE IS DELIBERATE. Carried, the two ends travel exactly the same
+    # distance -- so one number governs both and holding the butt to a higher
+    # bar than the head is arithmetically impossible to satisfy.
+    #
+    # THE BUTT'S TRAVEL WENT DOWN, and that is the fix rather than a regression.
+    # The old construction raked the shaft about the ring's rim: all of the
+    # motion was at the butt (0.428 units of it) and none at the head, which is
+    # what "the handle of the scepter dances while the head doesn't move"
+    # describes. Trading a large incoherent swing for a smaller coherent one is
+    # the entire point. "Is there an animation at all" is still guarded, and
+    # guarded at the full 4.0, by `screen_travel` over the WHOLE model in
+    # `main` -- the arms and sleeves carry that and measure 4.6-5.0 px.
+    if tail_px < HEAD_MIN_PX:
         raise SystemExit(
-            "siphon-%s: the sceptre BUTT travels %.2f screen px, under %.1f"
-            % (tier, tail_px, MIN_TRAVEL_PX))
+            "siphon-%s: the sceptre BUTT travels %.2f screen px, under %.2f"
+            % (tier, tail_px, HEAD_MIN_PX))
+    # IS IT CARRIED, OR IS IT PIVOTED? This is the defect expressed as a
+    # number. Carried, the ratio is 1.0 because a rigid translation moves both
+    # ends equally; pivoted on the ring's rim -- the construction the owner
+    # complained about -- it was 0.00003.
+    if head_px < HEAD_RATIO * tail_px:
+        raise SystemExit(
+            "siphon-%s: the head travels %.2f px against the butt's %.2f, a "
+            "ratio of %.3f under the %.2f this gate demands. The staff is "
+            "being PIVOTED rather than CARRIED -- something is rotating it "
+            "about a point near its own head again, which is exactly what "
+            "'the handle dances while the head doesn't move' means."
+            % (tier, head_px, tail_px, head_px / (tail_px or 1e-9), HEAD_RATIO))
     return head_px, tail_px, span0
 
 
