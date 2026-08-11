@@ -650,7 +650,17 @@ var TowerPreview3D = (function () {
   // has fired, and a listener that only ever waits for an event already in the
   // past is a listener that is never attached.
   function bindContextEvents() {
-    var c = document.getElementById("gl");
+    // A BROWSER RETURNS NULL FOR A MISSING ELEMENT. tests/sandbox.smoke.js does
+    // not: its DOM stub THROWS on an id it has no stub for, and it has none for
+    // "#gl" because the smoke test drives the 2D board. That turned a load-time
+    // convenience into a crash that took the whole suite down -- it stopped
+    // reporting a summary line at all, which is how ci-check caught it.
+    //
+    // Nothing here is required for the module to work; losing the listeners
+    // only costs a cache flush on a context loss, so failing to attach them
+    // must never be fatal.
+    var c = null;
+    try { c = document.getElementById("gl"); } catch (e) { return; }
     if (!c || c.__towerPreviewBound) return;
     c.__towerPreviewBound = true;
     c.addEventListener("webglcontextlost", function () {
