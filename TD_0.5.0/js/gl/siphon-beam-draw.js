@@ -1626,8 +1626,49 @@ var SiphonFXBeam = (function () {
     VERSION: VERSION,
     draw: draw,
     reset: reset,
+    // THE ONE PLACE THE SIPHON'S ANIMATION FRAME IS DERIVED. gl-world.js calls
+    // this from its tower loop and this module calls it from the overlay pass.
+    // gl-world deliberately holds NO fallback copy of the formula: if this
+    // module is missing it draws frame 0 and the body simply does not animate,
+    // because a fallback copy is exactly the duplication this export removes.
+    animFrame: animFrame,
     // Exposed for review and for the harness; nothing in the game calls them.
     stateFor: stateFor,
-    originPoint: originPoint
+    originPoint: originPoint,
+    // Is the per-frame origin table actually driving this tower, or is it the
+    // static HANDS/RING fallback? A test that cannot tell the two apart is not
+    // a test -- with the table absent the picture is plausible either way.
+    originAnimated: originAnimated,
+    bodyKey: bodyKey,
+    // Every table/model frame-count disagreement and every key miss seen so
+    // far, so a review can assert the list is empty instead of reading the
+    // console.
+    mismatches: mismatches,
+    // ---- occlusion, for review ---------------------------------------------
+    // The predicate itself, and a flag to force it off. The flag is the point:
+    // the only scene-invariant way to prove occlusion is to render the SAME
+    // frame twice and diff, and deleting the blocking tower makes the two
+    // frames differ by a whole tower instead. It is a module-level boolean read
+    // once per cord, so it costs nothing per frame.
+    occluded: occluded,
+    setOcclusion: function (on) { occlusionOn = !!on; return occlusionOn; },
+    occlusion: function () { return occlusionOn; },
+    // The capsules built for the last frame drawn, and the per-sample
+    // visibility of the last cord drawn -- so a review can aim a pixel probe at
+    // a sample that is genuinely meant to be hidden rather than guessing.
+    occluders: function () { return occ.slice(0, occN); },
+    lastSpans: function () {
+      var out = [], n = nS;
+      eachSpan(0, n - 1, function (a, b) { out.push([a, b]); });
+      return { n: n, visible: visN, spans: out };
+    },
+    lastSamples: function () {
+      var out = [];
+      for (var i = 0; i < nS; i++) {
+        out.push({ i: i, x: sx[i], y: sy[i], depth: sd[i], z: sz[i],
+                   hw: hw[i], vis: sv[i] });
+      }
+      return out;
+    }
   };
 })();

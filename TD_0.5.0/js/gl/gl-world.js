@@ -975,20 +975,31 @@ var World3D = (function () {
         // failure the blubs had, and just as invisible, because frame 0 is the
         // rest pose. There is no per-shot cooldown to index either: the beam is
         // continuous by design and the brief forbids an attack pulse. So the
-        // phase comes from a clock, and only while it actually holds a lock.
-        //
-        // Off the lock it eases back to rest rather than snapping, because a
+        // phase comes from a clock, and only while it actually holds a lock;
+        // off the lock it EASES back to rest rather than snapping, because a
         // hard cut to frame 0 is exactly the "strike" read the brief rules out.
+        //
+        // THE ARITHMETIC USED TO LIVE HERE AND NOW LIVES IN EXACTLY ONE PLACE:
+        // SiphonFXBeam.animFrame. The sceptre's ring IS the beam's origin, and
+        // it moves per frame -- so js/gl/siphon-beam-draw.js has to read the
+        // origin FOR THE FRAME THIS LOOP DRAWS THE BODY AT. Two copies of a
+        // clock drift the moment either is tuned, and the symptom would be a
+        // cord starting a few pixels off the ring, which looks like a bad model
+        // and is not.
+        //
+        // The ease is mutated per call and this is now one of at least two
+        // callers per rendered frame (here, and the overlay pass). animFrame
+        // memoises the step on `state.now` for exactly that reason -- see its
+        // own comment. Do not step `_chanEase` here as well.
+        //
+        // NO FALLBACK COPY OF THE FORMULA. If SiphonFXBeam is absent the body
+        // holds frame 0 and simply does not animate. Writing the formula out
+        // again here "just in case" would reinstate the duplication this call
+        // exists to remove, and the fallback is the copy that would go stale.
         if (m && m.frames.length > 1 && t.constructor &&
-            t.constructor.ID === "siphon") {
-          var chan = (t.locks && t.locks.length) ? 1 : 0;
-          t._chanEase = (t._chanEase === undefined) ? 0 : t._chanEase;
-          t._chanEase += (chan - t._chanEase) * 0.06;      // ~0.4 s either way
-          if (t._chanEase > 0.02) {
-            var sphase = (((state.now || 0) * 0.42) % 1 + 1) % 1;
-            frame = 1 + Math.min(m.frames.length - 2,
-              Math.floor(sphase * (m.frames.length - 1)));
-          }
+            t.constructor.ID === "siphon" &&
+            typeof SiphonFXBeam !== "undefined" && SiphonFXBeam.animFrame) {
+          frame = SiphonFXBeam.animFrame(t, state.now, m.frames.length);
         }
         // THE SUMMONER'S IDLE GROWS WITH ITS SWARM.
         //
@@ -1387,10 +1398,18 @@ var World3D = (function () {
   // otherwise have -- and it is passed on every one of three hundred blubs'
   // worth of drawing. The field is named `groundAt` because that is the name
   // that file asks for.
+  //
+  // `towerTop` / `enemyTop` were added for the Siphon's cords: a 2D overlay has
+  // no depth buffer, so anything drawn on it has to mask itself by hand against
+  // the bodies on the GL canvas, and the height of a body is the one number a
+  // screen-space occluder cannot invent. They are function DECLARATIONS further
+  // down this closure and therefore hoisted, so naming them here is safe.
   var BLUB_FX_API = {
     project: project,
     withGround: withGround,
-    groundAt: groundHeightAt
+    groundAt: groundHeightAt,
+    towerTop: towerTop,
+    enemyTop: enemyTop
   };
 
   // Projected per point rather than through camera.groundCircle, for the same
@@ -3093,6 +3112,32 @@ var World3D = (function () {
   function enemyCrown(e) {
     var r = e.radiusPx ? e.radiusPx() : 11;
     return crownOf(e, enemyModel(e), r, r / 11);
+  }
+
+  // THE TOP OF THE BODY ITSELF, which is not the same number as its crown.
+  // `crownOf` adds 10 px of headroom because it answers "where does the health
+  // bar go"; an OCCLUDER that inherits that headroom stands ten pixels taller
+  // than the thing it is standing in for and hides whatever passes over the
+  // model's head. Measured from the model's own `top` for exactly the reason
+  // crownOf is -- a guessed height under-occludes the upper body, which is the
+  // half of a tower a cord most often crosses.
+  //
+  // Handed to the FX modules through BLUB_FX_API; js/gl/siphon-beam-draw.js
+  // builds one screen-space capsule per actor out of this plus the actor's own
+  // authored radius. Nothing else uses it yet.
+  function bodyTopOf(actor, model, fallbackRadius, scale) {
+    var m = model ? GLModels.get(renderer, model) : null;
+    if (m && m.top) return m.top * m.unitsToPx * (scale || 1);
+    return (fallbackRadius || 11) * 2.2;
+  }
+
+  function towerTop(t) {
+    return bodyTopOf(t, towerModel(t), t.footprintPx, 1);
+  }
+
+  function enemyTop(e) {
+    var r = e.radiusPx ? e.radiusPx() : 11;
+    return bodyTopOf(e, enemyModel(e), r, r / 11);
   }
 
   function bar(ctx, actor, kind) {
