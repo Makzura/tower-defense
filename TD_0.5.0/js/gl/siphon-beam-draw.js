@@ -215,16 +215,189 @@ var SiphonFXBeam = (function () {
     return { a: (p && p.A) || 0, b: (p && p.B) || 0 };
   }
 
+  // WHICH BODY IS ON SCREEN. This mirrors gl-world.js:377 `siphonGroup` line for
+  // line, and it is mirrored rather than re-derived from `tiers(tower).a >= 3`
+  // on purpose. Those are not the same question. `originByTier` asks WHERE on
+  // the body the cord leaves (hands or ring), which A3 settles for every tier
+  // above it; `originFrames` is a table PER BODY, and the Siphon has eleven
+  // bodies. Reading a4's ring position out of a3's row would put the cord a few
+  // pixels off the ring in a way that reads as a modelling error rather than as
+  // the plumbing error it would be -- and nobody would ever spot it by eye.
+  //
+  // If gl-world's picker ever changes, this must change with it. That is the
+  // cost of the mirror; the alternative was exporting the picker out of a
+  // closure that has no other reason to open.
+  function bodyKey(tower) {
+    var t = tiers(tower);
+    if (t.a >= 3) return "a" + Math.min(t.a, 5);
+    if (t.b >= 3) return "b" + Math.min(t.b, 5);
+    if (t.a >= 1) return "a" + t.a;
+    if (t.b >= 1) return "b" + t.b;
+    return "base";
+  }
+
+  // A DISAGREEMENT BETWEEN THE TABLE AND THE MODEL IS SURFACED, NOT ABSORBED.
+  //
+  // `originFrameCount` is written by the generator; `m.frames.length` is what
+  // the exported body actually carries. If the two drift -- a regenerated spec
+  // against a stale model, or the reverse -- clamping alone would keep drawing a
+  // plausible cord off the wrong pose, silently, forever. So the clamp stays
+  // (a wrong ring beats no beam) and the mismatch is recorded and warned once.
+  var mismatchSeen = Object.create(null);
+
+  function noteMismatch(key, modelFrames, tableFrames) {
+    var id = key + ":" + modelFrames + "/" + tableFrames;
+    if (mismatchSeen[id]) return;
+    mismatchSeen[id] = { body: key, modelFrames: modelFrames,
+                         originFrames: tableFrames };
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("SiphonFXBeam: siphon-" + key + " draws " + modelFrames +
+        " frames but SiphonBeamSpec.originFrames has " + tableFrames +
+        " -- the ring is being read from a clamped index. Regenerate " +
+        "tools/blender/siphon_beam.py against the current bodies.");
+    }
+  }
+
+  // A KEY MISS IS THE OTHER WAY THIS CHANGE SHIPS AS A NO-OP, and it is the
+  // quieter of the two. `originFrames` is keyed by `siphonGroup()`'s LOWERCASE
+  // body names -- "base", "a1".."a5", "b1".."b5" -- while the spec's own
+  // `originByTier` is uppercase. Index it with the wrong case and every lookup
+  // misses, every miss falls back to the static ring, the beam still starts
+  // somewhere plausible, and every capture passes while nothing new is in use.
+  // So a miss is warned once per key, with the keys the table actually has.
+  //
+  // EXCEPT ON A B BODY, WHICH IS A CONTRACT AND NOT AN ERROR. The b1..b5 bodies
+  // are authored by tools/blender/siphon_abyss.py, which never writes the
+  // origins file, and a B-path Siphon pours from the HANDS -- there is no ring
+  // on it to follow. A b-tier miss is therefore expected and silent by design;
+  // if that ever changes, the only edit needed is to drop this branch.
+  function noteKeyMiss(key, table) {
+    if (key.charAt(0) === "b" && key !== "base") return;   // documented above
+    var id = "miss:" + key;
+    if (mismatchSeen[id]) return;
+    var have = [];
+    for (var k in table) have.push(k);
+    mismatchSeen[id] = { body: key, missing: true, tableKeys: have };
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("SiphonFXBeam: SiphonBeamSpec.originFrames has no row for " +
+        "body \"" + key + "\" -- falling back to the STATIC ring, so the " +
+        "per-frame origin is not in use for this tower. Table has: [" +
+        have.join(", ") + "].");
+    }
+  }
+
+  function mismatches() {
+    var out = [];
+    for (var k in mismatchSeen) out.push(mismatchSeen[k]);
+    return out;
+  }
+
   // The origin follows the TIER, never the state -- SiphonBeamSpec.originByTier
   // says so in as many words, and states like `ramp` exist on both sides of A3.
   // A3/A4/A5 pour from the RING; base, A1, A2 and the whole of path B pour from
   // the HANDS.
-  function originPoint(tower) {
+  //
+  // AND, SINCE THE RING MOVES, IT FOLLOWS THE FRAME TOO. The sceptre's ring IS
+  // the beam origin, and it is animated -- so the point this returns has to be
+  // the one belonging to the frame the BODY IS ACTUALLY DRAWN AT this frame, or
+  // the cord leaves the ring by a few pixels every time the arm swings. `frame`
+  // comes from animFrame() below, which is the single place that arithmetic
+  // lives; do not pass a frame worked out anywhere else.
+  //
+  // FALLBACK. With `originFrames` absent -- which is the live path until the
+  // generator lands it -- this is exactly the old static HANDS/RING behaviour,
+  // so the tree is never broken mid-generation. That also means a silent
+  // fallback looks identical to a working per-frame origin at rest, which is
+  // why `originAnimated()` is exported: a test that cannot tell the two apart
+  // is not testing anything.
+  function originPoint(tower, frame) {
     var sp = spec();
     var o = sp && sp.origins;
     var hands = (o && o.HANDS) || [0.055, 0.305, 1.045];
     var ring = (o && o.RING) || [0.315, 0.395, 1.190];
-    return tiers(tower).a >= 3 ? ring : hands;
+    var stat = tiers(tower).a >= 3 ? ring : hands;
+
+    var table = sp && sp.originFrames;
+    if (!table) return stat;
+    var key = bodyKey(tower);
+    var row = table[key];
+    if (!row || !row.length) { noteKeyMiss(key, table); return stat; }
+
+    // The model's own frame count, as reported by gl-world through animFrame on
+    // this same rendered frame. Zero when the GL body pass has not run (the 2D
+    // fallback, or a harness that draws overlays alone), in which case there is
+    // nothing to disagree with.
+    var modelFrames = (tower && tower._chanFrames) | 0;
+    var declared = (typeof sp.originFrameCount === "number")
+      ? sp.originFrameCount | 0 : row.length;
+    if (declared !== row.length) noteMismatch(key, row.length, declared);
+    if (modelFrames > 1 && modelFrames !== row.length) {
+      noteMismatch(key, modelFrames, row.length);
+    }
+
+    var i = frame | 0;
+    if (i < 0) i = 0;
+    if (i > row.length - 1) i = row.length - 1;
+    var p = row[i];
+    return (p && p.length === 3) ? p : stat;
+  }
+
+  // Is the live spec actually driving the origin per frame, or is this the
+  // static fallback? Exported so a test can assert which of the two it just
+  // measured instead of photographing a plausible still.
+  function originAnimated(tower) {
+    var sp = spec();
+    var table = sp && sp.originFrames;
+    if (!table) return false;
+    var row = table[bodyKey(tower)];
+    return !!(row && row.length > 1);
+  }
+
+  // ---- the shared animation frame -----------------------------------------
+  //
+  // ONE PLACE. gl-world.js draws the Siphon's body at this frame and this file
+  // reads the ring's position FOR THAT FRAME. If the two derived it separately
+  // they would drift the moment either was tuned, and the cord would sit a few
+  // pixels off the ring -- which looks like suki's problem and is not.
+  //
+  // THE TRAP, and the reason this is not a pure function. `_chanEase` is the
+  // ease toward "he is channelling", MUTATED once per step at 0.06. This
+  // function is called AT LEAST TWICE per rendered frame -- once from the GL
+  // body pass (gl-world's tower loop) and once from the overlay pass (this
+  // file's draw) -- so stepping the ease per call would spin the animation up
+  // at twice its designed rate, and a 0.4 s ramp measured at 0.2 s is exactly
+  // the sort of wrongness nobody reports because it still looks like an ease.
+  //
+  // So the step is memoised on the tower, keyed by `now`: the ease advances
+  // only when the render clock has actually moved, and every later caller in
+  // the same rendered frame reads the same value. A paused game holds `now`
+  // still and therefore holds both the ease and the frame still, which is what
+  // the beam already does and is correct.
+  //
+  // The FRAME is not cached, only the ease step, so two callers holding models
+  // with different frame counts each get a right answer for their own strip
+  // rather than whichever of them asked first.
+  var CHAN_EASE = 0.06;        // per rendered frame -- ~0.4 s either way at 60
+  var CHAN_ON = 0.02;          // below this he is at rest, and rest is frame 0
+  var CHAN_SPIN = 0.42;        // Hz
+
+  function animFrame(tower, now, frameCount) {
+    if (!tower) return 0;
+    var t = now || 0;
+    if (tower._chanEase === undefined) tower._chanEase = 0;
+    if (tower._chanStamp !== t) {
+      var want = (tower.locks && tower.locks.length) ? 1 : 0;
+      tower._chanEase += (want - tower._chanEase) * CHAN_EASE;
+      tower._chanStamp = t;
+    }
+    var n = frameCount | 0;
+    // Remembered for originPoint's mismatch check -- it is the only honest
+    // reading of how many frames the body on screen actually has, and only the
+    // GL pass knows it.
+    if (n > 1) tower._chanFrames = n;
+    if (n < 2 || tower._chanEase <= CHAN_ON) return 0;
+    var ph = (((t * CHAN_SPIN) % 1) + 1) % 1;
+    return 1 + Math.min(n - 2, Math.floor(ph * (n - 1)));
   }
 
   // How far the per-target ramp has climbed, 0..1. This is the ONE continuously
@@ -449,6 +622,9 @@ var SiphonFXBeam = (function () {
   var hw = new Float64Array(MAXS);          // screen half-width
   var cc = new Float64Array(MAXS);          // flow coordinate
   var seg = new Int32Array(MAXS);           // chain segment index
+  var sd = new Float64Array(MAXS);          // projected depth (camera w)
+  var sz = new Float64Array(MAXS);          // ABSOLUTE world height of the sample
+  var sv = new Uint8Array(MAXS);            // 1 = this sample is not occluded
   var nS = 0;
 
   // ---- per-tower records ---------------------------------------------------
@@ -559,6 +735,13 @@ var SiphonFXBeam = (function () {
       var k = i0 + i;
       sx[k] = p.x; sy[k] = p.y; ss[k] = p.scale;
       st[k] = t; seg[k] = segIndex;
+      // DEPTH AND HEIGHT, KEPT. `project` has always returned `out.depth = w`
+      // (gl-camera.js:252) and this loop has always thrown it away. It is the
+      // only depth information a 2D overlay can have, and without it a cord
+      // behind a tower is indistinguishable from a cord in front of one. `wz`
+      // is kept beside it because the occluders below compare depths AT THE
+      // SAME HEIGHT -- see the note there for why the base depth alone lies.
+      sd[k] = p.depth; sz[k] = wz;
     }
     return true;
   }
