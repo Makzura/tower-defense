@@ -96,8 +96,8 @@ early reading of "the sceptre is 92.5% occluded" was 468 pixels of cord. With
 opposite. The lesson is the general one: an isolation without a null control is
 not an isolation.
 
-**2026-08-12 — six corrections in `AGENTS.md`, and this file put back into
-date order.**
+**2026-08-12 — twelve corrections in `AGENTS.md`, seven of them the same dead
+cash rule, and this file put back into date order.**
 
 Documentation only. No game code, test, asset or generator was touched, and
 nothing below implies a balance change. Each correction names the symbol or the
@@ -191,12 +191,60 @@ Those three figures are nadia's measured readings and are recorded here rather
 than in the values table, because 841 does not reconcile against the 797
 scheduled bodies `waveCount` sums for Easy — the difference is presumably
 spawned bodies, and an unreconciled number does not belong in the table whose
-whole job is to be the one that is right. **This clause is one site of seven.**
-Six more fossils are known to exist, three of them outside `AGENTS.md`, and
-they are not fixed here; `tests/beam.test.js` is one — its gold-income test
-still says in a comment that "the game loop pays that at `CASH_PER_DAMAGE` like
-every other tower's", present tense, about a constant deleted on 2026-07-31.
-The test passes, because it asserts a number and the comment is what is wrong.
+whole job is to be the one that is right.
+
+**It was never one clause. Six more sites in `AGENTS.md`, all repaired here.**
+Vera found five and the sixth turned up while repairing them.
+
+- *Exception 1 of "Conservation has three exceptions now"* said cash still
+  equals the HP removed against `armored`, `brute` and `midboss` because
+  "damage *landed* is what pays". The mechanism is dead. The arithmetic,
+  checked rather than assumed, is **accidentally still true**: those three are
+  each authored with `bounty` equal to `health`, so the ratio is exactly 1, and
+  `Enemy.bountyOf` preserves it through a wave's `health` override. Nothing
+  enforces it. The bullet now names the real mechanism, keeps the true
+  conclusion, and states the ratio it is an exception to — 0.905 across the
+  schedule, and 0.4545 (`colossus`) to 1.5 (`fast`, `camo_fast`, `camo_heavy`)
+  per type, both re-derived from `Enemy.TYPES` at runtime.
+- *Exception 3* said cash-equals-HP-removed "still holds for everything in
+  `WAVES`". It does not. But the exception's HEADER — "Nothing the schedule
+  names is unpaid" — is true and load-bearing, and `noBounty` really is a
+  per-spawn property. Scalpel: the header and the `noBounty` fact stand, the
+  cash-equals-HP clause is replaced by a pointer to exception 1.
+- *"$4 092 off a $42 443 purse, a 10% pay cut"* was damage-era end to end:
+  $4 092 is 1 364 × 3 at the retired rate, and $42 443 was the 2026-07-30 purse
+  against a current authored $36 204. Under bounties those shields cost the
+  player no income at all. The 1 364 HP is the one figure that survived and it
+  is kept. **This was the dangerous one**: the bullet directly above it had
+  already been repaired, so true and false text were sitting adjacent with
+  nothing to tell them apart.
+- **A SIXTH, not on vera's list, found because it is the bullet directly above
+  that one.** "`Enemy.bounty()` is `maxHealth`, not `maxRemainingHealth()` …
+  the death popup over a Bulwark reads its 12" — the structural claim is right
+  and the number is wrong. `bounty()` is `Enemy.bountyOf(typeId, maxHealth)`,
+  which returns `type.bounty × health / type.health`, so a Bulwark pays **20**;
+  verified at runtime, and `js/game.js`'s death sweep passes that same figure
+  to `Effects.enemyKilled`. The 12 is the LEAK cost from `baseHp -= gone.health`
+  three lines below it. Two different numbers about the same enemy, conflated
+  while cash was still per-point-of-damage.
+- *"damage income arrives in a dribble"* — conclusion true, mechanism dead.
+  Restated as kill bounties arriving one body at a time.
+- *"they do not simply pay for their own answer through damage income"*, on the
+  difficulty levers — the sentence is right for a reason it no longer states.
+  Health overrides DO still scale income, through `Enemy.bountyOf`, and so does
+  body count; interval and lead compression pay nothing. The reason is now
+  written out instead of the retired one.
+
+Each repair follows the phrasing this file already got right once, in the
+data-flow paragraph reading "the main loop discards that return — only the
+later death sweep pays cash, out of `bounty()`": name the mechanism, name what
+does not happen, cite the function. **Three further sites are outside
+`AGENTS.md` and are not touched here** — `tests/beam.test.js`'s gold-income
+group and `tests/harness.js`'s `pinWaveBreak` comment belong to quality, and
+`js/towers/long-range-dps.config.js` is a price and belongs to simulation.
+Noted for whoever takes them: the harness comment NEXT to the fossil, reading
+"the cash delta stopped being a damage meter", is CORRECT and must not be swept
+up with its neighbour.
 
 **Four rows of the current-values table were in it twice, verbatim and
 adjacent.** `Warbringer full A`, `Warbringer full B`, `Tower HP from upgrades`

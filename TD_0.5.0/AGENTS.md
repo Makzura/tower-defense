@@ -578,7 +578,12 @@ Normal and Hard are built from Easy's proven spine by
 `buildDifficultyWaves(tuning, additions)`. The transform is deterministic and
 authored, not simulated. Health/count increase the workload; interval/lead
 compression and the supporters are the important difficulty levers because
-they do not simply pay for their own answer through damage income.
+**they pay nothing at all.** A wave's `health` override still scales income —
+`Enemy.bountyOf` prices a body at `type.bounty × health / type.health`, so
+raising health raises its bounty in the same proportion — and more bodies means
+more bounties. Tightening an interval or a lead adds neither. (This sentence
+used to end "they do not simply pay for their own answer through damage
+income"; it was right, for a mechanism retired on 2026-07-31.)
 
 **All five formerly sandbox-only types appear in both Normal and Hard:**
 Aether Wisp, Shieldbearer, Healer, Vanguard and Camo Heavy. Normal introduces
@@ -1103,8 +1108,11 @@ is correct: the last bounty is paid for actually clearing the board, and that is
 the same step that sets `victory`. A test pins it.
 
 It lands when the break opens and the player is about to read a panel, which is
-part of the point — damage income arrives in a dribble, so the wallet is almost
-never on a round number at the moment a decision is being made.
+part of the point — kill bounties arrive one body at a time, at whatever each
+body is authored to pay, so the wallet is almost never on a round number at the
+moment a decision is being made. (This used to say "damage income arrives in a
+dribble". The conclusion held; the mechanism it named was retired on
+2026-07-31.)
 
 It deliberately does **not** count a Hive's brood or the boss's summons. A
 payout has to be knowable in advance to be worth anything.
@@ -1487,11 +1495,14 @@ the catalogue at all. To make that work a tower constructor must expose:
 | `prototype.containsPoint(x, y)` | click-to-inspect hit test |
 | `prototype.attackDamage()`, `prototype.attacksPerSecond()` | the shared stat rows and DPS — see "One vocabulary" below |
 
-**All four built towers are in the shipping game as of 2026-07-28.** The
-Longshot and the Siphon existed, were fully tested, and were reachable only
-through `sandbox.html` — so two of the project's four towers were invisible to
+**On 2026-07-28 every tower that existed reached the shipping game.** There were
+four of them then — the Gunner, the Smasher, the Longshot and the Siphon. The
+Longshot and the Siphon were finished, priced and fully tested, and were
+reachable only through `sandbox.html`, so two of the four were invisible to
 anyone actually playing. Wiring them in was a build-bar entry plus
-`index.html` loading their systems; no tower code changed.
+`index.html` loading their systems; no tower code changed. The roster is
+neither that size nor that list any more; the current one is at the top of this
+file, and the renames are in "Tower names" below.
 
 **The order is not by price.** It is CATALOGUE order in `js/meta.js` —
 Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner — which is the historical
@@ -2051,10 +2062,20 @@ The opening contains `5 × 4 + 8 × 4 = 52` HP; the full thirty-five-wave
 schedule contains **23 867 scheduled / 25 969 effective** HP (per-wave table is a
 comment on `WAVES`). Damage dealt plus health leaked to the base must add back
 to the *effective* total; that is the quickest whole-run conservation check —
-note it is a check on HP, not on cash, and cash has been damage × 3 since
-2026-07-30. (The figures here read 6466/8056 until 2026-07-30. Those were the
-v0.4.6 schedule's and were left behind when v0.4.7 rewrote it; 23 867/25 969 are
-what `tests/run.js` asserts and what the harness reports.)
+note it is a check on HP, not on cash. **Damage does not pay at all.**
+`CASH_PER_DAMAGE` was $3 per point for one day, from the 2026-07-30 economy
+revamp until the 2026-07-31 bounty merge removed it, and there is no
+damage-to-cash path in the code now — the removal is recorded in the comment
+block above `STARTING_CASH` in `js/game.js`, which ends "anything still reading
+a per-damage rate is stale". **Measured at runtime on 2026-08-12, not argued
+from the source:** kill cash equals `bounty()` exactly, and is the same figure
+for a clean kill and for a 50× overkill, across six types; non-lethal damage
+pays $0; and a per-damage rate would have paid about three times what a full
+clear actually realises. Anything balanced against the fossil clause is
+balanced against a game three times richer than the one that ships. (The
+figures here read 6466/8056 until 2026-07-30.
+Those were the v0.4.6 schedule's and were left behind when v0.4.7 rewrote it;
+23 867/25 969 are what `tests/run.js` asserts and what the harness reports.)
 
 **Effective, not scheduled, and the difference is v0.4.7's.** A shield is
 health the player must remove and a Revenant is two bodies, so effective HP is
@@ -2063,18 +2084,28 @@ on an Enemy is the same idea at the instance level.
 
 **Conservation has three exceptions now, and all are by design.**
 
-1. Damage *landed* is what pays, and mitigation removes damage before it lands:
-   a hit that armor eats entirely pays nothing and takes nothing off the enemy.
-   So against `armored`, `brute` and `midboss` the player's cash still equals
-   the HP removed, but the *shots fired* no longer divide evenly into it.
+1. Mitigation removes damage before it lands: a hit that armor eats entirely
+   takes nothing off the enemy, so against `armored`, `brute` and `midboss` the
+   *shots fired* no longer divide evenly into the HP removed. **Cash is not
+   part of this any more** — the main loop discards a bullet's returned damage
+   and only the later death sweep pays, out of `bounty()`. Cash does still
+   equal HP removed against those three, but only because each was authored
+   with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
+   scales bounty with a wave's `health` override, so the ratio survives an
+   override but would not survive a retune of either field. Across the whole
+   schedule the ratio is 0.905, and per type it runs 0.4545 (`colossus`) to
+   1.5 (`fast`, `camo_fast`, `camo_heavy`).
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
    removes more health than the schedule names while earning exactly the
    schedule's worth. There is no closed form for the excess; that is the point
    of the enemy.
 3. **Nothing the schedule names is unpaid.** `noBounty` is a per-spawn
-   property, not a type one, so cash-equals-HP-removed still holds for
-   everything in `WAVES` — it is only the broods that break it.
+   property, not a type one, so every body `WAVES` names pays its `bounty()`
+   and only the broods carry it. That is all this exception claims. It does
+   NOT mean cash equals HP removed across the schedule — see exception 1; that
+   stopped being true on 2026-07-31, when bounties replaced the per-damage
+   rate.
 
 Shots per kill is therefore only a clean diagnostic on undefended, unshielded
 bodies that were not born of a Hive — check it against scheduled normals.
@@ -2535,19 +2566,31 @@ being precise about what moved:
   cash, the beam's lifesteal, its charge meter, and each tower's damage
   counter. **A Siphon chewing a shield now earns no lifesteal and no charges**,
   which follows from the same principle and was not separately asked for.
-- **`Enemy.bounty()` is `maxHealth`, not `maxRemainingHealth()`.** The two
-  answer different questions and only one of them is about money. The death
-  popup over a Bulwark reads its 12, not the 36 the player had to remove.
+- **`Enemy.bounty()` is priced off `maxHealth`, not `maxRemainingHealth()`.**
+  The two answer different questions and only one of them is about money — a
+  Bulwark's 24 points of shield never enter the price. **The figure itself is
+  the authored bounty, NOT the health**: `bounty()` is
+  `Enemy.bountyOf(typeId, maxHealth)`, which returns
+  `type.bounty × health / type.health`, so the death popup over a Bulwark reads
+  **20**, not the 12 this bullet claimed and not the 36 the player had to
+  remove. The 12 is the LEAK cost — `baseHp -= gone.health` in the same sweep —
+  and the two were conflated here while cash was still priced per point of
+  damage.
 - **`waveEffectiveHealth` did NOT change**, and must not. It measures what the
   player has to REMOVE — which is what the clear bounty is a tenth of — and
   that is still what it measures, now 25 969. It is simply no longer a purse.
   **Confusing the two is now the easiest way to get the economy wrong**; there
   is a warning to that effect on the function itself.
 - **What it costs the player is exactly 1 364 HP** — the shields the schedule
-  carries, all of them Bulwarks — so **$4 092 off a $42 443 purse, a 10% pay
-  cut** concentrated on precisely the waves that carry them. Measured against
-  the real `WAVES`, not estimated. Nobody has asked for the schedule or the
-  prices to move in compensation and neither was touched.
+  carries, all of them Bulwarks — and under bounties that costs no income
+  whatsoever. A Bulwark pays the same `bounty()` whether the player removed 12
+  or 36, so a shield is a cost in TIME and in nothing else. **This bullet used
+  to read "$4 092 off a $42 443 purse, a 10% pay cut", and that was damage-era
+  arithmetic end to end**: $4 092 is 1 364 × 3 at the retired
+  `CASH_PER_DAMAGE`, and $42 443 was the 2026-07-30 purse against a current
+  authored $36 204. Only the 1 364 HP survived the bounty merge; it is still
+  measured against the real `WAVES`, not estimated. Nobody has asked for the
+  schedule or the prices to move in compensation and neither was touched.
 
 **HEALED HEALTH PAYS NOTHING EITHER**, for the same reason and by the same
 mechanism — `healedHealth` on the instance is health the player has already
@@ -4170,9 +4213,12 @@ is a much smaller error than a prop split down the middle.
 
 ## Tower names: what a tower is CALLED versus what it IS
 
-**2026-07-30.** Four of the five towers were renamed and redrawn for a robot
-fantasy/magic theme. **Nothing else changed** — not a stat, not a cost, not a
-behaviour, not a footprint, not a range.
+**2026-07-30.** The roster that day was Smasher, Longshot, Siphon, Soldier and
+Gunner. Four of those five were renamed and redrawn for a robot fantasy/magic
+theme; the Gunner was the exception, and was deleted later the same day. That
+is the roster the table below records — it is a snapshot of 2026-07-30, not the
+current build bar, and the Summoner did not exist yet. **Nothing else changed**
+— not a stat, not a cost, not a behaviour, not a footprint, not a range.
 
 | was | is now | constructor | id (SAVE FORMAT) |
 |---|---|---|---|
@@ -4309,7 +4355,7 @@ no mechanic was moved to match the description.
 | Default enemy HP | 4 | `Enemy.BASE_HEALTH` |
 | Enemy speed | 50 u.l./s (~37 s crossing) | `Enemy.BASE_SPEED_ULPS` |
 | Enemy lane spread | ±7 u.l. off the centreline, deterministic hash | `Enemy.LANE_SPREAD_UL`, `Enemy.laneOffsetFor` |
-| Enemy sprite radius | 11 px × the type's `sizeScale` (0.55 swarm … 1.8 midboss) | `Enemy.RADIUS_PX`, `Enemy.prototype.radiusPx` |
+| Enemy sprite radius | 11 px × the type's `sizeScale` — swarm 0.55 is the smallest, boss 2.4 the largest, and a type that declares none counts as 1. A fractal split multiplies again by its own `fractalSizeScale` | `Enemy.RADIUS_PX`, `Enemy.prototype.radiusPx` |
 | Camo detection | Arcane Sniper **A1** (not B — see the naming section), Siphon B1, **Rifleman B3** — nothing else has it | `seesCamo` |
 | Flying eligibility | fail-closed: Arcane Sniper at base and Siphon A4 can target flyers; flat towers cannot unless `seesFlying` is explicit | `Targeting.sees`, `RangeFilter.canTarget` |
 | Defence pierce (flat) | Rifleman B4 only: 10 percentage points off `defense`, clamped at 0 so it is never a damage bonus. Nothing pierces flat armor | `Mitigation.mitigate`'s 4th argument |
@@ -4324,10 +4370,6 @@ no mechanic was moved to match the description.
 | Warbringer earthquake (B5) | map-wide: 3 s movement stun, then 60% slow for 5 s, **45 s cooldown**, no damage; 0.75 s world shake and 2.4 s floor fissures | `Smasher.QUAKE_*`, `triggerQuake`, `Effects.earthquake` |
 | Enemy stun | timed, movement only, longest wins — distinct from `rooted` and from a slow | `Enemy.stunTimer`, `Enemy.applyStun` |
 | Warbringer cost | 700 (was 200 before 2026-07-30) | `Smasher.COST` |
-| Warbringer full A | 4500 on top of $700 (200/350/600/1400/1950) = $5200 | `Smasher.UPGRADES` |
-| Warbringer full B | 6300 on top of $700 (200/400/900/1900/2900) = $7000 | `Smasher.UPGRADES` |
-| Tower HP from upgrades | every tier on both towers carries `hp`; Warbringer 150 → 575 (A) / 700 (B), Rifleman 80 → 380 (A) / 505 (B) | `Smasher.UPGRADES`, `Soldier.UPGRADES` |
-| Health tier semantics | GRANTS its delta — it does not heal to the new maximum | `applyUpgrade` on both |
 | Warbringer full A | 4500 on top of $700 (200/350/600/1400/1950) = $5200 | `Smasher.UPGRADES` |
 | Warbringer full B | 6300 on top of $700 (200/400/900/1900/2900) = $7000 | `Smasher.UPGRADES` |
 | Tower HP from upgrades | every tier on both towers carries `hp`; Warbringer 150 → 575 (A) / 700 (B), Rifleman 80 → 380 (A) / 505 (B) | `Smasher.UPGRADES`, `Soldier.UPGRADES` |
@@ -4353,7 +4395,7 @@ no mechanic was moved to match the description.
 | Defense cap | 99% | `Mitigation.DEFENSE_CAP` |
 | Siphon base | 1 AD x 10/s, 75 u.l., 1 target | `TowerConfigs.beam.base` |
 | Siphon cost | 800, unchanged (full A 33 800, full B 17 900) | `beam.config.js` |
-| Siphon beam origin | the spout, 8 px + 0.86 x footprint above centre — beams rise out of the basin | `BeamTower.prototype.spoutPoint` |
+| Siphon beam origin | TWO ORIGINS, and the player sees the 3D one. **3D (shipping):** the hands on base/A1/A2 and on the whole of path B, the sceptre's RING from A3 — and the ring is carried by the hand, so A3-A5 read a different point on EVERY ANIMATION FRAME out of a 25-frame table keyed by the body actually drawn. A model-space `[x, y, z]`, placed by the tower's aim and `unitsToPx`. Path B has no rows by contract and pours from the static hands. **2D (fallback, only when `World3D` is not drawing the world):** the spout, a screen-space `{x, y}` 8 px + 0.86 x footprint above centre — beams rise out of the basin | 3D: `SiphonFXBeam.originPoint` / `originWorld` over `SiphonBeamSpec.originFrames`, frame from `SiphonFXBeam.animFrame`. 2D: `BeamTower.prototype.spoutPoint` |
 | Death denial knockback | 500 u.l. along the path | `DeathDenial.KNOCKBACK_UL` |
 | Rewind animation | 1.4 s, simulation frozen | `DeathDenial.REWIND_SECONDS` |
 | Charge decay | 1 charge / 3 s, continuous, out of combat | `charge_to_gold.decaySeconds` |
