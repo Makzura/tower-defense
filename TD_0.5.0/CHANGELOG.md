@@ -69,10 +69,12 @@ ability behind the B5 flag`, and the two sandbox ability-click smokes. None of
 them is near a schedule, a spout or a midboss.
 
 **2026-08-12 — the Siphon's cords are occluded by the bodies in front of them,
-and the body's animation frame is derived in exactly one place.**
+the body's animation frame is derived in exactly one place, and the ritual
+stops discarding the beam's origin.**
 
-Two changes in `js/gl/siphon-beam-draw.js` and `js/gl/gl-world.js`. Nothing in
-`update()` was touched and no property the simulation reads was added.
+Three changes, in `js/gl/siphon-beam-draw.js`, `js/gl/gl-world.js` and
+`js/gl/siphon-ritual.js`. Nothing in `update()` was touched and no property the
+simulation reads was added.
 
 **The cords used to be visible through everything.** The owner's words: "the
 siphon's passive rays are seeable through everything, other towers included."
@@ -187,19 +189,39 @@ assert which of the two it just measured.
   origin at agreed on every single one (0 mismatches), both off the same `now`,
   running 1→24 and wrapping — the right order, not merely plausible stills.
 
-**One thing that turned out to be a different bug, reported and NOT fixed
-here.** `js/gl/siphon-ritual.js` discards the origin the beam module hands it.
+**And a third change, in `js/gl/siphon-ritual.js`, without which the other two
+were a no-op.** That module was discarding the origin the beam module hands it.
 `plan()` installs it at :660–662 — its comment says "the beam module's own
 origin is authoritative when it hands one over" — and three lines later
-`advance()` calls the ritual's OWN static `originWorld` at :466, overwriting
+`advance()` called the ritual's OWN static `originWorld` at :466, overwriting
 `rec.ox/oy/oz` from a third private copy of the HANDS/RING derivation
-(:374–380) that has no frame parameter. It is invisible today because both
-compute the same static point. Measured with a synthetic per-frame table
-injected at runtime: over 26 rendered frames the origin handed to `plan()` moved
-47 world px while the cord root actually drawn stayed at z = 58, range 0. So the
-moment the per-frame table lands, every cord root and the ritual circle stay
-welded to the static point while the ring moves. That file was not in scope for
-this change and is untouched.
+(:374–380) that has no frame parameter. So plan()'s assignment survived exactly
+three lines, and the comment was false.
+
+It cost nothing while both copies were static and computed the same point. It
+stopped costing nothing the moment the ring started moving. **Measured on an A5
+over one full cycle, before the fix: the origin handed to `plan()` travelled
+7.315 px and the cord root actually drawn travelled 0.799 px** — and that
+residual was the circle's own breathe rather than the ring, so the correlation
+between the two was noise. The generator, the spec table and
+`SiphonFXBeam.originPoint` were all wired correctly and all discarded at this
+one call, in a way that reads as working.
+
+Fixed by making the local derivation the fallback it should always have been:
+`plan()` stamps `rec.handed = now` when it installs, and `advance()` runs its
+own `originWorld` only when nobody better has supplied one. No fourth copy of
+the derivation was added — the existing one is now reached only when
+`SiphonFXBeam` is absent, which its own call site is already `typeof`-guarded
+for. **After the fix, same measurement: root travel 6.767 px against 7.315 px
+handed in, correlation 0.9971 over 150 rendered frames, and the gap between the
+two varies by only 0.96 px across the whole cycle — which is the breathe, and is
+what should remain.** The no-`plan()` path was checked separately: with the beam
+module's draw stubbed out, the circle is still placed at (266.1, 350, 37.8) for
+a tower at (250, 350) rather than collapsing to the world origin.
+
+Re-run after the ritual change, unchanged: occluder in front 0/144 differ
+against a stubbed beam module and 144/144 against occlusion-off at max delta
+222; occluder behind 0/512 between occlusion on and off.
 
 **2026-08-12 — a documentation repair pass over `AGENTS.md`, and eight missing
 change log entries reconstructed.**
