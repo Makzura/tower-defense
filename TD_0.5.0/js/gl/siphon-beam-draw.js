@@ -979,6 +979,20 @@ var SiphonFXBeam = (function () {
         var o = originWorld(t, api.groundAt);
         var ox = o.x, oy = o.y, oz = o.z;
 
+        // THE BEAMS LEAVE THE RITUAL CIRCLE, NOT THE BODY.
+        //
+        // The owner's design: he extends both hands (or puts the staff forward
+        // from A3) and a circle forms in front of him; the beams come out of
+        // THAT. So when the ritual module is present it owns the origin, and
+        // this falls through to the hands/ring origin above when it is not --
+        // which is also what keeps this file working on its own.
+        if (typeof SiphonFXRitual !== "undefined") {
+          var rite = SiphonFXRitual.plan(t, live, ox, oy, oz, now, api);
+          if (rite && rite.origin) {
+            ox = rite.origin.x; oy = rite.origin.y; oz = rite.origin.z;
+          }
+        }
+
         if (name === "seeking") {
           drawSeeking(ctx, api, t, ss2, ox, oy, oz, now, rec);
           continue;

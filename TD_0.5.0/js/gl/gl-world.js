@@ -1831,6 +1831,20 @@ var World3D = (function () {
     if (typeof SiphonFXBeam !== "undefined") {
       SiphonFXBeam.draw(ctx, state, BLUB_FX_API);
     }
+    // THE RITUAL CIRCLE, and the LATCH that keeps it from strobing.
+    //
+    // The owner's report: a Siphon re-acquires many times a second on small
+    // groups, and an animation restarted on every acquire flickers. So the
+    // circle is the persistent animation -- it spins up once, survives any
+    // number of lock drops, and only spins down after IDLE_DWELL_SECONDS of
+    // genuine idleness. Its rotation is never reset.
+    //
+    // Drawn AFTER the beams so the beams read as leaving it, and at top level
+    // outside any withGround for the same reason the beams are: the circle
+    // floats above the deck the tower stands on and pins its own reference.
+    if (typeof SiphonFXRitual !== "undefined") {
+      SiphonFXRitual.draw(ctx, state, BLUB_FX_API);
+    }
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
     // hardware that fired it and under the cosmetic burst layer. The death
