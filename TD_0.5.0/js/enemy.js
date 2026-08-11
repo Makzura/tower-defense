@@ -595,7 +595,7 @@ Enemy.TYPES = {
 
   // --- THE BOSS. Wave 35, arriving in the middle of it. ---------------------
   //
-  // 2500 HP, the slowest thing in the game, and it fights in DELIBERATE,
+  // 5000 HP, the slowest thing in the game, and it fights in DELIBERATE,
   // TELEGRAPHED BEATS rather than on a fast tick. Each attack begins by
   // stopping it dead for a second or so -- the seconds it spends aiming are
   // seconds it is not advancing, which is what makes a heavy attack fair and
@@ -639,11 +639,19 @@ Enemy.TYPES = {
     id: "boss",
     displayName: "Tyrant",
     // 5000 since 2026-07-30, at the owner's instruction ("give the final boss
-    // 5k hp instead"). It was 2500. Everything derived from it follows on its
-    // own: the roar still fires at half, which is now 2500, and the 200 point
-    // shield it conjures there is unchanged -- so the phase is a smaller
-    // fraction of the fight than it used to be, deliberately. The wall is what
-    // got bigger.
+    // 5k hp instead"). It was 2500. The roar still fires at half, which is now
+    // 2500.
+    //
+    // THE SHIELD'S SHARE OF THE FIGHT WENT UP, NOT DOWN, AND THIS COMMENT USED
+    // TO ARGUE THE OPPOSITE. It read that a fixed 200 point shield against a
+    // doubled body made the phase "a smaller fraction of the fight than it
+    // used to be, deliberately". The 2026-08-01 retune took the shield to 1000
+    // and reversed that intent: it was 200/2500 = 8% at the start, the old
+    // comment described 200/5000 = 4%, and it is 1000/5000 = 20% today -- two
+    // and a half times the ORIGINAL share, five times what the comment claimed.
+    // The phase is now a bigger part of the fight than it has ever been. Do not
+    // restore the old reading; it records an intent that was abandoned on
+    // purpose. See `phases[0].shield` below, which is the live number.
     health: 5000,
     bounty: 3000,
     speedMultiplier: 0.3,           // 15 u.l./s -- the slowest thing in the game
@@ -652,7 +660,7 @@ Enemy.TYPES = {
     sizeScale: 2.4,
     laneSpread: 0,                  // dead centre; it more than fills the road
     showHealthBanner: true,
-    // No armor and no defense. Its 2500 is meant to be a wall you grind, not a
+    // No armor and no defense. Its 5000 is meant to be a wall you grind, not a
     // wall that also taxes you -- and a percentage on top of that much health
     // would quietly invalidate whole tower builds at the last moment.
     attacks: [{
