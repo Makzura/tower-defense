@@ -2489,8 +2489,8 @@ def main():
         model, scene, origins, (pen, gap, drift) = build_body(tier, flat)
         lo, hi, rad = audit(tier, model, origins)
         if LOOKS[tier]["sceptre"]:
-            head, tail = _audit_sceptre(tier, model, scene, pen)
-            sceptre_rows.append((tier, gap, head, tail))
+            head, tail, span = _audit_sceptre(tier, model, scene, pen)
+            sceptre_rows.append((tier, gap, head, tail, span))
         if base_rad is None:
             base_rad = rad
         elif rad > base_rad + 1e-6:
@@ -2525,22 +2525,60 @@ def main():
                 "The socle's rule is that this tower never grows; a gesture may "
                 "move anything it likes but it may not push the outline past "
                 "where the rest pose already puts it." % (tier, posed, rad))
-        hdrift, rdrift = drift
-        live = rdrift if LOOKS[tier]["sceptre"] else hdrift
-        if live > ORIGIN_TOL:
-            raise SystemExit(
-                "siphon-%s moves its BEAM ORIGIN by %.6f while animating. "
-                "js/gl/siphon-beam-draw.js reads that point out of "
-                "siphon_origins.json as a constant, so the beam and the ritual "
-                "circle would detach from him. Either pin it or take the "
-                "three-file change to the owner." % (tier, live))
+        # THE ORIGIN ASSERTION, NOW PER-FRAME RATHER THAN FROZEN.
+        #
+        # It used to demand the beam origin never move, which was right while
+        # the origin was a constant in siphon_origins.json and wrong the moment
+        # the staff started being carried. It is not deleted: on a NON-sceptre
+        # tier HANDS must still be pinned to ORIGIN_TOL, because base/A1/A2 pour
+        # from the void between two palms that carry equal and opposite offsets
+        # and their midpoint is still required to be exact. On a SCEPTRE tier
+        # the ring moves on purpose, and what is asserted instead is that the
+        # track we are about to EXPORT is the track the geometry actually has,
+        # to the same tolerance -- plus that frame 0 is the authored rest point,
+        # since frame 0 is what an idle Siphon shows.
+        hdrift, track = drift
+        if LOOKS[tier]["sceptre"]:
+            if track is None or len(track) != ATTACK_FRAMES:
+                raise SystemExit(
+                    "siphon-%s: the ring track has %s entries, not %d -- the "
+                    "beam lot indexes it by animation frame."
+                    % (tier, "no" if track is None else len(track),
+                       ATTACK_FRAMES))
+            rest_gap = max(abs(track[0][k] - origins["RING"][k])
+                           for k in range(3))
+            if rest_gap > ORIGIN_TOL:
+                raise SystemExit(
+                    "siphon-%s: frame 0 of the ring track is %.3e off the "
+                    "authored rest RING. Frame 0 is what an idle Siphon draws, "
+                    "so the cord would jump the instant he stopped channelling."
+                    % (tier, rest_gap))
+            live = 0.0
+        else:
+            live = hdrift
+            if live > ORIGIN_TOL:
+                raise SystemExit(
+                    "siphon-%s moves its BEAM ORIGIN by %.6f while animating. "
+                    "base/A1/A2 pour from the midpoint of the two palms and "
+                    "js/gl/siphon-beam-draw.js reads that point as a constant, "
+                    "so the beam and the ritual circle would detach from him. "
+                    "The palms carry the same rotation and opposite offsets; "
+                    "if that is still true this cannot fire." % (tier, live))
         move_rows.append((tier, worst_px, best_px, step_px, posed, live))
 
         td.write_js(model, "siphon-%s.js" % tier)
         total += model["triangles"]
+        # `point` stays the REST origin, unchanged in meaning, so a reader that
+        # knows nothing about frames still gets the right answer for an idle
+        # tower. `frames` is the per-frame track measured off the posed
+        # geometry, and it is asserted above to start exactly at `point`.
+        # HANDS tiers get a track too, every entry identical -- that measured
+        # constancy is worth more than the by-construction claim it replaces.
         exported[tier] = ("RING" if LOOKS[tier]["sceptre"] else "HANDS",
                           origins["RING"] if LOOKS[tier]["sceptre"]
-                          else origins["HANDS"])
+                          else origins["HANDS"],
+                          track if LOOKS[tier]["sceptre"]
+                          else [origins["HANDS"]] * ATTACK_FRAMES)
         worst = max(p[0] for p in pen)
         print("  siphon-%-5s %5d %6.3f %6.3f  %-7.2f %-7.2f  %-7.2f %-7.2f "
               "%-6.3f %-6s %s"
@@ -2594,28 +2632,36 @@ def main():
           "coordinated change across siphon_idol.py, siphon_origins.json and "
           "the beam/ritual modules, and it is the owner's call, not this "
           "file's." % (abs(math.degrees(HAND_ROLL)), 2.0 * HAND_OPEN))
-    print("    a3/a4/a5 PUT THE STAFF FORWARD, which needs no such trade: the "
-          "ring is the origin, the ring is not in an animated group, and the "
-          "shaft pivots on the ring's own rim, so it can rake %.0f degrees out "
-          "over the ground in front of him with the origin structurally unable "
-          "to follow." % math.degrees(SCEPTRE_RAKE))
+    print("    a3/a4/a5 HOLD THE STAFF AND RAISE IT. The whole sceptre -- "
+          "shaft, weld and rings -- rides the LEFT HAND's group, so the head "
+          "and the handle move together and the hand is actually holding it. "
+          "The hand lifts %.3f at peak, which is pure +z because rotation "
+          "cannot raise a near-vertical staff's head and horizontal costs "
+          "ground radius a5 does not have." % SCEPTRE_LIFT)
 
     if sceptre_rows:
         join, butt, _up = _sceptre_axis()
-        print("  THE SCEPTRE is held at his side, and 'in-him' above is the "
-              "proof: weapon solids against body solids AS BOXES, %d frames, "
-              "%.3f of slack. Zero on every tier. Run the same check against "
-              "the shaft this replaced and it rejects all three: 'shaft_0 in "
-              "robe_torso', 0.011 deep." % (ATTACK_FRAMES, PEN_SLACK))
+        print("  THE SCEPTRE is carried, and 'in-him' above is the proof: "
+              "weapon solids against body solids AS BOXES, %d frames, %.3f of "
+              "slack. Zero on every tier." % (ATTACK_FRAMES, PEN_SLACK))
         print("    shaft  butt %s -> join %s, %.3f long, off the centreline "
               "the whole way" % (_fmt(butt), _fmt(join), SCEPTRE_DROP))
-        for (tier, gap, head, tail) in sceptre_rows:
-            print("      siphon-%-5s clear of the cloth by %.3f (%.1f px at "
-                  "%.1f px/unit); butt travels %.3f, head %.6f"
-                  % (tier, gap, gap * PX_PER_UNIT, PX_PER_UNIT, tail, head))
-        print("    the head is the pivot, so it CANNOT leave the ring's rim, "
-              "and the rings are not in the animated group at all -- the ring "
-              "never rotates and the beam origin never moves.")
+        print("    %-12s %-8s %-9s %-9s %-9s %s"
+              % ("model", "clear", "head px", "butt px", "rigid", "grip"))
+        for (tier, gap, head, tail, span) in sceptre_rows:
+            print("      siphon-%-5s %-8s %-9.2f %-9.2f %-9.4f exact"
+                  % (tier, "%.3f (%.1fpx)" % (gap, gap * PX_PER_UNIT),
+                     head, tail, span))
+        print("    HEAD px and BUTT px are worst-bearing screen travel over "
+              "%d bearings, the same measure `screen_travel` uses, against a "
+              "%.1f px gate. The build this replaces printed 'butt travels "
+              "0.428, head 0.000013' and passed: the head was the pivot, so it "
+              "was incapable of moving, which is what the owner reported."
+              % (AIM_SAMPLES, MIN_TRAVEL_PX))
+        print("    RIGID is |head - butt| and it is constant to 1e-9 by "
+              "construction -- one group cannot shear. GRIP is exact for the "
+              "same reason: the palm and the shaft share a transform, so he "
+              "cannot lose hold of it on any frame.")
 
     print("  BEAM ORIGINS, measured off the built geometry -- the beam lot "
           "READS these, it never retypes them:")

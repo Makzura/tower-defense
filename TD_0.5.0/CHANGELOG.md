@@ -342,6 +342,55 @@ Gates at the time: all 12 primitives wound outward, suites at baseline
 *(Reconstructed 2026-08-12 from commit `936f358`, which landed without a log
 entry.)*
 
+**2026-08-12 — the beam generator reads the Siphon's origins instead of
+retyping them, and can carry a per-frame one.**
+
+`tools/blender/siphon_beam.py` held `HANDS = (0.055, 0.305, 1.045)` and
+`RING = (0.315, 0.395, 1.190)` as literals, a few hundred lines from the
+identical pair in `siphon_idol.py`. It now reads `tools/blender/siphon_origins.json`,
+which `siphon_idol.py` MEASURES off the built geometry, and hard-errors with
+instructions if that file is absent rather than defaulting. Two generators
+holding the same constant by hand is the drift that ends with a beam starting a
+few pixels off a ring that moved — and both files build cleanly while it
+happens, which is what makes it worth removing. All eight
+`js/gl/models/siphon-beam-*.js` are byte-identical after the change, which is
+the proof that reading reproduces the retyped values exactly.
+
+`js/gl/siphon-beam-spec.js` gains **`originFrameCount`** and **`originFrames`**,
+a per-body table of where the beam leaves from on each frame. This exists
+because the sceptre is becoming one rigid body carried by the hand, so A3+'s
+ring — the beam origin — stops being a fixed point. The table is keyed by
+`gl-world.js` `siphonGroup()`'s **lowercase** body names, which is what
+`siphon-beam-draw.js` `bodyKey()` indexes it with. The neighbouring
+`originByTier` is uppercase and was deliberately left alone: it answers a
+different question (hands or ring, per tier), and matching the neighbour's
+convention here would make every lookup miss, fall back to the static ring, and
+ship the whole change as a no-op that looks right in every screenshot.
+
+**Three invariants this establishes.**
+
+1. *The two fields are OMITTED, not emptied, when there is nothing to say.*
+   Until the per-frame export lands in `siphon_origins.json` the spec carries
+   neither key, which is exactly the renderer's documented static path
+   (`if (!table) return stat`). An empty or one-entry table is not the same
+   thing, and it would read as a working per-frame origin that never moves.
+2. *`frames[0]` must equal `point` exactly, and the build fails if it does not.*
+   Frame 0 is the rest pose and `gl-world` draws it to an idle Siphon, so a
+   disagreement makes the beam jump the instant the tower takes a lock and jump
+   back when it drops it.
+3. *Every tier's row must be the same length.* `originFrameCount` is one number
+   for the whole spec and the renderer warns when a row disagrees with it.
+
+**There are deliberately no `b1`..`b5` rows.** The b bodies come from
+`siphon_abyss.py`, which never writes the origins file, and a path-B Siphon
+pours from the static HANDS. Making the table total would be worse than leaving
+it partial, measurably: `siphon_abyss.py` ships 4 frames per b body against
+`siphon_idol.py`'s 25, so a 25-long b row trips the renderer's
+`modelFrames !== row.length` warning and a 4-long one trips
+`declared !== row.length`. Either way every B-path Siphon on the board earns a
+console warning to describe a point that never moves. `siphon-beam-draw.js`
+already treats a b-tier miss as a contract and stays silent for it.
+
 **2026-08-11 — the ten blub units get a detail layer (pass 3).**
 
 New `tools/blender/blub_detail.py` builds ten add-on meshes, `blub-detail-<unit>`,
