@@ -149,3 +149,112 @@ should not go chasing them:
 | 5 | **G09** grounding — placement rule | (behaviour, at owner's request) | A tower whose footprint bridges a height edge is half planted and half hanging over the drop. `whyCannotBuild` now rejects it with "not level here", asked of the 3D board via `World3D.isLevelUnder` and guarded so the flat 2D fallback keeps its old rules exactly. | — | — | **works** — on the deck: allowed; straddling the edge (y 385–405): "not level here"; clear of it again at y 410: allowed. The road case never reaches it, already covered by "too close to the path". |
 | 4 | **G09** contact shadows and grounding | silhouette, form, motion, cohesion | Actors were all drawn at z=0 while the board has real height (deck tops 9.4, road ribbon 7), so towers sank into decks and enemies walked buried in the track. Added a coarse height field stamped when the map mesh is built, and fed `groundHeightAt` to every actor draw — towers, recruits, modelled enemies, sphere enemies and the stand-in cylinder. | `10010214` 9/40 (1.13) | `33122235` 21/40 (2.63) | **improved** — verified on all six maps: enemies read ground 7 on the road, and 9.4 where sigil-lattice's road crosses a deck. Lookup costs **0.093 µs**, i.e. 0.006 ms/frame at 60 actors. Not passing: material still 1, because contact shadows themselves still do not exist — only half this group is done. |
 | 3 | **G02** road mesh and edging | form, material | Both kerb quads in `GLGeometry.road` were wound with normals pointing inward, so with `CULL_FACE`/`BACK` every kerb was culled on every frame — the "raised ribbon with visible kerbs" in the file's own header had never rendered. Reversed both windings. | `3113--24` 14/30 (2.33) | `4323--35` 20/30 (3.33) | **improved** — a dark kerb band now reads at the road edge (luminance 36 against floor 41 and deck 71) and is unmistakable close up. Not passing: material still 2, `theme.roadEdge`/`roadCenter` still unused. |
+
+---
+
+## The ritual circle, verified on screen
+
+The handoff's next action: "place a Siphon, root a target, capture, open the
+PNG. Nobody has seen a circle on screen." Done. It renders. Evidence is in
+`captures/ritual-*.png` and `captures/order-*.png`, every one of them opened
+and read, not just written.
+
+### Three instrument faults, found before any finding was trusted
+
+The rig lied twice before this session and it lied twice more during it. Both
+new faults produce a capture that looks exactly like an effect that was never
+wired up, which is why they are written down here rather than just fixed.
+
+1. **The render clock never moved.** `worldRenderState().now` is `lastTime /
+   1000` — the requestAnimationFrame timestamp — and rAF is throttled to a
+   standstill in a hidden pane. `TDObs.step()` advanced the simulation and left
+   that clock frozen, so `advance()` early-returned on `rec.stamp === now` after
+   the first frame and the circle sat at `cast 0`: 34% radius, zero rotation,
+   forever. Stepping the simulation without stepping the clock the renderer
+   reads is not slow motion, it is a still frame. `step()` now advances
+   `lastTime` by the same dt.
+
+2. **The 2D canvas was 300x150.** The game sizes its backing store from a
+   `resize` listener; a hidden pane never fires one, so `game` stayed at the
+   HTML default while CSS stretched it to 1280x720. Everything drawn through
+   `drawOverlays` — the circle, the beams, every range ring — is drawn in
+   SCREEN pixels, so all of it landed outside the bitmap. The first capture of
+   the circle was of a circle being painted at (732, 237) on a canvas 300 wide.
+   `TDObs.boot()` now calls `resizeCanvasBackingStore()` first.
+
+3. **The camera loses one focus call after a reload.** `TDObs.focus` writes
+   `distance` and `wantDistance` directly, but a focus issued in the first
+   frames after a page load is overwritten by the renderer's own init. It takes
+   on the second call. Two captures were shot at the default 2022 distance
+   before this was spotted. Assert `TDObs.cam().distance` before shooting.
+
+### The seam was broken exactly where the handoff predicted
+
+`SiphonFXBeam.draw` guarded on `rite.origin`. `plan()` returns `rec.out`, which
+is `{ beams, idle }` — there is no `origin` on it and there never was, so the
+test was always false. Every rim anchor and every chain assignment the ritual
+computed was discarded and the beams kept leaving the hands. Confirmed live:
+`Object.keys(plan(...))` is `["beams","idle"]`.
+
+`siphon-beam-draw.js` now consumes what the ritual actually returns: one cord
+per ARM, starting on the rim, chaining through the locks that arm was dealt.
+Chaining stops being a special case — an arm with three locks IS a chain.
+
+### What was measured
+
+| check | result |
+|---|---|
+| circle renders, single lock | yes — `ritual-02`, `ritual-05` |
+| beams leave the circle | yes, after the arm fix — `ritual-05-armwired` |
+| beam count by B tier | B0→1, B2→2, B3→3, B4→4, B5→5. Matches `BEAMS_BY_B` exactly |
+| chaining | yes — B5 with 11 locks dealt `[1,3,1,3,3]`, 11 corded, cap held |
+| arms never exceed locks | `want = min(beamCount, n)` — B4 with 3 locks drew 3 cords, not 4 |
+| circle size at TRUE game scale | **14.1 x 21.6 px** (A0), 13.5 x 22.8 px (A3) |
+
+B5 was reached through the real gate, not by poking a counter: it needs 5000 HP
+healed, which took 159 simulated seconds of draining.
+
+### Findings, from looking at the pixels
+
+- **The cords are far too wide.** At B4/B5 each cord is about as wide as an
+  enemy torso; five of them merge into one pink mass that hides the enemies and
+  the circle both. The serrated edge reads as fur or centipede legs rather than
+  as energy. This is the single biggest visual problem on the tower and it is
+  what forced the draw-order decision below.
+- **The A3 staff-forward circle does not read as bigger.** `STAFF_SCALE` is
+  1.16 in world units, but on screen the A3 circle measured 13.5 px wide against
+  A0's 14.1 — the tier distinction is invisible at game scale.
+- **The gesture does not read at true scale.** The whole tower is ~25 px tall;
+  the extended arm is 2-3 px and the circle covers the torso where the arms are.
+  The CIRCLE reads at game scale. The gesture producing it does not.
+- **At A0 the circle and the robe are the same tan**, so the circle has almost
+  no contrast against the body it is drawn over. At A3+ (gold on a dark body)
+  and B4/B5 (magenta on near-black) it separates well.
+- **The single-beam anchor sits at the top of the disc** (`anchorAngle(0,1)` is
+  +pi/2) regardless of where the target is, so at one lock the cord crosses the
+  face of the circle to get out. Worth revisiting when the widths are.
+- The b2 body reads as a shapeless brown lump in silhouette, not a robed
+  figure. Related to the known-open "path B b1/b2 changed shape after review".
+
+### Draw order: tested, and the module header was wrong
+
+`siphon-ritual.js` said the circle is drawn BEFORE the beams and under them.
+`gl-world.js` did the opposite and carried a comment claiming the same goal.
+Two files asserting opposite orders, each certain it achieved the same effect.
+
+Both were captured on one B3 three-lock scene: `order-A-full.png` (circle last,
+as shipped) and `order-B-full.png` (circle first, as the header asked). Circle
+first is WRONG on screen at today's cord widths — the cords cover the disc
+almost entirely and the circle stops being visible at all. The shipped order
+was kept, the header was corrected, and both files now carry the same note and
+point at the two captures. Revisit if the cords are ever thinned; the argument
+is about their width, not about depth.
+
+### New in the harness
+
+- `TDObs.crop(name, x, y, w, h, scale)` — a nearest-neighbour magnified crop of
+  the REAL frame. Not a re-render at a closer camera: to judge whether something
+  reads at true game scale you have to magnify the pixels the game actually
+  drew, because re-rendering bigger answers a question nobody asked.
+- `TDObs.screenOf(ent)` — borrows `api.project` from the next FX draw, since the
+  projector is module-private inside gl-world.
