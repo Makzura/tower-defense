@@ -362,11 +362,12 @@ var SiphonFXGround = (function () {
   function buildVein(rec, t, b) {
     var tierB = rec.tierB;
     var seed = ((t.x * 73856093) ^ (t.y * 19349663)) | 0;
-    // The yaw is frozen the first time the vein is built. BeamTower has no
-    // `aim` (it is a continuous weapon and never turns), so this is 0 today --
-    // but a root grown into the ground does not swing when the body above it
-    // turns, and freezing it is what makes that true if the tower ever gains
-    // one. The anchor itself is 9.7 px from the axis, i.e. under a robe whose
+    // The yaw is frozen the first time the vein is built, and that freeze is
+    // now load-bearing rather than theoretical: BeamTower sets `aim` and
+    // `faceLocks` slews it, so the body above this root really does turn. A
+    // root grown into the ground does not swing with it. The pour, which is
+    // held to the hem, deliberately does -- see `pourYaw`.
+    // The anchor itself is 9.7 px from the axis, i.e. under a robe whose
     // hem reaches 21 px on that side, so the emergence point is never on
     // screen anyway; what the freeze protects is the SHAPE of the route.
     var c = Math.cos(rec.yaw), s = Math.sin(rec.yaw);
@@ -606,7 +607,11 @@ var SiphonFXGround = (function () {
 
   function buildPour(rec, t) {
     var seed = ((t.x * 83492791) ^ (t.y * 29399999)) | 0;
-    var c = Math.cos(rec.yaw), s = Math.sin(rec.yaw);
+    // THE LIVE YAW, not the frozen one. The pour is held to the front of the
+    // figure and the figure turns; freezing it would peel the gold off the hem
+    // the first time he faced a new lane.
+    rec.pourYaw = drawYaw(t);
+    var c = Math.cos(rec.pourYaw), s = Math.sin(rec.pourYaw);
     var pa = anchor("POUR_ROOT");
     var zBase = pa[2] * U;                        // 0.32 px
     // Which bearing the gold actually comes out at, from the anchor itself:
@@ -725,7 +730,12 @@ var SiphonFXGround = (function () {
       if (hasVein && rec.grow <= 0) rec.grow = 0.0001;   // it grows in
       rec.pa = null;
     }
-    if (hasPour && (step !== rec.goldStep || !rec.pour)) {
+    // Rebuilt on a gold step, on first need -- and on a TURN, because the pour
+    // is baked in world space off the body's facing. 0.05 rad is about 3
+    // degrees, which is under a pixel of travel at the hem and well inside the
+    // step the gold gate already causes.
+    var turned = Math.abs(drawYaw(t) - rec.pourYaw) > 0.05;
+    if (hasPour && (step !== rec.goldStep || turned || !rec.pour)) {
       rec.goldStep = step;
       rec.pour = buildPour(rec, t);
       rec.pa = null;
