@@ -13,6 +13,60 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the Longshot's target scan: one linear pass instead of two
+arrays, three closures and a sort.** `js/towers/longshot-adapter.js`.
+Behaviour-preserving; no number retuned.
+
+`LongshotTower.update` built a `live` array of `targetView` wrappers (one
+object per living enemy), handed it to `RangeFilter.getValidTargets` (which
+filters into a *second* array through a closure), sorted that array with a
+third closure, and then read exactly one element out of it — `valid[0]`.
+Nothing downstream ever looked at the rest: which enemies a piercing shot
+passes through is decided from where the bodies are standing, in
+`PierceBullet.update`, not from an order picked here. So the sort was
+computing an argmax the long way round.
+
+It is now one pass over `enemies` keeping the best by the same shared
+`Targeting.comparator`. **Exactly equivalent to element 0 of the old stable
+sort**: the incumbent is replaced only on `order(...) < 0`, i.e. a strictly
+better candidate, so an exact tie keeps the one appearing earlier in
+`enemies` — which is what a stable sort left at the front. The tower still
+obeys whichever of the six targeting modes the player picked, through the same
+comparator as before. `targetView` had no other caller and is gone with it.
+
+Measured on the real loop through `tests/harness.js` — 18 towers, rune-circuit,
+µs per `update()` step, min of 6 interleaved process pairs per arm (the two
+builds alternate so machine drift hits both equally):
+
+| bodies | before | after | change |
+|-------:|-------:|------:|-------:|
+|     20 |  212.0 | 209.3 |  −1.3% |
+|     40 |  371.0 | 365.9 |  −1.4% |
+|     85 |  749.7 | 662.7 | −11.6% |
+|    120 |  922.7 | 821.7 | −11.0% |
+
+The win arrives exactly where it was wanted — the dense wave-35 board — and is
+noise at small counts, which is expected: the discarded sort was only ever as
+long as the list of enemies *in range*.
+
+**A change that was measured and REVERTED, recorded because the reasoning was
+wrong in an instructive way.** The same pass replaced the two object literals
+in `BeamTower.canHold` (269 calls/step on an 85-body board, so ~540 short-lived
+objects per step) with reused module-scope scratch objects. It measured **64%
+slower** — 589 → 969 µs/step at 85 bodies — and was taken out. V8's escape
+analysis had already elided those literals, so they were never really
+allocated; a module-scope scratch object defeats that inlining and adds a write
+barrier on every store, paying a real cost to remove an imaginary one. **An
+allocation-site count is not an allocation count.** The literals in the new
+Longshot scan are left as literals for the same reason: they no longer escape
+into an array, so the engine removes them for free.
+
+Also measured and **not** found: the O(n²) that was suspected as the roster
+grew. `update()` scales linearly with bodies on the board across 20→120
+(200.6 → 811.6 µs/step before this change, ~5.6 µs per additional body on a
+~135 µs fixed base). Enemy-vs-bullet, enemy-vs-tower and targeting scans are
+all O(n·towers) with a small constant, not quadratic.
+
 **2026-08-12 — seven wrong figures and one inverted argument, in the two files
 the simulation is written in.** Comment-only, both commits.
 
