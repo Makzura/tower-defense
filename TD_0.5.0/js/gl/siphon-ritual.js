@@ -204,23 +204,30 @@ var SiphonFXRitual = (function () {
   var CIRCLE_LIFT_UL = 0.06;
   var STAFF_SCALE    = 1.16;   // A3+ casts from the staff, so it is bigger
 
-  // HOW FAR THE DISC LEANS BACK, and why it is not a constant.
+  // HOW FAR THE DISC LEANS BACK: it does not. It stands dead vertical, facing
+  // along the cast, always. See screenBasis.
   //
-  // The disc's normal is `f*cos(T) + z*sin(T)`: T = 0 is a disc standing dead
-  // vertical facing the cast, T = pi/2 is one lying flat. A FIXED T cannot
-  // work. At the board camera (pitch 0.594) a vertical disc is nearly face-on
-  // when he casts toward the viewer and goes EDGE-ON when he casts across the
-  // view -- measured, and the first build of this file did exactly that: at
-  // 1278x719 the B4 circle collapsed to an oblique smear the moment the tower
-  // was placed beside a road running left-right. A flat disc is legible from
-  // every angle but never leans toward anything.
+  // TILT_MIN/TILT_MAX and the solved lean they clamped are GONE, at the owner's
+  // instruction: "the circle is in a goofy position, he should at all time be
+  // perpendicular to the ground and parallel to the body of the siphon."
   //
-  // So T is SOLVED each frame for the widest ellipse the current view allows,
-  // and then clamped into a band so the result is always a disc held out and
-  // tipped -- never a billboard facing the camera, never a plate on the floor.
-  // It costs three unit probes, which are the same three the screen basis needs
-  // anyway, so it is free. It moves only as fast as the cast direction slews.
-  var TILT_MIN = 0.45, TILT_MAX = 1.30;
+  // THE WARNING THE DELETED CODE WAS CARRYING, PRESERVED BECAUSE IT IS TRUE.
+  // The author of the tilt solver had measured this: at the board camera
+  // (pitch 0.594) a vertical disc is nearly face-on when he casts toward the
+  // viewer and goes EDGE-ON when he casts across it, and at 1278x719 the B4
+  // circle "collapsed to an oblique smear the moment the tower was placed
+  // beside a road running left-right". That observation was correct and it
+  // still applies to the disc built here.
+  //
+  // It is accepted rather than solved, for two reasons. The cure was worse:
+  // choosing the world orientation that looks widest from the current camera
+  // makes the disc a weathervane, which is the defect actually reported. And it
+  // is now much less likely to bite, because the BODY turns to face its locks
+  // (BeamTower.faceLocks) -- so casting across the view means he is standing in
+  // profile, and a disc square to a body in profile reading narrow is what a
+  // real object does. If it proves too costly in practice the fix is a billboard
+  // about the vertical axis -- keep V = z, spin U to face the camera -- which
+  // holds "perpendicular to the ground" but gives up "parallel to the body".
 
   // THE MARKINGS, as fractions of the rim. Deliberately FINE: the first build
   // used ticks 0.052 rad wide and five inner wedges 0.105 rad wide, and at a
