@@ -392,7 +392,10 @@ var SiphonFXBeam = (function () {
     thread:    { body: "cloth_worn",  core: "skin",       bead: "hem_fray",  rim: "cloth_dark",  glow: null },
     ramp:      { body: "brass",       core: "amber",      bead: "amber",     rim: "gold_dark",   glow: "amber" },
     saturated: { body: "gold_dark",   core: "white_warm", bead: "amber",     rim: "ochre_cloth", glow: "amber" },
-    seeking:   { body: "cloth_worn",  core: "hem_fray",   bead: "hem_fray",  rim: "cloth_dark",  glow: null },
+    // seeking takes THREAD's core, not a cloth one. It is the same cord he
+    // drains with, held slack -- so the substance has to be the same substance.
+    // `skin` is in seeking's own `mats` list, so the rule above still holds.
+    seeking:   { body: "cloth_worn",  core: "skin",       bead: "hem_fray",  rim: "cloth_dark",  glow: null },
     gold:      { body: "gold",        core: "white_warm", bead: "gold",      rim: "gold_dark",   glow: "amber" },
     column:    { body: "gold",        core: "white_warm", bead: "gold",      rim: "purple_rich", glow: "white_warm" },
     tendon:    { body: "tendon",      core: "rose_sick",  bead: "oil_black", rim: "oil_black",   glow: "rose_sick" },

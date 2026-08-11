@@ -550,47 +550,51 @@ var SiphonBeamSpec = {
    "sections": 18,
    "radius": {
     "formula": "r_target + (r_tower - r_target)*(1-t)^p",
-    "r_target": 0.0085,
-    "r_tower": 0.033,
+    "r_target": 0.014,
+    "r_tower": 0.036,
     "p": 1.35
    },
    "twist": {
-    "formula": "total*(1-t)^p + 0.28*sin(7t) -- wavering",
-    "total": 1.1,
-    "p": 0.8
+    "formula": "total*(1-t)^p + 0.10*sin(7t) -- barely wavering",
+    "total": 0.7,
+    "p": 0.9
    },
    "scroll": {
     "formula": "base*(1 + gain*(1-t)^p)",
-    "base": 0.3,
-    "gain": 0.2,
+    "base": 0.5,
+    "gain": 0.3,
     "p": 1.0,
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.1246,
-    "count": 9,
-    "t_from": 0.66,
+    "spacing": 0.1442,
+    "count": 12,
+    "t_from": 0.88,
+    "proud": 1.3,
     "profile": "BEAD",
     "mat": "hem_fray",
     "spacingNote": "measured off the built mesh at a 60 u.l. run; scale it with the real distance"
    },
    "curve": {
-    "sag": 0.3,
-    "sway": 0.16,
-    "kink": 0.03,
+    "sag": 0.1,
+    "sway": 0.06,
+    "kink": 0.0,
     "kink_n": 3.0,
     "reach": 0.55,
     "sweeps": true,
     "sweep_hint": "the free end orbits the tower at ~0.5 rad/s; the 3 filaments lag it"
    },
    "mats": [
+    "skin",
+    "skin_dark",
     "cloth_worn",
     "hem_fray",
     "cloth_dark"
    ],
    "emits": false,
    "pulses": "none",
-   "note": "detached: reaches only 0.55 of the run and ends in 3 groping filaments of unequal length",
+   "note": "detached: reaches only 0.55 of the run and ends in 3 groping filaments of unequal length. THE SAME CORD AS `thread`, THINNER AND SEARCHING -- see the retune note below.",
+   "retune": "Owner: 'the passive rays who dangle around when he is not attacking doesn't fit the ray he uses when attacking, which is confusing.' He was right, and the mismatch was geometry, not colour -- seeking and thread already shared body/bead/rim roles and differed only in `core`. Against thread, seeking was 2.1x thinner at the far end, sagged 10x (0.3 vs 0.03), swayed 7.3x (0.16 vs 0.022), carried kinks thread has none of, twisted 1.8x with a waver term, scrolled at 55% of thread's speed, and bunched 9 knots into the tower-side two thirds while thread spreads 14 proud ones along the whole run. Together that read as frayed cloth rope rather than as the same flesh cord drawing in. Every one of those is now moved most of the way to thread's value: same bead spacing and proud, same scroll order, kinks off, sag and sway cut to a searching droop rather than a hanging one, and `skin` added to mats so ROLES can give it thread's core. It stays THINNER and it keeps the droop and the sweep, because idle must still read as weaker and searching -- it is the same rope, slack, not a different one.",
    "path": "BASE",
    "bakedOrigin": "HANDS",
    "model": "siphon-beam-seeking",
