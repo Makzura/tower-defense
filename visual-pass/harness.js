@@ -356,8 +356,14 @@
       TDObs._showcase = items.map(function (it) {
         var r = it.radius || 20;
         x += r + gap;
+        // `frame` MUST be carried through. Rebuilding the item here without it
+        // meant it.frame was always undefined in the draw loop, _drawPosed was
+        // never reached, and filmstrip() laid out N copies of frame 0 -- so the
+        // fix that was supposed to make the rig able to see animation still
+        // could not, and anyone told "filmstrip works now" would have reviewed
+        // frame 0 nine times and called the cycle dead.
         var o = { model: it.model, x: x, y: it.y || 210, z: 0,
-                  yaw: it.yaw || 0, scale: it.scale || 1 };
+                  yaw: it.yaw || 0, scale: it.scale || 1, frame: it.frame || 0 };
         placed.push(it.model + " @" + Math.round(x) + " r" + r);
         x += r;
         return o;

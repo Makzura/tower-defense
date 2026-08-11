@@ -88,6 +88,24 @@
 # only living thing in the palette. If any of it reads as merely disgusting it
 # has failed the brief, so the escalation is carried by ARRANGEMENT.
 #
+# ---------------------------------------------------------------------------
+# AND IT MOVES -- FOUR FRAMES, KEYED ON EMPTIES. See THE ATTACK below for the
+# tables and the arithmetic. Three things about it belong in the header because
+# they are the shape of the tier arc rather than details of it:
+#
+#   * IT IS A DRAW, NEVER A STRIKE. This tower channels a continuous beam, so
+#     nothing is thrown and nothing recoils. What plays is a slow pull, a
+#     settle and a hold -- and the hold is most of the cycle.
+#   * THE MOTION GETS SMALLER UP THE LADDER, which is the opposite of the usual
+#     instinct and is the whole point: b5 is where "he barely moves at all".
+#     `MOTION` is one scalar per tier, 1.00 down to 0.30, and `main` FAILS THE
+#     BUILD if the measured worst travel is not strictly decreasing b1 -> b5.
+#   * THE BEAM ORIGIN IS STRUCTURALLY INCAPABLE OF MOVING. HANDS is bracketed
+#     by the palms at b1..b3 and by two tendons at b4/b5, and each of those is
+#     on the STATIC group -- not held still by a small number, absent from
+#     the animated groups altogether. `measure` then proves no animated vertex
+#     comes within 0.035 of the origin on any frame, at any tier.
+#
 # GEOMETRY IS AUTHORED IN WORLD SPACE (see td_mesh.build). `parent` picks the
 # animated / world-fixed group, it is NOT a second transform, so every number
 # below is a real position on the finished model.
@@ -1108,27 +1126,63 @@ def hands(s, body, cfg):
                      m["skin_dk"], body, (0.0, 0.0, 0.0), 5, 2)
 
 
-def tendons(s, body, cfg):
+TENDON_SPLIT = 2                       # the vertex a settling tendon bends at
+
+
+def tendons(s, body, cfg, moving=None):
     """THEY COME OUT OF THE SLEEVES, NOT THE WRISTS -- every path starts on the
     UNDERSIDE of a sleeve, above a cuff that is shut and empty.
 
     Each carries THREE joints where an arm has one, and none of them lash:
     every path ends level, aimed at where it is going rather than snatching at
-    it. The brief's word is 'se poser' -- they settle."""
+    it. The brief's word is 'se poser' -- they settle.
+
+    `moving` maps a tendon index to the (inner, outer) empties it rides, and
+    the two being DIFFERENT is what splits it. A mesh belongs to exactly one
+    group, so a limb that has to bend part-way along cannot be one loft: the
+    path is cut at `TENDON_SPLIT` and the halves are parented to a nested pair
+    of empties, which is how the settle bends at the root AND again half way
+    out -- one articulation more than a reaching arm has, on a limb that
+    already carries one joint too many.
+
+    THE CUT COSTS NOTHING. A five-point path is four bands; cut at 2 it is two
+    bands plus two bands, so the triangle count is identical and only a ring of
+    vertices is duplicated. The two halves take slightly different tangents at
+    the shared ring -- which is exactly what a joint is -- and the joint bead,
+    at 1.55x the tube radius and centred ON the pivot, covers the seam on every
+    frame because a ball centred on the axis of a rotation does not move.
+    """
     m = cfg["mat"]
+    moving = moving or {}
     for i, (pts, radii) in enumerate(cfg["tendons"]):
+        inner, outer = moving.get(i, (body, body))
         # No end caps: the root is buried in the sleeve it came through and the
         # tip is covered by its own bead, so two caps a tendon would be twelve
         # triangles of nothing on a body that has a budget.
-        _path_loft(s, "tendon_%d" % i, pts, radii, m["tendon"], body, 4,
-                   1.0, 0.78, wrinkle=0.10, phase=i * 1.1, cap=False)
+        if outer is not inner:
+            k = TENDON_SPLIT
+            _path_loft(s, "tendon_%d_a" % i, pts[:k + 1], radii[:k + 1],
+                       m["tendon"], inner, 4, 1.0, 0.78, wrinkle=0.10,
+                       phase=i * 1.1, cap=False)
+            # The wrinkle phase is carried ACROSS the cut (`+ k * 0.7` is the
+            # per-ring advance `_path_loft` would have applied), so the crease
+            # pattern runs on through the joint instead of restarting there and
+            # advertising where the limb was divided.
+            _path_loft(s, "tendon_%d_b" % i, pts[k:], radii[k:],
+                       m["tendon"], outer, 4, 1.0, 0.78, wrinkle=0.10,
+                       phase=i * 1.1 + k * 0.7, cap=False)
+        else:
+            _path_loft(s, "tendon_%d" % i, pts, radii, m["tendon"], inner, 4,
+                       1.0, 0.78, wrinkle=0.10, phase=i * 1.1, cap=False)
         for j in range(1, len(pts) - 1):
             r = radii[j] * 1.55
             td.ellipsoid(s, "tendon_joint_%d_%d" % (i, j), (r, r, r * 0.72),
-                         pts[j], m["joint"], body, (0.0, 0.0, 0.0), 4, 2)
+                         pts[j], m["joint"],
+                         outer if j >= TENDON_SPLIT else inner,
+                         (0.0, 0.0, 0.0), 4, 2)
         td.ellipsoid(s, "tendon_lit_%d" % i,
                      (radii[-1] * 1.9, radii[-1] * 1.9, radii[-1] * 1.3),
-                     pts[-1], m["glow"], body, (0.0, 0.0, 0.0), 4, 2)
+                     pts[-1], m["glow"], outer, (0.0, 0.0, 0.0), 4, 2)
 
 
 def _tendon(pts, r0, r1):
@@ -1262,7 +1316,7 @@ def _cfg(tier, **kw):
         hood_yaw=0.0, hood_pitch=0.0, chest_open=False,
         chest_gap=(math.radians(48.0), math.radians(116.0)),
         pushes=[], crest=False, vein=False, lit_face=False, extra_joint=False,
-        tendons=[], has_hands=True, mat=MAT_WORN,
+        tendons=[], tendon_motion={}, has_hands=True, mat=MAT_WORN,
         sleeve_l=(SLEEVE_L, SLEEVE_L_R), sleeve_r=(SLEEVE_R, SLEEVE_R_R),
     )
     base.update(kw)
@@ -1308,6 +1362,10 @@ TIERS = {
                                            math.radians(124.0)),
                vein=True, crest=True, lit_face=True, has_hands=False,
                mat=MAT_ABYSS, tendons=TENDONS_B4,
+               # 0 and 1 BRACKET THE BEAM ORIGIN AND THEREFORE NEVER MOVE. The
+               # two that reach for the ground are the ones still on their way
+               # down, so they are the ones that settle.
+               tendon_motion={2: "settle", 3: "settle"},
                sleeve_l=(SLEEVE_L_EMPTY, SLEEVE_EMPTY_R),
                sleeve_r=(SLEEVE_R_EMPTY, SLEEVE_EMPTY_R),
                pushes=[(math.radians(318.0), 0.960, 0.46, 0.150, 0.032)]),
@@ -1322,11 +1380,206 @@ TIERS = {
                                            math.radians(128.0)),
                vein=True, crest=True, lit_face=True, has_hands=False,
                mat=MAT_ABYSS, tendons=TENDONS_B5,
+               # THE THREE ON THE GROUND HAVE ARRIVED, so there is no settle
+               # left to play: what is left is a CREEP, one joint only, all
+               # three together, and the fact that they still agree with each
+               # other to the degree while they do it is the tier.
+               tendon_motion={2: "creep", 3: "creep", 4: "creep"},
                sleeve_l=(SLEEVE_L_EMPTY, SLEEVE_EMPTY_R),
                sleeve_r=(SLEEVE_R_EMPTY, SLEEVE_EMPTY_R)),
 }
 
 ORDER = ["b1", "b2", "b3", "b4", "b5"]
+
+
+# ---------------------------------------------------------------------------
+# THE ATTACK. Four frames, the house norm, keyed on EMPTIES -- geometry ships
+# once in its group's local space and a frame is one 4x4 per group, per
+# td_mesh.build. FRAME 0 IS THE REST POSE AND IT IS THE IDENTITY on every group
+# at every tier (`_rest_is_identity` fails the build otherwise), so a frameless
+# runtime draws the model that was reviewed and the group-local vertices in the
+# file ARE world vertices -- which the 360 test below depends on.
+#
+# WHAT THE RUNTIME DOES WITH THEM, read out of gl-world.js rather than assumed:
+# `frame = 1 + floor((gearPhase / 0.45) * 3)` capped at 3 while the phase is
+# under 0.45, and frame 0 for the rest of the cycle. gearPhase is
+# `1 - cooldown / cycle`, so it is zero straight after a shot. The strip
+# therefore plays 1, 2, 3 over the first 45% of the recharge and then HOLDS
+# frame 0 for the remaining 55%. The animation is more than half stillness
+# before a single number below is chosen, and that is the right skeleton for
+# this tower: a pull, a settle, and a long hold.
+#
+# AND NOTHING DRIVES IT YET. THIS IS NOT A DEFECT IN THIS FILE AND IT CANNOT BE
+# FIXED FROM THIS FILE, so it is recorded here rather than discovered again.
+# gl-world.js's `drawActor` leaves frame 0 only if the tower object answers to
+# `gearPhase()` or `swingProgress()`. `BeamTower` (js/towers/beam-adapter.js,
+# ID "siphon") has NEITHER -- it keeps time on a `tickTimer`, because it
+# channels rather than shoots -- so every Siphon in play draws frame 0 for
+# ever, on BOTH paths: siphon_idol.py's sceptre sway is in exactly the same
+# position.
+#
+# Measured, not inferred. A real BeamTower placed on the board and upgraded to
+# b5, with eight enemies up and its tickTimer cycling 0.100 -> 0.067 -> 0.033,
+# renders 11236 pixels and NOT ONE of them changes over twelve simulation steps
+# and several full tick cycles: pixel diff 0, twelve times. The identical model
+# posed by hand to frame 2 at the same place and scale differs by 2010 pixels.
+# The strip is right and the switch is missing.
+#
+# What is missing is one derived, cosmetic getter on BeamTower -- the Soldier's
+# own `gearPhase` is four lines and stores nothing, and a beam tower's natural
+# phase is its tick clock. That belongs to whoever owns the beam adapter; it is
+# a simulation file and this lot does not touch it.
+#
+# THIS IS NOT A SWING AND MUST NEVER BECOME ONE. The Siphon channels a
+# CONTINUOUS beam: nothing is thrown, nothing recoils, nothing is struck. A
+# strike would be a lie about the mechanic before it was a lie about the
+# character. Path B's whole idea is the disturbing without the ugly -- what
+# unsettles is the CALM -- so the peak of the whole file is 5.7 degrees and the
+# fastest thing in it takes three frames to happen.
+#
+# ---------------------------------------------------------------------------
+# WHAT MOVES, AND WHAT MAY NOT.
+#
+# THE ORIGIN MAY NOT MOVE. HANDS (0.055, 0.305, 1.045) is frozen by the socle,
+# written to tools/blender/siphon_origins.json and read at runtime by
+# js/gl/siphon-beam-draw.js. If the hands shifted, the beam would leave from
+# empty air beside them. So the palms (b1..b3) and the two tendons that bracket
+# the origin (b4/b5) are not merely held still: they are NOT IN AN ANIMATED
+# GROUP AT ALL, which is a structural guarantee rather than a tolerance on a
+# measurement. siphon_idol.py reaches the same conclusion about its ring by the
+# same route. `measure` then proves the other half -- that nothing which does
+# move ever comes within 0.035 of the origin, on any frame, at any tier.
+#
+# TWO SYSTEMS MOVE, and both of them are the tier's own signature rather than a
+# new idea bolted on for the sake of having an animation:
+#
+#   * THE HOOD, at every tier. b1's entire premise is that the hood did not
+#     turn when he did; the attack is that lag EXTENDING -- he draws, and the
+#     head goes a little further off the shoulders and tips back before it
+#     comes most of the way home. It turns about `hood_spec`'s own origin, the
+#     collar centre, so the animation's pivot IS the pose's pivot and the
+#     collar ring stays inside the shoulder it sits in.
+#   * THE REACHING TENDONS, at b4 and b5 only, and never the two that bracket
+#     the beam. At b4 they are still in mid-air and they SETTLE -- down and
+#     along, bending at the root and again half way out. At b5 they have
+#     arrived, so all that is left is a creep.
+#
+# WHAT DELIBERATELY DOES NOT MOVE, because restraint is the brief: the robe,
+# the sash, the cowl, the empty sleeves, the lamellae and the rose bead. Five
+# more animated groups would have been five more draw calls per tower for
+# motion that is a third of a pixel behind a chest gap, and a body where
+# everything drifts is a body where nothing reads.
+#
+# ---------------------------------------------------------------------------
+# THE LADDER RUNS DOWNWARD, and this is the part that is worth stating twice
+# because every instinct says otherwise: a tier does not buy more movement, it
+# buys less. By b5 he barely moves at all. `MOTION` is the one scalar that says
+# so, `measure` reports what each tier actually travelled, and `main` REFUSES
+# TO BUILD if that measured ladder is not strictly decreasing -- so the claim
+# cannot rot into a comment that used to be true.
+#
+# The numbers are chosen against the screen. The figure is ~57 px for 1.79
+# units, i.e. 31.8 px per unit, so a tenth of a unit is three pixels and the
+# whole vocabulary here lives between a third of a pixel and two.
+ATTACK_FRAMES = 4
+
+MOTION = {"b1": 1.00, "b2": 0.80, "b3": 0.62, "b4": 0.46, "b5": 0.30}
+
+# THE HOOD'S DRAW, as (rx, ry, rz) at MOTION 1.0. Frame 0 is rest; 1 opens the
+# pull, 2 is the deepest of it, 3 is the settle -- and the settle does NOT come
+# back the way it went. Its yaw crosses through zero to the other side while
+# the pitch is still unwinding, so the cycle is a loop rather than an
+# out-and-back, which is what stops four frames reading as a metronome.
+#
+# rx IS NEVER NEGATIVE, and that is a safety property rather than a taste.
+# Positive rx tips the crown BACKWARD, the same sense as `hood_pitch`, and the
+# hood's mass leans to -y, so a positive pitch can only LOWER the top of the
+# model. A negative one would raise it, and the model's height is the socle's
+# ladder, checked to 0.008. `measure` gates the built top of every frame
+# anyway; this just means the gate is never close.
+HOOD_DRAW = [(0.000, 0.000, 0.000),
+             (0.040, 0.014, -0.028),
+             (0.088, 0.020, -0.050),
+             (0.038, -0.010, 0.020)]
+
+# The settle's shape, shared by both tendon joints so a limb bends as one thing
+# instead of two. Same skeleton as the hood: open, deepest, most of the way
+# back. Nothing here returns to zero on frame 3 -- the return happens on the
+# hold, which is where a thing that is settling should finish.
+TENDON_DRAW = [0.00, 0.34, 0.80, 0.40]
+# THESE TWO ARE SET BY THE LADDER GATE, NOT BY TASTE, and the first values
+# tried are worth recording because the gate is what rejected them. At 0.086 /
+# 0.062 the settle measured 1.44 px at b4 against the b3 hood's 0.98 -- so the
+# tower moved MORE at b4 than at b3, which is the exact inversion of the arc,
+# and `main` refused the build. They are scaled to 0.597 of that. A joint's own
+# travel is small; what makes the tip the biggest mover on the model is that
+# the outer half of the limb carries BOTH rotations, and that compounding is
+# easy to under-count from the constants alone. Only the measurement sees it.
+TENDON_ROOT = 0.051          # radians at MOTION 1.0, at the sleeve
+TENDON_MID = 0.037           # and again at the joint half way out
+TENDON_CREEP = 0.150         # b5, about the vertical: see `_creep_axis`
+
+
+def _settle_axis(pivot, tip):
+    """The axis that brings a tendon's tip DOWN, taken from the tendon's own
+    geometry rather than typed, so the arms settle in the directions they are
+    actually reaching instead of all leaning the same way.
+
+    r is the reach from the joint to the tip. z_hat x r is horizontal and
+    perpendicular to it, so turning by +a about it moves the tip by a*|r| and
+    drops it by exactly a*|r_horizontal|.
+    """
+    return _norm(_cross((0.0, 0.0, 1.0), _sub(tip, pivot)))
+
+
+def _creep_axis(_pivot, _tip):
+    """b5, and it is the vertical on purpose. Three tendons have SETTLED onto
+    the ground; there is no descent left to play and a rigid pitch about a root
+    a metre up would drive a tip that is already at z 0.042 through the floor.
+    So what is left is a crawl ALONG the ground -- constant height, constant
+    distance from the root, no penetration possible by construction -- and all
+    three do it together, still exactly 50 degrees apart afterwards. The
+    regularity is the thing that is wrong, and it survives the motion."""
+    return (0.0, 0.0, 1.0)
+
+
+def _turn_frames(axis, amp):
+    """One joint's four rotations, as XYZ Euler triples.
+
+    A Node carries an Euler triple and nothing else, and `angle * axis` IS that
+    triple here: Euler-XYZ and axis-angle agree to first order, and at this
+    file's 0.09 rad peak the second-order disagreement is 0.004 rad -- a
+    thirtieth of a pixel on the longest lever in the model. `measure` reads the
+    matrices that shipped rather than these numbers, so the report is of the
+    built animation either way.
+    """
+    return [tuple(c * amp * k for c in axis) for k in TENDON_DRAW]
+
+
+def _pivot_pose(node, pivot, rot):
+    """Turn `node` about `pivot`.
+
+    A node's matrix is T(location)*R, i.e. R*p + location, so to spin about a
+    point C the location has to carry C - R*C. Getting that wrong is what hangs
+    a part a metre off the model. siphon_idol.py's `_sceptre_pose` records the
+    same trap, and this is the same three lines.
+
+    NESTED JOINTS COMPOSE FOR FREE. A child empty's world matrix is P*C, and at
+    rest every matrix here is the identity, so a pivot written in world
+    coordinates is also written in its parent's frame. The child turns about
+    its own joint and the parent then carries joint and all -- which is
+    articulation, from two 4x4s and no skinning.
+    """
+    node.rotation = list(rot)
+    spun = td.apply(td.trs((0, 0, 0), node.rotation), pivot)
+    node.location = [pivot[k] - spun[k] for k in range(3)]
+
+
+def _make_pose(joints):
+    def pose(frame):
+        for node, pivot, rots in joints:
+            _pivot_pose(node, pivot, rots[frame % len(rots)])
+    return pose
 
 
 def build_body(tier, flat):
@@ -1335,21 +1588,57 @@ def build_body(tier, flat):
     fixed = s.node("world_fixed", parent=root, world_fixed=True)
     body = s.node("body", parent=root)
     cfg = TIERS[tier]
+    scale = MOTION[tier]
+    joints = []
+
+    # THE HOOD TURNS ABOUT THE COLLAR CENTRE -- `hood_spec`'s own origin, the
+    # point the tier's yaw and pitch already turn it about. Two things follow
+    # for free: the bottom ring of the hood is the geometry CLOSEST to the
+    # pivot, so it is the geometry that moves least and the join at the
+    # shoulders cannot open, and the attack reads as more of the lag the tier
+    # already has rather than as a second, unrelated motion.
+    hood_node = s.node("hood", parent=body, animated=True)
+    hox, hoy = axis(1.305)
+    joints.append((hood_node, (hox, hoy, lift(HOOD_COLLAR, cfg["rise"])),
+                   [tuple(c * scale for c in rot) for rot in HOOD_DRAW]))
 
     robe(s, body, cfg)
     sash(s, body, cfg)
     cowl(s, body, cfg)
-    hood(s, body, cfg)
+    hood(s, hood_node, cfg)
     sleeves(s, body, cfg)
     if cfg["chest_open"]:
         cavity(s, body, cfg)
     if cfg["has_hands"]:
         hands(s, body, cfg)
     if cfg["tendons"]:
-        tendons(s, body, cfg)
+        moving = {}
+        for i in sorted(cfg["tendon_motion"]):
+            kind = cfg["tendon_motion"][i]
+            pts = cfg["tendons"][i][0]
+            inner = s.node("tendon%d" % i, parent=body, animated=True)
+            if kind == "creep":
+                moving[i] = (inner, inner)
+                joints.append((inner, pts[0],
+                               _turn_frames(_creep_axis(pts[0], pts[-1]),
+                                            TENDON_CREEP * scale)))
+                continue
+            outer = s.node("tendon%db" % i, parent=inner, animated=True)
+            moving[i] = (inner, outer)
+            joints.append((inner, pts[0],
+                           _turn_frames(_settle_axis(pts[0], pts[-1]),
+                                        TENDON_ROOT * scale)))
+            joints.append((outer, pts[TENDON_SPLIT],
+                           _turn_frames(_settle_axis(pts[TENDON_SPLIT],
+                                                     pts[-1]),
+                                        TENDON_MID * scale)))
+        tendons(s, body, cfg, moving)
     if cfg["vein"]:
         vein_socket(s, fixed, cfg)
-    return td.build(s, "siphon-" + tier), s
+
+    pose = _make_pose(joints)
+    model = td.build(s, "siphon-" + tier, frames=ATTACK_FRAMES, pose=pose)
+    return model, s, pose
 
 
 # ---------------------------------------------------------------------------
@@ -1395,18 +1684,35 @@ IOU_QUARTER_MAX = 0.85
 IOU_MIRROR_MAX = 0.88
 
 
-def _group_tris(model, group=""):
+def _turning_tris(model):
+    """Every triangle that TURNS WITH THE TOWER -- which is every group except
+    `world_fixed`, and that now includes the animated ones.
+
+    THIS IS WHERE ANIMATING A MODEL QUIETLY WEAKENS ITS OWN TEST, so it is
+    worth being exact about. The version this replaces asked for the group
+    named "" and rasterised that. When it was written "" was the whole model,
+    and it stopped being the whole model the moment a group was added: the hood
+    is a third of this silhouette and the tendons are most of b5's, and both
+    would have walked out of the gate on the day they started to move. A test
+    that gets easier when the model gets more complicated is not a test.
+
+    So the union, less the world-fixed socket -- which is excluded for the
+    reason it always was, that it does not rotate with the tower and including
+    it would flatter the score. Frame 0 is the rest pose and every group's rest
+    matrix is the identity, so group-local vertices ARE world vertices and the
+    silhouette is the one that was measured before any of this moved: b1 0.827
+    / 0.831 before, b1 0.827 / 0.831 after. Identical numbers are the evidence
+    that the gate did not move.
+    """
     pos = model["positions"]
-    first, count = 0, len(pos) // 3
-    for g in model["groups"]:
-        if g["name"] == group:
-            first, count = g["first"], g["count"]
-            break
+    spans = [(g["first"], g["count"]) for g in model["groups"]
+             if g["name"] != td.WORLD_FIXED_GROUP]
     out = []
-    for t in range(count // 3):
-        v = first + t * 3
-        out.append(tuple((pos[(v + k) * 3], pos[(v + k) * 3 + 1],
-                          pos[(v + k) * 3 + 2]) for k in range(3)))
+    for first, count in spans:
+        for t in range(count // 3):
+            v = first + t * 3
+            out.append(tuple((pos[(v + k) * 3], pos[(v + k) * 3 + 1],
+                              pos[(v + k) * 3 + 2]) for k in range(3)))
     return out
 
 
@@ -1494,7 +1800,7 @@ def rotation_test(model):
     further apart ever get, which is the flattest reading of all -- a surface of
     revolution sits at 1.00 there whatever its 90-degree pairs happen to do.
     """
-    tris = _group_tris(model, "")
+    tris = _turning_tris(model)
     worst_q = worst_m = worst_any = 0.0
     step = max(1, YAWS // 6)
     for elev in (0.0, 35.0):
@@ -1539,16 +1845,109 @@ def _extent(model, group=None):
     return lo, hi, maxr
 
 
-def _near_hands(model):
+def _near_hands(model, group=None):
+    """How close the nearest vertex gets to the beam origin. `group` narrows it
+    to one export group, which is how the bracketing is proved to be STATIC
+    rather than merely present."""
     pos = model["positions"]
+    first, count = 0, len(pos) // 3
+    if group is not None:
+        for g in model["groups"]:
+            if g["name"] == group:
+                first, count = g["first"], g["count"]
+                break
+        else:
+            return 1e9
     best = 1e9
-    for i in range(0, len(pos), 3):
-        best = min(best, math.dist((pos[i], pos[i + 1], pos[i + 2]), HANDS))
+    for v in range(first, first + count):
+        best = min(best, math.dist((pos[v * 3], pos[v * 3 + 1],
+                                    pos[v * 3 + 2]), HANDS))
     return best
 
 
-def audit(tier, model, scene):
-    """Six things the brief will not forgive, checked at build time."""
+# ---------------------------------------------------------------------------
+# WHAT THE ANIMATION ACTUALLY DID, measured off the built matrices.
+#
+# Everything below reads the scene the way the runtime reads the file: a mesh's
+# vertices are authored in world space and its group's rest matrix is the
+# identity, so pushing those vertices through the group's matrix for a frame
+# lands them exactly where that frame draws them. siphon_idol.py's
+# `penetration` walks the scene for the same reason -- the flattened model has
+# already thrown the parent chain away, and the parent chain is the question.
+#
+# Five things are measured rather than asserted, and four of them are gates:
+#
+#   TRAVEL   the furthest any vertex of a group moves off its rest position, in
+#            units and in pixels. This is the animation, and it is the number
+#            the tier ladder is held to.
+#   TOP      the highest any frame reaches. The socle's height ladder is a
+#            build gate at rest; a pose that broke it would be a tower that
+#            grows while it fires.
+#   RADIUS   the furthest any frame reaches from the axis. The footprint is
+#            15 u.l. at every tier and a swinging tendon is not an exemption.
+#   FLOOR    the lowest any frame reaches. A tendon that has settled ON the
+#            ground must not then be pushed THROUGH it.
+#   HANDS    how close any moving vertex ever gets to the beam origin.
+# ---------------------------------------------------------------------------
+
+def _animated_of(node):
+    """The animated group a mesh rides, by td_mesh's own rule."""
+    while node is not None:
+        if node.world_fixed:
+            return None
+        if node.animated:
+            return node
+        node = node.parent
+    return None
+
+
+def measure(scene, pose):
+    riders = [(m, _animated_of(m.parent)) for m in scene.meshes]
+    riders = [(m, n) for (m, n) in riders if n is not None]
+    pose(0)
+    rest = dict((id(m),
+                 [td.apply(m.parent.matrix_world(), v) for v in m.verts])
+                for m, _n in riders)
+    out = {"travel": {}, "top": -1e9, "floor": 1e9, "radius": 0.0,
+           "hands": 1e9, "worst": 0.0}
+    for f in range(ATTACK_FRAMES):
+        pose(f)
+        for m, n in riders:
+            mat = m.parent.matrix_world()
+            base = rest[id(m)]
+            for k, v in enumerate(m.verts):
+                p = td.apply(mat, v)
+                d = math.dist(p, base[k])
+                if d > out["travel"].get(n.name, -1.0):
+                    out["travel"][n.name] = d
+                out["worst"] = max(out["worst"], d)
+                out["top"] = max(out["top"], p[2])
+                out["floor"] = min(out["floor"], p[2])
+                out["radius"] = max(out["radius"], math.hypot(p[0], p[1]))
+                out["hands"] = min(out["hands"], math.dist(p, HANDS))
+    pose(0)
+    return out
+
+
+def _rest_is_identity(tier, model):
+    """FRAME 0 MUST BE THE REST POSE. A frameless runtime draws frame 0, the
+    360 test rasterises the file's own vertices, and `measure` calls frame 0
+    the thing everything else is a departure from -- three separate things that
+    are only true if the first matrix of every group is the identity."""
+    if len(model["frames"]) != ATTACK_FRAMES:
+        raise SystemExit("siphon-%s shipped %d frames, not %d"
+                         % (tier, len(model["frames"]), ATTACK_FRAMES))
+    want = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    for g, m in zip(model["groups"], model["frames"][0]):
+        if m is None:
+            continue
+        if max(abs(m[k] - want[k]) for k in range(16)) > 1e-6:
+            raise SystemExit("siphon-%s: group '%s' does not rest at the "
+                             "identity on frame 0" % (tier, g["name"]))
+
+
+def audit(tier, model, scene, motion):
+    """Seven things the brief will not forgive, checked at build time."""
     name = "siphon-" + tier
     used = _materials(scene)
     stray = sorted(used - set(PALETTE))
@@ -1571,15 +1970,20 @@ def audit(tier, model, scene):
         raise SystemExit("%s reaches %.3f from the axis, past the hem's %.2f"
                          % (name, maxr, HEM_LONG))
 
-    # 3. THE BEAM ORIGIN IS A VOID. There must be geometry near it (the palms,
-    #    or the tendons that replaced them) and none AT it.
-    d = _near_hands(model)
+    # 3. THE BEAM ORIGIN IS A VOID, AND IT IS BRACKETED BY THINGS THAT CANNOT
+    #    MOVE. There must be geometry near it (the palms, or the tendons that
+    #    replaced them) and none AT it -- and that geometry is asked of the
+    #    STATIC group by name, because a pair of hands that framed the origin
+    #    on frame 0 and drifted off it on frame 2 would satisfy the old check
+    #    and detach the beam anyway.
+    d = _near_hands(model, "")
     if d < 0.035:
         raise SystemExit("%s puts solid geometry on the beam origin (%.3f)"
                          % (name, d))
     if d > 0.150:
-        raise SystemExit("%s leaves the beam origin unbracketed (%.3f)"
-                         % (name, d))
+        raise SystemExit("%s leaves the beam origin unbracketed by anything "
+                         "static (%.3f) -- whatever brackets HANDS may not be "
+                         "in an animated group" % (name, d))
 
     # 4. THE PALETTE LADDER. Skin is the last human material and it leaves at
     #    b4, exactly where the hands do. The bright rose is the reveal and may
@@ -1607,6 +2011,32 @@ def audit(tier, model, scene):
     # 6. THE BROKEN AXIS, as numbers rather than as an impression.
     if abs((SH_L[2] - SH_R[2]) - SHOULDER_LIFT) > 1e-6:
         raise SystemExit("the shoulders are level")
+
+    # 7. THE ANIMATION, held to the same invariants as the rest pose -- on
+    #    EVERY frame, because a socle number that only holds while the tower is
+    #    idle is not a socle number. Same tolerances as checks 1 to 3 above;
+    #    none of them is loosened to let a pose through.
+    _rest_is_identity(tier, model)
+    if motion["top"] > want + 0.008:
+        raise SystemExit("%s grows to %.3f while it fires, past the ladder's "
+                         "%.3f" % (name, motion["top"], want))
+    if motion["radius"] > HEM_LONG + 0.005:
+        raise SystemExit("%s swings out to %.3f while it fires, past the "
+                         "hem's %.2f"
+                         % (name, motion["radius"], HEM_LONG))
+    if motion["floor"] < -0.002:
+        raise SystemExit("%s pushes geometry %.3f through the ground while it "
+                         "fires" % (name, motion["floor"]))
+    if motion["hands"] < 0.035:
+        raise SystemExit("%s moves geometry to within %.3f of the beam origin "
+                         "-- HANDS is frozen by the socle and read at runtime "
+                         "by js/gl/siphon-beam-draw.js" % (name,
+                                                           motion["hands"]))
+    if motion["worst"] < 0.012:
+        raise SystemExit("%s travels %.4f, which is under half a pixel at "
+                         "%.1f px/unit -- the tower is meant to move a little "
+                         "while it draws, even at b5"
+                         % (name, motion["worst"], PX_PER_UNIT))
     return maxr
 
 
@@ -1619,15 +2049,18 @@ def main():
              _hem_raw(TRAIN + math.pi / 2), _hem_raw(TRAIN - math.pi / 2)))
 
     total, radii, passes, heights = 0, [], [], []
+    moves = []
     for tier in ORDER:
-        model, scene = build_body(tier, flat)
-        maxr = audit(tier, model, scene)
+        model, scene, pose = build_body(tier, flat)
+        motion = measure(scene, pose)
+        maxr = audit(tier, model, scene, motion)
         td.write_js(model, "siphon-%s.js" % tier)
         lo, hi, _r = _extent(model)
         wq, wm, wany, ok = rotation_test(model)
         passes.append(ok)
         radii.append(maxr)
         heights.append(hi[2])
+        moves.append((tier, model, motion))
         total += model["triangles"]
         print("  siphon-%s %4d tris  h %.3f  span %.2f x %.2f  r %.3f  |  "
               "quarter %.3f  mirror %.3f  any60 %.3f  %s"
@@ -1656,10 +2089,48 @@ def main():
           % IOU_QUARTER_MAX)
     print("      worst MIRROR IoU       < %.2f -- worst case, not the mean"
           % IOU_MIRROR_MAX)
+    # THE ATTACK, reported as what the built matrices do rather than as what
+    # the tables above intend. The ladder is the claim the brief cares about --
+    # a tier buys LESS movement, not more -- so it is a gate, not a print.
+    print("  THE ATTACK: %d frames on empties, played 1-2-3 over the first "
+          "45%% of the recharge and held at 0 (rest) for the other 55%%."
+          % ATTACK_FRAMES)
+    print("    %-4s %-6s %-8s %-7s  %s"
+          % ("tier", "scale", "travel", "px", "what moved, worst vertex per "
+             "group, in px"))
+    for (tier, model, motion) in moves:
+        parts = "  ".join(
+            "%s %.2f" % (n, motion["travel"][n] * PX_PER_UNIT)
+            for n in sorted(motion["travel"]))
+        print("      %-4s %-6.2f %-8.4f %-7.2f  %s"
+              % (tier, MOTION[tier], motion["worst"],
+                 motion["worst"] * PX_PER_UNIT, parts))
+    ladder = [m["worst"] for (_t, _m, m) in moves]
+    if any(b >= a for a, b in zip(ladder, ladder[1:])):
+        raise SystemExit(
+            "the motion does not get SMALLER up the tier ladder: %s. By b5 he "
+            "barely moves at all -- that is the arc, and the opposite of the "
+            "usual instinct, so it is gated here rather than trusted to a "
+            "comment." % ["%.4f" % v for v in ladder])
+    print("    the ladder is STRICTLY DECREASING, %.2f px at b1 down to %.2f "
+          "at b5, and the build fails if it ever stops being."
+          % (ladder[0] * PX_PER_UNIT, ladder[-1] * PX_PER_UNIT))
+    print("    every frame is inside the socle: top <= the tier's own height, "
+          "radius <= the hem's %.2f, nothing under the ground, and nothing "
+          "moving within 0.035 of HANDS." % HEM_LONG)
+    for (tier, _model, motion) in moves:
+        print("      %-4s top %.3f (ladder %.3f)  radius %.3f  floor %+.3f  "
+              "nearest moving vertex to HANDS %.3f"
+              % (tier, motion["top"], HEIGHT[tier], motion["radius"],
+                 motion["floor"], motion["hands"]))
+
     print("  BEAM ORIGIN (read by the rayon lot, never retyped):")
     print("    HANDS      %.3f %.3f %.3f   -- all five path B tiers" % HANDS)
     print("    VEIN_ROOT  %.3f %.3f %.3f   -- world_fixed, b3 b4 b5" % VEIN_ROOT)
     print("    no RING anywhere: the sceptre is voie A.")
+    print("    the palms (b1-b3) and the two bracketing tendons (b4-b5) are "
+          "on the STATIC group: the origin is incapable of moving, not "
+          "merely measured not to.")
     if not all(passes):
         raise SystemExit("a body reads as a surface of revolution -- rebuild it")
 

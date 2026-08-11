@@ -854,6 +854,43 @@ var World3D = (function () {
               Math.floor((phase / WORK_SHARE) * (m.frames.length - 1)));
           }
         }
+        // A BLUB'S ANIMATION IS ITS COOLDOWN.
+        //
+        // It has neither gearPhase nor swingProgress, so without this branch
+        // `frame` stays 0 and all ten attack cycles are dead weight -- nine
+        // frames on disk and a still board. There is no visible symptom to catch
+        // that, because a frozen blub looks exactly like a correct rest pose,
+        // which is precisely why frame 0 IS the rest pose. One grep checks it:
+        //   grep -c BLUB_CYCLE js/gl/gl-world.js
+        //
+        // Indexing the strip by reload PHASE rather than by a clock means the
+        // cycle can neither overrun the interval nor lag a rate change -- and
+        // the swarm buff moves that rate mid-interval.
+        //
+        // Reading a cooldown of exactly zero as REST is not a detail: an idle
+        // blub holds cooldown at 0, and `1 - 0 * rate` is 1, not 0, so the naive
+        // formula parks every idle unit on the last frame of its wind-up.
+        //
+        // Both reads are read-only and neither is a simulation value; js/blub.js
+        // already publishes cooldown and attacksMade.
+        var BLUB_CYCLE = 8;
+        if (m && m.frames.length > 1 && t.isSummon &&
+            typeof t.attacksPerSecond === "function") {
+          frame = 0;
+          var brate = t.attacksPerSecond();
+          if (t.cooldown > 0 && brate > 0) {
+            var bphase = 1 - t.cooldown * brate;
+            if (!(bphase > 0)) bphase = 0;              // a rate that just rose
+            if (bphase > 0.999999) bphase = 0.999999;
+            // The SuperBlub carries a SECOND band for the interval that ends in
+            // its piercing beam, so the shoulder gun has somewhere to come up.
+            // The other nine have one band and never take this branch.
+            var bands = Math.max(1, Math.round((m.frames.length - 1) / BLUB_CYCLE));
+            var band = (bands > 1 && t.laser && t.laser.every &&
+                        ((t.attacksMade + 1) % t.laser.every === 0)) ? 1 : 0;
+            frame = 1 + band * BLUB_CYCLE + Math.floor(bphase * BLUB_CYCLE);
+          }
+        }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from
         // `swingProgress()`, which is already the cosmetic window the 2D pack
