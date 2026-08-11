@@ -1,14 +1,15 @@
 # Tower Defense — project context
 
 **Version 0.5.0** — three thirty-five-wave campaign difficulties: the original
-**Easy** schedule at 738 bodies / 13 498 effective HP, **Normal** at 851 /
-22 369, and **Hard** at 962 / 30 911. All can be won or lost and end on a boss.
-A **nineteen**-type enemy roster (swarms, armor, camo,
+**Easy** schedule at 797 bodies / 25 969 effective HP, **Normal** at 918 /
+43 844, and **Hard** at 1039 / 56 895. All can be won or lost and end on a boss.
+A **twenty-one**-type enemy roster (swarms, armor, camo,
 an early midboss, one that attacks your towers, one behind a shield that
 doubles its speed when the shield breaks, one that gets back up once, a spawner
-whose brood is shielded and pays nothing, and the Tyrant at wave 35). Fourteen
-types remain on Easy; **all nineteen appear on Normal and Hard**, including
-the four v0.4.9 additions and the flying Aether Wisp imported from v0.4.10.0.
+whose brood is shielded and pays nothing, and the Tyrant at wave 35). **All
+twenty-one are scheduled on every difficulty**, including the four v0.4.9
+additions and the flying Aether Wisp imported from v0.4.10.0; Normal and Hard
+simply bring them in earlier.
 **A shield now pays nothing, ever**, and so does healed health;
 waves
 that mix three or four types at once; a clear bonus of a tenth of each wave;
@@ -105,14 +106,15 @@ several "obvious" visual tests turned out to prove nothing (see the map-fixed
 note in the 2026-08-09 entry). Do not accept a screenshot glance as proof.
 
 **Run the test suite:** all six, none of which import each other. These are the
-current measured results, taken on 2026-08-10 after the Summoner landed:
+current measured results, taken on 2026-08-10 after the Summoner landed and
+confirmed on 2026-08-11 at commit `77a7865`:
 
 ```
 node tests/run.js                 105 pass / 3 fail   core game and difficulty
 node tests/content.test.js        182 pass / 30 fail  content, visuals and index
 node tests/long-range-dps.test.js  70 pass / 1 fail   the Longshot spec
 node tests/beam.test.js            45 pass / 0 fail   the beam acceptance list
-node tests/blub.test.js            47 pass / 0 fail   the Summoner acceptance list
+node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
 node tests/sandbox.smoke.js       2 failures          sandbox integration
 ```
 
@@ -143,18 +145,9 @@ group plus older schedule, boss, price and test fixture drift. Known examples:
   copied across without it. A pure test-file bug — the mechanics themselves are
   fine, and the sandbox exercises them.
 - `content.test.js` — `the roar shields it…` expects the boss to shoot every
-  1.75 s off a 3.5 s base. The shipping boss is 8 s before the roar and 6 s
+  6 s off an 8 s base. The shipping boss is 12 s before the roar and 9 s
   after, which is what this document and the owner's correction describe, so the
   **test** is stale, not the boss.
-- `content.test.js` — `the enemy tab covers the roster…` expects a stock normal's
-  late-wave ceiling to be 18 and derives 27. A codex/schedule question, untouched
-  here. (Its three *bounty* assertions in the same test did break on 2026-07-30 —
-  codex bounties are `health × CASH_PER_DAMAGE` — and those were updated to
-  derive from the constant, so this test now fails on the ceiling alone, exactly
-  as it did before the revamp.)
-- `run.js` — `a mixed wave deploys its groups in order` expects 36 bodies across
-  three groups and finds 44 in two. A wave-schedule assertion; the schedule was
-  out of scope on 2026-07-30, so it was left exactly as found.
 
 Fixing those is a separate job from anything the economy touched.
 
@@ -173,7 +166,7 @@ under three building policies (the figures are in the `WAVES` comment). That is
 a good substitute for the *balance* work and a poor one for the suite. The new
 tests are written and believed correct; they are not yet proven.
 
-**Run all five before believing a change is done.** Together they take roughly
+**Run all six before believing a change is done.** Together they take roughly
 25 seconds on the bundled Node runtime.
 
 No install, no dependencies — the suite uses only Node's built-in
@@ -294,7 +287,7 @@ js/targeting.js     WHICH enemy to shoot: the six modes, TowerScore, and
 js/maps.js          four authored maps plus two deterministic generated maps;
                      multi-route normalization, derived difficulty, and
                      themed non-gameplay sci-fi environments
-js/enemy.js         Enemy: the nineteen-type roster, movement, lane offsets,
+js/enemy.js         Enemy: the twenty-one-type roster, movement, lane offsets,
                      health, armor/defense, camo, flight, per-type sprite size,
                      timed slows, hover hit test, damage reporting
 js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces)
@@ -321,6 +314,13 @@ js/blub.js          BlubTower ("Summoner", id `blub`): the $450 tower that
                      summoned unit, which IS in `towers` (see that file's
                      header for the six things that buys) and whose hit points
                      are its ammunition
+js/systems/summon-contact.js  SummonContact: the ONE door every friendly
+                     summon uses for contact damage. A summon commits its
+                     remaining HP when it hits an enemy; if the strike kills,
+                     only the HP the enemy actually absorbed is spent and the
+                     rest survives for the next body. Damage still goes
+                     through TowerScore.apply, so armor, defense, shields,
+                     revives and kill credit keep their normal rules
 js/systems/damage-amp.js  timed "+X% damage taken" stacks that each expire on
                      their own clock. Read by Enemy.takeDamage, so it raises
                      damage from EVERY source; written only by the Summoner's
@@ -370,6 +370,29 @@ js/gl/gl-world.js   the world renderer: map mesh, board scenery, actors, the
                      standing on the surface that was actually built under it.
                      `groundHeightAt` and `isLevelUnder` are the seams; the
                      second is read by the placement rule
+js/gl/tower-preview.js TowerPreview3D: renders a tower's REAL registered model
+                     into an offscreen framebuffer on the board's own GL
+                     context and hands the 2D HUD a small bitmap, so the build
+                     bar, armoury, loadout and codex icons are the same object
+                     that lands on the board rather than a hand-drawn glyph
+js/gl/siphon-beam-spec.js GENERATED by tools/blender/siphon_beam.py -- the
+                     Siphon beam's profiles, laws and states. Do not hand-edit
+js/gl/siphon-beam-draw.js SiphonFXBeam: draws that spec between two MOVING
+                     points. The 3D branch draws towers itself and never calls
+                     a tower's own draw(), which is why the 2D beam code in
+                     beam-adapter.js rendered nothing until this file existed
+js/gl/blub-circles.js BlubFXCircles: the summoning circle under every planted
+                     unit -- exactly two seconds, diameter taken from the
+                     unit's own footprint so the table can be retuned freely
+js/gl/blub-summon.js BlubFXSummon: the summon ceremony, on a duration budget
+                     tied to the interval that triggers it
+js/gl/blub-projectiles.js what a blub's shot LOOKS like. Presentation only --
+                     js/blub.js resolves an attack instantly, so there is no
+                     projectile in the air; this reads the cosmetic field
+                     resolveAttack/fireLaser leave behind
+js/gl/blub-systems.js BlubFXSystems: swarm threads (counting them reads the
+                     bonus), the weaken sigil that fills with DamageAmp
+                     stacks, and death effects
 js/gl/models/*.js   GENERATED geometry, one classic script per model. Do not
                      hand-edit; re-run tools/blender/export_mesh.py
 tools/blender/td_scene.py shared offline camera/light/material/render pipeline;
@@ -472,9 +495,9 @@ sandbox.html                         SANDBOX MODE -- the real game plus infinite
                                       the u.l. debug overlay
 js/sandbox/sandbox.js                that page's wiring and schedule controls
                                       (hooks game.js, never edits it)
-tests/long-range-dps.test.js         54 tests -- run standalone, not part of run.js
-tests/beam.test.js                   42 tests -- the beam spec's acceptance list
-tests/blub.test.js                   46 tests -- one per numbered item in the
+tests/long-range-dps.test.js         run standalone, not part of run.js
+tests/beam.test.js                   the beam spec's acceptance list
+tests/blub.test.js                   one per numbered item in the
                                       Summoner's brief, plus the blub rail
 tests/sandbox.smoke.js               boots sandbox.html against a stubbed DOM
 tools/price-upgrades.js              the DPS model behind the upgrade prices
@@ -505,15 +528,20 @@ across input (`slotRect`, `slotAt`, `onClick`, `onKeyDown`) and rendering
 (`drawBuildBar`, `drawInspection`) — hit-test geometry and draw geometry both
 come from `slotRect`, so the two can never disagree about where a slot is.
 
-Data flow worth knowing: `Bullet.update()` **returns the damage it landed**,
-and the main loop turns that into cash. Nothing uses global mutation for
-scoring. Keep it that way.
+Data flow worth knowing: `Bullet.update()` **returns the damage it landed**, but
+the main loop discards that return — **only the later death sweep pays cash**,
+out of `bounty()`. Damage and kill credit are the things that never travel by
+global mutation; they go through `TowerScore.apply`. Cash is not in that rule:
+it is a global written in four places, and `worldContext.addGold` is the door a
+tower uses. Keep scoring that way.
 
 A bullet also **claims damage on its target while in flight**, which is what
 stops two towers wasting shots on the same enemy — see Target claiming below.
 That claim is the one piece of cross-entity state in the game, and it is
-strictly paired: reserved in the `Bullet` constructor, released when the
-bullet dies.
+strictly paired: reserved in the constructor, released when the bullet dies.
+There are **two** such pairs, not one — `PierceBullet` keeps its own and claims
+only the enemy it was AIMED at, so the ones it passes through go unclaimed.
+That is deliberate, and documented in the file as a known limitation.
 
 ---
 
@@ -534,9 +562,9 @@ begins. The next wave starts when that countdown reaches zero.
 
 | tier | waves | scheduled bodies | effective HP | authored pressure |
 |---|---:|---:|---:|---|
-| Easy | 35 | 738 | 13 498 | the original schedule, byte-identical |
-| Normal | 35 | 851 | 22 369 | 8% more bodies, 15% more health, 16% tighter intervals, five roster additions |
-| Hard | 35 | 962 | 30 911 | 20% more bodies, 35% more health, 32% tighter intervals, repeated support threats |
+| Easy | 35 | 797 | 25 969 | the original spine, rescaled once; pinned by `tests/run.js` |
+| Normal | 35 | 918 | 43 844 | 8% more bodies, 15% more health, 16% tighter intervals, five roster additions |
+| Hard | 35 | 1039 | 56 895 | 20% more bodies, 35% more health, 32% tighter intervals, repeated support threats |
 
 Normal and Hard are built from Easy's proven spine by
 `buildDifficultyWaves(tuning, additions)`. The transform is deterministic and
@@ -712,13 +740,16 @@ time kills fewer of them. A wave says how many, how often and which type —
 groups) carries a `health` override, resolved through `Enemy.healthOf`, the
 same resolver the spawner uses.
 
-**Easy is thirty-five waves, 738 enemies, 11 747 scheduled HP**
-(2026-07-29, v0.4.7; it was 33 waves and 4308 HP, before that 20 waves and 3094,
-before that two waves and 52). Scheduled HP is no longer the whole story, so
+**Easy is thirty-five waves, 797 enemies, 23 867 scheduled HP**
+(2026-07-29, v0.4.7, rescaled since; it was 33 waves and 4308 HP, before that 20
+waves and 3094, before that two waves and 52). Both figures are pinned by
+`tests/run.js`. Scheduled HP is no longer the whole story, so
 two more numbers matter:
 
-- **13 498 EFFECTIVE HP on Easy** — what the player actually has to remove, and the
-  owner's target ("make it so that the total is like 13500 hp", 2026-07-29). A
+- **25 969 EFFECTIVE HP on Easy** — what the player actually has to remove. The
+  owner's original target was half that ("make it so that the total is like
+  13500 hp", 2026-07-29); the spine was rescaled afterwards and 13 500 is no
+  longer what the schedule aims at. A
   shield is health you must chew through and a Revenant is two bodies, so
   effective HP is `count × health × (1 + shieldRatio) × (1 + revives)` per
   group — `waveEffectiveHealth` in game.js is the one implementation, and the
@@ -728,7 +759,7 @@ two more numbers matter:
   Every seven seconds a living Hive drops five hatchlings, each with a shield
   equal to its own life and each paying nothing — about 160 points of unpaid
   effective health per Hive that survives thirty seconds. And the wave-35
-  boss's roar calls in another 274 HP at 1.5× speed. Neither is a gap in the
+  boss's roar calls in another 2780 HP at 1.5× speed. Neither is a gap in the
   arithmetic; both are the point of the enemy that produces them.
 
 On top of that, **finishing a wave pays a tenth of it** — about $1350 across
@@ -753,9 +784,9 @@ GROUP across all three `DIFFICULTIES`, rather than from whichever schedule
 happened to run last. A type present at the same wave numbers everywhere reads
 "All modes"; the five additions state their Normal/Hard appearances.
 
-Easy deliberately keeps the earlier fourteen-type roster. The exact Easy-only
-absences are Aether Wisp, Shieldbearer, Healer, Vanguard and Camo Heavy.
-Normal and Hard must contain all nineteen; `tests/run.js` asserts both halves
+Every difficulty now schedules all twenty-one types; Aether Wisp, Shieldbearer,
+Healer, Vanguard and Camo Heavy arrive late on Easy and earlier on the higher
+tiers. `tests/run.js` asserts that every type is scheduled
 and also resolves every scheduled id through `Enemy.typeOf`, so a typo fails
 loudly.
 
@@ -787,7 +818,9 @@ particular thing:
 - **Waves 14, 18 and 28 are camo** — three things grant detection: the
   Longshot's A1 ($300 on top of a $900 tower — the tower was $75 before the
   2026-07-30 revamp; A1's own price did not move), the beam's B1, and since
-  2026-07-29 the **Soldier's B3** ($400 on top of a $15 tower). 14 and 18 are
+  2026-07-29 the **Soldier's B3** ($750 itself, but $1300 to reach — B1 200 +
+  B2 350 + B3 750 — on top of a $300 tower; unlike A1 it cannot be bought
+  straight off the shelf). 14 and 18 are
   deliberately *small* (32 and 40 HP): a healthy base can afford to leak them
   while it saves up, which is the point — an early camo wave the player cannot
   yet answer has to be a warning, not a run-ender. Wave 28's 100 HP is the one
@@ -884,7 +917,7 @@ never read as a win — do not add a second assignment or derive the flag from
 `waveIndex`. The loss check runs before the victory check so a final enemy
 that both empties the board and zeroes the base reads as the defeat it is.
 
-Since total effective HP (13 498) far exceeds the base's 100, an undefended base
+Since total effective HP (25 969) far exceeds the base's 100, an undefended base
 really is destroyed — the loss path is reachable in ordinary play, not just
 by tests. Both outcomes are pinned: the loss freeze by the original tests,
 the victory path (and the manual-idiom non-victory) by
@@ -899,6 +932,11 @@ empty a few hours earlier: *"2500hp slow, arrives at the middle of the 35th
 wave, shoots towers stunning them for 2 seconds, at half hp roars, sending
 enemies from the waves that have 1.5x speed and the boss gains a 200hp shield
 and gets a little faster and shoots more often."*
+
+**Two figures in that quote have since been raised and it is kept verbatim as
+the original ask, not as current values**: the body is **5000**, not 2500, and
+the shield is **1000**, not 200 (2026-08-01, at the owner's instruction). The
+table below is what ships.
 
 **It silences towers; it does not destroy them**, and that is the whole design.
 A threat that kills towers is answered by rebuilding. A threat that switches
@@ -1097,7 +1135,7 @@ compares a distance re-deriving pixels from scratch (that caching is what
 findTarget`, which compares two already-world-space numbers, never a raw u.l.
 one against a pixel one).
 
-**What one u.l. is worth, and why the constant is 1.552.** The yardstick is
+**What one u.l. is worth, and why the constant is 1.04.** The yardstick is
 the hypothetical 100 u.l. reference tower, and **the gunner IS that
 reference** — its range is exactly 100 u.l. A Longshot at 250 is two and a
 half reference towers, which is what "long range" means here; the map is
@@ -1419,12 +1457,16 @@ The sandbox sidebar also has a direct `← Back to main menu` button.
 Towers are no longer placed by clicking bare ground. The player **arms a build
 slot first**, then clicks the map.
 
-**`BUILD_SLOTS` is an array of tower CONSTRUCTORS**, currently
-`[Tower, Smasher, LongshotTower, BeamTower, Soldier]` — five slots, **all five
-now filled**. This is the whole extension point: drop a new constructor into a
-`null` slot and it appears in the bar, priced, with an icon, placeable, and
-inspectable. Nothing in the bar knows what a gunner is. To make that work a
-tower constructor must expose:
+**`BUILD_SLOTS` is an array of five tower CONSTRUCTORS**, and it is **DERIVED
+from the player's saved loadout** rather than written out as a literal —
+`MetaProgress.slotConstructors()` at load, re-read by `rebuildBuildBar()`
+whenever the armoury changes it. See "Meta progression" below for the ownership
+rules; they are not restated here. An unfilled slot is `null`, so **a fresh
+profile arms two of the five**, not all of them. The extension point is the
+CATALOGUE in `js/meta.js`: an entry there is a tower the armoury can sell, and
+an equipped entry appears in the bar, priced, with an icon, placeable, and
+inspectable. Nothing in the bar knows what a gunner is — the gunner is not in
+the catalogue at all. To make that work a tower constructor must expose:
 
 | Member | Used for |
 |---|---|
@@ -1443,19 +1485,30 @@ through `sandbox.html` — so two of the project's four towers were invisible to
 anyone actually playing. Wiring them in was a build-bar entry plus
 `index.html` loading their systems; no tower code changed.
 
-**The order is not by price** ($100, $700, $900, $800, $15 since the 2026-07-30
-revamp; it was $15, $200, $75, $800, $15). It preserves the
-slots that already existed, because the number keys are muscle memory and
-`tests/harness.js`'s `placeSmasher` addresses the Smasher as slot 1. New types
-append. Sorting the bar by cost means moving that helper too.
+**The order is not by price.** It is CATALOGUE order in `js/meta.js` —
+Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner — which is the historical
+build-bar order, preserved because the number keys are muscle memory. Their
+build costs run $700, $900, $800, $300, $450, and each comes from that type's own
+`COST`; the catalogue's own `price` field is the separate meta-COIN price the
+armoury charges, and is not a dollar figure. New types append. Nothing in the
+suite hardcodes a slot index any more:
+`tests/harness.js`'s `placeSmasher` resolves the Smasher **by constructor**,
+through `api.slotOf(sandbox.Smasher)`, precisely so that a shift like the
+gunner's deletion fails loudly instead of quietly placing a different tower.
 
 **The fifth slot was held empty for a year of change logs, and the Soldier is
 what it was being held for** (2026-07-29, at the owner's request). It existed
 so the bar would not change shape the day a fifth type arrived, and it did not.
-**The bar is now full**, so a sixth type is no longer a drop-in: it needs a
-decision about the bar's geometry (`SLOT_SIZE`, `BAR_WIDTH`, the `1`–`5` keys,
-`MetaProgress.SLOT_COUNT`) that nobody has made. `tests/run.js`'s "every built
-tower type is in the build bar" is where that decision will surface.
+
+**A sixth TYPE turned out not to need a sixth SLOT**, which is what the armoury
+bought. The Summoner landed on 2026-08-10 as the catalogue's fifth *buildable*
+type, and the bar absorbed it without changing shape because the loadout
+already decides which five of the owned types are equipped. A sixth SLOT is
+still an unmade decision, and still means the bar's geometry (`SLOT_SIZE`,
+`BAR_WIDTH`, the `1`–`5` keys, `MetaProgress.SLOT_COUNT`) — but that decision is
+about the bar's shape, not about how many towers the game may contain.
+`tests/run.js`'s "every built tower type is in the build bar" is where it will
+surface.
 
 **A consequence worth knowing: the expensive towers cannot stand where a
 gunner can.** Placement clearance is derived from each type's own footprint
@@ -1775,8 +1828,8 @@ table in Balance math below — different method, same caveat as always.
 
 **Two ways to make an unplayable bar, and `MetaProgress.unequip` refuses
 both:** an empty bar, and a bar whose cheapest tower costs more than
-`STARTING_CASH`. The second is the same deadlock with an extra step —
-unequipping the gunner and leaving only the $800 Siphon is a board you can
+`STARTING_CASH`. The second is the same deadlock with an extra step — stripping
+the bar down to the $800 Siphon alone, against a $600 stake, is a board you can
 never build on. AGENTS has always stated this invariant as "STARTING_CASH must
 exceed the cost of the cheapest tower"; it used to be guaranteed by
 `BUILD_SLOTS` being a constant with the gunner in it, and now that the player
@@ -1987,12 +2040,12 @@ the stretch the starting stake is tuned on):
 roster change and were stale; the ones above are what `tests/run.js` pins.)
 
 The opening contains `5 × 4 + 8 × 4 = 52` HP; the full thirty-five-wave
-schedule contains **11 747 scheduled / 13 498 effective** HP (per-wave table is a
+schedule contains **23 867 scheduled / 25 969 effective** HP (per-wave table is a
 comment on `WAVES`). Damage dealt plus health leaked to the base must add back
 to the *effective* total; that is the quickest whole-run conservation check —
 note it is a check on HP, not on cash, and cash has been damage × 3 since
 2026-07-30. (The figures here read 6466/8056 until 2026-07-30. Those were the
-v0.4.6 schedule's and were left behind when v0.4.7 rewrote it; 11 747/13 498 are
+v0.4.6 schedule's and were left behind when v0.4.7 rewrote it; 23 867/25 969 are
 what `tests/run.js` asserts and what the harness reports.)
 
 **Effective, not scheduled, and the difference is v0.4.7's.** A shield is
@@ -2219,8 +2272,8 @@ is actively unhelpful.
 
 **2026-07-29: "Save/load" came off this list.** The owner asked for meta coins
 "kept in between run", and a currency that resets on refresh is not a currency.
-What was built is the narrowest thing that satisfies that — three fields in
-`js/meta.js` (coins, owned, equipped) and nothing else. **Run state is still
+What was built is the narrowest thing that satisfies that — four fields in
+`js/meta.js` (coins, owned, equipped, and a run counter) and nothing else. **Run state is still
 not saved and must not be**: no resuming a run, no saved boards, no settings
 file. If a future ask needs one of those, it is a new decision, not an
 extension of this one.
@@ -2317,8 +2370,8 @@ walks past every tower regardless, so length only changes how long you have
 before the first leak. What actually moves the number is whether the road
 comes back *near itself*, within the Rifleman's reach of a second lane.
 
-**Enemy types (`Enemy.TYPES`).** Nineteen since the selective v0.4.10.0 merge:
-**fourteen on Easy, all nineteen on Normal and Hard**.
+**Enemy types (`Enemy.TYPES`).** Twenty-one, and **all twenty-one are scheduled
+on every difficulty** — a passing test in `tests/run.js` pins that.
 
 | id | HP | speed | armor | defense | camo | size | first seen | what it asks of the player |
 |---|---|---|---|---|---|---|---|---|
@@ -2336,14 +2389,14 @@ comes back *near itself*, within the Rifleman's reach of a second lane.
 | `brute` | 40 | ×0.55 | **5** | — | — | 1.5 | 20 | a weapon that hits for more than 5 — gunners and the beam do **zero** |
 | `revenant` | 16 **×2 lives** | ×0.85, **0 after** | — | — | — | 1.2 | 21 | attention — a parked body keeps eating shots meant for the wave behind it |
 | `hive` | 150 | ×0.4 | — | — | — | 1.6 | 26 | speed of kill — it seeds 5 normals every 7 s, and each of THOSE wears a shield equal to its life and pays nothing |
-| `boss` | 2500 **+200 at half** | ×0.3, **×0.405 after** | — | — | — | 2.4 | 35 | DEPTH — it stops, aims, and hits your single best tower for 45 and a stun; after the roar it also leaps 50 u.l. and shockwaves whatever it lands beside |
+| `boss` | 5000 **+1000 at half** | ×0.3, **×0.405 after** | — | — | — | 2.4 | 35 | DEPTH — it stops, aims, and hits your single best tower for 45 and a stun; after the roar it also leaps 90 u.l. and shockwaves whatever it lands beside |
 | `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | N16 / H15 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays |
 | `healer` | 200 | ×0.4 | — | — | — | 1.45 | N24 / H24 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either |
 | `boss_fast` | 750 | ×3.5 **for the first 400 u.l.**, then ×1.75 | — | — | — | 1.9 | N32 / H32 | TEMPO — 100 shield every 7 s that never stacks, on a body that crosses the opening stretch faster than anything else in the game |
 | `camo_heavy` | 20 | ×0.65 | **5** | 20% | **yes** | 1.4 | N18 / H18 | that SEEING it and KILLING it are two separate purchases |
 
-The four v0.4.9 additions and the Aether Wisp are **Easy-absent by design** and
-scheduled on both higher tiers. The index derives per-difficulty appearances;
+The four v0.4.9 additions and the Aether Wisp are scheduled on all three tiers
+and simply arrive earlier on Normal and Hard. The index derives per-difficulty appearances;
 the sandbox's type dropdown still exposes every roster row individually.
 
 Speeds are stored as **multipliers** of `BASE_SPEED_ULPS` so retuning the
@@ -2372,7 +2425,7 @@ carries an `attack: { damage, reachUl, intervalSeconds }` block, and
 `Enemy.prototype.attackTowers` asks *"does this enemy have an attack"*, never
 *"is this enemy angry"*. The file's founding rule — "no type has behaviour of
 its own, so nothing branches on which one an enemy is" — still holds across
-**seven** mechanic blocks now, each read by one method that asks whether the
+**eight** mechanic blocks now, each read by one method that asks whether the
 enemy HAS one:
 
 | block | what it does | read by |
@@ -2385,7 +2438,7 @@ enemy HAS one:
 | `support` | helps OTHER enemies on a timer — shields or heals them | `supportAllies` |
 | `sprint` | faster over the OPENING stretch of road, then never again | `currentSpeedUlps`, `isSprinting` |
 
-Tests pin the exact membership of each list — `attack` is `["angry", "boss"]`,
+Tests pin the exact membership of each list — `attack` is `["angry"]`,
 `shield` is `["shielded"]`, `revive` is `["revenant"]`, `spawns` is `["hive"]`,
 `phases` is `["boss"]`, `support` is
 `["shieldbearer", "healer", "boss_fast"]`, `sprint` is `["boss_fast"]` — so a
@@ -2478,8 +2531,8 @@ being precise about what moved:
   answer different questions and only one of them is about money. The death
   popup over a Bulwark reads its 12, not the 36 the player had to remove.
 - **`waveEffectiveHealth` did NOT change**, and must not. It measures what the
-  player has to REMOVE — which is what the 13 498 target and the clear bounty
-  are a tenth of — and that is still 13 498. It is simply no longer a purse.
+  player has to REMOVE — which is what the clear bounty is a tenth of — and
+  that is still what it measures, now 25 969. It is simply no longer a purse.
   **Confusing the two is now the easiest way to get the economy wrong**; there
   is a warning to that effect on the function itself.
 - **What it costs the player is exactly 1 364 HP** — the shields the schedule
@@ -3217,7 +3270,7 @@ tower still acting, not something it has finished doing.
 shooting"). A recruit is either marching or firing, never both, and `holding` is
 the flag. That changes what a recruit is *for*: it holds the ground where it met
 the wave instead of trading shots on the way past, so its life is decided by what
-walks into it rather than by the length of the road — which also makes the ~37 s
+walks into it rather than by the length of the road — which also makes the ~47 s
 crossing a **floor** on how long one lasts rather than an estimate. Targeting
 therefore happens **before** movement in `SoldierRecruit.update`, because whether
 there is a target is what decides whether it moves at all; the old order marched
@@ -3277,9 +3330,10 @@ has to be the number of hit points of wave it can stop, or it is decoration.
 
 Three derivations, so the rest of the numbers are not arbitrary:
 
-- **Walk speed is `Enemy.BASE_SPEED_ULPS`.** A recruit marching against the
-  traffic at the traffic's own pace crosses the reference route in ~37 s, which
-  is what makes the 45 s cooldown read as "your last group is just gone".
+- **Walk speed is 80% of `Enemy.BASE_SPEED_ULPS`** (40 u.l./s). A recruit
+  marching against the traffic at four fifths of its pace crosses the reference
+  route in ~47 s, which is what makes the 45 s cooldown read as "your last group
+  is just gone".
 - **Range is `Soldier.BASE_RANGE_UL`** — a recruit is a Soldier, so it sees as
   far as one that has bought nothing. The owner's "100 UL range" and that
   derivation are the same number, which is why it is still written as the
@@ -3965,8 +4019,8 @@ combination. It intentionally lives beside the gunner rather than inside it:
 
 The Arcane Sniper, the Rifleman and the four enemies set the bar. The Warbringer
 now has all seven tiers built through `td_mesh` (no Blender needed for it). **The
-Siphon is still a placeholder cylinder**, fifteen of the nineteen enemy types
-are still untextured spheres, and so is the Tyrant — the wave-35 boss the whole
+Siphon now has all eleven tiers built too**; seventeen of the twenty-one enemy
+types are still untextured spheres, and so is the Tyrant — the wave-35 boss the whole
 campaign ends on. Every future enemy has the same problem to solve. This is the
 contract. A model that meets it needs no
 special-casing anywhere in the renderer; a model that skips a clause needs a
@@ -4146,9 +4200,10 @@ above as a glossary.
 "delete this tower, but it stays in code as a placeholder for now", so it keeps
 its name and its old artwork and is now the one tower on the board that still
 looks like the pre-reskin game — which is the right signal for a unit on its
-way out. Nothing was removed: it is still in `BUILD_SLOTS`, still a starter in
-the meta catalogue, and still **the reference tower the whole u.l. system is
-anchored to** (100 u.l. range — see the core invariant section). Actually
+way out. But it IS removed from play: it is not in `BUILD_SLOTS`, not in the
+meta catalogue, and no longer the tower the u.l. system is anchored to — the
+Rifleman carries the 100 u.l. reference now (`Maps.REFERENCE_TOWER`). What
+survives is the file itself, as the shared footprint/hit-test source. Actually
 deleting it is a mechanics change and needs its own decision; see the note on
 `Tower.DISPLAY_NAME` in js/tower.js.
 
@@ -4194,7 +4249,7 @@ no mechanic was moved to match the description.
 | Logical canvas | 1280 × 720; all gameplay, UI and input coordinates remain here | `VIEW_WIDTH`, `VIEW_HEIGHT` in js/game.js |
 | Physical canvas | displayed CSS size × DPR, one uniform scale clamped to 1×–3× (1280×720 through 3840×2160) | `resizeCanvasBackingStore`, `MAX_CANVAS_SCALE` in js/game.js |
 | Rendered model sheets | Normal, Swarm, Brute and Hive: aligned base/shield sheets with 128×160 tiles, 8 facings × 8 walk frames; Arcane Sniper: 48 facings, normally 256×256, A5 512×512 and B5 384×384 paged as 3×16 direction rows, 20 composited sheets covering 27 legal builds | tools/blender, js/skins/draw-pack.js |
-| Rendered sheet cache version | `ASSET_VERSION = 12` | js/skins/draw-pack.js |
+| Rendered sheet cache version | `ASSET_VERSION = 14` | js/skins/draw-pack.js |
 | Measured rendered `contentTop` | Normal .8438; Swarm .6875; Brute .6937; Hive .5750 (shield-safe); Sniper base .7695, A3 .7539, A4 .5547, A5 .5625, B3 .7383, B4 .6406, B5 .5938 | js/skins/draw-pack.js; printed by tools/blender/td_scene.py |
 | Path length | ~1865 u.l. on the reference route | `Maps.referenceLengthUl()` (derived, not declared) |
 | Maps | 6: four authored plus fixed-seed Shifting Ley and two-route Twin Confluence | `Maps.LIST`, `Maps.DEFAULT_ID`, `Maps.routesOf` |
@@ -4202,9 +4257,9 @@ no mechanic was moved to match the description.
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
 | Campaign difficulties | Easy / Normal / Hard, selected before the route; Restart keeps the selected tier | `DIFFICULTIES`, `setDifficulty`, `selectedDifficultyId` |
-| Easy schedule | 35 waves, 738 enemies, 11 747 scheduled HP / **13 498 effective**, plus each Hive's brood and the boss's summons | `EASY_WAVES` in game.js |
-| Normal schedule | 35 waves, 851 enemies / **22 369 effective HP**, all nineteen types | `DIFFICULTIES.normal` |
-| Hard schedule | 35 waves, 962 enemies / **30 911 effective HP**, all nineteen types with repeated support threats | `DIFFICULTIES.hard` |
+| Easy schedule | 35 waves, 797 enemies, 23 867 scheduled HP / **25 969 effective**, plus each Hive's brood and the boss's summons | `EASY_WAVES` in game.js |
+| Normal schedule | 35 waves, 918 enemies / **43 844 effective HP**, all twenty-one types | `DIFFICULTIES.normal` |
+| Hard schedule | 35 waves, 1039 enemies / **56 895 effective HP**, all twenty-one types with repeated support threats | `DIFFICULTIES.hard` |
 | Wave clear bounty | a tenth of the wave's effective HP, ~$2596 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
 | Wave reward, all in | clear bounty + redistributed opening cash + rising allowance | `waveReward`, `waveProgressionReward`, `waveEscalatingReward` |
 | The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
@@ -4212,7 +4267,7 @@ no mechanic was moved to match the description.
 | Tyrant leap | 90 u.l. jump, 120 u.l. shockwave, 80 damage + 3 s stun to everything it reaches, commits within 220 u.l., 1.5 s wind-up | `phases[0].addAttack` |
 | Wave bonus timing | owed on deploy; paid on board-clear, on a skip, or when the next wave arrives | `pendingBounty`, `payWaveBounty` |
 | Tower stun | longest wins; no update, cooldown, aim tracking or live Siphon beam presentation while stunned | `TowerHealth.stun / isStunned / tickStun`, `BeamTower.visibleLocks` |
-| Waves 1-10 | the introduction, single-type, pinned exactly | `WAVES.slice(0, 11)` — deep-equal test in run.js |
+| Waves 1-11 | the introduction, single-type, pinned exactly | `WAVES.slice(0, 11)` — deep-equal test in run.js |
 | Mixed waves | `groups: [...]`, each with its own count/interval/type/health/lead | `waveGroups`, `waveCount`, `waveGroupAt`, `waveSummary` |
 | Wave break | 90 s ceiling; 3 s once called in; 5 s once the board is cleared | `WAVE_BREAK`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave` in game.js |
 | Run opening | 10 s before wave 1, or the Start button; 0 with auto-send | `RUN_START_DELAY`, `beforeFirstWave`, `waveSkipButtonLabel` in game.js |
@@ -4225,7 +4280,7 @@ no mechanic was moved to match the description.
 | Run-over buttons | Restart (R/Enter), Choose another route (M), Main menu (Escape) | `restartButtonRect`, `changeMapButtonRect`, `mainMenuButtonRect` |
 | Victory | all waves naturally deployed + board clear + base standing | `allWavesDeployed`, `victory` in game.js |
 | Wave banner | 2.4 s, on each wave's first spawn | `BANNER_SECONDS` in js/effects.js |
-| Enemy roster | 19 types: 14 on Easy, all 19 on Normal/Hard, including the flying Aether Wisp | `Enemy.TYPES`, difficulty additions |
+| Enemy roster | 21 types, all 21 scheduled on every difficulty, including the flying Aether Wisp | `Enemy.TYPES`, difficulty additions |
 | Enemy mechanic blocks | `attack`, `shield`, `revive`, `spawns`, `phases`, `support`, `sprint` — data, never a branch on the id | `Enemy.TYPES`, and one method per block |
 | What a shield pays | **nothing, ever** (2026-07-30). Healed HP too. Only health pays | `Enemy.takeDamage`, `Enemy.bounty` |
 | Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks | `Enemy.TYPES.shielded` |
@@ -4238,7 +4293,7 @@ no mechanic was moved to match the description.
 | Camo Heavy | 20 HP, ×0.65, camo, 5 flat armor + 20% defense. Normal/Hard | `Enemy.TYPES.camo_heavy` |
 | Brood trail | 12 u.l. between hatchlings, back along the road | `Enemy.BROOD_TRAIL_UL` |
 | Enemy lane offsets | a 32-bit hash of the spawn index, ±7 u.l. | `Enemy.laneOffsetFor`, `Enemy.LANE_SPREAD_UL` |
-| Tower HP | Rifleman 80 (110 with B2), Warbringer 150, Arcane Sniper / Siphon from their stat tables (the deleted gunner was 60) | `Soldier.BASE_HP`, `Smasher.BASE_HP`, `config.base.hp` |
+| Tower HP | Rifleman 80 (145 with B1+B2), Warbringer 150, Arcane Sniper / Siphon from their stat tables (the deleted gunner was 60) | `Soldier.BASE_HP`, `Smasher.BASE_HP`, `config.base.hp` |
 | Angry attack | 20 damage, 47.5 u.l. reach, every 2.5 s, nearest tower only | `Enemy.TYPES.angry.attack` |
 | Meta payout | 2 per wave cleared, +60 for a clear | `MetaProgress.coinsForRun` |
 | Store prices | Arcane Sniper 40 coins, **Summoner 90**, Siphon 150; Warbringer and Rifleman are the starting kit | `CATALOGUE` in js/meta.js |
@@ -4281,7 +4336,7 @@ no mechanic was moved to match the description.
 | Rifleman cost | 300 | `Soldier.COST` |
 | Rifleman footprint | 11.25 u.l. — the gunner's, so it stands where a gunner can | `Soldier.FOOTPRINT_RADIUS_UL` |
 | Recruits (B4) | 2 per press, 0.25 s stagger, 45 s cooldown; drawn as smaller automatons | `Soldier.RECRUIT_*` |
-| Recruit stats (B4) | 1 dmg @ 2/s, 20 HP, 100 u.l., walks END → START at 50 u.l./s and stops to shoot | `SoldierRecruit` |
+| Recruit stats (B4) | 1 dmg @ 2/s, 20 HP, 100 u.l., walks END → START at 40 u.l./s and stops to shoot | `SoldierRecruit` |
 | Recruit stats (B5) | 4 per press, 3 dmg @ 2.5/s, 40 HP, still a 45 s cooldown | B5 `recruitBoost` |
 | Recruit contact | mutual, out of a pool: each body costs what killing it is worth (`armor + hp / (1 − def%)`), capped at what the recruit has left | `SoldierRecruit.takeContactDamage`, `contactCostFor` |
 | Recruit hover | HP and range under the cursor plus a violet range ring; yields to enemy hover | `recruitAt`, `drawRecruitHover` |
@@ -4290,7 +4345,7 @@ no mechanic was moved to match the description.
 | Defense cap | 99% | `Mitigation.DEFENSE_CAP` |
 | Siphon base | 1 AD x 10/s, 75 u.l., 1 target | `TowerConfigs.beam.base` |
 | Siphon cost | 800, unchanged (full A 33 800, full B 17 900) | `beam.config.js` |
-| Siphon beam origin | the spout, 0.62 x footprint above centre — beams rise out of the basin | `BeamTower.prototype.spoutPoint` |
+| Siphon beam origin | the spout, 8 px + 0.86 x footprint above centre — beams rise out of the basin | `BeamTower.prototype.spoutPoint` |
 | Death denial knockback | 500 u.l. along the path | `DeathDenial.KNOCKBACK_UL` |
 | Rewind animation | 1.4 s, simulation frozen | `DeathDenial.REWIND_SECONDS` |
 | Charge decay | 1 charge / 3 s, continuous, out of combat | `charge_to_gold.decaySeconds` |
@@ -4302,7 +4357,7 @@ no mechanic was moved to match the description.
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | ~$42 443 = 13 498 effective HP x $3 + $1 349 bounties + $600 stake | derived; asserted in `tests/run.js` |
+| Easy run purse | $36 204 = $23 503 kill bounties + $2 596 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |
@@ -4328,7 +4383,7 @@ no mechanic was moved to match the description.
 | Summon clock vs cycle | a tier that shortens an interval clamps the running timer to it -- from applyUpgrade, NEVER from recalcStats | `BlubTower.clampTimersToCycle` |
 | Compact panel actions | `action.compact` — 34 px, two per row, so six action rows still fit | `inspectionLayout` in game.js |
 | Build slots | 5, ALL FIVE FILLED since 2026-08-09: Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner | `BUILD_SLOTS` in game.js |
-| Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 200–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
+| Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 150–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
 | Screens | menu → difficulty + route chooser / index → play | `screen` in game.js |
 | Pause menu | Escape only, no HUD button | `paused`, `drawPauseMenu` |
 | Build slot size | 76 px, 10 px gap | `SLOT_SIZE`, `SLOT_GAP` |

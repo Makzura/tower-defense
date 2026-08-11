@@ -1046,6 +1046,58 @@ def _hand_motion(side, amp_roll, amp_open):
     return rot, off
 
 
+# ---------------------------------------------------------------------------
+# THE HAND THAT CARRIES THE STAFF LIFTS IT. IT DOES NOT ROLL IT.
+#
+# The staff rides the left hand now, so whatever that hand does, the sceptre
+# does. `_hand_motion` is therefore the wrong motion for it, and not by a
+# little: HAND_ROLL is -1.45 rad about an axis through HANDS, PALM_L is 0.0755
+# from that axis but RING is 0.29 and the BUTT is 0.62, so the same roll that
+# moves a palm 0.11 sweeps the ring 0.385 and the butt 0.82. Against a5's 0.018
+# of ground-radius headroom and 0.063 of clearance that is not a tuning
+# problem, it is a different gesture.
+#
+# WHY THE LIFT IS PURE VERTICAL, and it is forced rather than chosen:
+#
+#   * ROTATION CANNOT MOVE THE HEAD UP. The staff is near-vertical, so the head
+#     sits almost directly above the butt, and under a rotation a point travels
+#     PERPENDICULAR to its offset from the pivot. Every pivot -- the grip, the
+#     HANDS axis, a point at butt height -- therefore gives the head HORIZONTAL
+#     travel. Measured on all three.
+#   * HORIZONTAL IS THE EXPENSIVE AXIS. One unit of z is 16.49 screen px from
+#     EVERY bearing; horizontal runs 19.73 down to 10.91 and at the bearing
+#     where it opposes it SUBTRACTS. Horizontal also spends ground radius, and
+#     a5 has 0.018 of it -- the outer ring at major 0.178 has already eaten the
+#     rest of the hem's 0.660.
+#   * VERTICAL IS FREE. A pure z translation leaves every xy untouched, so
+#     `posed_radius` cannot move and the footprint rule cannot be broken.
+#
+# WHAT CAPS THE LIFT: the two-bone solve. SH_L is only 0.292 above WR_L, so
+# lifting the wrist walks it TOWARD the shoulder and out of the reach window
+# [0.1576, 0.4034]. Measured: 0.20 lift leaves 0.1755, 0.24 leaves 0.1583
+# against a 0.1576 floor, and 0.25 fails. So the band is lift <= 0.24, worth up
+# to 3.96 screen px at the head.
+#
+# (There is a second feasible band above the shoulder -- lift 0.40 restores
+# |SH-WR| to 0.1844 and would buy 6.60 px -- but the cycle would have to cross
+# a dead zone at 0.24-0.33 where the solve has no answer. Clearing it needs a
+# tangential mid-stroke bulge along (-0.782, 0.623), which is the one horizontal
+# direction whose radial component against the ring is exactly zero. That is a
+# bigger change than this defect needs; it is written down here so the next
+# person does not have to re-derive it.)
+SCEPTRE_LIFT = 0.200                       # peak vertical lift of the left hand
+
+
+def _sceptre_hand_motion(amp):
+    """What the CARRYING hand does: it raises the staff and nothing else.
+
+    Returns the same (rotation, translation) shape as `_hand_motion` so
+    `_arm_pose` can use either without branching on more than the tier. The
+    rotation is exactly identity -- see above for why any rotation at all is
+    unaffordable on this lever."""
+    return _rot_axis(ROLL_AXIS, 0.0), [0.0, 0.0, SCEPTRE_LIFT * amp]
+
+
 # HOW MUCH ROOM THE SOLVE IS REQUIRED TO KEEP, and the bug it caught.
 #
 # A two-bone chain can only reach a wrist between ||L1-L2|| and L1+L2 of the
@@ -1109,16 +1161,24 @@ def _elbow(side, wrist_now, swivel):
     return tuple(base[k] + ht * (c * e1[k] + s * e2[k]) for k in range(3))
 
 
-def _arm_pose(nodes, frame):
-    """Pose whichever arms this tier rigged. base/A1/A2 rig both; A3+ rig only
-    the right, because the left is welded to the sceptre."""
+def _arm_pose(nodes, frame, sceptre=False):
+    """Pose both arms. Every tier rigs both now -- A3+ used to rig only the
+    right, and that was the defect: the left hand carries the staff, so leaving
+    it out of the rig meant nothing was holding it.
+
+    `sceptre` picks what the LEFT hand does. Carrying a staff it LIFTS (see
+    `_sceptre_hand_motion`); empty it rolls and opens with its partner. The
+    right hand is unchanged in both cases."""
     u = _phase(frame)
     a_roll, a_open = _amp(u), _amp(u - OPEN_LAG)
     for side in ("l", "r"):
         if ("hand_" + side) not in nodes:
             continue
         sh, el, wr = ARM_CHAIN[side]
-        rot, off = _hand_motion(side, a_roll, a_open)
+        if sceptre and side == "l":
+            rot, off = _sceptre_hand_motion(a_roll)
+        else:
+            rot, off = _hand_motion(side, a_roll, a_open)
         hand = nodes["hand_" + side]
         _place(hand, rot, HANDS, offset=off)
         # Read the wrist back out of the POSED node rather than recomputing it,
@@ -1699,7 +1759,7 @@ def build_body(tier, flat):
 
     def pose(frame):
         if rig:
-            _arm_pose(rig, frame)
+            _arm_pose(rig, frame, sceptre=bool(lk["sceptre"]))
 
     frames = ATTACK_FRAMES
     pen = penetration(s, pose, frames)
