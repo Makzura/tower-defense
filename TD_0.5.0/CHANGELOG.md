@@ -13,6 +13,230 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the CI gate stopped counting failures and started naming them,
+and the hard constraints got a guard of their own.**
+
+Two tools, both written by the quality lead and entered here by the archivist —
+one writer in this file, which had already collided once tonight. Facts hers,
+wording mine.
+
+**`tools/ci-check.js` now diffs failing test NAMES, not pass/fail totals.**
+Comparing counts cannot see a swap: one test breaking while another is silently
+fixed leaves the totals identical and the gate printed "No regressions" in
+green. That was demonstrated rather than asserted — against a doctored baseline
+the totals column read 105/3 versus 105/3, matching exactly, while three NEW
+failing names were listed underneath it. The 36 known failing names are now
+written into the tool itself with their causes, `--names` regenerates them
+paste-ready, and the scrape hard-fails if the number of FAIL lines it can see
+stops matching the number the suite reports about itself — so the gate cannot go
+quietly blind the way a silent scrape can. Measured at `c099377`.
+
+**`tools/check-constraints.js` is new, and guards the constraints no test can
+reach.** `AGENTS.md`'s hard constraints — ES5 syntax, no `fetch`, no
+`XMLHttpRequest`, no `type="module"`, and every `js` file on disk actually
+loaded by a `src=` in one of the four pages — are all breakable with six green
+suites, because the suites run under Node and Node accepts ES6 happily. Zero
+violations across 167 files at the time of writing. It ships a `--selftest`
+that builds a throwaway tree containing one deliberate violation of every rule
+and asserts that each one fires AND that none of them fires on the same tokens
+sitting inside comments and string literals. That self-test earned itself on
+its first run: the module rule matched `import(` and `import{` and sailed
+straight past `import x from "y"`. **A check that can only ever say "clean" is
+not a check** — which is the same defect as the one above, in a different
+costume.
+
+**2026-08-12 — the Siphon's sceptre confirmed ON SCREEN, and one comment in
+`siphon-beam-draw.js` that had outlived its fact.**
+
+Measurement plus a comment repair. No geometry, no constant, no generator and no
+model file was touched; `HEAD_MIN_PX`, `MIN_TRAVEL_PX` and `REACH_MARGIN` are
+untouched by design, because the head gate is the owner's decision and this pass
+exists to give him evidence rather than to pre-empt him.
+
+**The comment.** `originPoint`'s fallback block said `originFrames` being absent
+"is the live path until the generator lands it". The generator landed it and the
+sentence outlived the fact. Probed at runtime rather than read off the
+generator: `SiphonBeamSpec.originFrames` is present, `originFrameCount` is 25,
+six LOWERCASE rows `base`/`a1`..`a5` of 25 frames each. The block now records
+that the static path is the broken-tree path only, and keeps the reason
+`originAnimated()` is exported — frame 0 of the table is bit-identical to the
+static `RING` point `[0.315, 0.395, 1.19]`, so a silent fallback and a working
+per-frame origin are indistinguishable at rest.
+
+**The measurement, for the record, since nothing had ever been looked at.**
+Driven in Chrome against the live game at the default camera (viewport
+1284x722, target 640/360, distance 2022, pitch 0.5944591432292686, yaw -pi/2),
+a real `BeamTower` upgraded to A4 through `performAction`, frames driven through
+the game's own `SiphonFXBeam.animFrame` seam. All figures are `getImageData`
+readback of the composited frame, diffed.
+
+The projection constant everything rests on is sound. Re-measured live by
+projecting a world point one Blender unit along each axis: Z 16.5913 px against
+the generator's `SCREEN_PX` claim of 16.49, X 19.7399 against 19.73, Y 10.5748
+against 10.91.
+
+At true game scale the whole A4 figure occupies 447 pixels in a 22x35 box. The
+sceptre — `hand_l`, 840 of 1080 triangles — is 52 pixels unoccluded and 48
+visible, so only 7.7% of it is hidden by the figure's own body; the 2D cord
+overlay then paints over about ten more. Its top row travels 338 -> 334, four
+pixel rows; the centroid travels 4.515 px, inflated because the visible pixel
+count grows 22 -> 38 as it clears the body. The shipped artifact predicts
+0.23 bu x 16.5913 = 3.82 px. Across the played cycle the largest single-frame
+step is 1.32 px, the wrap from frame 24 back to frame 1 is 0.6 px and seamless,
+and frames 9 through 16 are dead still — a third of the cycle is a hold.
+
+Four controls, all of which had to pass before any of the above meant anything:
+a frame diffed against itself is 0 px; the static body's top row does not move
+across all 25 frames; `world_fixed`'s centroid does not move; and with every
+model group suppressed the screen is unchanged. That last one initially came
+back at 468 px and killed a first result. Suppressing a model's groups does not
+suppress the tower's beam FX, which draw whether or not its geometry does, so an
+early reading of "the sceptre is 92.5% occluded" was 468 pixels of cord. With
+`SiphonFXBeam.draw` stubbed the control goes to zero and the truth is the
+opposite. The lesson is the general one: an isolation without a null control is
+not an isolation.
+
+**2026-08-12 — six corrections in `AGENTS.md`, and this file put back into
+date order.**
+
+Documentation only. No game code, test, asset or generator was touched, and
+nothing below implies a balance change. Each correction names the symbol or the
+runtime reading it was checked against; where the brief that ordered the pass
+was itself wrong, that is recorded here rather than written into the document.
+
+**The `Siphon beam origin` row documented the 2D fallback as though it were the
+origin.** `BeamTower.prototype.spoutPoint` returns a screen-space `{x, y}` at
+`this.y - 8 - this.footprintPx * 0.86`, which is what the row described and
+described accurately. It is not what the player sees. The shipping origin is
+`SiphonFXBeam.originPoint`, read out of `SiphonBeamSpec.originFrames` for the
+frame `SiphonFXBeam.animFrame` hands over and turned into world coordinates by
+`originWorld` from the tower's aim and `unitsToPx`. The row now carries both
+paths and says which one ships. The spec was probed at runtime rather than read
+off its generator: `originFrameCount` is 25, `originFrames` has six LOWERCASE
+rows — `base`, `a1`..`a5` — of 25 frames each, and `origins` is
+`HANDS [0.055, 0.305, 1.045]` / `RING [0.315, 0.395, 1.19]`.
+
+**Only `a3`, `a4` and `a5` actually move.** `base`, `a1` and `a2` are
+twenty-five identical copies of HANDS — maximum deviation 0.0000 across the
+whole row — while each of `a3`, `a4` and `a5` departs from its own frame 0 by up
+to 0.23. "Varies per animation frame" is true of the sceptre's ring and of
+nothing else, so that is what the row says. Path B has no rows at all, by the
+contract `siphon-beam-draw.js` states at `noteKeyMiss`, and pours from the
+static hands.
+
+**`spoutPoint` is not dead code, and the row does not call it that — but the
+gate is not the one it looks like.** `BeamTower.prototype.draw` opens with
+`VisualModels.draw("tower", BeamTower.ID + ":complete", ...)`, and nothing in
+the tree registers a `siphon:complete` model, so that call always returns false
+and gates nothing today. What decides is one level up, in `game.js`'s render
+loop: `World3D.isEnabled() && World3D.drawWorld(...)` replaces the entire 2D
+world layer, and only when that returns false does any tower's `draw(ctx)` run
+at all. The spout is therefore the live 2D origin on a path that still exists —
+a load with no WebGL — which is why the row keeps it instead of deleting it.
+
+**`sizeScale`'s "(0.55 swarm … 1.8 midboss)" was the only ellipsis-as-range in
+that table, and 1.8 is not the maximum.** Enumerated from `Enemy.TYPES` in a
+booted harness: swarm 0.55, flying 0.85, fractal_slime 1, armored 1.05,
+shielded 1.15, revenant 1.2, angry 1.25, shieldbearer 1.35, camo_heavy 1.4,
+healer 1.45, brute 1.5, hive 1.6, midboss 1.8, boss_fast 1.9, colossus 2.1,
+boss 2.4 — three types are larger than the midboss. **Five types declare no
+`sizeScale` at all**: normal, fast, slow, camo_normal and camo_fast.
+`radiusPx()` reads `(this.type.sizeScale || 1)`, so those are 1, and it
+multiplies by `fractalSizeScale` on top — which it always did and the row never
+mentioned. The row now gives the true endpoints, the default and the fractal
+factor as named comma-separated values, the form every other multi-value row in
+that table already uses.
+
+**A dated paragraph in the PRESENT tense is a live rule, and one of them
+contradicted the opening of its own file.** "All four built towers are in the
+shipping game as of 2026-07-28" is present tense carrying a count of four, while
+the opening of `AGENTS.md` says five towers in five slots and that the bar is
+full. The fact underneath is historical and survives intact: on 2026-07-28 the
+roster was four — Gunner, Smasher, Longshot, Siphon — and the last two had been
+reachable only through `sandbox.html` until that day. Rewritten in the past
+tense with the four named, and pointing at the opening for the current count
+rather than repeating it.
+
+**A PAST-tense paragraph can still carry a present-tense denominator, and one
+did.** "2026-07-30. Four of the five towers were renamed and redrawn" is
+correctly scoped by its date, but "the five towers" reads as today's five and is
+not: that day's five were Smasher, Longshot, Siphon, Soldier and Gunner, and the
+Summoner did not arrive for another eleven days. Now named instead of counted,
+with the table beneath it labelled as the 2026-07-30 snapshot it is. **The rule
+this establishes: where a dated paragraph needs a roster count, name the roster
+or bound the count to the date.** A count that must be rechecked on every roster
+change will eventually be wrong, and nobody rereads a paragraph headed with an
+old date. A sweep of the rest of the file found no third instance — "all five
+formerly sandbox-only types" names all five, and "all four arrived in the v0.3.5
+fusion" counts that section's own four subjects rather than a roster.
+
+**Cash has not been damage × 3 since 2026-07-31, and it was only ever that for
+one day.** The whole-run conservation paragraph carried "cash has been damage ×
+3 since 2026-07-30" while the current-values table recorded "gone since
+2026-07-31. Damage pays nothing." These were never two competing claims. The
+2026-07-30 economy revamp introduced `CASH_PER_DAMAGE = 3` and the 2026-07-31
+bounty merge removed it, so the clause was true on the day it was written and
+stale the day after; the dates in this file settle it without anyone having to
+rule on intent. There is no damage-to-cash path in the code at all — the comment
+above `STARTING_CASH` in `js/game.js` records the removal and ends "anything
+still reading a per-damage rate is stale". No balance change is implied.
+
+**And the clause was measured out of existence, not reasoned out of it.** Kill
+cash equals `bounty()` exactly and is the same figure for a clean kill as for a
+50× overkill across six enemy types; non-lethal damage pays $0; a full clear
+realises **$25 950 across 841 bodies**, where damage × 3 would have paid
+**$77 907**. Three times the economy. That is why this is not a cosmetic edit:
+anyone tuning against the fossil clause is tuning a game that does not exist.
+Those three figures are nadia's measured readings and are recorded here rather
+than in the values table, because 841 does not reconcile against the 797
+scheduled bodies `waveCount` sums for Easy — the difference is presumably
+spawned bodies, and an unreconciled number does not belong in the table whose
+whole job is to be the one that is right. **This clause is one site of seven.**
+Six more fossils are known to exist, three of them outside `AGENTS.md`, and
+they are not fixed here; `tests/beam.test.js` is one — its gold-income test
+still says in a comment that "the game loop pays that at `CASH_PER_DAMAGE` like
+every other tower's", present tense, about a constant deleted on 2026-07-31.
+The test passes, because it asserts a number and the comment is what is wrong.
+
+**Four rows of the current-values table were in it twice, verbatim and
+adjacent.** `Warbringer full A`, `Warbringer full B`, `Tower HP from upgrades`
+and `Health tier semantics` each appeared as two byte-identical rows. Both
+copies were right, so nothing was chosen between: all four were re-derived from
+a booted harness before either copy was touched — `Smasher.UPGRADES` sums to
+4500 (A) and 6300 (B) on a $700 base, its `hp` tiers to 425 and 550 on
+`BASE_HP` 150 for 575 and 700, and `Soldier.UPGRADES` to 300 and 425 on 80 for
+380 and 505 — and the second copy was deleted. This is the one defect in the
+pass that nobody reported: a fact written twice in one table is a fact that
+will be retuned in one place and not the other, and this table is the part of
+`AGENTS.md` the file's own preamble says exists to stop exactly that.
+
+**This file was no longer newest-first.** "the beam generator reads the Siphon's
+origins instead of retyping them" (2026-08-12) had come to rest between two
+2026-08-11 entries — below "salvage the wave that died on the session limit" and
+above "the ten blub units get a detail layer (pass 3)". It was written into what
+was the top of the file ninety seconds after eight reconstructed entries went in
+above that point, and it stayed where it was put while the file moved under it.
+Moved unedited into the 2026-08-12 block, in the position its landing order
+gives it: below the two entries that landed after it, above the documentation
+pass that landed before it. The diff is a pure move plus one citation — forty-nine
+lines out, forty-nine lines in, six blank lines out and six back.
+
+**Line-number citations of `AGENTS.md` are gone from this file.** The comments
+entry below cited the spout figure as `AGENTS.md:4356`; it now cites the
+`Siphon beam origin` row by name. That row moved ten lines down during this
+pass, and it moved again while this entry was being written — drift inside a
+single session, which is the entire argument for the rule. A phrase survives an
+edit above it; a line number does not.
+
+**Two things noted and deliberately NOT fixed.** This file's header says
+"Newest at the top" and there are older violations further down: a
+"2026-08-10 (later)" entry sits below a "2026-08-09 (latest)" one. They predate
+tonight, and reordering them is a large diff to land while two divisions are
+working in the same tree — recorded here so the next reader does not mistake
+them for new damage. Separately, `README.txt` is still player-facing and still
+uses the pre-2026-07-30 tower names; the rename entry flagged that as out of
+scope on the day and nobody has picked it up since.
+
 **2026-08-12 — the three source comments that stated the same false facts
 `AGENTS.md` had just been repaired of.**
 
@@ -29,8 +253,8 @@ column could go "before the tower stops reading as a round basin", and that
 "taller was tried and looked wrong". The line under it has shipped
 `footprintPx * 0.86` throughout — taller than the ceiling the comment declared,
 so the rationale was not merely a stale number but inverted. This is the origin
-of the wrong figure that reached `AGENTS.md`; that table now reads 0.86
-(`AGENTS.md:4356`) and so does the comment. **The unverifiable aesthetic claim
+of the wrong figure that reached `AGENTS.md`; that table now reads 0.86 (the
+`Siphon beam origin` row) and so does the comment. **The unverifiable aesthetic claim
 was dropped rather than re-attached to 0.86** — restating a rationale nobody can
 check is how the first one survived. What replaces it is checkable: the number,
 the 8 px lift, the 15 u.l. footprint it was judged against, and the fact that
@@ -222,6 +446,55 @@ a tower at (250, 350) rather than collapsing to the world origin.
 Re-run after the ritual change, unchanged: occluder in front 0/144 differ
 against a stubbed beam module and 144/144 against occlusion-off at max delta
 222; occluder behind 0/512 between occlusion on and off.
+
+**2026-08-12 — the beam generator reads the Siphon's origins instead of
+retyping them, and can carry a per-frame one.**
+
+`tools/blender/siphon_beam.py` held `HANDS = (0.055, 0.305, 1.045)` and
+`RING = (0.315, 0.395, 1.190)` as literals, a few hundred lines from the
+identical pair in `siphon_idol.py`. It now reads `tools/blender/siphon_origins.json`,
+which `siphon_idol.py` MEASURES off the built geometry, and hard-errors with
+instructions if that file is absent rather than defaulting. Two generators
+holding the same constant by hand is the drift that ends with a beam starting a
+few pixels off a ring that moved — and both files build cleanly while it
+happens, which is what makes it worth removing. All eight
+`js/gl/models/siphon-beam-*.js` are byte-identical after the change, which is
+the proof that reading reproduces the retyped values exactly.
+
+`js/gl/siphon-beam-spec.js` gains **`originFrameCount`** and **`originFrames`**,
+a per-body table of where the beam leaves from on each frame. This exists
+because the sceptre is becoming one rigid body carried by the hand, so A3+'s
+ring — the beam origin — stops being a fixed point. The table is keyed by
+`gl-world.js` `siphonGroup()`'s **lowercase** body names, which is what
+`siphon-beam-draw.js` `bodyKey()` indexes it with. The neighbouring
+`originByTier` is uppercase and was deliberately left alone: it answers a
+different question (hands or ring, per tier), and matching the neighbour's
+convention here would make every lookup miss, fall back to the static ring, and
+ship the whole change as a no-op that looks right in every screenshot.
+
+**Three invariants this establishes.**
+
+1. *The two fields are OMITTED, not emptied, when there is nothing to say.*
+   Until the per-frame export lands in `siphon_origins.json` the spec carries
+   neither key, which is exactly the renderer's documented static path
+   (`if (!table) return stat`). An empty or one-entry table is not the same
+   thing, and it would read as a working per-frame origin that never moves.
+2. *`frames[0]` must equal `point` exactly, and the build fails if it does not.*
+   Frame 0 is the rest pose and `gl-world` draws it to an idle Siphon, so a
+   disagreement makes the beam jump the instant the tower takes a lock and jump
+   back when it drops it.
+3. *Every tier's row must be the same length.* `originFrameCount` is one number
+   for the whole spec and the renderer warns when a row disagrees with it.
+
+**There are deliberately no `b1`..`b5` rows.** The b bodies come from
+`siphon_abyss.py`, which never writes the origins file, and a path-B Siphon
+pours from the static HANDS. Making the table total would be worse than leaving
+it partial, measurably: `siphon_abyss.py` ships 4 frames per b body against
+`siphon_idol.py`'s 25, so a 25-long b row trips the renderer's
+`modelFrames !== row.length` warning and a 4-long one trips
+`declared !== row.length`. Either way every B-path Siphon on the board earns a
+console warning to describe a point that never moves. `siphon-beam-draw.js`
+already treats a b-tier miss as a contract and stays silent for it.
 
 **2026-08-12 — a documentation repair pass over `AGENTS.md`, and eight missing
 change log entries reconstructed.**
@@ -551,55 +824,6 @@ Gates at the time: all 12 primitives wound outward, suites at baseline
 
 *(Reconstructed 2026-08-12 from commit `936f358`, which landed without a log
 entry.)*
-
-**2026-08-12 — the beam generator reads the Siphon's origins instead of
-retyping them, and can carry a per-frame one.**
-
-`tools/blender/siphon_beam.py` held `HANDS = (0.055, 0.305, 1.045)` and
-`RING = (0.315, 0.395, 1.190)` as literals, a few hundred lines from the
-identical pair in `siphon_idol.py`. It now reads `tools/blender/siphon_origins.json`,
-which `siphon_idol.py` MEASURES off the built geometry, and hard-errors with
-instructions if that file is absent rather than defaulting. Two generators
-holding the same constant by hand is the drift that ends with a beam starting a
-few pixels off a ring that moved — and both files build cleanly while it
-happens, which is what makes it worth removing. All eight
-`js/gl/models/siphon-beam-*.js` are byte-identical after the change, which is
-the proof that reading reproduces the retyped values exactly.
-
-`js/gl/siphon-beam-spec.js` gains **`originFrameCount`** and **`originFrames`**,
-a per-body table of where the beam leaves from on each frame. This exists
-because the sceptre is becoming one rigid body carried by the hand, so A3+'s
-ring — the beam origin — stops being a fixed point. The table is keyed by
-`gl-world.js` `siphonGroup()`'s **lowercase** body names, which is what
-`siphon-beam-draw.js` `bodyKey()` indexes it with. The neighbouring
-`originByTier` is uppercase and was deliberately left alone: it answers a
-different question (hands or ring, per tier), and matching the neighbour's
-convention here would make every lookup miss, fall back to the static ring, and
-ship the whole change as a no-op that looks right in every screenshot.
-
-**Three invariants this establishes.**
-
-1. *The two fields are OMITTED, not emptied, when there is nothing to say.*
-   Until the per-frame export lands in `siphon_origins.json` the spec carries
-   neither key, which is exactly the renderer's documented static path
-   (`if (!table) return stat`). An empty or one-entry table is not the same
-   thing, and it would read as a working per-frame origin that never moves.
-2. *`frames[0]` must equal `point` exactly, and the build fails if it does not.*
-   Frame 0 is the rest pose and `gl-world` draws it to an idle Siphon, so a
-   disagreement makes the beam jump the instant the tower takes a lock and jump
-   back when it drops it.
-3. *Every tier's row must be the same length.* `originFrameCount` is one number
-   for the whole spec and the renderer warns when a row disagrees with it.
-
-**There are deliberately no `b1`..`b5` rows.** The b bodies come from
-`siphon_abyss.py`, which never writes the origins file, and a path-B Siphon
-pours from the static HANDS. Making the table total would be worse than leaving
-it partial, measurably: `siphon_abyss.py` ships 4 frames per b body against
-`siphon_idol.py`'s 25, so a 25-long b row trips the renderer's
-`modelFrames !== row.length` warning and a 4-long one trips
-`declared !== row.length`. Either way every B-path Siphon on the board earns a
-console warning to describe a point that never moves. `siphon-beam-draw.js`
-already treats a b-tier miss as a contract and stays silent for it.
 
 **2026-08-11 — the ten blub units get a detail layer (pass 3).**
 

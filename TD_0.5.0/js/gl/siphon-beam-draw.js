@@ -304,12 +304,20 @@ var SiphonFXBeam = (function () {
   // comes from animFrame() below, which is the single place that arithmetic
   // lives; do not pass a frame worked out anywhere else.
   //
-  // FALLBACK. With `originFrames` absent -- which is the live path until the
-  // generator lands it -- this is exactly the old static HANDS/RING behaviour,
-  // so the tree is never broken mid-generation. That also means a silent
-  // fallback looks identical to a working per-frame origin at rest, which is
-  // why `originAnimated()` is exported: a test that cannot tell the two apart
-  // is not testing anything.
+  // FALLBACK. With `originFrames` absent this is exactly the old static
+  // HANDS/RING behaviour, so the tree is never broken mid-generation.
+  //
+  // THE TABLE HAS LANDED AND THE FALLBACK IS NO LONGER THE LIVE PATH. This
+  // comment used to say the static path "is the live path until the generator
+  // lands it"; the generator landed it, and the sentence outlived the fact.
+  // Probed at runtime 2026-08-12: `SiphonBeamSpec.originFrames` is present with
+  // 25 frames across six LOWERCASE body rows, the hands below A3 and the
+  // sceptre's ring from A3 up. The fallback is now the broken-tree path only.
+  //
+  // It still matters, and this is why: a silent fallback looks identical to a
+  // working per-frame origin AT REST, because frame 0 of the table IS the
+  // static point. That is what `originAnimated()` is exported for -- a test
+  // that cannot tell the two apart is not testing anything.
   function originPoint(tower, frame) {
     var sp = spec();
     var o = sp && sp.origins;
