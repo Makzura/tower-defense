@@ -466,7 +466,29 @@ var SiphonFXRitual = (function () {
     rec.spin += dt * SPIN_RAD_PER_SEC;
     if (rec.spin > TAU) rec.spin -= TAU;
 
-    originWorld(tower, api.groundAt, rec);
+    // THE ORIGIN, AND ONLY WHEN NOBODY BETTER HAS SUPPLIED ONE.
+    //
+    // This USED to run unconditionally, three lines after plan() had installed
+    // the origin SiphonFXBeam handed over -- so it overwrote it, every frame,
+    // with this file's own static copy, and plan()'s comment that the beam
+    // module's origin "is authoritative when it hands one over" was false.
+    //
+    // It cost nothing while both were static and computed the same point. It
+    // stops costing nothing the moment the origin varies per animation frame,
+    // which it now does: the sceptre's ring IS the beam origin and it moves.
+    // Measured before this guard, on an A5 over one full cycle: the origin
+    // handed to plan() travelled 7.315 px while the cord root actually drawn
+    // travelled 0.799 px, and that residual was this circle's own breathe
+    // rather than the ring. The entire per-frame origin path -- the generator,
+    // the spec table, SiphonFXBeam.originPoint -- was a no-op past this call,
+    // and it read as working.
+    //
+    // The local derivation stays as the FALLBACK it always should have been:
+    // SiphonFXBeam is typeof-guarded at its call site, and when it is absent
+    // nothing else will place this circle. It is not a fourth copy of the
+    // origin -- it is the same one that has always been here, now used only
+    // when it is the only one available.
+    if (rec.handed !== now) originWorld(tower, api.groundAt, rec);
 
     // THE CAST DIRECTION IS THE BODY'S FACING. It is not solved here.
     aimDirection(tower, rec, live, work, dt);
@@ -662,6 +684,9 @@ var SiphonFXRitual = (function () {
     // it goes in BEFORE the latch runs and the circle is placed off it.
     if (typeof ox === "number" && isFinite(ox) && rec.stamp !== now) {
       rec.ox = ox; rec.oy = oy; rec.oz = oz;
+      // Tell advance() not to overwrite it with the local static derivation.
+      // Without this the assignment above survived exactly three lines.
+      rec.handed = now;
     }
     advance(tower, rec, live, now, api);
     var out = rec.out;
