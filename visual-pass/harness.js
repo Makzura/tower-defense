@@ -221,10 +221,27 @@
 
     // Where an entity lands on the composited image, so a crop can be aimed
     // without guessing at the projection.
+    //
+    // The projector is module-private inside gl-world -- it is only ever handed
+    // out as `api.project` to the FX modules -- so it is borrowed from the next
+    // FX draw rather than reached for directly. One frame of latency, no new
+    // export, and it is the SAME function the beams and the circle project
+    // with, which is the only one whose answer is worth aiming a crop at.
     screenOf: function (ent) {
       var p = ent.pos ? ent.pos : ent;
-      var z = (typeof p.z === "number") ? p.z : 0;
-      var s = World3D.project ? World3D.project(p.x, p.y, z) : null;
+      if (!TDObs._api) {
+        if (typeof SiphonFXRitual === "undefined") return null;
+        var real = SiphonFXRitual.draw;
+        SiphonFXRitual.draw = function (ctx, state, api) {
+          TDObs._api = api; SiphonFXRitual.draw = real;
+          return real.apply(this, arguments);
+        };
+        draw();
+        if (!TDObs._api) { SiphonFXRitual.draw = real; return null; }
+      }
+      var z = (typeof p.z === "number") ? p.z
+            : (TDObs._api.groundAt ? TDObs._api.groundAt(p.x, p.y) : 0);
+      var s = TDObs._api.project(p.x, p.y, z);
       return s ? { x: Math.round(s.x), y: Math.round(s.y) } : null;
     },
 
