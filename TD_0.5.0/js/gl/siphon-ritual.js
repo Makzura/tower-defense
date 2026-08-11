@@ -460,12 +460,7 @@ var SiphonFXRitual = (function () {
 
     originWorld(tower, api.groundAt, rec);
 
-    // THE CAST DIRECTION, rate-limited, and HELD through the dwell.
-    //
-    // Three cases, and the middle one is the point: with the circle up but no
-    // lock in hand, the direction is not recomputed at all. Re-aiming it at the
-    // body's facing during every gap between two enemies is exactly the shudder
-    // the contract forbids, just expressed as rotation instead of as alpha.
+    // THE CAST DIRECTION IS THE BODY'S FACING. It is not solved here.
     aimDirection(tower, rec, live, work, dt);
 
     // ---- the circle in space, and its image on the screen ------------------
@@ -478,32 +473,42 @@ var SiphonFXRitual = (function () {
     return rec;
   }
 
-  function aimDirection(tower, rec, live, work, dt) {
-    var wx = 0, wy = 0, aim;
-    if (work > 0) {
-      for (var i = 0; i < work; i++) { wx += live[i].pos.x; wy += live[i].pos.y; }
-      wx = wx / work - rec.ox;
-      wy = wy / work - rec.oy;
-    } else if (rec.cast <= 0) {
-      aim = (typeof tower.aim === "number" && isFinite(tower.aim)) ? tower.aim : 0;
-      wx = Math.cos(aim); wy = Math.sin(aim);
-    } else {
-      return;                           // dwell: hold the direction, unchanged
-    }
-
-    var L = Math.sqrt(wx * wx + wy * wy);
-    if (L < 1e-6) return;
-    wx /= L; wy /= L;
-    if (!rec.aimed) { rec.dx = wx; rec.dy = wy; rec.aimed = true; return; }
-
-    var cur = Math.atan2(rec.dy, rec.dx);
-    var d = Math.atan2(wy, wx) - cur;
-    while (d > Math.PI) d -= TAU;
-    while (d < -Math.PI) d += TAU;
-    var cap = SLEW_RAD_PER_SEC * dt;
-    if (d > cap) d = cap; else if (d < -cap) d = -cap;
-    rec.dx = Math.cos(cur + d);
-    rec.dy = Math.sin(cur + d);
+  // THE DISC FACES WHERE THE BODY FACES, AND IT DOES NOT GET A SECOND OPINION.
+  //
+  // The owner's requirement is that the circle be "perpendicular to the ground
+  // and parallel to the body of the siphon" AT ALL TIMES. `parallel to the
+  // body` is not something that can be re-derived here and still be guaranteed
+  // -- it is only guaranteed if this reads the body's facing instead of
+  // solving for one.
+  //
+  // THIS USED TO SOLVE ITS OWN. It took the centroid of the locks measured
+  // from `rec.ox/rec.oy` -- the APERTURE, the point between the palms -- and
+  // rate-limited it at SLEW_RAD_PER_SEC. Once BeamTower.faceLocks landed, that
+  // became the SECOND slew of the same angle: faceLocks measures the same
+  // centroid from `tower.x/tower.y` -- the tower CENTRE, about 10 board px
+  // away -- and rate-limits it separately. Two pivots and two independent rate
+  // limits meant the body and the disc chased different angles all the way
+  // through every turn, so the disc slid off his chest while he turned and the
+  // tether drew the disagreement as a line raking across him.
+  //
+  // The dwell hold that the old three-case version existed to provide is now
+  // free: `faceLocks` returns early when there is nothing to face, so
+  // `tower.aim` holds by itself, and the disc holds with it. Likewise the rate
+  // limit -- `tower.aim` arrives already slewed, so smoothing it twice would
+  // only add lag.
+  //
+  // `tower.aim` IS THE WORLD ANGLE THE BODY'S AUTHORED FRONT POINTS ALONG.
+  // gl-world draws the model at `aim + authoredFrontOffset()`, which for
+  // /^siphon-/ is `aim - PI/2`; GLMath.modelYaw is a plain CCW rotation about
+  // Z, so the authored +Y front lands on (cos aim, sin aim) exactly. That is
+  // this vector, so the disc's normal is the body's forward direction and the
+  // two can never disagree.
+  function aimDirection(tower, rec) {
+    var aim = (typeof tower.aim === "number" && isFinite(tower.aim))
+      ? tower.aim : 0;
+    rec.dx = Math.cos(aim);
+    rec.dy = Math.sin(aim);
+    rec.aimed = true;
   }
 
   // ---- the circle in space -------------------------------------------------

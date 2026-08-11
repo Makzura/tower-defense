@@ -53,9 +53,20 @@ function BeamTower(x, y, path) {
   // direction while draining something behind him. Owner: "the siphon tower
   // doesn't turn towards the enemies he attacks, he should."
   //
-  // -pi/2 is the same rest facing Tower, Soldier, Smasher and Longshot all
-  // start at, and it is also SIPHON_YAW, so a Siphon that has never acquired
-  // anything is drawn exactly as it was before this existed.
+  // -pi/2 is the same rest facing Tower (tower.js:71), Soldier (soldier.js:93),
+  // Smasher (smasher.js:56) and Longshot (longshot-adapter.js:46) all start at.
+  //
+  // IT DOES CHANGE THE IDLE FACING, BY 90 DEGREES, and an earlier draft of this
+  // comment claimed it did not. The arithmetic: gl-world draws the body at
+  // `aim + authoredFrontOffset(model)`, and that offset is -pi/2 for /^siphon-/.
+  // Before, `t.aim || 0` gave drawYaw = -pi/2 and put the authored +Y front on
+  // world +X. Now drawYaw = -pi and it lands on world -pi/2. So every Siphon
+  // capture taken before this predates the change.
+  //
+  // The new value is nonetheless the right one: the other four towers are
+  // +X-front models, so -pi/2 puts THEIR fronts on world -pi/2 too. This is the
+  // first time the Siphon has rested facing the same way as everything else on
+  // the board.
   this.aim = -Math.PI / 2;
 
   // damageDealt and kills, through the shared scorer -- the beam applied its
