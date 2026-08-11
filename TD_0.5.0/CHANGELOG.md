@@ -13,6 +13,45 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — seven wrong figures and one inverted argument, in the two files
+the simulation is written in.** Comment-only, both commits.
+
+`js/game.js` (305b945). The wave-35 header described a boss retuned twice since
+it was written: **2500 HP** (5000 since 2026-07-30), **a 200 point shield**
+(1000 since 2026-08-01), **"twice its rate of fire"** (`attackIntervalMultiplier`
+is 0.75 — a third again, and this one was never true at any point), and
+**twenty-one bodies** (the roar's nine `summon.groups` counts sum to forty:
+8+10+6+4+2+2+3+3+2). `AGENTS.md` had already been corrected on the same roster
+and the source comment mirroring it was left behind, which is the pattern the
+archivist's sweep then generalised.
+
+Also in that file, `BUILD_SLOTS` claimed a fresh profile owns **the gunner** —
+deleted in v0.4.9 and explicitly dropped from any save still naming it by
+`js/meta.js`; the starters are `smasher` and `soldier`. And it called the array
+**"a `var` reassigned by rebuildBuildBar()"** while that function mutates in
+place, which the comment fourteen lines below has always described correctly.
+Two comments on one array contradicting each other, one of them right.
+
+`js/enemy.js` (ce96270). The `health: 5000` note argued that a fixed 200 point
+shield against a doubled body made the roar *"a smaller fraction of the fight
+than it used to be, deliberately"*. **The 2026-08-01 retune reversed that
+intent and the comment went on arguing the old way**: 200/2500 = 8% at the
+start, the comment described 200/5000 = 4%, and it is 1000/5000 = **20%**
+today — two and a half times the original share. A stale number misinforms; a
+stale *argument* misleads someone into preserving an intent that was abandoned
+on purpose, so the replacement states the reversal explicitly rather than
+quietly restating the corrected number. Banner and grind-wall figures 2500 →
+5000, the grind-wall conclusion surviving with only its number moved.
+
+**Kept deliberately: "the roar still fires at half, which is now 2500."** That
+2500 is half of 5000 and is live. Two different 2500s ten words apart, one dead
+and one correct — which is the argument against sweeping a file for a literal.
+
+Both commits proved comment-only by filtering the diff for lines not beginning
+with `//` and getting an empty result — a stronger argument than a passing
+suite, since it shows no executable line moved. Six suites identical by NAME
+before and after: 36 failures, 3 / 30 / 0 / 0 / 1 / 2.
+
 **2026-08-12 — the CI gate stopped counting failures and started naming them,
 and the hard constraints got a guard of their own.**
 
