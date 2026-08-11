@@ -1629,6 +1629,27 @@ var World3D = (function () {
         }
       }
     }
+    // THE SIPHON'S BEAM (js/gl/siphon-beam-draw.js).
+    //
+    // It was invisible in 3D for a simple structural reason: BeamTower draws its
+    // fountain AND its beams inside its own 2D draw(), and game.js wraps the
+    // whole 2D world layer -- including the actor draw loop that calls it -- in
+    // `if (!world3D)`. With the 3D board on, which is every ordinary load, that
+    // method never runs, so the tower whose beam the brief calls "more than half
+    // its visual value" had no beam at all.
+    //
+    // Hardware, not a shot: it is continuous while a lock is held, so it belongs
+    // in the hardware pass, under the shots and under the cosmetic burst.
+    //
+    // Called at TOP LEVEL, outside the per-tower withGround, deliberately. A
+    // beam spans TWO ground heights -- the deck the tower stands on and the road
+    // the target walks -- so it pins its own reference and feeds project()
+    // absolute heights, the same rule a shot in flight follows. Called inside a
+    // tower's withGround it would flatten every beam onto that tower's deck and
+    // the far end would float.
+    if (typeof SiphonFXBeam !== "undefined") {
+      SiphonFXBeam.draw(ctx, state, BLUB_FX_API);
+    }
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
     // hardware that fired it and under the cosmetic burst layer. The death
