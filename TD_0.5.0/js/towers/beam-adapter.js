@@ -691,9 +691,11 @@ BeamTower.prototype.isDestroyed = function () {
 // A function rather than two inline expressions because draw() needs it in
 // several places and a spout that disagrees with the beams leaving it is the
 // one way this can look wrong.
-// The 0.62 is as tall as the column can be before the tower stops reading as a
-// round basin from above and starts reading as a vertical egg. Measured by eye
-// against the shipping 15 u.l. footprint; taller was tried and looked wrong.
+// The height is 0.86 of the footprint radius plus a flat 8 px lift, chosen by
+// eye against the shipping 15 u.l. footprint (BeamTower.FOOTPRINT_RADIUS_UL).
+// THE SAME 0.86 IS WRITTEN AGAIN where the water column is drawn in draw()
+// below -- the column climbs to exactly this point, so the two are one number
+// in two places and have to move together or the beams leave from mid-air.
 BeamTower.prototype.spoutPoint = function () {
   return { x: this.x, y: this.y - 8 - this.footprintPx * 0.86 };
 };

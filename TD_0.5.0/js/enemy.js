@@ -484,7 +484,10 @@ Enemy.TYPES = {
   // The early midboss: one enemy, 250 HP behind 10% defense, walking at under
   // half a normal's pace so there is time to bring it down. It is a CHECK, not
   // a filler wave -- 250 remaining health against a 100 HP base means letting
-  // it through ends the run, so wave 9 asks whether the board has been built.
+  // it through ends the run, so wave 11 asks whether the board has been built.
+  // (Wave 11 is its only appearance, on all three difficulties: one body on
+  // Easy, two on Normal and Hard. The schedule overrides the 250 UP -- 420 on
+  // Easy -- so the figures below are the type's floor, not what walks in.)
   midboss: {
     id: "midboss",
     displayName: "Midboss",
@@ -762,19 +765,24 @@ Enemy.TYPES = {
     }]
   },
 
-  // --- v0.4.9: four UNSCHEDULED types --------------------------------------
+  // --- v0.4.9: the last four types -----------------------------------------
   //
-  // NONE of these four appears in WAVES, and that is deliberate rather than an
-  // oversight -- the owner asked for them "in the index and in the sandbox" so
-  // they can be looked at and tested before anything is built around them
-  // (2026-07-30). The index screen therefore shows a type with an empty wave
-  // list, and the test that used to demand every type be scheduled now demands
-  // instead that every SCHEDULED type be reachable. When one of these is
-  // fitted into the schedule, nothing here needs to change: add it to a wave
-  // and the guide picks the appearance up on its own.
+  // ALL FOUR ARE SCHEDULED, on all three difficulties. They were added on
+  // 2026-07-30 for the index and the sandbox first -- the owner asked to look
+  // at them before anything was built around them -- and were fitted into the
+  // schedule afterwards. In EASY_WAVES: Shieldbearer 27, Camo Heavy 28,
+  // Healer 32, Vanguard 34. Normal and Hard inherit those and add more, so the
+  // two supports arrive considerably earlier there.
   //
-  // Three of them use the new `support` block -- an ability that acts on OTHER
-  // enemies rather than on towers. See Enemy.prototype.supportAllies.
+  // Nothing carries `sandboxOnly` any more. The flag still works and is still
+  // the way to park a type in the index and the sandbox, but the test "every
+  // enemy type is scheduled, and every scheduled type exists" (tests/run.js)
+  // enforces BOTH directions: without the flag a type must appear in the
+  // campaign, with it a type must not.
+  //
+  // Three of them carry a `support` block -- an ability on a timer that acts
+  // on enemies rather than on towers. Two of those act on OTHERS (Shieldbearer,
+  // Healer); the Vanguard's picks itself. See Enemy.prototype.supportAllies.
 
   // Shieldbearer. It fights nothing. Every ten seconds it hands 20 points of
   // shield to the ten strongest bodies on the road, and those grants STACK --
