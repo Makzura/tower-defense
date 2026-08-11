@@ -635,7 +635,28 @@ def _hood_surface(rings, deg, t):
 
 SH_L = (0.246, 0.070, 1.300)
 SH_R = (-0.238, 0.062, 1.240)              # SH_L.z - SH_R.z == SHOULDER_RISE
-EL_L = (0.268, 0.116, 0.995)
+# EL_L WAS (0.268, 0.116, 0.995), AND THAT IS WHY THIS FILE WOULD NOT BUILD.
+#
+# The two arms were authored with different PROPORTIONS. Forearm over upper arm
+# was 0.37 on the left and 0.51 on the right -- the left forearm was 0.1144
+# where its pair was 0.1521 -- and a forearm barely a third of the upper arm
+# cannot fold. A two-bone chain reaches no closer than |L1 - L2|, which on the
+# left was 0.1948, and the hands-out cycle takes that wrist to 0.1741 of the
+# shoulder. Measured across the built cycle, the left elbow offset `h` hit
+# exactly 0.0000: the pinned-elbow pathology REACH_MARGIN exists to catch. The
+# gate was right and the arm was wrong, so the build aborted on the first tier
+# and NO tier could be regenerated from source.
+#
+# The right arm never had the problem (min span 0.2956, min h 0.0807), so the
+# fix is to make the mismatched arm match its pair rather than to shrink a
+# gesture that the right arm makes comfortably. The elbow is re-solved for the
+# RIGHT arm's ratio in the same bend plane, keeping SH_L, WR_L and the TOTAL
+# arm length (0.4236) all exactly as authored -- so the shoulder socket, the
+# palm, and therefore HANDS and the beam origin, are untouched.
+#
+# |L1 - L2| falls 0.1948 -> 0.1383, which clears the gate by 0.0158, and the
+# elbow itself moves 0.0390 bu: 0.77 screen px. Sub-pixel.
+EL_L = (0.278, 0.089, 1.022)
 EL_R = (-0.246, 0.128, 0.948)
 WR_L = (0.214, 0.216, 1.008)
 WR_R = (-0.142, 0.226, 1.000)
