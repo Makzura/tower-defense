@@ -684,8 +684,8 @@ var SiphonFXBeam = (function () {
   // authored with front on +Y.
   var originScratch = { x: 0, y: 0, z: 0 };
 
-  function originWorld(tower, groundAt) {
-    var p = originPoint(tower);
+  function originWorld(tower, groundAt, frame) {
+    var p = originPoint(tower, frame);
     var aim = (typeof tower.aim === "number" && isFinite(tower.aim)) ? tower.aim : 0;
     var yaw = aim + SIPHON_YAW;
     var k = unitsToPx(), c = Math.cos(yaw), s = Math.sin(yaw);
@@ -1084,6 +1084,16 @@ var SiphonFXBeam = (function () {
 
   var bead = { x: 0, y: 0, nx: 0, ny: 0, tx: 0, ty: 0, hw: 0, scale: 1 };
 
+  // A knot rides the cord, so it is hidden exactly when the cord under it is.
+  // Asked at BOTH samples it sits between rather than at a rounded one: a knot
+  // straddling the edge of a body should disappear with the stretch it belongs
+  // to, not survive as a chevron pasted on a chest.
+  function beadVisible(n, t) {
+    var f = sampleIndexAt(n, t);
+    var i = Math.min(n - 2, Math.max(0, Math.floor(f)));
+    return !!(sv[i] && sv[i + 1]);
+  }
+
   // ---- one beam ------------------------------------------------------------
 
   var MIN_CORE_PX = 1.15;   // a thread must still be a thing you can see
@@ -1160,6 +1170,15 @@ var SiphonFXBeam = (function () {
     var lift = MIN_BODY_PX / Math.max(0.001, hw[0]);
     if (lift > 1) for (i = 0; i < n; i++) hw[i] *= lift;
 
+    // ---- who can see this cord ----------------------------------------------
+    // Done here, after the widths, because the screen bounding box that
+    // prefilters the occluder list is built out of them. Every layer below
+    // paints per visible SPAN and nothing paints the whole range unconditionally
+    // -- one layer that forgot would put a halo or a rim outline through the
+    // body, which reads as a rendering fault rather than as a beam.
+    computeVisibility(n, tower);
+    if (!visN) return;
+
     // ---- paint -------------------------------------------------------------
     var last = n - 1;
 
@@ -1167,9 +1186,11 @@ var SiphonFXBeam = (function () {
     // (thread, seeking) get none -- they are matter catching light, and their
     // legibility comes from the rim and the core below.
     if (role.glow && ss2.emits) {
-      ribbon(ctx, 0, last, 2.35);
       ctx.fillStyle = ink(role.glow, 0.1, 0.13);
-      ctx.fill();
+      eachSpan(0, last, function (a, b) {
+        ribbon(ctx, a, b, 2.35);
+        ctx.fill();
+      });
     }
 
     // The body. For the two states that RIPEN, the colour ramp is painted in
@@ -1185,43 +1206,52 @@ var SiphonFXBeam = (function () {
         var i1 = Math.ceil(sampleIndexAt(n, Math.min(t1, t0)));
         i0 = clamp(i0, 0, last); i1 = clamp(i1, 0, last);
         if (i1 <= i0) continue;
-        ribbon(ctx, i0, i1, 1);
         ctx.fillStyle = ink(ripen[bnd][1], 0, 0.95);
-        ctx.fill();
+        eachSpan(i0, i1, function (a, b) {
+          ribbon(ctx, a, b, 1);
+          ctx.fill();
+        });
       }
     } else {
-      ribbon(ctx, 0, last, 1);
       ctx.fillStyle = ink(role.body, 0, 0.93);
-      ctx.fill();
+      eachSpan(0, last, function (a, b) {
+        ribbon(ctx, a, b, 1);
+        ctx.fill();
+      });
     }
 
     // The rim. A dark edge is what separates a cord from the board behind it
     // without adding light -- which is how the two non-emissive states stay
     // visible while honouring "no emission anywhere in the base ladder".
-    ribbon(ctx, 0, last, 1);
     ctx.lineWidth = 1;
     ctx.strokeStyle = ink(role.rim, 0, 0.75);
-    ctx.stroke();
+    eachSpan(0, last, function (a, b) {
+      ribbon(ctx, a, b, 1);
+      ctx.stroke();
+    });
 
     // The core: the lit crown of the cord, offset a little toward the light so
     // the cord reads as round rather than as a flat strap.
-    ctx.beginPath();
-    for (i = 0; i <= last; i++) {
-      var cxp = sx[i] + nx[i] * hw[i] * 0.26;
-      var cyp = sy[i] + ny[i] * hw[i] * 0.26;
-      var cw = Math.max(MIN_CORE_PX, hw[i] * 0.40);
-      var px2 = cxp + nx[i] * cw, py2 = cyp + ny[i] * cw;
-      if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
-    }
-    for (i = last; i >= 0; i--) {
-      var cxq = sx[i] + nx[i] * hw[i] * 0.26;
-      var cyq = sy[i] + ny[i] * hw[i] * 0.26;
-      var cwq = Math.max(MIN_CORE_PX, hw[i] * 0.40);
-      ctx.lineTo(cxq - nx[i] * cwq, cyq - ny[i] * cwq);
-    }
-    ctx.closePath();
     ctx.fillStyle = ink(role.core, ss2.emits ? 0.15 : 0, ss2.emits ? 0.92 : 0.72);
-    ctx.fill();
+    eachSpan(0, last, function (a, b) {
+      var j;
+      ctx.beginPath();
+      for (j = a; j <= b; j++) {
+        var cxp = sx[j] + nx[j] * hw[j] * 0.26;
+        var cyp = sy[j] + ny[j] * hw[j] * 0.26;
+        var cw = Math.max(MIN_CORE_PX, hw[j] * 0.40);
+        var px2 = cxp + nx[j] * cw, py2 = cyp + ny[j] * cw;
+        if (j === a) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+      }
+      for (j = b; j >= a; j--) {
+        var cxq = sx[j] + nx[j] * hw[j] * 0.26;
+        var cyq = sy[j] + ny[j] * hw[j] * 0.26;
+        var cwq = Math.max(MIN_CORE_PX, hw[j] * 0.40);
+        ctx.lineTo(cxq - nx[j] * cwq, cyq - ny[j] * cwq);
+      }
+      ctx.closePath();
+      ctx.fill();
+    });
 
     // ---- the knots ---------------------------------------------------------
     drawKnots(ctx, name, ss2, n, ramp, k, flow, now, role);
@@ -1229,16 +1259,20 @@ var SiphonFXBeam = (function () {
     // ---- the intake --------------------------------------------------------
     // The mouth at the tower end. Not a flash and not an icon: the swelling the
     // cord already has, closed off with a lip so it reads as an opening that
-    // the cord is running into.
-    var mouthW = hw[0];
-    ctx.beginPath();
-    ctx.moveTo(sx[0] + nx[0] * mouthW, sy[0] + ny[0] * mouthW);
-    ctx.lineTo(sx[0] - nx[0] * mouthW, sy[0] - ny[0] * mouthW);
-    ctx.lineWidth = Math.max(1.2, mouthW * 0.42);
-    ctx.strokeStyle = ink(role.core, ss2.emits ? 0.35 : 0.12, ss2.emits ? 0.95 : 0.8);
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.lineCap = "butt";
+    // the cord is running into. It belongs to sample 0, so it is drawn only when
+    // sample 0 survived -- an intake bell floating on a hidden cord root would
+    // be the single most obvious leak of the lot.
+    if (sv[0]) {
+      var mouthW = hw[0];
+      ctx.beginPath();
+      ctx.moveTo(sx[0] + nx[0] * mouthW, sy[0] + ny[0] * mouthW);
+      ctx.lineTo(sx[0] - nx[0] * mouthW, sy[0] - ny[0] * mouthW);
+      ctx.lineWidth = Math.max(1.2, mouthW * 0.42);
+      ctx.strokeStyle = ink(role.core, ss2.emits ? 0.35 : 0.12, ss2.emits ? 0.95 : 0.8);
+      ctx.lineCap = "round";
+      ctx.stroke();
+      ctx.lineCap = "butt";
+    }
   }
 
   // The chain's radius: THINNER OUTWARD, per segment, from the spec's own
@@ -1302,6 +1336,7 @@ var SiphonFXBeam = (function () {
       var c = ((i / count) + phase) % 1;
       var t = flowInverse(flow, c);
       if (t > tFrom) continue;
+      if (!beadVisible(n, t)) continue;         // behind a body -- see above
       beadAt(n, t, bead);
       var r = (name === "chain")
         ? chainRadius(ss2, seg[Math.min(n - 1, Math.round(sampleIndexAt(n, t)))],
@@ -1327,6 +1362,7 @@ var SiphonFXBeam = (function () {
       for (var j = 0; j < count; j++) {
         var c2 = ((j / count) + phase) % 1;
         var t2 = flowInverse(flow, c2);
+        if (!beadVisible(n, t2)) continue;
         beadAt(n, t2, bead);
         var r2 = radiusAt(name, ss2, t2, ramp);
         var s2 = Math.max(0.9, r2 * k * bead.scale * 0.8);
@@ -1434,6 +1470,14 @@ var SiphonFXBeam = (function () {
     // `project` below is ABSOLUTE. See the note at the head of this file: a
     // beam spans two ground heights and must fly a straight line between them.
     api.withGround(0, function () {
+      // OCCLUDERS FIRST, ONCE, inside the same pinned reference the cords are
+      // sampled in -- so every height in `occ` and every height in `sz[]` is
+      // measured from the same z = 0 and the two are comparable without a
+      // second thought. Built here rather than lazily per cord because a board
+      // with five Siphons on it would otherwise rebuild the same list five
+      // times for nothing.
+      buildOccluders(state, api);
+
       for (var i = 0; i < towers.length; i++) {
         var t = towers[i];
         if (!t || !t.constructor || t.constructor.ID !== "siphon") continue;
@@ -1457,7 +1501,14 @@ var SiphonFXBeam = (function () {
         if (!ss2) continue;
         if (rec) updatePulses(t, rec, ss2, dt);
 
-        var o = originWorld(t, api.groundAt);
+        // THE FRAME THE BODY IS ACTUALLY DRAWN AT, from the one place that
+        // derives it. `_chanFrames` was set by gl-world's GL pass earlier in
+        // this same rendered frame, which is the only reading of how many
+        // frames the body on screen has; with no GL pass it is 0, animFrame
+        // returns 0, and originPoint reads the table's rest pose. The ease is
+        // memoised on `now`, so calling it here does NOT step it a second time.
+        var frame = animFrame(t, now, t._chanFrames || 0);
+        var o = originWorld(t, api.groundAt, frame);
         var ox = o.x, oy = o.y, oz = o.z;
 
         // THE BEAMS LEAVE THE RITUAL CIRCLE, NOT THE BODY.
