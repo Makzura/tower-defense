@@ -1508,21 +1508,38 @@ SPEC_STATES = {
         "note": "another THING, not a bigger ramp: rolled section, stepped "
                 "drums, twist stops, grains fuse into one screw thread"},
 
+    # RETUNED AGAINST `thread`, ON THE OWNER'S REPORT. He said: "the passive
+    # rays who dangle around when he is not attacking doesn't fit the ray he
+    # uses when attacking, which is confusing." He was right, and the mismatch
+    # was GEOMETRY, not colour -- seeking and thread already shared body/bead/
+    # rim roles and differed only in `core`. Against thread, seeking was 2.1x
+    # thinner at the far end, sagged 10x (0.300 vs 0.030), swayed 7.3x (0.160
+    # vs 0.022), carried kinks thread has none of, twisted 1.8x with a waver
+    # term, scrolled at 55% of thread's speed, and bunched 9 knots into the
+    # tower-side two thirds while thread spreads 14 proud ones along the whole
+    # run. Together that read as frayed cloth rope rather than as the same
+    # flesh cord drawing in.
+    #
+    # Every one of those is now moved most of the way to thread's value, and
+    # `skin`/`skin_dark` are added so ROLES can give it thread's core. It stays
+    # THINNER and it keeps the droop and the sweep, because idle must still
+    # read as weaker and searching -- it is the same rope, slack, not a
+    # different one.
     "seeking": {
         "profile": "DROOP", "sections": 18,
         "radius": {"formula": "r_target + (r_tower - r_target)*(1-t)^p",
-                   "r_target": 0.0085, "r_tower": 0.0330, "p": 1.35},
-        "twist": {"formula": "total*(1-t)^p + 0.28*sin(7t) -- wavering",
-                  "total": 1.10, "p": 0.8},
-        "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.30,
-                   "gain": 0.20, "p": 1.0, "toward": "tower"},
-        "beads": {"spacing": 0.101, "count": 9, "t_from": 0.66,
-                  "profile": "BEAD", "mat": "hem_fray"},
-        "curve": {"sag": 0.300, "sway": 0.160, "kink": 0.030, "kink_n": 3.0,
+                   "r_target": 0.0140, "r_tower": 0.0360, "p": 1.35},
+        "twist": {"formula": "total*(1-t)^p + 0.10*sin(7t) -- barely wavering",
+                  "total": 0.70, "p": 0.9},
+        "scroll": {"formula": "base*(1 + gain*(1-t)^p)", "base": 0.50,
+                   "gain": 0.30, "p": 1.0, "toward": "tower"},
+        "beads": {"spacing": 0.1442, "count": 12, "t_from": 0.88,
+                  "proud": 1.30, "profile": "BEAD", "mat": "hem_fray"},
+        "curve": {"sag": 0.100, "sway": 0.060, "kink": 0.0, "kink_n": 3.0,
                   "reach": 0.55, "sweeps": True,
                   "sweep_hint": "the free end orbits the tower at ~0.5 rad/s; "
                                 "the 3 filaments lag it"},
-        "mats": ["cloth_worn", "hem_fray", "cloth_dark"],
+        "mats": ["skin", "skin_dark", "cloth_worn", "hem_fray", "cloth_dark"],
         "emits": False, "pulses": "none",
         "note": "detached: reaches only 0.55 of the run and ends in 3 groping "
                 "filaments of unequal length"},

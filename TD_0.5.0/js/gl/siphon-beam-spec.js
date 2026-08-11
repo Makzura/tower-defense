@@ -567,7 +567,7 @@ var SiphonBeamSpec = {
     "toward": "tower"
    },
    "beads": {
-    "spacing": 0.1442,
+    "spacing": 0.1246,
     "count": 12,
     "t_from": 0.88,
     "proud": 1.3,
@@ -593,8 +593,7 @@ var SiphonBeamSpec = {
    ],
    "emits": false,
    "pulses": "none",
-   "note": "detached: reaches only 0.55 of the run and ends in 3 groping filaments of unequal length. THE SAME CORD AS `thread`, THINNER AND SEARCHING -- see the retune note below.",
-   "retune": "Owner: 'the passive rays who dangle around when he is not attacking doesn't fit the ray he uses when attacking, which is confusing.' He was right, and the mismatch was geometry, not colour -- seeking and thread already shared body/bead/rim roles and differed only in `core`. Against thread, seeking was 2.1x thinner at the far end, sagged 10x (0.3 vs 0.03), swayed 7.3x (0.16 vs 0.022), carried kinks thread has none of, twisted 1.8x with a waver term, scrolled at 55% of thread's speed, and bunched 9 knots into the tower-side two thirds while thread spreads 14 proud ones along the whole run. Together that read as frayed cloth rope rather than as the same flesh cord drawing in. Every one of those is now moved most of the way to thread's value: same bead spacing and proud, same scroll order, kinks off, sag and sway cut to a searching droop rather than a hanging one, and `skin` added to mats so ROLES can give it thread's core. It stays THINNER and it keeps the droop and the sweep, because idle must still read as weaker and searching -- it is the same rope, slack, not a different one.",
+   "note": "detached: reaches only 0.55 of the run and ends in 3 groping filaments of unequal length",
    "path": "BASE",
    "bakedOrigin": "HANDS",
    "model": "siphon-beam-seeking",
