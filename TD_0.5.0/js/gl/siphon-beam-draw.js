@@ -983,18 +983,47 @@ var SiphonFXBeam = (function () {
         //
         // The owner's design: he extends both hands (or puts the staff forward
         // from A3) and a circle forms in front of him; the beams come out of
-        // THAT. So when the ritual module is present it owns the origin, and
-        // this falls through to the hands/ring origin above when it is not --
+        // THAT. So when the ritual module is present it owns the cords, and
+        // this falls through to the hands/ring origin below when it is not --
         // which is also what keeps this file working on its own.
-        if (typeof SiphonFXRitual !== "undefined") {
-          var rite = SiphonFXRitual.plan(t, live, ox, oy, oz, now, api);
-          if (rite && rite.origin) {
-            ox = rite.origin.x; oy = rite.origin.y; oz = rite.origin.z;
-          }
-        }
+        //
+        // WHAT `plan()` ACTUALLY RETURNS. This used to read `rite.origin` and
+        // take a single point off it. There is no `origin` on that object and
+        // there never was -- it returns `{ beams, idle }` -- so the test was
+        // always false, every rim anchor and every chain assignment the ritual
+        // computed was thrown away, and the beams kept leaving the hands. It
+        // failed silently and looked exactly like a module that was not loaded,
+        // which is the worst way for a seam to be wrong.
+        var rite = (typeof SiphonFXRitual !== "undefined")
+          ? SiphonFXRitual.plan(t, live, ox, oy, oz, now, api) : null;
+
+        // `idle` is the groping filaments' root: the circle's centre while it
+        // is open, the hands once it has closed, blended across the handover so
+        // it cannot pop.
+        if (rite && rite.idle) { ox = rite.idle.x; oy = rite.idle.y; oz = rite.idle.z; }
 
         if (name === "seeking") {
           drawSeeking(ctx, api, t, ss2, ox, oy, oz, now, rec);
+          continue;
+        }
+
+        // ONE CORD PER ARM. The ritual has already placed `beamCount(tower)`
+        // anchors around the rim and dealt every lock to one of them, nearest
+        // first, so each cord starts on the circle and rebounds through its own
+        // share. Chaining is therefore not a separate case here -- an arm with
+        // three locks IS a chain, and an arm with one is a straight cord.
+        if (rite && rite.beams && rite.beams.length) {
+          for (var a = 0; a < rite.beams.length; a++) {
+            var arm = rite.beams[a];
+            if (!arm.targets || !arm.targets.length) continue;
+            var an = [node(0, arm.x, arm.y, arm.z)];
+            for (var ah = 0; ah < arm.targets.length; ah++) {
+              var ae = arm.targets[ah];
+              an.push(node(ah + 1, ae.pos.x, ae.pos.y,
+                api.groundAt(ae.pos.x, ae.pos.y) + biteHeight(ae)));
+            }
+            drawBeam(ctx, api, t, name, rampOf(t, arm.targets[0]), an, now, rec);
+          }
           continue;
         }
 

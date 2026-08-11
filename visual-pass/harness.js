@@ -32,10 +32,24 @@
     // Start a run through the game's own entry point, so nothing is
     // special-cased. startRun takes the map OBJECT, not its id.
     boot: function (mapId, difficulty) {
+      // SIZE THE 2D CANVAS FIRST. Its backing store is set by the game's
+      // `resize` listener, and a hidden or headless pane never fires one -- so
+      // `game` sits at the HTML default of 300x150 while CSS stretches it to
+      // the full 1280x720. Everything drawn through drawOverlays (the ritual
+      // circle, the beams, every range ring) is drawn in SCREEN pixels, so at
+      // 300x150 all of it lands outside the bitmap and the capture comes back
+      // with an empty overlay layer over a perfectly good 3D board.
+      //
+      // That is indistinguishable from an effect that is not wired up, and it
+      // is why the ritual circle "did not render": it was rendering, off the
+      // edge of a canvas a sixteenth of the size anyone thought it was.
+      if (typeof resizeCanvasBackingStore === "function") resizeCanvasBackingStore();
       var m = Maps.byId(mapId || Maps.DEFAULT_ID) || Maps.LIST[0];
       startRun(m, difficulty || "normal");
+      var uic = document.getElementById("game");
       return { map: m.id, screen: (typeof screen !== "undefined") ? screen : "?",
-               enemies: enemies.length, towers: towers.length };
+               enemies: enemies.length, towers: towers.length,
+               ui: uic ? [uic.width, uic.height] : null };
     },
 
     maps: function () { return Maps.LIST.map(function (m) { return m.id; }); },
