@@ -13,6 +13,335 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — a documentation repair pass over `AGENTS.md`, and eight missing
+change log entries reconstructed.**
+
+No game code was touched. Every correction below is backed by a file and line in
+`js/` or `tests/`, or by a commit hash, and anything that could not be proved was
+left alone and reported instead — a confident guess in the source of truth is
+worse than a known gap.
+
+**Why it was needed.** `AGENTS.md` opens by warning that a stale document is how
+a session ends up acting on facts that are no longer true, and it had drifted in
+exactly the ways it warns about. The eight commits of 2026-08-11 landed without a
+log entry between them, so the history this file exists to carry simply stopped
+on the 11th. Those eight are reconstructed below and marked as such.
+
+**The counts, which had drifted three ways at once.** `tests/blub.test.js` was
+recorded as 47 in the baseline block and 46 in the architecture file map, and is
+53 — measured, and 53 at the commit that typed "47", so it was a transcription
+error the day it was written rather than a coverage change. The file map also
+carried counts for `long-range-dps.test.js` and `beam.test.js` that disagreed
+with the baseline block. **Those three counts are now deleted rather than
+corrected**, and that is the point: a file map answers "what is this file",
+which a test count is not, and the baseline block is the only place that also
+records WHEN it was measured. A count with no measurement date cannot be
+falsified, so it rots silently. This project already paid for the two-copies
+lesson once when `CLAUDE.md` was reduced to a pointer; refreshing the second copy
+would have rebuilt the same trap with newer numbers.
+
+**Two named "known failures" that pass.** The bulleted examples under the
+baseline claimed `a mixed wave deploys its groups in order` and `the enemy tab
+covers the roster` were failing. Both print `ok`, and `tests/` is byte-identical
+between the checkout baseline and `77a7865`, so they cannot have been fixed since
+— the prose was wrong when it was written. Removed. The `ReferenceError: w is not
+defined` bullet above them is correct and is untouched.
+
+**The Tyrant bullet was stale by two retunes.** It said the test wants 1.75 s off
+a 3.5 s base and the game ships 8 s and 6 s. The test asserts 6 off a base of 8
+(`tests/content.test.js:595`, `:601`) and the game ships 12 and 9
+(`js/enemy.js:664`, `:681`) — so the bullet described a test state and a shipping
+value that had both moved on, and on its own figures it convicted the test of
+matching. Only the numbers changed; **the conclusion that the test is stale
+rather than the boss is correct and was deliberately left standing**, because the
+1000/12/9/90 set is what the owner asked for twice in writing and inviting a
+future session to "fix" the game back to 200/8/6/50 would be a worse defect than
+the one being repaired. The 2026-07-29 owner quote that opens the Tyrant section
+is kept verbatim as the original ask and now carries a marker saying the body and
+the shield were raised afterwards, because readers were lifting its 200 out as a
+live value. The enemy roster table separately still described the boss as
+2500 **+200** with a 50 u.l. leap; it now reads 5000, **+1000**, 90.
+
+**The build bar section described a system that had been replaced.** It said
+`BUILD_SLOTS` is the literal `[Tower, Smasher, LongshotTower, BeamTower,
+Soldier]` with "all five now filled". It is derived from the saved loadout
+(`js/game.js:1120`, re-read by `rebuildBuildBar()` at `:1131`), the gunner is not
+in the catalogue at all, and a fresh profile arms two of five, not five. The
+meta-progression section 280 lines away already said this correctly — the same
+two-copies failure, inside one document, with the wrong copy sitting where a
+reader reaches it first. The stale copy now points at the correct one instead of
+restating it. In the same section: the bar order is catalogue order rather than a
+price list that had the Rifleman at $15 against a shipping $300, the claim that
+`placeSmasher` addresses slot 1 was the opposite of what `tests/harness.js`
+does, and "a sixth type is no longer a drop-in" was outlived by the Summoner,
+which landed as a sixth type precisely because the armoury made a sixth SLOT
+unnecessary.
+
+**Smaller factual corrections.** The document told the reader to run "all five"
+suites nine lines after listing six. The data-flow paragraph said the main loop
+turns a bullet's returned damage into cash — it discards it, and only the death
+sweep pays — and said nothing scores by global mutation, which is true of damage
+and kill credit but not of cash. Target claiming was described as one
+constructor pair when `PierceBullet` has a second. The u.l. section was headed
+"why the constant is 1.552" directly above a code block showing 1.04. The camo
+line priced the Soldier's B3 at "$400 on top of a $15 tower" against a shipping
+$750 on a $300 tower, and now says both the tier price and the $1300 needed to
+reach it, labelled, because B3 cannot be bought off the shelf the way the
+Longshot's A1 can. An unequip example used the gunner, which can no longer be
+equipped.
+
+**Eight scripts that `index.html` loads were missing from the architecture file
+map** — `js/systems/summon-contact.js` and seven `js/gl/` modules from the
+2026-08-11 rendering work. The file's own rules require the map to be updated
+when a file is added, and a map that omits a third of a day's work is how the
+next session concludes a module does not exist.
+
+**Every campaign schedule figure in the file was pre-rescale**, in eight places
+including the version header. Easy is 797 bodies, 23 867 scheduled HP and
+**25 969 effective**, not 738 / 11 747 / 13 498; Normal is 918 / 43 844 and Hard
+1039 / 56 895. This was held back at first as a possible balance defect rather
+than a documentation one, because the file quotes 13 500 as the owner's stated
+target — but it is settled by `tests/run.js`, which pins 23 867 and 25 969 in an
+assertion that PASSES, so the schedule is intended and the document was the only
+thing left behind. The file had in fact already half-corrected itself without
+noticing: its clear-bounty figure of ~$2596 is a tenth of 25 969 and cannot be
+derived from 13 498 at all. The run purse is $36 204, also pinned, not the
+~$42 443 the values table computed from a cash-per-damage rate the same table
+records as retired. The 13 500 target is now recorded as the original ask that
+the rescale moved past, in the same way as the Tyrant quote.
+
+**The roster is twenty-one types, not nineteen**, and all twenty-one are
+scheduled on every difficulty — the "fourteen on Easy" split has not been true
+since the five supposedly Easy-absent types were scheduled into `EASY_WAVES`
+itself. Corrected in the five places it appeared.
+
+**Deliberately not changed, and reported instead.** Four stale comments in game
+code, which a documentation pass does not touch and which were routed to their
+owners — two of them say the same wrong thing the document said, so correcting
+only the document would have left the source contradicting itself. The "roughly
+25 seconds" suite runtime, which measured 52 s on the machine doing this pass
+but is a claim about the owner's, and so was left as unverified rather than
+replaced with a number from the wrong computer.
+
+**2026-08-11 — the fused creature never drew: `monsterTier` is a number, not an
+object.**
+
+Owner, game-testing: *"there is no model or animation for any tier of the monster
+blub yet."* All five creature models were built AND loaded by both pages; the
+resolver was wrong. `blubModel()` tested `tower.monsterTier.tier`, but
+`js/blub.js` carries `monsterTier` as a NUMBER — it compares it directly
+(`blub.monsterTier >= 3`) and prints it as `"T" + monsterTier`. `.tier` on a
+number is `undefined`, so every creature fell through to the `unitId` branch,
+found none, and drew the placeholder cylinder.
+
+The fix has TWO traps and each breaks a different half of the roster. Truthiness
+fails T0: tier 0 is real and `0 &&` is false, so a truthy test leaves the
+smallest creature a cylinder. `typeof` alone fails all ten ordinary units: an
+ordinary blub does not carry `undefined` here, it carries `-1`, so a bare
+`typeof` check matches every blub and resolves it to `blub-monster-t-1`, which
+does not exist — the fix for the creature would have turned all ten UNITS into
+cylinders. The guard is now a number AND non-negative. The `typeof` version was
+written first and the second trap was caught by checking a live board before
+shipping, not by reasoning about it.
+
+*(Reconstructed 2026-08-12 from commit `77a7865`, which landed without a log
+entry.)*
+
+**2026-08-11 — fix the regression the previous commit shipped.**
+
+`tower-preview.js` called `document.getElementById('gl')` at load time to attach
+`webglcontextlost` listeners. A browser returns `null` for a missing element and
+the code already handled that — but `tests/sandbox.smoke.js`'s DOM stub THROWS on
+an id it has no stub for, and it has none for `#gl` because the smoke test drives
+the 2D board. The throw took the whole suite down: it stopped emitting a summary
+line at all, which is exactly how `ci-check` flagged it as a regression rather
+than as a count change.
+
+Guarded. Nothing there is required for the module to work — losing the listeners
+only costs a cache flush on context loss — so failing to attach them must never
+be fatal. Worth recording that the gate did its job: this is the first regression
+the CI check has caught, and it caught it on the commit that introduced it.
+
+*(Reconstructed 2026-08-12 from commit `a83f5f6`, which landed without a log
+entry.)*
+
+**2026-08-11 — 3D model previews in the build bar and armoury; frame drivers for
+the Siphon and the Summoner.**
+
+THE PREVIEWS, which the owner asked for. `js/gl/tower-preview.js` renders a
+tower's real mesh into an FBO on World3D's OWN GL context — not a private one,
+because `GLModels` caches uploaded buffers on the model object and a second
+context would either steal the board's buffers or duplicate every mesh — reads
+back once, and keeps a 2D bitmap keyed on (model, device px). Steady state is one
+`drawImage` per slot and zero GL work: measured 2 renders against 458 blits, 352
+deferred, 15.3 ms of render total. Wired at both call sites with the same rule:
+try the mesh, fall back to the tower's own `drawIcon` when it returns false. With
+WebGL unavailable World3D is never installed and the old glyph is simply what
+runs, so a slot is never blank.
+
+FRAME DRIVERS. Two more towers had animation built and nothing driving it — the
+same silent failure as the blubs, and just as invisible, since frame 0 is the
+rest pose. The Siphon CHANNELS, so its clock is not a cooldown: there is no
+per-shot cadence to index and the brief forbids an attack pulse, so the phase
+runs off a clock and only while a lock is held, easing back to rest rather than
+cutting, because a hard cut to frame 0 is exactly the "strike" read the brief
+rules out for this tower. The Summoner's idle band is chosen by its LIVING UNIT
+COUNT, because the brief makes the amplitude of his chant a function of how big
+the swarm has grown — one rung per doubling, so the ladder still means something
+when a maxed tower fields hundreds. `liveBlubs()` was guessed for that count and
+checked before shipping; the real method is `blubCount()`.
+
+*(Reconstructed 2026-08-12 from commit `3bb48f3`, which landed without a log
+entry.)*
+
+**2026-08-11 — blubs actually animate now, and the harness can finally show it.**
+
+Two blockers, both invisible by design.
+
+`gl-world` had NO blub frame branch. A blub has neither `gearPhase` nor
+`swingProgress`, so `frame` stayed 0 and all ten attack cycles were dead weight —
+nine frames on disk and a still board. Nothing would ever have caught it: **a
+frozen blub looks exactly like a correct rest pose**, which is the whole reason
+frame 0 IS the rest pose. It is now one grep, and the build script says so —
+`grep -c BLUB_CYCLE js/gl/gl-world.js`, where 0 means every blub is frozen. The
+strip is indexed by reload PHASE, not by a clock, so a cycle can neither overrun
+its interval nor lag a rate change, and the swarm buff moves that rate
+mid-interval. A cooldown of exactly zero reads as REST: an idle blub holds
+cooldown at 0 and `1 - 0*rate` is 1, not 0, so the naive formula would park every
+idle unit on the last frame of its wind-up.
+
+The second blocker was the review rig. The harness fix an hour earlier
+(`d2bb8ec`, in `visual-pass/`) was incomplete and unchecked: `showcase()`'s layout
+rebuilt each item without copying `frame`, so `it.frame` was always `undefined`,
+`_drawPosed` was never reached, and `filmstrip()` laid out N copies of frame 0.
+The agents had been told "filmstrip is fixed, use it" — one of them found the
+hole and worked around it in-page rather than trusting that. Verified after:
+nine visibly different poses.
+
+*(Reconstructed 2026-08-12 from commits `d80b6cd` and `d2bb8ec`, which landed
+without a log entry.)*
+
+**2026-08-11 — blub attack frames reviewed frame by frame; four of the ten were
+wrong.**
+
+Nobody had ever seen these move — `showcase` drew the whole buffer with one
+matrix, so the review rig was blind to animation until the harness fix above.
+Every unit is now measured off the built strip (max vertex travel from rest, per
+frame, in screen pixels) and looked at in a filmstrip at 2–6× and again at true
+game scale. Six units passed and are untouched, their model files byte-identical.
+Four did not:
+
+- **hungry** — the stomach piston DETACHED. The gut front sits at −0.18 r, the
+  jaw it slides out of ends at −0.50 r, and the stroke is 0.43 r, so the two shot
+  frames opened three pixels of black sky between the animal and its own stomach.
+  It read as a part falling off. A `gut_neck` buried inside the jaw at rest now
+  spans the stroke, and the rise comes down 0.30 → 0.18 so the shaft stays in the
+  jaw's own z band.
+- **mecha** — five of eight poses within 1.6 px of rest (9.4, 10.3, 4.1, 1.5, 0.6,
+  0.2, 0.6, 1.6): a recoil with 200 ms of photograph in front of it and no
+  anticipation at all. Release untouched, tail of NOD/RUN deepened; the coil goes
+  1.6 → 7.0 px.
+- **mecha2** — same disease, 4.2 px of wind-up against a 19.8 px release. Now
+  11.3, and the MK2 visibly hauls itself forward to reload.
+- **mini2** — the file claimed frame 1 was "three times the amplitude of the buzz
+  around it"; it was 1.7×, and the intake was exactly the buzz floor. The cause
+  was anatomy: a 12 px slab cannot show the rotation a spire shows, so its two
+  accents move the body bodily on push instead. 4.0 → 5.7 px shot, 2.2 → 4.1
+  intake, floor down to 1.5.
+
+**Frame 0 is untouched, and that is measured rather than argued.** Silhouettes by
+frame differential at the reference viewport 1278 × 719 and the default game
+camera, three yaws, come back BIT-FOR-BIT IDENTICAL for all ten units, including
+hungry with its new neck — same boxes, same areas, same masks. So all 45 pair
+IoUs are unchanged, the `>= 0.85` circular family stays empty (worst pair
+blub1/cyber at 0.833), and the three profiles, the maw on the head and the ten
+footprints cannot have moved.
+
+Doc fix in the same pass: the build script's header credited a `--check` flag
+that has never existed; the checks run on every build.
+
+*(Reconstructed 2026-08-12 from commit `af9501a`, which landed without a log
+entry.)*
+
+**2026-08-11 — sceptre out of the body, blub attack frames, and the summon
+ceremony wired.**
+
+SCEPTRE, proven rather than eyeballed. The old shaft ran from the ring THROUGH
+the palm, and the cause was geometric rather than a typo: RING
+(0.315, 0.395, 1.190) is 0.185 outboard of the palm and only 0.150 above it, so
+any straight line through both is at x = −0.36 by z = 0.62 — through his hip. It
+now drops nearly plumb from the ring's lower rim, raking out and back, off the
+centreline the whole way, which is `tower_warbringer.py`'s lesson that **a weapon
+at rest belongs OFF the axis**. The hand meets it at the TOP and `_weld` bridges
+the gap.
+
+That file's `penetration()` check is ported in and is NOT vacuous: re-run against
+the old geometry it rejects 3/3 tiers. After, penetration is 0.000 on every tier
+and frame, clearance 0.063 (2 px). A real bug in the check itself was fixed on
+the way — `_patch_boxes` dropped vertices on faces with more than four sides, and
+a frustum's caps are pentagons, so it under-covered the weapon and could have
+missed a hit.
+
+Animation is 4 frames on a `sceptre` empty rotating about the join, so the head is
+the pivot. **The RINGS stay on the static group, so the beam origin is
+structurally incapable of moving.** Frame 0 is exactly identity, so a frameless
+runtime still gets the rest pose. `siphon_origins.json` is byte-identical, so the
+beam lot needs no edit, and triangle counts are unchanged. Also lands the blub
+attack frames and wires `js/gl/blub-summon.js`, which had never executed once:
+~1,300 drawn frames across five scenarios, zero exceptions.
+
+*(Reconstructed 2026-08-12 from commit `82464bf`, which landed without a log
+entry.)*
+
+**2026-08-11 — the Siphon's beam was never drawn in 3D. Wire it.**
+
+ROOT CAUSE, and it is structural rather than a bug in the beam code. `BeamTower`
+draws its fountain AND its beams inside its own 2D `draw()`. `js/game.js:2953`
+wraps the entire 2D world layer in `if (!world3D)` — including the actor loop at
+`:3011` that calls `tower.draw(ctx)`. With the 3D board installed, which is every
+ordinary load of `index.html`, that method never runs. So the tower whose beam
+the brief calls "more than half its visual value" had no beam at all, and had not
+had one since the 3D board shipped.
+
+`js/gl/siphon-beam-draw.js` already existed — written by an agent that reached the
+same diagnosis independently before it died on the session limit — and it
+documents its own call sites. Wired exactly as specified: loaded in `index.html`
+and `sandbox.html` after `siphon-beam-spec.js`, whose table it reads at call time
+(the two pages must stay identical); called in `drawOverlays` at the END of the
+tower-hardware pass, immediately before `drawShots`, because **the beam is
+hardware, not a shot** — it is continuous while a lock is held, so it belongs
+under the shots and under the cosmetic burst; and at TOP LEVEL, outside the
+per-tower `withGround`. That last one matters: **a beam spans TWO ground
+heights**, the deck the tower stands on and the road its target walks, so it pins
+its own reference and feeds `project()` absolute heights, the same rule a shot in
+flight follows. Called inside a tower's `withGround` it would flatten every beam
+onto that tower's deck and the far end would float.
+
+*(Reconstructed 2026-08-12 from commit `5e8a74f`, which landed without a log
+entry.)*
+
+**2026-08-11 — salvage the wave that died on the session limit. UNVERIFIED.**
+
+All four agents failed mid-task on the session limit, but had already written
+substantial work that validates, so it was kept rather than thrown away:
+`js/gl/siphon-beam-draw.js` (1058 lines, parses), `js/gl/blub-summon.js` (1275
+lines, parses), and `tools/blender/tower_summoner.py`, which still builds and now
+puts the ten units at 5012 triangles against 4672, so attack geometry was added.
+
+**What this is not: verified.** Nothing in it had been seen running. The two
+modules were inert because no script tag loaded them, and that is the only reason
+it was safe to commit half-finished work — the game was unaffected either way.
+Both were wired and checked in the commits above. The diagnostics survive and
+were worth reading before the work was retried: the beam agent captured the
+BEFORE state (`captures/siphon-beam-BEFORE-locked.png`, `-close.png`) and the
+sceptre agent captured the path A head.
+
+Gates at the time: all 12 primitives wound outward, suites at baseline
+(105/3, 182/30, 70/1, 45/0, 53/0, 2).
+
+*(Reconstructed 2026-08-12 from commit `936f358`, which landed without a log
+entry.)*
+
 **2026-08-11 — the ten blub units get a detail layer (pass 3).**
 
 New `tools/blender/blub_detail.py` builds ten add-on meshes, `blub-detail-<unit>`,

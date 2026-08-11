@@ -18,3 +18,8 @@ __MACOSX/
 .claude/worktrees/
 **/.claude/worktrees/
 visual-pass/tmp/
+
+# Agent company: runtime data, not knowledge
+.claude/org/log/
+.claude/org/status/*.jsonl
+tools/org/tree.html

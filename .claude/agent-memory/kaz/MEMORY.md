@@ -1,0 +1,6 @@
+- [Rig traps in the visual pass harness](rig-traps-visual-pass.md) — four traps that make a broken capture look like a missing feature; rule them out before believing any visual result.
+- [Visual evidence that proves nothing](visual-evidence-that-proves-nothing.md) — the five shapes of fake proof to reject from staff and from myself.
+- [Siphon lot: unwired effect modules](siphon-lot-dead-modules.md) — three complete GL effect modules load from no page; one's documented blocker has since gone stale.
+- [Siphon sceptre geometry](siphon-sceptre-geometry.md) — the measured box the A3+ staff motion lives in: reach window, a5 radius headroom, why only vertical works.
+- [Agent comms and memory durability](agent-comms-and-memory-durability.md) — SendMessage by name fails soft and makes working agents look idle; memory under .claude/worktrees is gitignored.
+- [Siphon cord occlusion](siphon-cord-occlusion.md) — the depth-compare error that makes a chest-height cord read as in front, and why a feet-level test passes anyway.

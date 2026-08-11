@@ -1,0 +1,37 @@
+{
+  "_comment": [
+    "Paste the `hooks` block below into .claude/settings.json to switch on",
+    "enforced activity logging. It is NOT active until you do.",
+    "",
+    "These four events give full coverage of a nested agent tree:",
+    "  SubagentStart  - an employee is hired onto a task",
+    "  PreToolUse     - fires INSIDE subagents, carries agent_id + agent_type",
+    "  PostToolUse    - same, plus duration_ms",
+    "  SubagentStop   - carries agent_transcript_path and last_assistant_message",
+    "",
+    "Known coverage gaps, documented rather than hidden:",
+    "  - @-file references bypass PreToolUse entirely",
+    "  - schema/validation rejections fire neither PreToolUse nor PostToolUseFailure",
+    "  - `disableAllHooks: true` in any settings file switches all of this off.",
+    "    Only managed policy settings survive that, so if 'enforced' must mean",
+    "    'nobody can turn it off', these belong in managed policy instead.",
+    "",
+    "PostToolUse is the noisy one - it fires on every tool call by every agent",
+    "at every depth. Drop it if activity.jsonl grows faster than you want."
+  ],
+
+  "hooks": {
+    "SubagentStart": [
+      { "hooks": [{ "type": "command", "command": "node .claude/org/log-hook.js" }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "node .claude/org/log-hook.js" }] }
+    ],
+    "PreToolUse": [
+      { "hooks": [{ "type": "command", "command": "node .claude/org/log-hook.js" }] }
+    ],
+    "PostToolUse": [
+      { "hooks": [{ "type": "command", "command": "node .claude/org/log-hook.js" }] }
+    ]
+  }
+}
