@@ -3730,7 +3730,15 @@ function drawBuildBar() {
 
     // Unaffordable towers stay visible but read as inert.
     ctx.globalAlpha = affordable ? 1 : 0.4;
-    type.drawIcon(ctx, r.x + r.w / 2, r.y + 30, 22);
+    // THE REAL BODY, not a hand-drawn glyph. TowerPreview3D renders the tower's
+    // actual mesh once into an offscreen bitmap and blits it here, so the slot
+    // shows what the player will place. It returns FALSE when it cannot -- no
+    // WebGL, no mesh for that tier -- and then the tower's own drawIcon runs
+    // exactly as before, so a slot is never left blank.
+    if (typeof TowerPreview3D === "undefined" ||
+        !TowerPreview3D.draw(ctx, type, r.x + r.w / 2, r.y + 30, 22)) {
+      type.drawIcon(ctx, r.x + r.w / 2, r.y + 30, 22);
+    }
     ctx.globalAlpha = 1;
 
     ctx.textAlign = "center";

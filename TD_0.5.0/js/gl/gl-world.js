@@ -891,6 +891,46 @@ var World3D = (function () {
             frame = 1 + band * BLUB_CYCLE + Math.floor(bphase * BLUB_CYCLE);
           }
         }
+        // THE SIPHON CHANNELS, SO ITS CLOCK IS NOT A COOLDOWN.
+        //
+        // BeamTower answers to neither gearPhase nor swingProgress, so without
+        // this every Siphon in play drew frame 0 forever -- the same silent
+        // failure the blubs had, and just as invisible, because frame 0 is the
+        // rest pose. There is no per-shot cooldown to index either: the beam is
+        // continuous by design and the brief forbids an attack pulse. So the
+        // phase comes from a clock, and only while it actually holds a lock.
+        //
+        // Off the lock it eases back to rest rather than snapping, because a
+        // hard cut to frame 0 is exactly the "strike" read the brief rules out.
+        if (m && m.frames.length > 1 && t.constructor &&
+            t.constructor.ID === "siphon") {
+          var chan = (t.locks && t.locks.length) ? 1 : 0;
+          t._chanEase = (t._chanEase === undefined) ? 0 : t._chanEase;
+          t._chanEase += (chan - t._chanEase) * 0.06;      // ~0.4 s either way
+          if (t._chanEase > 0.02) {
+            var sphase = (((state.now || 0) * 0.42) % 1 + 1) % 1;
+            frame = 1 + Math.min(m.frames.length - 2,
+              Math.floor(sphase * (m.frames.length - 1)));
+          }
+        }
+        // THE SUMMONER'S IDLE GROWS WITH ITS SWARM.
+        //
+        // The brief makes the amplitude of his chant a function of how many
+        // units are alive -- he gets more agitated as the swarm grows -- so the
+        // band is chosen by the live count and the phase runs off a clock.
+        // BlubTower has no gearPhase either; same silent failure as the others.
+        if (m && m.frames.length > 1 && t.constructor &&
+            t.constructor.ID === "blub" && typeof t.blubCount === "function") {
+          var SUM_CYCLE = 15;
+          var bandsAvail = Math.max(1, Math.floor((m.frames.length - 1) / SUM_CYCLE));
+          var alive = t.blubCount() | 0;
+          // One rung per doubling, so the ladder keeps meaning something when a
+          // maxed tower is fielding hundreds rather than a handful.
+          var rung = alive <= 0 ? 0 : Math.floor(Math.log(alive + 1) / Math.LN2);
+          var iband = Math.min(bandsAvail - 1, rung);
+          var iphase = (((state.now || 0) * 0.30) % 1 + 1) % 1;
+          frame = 1 + iband * SUM_CYCLE + Math.floor(iphase * SUM_CYCLE);
+        }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from
         // `swingProgress()`, which is already the cosmetic window the 2D pack

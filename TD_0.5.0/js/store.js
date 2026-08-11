@@ -176,7 +176,12 @@ var Store = (function () {
       // price is the whole reason to earn coins.
       ctx.save();
       if (!owned) ctx.globalAlpha = 0.45;
-      if (Type) Type.drawIcon(ctx, r.x + 42, r.y + r.h / 2, 26);
+      // Same rule as the build bar: the real mesh when it can be rendered, the
+      // tower's own glyph when it cannot. A card must never be empty.
+      if (Type && (typeof TowerPreview3D === "undefined" ||
+          !TowerPreview3D.draw(ctx, Type, r.x + 42, r.y + r.h / 2, 26))) {
+        Type.drawIcon(ctx, r.x + 42, r.y + r.h / 2, 26);
+      }
       ctx.restore();
 
       ctx.textAlign = "left";
