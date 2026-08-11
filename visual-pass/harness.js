@@ -193,6 +193,41 @@
               function (e) { return "SINK ERROR " + e; });
     },
 
+    // A CROP OF THE REAL FRAME, magnified. Not a re-render.
+    //
+    // The distinction is the whole point. To judge whether a gesture reads AT
+    // TRUE GAME SCALE you have to look at the pixels the game actually put on
+    // the board -- roughly 25 of them tall at the default camera -- and the
+    // only honest way to look closer is to magnify those pixels, not to move
+    // the camera in and rasterise a different, larger image. Re-rendering
+    // bigger answers "is the geometry there", which was never the question.
+    //
+    // Nearest-neighbour, so a magnified pixel stays a pixel and nothing is
+    // invented by the interpolator.
+    crop: function (name, x, y, w, h, scale) {
+      draw();
+      var src = composite();
+      var k = scale || 6;
+      var c = document.createElement("canvas");
+      c.width = Math.round(w * k); c.height = Math.round(h * k);
+      var g = c.getContext("2d");
+      g.imageSmoothingEnabled = false;
+      g.drawImage(src, x, y, w, h, 0, 0, c.width, c.height);
+      return fetch(SINK, { method: "POST", headers: { "Content-Type": "text/plain" },
+                           body: name + "\n" + c.toDataURL("image/png") })
+        .then(function () { return "saved " + name + " (" + w + "x" + h + " @" + k + "x)"; },
+              function (e) { return "SINK ERROR " + e; });
+    },
+
+    // Where an entity lands on the composited image, so a crop can be aimed
+    // without guessing at the projection.
+    screenOf: function (ent) {
+      var p = ent.pos ? ent.pos : ent;
+      var z = (typeof p.z === "number") ? p.z : 0;
+      var s = World3D.project ? World3D.project(p.x, p.y, z) : null;
+      return s ? { x: Math.round(s.x), y: Math.round(s.y) } : null;
+    },
+
     // Pixel readback, the proof standard AGENTS.md asks for.
     sample: function (x, y, w, h) {
       draw();
