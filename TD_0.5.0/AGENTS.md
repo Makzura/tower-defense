@@ -1268,12 +1268,17 @@ the removal sweep adds `enemy.bounty()` exactly once and passes the same value
 to the `+$` effect. The old `CASH_PER_DAMAGE = 3` constant and both tower/bullet
 damage-payment loops are gone.
 
-The point is to break the feedback loop where increasing HP increased both
-difficulty and income. Health, shields, armor, speed and abilities now determine
-how hard an enemy is; bounty is a separate authored balance value. A wave
-`health` override scales its type's base bounty linearly through
-`Enemy.bountyOf(typeId, healthOverride)`, so a deliberately stronger scheduled
-variant pays more without exposing the economy to every shield refresh or heal.
+The point was to break the feedback loop where increasing HP increased income —
+**and it was broken for DAMAGE, not for authored health.** Read the two apart or
+this section reads as a stronger claim than the code makes. What is gone is
+income per point of damage landed, so a shield refresh, a heal, an armor retune
+and a longer grind now pay nothing. What REMAINS deliberate is that a wave's
+`health` override scales that type's base bounty linearly, through
+`Enemy.bountyOf(typeId, healthOverride)` — a stronger scheduled variant is meant
+to pay more. Health, shields, armor, speed and abilities determine how hard an
+enemy is; `bounty` is a separate authored balance value that the schedule may
+scale but nothing else may. The comment above `STARTING_CASH` in `js/game.js`
+puts it the same way and is the source to check against.
 
 | Enemy | Base bounty |
 |---|---:|
@@ -1793,9 +1798,11 @@ written there. `BUILD_SLOTS.length` and `MetaProgress.SLOT_COUNT` must stay the
 same number — the bar's geometry is computed from it once at load — and a test
 pins that.
 
-**The starting kit is the gunner, the Smasher and the Soldier** (the Soldier
-joined it 2026-07-29, at the owner's request). The Longshot costs 40 coins and
-the Siphon 150. That is tuned against the payout and it is the whole
+**The starting kit is the Smasher and the Soldier** — the two catalogue entries
+priced at 0 coins, which is what `MetaProgress.reset()` leaves owned. (The
+Soldier joined it 2026-07-29, at the owner's request. The gunner was in this
+sentence until 2026-08-12 and has not been in the catalogue since 2026-07-30.)
+The Longshot costs 40 coins, the Siphon 150 and the Summoner 90. That is tuned against the payout and it is the whole
 progression loop, measured:
 
 > A first run on a fresh profile **loses on every route** and pays 30–56 coins.
@@ -1808,10 +1815,24 @@ fact that a fresh profile cannot win — that IS the loop.
 **The Soldier's B3 changed the PREMISE of that loop, and it was re-measured
 rather than assumed.** Until 2026-07-29 the reason a fresh profile could not
 win was simple: nothing on the starter bar could see camo, so waves 13, 16 and
-26 leaked whatever they liked. The Soldier's B3 *is* camo detection, and at
-$15 + 75 + 125 + 200 = **$415** it is not far off the Longshot's $375 — so for
-the first time the starter bar can buy the thing the loop is built on
-withholding.
+26 leaked whatever they liked. The Soldier's B3 *is* camo detection, so for the
+first time the starter bar could buy the thing the loop is built on withholding.
+
+**What it costs is no longer close, and the old figures were pegged to a deleted
+tower.** This passage read "$15 + 75 + 125 + 200 = **$415** … not far off the
+Longshot's $375" until 2026-08-12; the $15 was the gunner's price and the gunner
+left the catalogue on 2026-07-30. Live, the Rifleman's detection is **$1 600**
+all in (tower 300 + B1 200 + B2 350 + B3 750) against the Arcane Sniper's
+**$1 200** (tower 900 + A1 300) — **a third dearer, not a tenth**. The
+conclusion did not survive the arithmetic: the starter bar's detection is not
+"not far off", it is the expensive way to get it. What the table below shows is
+that it moves the wall anyway.
+
+**The flag is spelled differently on each tower, and one grep will mislead you.**
+The Rifleman's B3 carries `seesCamo: true`; the Arcane Sniper's A1 carries
+`grants: ["camoDetection"]` and has no `seesCamo` key at all. Cite each tower's
+own symbol — a reader checking with a single `seesCamo` grep concludes the
+Sniper has no detection and "corrects" a sentence that is right.
 
 `tools/measure-starter-kit.js` was written for exactly this question and the
 answer is that **the loop survives, for a new reason**. Scripted play, starter
@@ -1829,13 +1850,16 @@ Two things to take from that, and one trap:
 - **Detection is what moves the wall**, from wave 19 to wave 28 on the two
   easier routes. That is the camo waves no longer leaking, and it is the
   Soldier doing exactly what it was added to be able to do.
-- **It is still not a win, anywhere.** Buying $415 of upgrades costs you the
+- **It is still not a win, anywhere.** Buying the $1 300 of upgrades that reach
+  B3 costs you the
   board that earns it: the winning lines run 60–70 towers and the lines that
   reach B3 run 12–41. The detection is affordable *in principle* and not *at
   the moment wave 13 lands*, which is a more interesting reason to lose than
-  "you cannot buy it at all" and is still a reason to lose.
-- **The trap, if you re-measure**: a greedy builder that spends every $15 the
-  moment it has one never accumulates $200, so a "build, then upgrade" script
+  "you cannot buy it at all" and is still a reason to lose. (This bullet read
+  "$415" until 2026-08-12, from the same deleted-gunner peg as the sentence
+  above.)
+- **The trap, if you re-measure**: a greedy builder that spends every dollar the
+  moment it has one never accumulates an upgrade's worth, so a "build, then upgrade" script
   measures building and reports it as upgrading. The first draft of that tool
   did precisely this and confidently reported no change. Its policies now have
   an explicit saving phase, and the reading prints how many Soldiers actually
@@ -3045,7 +3069,7 @@ shot of a burst. That is what makes the owner's DPS figures come out —
 `attacksPerSecond()` is `shotsPerBurst / burstCooldown` for a burst weapon. Shot
 spacing is therefore a *shape*: it decides how bunched a burst is, never how
 often one happens. Every tier keeps `(shots − 1) × spacing` comfortably under the
-cooldown (0.28 s against 0.7 s at A5), and a test asserts that relationship
+cooldown (0.28 s against 0.6 s at A5), and a test asserts that relationship
 still holds — invert it and the rate the tower reports stops being the rate it
 fires at.
 
@@ -3092,7 +3116,7 @@ payout and kill-crediting all work without the Soldier knowing about any of it.
 
 ### The paths
 
-**Path A tightens the burst** (A1 150, A2 250, A3 400, A4 700, A5 1200): more
+**Path A tightens the burst** (A1 200, A2 325, A3 700, A4 1900, A5 3275): more
 shots, less space between them, a shorter pause, then raw damage. It is a burst
 weapon all the way up.
 
@@ -3115,8 +3139,8 @@ so make it that each upgrade gives +0.25/s to b path."*
 
 He is right. A1 and A2 buy their attack speed as `shots`/`spacing`/`cooldown` —
 the shape of a BURST — and B3 throws the burst away for a flat 2.5 shots a
-second. A B-path Rifleman that had spent $400 crosspathing into them got
-**nothing whatsoever** for it the moment B3 landed. Each now also adds **+0.25
+second. A B-path Rifleman that had spent $525 crosspathing into them (A1 200 +
+A2 325) got **nothing whatsoever** for it the moment B3 landed. Each now also adds **+0.25
 to the automatic rate**, so the same purchase pays out in whichever firing model
 the tower ends up in: full B is 2.5/s alone and **3.0/s with A1+A2** -- they are now the only attack speed path B can get.
 
@@ -3170,14 +3194,25 @@ for $150 *less*, and while also carrying camo detection, armor pierce, +25 range
 quietly fixed, and the owner's answer was the A4/A5 retune above. Where it sits
 now:
 
-- **Path A wins on the tower** — 66.7 DPS against path B's 50 (60 crosspathed into A1+A2), for $150 more.
-- **Path B wins on everything else as well** — camo, 10 points of defence pierce, +25 range, +425 HP,
+- **Path A wins on the tower** — 66.7 DPS against path B's 50 (60 crosspathed into A1+A2).
+- **And path A is CHEAPER**, which is the thing to look at first: full A is
+  $6 700 all in (300 + 200/325/700/1900/3275) against full B's $7 500
+  (300 + 200/350/750/2100/3800). **$800 less, not $150 more** — this passage
+  said the opposite until 2026-08-12, on the strength of a path-A ladder that
+  had been retuned out from under it. The Current values table had A right the
+  whole time; the prose here was the stale copy.
+- **Path B wins on everything else** — camo, 10 points of defence pierce, +25 range, +425 HP,
   and four recruits worth 7.5 DPS each while they live, which closes most of the
   raw-damage gap when they are out and closes none of it when they are not.
 
-That is a real choice rather than a right answer, which is what a two-branch tree
-is for. It is also the whole balance of this tower resting on one 45 s cooldown,
-so anyone retuning either branch should re-derive both columns rather than one.
+**So this is NOT the clean trade-off the section used to claim.** On live prices
+path A is ahead on the tower *and* undercuts path B by 12%, so what B is really
+selling is the utility column, and it charges $800 for it. Whether that is the
+intended shape is a balance question and is nobody's to settle in this document
+— it is recorded here because the section previously argued for a trade-off the
+game does not offer. It is also the whole balance of this tower resting on one
+45 s cooldown, so anyone retuning either branch should re-derive both columns
+rather than one.
 
 **The A5 + B1 + B2 endpoint has moved twice**, and it is worth stating because it
 was the owner's originally specified build. It resolved to 3 damage / 21.4 DPS

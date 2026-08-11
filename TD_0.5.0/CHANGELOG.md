@@ -13,6 +13,110 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the Rifleman section argued for a trade-off the game does not
+offer, and two more sites were pegged to the deleted gunner.**
+
+Documentation only. Every figure below was verified at runtime through a booted
+harness by the quality lead and re-verified here before it was written; where
+this pass disagrees with what was handed over, that is recorded rather than
+silently resolved.
+
+**The sign was flipped, and it was not a stale number — it was a stale
+ARGUMENT.** The Rifleman's path comparison read "Path A wins on the tower … for
+$150 more", and the section's whole point was that A wins on the tower while B
+wins on everything else, so the choice is real. Live, from `Soldier.UPGRADES`:
+full A is **$6 700** all in (300 + 200/325/700/1900/3275) against full B's
+**$7 500** (300 + 200/350/750/2100/3800). **A is $800 CHEAPER, not $150 dearer.**
+So path A is ahead on the tower *and* undercuts B by 12%, and what B actually
+sells is the utility column at an $800 premium. The passage now says that, and
+says plainly that whether it is the intended shape is a balance question nobody
+settles in this document.
+
+**The root cause was a dead ladder in the prose** — "(A1 150, A2 250, A3 400,
+A4 700, A5 1200)" — while the path B table forty lines below was current and the
+Current values table had A right all along. The document was contradicting
+itself, and the repair went against the table, not the other way round. Two
+smaller figures fell out of the same ladder: the A1+A2 crosspath is **$525**
+(200 + 325), not $400; and an A5 cooldown contradiction 57 lines apart — one
+site said "0.28 s against 0.7 s at A5", another "0.28 s against 0.6 s" —
+resolves to **0.6**, which is `A5.cooldown` live, so the 0.6 site was right and
+the 0.7 site is corrected.
+
+**The camo comparison was pegged to a tower deleted on 2026-07-30.** It read
+"$15 + 75 + 125 + 200 = **$415** … not far off the Longshot's $375", and the
+$15 was the gunner's price. Live: the Rifleman's detection is **$1 600** all in
+(tower 300 + B1 200 + B2 350 + B3 750) against the Arcane Sniper's **$1 200**
+(tower 900 + A1 300) — a ratio of **1.3333**. The document said 11% dearer; it
+is **33%** dearer. **This is the case where the rationale AND the conclusion
+both go**: "not far off" is not a smaller version of the truth, it is the
+opposite of it. What survives is the measured table beneath it, which shows
+detection moving the wall from wave 19 to wave 28 regardless of what it costs.
+
+**A flag that is spelled differently on each tower, now written down before it
+bites someone.** The Rifleman's B3 carries `seesCamo: true`; the Arcane Sniper's
+A1 carries `grants: ["camoDetection"]` and has no `seesCamo` key at all. A
+reader checking with one `seesCamo` grep concludes the Sniper has no detection
+and "corrects" a sentence that is right. Each tower is now cited by its own
+symbol.
+
+**Adjacency again, and this time it was predicted rather than discovered.** A
+neighbouring passage — "the Soldier's B3 ($750 itself, but $1300 to reach — B1
+200 + B2 350 + B3 750 — on top of a $300 tower)" — had already been repaired in
+an earlier pass, so a repaired and an unrepaired statement about the SAME
+subject were sitting in one document. The two now agree, and the second
+`$415` site in the bullet below the table went with them.
+
+**The economy section's opening sentence overstated its own claim.** It said
+the point was "to break the feedback loop where increasing HP increased both
+difficulty and income" — full stop. `js/game.js` says the narrower and correct
+thing, and the wave-building paragraph further down this same document already
+said it too: the loop was broken for DAMAGE, not for authored health, because
+`Enemy.bountyOf` still scales a type's bounty with the health a wave overrides.
+That is deliberate — a stronger scheduled variant is meant to pay more. The
+opening now separates the two, because the opening is what gets read.
+
+**One thing handed over that this pass did NOT change.** The neighbouring
+historical clause "the path B rebuild landed first and left full B at 44 DPS
+against full A's 21.4 — for $150 *less*" is past tense and scoped to the state
+before the 2026-07-30 retune. It describes a moment, not the present, and
+re-pricing it against today's ladder would turn a record into a fiction.
+
+**2026-08-12 — three test comments named after an economy deleted on
+2026-07-31.**
+
+Commit `340ee66`, milo's, entered here by the archivist because one writer owns
+this file; facts his and the quality lead's. **No assertion changed and no
+expected value moved** — the six suites are identical BY NAME at 36 failures
+before and after. This is documentation that happens to live inside test files.
+
+- `tests/beam.test.js`, the test named "the beam earns the same rate as every
+  other damage source" — false twice over. No other damage source earns anything
+  under kill bounties, and the beam does not earn at that rate either. It is now
+  named for what it checks: `baseGoldPerDamage` is the UNIT the A3 charge
+  multiplier is priced in, not income. Confirmed against a booted game rather
+  than by reading — the wallet delta equals the bonus in every trial and equals
+  `earned` in none, an unbought A3 banks nothing at all, and changing the 1 to a
+  7 scaled the payout from 10 to 70. That last check is what makes the number
+  live rather than a fossil.
+- `tests/beam.test.js`, the neighbouring label "1459 damage at x2 is 2918 gold".
+  2918 is a real intermediate but it is not what the wallet receives; the player
+  banks 1459, the part the charges added. **The assertion still pins 2918**,
+  because that intermediate is what the test computes — only the label moved, to
+  say which of the two numbers reaches the bank.
+- `tests/harness.js`, the `pinWaveBreak` comment justifying the pin with "$1 per
+  point of damage". **Dead rationale, live conclusion: the pin STAYS.** The
+  comment now explains it the way the code works — the suite measures a board
+  over a fixed window of simulated time, and a 90 s break puts one wave and a
+  long silence inside that window.
+
+**The reusable lesson: all three passed continuously through every change they
+were describing.** `tests/beam.test.js` requires the pure modules directly and
+never boots a game, so it can only ever see arithmetic and never the banking
+decision. A green test carries a false claim indefinitely because nothing ever
+forces anyone to read it. **The failing set is not the truth set** — a suite at
+baseline says the assertions still hold and says nothing whatsoever about
+whether the words around them are true.
+
 **2026-08-12 — the Longshot's target scan: one linear pass instead of two
 arrays, three closures and a sort.** `js/towers/longshot-adapter.js`.
 Behaviour-preserving; no number retuned.
@@ -66,6 +170,22 @@ grew. `update()` scales linearly with bodies on the board across 20→120
 (200.6 → 811.6 µs/step before this change, ~5.6 µs per additional body on a
 ~135 µs fixed base). Enemy-vs-bullet, enemy-vs-tower and targeting scans are
 all O(n·towers) with a small constant, not quadratic.
+
+**"Behaviour-preserving" was checked by someone who did not write it**, which is
+the only kind of check that claim can survive. 42 boards across 7 scenarios and
+6 targeting modes, 5040 steps, old picker against new compared **by object
+identity** rather than by id — **zero disagreements**, including **1305 exact
+comparator ties**, which is the case the stable-sort argument above turns on. A
+tie is where an argmax and a sort are free to differ, so a run that never
+produced one would not have tested the claim. Separately, live `this.aim` after
+a real `tower.update()` matched to within 1e-12 on 540 of 540 steps.
+
+**The caveat belongs with the result, not underneath it.** That proves
+SELECTION — the two implementations choose the same enemy. It does NOT prove the
+refactor is allocation-free, and it does not cover the `PierceBullet` path
+downstream, which decides what a shot passes through from where the bodies are
+standing rather than from anything the scan returns. Both are open, neither is
+suspected.
 
 **2026-08-12 — seven wrong figures and one inverted argument, in the two files
 the simulation is written in.** Comment-only, both commits.
