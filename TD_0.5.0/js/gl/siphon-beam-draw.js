@@ -402,6 +402,31 @@ var SiphonFXBeam = (function () {
     chain:     { body: "membrane",    core: "rose_sick",  bead: "rose_dim",  rim: "oil_black",   glow: "rose_sick" }
   };
 
+  // THE IDLE CORD WEARS THE TIER'S MATERIAL, NOT THE BASE LADDER'S.
+  //
+  // `stateFor` returns "seeking" on lockCount <= 0 ABOVE every tier test, so
+  // one name covered every tier and ROLES.seeking is a base-tier cloth rope.
+  // An A5 whose attack cord is `column` -- gold body, white_warm core, a
+  // purple_rich rim -- therefore groped with grey cloth, and the moment it
+  // acquired a lock the cord changed substance. That is the owner's complaint
+  // ("the passive rays ... doesn't fit the ray he uses when attacking")
+  // surviving at every tier above base, after the geometry retune had already
+  // fixed the shape.
+  //
+  // The GEOMETRY stays seeking's: `stateSpec("seeking")` is looked up
+  // separately, so the idle cord keeps its thinner radii, its droop, its reach
+  // of 0.55 and its sweep. Only the palette follows the tier. Idle still reads
+  // as weaker and searching -- it is the same rope, slack, which is exactly
+  // what the retune note argues for.
+  //
+  // Asked with one lock at ramp 0, which is the state it will actually become
+  // the instant it acquires: A5 -> column, A3/A4 -> gold, B3+ -> tendon, and
+  // the base ladder -> thread, whose roles ARE seeking's old ones. So a base
+  // Siphon is unchanged and nothing below A3/B3 moves.
+  function idleRole(tower) {
+    return ROLES[stateFor(tower, 1, 0)] || ROLES.thread;
+  }
+
   // How the knots are drawn. `wedge` is the chevron; `box` is gold's cast
   // grain; `constriction` is the tendon's peristaltic pinch, which is a band
   // ACROSS the cord rather than a point along it -- its direction comes from
@@ -615,7 +640,7 @@ var SiphonFXBeam = (function () {
     var ss2 = stateSpec(name);
     if (!ss2) return;
     var project = api.project, groundAt = api.groundAt;
-    var role = ROLES[name] || ROLES.thread;
+    var role = (name === "seeking") ? idleRole(tower) : (ROLES[name] || ROLES.thread);
     var curve = ss2.curve || {};
     var scroll = ss2.scroll || { base: 0.5, gain: 0.5, p: 1 };
     var flow = flowTable(scroll.base || 0.5, scroll.gain || 0, scroll.p || 1);
