@@ -1165,18 +1165,23 @@ def _arm_pose(nodes, frame):
 #     travel under the footprint cap -- the radius is a hypotenuse, so spending
 #     some of the swing on x lets y go further before the cap bites. It also
 #     stops the whole gesture being a single planar hinge.
-SCEPTRE_RAKE = 0.62                        # radians about x, at `join`
-SCEPTRE_YAW = 0.50                         # radians about y, same pivot
-
-
-def _sceptre_pose(node, frame):
-    """Rake the shaft forward about the join, on the shared cycle so the staff
-    and the arms breathe together."""
-    a = _amp(_phase(frame))
-    pivot = _sceptre_axis()[0]
-    node.rotation = [SCEPTRE_RAKE * a, SCEPTRE_YAW * a, 0.0]
-    spun = td.apply(td.trs((0, 0, 0), node.rotation), pivot)
-    node.location = [pivot[k] - spun[k] for k in range(3)]
+# THERE IS NO `_sceptre_pose` ANY MORE, and its absence is the fix.
+#
+# It used to rake the shaft about `join`, a point on the ring's own rim, with
+# the rings pinned to the static body so the beam origin could not move. Read
+# that construction back and it says: the head is the pivot, therefore the head
+# cannot move; the hand is not in a group, therefore the hand cannot move; only
+# the butt swings. Which is exactly the three things the owner reported.
+#
+# The staff now rides the left hand's group and inherits the hand's gesture
+# whole -- one rigid body, carried. There is nothing left for a second,
+# independent sceptre pose to do, and reintroducing one would immediately
+# recreate the defect: any transform applied to the staff but not to the hand
+# is, by definition, the staff moving out of his grip.
+#
+# SCEPTRE_RAKE and SCEPTRE_YAW went with it. If the staff ever needs more swing
+# than the arm gives it, the amplitude to raise is the LEFT HAND's, not a rake
+# private to the weapon.
 
 
 # --- the tier table ---------------------------------------------------------
@@ -1518,26 +1523,44 @@ def _weld(s, arm, lk):
     return made
 
 
-def _sceptre(s, body, arm, lk):
+def _sceptre(s, hand, lk):
     """NOT a weapon and NOT a point: a HOLLOW RING on a shaft, echoing the
     cupped hands it replaces. The rings are concentric on the socle's RING and
     deliberately MISALIGNED -- A4 adds the second, A5 the third.
 
-    WHAT RIDES WHAT. The shaft and the weld go on `arm`, the animated group, so
-    they can settle while he channels. The RINGS go on `body` and do not move:
-    the ring is the beam origin and the brief says it never rotates -- the beam
-    rotates inside it. Keeping them out of the group is what makes both true by
-    construction rather than by a tolerance.
+    WHAT RIDES WHAT, AND WHY IT ALL RIDES ONE THING NOW. Every piece -- shaft,
+    weld and RINGS alike -- goes on `hand`, the LEFT hand's animated group. It
+    used to be split: shaft and weld on a `sceptre` group that pivoted about the
+    ring's rim, rings pinned to the static `body` so the beam origin could not
+    move. That split is what the owner saw. The head was the pivot, so it was
+    incapable of moving by construction, and the hand holding it was not in a
+    group at all -- so the staff waved about a fixed point next to a fixed hand.
+
+    One group fixes all three complaints at once, and by construction rather
+    than by tolerance:
+
+      * he HOLDS it       -- sceptre and hand share a transform, so the grip
+                             distance is exactly constant on every frame;
+      * head and handle move TOGETHER -- one rigid group cannot shear, so
+                             |head - butt| is exactly constant;
+      * the head MOVES    -- it inherits the hand's whole gesture instead of
+                             being nailed to a pivot.
+
+    The price is that the ring -- the beam origin -- now moves, and the beam lot
+    has to be told where it is on every frame. That is `origin_drift` returning
+    the per-frame ring track, `siphon_origins.json` carrying a `frames` axis,
+    and js/gl/siphon-beam-draw.js reading it through `originPoint(tower, frame)`.
+    The origin assertion is not dropped for this; it becomes per-frame.
 
     Every piece here is marked `is_weapon`, which is how `penetration` below
     tells the sceptre from the man."""
     join, butt, up = _sceptre_axis()
     split = _add(butt, up, SCEPTRE_DROP * SCEPTRE_SPLIT)
     shaft = [
-        taper(s, "shaft_0", butt, split, 0.021, 0.025, "gold_dark", arm, 5),
-        taper(s, "shaft_1", split, join, 0.025, 0.020, "gold", arm, 5),
+        taper(s, "shaft_0", butt, split, 0.021, 0.025, "gold_dark", hand, 5),
+        taper(s, "shaft_1", split, join, 0.025, 0.020, "gold", hand, 5),
     ]
-    for m in shaft + _weld(s, arm, lk):
+    for m in shaft + _weld(s, hand, lk):
         m.is_weapon = True
     spec = (
         (RING_MAJOR, 0.020, (math.pi / 2 - 0.14, 0.10, 0.0), "gold"),
@@ -1548,7 +1571,7 @@ def _sceptre(s, body, arm, lk):
     made = []
     for n in range(lk["rings"]):
         major, minor, rot, mat = spec[n]
-        m = td.torus(s, "ring_%d" % n, major, minor, RING, rot, mat, body, 8, 3)
+        m = td.torus(s, "ring_%d" % n, major, minor, RING, rot, mat, hand, 8, 3)
         m.is_weapon = True
         made.append(m)
     return made
@@ -1636,8 +1659,18 @@ def _pour(s, fixed, lk):
 # staff alone measured 3.4 px at the bearing that flatters it least, under the
 # gate, while measuring 8.4 at the bearing that flatters it most. The arm's
 # swing carries vertical, which is worth 16.5 px per unit from EVERY bearing.
+# BOTH ARMS ARE RIGGED AT EVERY TIER, and the sceptre tiers used to be the
+# exception. That exception WAS THE DEFECT the owner reported: "he makes the
+# handle of the scepter dance while the head of the scepter doesn't move, and
+# he doesn't hold the scepter". Three symptoms, one cause, and it was here --
+# A3+ rigged only the right arm, the sceptre is on the LEFT (RING is at
+# x = +0.315, PALM_L at +0.130, and the weld is on the left index tip), so
+# `rig.get("hand_l", body)` fell back to the STATIC body node. The hand that is
+# supposed to hold the staff could not move at all, while the shaft swung on a
+# group of its own that pivoted about the ring's rim. A dancing handle, a
+# frozen head, and a hand nowhere near either.
 ARM_GROUPS = {False: ["arm_l", "fore_l", "hand_l", "arm_r", "fore_r", "hand_r"],
-              True: ["arm_r", "fore_r", "hand_r"]}
+              True: ["arm_l", "fore_l", "hand_l", "arm_r", "fore_r", "hand_r"]}
 
 
 def build_body(tier, flat):
@@ -1646,8 +1679,8 @@ def build_body(tier, flat):
     root = s.node("root")
     fixed = s.node("world_fixed", parent=root, world_fixed=True)
     body = s.node("body", parent=root)
-    arm = (s.node("sceptre", parent=root, animated=True)
-           if lk["sceptre"] else None)
+    # THERE IS NO LONGER A `sceptre` NODE. The staff rides the left hand's
+    # group, because that is what holding a thing means. See `_sceptre`.
     rig = dict((g, s.node(g, parent=root, animated=True))
                for g in ARM_GROUPS[bool(lk["sceptre"])])
 
@@ -1661,12 +1694,10 @@ def build_body(tier, flat):
     pr = _hand(s, rig.get("hand_r", body), lk, "r", PALM_R, PALM_ROT_R,
                DIGITS_R)
     _cowl(s, body, lk)
-    made = _sceptre(s, body, arm, lk) if lk["sceptre"] else []
+    made = _sceptre(s, rig["hand_l"], lk) if lk["sceptre"] else []
     _pour(s, fixed, lk)
 
     def pose(frame):
-        if arm is not None:
-            _sceptre_pose(arm, frame)
         if rig:
             _arm_pose(rig, frame)
 
@@ -1676,6 +1707,11 @@ def build_body(tier, flat):
     drift = origin_drift(s, pose, frames)
     model = td.build(s, "siphon-" + tier, frames=frames, pose=pose)
 
+    # THE REST POSE STAYS THE AUTHORED CONSTANT, and the per-frame track comes
+    # out of `origin_drift`, which re-measures both off the POSED vertices. The
+    # two must agree at frame 0 and `main` asserts that they do -- `frames[0]`
+    # is what an idle Siphon shows, so a rest pose that disagreed with the
+    # constant would move the cord the instant he stopped channelling.
     origins = {"HANDS": _mid(_mean(pl), _mean(pr))}
     if made:
         origins["RING"] = _mean(made[0])
@@ -1973,11 +2009,25 @@ def origin_drift(scene, pose, frames):
     measurement, and it is the same standard `penetration` holds the sceptre to
     -- 'by construction' has been wrong in this file before.
 
-    Returns (worst HANDS drift, worst RING drift) in Blender units."""
+    THE RING NO LONGER HOLDS STILL, AND THAT IS THE POINT. It rides the hand
+    now, so a frozen-ring assertion would be asserting the defect. What replaces
+    it is not nothing: this returns the RING's position ON EVERY FRAME, that
+    track is what `siphon_origins.json` exports, and `main` asserts the exported
+    track is the built one. The claim being measured changed; the habit of
+    measuring it did not.
+
+    HANDS is still asserted frozen, but only where it is still the origin --
+    base/A1/A2, which rig both arms with equal and opposite offsets. At A3+ the
+    left hand carries the staff and its palm moves; the origin there is the
+    RING, and HANDS is not read by anything.
+
+    Returns (worst HANDS drift, per-frame RING track) -- the track is a list of
+    ATTACK_FRAMES points, or None on a tier with no sceptre."""
     palm = dict((m.name, m) for m in scene.meshes
                 if m.name in ("palm_l", "palm_r"))
     rings = [m for m in scene.meshes if m.name.startswith("ring_")]
-    hands_worst = ring_worst = 0.0
+    hands_worst = 0.0
+    track = [] if rings else None
     for f in range(frames):
         pose(f)
         def centre(mesh):
@@ -1990,9 +2040,7 @@ def origin_drift(scene, pose, frames):
             hands_worst = max(hands_worst,
                               max(abs(got[k] - HANDS[k]) for k in range(3)))
         if rings:
-            got = centre(rings[0])
-            ring_worst = max(ring_worst,
-                             max(abs(got[k] - RING[k]) for k in range(3)))
+            track.append(centre(rings[0]))
     pose(0)
     return hands_worst, ring_worst
 
