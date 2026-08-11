@@ -97,7 +97,7 @@
 // the knots, the intake bell, the eight states and the transfer boluses. NONE
 // of that is duplicated here. This file owns three things and hands them over:
 //
-//   1. the CIRCLE (drawn here, under the beams);
+//   1. the CIRCLE (drawn here, OVER the beams -- see the note on draw());
 //   2. the CASTING HYSTERESIS (the latch above);
 //   3. the PLAN -- how many beams to draw, where each one STARTS, and which
 //      locks each one chains through.
@@ -806,8 +806,16 @@ var SiphonFXRitual = (function () {
   }
   var liveBuf = [];
 
-  // Called from gl-world's drawOverlays, at top level, immediately BEFORE
-  // SiphonFXBeam.draw -- so the circle is under its own beams.
+  // Called from gl-world's drawOverlays, at top level, immediately AFTER
+  // SiphonFXBeam.draw -- so the circle is painted OVER its own beams.
+  //
+  // This header used to say BEFORE, and under. It was never true of the call
+  // site, and the call site is right: with the cord widths the beam module
+  // draws today, putting the disc underneath means the cords cover it and the
+  // circle cannot be seen at all. Both orders were captured on the same scene
+  // (visual-pass/captures/order-A-full.png and order-B-full.png) before this
+  // was settled. Two files claiming opposite orders, each with a comment
+  // asserting it achieved the same goal, is how the seam stayed wrong.
   //
   // ONE pinned ground reference for the whole pass, and every height fed to
   // `project` is ABSOLUTE, for the same reason the beam gives: the circle

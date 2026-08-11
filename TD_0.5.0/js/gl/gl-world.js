@@ -1828,6 +1828,9 @@ var World3D = (function () {
     // absolute heights, the same rule a shot in flight follows. Called inside a
     // tower's withGround it would flatten every beam onto that tower's deck and
     // the far end would float.
+    if (typeof SiphonFXBeam !== "undefined") {
+      SiphonFXBeam.draw(ctx, state, BLUB_FX_API);
+    }
     // THE RITUAL CIRCLE, and the LATCH that keeps it from strobing.
     //
     // The owner's report: a Siphon re-acquires many times a second on small
@@ -1836,22 +1839,21 @@ var World3D = (function () {
     // number of lock drops, and only spins down after IDLE_DWELL_SECONDS of
     // genuine idleness. Its rotation is never reset.
     //
-    // Drawn BEFORE the beams, so the cords pass OVER the disc and read as
-    // leaving it. This used to be the other way round, with a comment claiming
-    // the same goal -- but painting the disc last puts the rim on top of the
-    // cords, and a cord that vanishes UNDER the circle reads as passing behind
-    // it, which is the one thing the arrangement is supposed to rule out.
-    // siphon-ritual.js has always documented this order ("the CIRCLE, drawn
-    // here, under the beams"); the call site was what disagreed.
+    // Drawn AFTER the beams so the beams read as leaving it, and at top level
+    // outside any withGround for the same reason the beams are: the circle
+    // floats above the deck the tower stands on and pins its own reference.
     //
-    // At top level outside any withGround for the same reason the beams are:
-    // the circle floats above the deck the tower stands on and pins its own
-    // reference.
+    // THIS ORDER WAS TESTED, both ways, on the same three-lock B3 scene:
+    // captures/order-A-full.png (this order) against order-B-full.png (circle
+    // first). Drawing the circle first is what the ritual module's own header
+    // asks for and it is WRONG on screen at the cord widths the beam module
+    // currently draws -- the cords cover the disc almost completely and the
+    // circle stops being visible at all. Painting it last costs the "cords
+    // emerge from it" cue and buys a circle you can actually see, which at a
+    // 14 px wide feature is the trade worth making. Revisit if the cords are
+    // ever thinned; the argument is entirely about their width, not the depth.
     if (typeof SiphonFXRitual !== "undefined") {
       SiphonFXRitual.draw(ctx, state, BLUB_FX_API);
-    }
-    if (typeof SiphonFXBeam !== "undefined") {
-      SiphonFXBeam.draw(ctx, state, BLUB_FX_API);
     }
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
