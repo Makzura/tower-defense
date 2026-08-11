@@ -2313,6 +2313,33 @@ def main():
         for line in _wrap(how, 62):
             print("               %s" % line)
 
+    print("\n  BEAM ORIGINS, read out of %s -- this file no longer retypes "
+          "them:" % os.path.basename(ORIGINS_PATH))
+    print("    HANDS  %.3f %.3f %.3f   base, A1, A2 and all of path B" % HANDS)
+    print("    RING   %.3f %.3f %.3f   A3, A4, A5" % RING)
+    rows, count = _origin_frames()
+    if not rows:
+        print("    per-frame table: ABSENT. siphon_origins.json carries no "
+              "`frames` arrays, so `originFrames` is OMITTED from the spec and "
+              "js/gl/siphon-beam-draw.js takes its static-origin path "
+              "unchanged (line 321, `if (!table) return stat`). Re-run "
+              "tools/blender/siphon_idol.py once its per-frame export lands, "
+              "then re-run this.")
+    else:
+        print("    per-frame table: %d bodies x %d frames, keys %s -- and the "
+              "frame count MUST equal each body's own frames.length or "
+              "siphon-beam-draw.js:334 warns."
+              % (len(rows), count, "/".join(sorted(rows))))
+        for key in sorted(rows):
+            seq = rows[key]
+            span = max(math.dist(seq[0], p) for p in seq)
+            print("      %-5s rest %s   travels %.4f bu (%.2f px up-screen)"
+                  % (key, " ".join("%.4f" % v for v in seq[0]), span,
+                     span * 16.49))
+        print("      no b1..b5 rows, deliberately: path B pours from the "
+              "static HANDS and siphon-beam-draw.js:274 makes that miss a "
+              "contract rather than an error.")
+
     p = write_spec(os.path.join(os.path.dirname(td.OUTPUT_DIR),
                                 "siphon-beam-spec.js"))
     print("\n  spec written to %s" % p)
