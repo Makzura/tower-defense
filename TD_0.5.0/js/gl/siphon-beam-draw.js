@@ -746,6 +746,276 @@ var SiphonFXBeam = (function () {
     return true;
   }
 
+  // ---- occlusion -----------------------------------------------------------
+  //
+  // THE COMPLAINT: "the siphon's passive rays are seeable through everything,
+  // other towers included." They are, and structurally: the cords are painted
+  // in gl-world's `drawOverlays` on the 2D canvas STACKED OVER the WebGL one,
+  // and that canvas carries no depth information at all. Everything drawn on it
+  // is drawn over the whole board by construction.
+  //
+  // WHY THIS IS SCREEN-SPACE CAPSULES AND NOT SOMETHING BETTER. Decided after a
+  // three-way comparison; recorded so it is not relitigated:
+  //
+  //   - Moving the cords into the GL pass. gl-renderer.js is STATIC_DRAW with
+  //     no BLEND, so a cord that moves every frame means streaming buffers plus
+  //     a blend mode -- and it would STILL lose the halo, the rim and the lifted
+  //     core, which are the three things keeping the two non-emissive states
+  //     (thread, seeking) legible against the board.
+  //   - Reading the depth buffer. WebGL cannot. `readPixels` on the colour
+  //     buffer can, and js/gl/tower-preview.js measures it at 3.6-7.1 ms a call,
+  //     which is a frame budget for one query.
+  //
+  // So: the same trick js/gl/siphon-ground.js:797 already uses for the gold
+  // pour -- a screen box plus a depth compare, because `project` returns both.
+  // That module is dead code (in no script tag, referenced by nothing), which
+  // made it a free reference implementation, and this is its structure with
+  // three deliberate departures. All three are named below.
+  //
+  // DEPARTURE 1 -- NO PROXIMITY GATE. That module skips any occluder more than
+  // 70 world px from the sample. It can: it masks a decal lying under the
+  // tower's own feet. A cord runs up to 180 px, so the same gate would exempt
+  // very nearly every occluder it crosses -- which is the whole defect. The
+  // test here is the screen-space overlap and the depth compare, and nothing
+  // else. (There IS a screen-bounding-box prefilter below, but that is a
+  // broad phase for the exact test, not a rule: it can produce no false
+  // negatives.)
+  //
+  // DEPARTURE 2 -- THE DEPTH COMPARE IS MADE AT THE SAMPLE'S OWN HEIGHT. That
+  // module stores one depth, the tower's base at z = 0, and compares every
+  // sample against it. `worldToScreen` sets `depth = w`, the homogeneous
+  // divide, so bigger is farther -- and under a downward pitch a point HIGHER
+  // UP is nearer the eye and has a SMALLER depth. Measured on the live camera
+  // at the Siphon's own footing: z = 0 -> 175.24, z = 30 -> 158.30,
+  // z = 60 -> 141.36. A tower's base is therefore the FARTHEST point of its own
+  // vertical extent, and a cord crossing its chest or its head compares against
+  // that base, comes out smaller, is judged "in front" and is drawn straight
+  // through -- through most of the tower, and only the strip near its feet
+  // would have worked. A verification that sampled near the ground would pass
+  // while the visible half of the defect stood untouched.
+  //
+  //   The fix costs nothing, because `w` is AFFINE in world position: it is
+  //   vp[3]*x + vp[7]*y + vp[11]*z + vp[15], so depth along an actor's vertical
+  //   axis is exactly linear in z. Two projections give the slope, and the
+  //   occluder's depth at any height is one multiply-add. Verified against the
+  //   numbers above: 175.24 - 0.5647*z reproduces both to the last digit, where
+  //   interpolating by SCREEN Y instead is out by 5% at mid-body.
+  //
+  // DEPARTURE 3 -- THE CROWN IS MEASURED, NOT GUESSED. That module falls back
+  // to `b0.y - 40` when the crown fails to project. A crown that is too short
+  // under-occludes the top of the body: the same failure as departure 2, from
+  // the other end. gl-world's `crownOf` reads the model's own `top`, and this
+  // takes it through `api.towerTop` / `api.enemyTop` -- the same measurement
+  // without the readout headroom `crownOf` adds for a health bar.
+  //
+  // ---------------------------------------------------------------------------
+  // THE LIMITATION, STATED WHERE THE EXEMPTION IS WRITTEN
+  // ---------------------------------------------------------------------------
+  //
+  // THIS CANNOT HIDE A CORD BEHIND THE CASTER'S OWN BODY. The cord's origin is
+  // the Siphon's hands or the ring on his sceptre; both sit INSIDE his own
+  // footprint, a little above it. Every cord therefore begins inside the
+  // caster's own occluder, and if he were allowed to occlude his own cords, the
+  // root of every one of them -- the intake bell, the fattest and most
+  // load-bearing part of the whole effect, the thing that carries the "it flows
+  // TOWARD the tower" message -- would be cut off. So he is exempt, in full, at
+  // any range. The visible consequence: stand a Siphon so that one of his own
+  // cords swings behind his shoulder and that stretch will draw over him.
+  // Nothing here fixes that, and nothing cheap can: it needs per-pixel depth for
+  // the caster alone, which is the readback this approach exists to avoid.
+  // Every OTHER tower, every blub and every enemy does occlude him normally.
+
+  var OCC_MAX = 128;
+  var occ = [];
+  var occHit = new Int32Array(OCC_MAX);
+  var occN = 0;
+  var occlusionOn = true;      // module flag; see setOcclusion()
+
+  function occSlot(i) {
+    var o = occ[i];
+    if (!o) {
+      o = { actor: null, x0: 0, y0: 0, x1: 0, y1: 0, r0: 0, r1: 0,
+            d0: 0, dPerZ: 0, minX: 0, maxX: 0, minY: 0, maxY: 0, nearest: 0 };
+      occ[i] = o;
+    }
+    return o;
+  }
+
+  // One capsule per actor: the segment from its feet to the top of its model,
+  // in screen space, with the actor's own authored radius for a thickness. Both
+  // ends are projected, so the capsule leans exactly as the body leans under an
+  // orbited camera and nothing has to assume the world's up is the screen's up.
+  //
+  // Called ONCE per frame, from draw(), inside the same pinned `withGround(0)`
+  // the cords are sampled in -- so every z here is absolute and comparable with
+  // `sz[]` without a second thought about which surface it was measured from.
+  function pushOccluder(actor, project, footX, footY, groundZ, radiusPx, topPx) {
+    if (occN >= OCC_MAX) return;
+    if (!(topPx > 0.5) || !(radiusPx > 0.01)) return;
+    var pb = project(footX, footY, groundZ);
+    if (!pb) return;
+    var topZ = groundZ + topPx;
+    var pt = project(footX, footY, topZ);
+    if (!pt) return;
+    var o = occSlot(occN++);
+    o.actor = actor;
+    o.x0 = pb.x; o.y0 = pb.y; o.r0 = radiusPx * (pb.scale || 1);
+    o.x1 = pt.x; o.y1 = pt.y; o.r1 = radiusPx * (pt.scale || 1);
+    o.d0 = pb.depth;
+    // Depth is affine in world position, so this slope is exact rather than a
+    // fit. Guarded anyway: a degenerate topPx would divide by nothing.
+    o.dPerZ = (topPx > 1e-6) ? (pt.depth - pb.depth) / topPx : 0;
+    // The base of a standing body is its farthest point, so this is the whole
+    // capsule's nearest depth -- used to reject, in one compare, an occluder
+    // that is behind every sample of the cord being tested.
+    o.nearest = Math.min(pb.depth, pt.depth);
+    var r = Math.max(o.r0, o.r1);
+    o.minX = Math.min(o.x0, o.x1) - r; o.maxX = Math.max(o.x0, o.x1) + r;
+    o.minY = Math.min(o.y0, o.y1) - r; o.maxY = Math.max(o.y0, o.y1) + r;
+  }
+
+  function buildOccluders(state, api) {
+    occN = 0;
+    if (!occlusionOn) return;
+    var project = api.project, groundAt = api.groundAt;
+    var i, a;
+    var list = state.towers || [];
+    for (i = 0; i < list.length; i++) {
+      a = list[i];
+      if (!a || a.dead) continue;
+      // `footprintPx` is the authored placement radius -- the actual width of
+      // the thing on the board -- so it is used as-is. No widening factor: an
+      // occluder wider than its body over-occludes, and over-occlusion is the
+      // failure that photographs as success.
+      pushOccluder(a, project, a.x, a.y, groundAt(a.x, a.y),
+        a.footprintPx || 12,
+        (api.towerTop ? api.towerTop(a) : (a.footprintPx || 12) * 2.2));
+    }
+    // ENEMIES TOO, and they are the commoner case. The complaint says "seeable
+    // through everything"; a body walking the road in front of a cord is what a
+    // player is looking at far more often than a second tower.
+    list = state.enemies || [];
+    for (i = 0; i < list.length; i++) {
+      a = list[i];
+      if (!a || a.dead || a.leaked || !a.pos) continue;
+      var r = (typeof a.radiusPx === "function") ? a.radiusPx() : 11;
+      pushOccluder(a, project, a.pos.x, a.pos.y, groundAt(a.pos.x, a.pos.y), r,
+        (api.enemyTop ? api.enemyTop(a) : r * 2.2));
+    }
+  }
+
+  // Squared distance from a screen point to the capsule's axis, plus the
+  // parameter along it -- so the radius can be taken at the right end. Returns
+  // the parameter in `capT`.
+  var capT = 0;
+
+  function axisDistSq(o, x, y) {
+    var ax = o.x1 - o.x0, ay = o.y1 - o.y0;
+    var len2 = ax * ax + ay * ay;
+    var t = 0;
+    if (len2 > 1e-9) {
+      t = ((x - o.x0) * ax + (y - o.y0) * ay) / len2;
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+    }
+    capT = t;
+    var dx = x - (o.x0 + ax * t), dy = y - (o.y0 + ay * t);
+    return dx * dx + dy * dy;
+  }
+
+  // The predicate. `caster` is exempted for the reason stated at length above.
+  // Exported, so a review can ask it directly rather than inferring it.
+  function occluded(x, y, depth, worldZ, caster) {
+    if (!occlusionOn) return false;
+    for (var i = 0; i < occN; i++) {
+      var o = occ[i];
+      if (o.actor === caster) continue;               // THE LIMITATION. See above.
+      if (x < o.minX || x > o.maxX || y < o.minY || y > o.maxY) continue;
+      if (depth <= o.nearest) continue;               // in front of all of it
+      var d2 = axisDistSq(o, x, y);
+      var r = o.r0 + (o.r1 - o.r0) * capT;
+      if (d2 > r * r) continue;
+      // The compare, at the sample's OWN height. Departure 2.
+      if (depth <= o.d0 + o.dPerZ * worldZ) continue;
+      return true;
+    }
+    return false;
+  }
+
+  // Fill sv[0..n-1]. One screen bounding box for the whole cord prefilters the
+  // occluder list, which is what keeps this affordable with three hundred blubs
+  // on the board: the inner loop then runs only over occluders that could
+  // possibly touch this cord.
+  var visN = 0;
+
+  function computeVisibility(n, caster) {
+    var i;
+    visN = 0;
+    if (!occlusionOn || !occN) {
+      for (i = 0; i < n; i++) sv[i] = 1;
+      visN = n;
+      return;
+    }
+    var lo = 1e9, hi = -1e9, loY = 1e9, hiY = -1e9, far = -1e9;
+    for (i = 0; i < n; i++) {
+      var pad = hw[i] * 2.4;              // the halo is the widest layer drawn
+      if (sx[i] - pad < lo) lo = sx[i] - pad;
+      if (sx[i] + pad > hi) hi = sx[i] + pad;
+      if (sy[i] - pad < loY) loY = sy[i] - pad;
+      if (sy[i] + pad > hiY) hiY = sy[i] + pad;
+      if (sd[i] > far) far = sd[i];
+    }
+    var live = 0, j;
+    for (i = 0; i < occN; i++) {
+      var o = occ[i];
+      if (o.actor === caster) continue;
+      if (o.maxX < lo || o.minX > hi || o.maxY < loY || o.minY > hiY) continue;
+      if (o.nearest >= far) continue;     // behind every sample of this cord
+      occHit[live++] = i;
+    }
+    if (!live) {
+      for (i = 0; i < n; i++) sv[i] = 1;
+      visN = n;
+      return;
+    }
+    for (i = 0; i < n; i++) {
+      var vis = 1;
+      for (j = 0; j < live; j++) {
+        var q = occ[occHit[j]];
+        if (sx[i] < q.minX || sx[i] > q.maxX ||
+            sy[i] < q.minY || sy[i] > q.maxY) continue;
+        if (sd[i] <= q.nearest) continue;
+        var d2 = axisDistSq(q, sx[i], sy[i]);
+        var r = q.r0 + (q.r1 - q.r0) * capT;
+        if (d2 > r * r) continue;
+        if (sd[i] <= q.d0 + q.dPerZ * sz[i]) continue;
+        vis = 0;
+        break;
+      }
+      sv[i] = vis;
+      visN += vis;
+    }
+  }
+
+  // EVERY LAYER RESPECTS THE SAME SPANS, or the cord is still visible through
+  // the body -- as a halo, or as a rim outline, which is worse than the whole
+  // cord because it reads as a rendering fault rather than as a beam. `ribbon`
+  // already takes an index range, so a polyline simply becomes a list of them
+  // and no new drawing primitive is needed.
+  //
+  // A span needs two samples to be a ribbon at all, so an isolated visible
+  // sample between two occluded ones is dropped. At 8..22 samples over a run
+  // that is a sub-sample-length sliver, and dropping it errs toward hiding
+  // rather than toward showing through.
+  function eachSpan(i0, i1, fn) {
+    var s = -1, i;
+    for (i = i0; i <= i1; i++) {
+      if (sv[i]) { if (s < 0) s = i; continue; }
+      if (s >= 0 && i - 1 > s) fn(s, i - 1);
+      s = -1;
+    }
+    if (s >= 0 && i1 > s) fn(s, i1);
+  }
+
   // Screen-space normals from the projected polyline. Derived from the PROJECTED
   // points, not from the world direction, for the reason gl-world's `barrelAxis`
   // gives: under a turning camera the cord's direction on screen is not its
