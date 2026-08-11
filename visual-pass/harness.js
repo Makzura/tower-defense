@@ -142,9 +142,27 @@
 
     // Advance the simulation in fixed steps. Deterministic, and independent of
     // requestAnimationFrame, so a hidden pane cannot change the result.
+    //
+    // THE RENDER CLOCK MOVES TOO, and it has to. `worldRenderState().now` is
+    // `lastTime / 1000` -- the requestAnimationFrame timestamp -- and rAF is
+    // throttled to a standstill in a hidden or headless pane. So every effect
+    // that keys off `state.now` (the ritual circle's cast and spin, the beam
+    // pulses, every breathe) sat at exactly its t=0 value no matter how long
+    // the simulation was stepped, and `advance()` early-returned on
+    // `rec.stamp === now` after the first frame.
+    //
+    // That made the rig structurally blind to animation a second time, in a
+    // second place: a reviewer stepping a full second and capturing would have
+    // photographed the ritual circle at 34% radius with zero rotation and
+    // reported it as what the game draws. Stepping the simulation without
+    // stepping the clock the renderer reads is not a slower version of real
+    // time -- it is a still frame.
     step: function (seconds, dt) {
       var d = dt || 1 / 60, n = Math.max(1, Math.round(seconds / d));
-      for (var i = 0; i < n; i++) { try { update(d); } catch (e) { return "update threw: " + e.message; } }
+      for (var i = 0; i < n; i++) {
+        try { update(d); } catch (e) { return "update threw: " + e.message; }
+        if (typeof lastTime === "number") lastTime += d * 1000;
+      }
       return n + " steps";
     },
 
