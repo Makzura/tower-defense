@@ -1828,9 +1828,6 @@ var World3D = (function () {
     // absolute heights, the same rule a shot in flight follows. Called inside a
     // tower's withGround it would flatten every beam onto that tower's deck and
     // the far end would float.
-    if (typeof SiphonFXBeam !== "undefined") {
-      SiphonFXBeam.draw(ctx, state, BLUB_FX_API);
-    }
     // THE RITUAL CIRCLE, and the LATCH that keeps it from strobing.
     //
     // The owner's report: a Siphon re-acquires many times a second on small
@@ -1839,11 +1836,22 @@ var World3D = (function () {
     // number of lock drops, and only spins down after IDLE_DWELL_SECONDS of
     // genuine idleness. Its rotation is never reset.
     //
-    // Drawn AFTER the beams so the beams read as leaving it, and at top level
-    // outside any withGround for the same reason the beams are: the circle
-    // floats above the deck the tower stands on and pins its own reference.
+    // Drawn BEFORE the beams, so the cords pass OVER the disc and read as
+    // leaving it. This used to be the other way round, with a comment claiming
+    // the same goal -- but painting the disc last puts the rim on top of the
+    // cords, and a cord that vanishes UNDER the circle reads as passing behind
+    // it, which is the one thing the arrangement is supposed to rule out.
+    // siphon-ritual.js has always documented this order ("the CIRCLE, drawn
+    // here, under the beams"); the call site was what disagreed.
+    //
+    // At top level outside any withGround for the same reason the beams are:
+    // the circle floats above the deck the tower stands on and pins its own
+    // reference.
     if (typeof SiphonFXRitual !== "undefined") {
       SiphonFXRitual.draw(ctx, state, BLUB_FX_API);
+    }
+    if (typeof SiphonFXBeam !== "undefined") {
+      SiphonFXBeam.draw(ctx, state, BLUB_FX_API);
     }
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
