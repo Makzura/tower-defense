@@ -737,51 +737,423 @@ def _digit_tip(root, tip, stiff):
 
 
 # ---------------------------------------------------------------------------
-# THE ATTACK. Four frames, the house norm, keyed on an EMPTY -- geometry ships
-# once in the group's local space and a frame is one 4x4, per td_mesh.build.
+# THE ATTACK, AND WHY THE LAST ONE WAS INVISIBLE.
 #
-# THIS TOWER CHANNELS A CONTINUOUS BEAM, so there is no swing to animate and a
-# swing would be a lie about the mechanic: nothing is thrown, nothing recoils,
-# the thing just keeps pouring. What moves is a slow SETTLE of the shaft, the
-# weight of the metal rocking while the current runs through it.
+# The owner played the game and reported "there is no attack animation for the
+# siphon". He was right, and the reason is a UNIT ERROR that had been sitting in
+# the comment this block replaces. It read:
 #
-# TWO THINGS PIN THE MOTION, and between them they decide everything:
+#     "The figure is ~57 px for 1.79 units, i.e. 31.8 px per unit, and the butt
+#      is 0.560 below the pivot, so a peak of 0.106 rad moves it about 0.059
+#      units = 1.9 px."
 #
-#   * THE RING IS THE BEAM ORIGIN. js/gl/siphon-beam-draw.js reads RING out of
-#     siphon_origins.json, so if the ring moved the beam would come out of thin
-#     air beside it. The rings are therefore NOT in the animated group at all --
-#     they stay on `body` and are structurally incapable of moving. `audit`
-#     fails the build if a ring ever lands in an animated group, which is a
-#     stronger guarantee than a tolerance on a measured drift.
-#   * THE BRIEF SAYS THE RING NEVER ROTATES -- the beam rotates inside it. Same
-#     answer: leaving the rings out of the group satisfies both at once.
+# 31.8 px per unit is td_mesh.UNITS_TO_PX -- the scale from Blender units to the
+# board's own WORLD pixels. It is not the scale to SCREEN pixels, and nothing on
+# the board is drawn at 1:1. MEASURED in the browser at the reference viewport
+# (1278x719, target 640/360, distance 2021.363, pitch 0.5944591432292686, yaw
+# -pi/2) by stepping a world point one Blender unit and projecting through the
+# camera's own view-projection:
 #
-# So only the SHAFT and the WELD ride the group, and they turn about `join`, the
-# point where the shaft meets the ring's rim. Pivoting there means the head of
-# the shaft is the fixed point: it cannot part from the rim by construction, so
-# the sceptre never visibly detaches from the ring or from the beam. The travel
-# is all at the far end -- the butt swings, the head does not.
+#     one Blender unit along world +X  ->  19.73 screen px   (across the screen)
+#     one Blender unit along world +Y  ->  10.91 screen px   (into it; the pitch
+#                                                             foreshortens this)
+#     one Blender unit along world +Z  ->  16.49 screen px   (up)
 #
-# The amplitude is chosen against the screen, not against taste. The figure is
-# ~57 px for 1.79 units, i.e. 31.8 px per unit, and the butt is 0.560 below the
-# pivot, so a peak of 0.106 rad (6.1 degrees) moves it about 0.059 units = 1.9
-# px. Under a degree and it is not there at all; past ten and a hanging staff
-# starts to read as a swing. `main` prints the measured butt travel so this is a
-# number rather than an opinion.
-ATTACK_FRAMES = 4
-SCEPTRE_SWAY = [(0.000, 0.000),            # rest -- what a frame-less runtime
-                (0.048, 0.026),            #         gets, so it must be right
-                (0.106, 0.010),
-                (0.052, -0.028)]           # (rx, ry) radians, about `join`
+# So the whole 1.79-unit figure is about 29.5 screen px tall, HALF the 57 the
+# old comment assumed, and the shipped sway moved the butt 0.059 units, i.e.
+# 1.2 screen px at its very best facing and 0.6 px at its worst. A pixel. That
+# is not a subtle animation, it is no animation, and it was signed off because
+# the number it was checked against was measured in the wrong space.
+#
+# EVERY AMPLITUDE BELOW IS THEREFORE CHOSEN AGAINST SCREEN PIXELS, `main`
+# prints them, and `screen_travel` FAILS THE BUILD under MIN_TRAVEL_PX. That
+# gate is the whole point of this rewrite: the previous attempt would not have
+# survived it.
+#
+# ---------------------------------------------------------------------------
+# WHAT THE OWNER ASKED FOR, AND THE ONE PART OF IT THAT CANNOT BE BUILT HERE.
+#
+#   base/A1/A2  he EXTENDS BOTH HANDS, palms forward, and a ritual circle forms
+#               in front of him.
+#   A3/A4/A5    he PUTS THE STAFF FORWARD instead, and the circle forms off the
+#               ring.
+#
+# A3/A4/A5 IS DELIVERED IN FULL, and the beam origin does not move: see the
+# sceptre block below. The ring is the origin, the ring is not in an animated
+# group, and the shaft pivots on the ring's own rim, so the staff can rake as
+# far forward as the footprint allows while the origin is structurally incapable
+# of moving.
+#
+# BASE/A1/A2 IS NOT, and the reason is arithmetic rather than modelling.
+# SIPHON-SOCLE.md defines HANDS as "le vide entre les deux paumes" and this file
+# asserts `mid(PALM_L, PALM_R) == HANDS` to 1e-9. The midpoint of two points is
+# an AFFINE function of them: push both palms forward by d and the midpoint --
+# the beam origin -- moves forward by exactly d. There is no pose, no pivot and
+# no cleverness that extends both hands and leaves their midpoint where it was.
+# A reach big enough to read is d ~ 0.35 units, which is 6.9 screen px, and
+# js/gl/siphon-beam-draw.js would still be starting the beam and the ritual
+# circle at the old point -- about a fifth of the way up his body, behind his
+# own hands.
+#
+# So base/A1/A2 ships the LARGEST gesture that leaves HANDS exactly fixed: the
+# palms ROLL from cupped-upward to presented-forward and OPEN apart along their
+# own axis, the elbows swivel out, and the sleeves -- the longest lever on the
+# arm and the biggest value mass on it -- swing. `main` prints what that is
+# worth in screen pixels. It is a real gesture and it is several times the old
+# one, but it is a PRESENTATION, not an EXTENSION, and the difference is the
+# owner's to spend: extending the hands is a coordinated edit across
+# siphon_idol.py, siphon_origins.json and the beam/ritual modules, and no lot
+# owner should make it alone.
+#
+# HOW THE ORIGIN IS KEPT EXACT, and it is by construction, not by a tolerance.
+# Both palms lie ON the line through HANDS in the direction PALM_L - PALM_R --
+# they must, because HANDS is their midpoint. So:
+#   * a rotation about that line moves neither palm centre at all, and
+#   * a pair of translations +t and -t along it moves the two palms apart while
+#     their midpoint stays put, because t + (-t) is exactly zero in IEEE.
+# The two hands are two groups carrying the SAME rotation and OPPOSITE offsets.
+# `origin_drift` re-measures the built midpoint on every frame anyway, from the
+# posed vertices, and fails the build over ORIGIN_TOL -- because "by
+# construction" is a claim, and this file's habit is to measure the claim.
+# ---------------------------------------------------------------------------
+
+# MEASURED, in the browser, at the reference viewport. See the block above.
+SCREEN_PX = (19.73, 10.91, 16.49)          # per Blender unit, world X / Y / Z
+MIN_TRAVEL_PX = 4.0                        # the gate the last attempt failed
+ORIGIN_TOL = 1e-6                          # same tolerance `audit` uses at rest
+
+# THE CYCLE, AND WHY IT IS SHAPED LIKE THIS.
+#
+# gl-world.js indexes this strip with a free-running clock and only while the
+# tower holds a lock:
+#     frame = 1 + min(N-2, floor(sphase * (N-1))),  sphase = (now*0.42) % 1
+# so frames 1..N-1 are the LOOP and frame 0 is what an idle Siphon shows. Two
+# things follow, and both are requirements rather than preferences:
+#
+#   * THE LOOP MUST CLOSE. Frame N-1 is followed by frame 1, forever, for as
+#     long as he is attacking. Writing the cycle as a PERIODIC function of
+#     u = (frame-1)/(N-1) makes that automatic: u runs 0, 1/(N-1) ... (N-2)/(N-1)
+#     and wraps to 0, so a periodic amplitude has no seam to hide.
+#   * FRAME 0 MUST BE THE REST POSE, and here it is also u = 0, so frame 1 IS
+#     frame 0. The cut gl-world makes when the lock is acquired therefore lands
+#     on a pose the model already had, instead of teleporting the arms.
+#
+# NOT A STRIKE. The brief and the owner both say this tower channels, so the
+# legs are reach 0.30, hold 0.34, SETTLE 0.36 -- the return is the slowest part
+# of the cycle, which is what separates a hand drawn slowly back from a recoil.
+# At the runtime's 2.38 s period that is 0.71 s out, 0.81 s held, 0.86 s back.
+# `_smooth` has zero slope at both ends, so every join and the wrap itself are
+# C1: `main` prints the worst frame-to-frame step to prove no leg snaps.
+# TWENTY-FOUR, and the number is set by the STEP rather than by taste. The
+# runtime holds each frame for period/(N-1) seconds, so with the old four-frame
+# strip a gesture big enough to see would have arrived in three 4 px jumps -- a
+# stutter, and the one thing worse than an invisible animation is a visibly
+# mechanical one. At 24 the reach leg is 7 frames, every step is under 2 px and
+# each frame is held about 0.10 s, which is smooth at this size. `main` prints
+# the worst step so the trade is a number.
+CYCLE_FRAMES = 24
+ATTACK_FRAMES = CYCLE_FRAMES + 1
+REACH_LEG, HOLD_LEG = 0.30, 0.34
+OPEN_LAG = 0.06                            # the hands keep opening after the
+                                           # roll has topped out; organic, and
+                                           # still periodic so the loop closes
+
+
+def _smooth(t):
+    t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _phase(frame):
+    """Frame -> u in [0,1). Frame 0 and frame 1 are both u = 0."""
+    if frame <= 0:
+        return 0.0
+    return ((frame - 1) % CYCLE_FRAMES) / float(CYCLE_FRAMES)
+
+
+def _amp(u):
+    """0 at rest, 1 at full reach. Periodic in u and C1 at every join."""
+    u = u % 1.0
+    if u < REACH_LEG:
+        return _smooth(u / REACH_LEG)
+    if u < REACH_LEG + HOLD_LEG:
+        return 1.0
+    return _smooth((1.0 - u) / (1.0 - REACH_LEG - HOLD_LEG))
+
+
+# --- rigid-motion helpers ---------------------------------------------------
+# A Node carries a LOCATION and an XYZ EULER, not a matrix, so an arbitrary
+# rotation has to be handed over as a triple. That is not a restriction -- every
+# rotation has an XYZ Euler -- it just has to be converted rather than assumed.
+
+def _rot_axis(axis, angle):
+    """Rodrigues, as three rows."""
+    x, y, z = _norm(axis)
+    c, s = math.cos(angle), math.sin(angle)
+    k = 1.0 - c
+    return [[c + x * x * k, x * y * k - z * s, x * z * k + y * s],
+            [y * x * k + z * s, c + y * y * k, y * z * k - x * s],
+            [z * x * k - y * s, z * y * k + x * s, c + z * z * k]]
+
+
+def _cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0])
+
+
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _sub(a, b):
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def _len(v):
+    return math.sqrt(_dot(v, v))
+
+
+def _rot_between(u, v):
+    """The MINIMAL rotation taking u to v -- no roll about the bone's own axis,
+    because a roll is something the pose did not ask for and a limb that spins
+    about itself while it swings reads as broken."""
+    u, v = _norm(u), _norm(v)
+    d = max(-1.0, min(1.0, _dot(u, v)))
+    if d > 1.0 - 1e-12:
+        return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    if d < -1.0 + 1e-12:
+        # Antiparallel. Unreachable for this rig, but a bare cross product here
+        # is the zero vector and _norm would hand back a matrix of garbage.
+        a = (1.0, 0.0, 0.0) if abs(u[0]) < 0.9 else (0.0, 1.0, 0.0)
+        return _rot_axis(_cross(u, a), math.pi)
+    return _rot_axis(_cross(u, v), math.acos(d))
+
+
+def _euler_xyz(m):
+    """Inverse of td_mesh.trs's rotation half (Rz*Ry*Rx)."""
+    sy = max(-1.0, min(1.0, -m[2][0]))
+    cy = math.sqrt(max(0.0, m[0][0] ** 2 + m[1][0] ** 2))
+    if cy < 1e-9:                          # gimbal lock; not reachable here
+        return (math.atan2(-m[1][2], m[1][1]), math.asin(sy), 0.0)
+    return (math.atan2(m[2][1], m[2][2]), math.asin(sy),
+            math.atan2(m[1][0], m[0][0]))
+
+
+def _place(node, rot3, pivot, offset=(0.0, 0.0, 0.0)):
+    """Send p -> R(p - C) + C + t. A node's matrix is T(location)*R, i.e.
+    R*p + location, so the location has to carry C - R*C + t. Getting that
+    wrong is what hangs a limb a metre off the model, and `spun` is read back
+    out of the REBUILT matrix rather than out of `rot3` so the node and this
+    arithmetic cannot disagree about what the Euler triple meant."""
+    node.rotation = list(_euler_xyz(rot3))
+    spun = td.apply(td.trs((0, 0, 0), node.rotation), pivot)
+    node.location = [pivot[k] - spun[k] + offset[k] for k in range(3)]
+
+
+def _mat4(node):
+    return td.trs(node.location, node.rotation)
+
+
+# --- base / A1 / A2: THE PRESENTATION ---------------------------------------
+#
+# HAND_AXIS is the line joining the two palms, and it passes through HANDS by
+# definition. Everything the hands do is expressed in it, which is what makes
+# the origin exact rather than nearly exact.
+#
+# HAND_ROLL turns the palms from the base tier's "palms up, fingers spread, as
+# if holding water" to presented forward. The palm CENTRES do not move under it
+# (they are on the axis); the fingers, the thumbs and the wrists sweep, which is
+# most of what the hand contributes to a 30 px silhouette anyway. -1.15 rad is
+# 66 degrees, which lands the palm normal forward and slightly up rather than
+# flat, so the cupped read survives at the ends of the cycle.
+#
+# HAND_OPEN slides each palm OUT along that same axis. The void between them --
+# the thing the beam actually leaves from, and the thing the ritual circle forms
+# in -- widens from 0.151 to 0.311 and its centre stays exactly put.
+# WHY THE ROLL AXIS IS FREE AND THE SPREAD AXIS IS NOT.
+#
+# The midpoint of the two palms is an affine function of them, so under a shared
+# rotation R about a pivot C it goes to R(mid - C) + C. Put the pivot ON the
+# midpoint and it goes to R(0) + HANDS = HANDS, for ANY axis. The rotation
+# therefore does not have to be about the palm line at all -- it only has to
+# turn about the origin point, and tilting it out of that line makes the palms
+# themselves sweep instead of sitting still on it.
+#
+# The SPREAD is the other half: two translations that are exact negatives sum to
+# exactly zero in IEEE, so the pair moves the palms apart without moving their
+# midpoint by a single bit. That one does want the palm line, because sliding
+# the hands apart along any other direction is a shear -- one hand up and the
+# other down -- and reads as a wrist injury rather than an opening.
+#
+# ROLL_TILT leans the roll axis UP out of the palm line. That matters more than
+# it looks: the camera's pitch means one Blender unit of VERTICAL travel is 16.5
+# screen px from every bearing, while horizontal travel swings between 19.7 and
+# 10.9 depending on which way the tower happens to be facing. A gesture with
+# vertical in it reads the same wherever the target is; a purely horizontal one
+# half-vanishes every quarter turn, and the gate below is on the WORST bearing.
+HAND_AXIS = _norm(_sub(PALM_L, PALM_R))
+ROLL_TILT = 0.95                           # up, out of the palm line
+ROLL_AXIS = _norm(_add(HAND_AXIS, (0.0, 0.0, 1.0), ROLL_TILT))
+HAND_ROLL = -1.45
+HAND_OPEN = 0.140
+
+# THE ELBOWS, and this is where the screen pixels actually come from.
+#
+# With the shoulder pinned to the torso and the wrist pinned to the hand, a
+# two-bone arm has exactly ONE degree of freedom left: the elbow swings round
+# the circle where its two spheres meet. That is the chicken-wing, it is what a
+# person's arm does when they present their palms, and it costs nothing to
+# animate because both ends stay welded to what they were welded to.
+#
+# It is worth more than it looks. The elbow itself only travels ~0.09 units,
+# but the upper arm turns about 0.30 rad to deliver it and the SLEEVE hangs
+# 0.58 below the shoulder, so the drape's hem sweeps three times as far as the
+# joint does. At 30 px the sleeves are the arm; the fingers are two pixels.
+ELBOW_SWIVEL = {"l": 1.45, "r": -1.35}     # radians, opposite senses so the two
+                                           # arms open rather than both leaning
+ARM_CHAIN = {"l": (SH_L, EL_L, WR_L), "r": (SH_R, EL_R, WR_R)}
+
+
+def _hand_motion(side, amp_roll, amp_open):
+    """What one hand does, as (rotation about HANDS, translation). The SAME
+    rotation goes to both sides and the translations are exact negatives, which
+    is the whole of the origin guarantee: the rotation fixes both palm centres
+    because they lie on its axis, and +t and -t sum to exactly zero."""
+    rot = _rot_axis(ROLL_AXIS, HAND_ROLL * amp_roll)
+    sign = 1.0 if side == "l" else -1.0
+    off = [HAND_AXIS[k] * HAND_OPEN * amp_open * sign for k in range(3)]
+    return rot, off
+
+
+# HOW MUCH ROOM THE SOLVE IS REQUIRED TO KEEP, and the bug it caught.
+#
+# A two-bone chain can only reach a wrist between ||L1-L2|| and L1+L2 of the
+# shoulder. This arm is L1 = 0.309 and L2 = 0.114, so the window is 0.195 to
+# 0.424 -- and it is the SHORT end that bites, because a forearm barely a third
+# of the upper arm cannot fold back very far.
+#
+# The first version of this rig wrote `h = sqrt(max(0.0, l1*l1 - a*a))`, which
+# is the reflex, and it is WRONG in the worst way: when the hand came inside
+# 0.195 of the shoulder the clamp silently pinned the elbow onto the
+# shoulder-wrist line instead of failing. Measured, it did that for HALF the
+# cycle -- h was exactly 0.0000 from u = 0.25 to u = 0.71 -- so the "hold" was
+# not a held pose at all, it was the solve stuck against its own limit, and the
+# frame where it hit the limit was a 3.1 px jump in a 4.7 px gesture. The whole
+# gesture was being sized by a clamp.
+#
+# So the clamp is gone and the window is a GATE. A pose the arm cannot make is a
+# bug in the pose, not something for the solver to paper over.
+REACH_MARGIN = 0.020
+
+
+def _elbow(side, wrist_now, swivel):
+    """Two-bone solve. Returns where the elbow has to be for BOTH bones to stay
+    exactly their own length with the shoulder fixed and the wrist wherever the
+    hand has taken it.
+
+    At rest -- wrist unmoved, swivel zero -- it returns the authored elbow to
+    the last bit, which is what makes frame 0 the identity rather than merely
+    close to it."""
+    sh, el, wr = ARM_CHAIN[side]
+    l1, l2 = _len(_sub(el, sh)), _len(_sub(wr, el))
+    span = _len(_sub(wrist_now, sh))
+    if not (abs(l1 - l2) + REACH_MARGIN <= span <= l1 + l2 - REACH_MARGIN):
+        raise SystemExit(
+            "the %s arm cannot make this pose: the hand ends up %.4f from the "
+            "shoulder and a %.3f + %.3f chain only reaches between %.3f and "
+            "%.3f (with %.3f of margin). Shrink HAND_OPEN or ROLL_TILT -- do "
+            "NOT clamp the solve, which is what the first version of this rig "
+            "did and it pinned the elbow for half the cycle."
+            % (side, span, l1, l2, abs(l1 - l2) + REACH_MARGIN,
+               l1 + l2 - REACH_MARGIN, REACH_MARGIN))
+
+    # The rest frame: base0 is the foot of the perpendicular from the elbow onto
+    # the shoulder-wrist line, so e0 is already perpendicular to it and swivel 0
+    # reproduces the authored elbow exactly.
+    d0 = _sub(wr, sh)
+    n0, len0 = _norm(d0), _len(d0)
+    a0 = (len0 * len0 + l1 * l1 - l2 * l2) / (2.0 * len0)
+    h0 = math.sqrt(max(0.0, l1 * l1 - a0 * a0))
+    base0 = _add(sh, n0, a0)
+    e0 = [(el[k] - base0[k]) / (h0 or 1e-9) for k in range(3)]
+
+    dt = _sub(wrist_now, sh)
+    nt, lent = _norm(dt), _len(dt)
+    at = (lent * lent + l1 * l1 - l2 * l2) / (2.0 * lent)
+    ht = math.sqrt(l1 * l1 - at * at)       # no clamp -- see REACH_MARGIN
+    base = _add(sh, nt, at)
+    e1 = _norm([e0[k] - _dot(e0, nt) * nt[k] for k in range(3)])
+    e2 = _cross(nt, e1)
+    c, s = math.cos(swivel), math.sin(swivel)
+    return tuple(base[k] + ht * (c * e1[k] + s * e2[k]) for k in range(3))
+
+
+def _arm_pose(nodes, frame):
+    """Pose whichever arms this tier rigged. base/A1/A2 rig both; A3+ rig only
+    the right, because the left is welded to the sceptre."""
+    u = _phase(frame)
+    a_roll, a_open = _amp(u), _amp(u - OPEN_LAG)
+    for side in ("l", "r"):
+        if ("hand_" + side) not in nodes:
+            continue
+        sh, el, wr = ARM_CHAIN[side]
+        rot, off = _hand_motion(side, a_roll, a_open)
+        hand = nodes["hand_" + side]
+        _place(hand, rot, HANDS, offset=off)
+        # Read the wrist back out of the POSED node rather than recomputing it,
+        # so the forearm is aimed at where the cuff actually ends up even if the
+        # Euler round-trip moved it by a float.
+        w = td.apply(_mat4(hand), wr)
+        e = _elbow(side, w, ELBOW_SWIVEL[side] * a_roll)
+        # The upper arm turns about the SHOULDER, so the shoulder never leaves
+        # the cloth shelf it comes out of. The forearm is the rigid motion that
+        # carries the old elbow to the new one and the old wrist to the new one
+        # -- both bones keep their length, so neither joint can open a gap.
+        _place(nodes["arm_" + side], _rot_between(_sub(el, sh), _sub(e, sh)), sh)
+        _place(nodes["fore_" + side], _rot_between(_sub(wr, el), _sub(w, e)),
+               el, offset=_sub(e, el))
+
+
+# --- A3 / A4 / A5: THE STAFF GOES FORWARD -----------------------------------
+#
+# THE RING IS THE BEAM ORIGIN. js/gl/siphon-beam-draw.js reads RING out of
+# siphon_origins.json, so if the ring moved the beam would come out of thin air
+# beside it. The rings are therefore NOT in the animated group at all -- they
+# stay on `body` and are structurally incapable of moving, which is a stronger
+# guarantee than a tolerance on a measured drift, and `_audit_sceptre` fails the
+# build if one ever picks up an animated ancestor. The brief's "the ring never
+# rotates, the beam rotates inside it" is satisfied by the same fact.
+#
+# So the SHAFT is what goes forward, turning about `join` -- the point where it
+# meets the ring's rim. The head is the pivot, so it cannot part from the rim,
+# and all the travel is at the butt. From hanging plumb at his side the shaft
+# rakes out over the ground in front of him and holds there while he channels:
+# that is "putting the staff forward" with a frozen origin, and it is the only
+# reading of it that does not detach the beam.
+#
+# WHAT SETS THE AMPLITUDE, in order:
+#   * THE FOOTPRINT. The socle's rule is that the tower never grows, and the
+#     rest silhouette reaches exactly the hem's 0.660. A raked shaft swings its
+#     butt outward, so `posed_radius` re-measures the ground radius ON EVERY
+#     FRAME and `main` fails the build if any frame is wider than the rest pose.
+#     That cap, not taste, is why the rake stops where it does.
+#   * `penetration`, unchanged and still zero: the rake takes the shaft AWAY
+#     from the cloth, so the clearance improves rather than degrades. It is
+#     printed per tier as it always was.
+#   * SCEPTRE_YAW turns the butt inward as it comes forward, which buys real
+#     travel under the footprint cap -- the radius is a hypotenuse, so spending
+#     some of the swing on x lets y go further before the cap bites. It also
+#     stops the whole gesture being a single planar hinge.
+SCEPTRE_RAKE = 0.62                        # radians about x, at `join`
+SCEPTRE_YAW = 0.50                         # radians about y, same pivot
 
 
 def _sceptre_pose(node, frame):
-    """Turn the shaft about the join. A node's matrix is T(location)*R, i.e.
-    R*p + location, so to spin about a pivot C the location has to carry
-    C - R*C. Getting that wrong is what hangs a weapon a metre off the model."""
-    rx, ry = SCEPTRE_SWAY[frame % len(SCEPTRE_SWAY)]
+    """Rake the shaft forward about the join, on the shared cycle so the staff
+    and the arms breathe together."""
+    a = _amp(_phase(frame))
     pivot = _sceptre_axis()[0]
-    node.rotation = [rx, ry, 0.0]
+    node.rotation = [SCEPTRE_RAKE * a, SCEPTRE_YAW * a, 0.0]
     spun = td.apply(td.trs((0, 0, 0), node.rotation), pivot)
     node.location = [pivot[k] - spun[k] for k in range(3)]
 
@@ -1026,35 +1398,50 @@ def _cowl(s, body, lk):
               (0.026, 0.086, 0.046), lk["jaw"], body, pitch=0.30)
 
 
-def _arms(s, body, lk):
+def _arms(s, body, lk, rig):
     """Sleeves, and the two of them are not the same length. The right one is
-    split from A3 -- the gilding has burst it."""
+    split from A3 -- the gilding has burst it.
+
+    WHICH BONE EACH PIECE RIDES. The upper arm and its drape go on `arm_<side>`,
+    which turns about the SHOULDER, so the sleeve's root never leaves the cloth
+    shelf it comes out of and the drape -- hanging 0.58 below that joint -- is
+    the longest lever in the gesture. The forearm goes on `fore_<side>`, whose
+    motion carries the old elbow to the new one and the old wrist to the new
+    one, so neither joint can open a gap. The CUFF goes on the HAND, not the
+    forearm: its near end is the wrist, which both bones agree on, and its far
+    end belongs to the palm it wraps."""
     for tag, sh, el, wr, palm, drape in (
             ("l", SH_L, EL_L, WR_L, PALM_L, 0.35),
             ("r", SH_R, EL_R, WR_R, PALM_R, 0.14)):
-        taper(s, "upper_" + tag, sh, el, 0.098, 0.074, lk["sleeve"], body, 5)
-        taper(s, "fore_" + tag, el, wr, 0.070, 0.052, lk["forearm"], body, 5)
+        upper = rig.get("arm_" + tag, body)
+        taper(s, "upper_" + tag, sh, el, 0.098, 0.074, lk["sleeve"], upper, 5)
+        taper(s, "fore_" + tag, el, wr, 0.070, 0.052, lk["forearm"],
+              rig.get("fore_" + tag, body), 5)
         taper(s, "cuff_" + tag, wr, _lerp(wr, palm, 0.40), 0.058, 0.044,
-              lk["cuff"], body, 5)
+              lk["cuff"], rig.get("hand_" + tag, body), 5)
         hang = _lerp(sh, el, 0.72)
         if tag == "r" and lk["split"]:
             for n, dz in ((0, 0.0), (1, -0.06)):
                 td.box(s, "drape_r_%d" % n, (0.090, 0.052, drape * 0.62),
                        (hang[0] - 0.030 + 0.052 * n, hang[1] - 0.020,
                         hang[2] - drape * 0.34 + dz), (0, 0, -0.22),
-                       lk["cuff"], body)
+                       lk["cuff"], upper)
         else:
             td.box(s, "drape_" + tag, (0.115, 0.068, drape),
                    (hang[0] + (0.018 if tag == "l" else -0.018),
                     hang[1] - 0.014, hang[2] - drape * 0.52),
-                   (0, 0, 0.16 if tag == "l" else -0.22), lk["cuff"], body)
+                   (0, 0, 0.16 if tag == "l" else -0.22), lk["cuff"], upper)
 
 
 def _hand(s, body, lk, tag, palm, rot, digits):
     """Palm UP, fingers SPREAD. `stiff` straightens and lifts the digits as the
     mineralisation climbs -- he closes his hands less and less well, and by A4
     they do not close at all. It never moves the palm centre, so HANDS stays
-    exactly where the socle put it."""
+    exactly where the socle put it.
+
+    `body` here is the hand's own animated group at base/A1/A2 and the static
+    body at A3+, where the left hand is welded to the sceptre and must not
+    wander off it."""
     stiff = lk["stiff"]
     m = td.box(s, "palm_" + tag, (0.128, 0.118, 0.034), palm, rot, lk["palm"],
                body)
@@ -1211,24 +1598,47 @@ def _pour(s, fixed, lk):
 
 # ---------------------------------------------------------------------------
 
+# WHICH ARMS EACH TIER RIGS, and it is the mineralisation arc that decides.
+#
+# base/A1/A2 rig BOTH: the gesture is his two hands and nothing else moves.
+#
+# A3+ rig only the RIGHT, and that is not a compromise, it is the tier. From A3
+# the gold hand is WELDED to the shaft and the brief makes that junction a
+# requirement -- a left arm on its own rig would tear it open. So the object
+# takes over half the gesture: the staff goes forward where the left hand used
+# to, and the right hand, still his own, still opens. He is half idol and it
+# shows in what he can still do with his own body.
+#
+# It also does real work on the screen. The staff's travel is almost entirely
+# HORIZONTAL, and the camera's pitch means horizontal travel is worth 19.7 px
+# per unit from one bearing and 10.9 from the one a quarter turn away -- so the
+# staff alone measured 3.4 px at the bearing that flatters it least, under the
+# gate, while measuring 8.4 at the bearing that flatters it most. The arm's
+# swing carries vertical, which is worth 16.5 px per unit from EVERY bearing.
+ARM_GROUPS = {False: ["arm_l", "fore_l", "hand_l", "arm_r", "fore_r", "hand_r"],
+              True: ["arm_r", "fore_r", "hand_r"]}
+
+
 def build_body(tier, flat):
     lk = LOOKS[tier]
     s = td.Scene(palette(flat))
     root = s.node("root")
     fixed = s.node("world_fixed", parent=root, world_fixed=True)
     body = s.node("body", parent=root)
-    # The animated empty exists only where there is a sceptre to move. base, a1
-    # and a2 keep building exactly the frame-less models they always did.
     arm = (s.node("sceptre", parent=root, animated=True)
            if lk["sceptre"] else None)
+    rig = dict((g, s.node(g, parent=root, animated=True))
+               for g in ARM_GROUPS[bool(lk["sceptre"])])
 
     rings = _robe(s, body, lk)
     _hem_detail(s, body, lk, rings)
     _accents(s, body, lk, rings)
     _foot(s, body, lk)
-    _arms(s, body, lk)
-    pl = _hand(s, body, lk, "l", PALM_L, PALM_ROT_L, DIGITS_L)
-    pr = _hand(s, body, lk, "r", PALM_R, PALM_ROT_R, DIGITS_R)
+    _arms(s, body, lk, rig)
+    pl = _hand(s, rig.get("hand_l", body), lk, "l", PALM_L, PALM_ROT_L,
+               DIGITS_L)
+    pr = _hand(s, rig.get("hand_r", body), lk, "r", PALM_R, PALM_ROT_R,
+               DIGITS_R)
     _cowl(s, body, lk)
     made = _sceptre(s, body, arm, lk) if lk["sceptre"] else []
     _pour(s, fixed, lk)
@@ -1236,17 +1646,19 @@ def build_body(tier, flat):
     def pose(frame):
         if arm is not None:
             _sceptre_pose(arm, frame)
+        if rig:
+            _arm_pose(rig, frame)
 
-    frames = ATTACK_FRAMES if arm is not None else 0
-    pen = penetration(s, pose, frames or 1)
-    gap = clearance(s, pose, frames or 1) if made else None
-    model = td.build(s, "siphon-" + tier, frames=frames,
-                     pose=pose if frames else None)
+    frames = ATTACK_FRAMES
+    pen = penetration(s, pose, frames)
+    gap = clearance(s, pose, frames) if made else None
+    drift = origin_drift(s, pose, frames)
+    model = td.build(s, "siphon-" + tier, frames=frames, pose=pose)
 
     origins = {"HANDS": _mid(_mean(pl), _mean(pr))}
     if made:
         origins["RING"] = _mean(made[0])
-    return model, s, origins, (pen, gap)
+    return model, s, origins, (pen, gap, drift)
 
 
 # ---------------------------------------------------------------------------
@@ -1432,6 +1844,139 @@ def clearance(scene, pose, frames):
 
 
 # ---------------------------------------------------------------------------
+# DOES IT ACTUALLY MOVE ON SCREEN? The gate the last attempt did not have.
+#
+# The previous animation was signed off against 31.8 px per unit, which is the
+# BOARD's pixel scale and not the SCREEN's. Everything below is measured in the
+# space the owner is actually looking at: SCREEN_PX was read out of the running
+# game by stepping a world point one Blender unit along each axis and pushing it
+# through the camera's own view-projection at the reference viewport.
+#
+# The model's forward is +Y and gl-world.authoredFrontOffset turns every
+# `siphon-*` by -pi/2, so a tower aiming at yaw `aim` draws at aim - pi/2. The
+# tower turns to face its target, so the same motion is worth different pixels
+# depending on where the target is: a reach along the model's +Y reads at 19.73
+# px per unit when he faces across the screen and 10.91 when he faces up it.
+# Both are reported, and the gate is on the WORST of them -- an animation that
+# only works at the flattering bearing is an animation that disappears half the
+# time.
+# ---------------------------------------------------------------------------
+
+AIM_SAMPLES = 24
+
+
+def _screen(local, aim):
+    """One point in the model's own space -> screen px at the reference view."""
+    yaw = aim - math.pi / 2
+    c, s = math.cos(yaw), math.sin(yaw)
+    wx = c * local[0] - s * local[1]
+    wy = s * local[0] + c * local[1]
+    return (SCREEN_PX[0] * wx, -(SCREEN_PX[1] * wy + SCREEN_PX[2] * local[2]))
+
+
+def _posed_positions(model):
+    """Every vertex of every frame, in the model's own space. Group matrices are
+    column-major 16-vectors, the way td_mesh.build writes them and the way the
+    renderer reads them."""
+    pos = model["positions"]
+    gid = [0] * (len(pos) // 3)
+    for gi, g in enumerate(model["groups"]):
+        for v in range(g["first"], g["first"] + g["count"]):
+            gid[v] = gi
+    out = []
+    for row in model["frames"]:
+        frame = []
+        for v in range(len(pos) // 3):
+            p = (pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2])
+            m = row[gid[v]]
+            if m is not None:
+                p = (m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
+                     m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
+                     m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14])
+            frame.append(p)
+        out.append(frame)
+    return out
+
+
+def screen_travel(model):
+    """(worst-bearing travel, best-bearing travel, worst single-frame step).
+
+    TRAVEL is how far the furthest-travelling vertex of the model gets from
+    where frame 0 draws it -- the size of the gesture. STEP is the largest
+    distance any vertex covers between two ADJACENT frames of the loop,
+    INCLUDING the wrap from the last frame back to frame 1, which is where a
+    cycle that does not close shows up as a jump."""
+    posed = _posed_positions(model)
+    if len(posed) < 2:
+        return 0.0, 0.0, 0.0
+    n = len(posed[0])
+    worst_travel, best_travel, worst_step = 1e9, 0.0, 0.0
+    for a in range(AIM_SAMPLES):
+        aim = math.tau * a / AIM_SAMPLES
+        rest = [_screen(p, aim) for p in posed[0]]
+        shots = [[_screen(p, aim) for p in f] for f in posed]
+        travel = 0.0
+        for f in range(1, len(shots)):
+            for i in range(n):
+                travel = max(travel, math.dist(shots[f][i], rest[i]))
+        worst_travel = min(worst_travel, travel)
+        best_travel = max(best_travel, travel)
+        # The loop is frames 1..N-1 and it wraps back to 1, never to 0.
+        loop = list(range(1, len(shots)))
+        for k in range(len(loop)):
+            f, g = loop[k], loop[(k + 1) % len(loop)]
+            for i in range(n):
+                worst_step = max(worst_step, math.dist(shots[f][i], shots[g][i]))
+    return worst_travel, best_travel, worst_step
+
+
+def posed_radius(model):
+    """The widest the tower ever gets, over every frame. The socle's rule is
+    that it never grows at the ground, and the rest silhouette already sits
+    exactly on the hem's 0.660 -- so an animation is free to move anything it
+    likes as long as it does not push the outline past where it starts."""
+    worst = 0.0
+    for frame in _posed_positions(model):
+        for p in frame:
+            worst = max(worst, math.hypot(p[0], p[1]))
+    return worst
+
+
+def origin_drift(scene, pose, frames):
+    """WHERE THE BEAM ACTUALLY LEAVES FROM, re-measured on every frame off the
+    posed vertices rather than trusted.
+
+    The comments above argue the origin cannot move: the palms sit on the axis
+    their group turns about, their two offsets are exact negatives, and the
+    rings are not in an animated group at all. All three are claims. This is the
+    measurement, and it is the same standard `penetration` holds the sceptre to
+    -- 'by construction' has been wrong in this file before.
+
+    Returns (worst HANDS drift, worst RING drift) in Blender units."""
+    palm = dict((m.name, m) for m in scene.meshes
+                if m.name in ("palm_l", "palm_r"))
+    rings = [m for m in scene.meshes if m.name.startswith("ring_")]
+    hands_worst = ring_worst = 0.0
+    for f in range(frames):
+        pose(f)
+        def centre(mesh):
+            mx = mesh.parent.matrix_world() if mesh.parent else None
+            pts = [td.apply(mx, v) for v in mesh.verts] if mx else mesh.verts
+            n = len(pts)
+            return tuple(sum(p[k] for p in pts) / n for k in range(3))
+        if len(palm) == 2:
+            got = _mid(centre(palm["palm_l"]), centre(palm["palm_r"]))
+            hands_worst = max(hands_worst,
+                              max(abs(got[k] - HANDS[k]) for k in range(3)))
+        if rings:
+            got = centre(rings[0])
+            ring_worst = max(ring_worst,
+                             max(abs(got[k] - RING[k]) for k in range(3)))
+    pose(0)
+    return hands_worst, ring_worst
+
+
+# ---------------------------------------------------------------------------
 # THE 360 DEGREE TEST, run rather than remembered.
 #
 # The brief: "rotate the model through 360 degrees. If two angles 90 degrees
@@ -1455,18 +2000,28 @@ IOU_QUARTER_MAX = 0.85
 IOU_MIRROR_MAX = 0.88
 
 
-def _group_tris(model, group=""):
+def _turning_tris(model):
+    """Everything that TURNS with the tower -- every group except the
+    world_fixed one, at the rest pose.
+
+    IT USED TO BE THE UNNAMED GROUP ALONE, and that was fine while the unnamed
+    group was the whole body. Rigging the arms would have quietly moved six
+    parts of the figure OUT of this test: the sleeves, the forearms and both
+    hands would have stopped being measured for asymmetry the moment they
+    started to move, and the 360 test would have gone on passing on a body with
+    no arms. Widening it to every turning group keeps the coverage the test had
+    before the rig existed and adds the sceptre, which was never in it either.
+    The gold pour stays out: it is world_fixed, it does not rotate with the
+    tower, and including it would flatter the score."""
     pos = model["positions"]
-    first, count = 0, len(pos) // 3
-    for g in model["groups"]:
-        if g["name"] == group:
-            first, count = g["first"], g["count"]
-            break
     out = []
-    for t in range(count // 3):
-        v = first + t * 3
-        out.append(tuple((pos[(v + k) * 3], pos[(v + k) * 3 + 1],
-                          pos[(v + k) * 3 + 2]) for k in range(3)))
+    for g in model["groups"]:
+        if g["name"] == td.WORLD_FIXED_GROUP:
+            continue
+        for t in range(g["count"] // 3):
+            v = g["first"] + t * 3
+            out.append(tuple((pos[(v + k) * 3], pos[(v + k) * 3 + 1],
+                              pos[(v + k) * 3 + 2]) for k in range(3)))
     return out
 
 
@@ -1548,7 +2103,7 @@ def _mirror(g):
 
 def rotation_test(model):
     """Returns (worst quarter-turn IoU, worst mirror IoU, passed)."""
-    tris = _group_tris(model, "")
+    tris = _turning_tris(model)
     worst_q = 0.0
     worst_m = 0.0
     for elev in (0.0, 35.0):
@@ -1658,10 +2213,17 @@ def _audit_sceptre(tier, model, scene, pen):
         raise SystemExit("siphon-%s: the shaft head moves %.5f off the ring "
                          "rim -- it must pivot AT the join or it detaches from "
                          "the beam" % (tier, head))
-    if tail < 0.020:
-        raise SystemExit("siphon-%s: the sceptre travels %.4f, which is under "
-                         "a pixel at 31.8 px/unit -- the owner asked for it to "
-                         "move a bit while attacking" % (tier, tail))
+    # RAISED from 0.020. That floor was written against 31.8 px per unit, where
+    # 0.020 looked like two thirds of a pixel; at the reference viewport's
+    # measured 10.9-19.7 px per unit it is a fifth of one, so it would have
+    # passed the very animation the owner could not see. The real gate is
+    # `screen_travel` in `main`; this stays as the cheap local one and is set
+    # where a raked staff belongs.
+    if tail < 0.220:
+        raise SystemExit("siphon-%s: the sceptre butt travels %.4f, under the "
+                         "0.220 the staff needs to read at board scale -- the "
+                         "owner reported the last one as no animation at all"
+                         % (tier, tail))
     return head, tail
 
 
@@ -1742,8 +2304,9 @@ def main():
           % ("model", "tris", "height", "radius", "quarter", "mirror",
              "cowl q", "cowl m", "in-him", "gap", "360"))
     sceptre_rows = []
+    move_rows = []
     for tier in TIERS:
-        model, scene, origins, (pen, gap) = build_body(tier, flat)
+        model, scene, origins, (pen, gap, drift) = build_body(tier, flat)
         lo, hi, rad = audit(tier, model, origins)
         if LOOKS[tier]["sceptre"]:
             head, tail = _audit_sceptre(tier, model, scene, pen)
@@ -1764,6 +2327,35 @@ def main():
                              "quarter %.2f, mirror %.2f -- the model passes "
                              "and the head is still a cone, rebuild the cowl"
                              % (tier, cq, cm))
+
+        # --- THE GATE THE LAST ATTEMPT DID NOT HAVE -----------------------
+        worst_px, best_px, step_px = screen_travel(model)
+        if worst_px < MIN_TRAVEL_PX:
+            raise SystemExit(
+                "siphon-%s moves %.2f screen px at its worst bearing, under "
+                "the %.1f this gate demands. The owner reported the previous "
+                "animation as 'there is no attack animation' and it measured "
+                "1.2 px -- it was sized against 31.8 px/unit, which is the "
+                "BOARD's scale, not the screen's. Do not lower this number; "
+                "make the gesture bigger." % (tier, worst_px, MIN_TRAVEL_PX))
+        posed = posed_radius(model)
+        if posed > rad + 1e-6:
+            raise SystemExit(
+                "siphon-%s reaches %.3f while animating against %.3f at rest. "
+                "The socle's rule is that this tower never grows; a gesture may "
+                "move anything it likes but it may not push the outline past "
+                "where the rest pose already puts it." % (tier, posed, rad))
+        hdrift, rdrift = drift
+        live = rdrift if LOOKS[tier]["sceptre"] else hdrift
+        if live > ORIGIN_TOL:
+            raise SystemExit(
+                "siphon-%s moves its BEAM ORIGIN by %.6f while animating. "
+                "js/gl/siphon-beam-draw.js reads that point out of "
+                "siphon_origins.json as a constant, so the beam and the ritual "
+                "circle would detach from him. Either pin it or take the "
+                "three-file change to the owner." % (tier, live))
+        move_rows.append((tier, worst_px, best_px, step_px, posed, live))
+
         td.write_js(model, "siphon-%s.js" % tier)
         total += model["triangles"]
         exported[tier] = ("RING" if LOOKS[tier]["sceptre"] else "HANDS",
@@ -1786,6 +2378,47 @@ def main():
           "point ALONE, because the robe's train was hiding a witch hat: the "
           "a5 cowl measured 0.925 / 0.870 on its own while siphon-a5 as a "
           "whole measured 0.75 / 0.71")
+
+    print("  THE ATTACK, MEASURED IN SCREEN PIXELS at the reference viewport "
+          "(1278x719, target 640/360, distance 2021.363, pitch 0.59446, yaw "
+          "-pi/2), where one Blender unit is %.2f px across the screen, %.2f "
+          "into it and %.2f up it -- so the whole figure is about %.1f px tall:"
+          % (SCREEN_PX[0], SCREEN_PX[1], SCREEN_PX[2],
+             HEIGHT_BASE * SCREEN_PX[2]))
+    print("    %-12s %-9s %-9s %-8s %-8s %s"
+          % ("model", "worst px", "best px", "step px", "radius", "origin"))
+    for (tier, wpx, bpx, spx, prad, live) in move_rows:
+        print("      siphon-%-5s %-9.2f %-9.2f %-8.2f %-8.3f %.2e"
+              % (tier, wpx, bpx, spx, prad, live))
+    print("    'worst/best px' is how far the furthest-travelling vertex gets "
+          "from the rest pose, over %d bearings -- worst is the bearing that "
+          "flatters it least, and the gate is on that one, at %.1f px. The "
+          "animation this replaces measured 1.2 px at its BEST bearing."
+          % (AIM_SAMPLES, MIN_TRAVEL_PX))
+    print("    'step px' is the largest any vertex moves between two ADJACENT "
+          "frames INCLUDING the wrap from the last back to the first: the loop "
+          "closes if that is no bigger than the steps inside it, and it is what "
+          "proves the cycle is a channel rather than a strike with a snap in "
+          "it. gl-world plays frames 1..%d on a %.2f s clock." % (
+              ATTACK_FRAMES - 1, 1.0 / 0.42))
+    print("    'origin' is the beam origin's worst drift over the whole cycle, "
+          "MEASURED off the posed vertices -- the palms' midpoint on base/a1/a2 "
+          "and the ring's centre on a3+. Both are structurally pinned and both "
+          "are re-measured anyway; the build fails over %.0e." % ORIGIN_TOL)
+    print("    base/a1/a2 PRESENT the hands -- the palms roll %.0f degrees from "
+          "cupped-up to forward and open %.3f apart along their own axis, the "
+          "elbows swivel and the sleeves swing. THIS IS NOT THE FORWARD "
+          "EXTENSION THE OWNER ASKED FOR, and it cannot be: HANDS is defined as "
+          "the midpoint of the two palms, so pushing both palms forward by d "
+          "moves the beam origin forward by exactly d. Extending them is a "
+          "coordinated change across siphon_idol.py, siphon_origins.json and "
+          "the beam/ritual modules, and it is the owner's call, not this "
+          "file's." % (abs(math.degrees(HAND_ROLL)), 2.0 * HAND_OPEN))
+    print("    a3/a4/a5 PUT THE STAFF FORWARD, which needs no such trade: the "
+          "ring is the origin, the ring is not in an animated group, and the "
+          "shaft pivots on the ring's own rim, so it can rake %.0f degrees out "
+          "over the ground in front of him with the origin structurally unable "
+          "to follow." % math.degrees(SCEPTRE_RAKE))
 
     if sceptre_rows:
         join, butt, _up = _sceptre_axis()

@@ -312,8 +312,23 @@ def face(s, cx, cy, z, r, parent, kind, flat, scale=1.0, front=0.80):
         td.box(s, "lid", (r * 0.50, e * 0.5, e * 0.34), (cx, fy, z + e * 0.72),
                (0, 0, 0), "moss_dark", parent)
     elif kind == "two_eye":                 # Mini II: deux yeux, toujours frenetique
-        for sx in (-1, 1):
-            td.ball(s, "eye", e * 0.90, (cx + sx * r * 0.34, fy, z), "eye", parent, 8, 5)
+        # NOT LEVEL, and that is the point. mini2's head is cocked, so its two
+        # eyes sit at two heights and are not the same size, with a single brow
+        # slanted over the high one. It is the only unit that uses this kind, so
+        # the tilt lives here rather than in a rotated group -- the body is one
+        # rigid group and the buzz owns it.
+        for sx, dz, k in ((-1, 0.52, 1.10), (1, -0.40, 0.84)):
+            td.ball(s, "eye", e * k, (cx + sx * r * 0.34, fy, z + e * dz),
+                    "eye", parent, 6, 4)
+        # ONE brow, over the high eye, and it has to stay ON the head. Two
+        # earlier tries missed that: e*0.34 square at z + e*1.5 rendered as a
+        # green twig standing clear of the body, and the eyes themselves, put
+        # up at the level of the hunch, rendered as two black knobs on its
+        # back. An eye is a dark spot in a surface; off the surface it is a
+        # bead. Both now sit on the jaw's own front, just above the grin.
+        td.box(s, "brow", (r * 0.70, e * 0.46, e * 0.56),
+               (cx - r * 0.22, fy * 0.90, z + e * 0.95), (0, 0.30, 0),
+               "moss_dark", parent)
     elif kind == "teeth":                   # Hungry: yeux minuscules, dents partout
         for sx in (-1, 1):
             td.ball(s, "eye", e * 0.34, (cx + sx * r * 0.26, fy, z + r * 0.44), "eye", parent, 6, 4)
@@ -772,30 +787,118 @@ def unit_mini1(s, body, flat):
 
 
 def unit_mini2(s, body, flat):
-    # LOW -- the exact opposite proportion, which is the only lever that exists
-    # at this size. Mini II is a wide crouching grin under a flat stone lid, so
-    # the top of its silhouette is a straight line where Mini I comes to a
-    # point, and it is wider than it is tall where Mini I is the reverse.
+    # LOW -- and REBUILT, because the owner looked at it and said "le mini blub
+    # 2 est moche, on dirait une crepe ecrasee". He was right, and the mask says
+    # exactly why. At true game scale the old body measured 16 x 11 px and read
+    # like this:
+    #
+    #     .......#####....        a lozenge. One convex blob, a straight top
+    #     ...#########....        edge, no step, no notch, nothing anywhere on
+    #     #############...        the outline you could point at and name.
+    #     .#############..        Eleven of its rows are the same row.
+    #     ..#.#######.....
+    #
+    # The cause was the lid. "Un caillou pose sur la tete" had been answered
+    # with a slab r*2.24 SQUARE laid flat across the whole head -- because a
+    # review had measured the pebble at one or two pixels and asked for
+    # something that reaches the outline. It does reach it: it BECOMES it. A
+    # plate as wide as the animal, level, at the top of a body that is already
+    # wider than it is tall, closes the profile with a horizontal line, and in
+    # colour it swallows the blub as well -- the capture is 90 % grey stone with
+    # a green rim under it.
+    #
+    # WHAT MAY NOT CHANGE. The one thing keeping the two Minis apart at 10 px is
+    # the aspect ratio -- mini1 is the SPIRE at l/h 0.67, mini2 is the wide one
+    # at 1.45 -- and the review that demanded that separation is the same review
+    # that measured them at 0.986 raw IoU when they were twins. So mini2 stays
+    # wide, stays low, and does NOT become a second spire. Its character has to
+    # come from somewhere that costs no height.
+    #
+    # It comes from ASYMMETRY. A squat frantic thing is allowed to be lopsided:
+    # this one crouches nose-down over its own mouth, humps its back behind its
+    # head, cocks that head to one side, and carries the caillou as a caillou
+    # again -- a real angular stone perched off-centre on the hunch, high on the
+    # left, with the head dipping away to the right. The top edge is a diagonal
+    # with a step in it instead of a straight line, and every horizontal slice
+    # through the animal is a different width.
     r = R(10) * 0.78
-    h = _stack(s, "b", 0, 0, r * 1.10, r * 0.86, SQUAT, "moss", body, segs=10)
-    zm = h * 0.42
-    maw(s, 0, 0, zm, radius_at(SQUAT, r * 1.10, h, zm), r * 0.42, body,
-        span=2.80, tiles=7, teeth=6)
-    ze = h * 0.86
-    face(s, 0, 0, ze, r, body, "two_eye", flat,
-         front=radius_at(SQUAT, r * 1.10, h, ze) / r)
-    # Le caillou est devenu un couvercle: a slab across the WHOLE head, set
-    # askew. A pebble on top was a 2 px notch; a lid is the top edge itself.
-    # It is square in plan and turned, so it is just as wide from the side as
-    # from the front -- an aspect ratio that only exists at one yaw is not one.
-    td.box(s, "slab", (r * 2.24, r * 2.24, r * 0.26), (0, -r * 0.04, h + r * 0.10),
-           (0.08, 0, 0.42), "stone", body)
-    td.box(s, "slab_chip", (r * 0.74, r * 0.52, r * 0.16),
-           (r * 0.62, -r * 0.24, h + r * 0.22), (0, 0, 0.42), "stone_dark", body)
-    for sx in (-1, 1):                       # pattes ecartees, bien en dehors
-        for fy in (-0.50, 0.42):
-            td.tube(s, "leg", r * 0.12, (sx * r * 0.74, r * fy, h * 0.34),
-                    (sx * r * 1.14, r * fy, 0), "moss_dark", body, 6)
+
+    # 1. THE JAW MASS -- lower and wider than the old body, and still a body of
+    #    revolution, because `maw()` lays its tiles on a radius and the file's
+    #    hardest-won rule is that the mouth is a feature OF a head. Pushed
+    #    forward on +y so the hunch behind it has somewhere to be.
+    rj = r * 1.02
+    h = _stack(s, "b", 0, r * 0.14, rj, r * 0.54, SQUAT, "moss", body, segs=10)
+    zm = h * 0.48
+    maw(s, 0, r * 0.14, zm, radius_at(SQUAT, rj, h, zm), r * 0.36, body,
+        span=2.90, tiles=7, teeth=5)
+    # les bajoues -- fat cheeks either side of the grin. They carry the WIDTH
+    # that the jaw mass gave up: a body of revolution that widens also deepens,
+    # and depth is what a 34-degree camera turns into silhouette HEIGHT. Wide
+    # and shallow is the only way to stay wide.
+    for sx in (-1, 1):
+        td.ellipsoid(s, "jowl", (r * 0.78, r * 1.06, r * 0.56),
+                     (sx * r * 0.92, r * 0.16, r * 0.28), "moss", body,
+                     (0.0, 0.0, sx * -0.20), 6, 4)
+
+    # 2. THE HUNCH -- shoulders rising BEHIND the head and rolled to the left,
+    #    high enough to CLEAR it. That last word is the whole lesson of two
+    #    failed attempts: at a 34-degree camera a body of revolution 1.3 r wide
+    #    projects its own back rim to 1.24 r of screen height, so a hunch that
+    #    tops out at 1.05 r is inside the outline and does not exist. It reads
+    #    only from the height it clears the rim by, and this one clears it by
+    #    half a radius.
+    td.ellipsoid(s, "hunch", (r * 1.56, r * 1.18, r * 1.06),
+                 (-r * 0.20, -r * 0.40, r * 0.74), "moss", body,
+                 (0.12, 0.30, 0.10), 8, 4)
+    # the nape closes the gap between hunch and jaw on the low right side, so
+    # the step reads as one animal and not as two lumps
+    td.frustum(s, "nape", r * 0.60, r * 0.34, r * 0.40,
+               (r * 0.34, -r * 0.02, r * 0.62), "moss", body, 6, (0.10, -0.34, 0))
+
+    # 3. THE HEAD IS COCKED, and the eyes sit in the STEP between the jaw's top
+    #    rim and the front of the hunch -- which is where a face goes on an
+    #    animal built this way. They were floating half a radius clear of both
+    #    in the first build and read as two dark pips on the skyline.
+    ze = r * 0.72
+    face(s, -r * 0.08, r * 0.10, ze, r * 0.92, body, "two_eye", flat, front=0.62)
+
+    # 4. LE CAILLOU, and it is a stone again: five-sided, leaning outward as if
+    #    it were about to slide off, parked over the LEFT shoulder alone.
+    #
+    #    It sits that far out for a measured reason. Normalise the two Minis
+    #    into one box -- which is what a shape IoU does -- and a stone on the
+    #    centre line reads as mini1's POINT: both units then narrow to a bump at
+    #    the top and the pair scores 0.79. Off at the shoulder, the top edge
+    #    becomes a slope with a shelf at its high end, the top right corner is
+    #    empty where mini1's is full, and no amount of rescaling turns that into
+    #    a spire. It is the same argument as the aspect ratio, applied to the
+    #    outline instead of to the box.
+    td.frustum(s, "pebble", r * 0.58, r * 0.40, r * 0.40,
+               (-r * 0.60, -r * 0.36, r * 1.36), "stone", body, 5,
+               (0.26, 0.42, 0.55))
+    td.box(s, "pebble_facet", (r * 0.46, r * 0.34, r * 0.14),
+           (-r * 0.72, -r * 0.44, r * 1.54), (0.22, 0.38, 0.55), "stone_dark", body)
+
+    # 5. THE CROUCH IS IN THE LEGS. The front pair is short and tucked under the
+    #    mouth, the back pair is longer and set wider -- the animal is down at
+    #    the front and up at the back, and the rear stance is what keeps the
+    #    outline wide now that the lid is not doing it.
+    #    They are STUBS, not sticks. The first build ran them out to 1.42 r on a
+    #    shallow diagonal and the capture shows exactly what that renders as:
+    #    four green twigs poking out of a blob. Short, steep and finished with a
+    #    foot, they read as an animal squatting on them.
+    for sx in (-1, 1):
+        td.tube(s, "leg", r * 0.15, (sx * r * 0.68, r * 0.44, r * 0.34),
+                (sx * r * 0.86, r * 0.50, r * 0.05), "moss_dark", body, 6)
+        td.box(s, "foot", (r * 0.34, r * 0.40, r * 0.12),
+               (sx * r * 0.88, r * 0.52, r * 0.06), (0, 0, sx * 0.18),
+               "moss_dark", body)
+        td.tube(s, "leg", r * 0.17, (sx * r * 0.78, -r * 0.36, r * 0.62),
+                (sx * r * 1.14, -r * 0.46, r * 0.06), "moss_dark", body, 6)
+        td.box(s, "foot", (r * 0.38, r * 0.44, r * 0.13),
+               (sx * r * 1.16, -r * 0.48, r * 0.07), (0, 0, sx * -0.22),
+               "moss_dark", body)
 
     # A SLAB RATTLES INSTEAD. Mini II is wide and low on four splayed legs, so
     # it cannot pitch the way Mini I does -- it shakes about its vertical axis

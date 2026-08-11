@@ -1060,15 +1060,42 @@ var World3D = (function () {
           }
         }
         drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame);
-        // Crosspath marks, drawn OVER an unchanged body at the same transform.
-        // Authored around their own seat, so they need no offset here -- and
-        // because they are separate models the body underneath is literally the
-        // same vertices with or without them, which is the rule they exist to
-        // satisfy rather than a discipline to remember.
+        // Crosspath marks, drawn OVER an unchanged body -- same yaw, same lift,
+        // TRANSLATED ONTO THEIR SEAT. Because they are separate models the body
+        // underneath is literally the same vertices with or without them, which
+        // is the rule they exist to satisfy rather than a discipline to
+        // remember; the seat offset is the only thing this loop adds.
+        //
+        // The seat is a point in the BODY's model space, so it is spun by the
+        // same drawYaw and scaled by the same unitsToPx the body is drawn with
+        // -- which is modelYaw's transform written out by hand, and the only
+        // honest way to land a mark on a limb the mark model knows nothing
+        // about. Body and mark share one unitsToPx (31.8032 for all eleven
+        // summoner models) and have to: a mark drawn at a different scale from
+        // the body it rides would be the wrong size on it.
+        //
+        // ONE SEAT IS NOT TURNED, AND THAT IS WHY IT SURVIVES BEING TURNED
+        // HERE. summoner-mark-a1's runes live in the model's `world_fixed`
+        // group, so drawActor draws them at yaw 0 whatever it is handed -- a
+        // ritual on the ground does not swivel. Its seat is the origin, so the
+        // rotated offset is (0, 0, 0) and the two agree. A future mark that was
+        // both world_fixed AND seated off-centre would NOT: the geometry would
+        // stand still while the offset spun. Give that one an unrotated offset,
+        // do not "fix" it by rotating the group.
         var marks = (t.constructor && t.constructor.ID === "blub")
           ? summonerMarks(t) : null;
-        for (var mi = 0; marks && mi < marks.length; mi++) {
-          drawActor(marks[mi], t.x + kx, t.y + ky, drawYaw, 1, tz, 0);
+        if (marks) {
+          var mSeats = summonerSeats(t);
+          var mScale = GLModels.unitsToPx(model);
+          var mCos = Math.cos(drawYaw), mSin = Math.sin(drawYaw);
+          for (var mi = 0; mi < marks.length; mi++) {
+            var mSeat = mSeats[SUMMONER_MARK_SEAT[marks[mi]]];
+            if (!mSeat) continue;
+            drawActor(marks[mi],
+              t.x + kx + (mCos * mSeat[0] - mSin * mSeat[1]) * mScale,
+              t.y + ky + (mSin * mSeat[0] + mCos * mSeat[1]) * mScale,
+              drawYaw, 1, tz + mSeat[2] * mScale, 0);
+          }
         }
         renderer.setGlow(0, null);
       } else {
