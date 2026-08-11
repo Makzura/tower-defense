@@ -104,7 +104,7 @@ var MAX_CANVAS_SCALE = 3;
 //             pays nothing. The Hive itself is ordinary work that pays
 //             ordinarily; leaving it alive is what costs, because its brood is
 //             unpaid, unscheduled health that keeps arriving.
-//   boss      (v0.4.7) the Tyrant, wave 35 only. 2500 HP, and it SILENCES
+//   boss      (v0.4.7) the Tyrant, wave 35 only. 5000 HP, and it SILENCES
 //             towers rather than destroying them. Answered by having more
 //             board than it can switch off at once.
 //
@@ -116,12 +116,18 @@ var MAX_CANVAS_SCALE = 3;
 // bar across the top of the screen. Its remaining health is what the base pays
 // on a leak, so letting it through at full health ends the run outright.
 //
-// WAVE 35 IS THE BOSS WAVE. The Tyrant walks in MID-WAVE: 2500 HP, the slowest
+// WAVE 35 IS THE BOSS WAVE. The Tyrant walks in MID-WAVE: 5000 HP, the slowest
 // thing in the game, and it does not damage towers -- it SHOOTS them and they
-// go silent for two seconds. At half health it roars: a 200 point shield, a
-// third again its speed, twice its rate of fire, and twenty-one bodies called
-// back in at 1.5x. All of that is data on the `boss` row in Enemy.TYPES;
+// go silent for two seconds. At half health it roars: a 1000 point shield, a
+// third again its speed, a third again its rate of fire, and forty bodies
+// called back in at 1.5x. All of that is data on the `boss` row in Enemy.TYPES;
 // nothing about the fight is special-cased in this file.
+//
+// Every figure above is read from that row, and each has a second site that
+// must move with it: health 5000 and the phase's shield 1000; the roar's rate
+// is `attackIntervalMultiplier` 0.75, which is a THIRD again the rate, not
+// double; and the forty bodies are the sum of the nine `summon.groups` counts
+// (8+10+6+4+2+2+3+3+2). If you retune the boss, re-read this paragraph.
 //
 // FINISHING A WAVE PAYS a tenth of what it took to clear, on top of the usual
 // damage income -- see waveBounty. About $1350 across the run.
@@ -1108,15 +1114,21 @@ var worldContext = {
 //
 // SINCE 2026-07-29 THIS ARRAY IS DERIVED, not declared: it is the player's
 // equipped loadout from js/meta.js, which is a saved profile. A fresh profile
-// owns the gunner and the Smasher; the Longshot and the Siphon are bought
-// with meta coins in the armoury. Everything downstream is unchanged -- the
-// bar still reads constructors out of this array and knows nothing about what
-// a gunner is -- so a slot being empty because it was never bought looks
-// exactly like a slot being empty because nothing was written there.
+// owns `smasher` and `soldier` -- the two CATALOGUE entries flagged
+// `starter: true` -- while `longshot`, `siphon` and `blub` are bought with
+// meta coins in the armoury. The gunner is NOT a starter and no longer exists
+// at all: it was deleted in v0.4.9, and meta.js drops it from any save that
+// still names it. Everything downstream is unchanged -- the bar still reads
+// constructors out of this array and knows nothing about what any particular
+// tower is -- so a slot being empty because it was never bought looks exactly
+// like a slot being empty because nothing was written there.
 //
-// It is a `var` reassigned by rebuildBuildBar() rather than a live getter,
-// because the geometry below (BAR_WIDTH) is computed from its length once at
-// load, and every other reader indexes it in a hot loop.
+// It is a `var` MUTATED IN PLACE by rebuildBuildBar() rather than a live
+// getter, because the geometry below (BAR_WIDTH) is computed from its length
+// once at load, and every other reader indexes it in a hot loop. In place and
+// never reassigned: the sandbox writes THROUGH this array, so any reference
+// handed out earlier has to stay live. See rebuildBuildBar's own note, which
+// has always said this correctly.
 var BUILD_SLOTS = MetaProgress.slotConstructors();
 
 // Re-read the loadout after the armoury changes it. Called by js/store.js on
