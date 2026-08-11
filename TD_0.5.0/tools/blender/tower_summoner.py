@@ -21,6 +21,56 @@
 # THE GAG THE WHOLE B PATH RESTS ON: the bigger the machine, the smaller and
 # more frightened the blub inside it. FACE_SCALE encodes exactly that, and it
 # only ever goes down.
+#
+# ---------------------------------------------------------------------------
+# THE ATTACK ANIMATION, added in this pass. Read this before touching a pose.
+#
+# HP IS AMMUNITION, so an attack is not an event -- it is the unit's entire
+# life, played a few dozen times and watched for as long as the body stands. It
+# therefore has to survive being seen hundreds of times, which rules out a
+# linear tween and rules out a motion that outlasts the interval that triggers
+# it. Both of those are structural here rather than a matter of taste:
+#
+# 1. THE ANIMATION IS THE COOLDOWN. It is not a clip fired off at the shot and
+#    left to run; it is a loop parameterised by the blub's own reload phase.
+#    gl-world reads `1 - cooldown / (1 / attacksPerSecond())` and indexes
+#    straight into the strip, so the cycle occupies the interval EXACTLY, at
+#    whatever rate the unit is actually firing at. It cannot overrun, because
+#    there is no clock of its own to overrun with. That matters more here than
+#    anywhere else in the game: `attacksPerSecond()` carries the swarm bonus, so
+#    a Mini Blub's 0.333 s becomes 0.238 s with a full fleet around it, and any
+#    animation authored in seconds would be 40 % too long the moment the tower
+#    is played well. See the block above `attack_cycle` for the exact mapping,
+#    and CHANGELOG for the runtime side.
+#
+# 2. THE SHOT IS THE DISCONTINUITY. Phase 0 is the instant the gob left, so the
+#    cycle runs RELEASE -> follow-through -> settle -> wind-up, and the wind-up
+#    at phase 1 snaps into the release at phase 0. That is where anticipation
+#    has to live: there is no room before the first shot, and a cycle that
+#    eases smoothly across its own seam has no accent in it at all. Every unit
+#    below overshoots past neutral on the rebound and coils past neutral on the
+#    intake -- neither extreme is the rest pose, which is what stops it reading
+#    as a metronome.
+#
+# 3. FRAME 0 IS REST, AND REST IS IDENTITY. Every animated empty sits at its
+#    pivot with zero rotation on frame 0, so frame 0 is the model that revue 1
+#    measured, vertex for vertex -- `check_rest_pose()` fails the build if it is
+#    not. The three profiles, the maw on the head's curve, the footprints and
+#    the >= 0.85 shape-IoU family are all properties of frame 0 and none of them
+#    can move by adding a pose. js/blub.js holds `cooldown` at exactly zero
+#    while a blub has nothing to shoot, so an idle blub shows frame 0 and only
+#    a firing one animates.
+#
+# 4. RIGID GROUPS ONLY. td_mesh emits one 4x4 per group per frame and a 4x4
+#    from `trs()` has no scale in it, so nothing here can squash or inflate by
+#    scaling. The Hungry Blub's "il se gonfle" is therefore a PISTON: its
+#    stomach cap is sunk inside the sac at rest and rides out of it on the
+#    intake, which grows the outline for real instead of pretending to.
+#
+# Eight frames per cycle, sampled uniformly, with the EASING IN THE KEY STOPS --
+# the same trick tower_warbringer.py uses. A release that owns 12 % of the
+# cycle and a settle that owns 40 % are two key positions, not two frame counts,
+# so the strip stays uniform and one runtime rule drives all ten units.
 # ---------------------------------------------------------------------------
 
 import math
