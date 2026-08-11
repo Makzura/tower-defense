@@ -842,9 +842,10 @@ var SiphonFXBeam = (function () {
   }
 
   // One capsule per actor: the segment from its feet to the top of its model,
-  // in screen space, with the actor's own authored radius for a thickness. Both
-  // ends are projected, so the capsule leans exactly as the body leans under an
-  // orbited camera and nothing has to assume the world's up is the screen's up.
+  // in screen space, with the actor's own authored radius for a thickness --
+  // flat-capped, for the reason axisDistSq gives at length. Both ends are
+  // projected, so it leans exactly as the body leans under an orbited camera
+  // and nothing has to assume the world's up is the screen's up.
   //
   // Called ONCE per frame, from draw(), inside the same pinned `withGround(0)`
   // the cords are sampled in -- so every z here is absolute and comparable with
@@ -904,20 +905,32 @@ var SiphonFXBeam = (function () {
     }
   }
 
-  // Squared distance from a screen point to the capsule's axis, plus the
-  // parameter along it -- so the radius can be taken at the right end. Returns
-  // the parameter in `capT`.
+  // Squared PERPENDICULAR distance from a screen point to the capsule's axis,
+  // and the parameter along that axis in `capT` -- so the radius can be taken
+  // at the right end of the body.
+  //
+  // FLAT CAPS, AND THIS WAS MEASURED, NOT ASSUMED. Clamping the parameter to
+  // [0, 1] before measuring -- the usual capsule form, and what a naive reading
+  // of "capsule" gives you -- puts a hemispherical dome of one full radius
+  // above the model's head and another below its feet. Measured on a Smasher at
+  // this camera: screen radius 37 px, so a cord passing 26 px CLEAR of its
+  // crown was being hidden by a dome that stands in for nothing. And it
+  // photographs as a success: the cord vanishes behind a tower, which is the
+  // thing being asked for, just not for the reason claimed.
+  //
+  // So the caller rejects any sample outside t = 0..1 and this measures to the
+  // infinite line. The occluder is a rectangle from the feet to the measured
+  // top, leaning exactly as the projected body leans -- which never claims the
+  // body occupies space it does not.
   var capT = 0;
 
   function axisDistSq(o, x, y) {
     var ax = o.x1 - o.x0, ay = o.y1 - o.y0;
     var len2 = ax * ax + ay * ay;
-    var t = 0;
-    if (len2 > 1e-9) {
-      t = ((x - o.x0) * ax + (y - o.y0) * ay) / len2;
-      if (t < 0) t = 0; else if (t > 1) t = 1;
-    }
+    if (len2 <= 1e-9) { capT = 0; var qx = x - o.x0, qy = y - o.y0; return qx * qx + qy * qy; }
+    var t = ((x - o.x0) * ax + (y - o.y0) * ay) / len2;
     capT = t;
+    if (t < 0 || t > 1) return 1e30;          // past an end: flat cap, no dome
     var dx = x - (o.x0 + ax * t), dy = y - (o.y0 + ay * t);
     return dx * dx + dy * dy;
   }
