@@ -413,6 +413,9 @@ var SiphonFXRitual = (function () {
         dx: 1, dy: 0, aimed: false,
         seed: ((tower.x || 0) * 0.137 + (tower.y || 0) * 0.211) % TAU,
         ox: 0, oy: 0, oz: 0,
+        // `now` of the last frame SiphonFXBeam handed an origin over. See the
+        // note at advance()'s call to originWorld.
+        handed: -1,
         // the circle in the world, and its image on the screen
         cx: 0, cy: 0, cz: 0, R: 0, ux: 0, uy: 0, vx: 0, vy: 0, vz: 0,
         sx: 0, sy: 0, sux: 0, suy: 0, svx: 0, svy: 0, tilt: 0.9, shown: false,
