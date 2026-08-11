@@ -121,18 +121,23 @@
 // with the beam module's. The circle sits FORWARD of that point; the beams
 // start at the circle's rim.
 //
-// WHICH WAY IS "FORWARD". Measured in game: BeamTower never assigns `aim` --
-// it is `undefined` on a live Siphon, and gl-world.js:1037 draws the body at
-// `(t.aim || 0) + authoredFrontOffset(model)`, so the body faces its authored
-// front and never turns. Taking "forward along the tower's aim" literally would
-// therefore pin the circle to one compass direction and let beams leave the far
-// rim and fly back across the caster. So the cast direction is
+// WHICH WAY IS "FORWARD". It is (cos(tower.aim), sin(tower.aim)) -- the world
+// direction the body's authored front points along -- and nothing else. See
+// `aimDirection`.
 //
-//     toward the mean of the live locks, when it holds any
-//     (cos(aim), sin(aim)) -- the body's own facing -- when it holds none
+// THIS PARAGRAPH USED TO SAY THE OPPOSITE, and it was true when it was written:
+// BeamTower did not inherit from Tower, never declared `aim`, and so stood at
+// one fixed compass bearing however the fight moved. Taking "forward along the
+// tower's aim" literally would then have let beams leave the far rim and fly
+// back across the caster, so this module solved for its own cast direction
+// instead -- the mean of the live locks, slewed.
 //
-// For any tower that DOES set `aim`, those two are the same direction, because
-// `aim` is `atan2(target - self)`. The slew rate above is what keeps it stable.
+// BeamTower now sets `aim` (beam-adapter.js) and slews it in `faceLocks`, so
+// the workaround became a liability: two rate limits on the same angle, from
+// two pivots ten board px apart, and a disc that slid off the chest through
+// every turn. The owner's requirement -- "perpendicular to the ground and
+// parallel to the body of the siphon" -- is only structurally true if the disc
+// READS the body's facing, so now it does.
 //
 // ---------------------------------------------------------------------------
 // PERFORMANCE -- visual-pass/PERF.md; OVERDRAW is the sensitive axis

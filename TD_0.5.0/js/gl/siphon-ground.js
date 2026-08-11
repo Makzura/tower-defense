@@ -341,6 +341,24 @@ var SiphonFXGround = (function () {
 
   function rot(x, y, c, s) { return [x * c - y * s, x * s + y * c]; }
 
+  // THE YAW THE BODY IS ACTUALLY DRAWN AT, which is NOT `t.aim`.
+  //
+  // Everything this module rotates is a MODEL-space vector -- buildPour works
+  // in "the model-space direction at phi off +Y", buildVein takes the train
+  // side as model (0,-1) -- and gl-world draws siphon models at
+  // `aim + authoredFrontOffset(model)`, which for /^siphon-/ is `aim - PI/2`.
+  // `rot` is a plain CCW rotation, so rotating the authored +Y front by this
+  // lands it on (cos aim, sin aim): the direction the body faces.
+  //
+  // Storing raw `aim` instead put every decal 90 degrees off the body. That was
+  // invisible for exactly as long as `aim` was 0 and this module was unloaded.
+  var SIPHON_YAW = -Math.PI / 2;
+
+  function drawYaw(t) {
+    var aim = (t && typeof t.aim === "number" && isFinite(t.aim)) ? t.aim : 0;
+    return aim + SIPHON_YAW;
+  }
+
   function buildVein(rec, t, b) {
     var tierB = rec.tierB;
     var seed = ((t.x * 73856093) ^ (t.y * 19349663)) | 0;
@@ -656,7 +674,11 @@ var SiphonFXGround = (function () {
     for (var i = 0; i < records.length; i++) if (records[i].t === t) return records[i];
     var rec = {
       t: t, seen: true,
-      yaw: t.aim || 0,
+      // FROZEN, and only the VEIN may use it: a root grown into the ground does
+      // not swing when the body above it turns. The POUR carries its own live
+      // yaw (`pourYaw`) because it is held to the front of the figure.
+      yaw: drawYaw(t),
+      pourYaw: drawYaw(t),
       tierA: -1, tierB: -1,
       vein: null, pour: null,
       healSeen: t.hpHealed || 0, healAccum: 0, sincePulse: 9,
