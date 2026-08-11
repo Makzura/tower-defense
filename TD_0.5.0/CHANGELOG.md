@@ -13,6 +13,78 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-11 — the crosspath marks are reseated on the re-profiled bodies, and
+b1 is finally big enough to see.**
+
+`tools/blender/summoner_unit_marks.py` only, plus the twenty generated
+`js/gl/models/blub-mark-*.js`. No body, no footprint and no simulation value was
+touched; `tower_summoner.py` was not edited.
+
+**Why.** The same-day re-profiling gave blub1 an `EGG`, mini1 a `SPIRE`, mini2 a
+`SQUAT` at r × 1.10, blub2 a `td.ellipsoid` lens and the Hungry Blub a pair of
+box wedges, leaving `drop()` to blub3 alone. Every seat in the marks file was
+still aimed at a drop, and it had its own copy of `drop()`'s band coefficients
+in `DROP_BANDS`/`_drop_radius` — the exact drift its header warned about.
+Measured on the new bodies before the fix, best of four yaws: mini1's lit mouth
+**1 px**, the Hungry Blub's **0**, and mini2's band **0 px from every yaw**,
+swallowed whole by a body a fifth wider than the band was cut for. The
+Cyberblub's lichen was inside its own graft at 4 px.
+
+**The profiles are imported now, not mirrored.** `EGG`, `SPIRE`, `SQUAT` and
+`radius_at` come from `tower_summoner`, exactly as `R` and `UNIT_FOOTPRINT`
+already did, so a re-profiled body moves its own marks and `main()` prints the
+resolved seat on the next build. Only `DROP` is still restated — four numbers
+`drop()` bakes into vertices for blub3 — and it is written in the same
+`(lower, upper, share)` form so one radius function serves the whole path.
+
+**Three things changed shape rather than position.**
+
+1. *b1 is a band of tiles on the body's own curve*, which is the answer
+   `maw()` already reached for the mouths themselves: a flat bar across a 12-gon
+   buries its middle in the nose ridge and floats its ends on the facets beside
+   it. That deletes `_drop_front_y` and `_facet_seat`, which existed only to
+   thread one flat piece onto one particular body. The Hungry Blub keeps a
+   straight row — its gape is a flat `gullet` slab between two wedges.
+2. *Rings are ovals where the body is.* blub2 is a lens half again as wide as it
+   is deep and the Hungry Blub is a box wedge; a circle round either stands 2 px
+   off the front while cutting the flanks. The ring is stretched onto the fitting
+   ellipse the way `td_mesh.ellipsoid` stretches a ball.
+3. *A ring flush on the surface is invisible under an overhang.* mini2's was
+   correctly seated and still measured 0 — at the board's 34° pitch the camera
+   looks down the creature's shoulder and the wider profile above simply stood in
+   front of it. `ring_out` carries the band past that bulge; the daylight it
+   costs is under a pixel.
+
+**Measured the way revue 1 measures**, and the conditions are part of the
+number: viewport 1278 × 719, map rune-circuit, game default camera, models
+lifted 12 u.l. so the board's own height cannot bury a short unit. Pixels
+changed over the bare body, best of four yaws — revue 1's figures in brackets:
+
+| unit | b1 | b2 | bare body |
+|---|---:|---:|---:|
+| blub1 | **36** (5) | 24 (21) | 235 |
+| blub2 | **39** (3) | 21 (29) | 258 |
+| blub3 | **65** (7) | 25 (20) | 617 |
+| mini1 | **20** (5) | 18 (21) | 110 |
+| mini2 | **22** (3) | 24 (21) | 139 |
+| hungry | **42** (42) | 34 (41) | 890 |
+
+Path B, same run: cyber 22/41 (17/32), mecha 44/75, mecha2 95/86, superb 90/175.
+The `>= 0.85`-invisible band revue 1 named — "b1 sur blub1/blub2/blub3/mini1/
+mini2 : 3 à 7 px, à agrandir avant que la passe 2 ne cherche à les colorer" — is
+empty; the floor is now 20 px. A mark still falls to 0 at the yaw that puts it
+behind the creature, which revue 1 already recorded as normal for a detail on a
+flank.
+
+Colour build committed, not `--silhouette`: 20/20 models on disk carry 2 to 3
+palette entries, none of them the flat grey, and 20/20 register on a fresh page
+load. Worst mark 108 triangles against a budget of 120.
+
+**One thing found and left alone**, because it belongs to the bodies and not to
+this file: `unit_hungry` calls `face(..., r*1.20, r*0.60, "teeth")`, which puts
+its eyes at z = 1.464 r while the `cranium` tops out at 1.37 r — they float
+about 1.5 px clear of the head.
+
 **2026-08-11 — the ten blub units get a detail layer (pass 3).**
 
 New `tools/blender/blub_detail.py` builds ten add-on meshes, `blub-detail-<unit>`,

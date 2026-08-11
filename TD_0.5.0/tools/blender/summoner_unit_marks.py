@@ -8,6 +8,10 @@
 #   python tools/blender/summoner_unit_marks.py                build everything
 #   python tools/blender/summoner_unit_marks.py --silhouette   build PASS 1 forms
 #
+# COMMIT COLOUR BUILDS. `--silhouette` exists so a form can be judged without a
+# palette; a silhouette build has been committed over colour models once already
+# and shipped 46 grey meshes. Re-run without the flag before you finish.
+#
 # THE ABSOLUTE RULE, AND WHY IT IS TRUE BY CONSTRUCTION. A mark adds a detail ON
 # TOP. It may never remodel anything, never change a proportion and never move a
 # pivot: the same body with and without a mark has to be superposable pixel for
@@ -16,14 +20,23 @@
 # geometry in this file to accidentally alter, and drawing a mark is drawing a
 # second model over an untouched first one.
 #
-# THE BODIES ARE STILL THE SOURCE OF TRUTH FOR WHERE A MARK GOES. The radii come
-# from tower_summoner's own R() and UNIT_FOOTPRINT, IMPORTED rather than retyped,
-# so a footprint change moves the marks with the bodies instead of leaving them
-# hanging in the air. What cannot be imported is the inside of `drop()`, `face()`
-# and `_mini_body()` -- those bake their numbers into vertices -- so the profile
-# coefficients are mirrored below in `_drop_radius`, next to the line of
-# tower_summoner they were copied from, and `main()` prints the seat of every
-# mark so a drift is visible the moment it happens.
+# THE BODIES ARE STILL THE SOURCE OF TRUTH FOR WHERE A MARK GOES, AND NOW THE
+# PROFILES ARE IMPORTED RATHER THAN MIRRORED. This file used to keep its own
+# copy of `drop()`'s four band coefficients in `DROP_BANDS`/`_drop_radius`,
+# because every path A body came out of `drop()` and the only way onto that
+# surface was to restate it. That is exactly the drift the copy was warned about
+# and it happened: the 2026-08-11 re-profiling gave blub1 an EGG, mini1 a SPIRE,
+# mini2 a SQUAT, blub2 a lens and the Hungry Blub a pair of box wedges, `drop()`
+# kept blub3 alone, and every seat in this file was still aimed at a drop. The
+# marks floated off five units and one of them (mini2's band) was swallowed
+# whole.
+#
+# So the profiles are now `ts.EGG`, `ts.SPIRE`, `ts.SQUAT` and the radius comes
+# from `ts.radius_at`, the same function the bodies use to lay their own mouths
+# on themselves. `R` and `UNIT_FOOTPRINT` were already imported for the same
+# reason. What is left restated is `DROP` -- four numbers `drop()` still bakes
+# into vertices for blub3 alone -- and it is written in the profile format the
+# other three use so that ONE radius function serves the whole path.
 #
 # PASS 1 vs PASS 2, exactly as tower_summoner.py and summoner_figure.py do it:
 # every solid carries its real material name from the first line and
@@ -64,13 +77,20 @@ PX_PER_UNIT = 20.0 * 1.529 * 1.04          # td_mesh.UNITS_TO_PX
 
 R = ts.R                                   # the unit radii, NOT retyped
 UNIT_FOOTPRINT = ts.UNIT_FOOTPRINT
+EGG, SPIRE, SQUAT = ts.EGG, ts.SPIRE, ts.SQUAT
+radius_at = ts.radius_at                   # and neither is the profile maths
+
+# Screen pixels per u.l. at the review's reference viewport (1278 x 719, the
+# game's default camera). Only used to PRINT a size prediction beside each mark,
+# so a piece too small to see is caught at build time instead of after a capture.
+PX_PER_UL = 0.68
 
 
 # --- palettes ---------------------------------------------------------------
 # Copied verbatim from tower_summoner.py. It is copied and not imported on
 # purpose: the palette is the contract every build script in this folder states
-# for itself (summoner_figure.py does the same), while the footprint table is a
-# derived number that must never be stated twice.
+# for itself (summoner_figure.py does the same), while the footprint table and
+# the body profiles are derived numbers that must never be stated twice.
 PALETTE = {
     # --- voie A, the organic ritual side ---
     "moss":       ("#5E7A4A", 0.0),
@@ -109,64 +129,42 @@ PATH_B = ["cyber", "mecha", "mecha2", "superb"]
 
 
 # ---------------------------------------------------------------------------
-# Reading the bodies without touching them.
+# READING THE BODIES WITHOUT TOUCHING THEM.
 #
 # `drop()` in tower_summoner stacks four frusta -- foot, belly, waist, dome --
-# and bakes the result into vertices, so the only way to land a mark ON that
-# surface is to mirror the profile. These are its coefficients, in its order:
+# and bakes the result into vertices. It is the ONE profile the body script does
+# not publish as data, because it is now blub3's alone and `squash`, its live HP
+# hook, is baked in with it. So its coefficients are restated here in the
+# (lower, upper, share of height) form `EGG`, `SPIRE` and `SQUAT` use, which
+# means `ts.radius_at` reads it exactly as it reads the imported three and this
+# file has one radius function instead of two:
 #
-#   foot   0.62 -> 0.94 over 0.00 .. 0.18 h
-#   belly  0.94 -> 1.00 over 0.18 .. 0.44 h
-#   waist  1.00 -> 0.74 over 0.44 .. 0.74 h
-#   dome   0.74 -> 0.14 over 0.74 .. 1.00 h
+#   foot   0.62 -> 0.94 over the first 18% of the height
+#   belly  0.94 -> 1.00 over the next  26%
+#   waist  1.00 -> 0.74 over the next  30%
+#   dome   0.74 -> 0.14 over the last  26%
 #
-# `squash` is the runtime HP hook and is 1.0 on every authored unit, so `wide`
-# is r and the profile below is exact.
+# `squash` is 1.0 on every authored unit, so `wide` is r and this is exact.
 # ---------------------------------------------------------------------------
 
-DROP_BANDS = ((0.00, 0.18, 0.62, 0.94), (0.18, 0.44, 0.94, 1.00),
-              (0.44, 0.74, 1.00, 0.74), (0.74, 1.00, 0.74, 0.14))
-
-DROP_SEGS = 12                              # drop()'s default `segs`
+DROP = [(0.62, 0.94, 0.18), (0.94, 1.00, 0.26), (1.00, 0.74, 0.30),
+        (0.74, 0.14, 0.26)]
 
 
-def _drop_radius(r, h, z):
-    """The circumscribed radius of the drop at height z."""
-    t = min(max(z / h, 0.0), 1.0)
-    for t0, t1, k0, k1 in DROP_BANDS:
-        if t <= t1:
-            return r * (k0 + (k1 - k0) * (t - t0) / (t1 - t0))
-    return r * DROP_BANDS[-1][3]
+def _skin(rx, ry, cy, a):
+    """A point on the horizontal ellipse (rx, ry) centred on (0, cy), at the
+    parameter `a` measured from +X towards +Y, and the OUTWARD yaw there.
 
-
-def _drop_front_y(r, h, z, x):
-    """The FRONT (+Y) surface of the drop at height z and lateral offset x.
-
-    A 12-gon puts a VERTEX on +Y, not a facet centre, so the nose of a blub is a
-    ridge at the full radius and the surface falls away to either side of it --
-    by 2.3 px across the Blub III's mouth, which is enough to bury the middle of
-    a flat bar and float its ends at the same time. The two facets flanking the
-    nose have normals at 75 and 105 degrees; this is that plane, and a ray probe
-    against the built body agrees with it to four decimals."""
-    rad = _drop_radius(r, h, z)
-    half = math.pi / DROP_SEGS                       # 15 degrees
-    n = math.pi / 2 - half                           # 75 degrees
-    return (rad * math.cos(half) - math.cos(n) * abs(x)) / math.sin(n)
-
-
-def _facet_seat(r, h, z, sx, along, thick, proud):
-    """A seat lying FLAT on one of the two facets that flank the nose.
-
-    This is what makes a mouth mark follow the body instead of hovering over it:
-    the piece is laid in the facet plane, `along` from the nose ridge, and given
-    `proud` of clearance. Returns (position, yaw) ready for `_chip`."""
-    half = math.pi / DROP_SEGS
-    yaw = math.pi / 2 - sx * half                    # the facet's outward normal
-    nx, ny = math.cos(yaw), math.sin(yaw)
-    tx, ty = sx * math.cos(half), -math.sin(half)    # along the facet, outward
-    rad = _drop_radius(r, h, z)
-    off = proud - thick * 0.5
-    return ((tx * along + nx * off, rad + ty * along + ny * off, z), yaw)
+    ONE PRIMITIVE FOR EVERY PATH A BODY. rx == ry is a circle, the yaw is just
+    the bearing, and that is what the four bodies of revolution want -- their rx
+    and ry are both `radius_at` at the seat's own height. They differ on the
+    Blub II, whose body is a single squashed ellipsoid: there the surface normal
+    leans towards the SHORT axis, by up to 12 degrees at its mouth, and a tile
+    laid along the bearing instead would be visibly turned against the surface
+    it is supposed to be lying flat on."""
+    x = math.cos(a) * rx
+    y = cy + math.sin(a) * ry
+    return x, y, math.atan2(math.sin(a) / ry, math.cos(a) / rx)
 
 
 # --- small builders shared by the marks --------------------------------------
@@ -187,86 +185,63 @@ def mark_b1(s, body, unit):
 
     A blub's mouth is the one feature every unit on this path already has, and
     it is the feature the player watches, so the crosspath announces itself
-    there. The piece is small, it is the only cold light on the body, and it
-    sits OVER the mouth the body already models -- it never replaces it, so the
-    dark mouth is still there underneath doing the drawing.
+    there. It sits OVER the mouth the body already models -- it never replaces
+    it, so the dark mouth is still there underneath doing the drawing.
 
-    WHAT THE MOUTH IS depends on the unit, so this has three shapes and they
-    were settled by rendering, not by reading the body script:
+    IT IS A BAND OF TILES ON THE BODY'S OWN CURVE, which is the same answer
+    `tower_summoner.maw()` reached for the mouths themselves and for the same
+    reason. A single flat bar across a 12-gon buries its middle in the nose
+    ridge and floats its ends off the two facets beside it; a run of tiles, each
+    seated and turned on its own piece of surface, cannot. That deletes the
+    `_drop_front_y` / `_facet_seat` facet arithmetic this file used to need --
+    those existed to thread one flat piece onto one particular body.
 
-      disc  the three drops' round or slotted mouth, on the nose.
-      seam  the Hungry Blub. Its two jaws interpenetrate rather than gape, and
-            the VALLEY where their outsides meet is what the eye reads as the
-            mouth -- one lit chip in it, a dimmer chip at each corner.
-      maw   the two minis. Their mouth is a dark bore seen from above, so the
-            light goes on the bore's cap. Put on their front lip instead -- the
-            place the geometry suggests -- it read as a lit chin.
+    AND IT IS MUCH BIGGER THAN IT WAS. Revue 1 measured b1 on blub1, blub2,
+    blub3, mini1 and mini2 at 3 to 7 screen pixels and said, correctly, that a
+    3 px mark has nowhere to put a cyan and must be revisited in SIZE, not in
+    palette, before pass 2 tries to colour it. The old piece was sized to the
+    mouth the body models -- blub1's is a ball 0.34 r across, which is 2.3 px --
+    so it could not be anything else. A light behind a mouth spills; the band
+    spans up to 2.6 radians of the front and stands as tall as the gape, and the
+    unit reads as lit from inside rather than as having a lit dot.
 
-    Brightest at the centre, dimmer at the edges, which is what keeps a mouth
-    that is 4 to 12 px wide from reading as one flat bar."""
+    Brightest at the centre, dimmer at the two ends: the outermost tile on each
+    side is cyan_dim, so a mouth 4 to 22 px wide does not read as one flat bar.
+    Tile heights fall off towards the ends by `mouth_lens`, which is what keeps
+    a round mouth (blub1) round and lets a slot mouth (blub3) stay a slot."""
     b = BODIES[unit]
-    kind = b["mouth_kind"]
-    r, h = b["r"], b["h"]
+    n = b["mouth_tiles"]
+    tall, thick, lens = b["mouth_tall"], b["mouth_thick"], b["mouth_lens"]
+    z, push = b["mouth_z"], b["mouth_push"]
 
-    if kind == "maw":
-        # The two minis are ALMOST ENTIRELY MOUTH (brief section 7) and what
-        # reads as that mouth is the dark bore down the middle, not the lip.
-        # So the light goes on the bore's own cap: a cyan disc laid over it,
-        # inset far enough that the dark rim still draws the opening. Anything
-        # on the front lip instead reads as a lit chin, which is what the first
-        # pass did and what the render caught.
-        mz, mr = b["maw_z"], b["maw_r"]
-        td.frustum(s, "mouth_glow", mr, mr * 0.95, r * 0.04,
-                   (0, r * 0.20, mz + r * 0.01), "cyan_dim", body, 8)
-        td.frustum(s, "mouth_core", mr * 0.62, mr * 0.52, r * 0.05,
-                   (0, r * 0.20, mz + r * 0.035), "cyan", body, 8)
-        return
+    for i in range(n):
+        u = -1.0 + 2.0 * (i + 0.5) / n
+        hi = tall * (1.0 - lens * u * u)
+        mat = "cyan_dim" if (i == 0 or i == n - 1) else "cyan"
 
-    if kind == "seam":
-        # The mouth line of a two-cup gape, measured off the built body: it is
-        # the VALLEY in the front surface, where the lower cup's outside runs
-        # into the upper cup's. One lit chip in the valley, half swallowed by it,
-        # and a dimmer chip at each corner where the line falls away.
-        sy, sz = b["seam"]
-        cx, cy, cz = b["side"]
-        w, tall, thick = b["seam_w"], b["seam_h"], b["seam_t"]
-        td.box(s, "mouth_seam", (w, thick, tall), (0, sy, sz), (0, 0, 0),
-               "cyan", body)
-        for sgn in (-1, 1):
-            yaw = b["side_yaw"] if sgn > 0 else math.pi - b["side_yaw"]
-            _chip(s, "mouth_corner", (sgn * cx, cy, cz), yaw,
-                  (thick * 0.85, w * 0.52, tall * 0.85), "cyan_dim", body)
-        return
+        if b["mouth_kind"] == "bar":
+            # THE HUNGRY BLUB, and it is the one flat mouth in the family. Its
+            # gape is the dark `gullet` slab standing between two box wedges, so
+            # the light lies on a plane and an arc would only bend it off one.
+            wide = b["mouth_w"] / n
+            at = (b["mouth_w"] * u * 0.5, b["mouth_y"] + push, z)
+            _chip(s, "mouth_%d" % i, at, math.pi * 0.5,
+                  (thick, wide * 1.12, hi), mat, body)
+            continue
 
-    z = b["mouth_z"]
-
-    if kind == "disc":
-        # Blub I: a round mouth, so a round lens, on the nose ridge itself.
-        rad = b["mouth_w"]
-        depth = r * 0.11
-        y = _drop_front_y(r, h, z, 0.0) - depth * 0.28
-        td.frustum(s, "mouth_glow", rad, rad * 0.80, depth, (0, y, z), "cyan",
-                   body, 8, (math.pi / 2, 0, 0))
-        for sx in (-1, 1):
-            at, yaw = _facet_seat(r, h, z, sx, rad * 1.45, r * 0.06, r * 0.02)
-            _chip(s, "mouth_spill",
-                  (at[0], at[1], at[2] + rad * 0.34), yaw,
-                  (r * 0.06, rad * 0.44, rad * 0.34), "cyan_dim", body)
-
-    else:                                   # "bar"
-        # Blub II and III: a slot mouth, and the slot is wider than the facet
-        # the nose is made of. So the light is TWO halves, each lying flat in
-        # its own facet and meeting at the ridge -- a single flat bar across
-        # both is the thing that buries its middle and floats its ends.
-        w, tall = b["mouth_w"], b["mouth_h"]
-        thick = r * 0.075
-        for sx in (-1, 1):
-            at, yaw = _facet_seat(r, h, z, sx, w * 0.5, thick, r * 0.025)
-            _chip(s, "mouth_half", at, yaw, (thick, w, tall), "cyan", body)
-            at, yaw = _facet_seat(r, h, z, sx, w + tall * 0.55, thick * 0.8,
-                                  r * 0.02)
-            _chip(s, "mouth_corner", (at[0], at[1], at[2] + tall * 0.10), yaw,
-                  (thick * 0.8, tall * 1.15, tall * 0.80), "cyan_dim", body)
+        span = b["mouth_span"]
+        step = span / n
+        a = math.pi * 0.5 + span * (-0.5 + (i + 0.5) / n)
+        rx, ry, cy = b["mouth_rx"], b["mouth_ry"], b["mouth_cy"]
+        # The tile's width is the CHORD its own step subtends, measured on the
+        # real ellipse rather than from a radius -- on the Blub II the two are
+        # 50% apart -- and overlapped a little so the band has no gaps in it.
+        x0, y0, _ = _skin(rx, ry, cy, a - step * 0.5)
+        x1, y1, _ = _skin(rx, ry, cy, a + step * 0.5)
+        wide = math.hypot(x1 - x0, y1 - y0) * 1.12
+        x, y, yaw = _skin(rx, ry, cy, a)
+        at = (x + math.cos(yaw) * push, y + math.sin(yaw) * push, z)
+        _chip(s, "mouth_%d" % i, at, yaw, (thick, wide, hi), mat, body)
 
 
 def mark_b2(s, body, unit):
@@ -274,31 +249,45 @@ def mark_b2(s, body, unit):
 
     The other half of the same statement as b1: a machined band clamped round a
     creature that has no straight lines anywhere on it. Twelve major segments
-    because every blub body is built from 12-sided frusta and shares its phase,
-    so the band's facets land on the body's facets and it hugs instead of
-    hovering.
+    because every blub body of revolution is built from 12-sided frusta and
+    shares its phase, so the band's facets land on the body's facets and it hugs
+    instead of hovering.
 
-    It takes the body's own radius at its own height -- read out of
-    `_drop_radius` on the drops, ray-probed on the three that are not bodies of
-    revolution -- so it is ON the creature and not around it. A band that cuts
+    IT TAKES THE BODY'S OWN GIRTH AT ITS OWN HEIGHT, out of `ts.radius_at` on
+    the four bodies of revolution and out of the ellipsoid's own semi-axes on
+    the Blub II, so it is ON the creature and not around it. A band that cuts
     into the body somewhere reads as fastened; one that floats everywhere reads
-    as a hoop lying on the floor behind it.
+    as a hoop lying on the floor behind it -- which is exactly what mini2's had
+    become in reverse, swallowed whole by a body that had grown a fifth wider
+    than the band was cut for.
 
-    IT ALWAYS SITS BELOW THE FACE, and every unit's height was chosen against a
-    render of the two marks TOGETHER. At the board's 34 degree pitch a
-    horizontal ring is lowest on screen at its front and highest at its SIDES,
-    and it is the sides that reach the mouth: the Blub III cleared it by 4 px
-    at the front and still crossed the ends of its own lit mouth.
+    IT IS AN OVAL WHERE THE BODY IS. Three of these animals are not bodies of
+    revolution: blub2 is a lens half again as wide as it is deep, and the Hungry
+    Blub is a box wedge. A circle round either stands 2 px off the front and
+    back while cutting the flanks. `ring_rx`/`ring_ry` are the ellipse that fits
+    the mass, and the ring is stretched onto it the same way `td_mesh.ellipsoid`
+    stretches a ball -- the tube ends up a little thicker across the long axis,
+    by a third of a screen pixel, and that is the whole cost.
+
+    IT SITS BELOW THE MOUTH, and every unit's height was chosen against a render
+    of the two marks TOGETHER. At the board's 34 degree pitch a mark on the
+    FRONT of a body is thrown a long way down the screen -- the Blub III's mouth
+    projects level with a band a full radius below it -- so "below the mouth"
+    has to be read off a capture and not off a z.
 
     THE CLASP is dark, not chrome: the darkest value in the mark goes under the
     emissive one, and it keeps path A's marks to cyan and shadow only."""
     b = BODIES[unit]
-    z, cy, major = b["ring_z"], b["ring_y"], b["ring_r"]
+    z, cy = b["ring_z"], b["ring_y"]
+    rx, ry = b["ring_rx"], b["ring_ry"]
     minor = 0.024                            # absolute: ~1.5 px thick on every
-    td.torus(s, "ring", major, minor, (0, cy, z), (0, 0, 0), "cyan", body,
-             12, 4)
+    ring = td.torus(s, "ring", ry, minor, (0, cy, z), (0, 0, 0), "cyan", body,
+                    12, 4)
+    if abs(rx - ry) > 1e-9:
+        k = rx / ry
+        ring.verts = [(v[0] * k, v[1], v[2]) for v in ring.verts]
     # One clasp, on the flank, so the ring has a direction and a seam.
-    _chip(s, "ring_clasp", (major * 0.99, cy, z), 0.0,
+    _chip(s, "ring_clasp", (rx * 0.99, cy, z), 0.0,
           (minor * 2.2, minor * 3.4, minor * 3.4), "dark", body)
 
 
@@ -386,58 +375,138 @@ MARKS_B = [("a1", mark_a1), ("a2", mark_a2)]        # go on path B units
 
 
 # ---------------------------------------------------------------------------
-# THE SEATS. One row per unit, every number derived from the same radius the
-# body uses. The comment on each row names the solid in tower_summoner.py the
-# seat was measured against, so a body change has one place to be checked.
+# THE SEATS. One row per unit. Wherever the body HAS a profile, no radius is
+# typed in: the seat is `radius_at` on the profile it was stacked from, or the
+# semi-axes of the ellipsoid it is, evaluated at the seat's own height. The
+# arguments are then the numbers that appear in tower_summoner.py's own call --
+# the profile, the height in radii, the fraction of it `face()` or `maw()` was
+# given -- so a row reads as a citation of the body it belongs to, and `main()`
+# prints the resolved surface so a drift is visible on the next build.
+#
+# The four rows that stay hand-measured are the four bodies with no profile to
+# read: the Hungry Blub and the three chassis are assemblies of boxes, and the
+# comment on each names the solid in tower_summoner.py it was measured against.
 # ---------------------------------------------------------------------------
 
-def _drop_seat(unit, height_k, face_k, mouth_dz, mouth_w, mouth_h, ring_k,
-               kind="bar", scale=1.0):
-    """A path A unit whose body is `drop()`. `face_k` and `mouth_dz` are the
-    two numbers face() uses to put the mouth on it: z = h*face_k - r*mouth_dz.
+# Depth of a mouth tile, and how much of it is buried. Nothing here is ever laid
+# ON the surface with no bite: a piece that only touches shows a seam of
+# background between itself and the body at some yaw.
+TILE_THICK = 0.09                           # in r
+TILE_SINK = 0.35                            # fraction of the tile inside
 
-    THE RING GOES UNDER THE FACE, and that is a rendered result, not a taste.
-    A horizontal ring seen at the board's 34 degree pitch throws its front arc
-    a long way DOWN the screen -- far enough that a ring at the waist lands
-    within a pixel of the mouth and the two marks merge into one smear when a
-    unit carries both. Below the belly they never touch."""
+
+def _round_seat(unit, profile, height_k, face_k, mouth_dz, span, tiles, tall,
+                lens, ring_k, scale=1.0, body_k=1.0, proud=0.0, ring_out=0.99):
+    """A path A unit whose body is `_stack`ed about the tower axis: blub1 (EGG),
+    mini1 (SPIRE), mini2 (SQUAT) and blub3, whose `drop()` is DROP above.
+
+    `height_k` is the height tower_summoner gave `_stack`, in r. `body_k` is the
+    radius it gave it, which is r everywhere except mini2 -- that one is stacked
+    at r * 1.10 and its band was a fifth too small for it. `face_k` and
+    `mouth_dz` are the two numbers that put the mouth on the body: z = h*face_k
+    - r*mouth_dz for a `face()` mouth, and mouth_dz = 0 for the two Minis, whose
+    mouth is a `maw()` at a plain fraction of the height.
+
+    `ring_out` is the one number a profile cannot supply, and it is the lesson
+    of this rebuild. A band flush on the body (0.99) is invisible if the body
+    BULGES OUT above it: at the board's 34 degree pitch the camera looks down
+    the creature's shoulder, and mini2's band -- correctly seated, 0.5 px proud
+    of the surface it was on -- was measured at 0 px over the body from the
+    front, because the SQUAT profile is a fifth wider a third of a radius higher
+    up and simply stood in front of it. Above 1.0 the band is carried out past
+    that bulge; the daylight it costs is under a pixel, and the alternative is a
+    mark nobody can see."""
     r = R(UNIT_FOOTPRINT[unit]) * scale
+    rb = r * body_k
     h = r * height_k
     z = h * face_k - r * mouth_dz
+    rad = radius_at(profile, rb, h, z)
+    zr = h * ring_k
+    ring = radius_at(profile, rb, h, zr) * ring_out
     return {
-        "r": r, "h": h, "mouth_kind": kind, "mouth_z": z,
-        "mouth_w": r * mouth_w, "mouth_h": r * mouth_h,
-        "ring_z": h * ring_k, "ring_y": 0.0,
-        "ring_r": _drop_radius(r, h, h * ring_k) * 0.99,
+        "r": r, "h": h,
+        "mouth_kind": "arc", "mouth_z": z,
+        "mouth_rx": rad, "mouth_ry": rad, "mouth_cy": 0.0,
+        "mouth_span": span, "mouth_tiles": tiles,
+        "mouth_tall": r * tall, "mouth_lens": lens,
+        "mouth_thick": r * TILE_THICK,
+        "mouth_push": r * (TILE_THICK * (0.5 - TILE_SINK) + proud),
+        "mouth_w": 2.0 * rad * math.sin(span * 0.5),
+        "ring_z": zr, "ring_y": 0.0, "ring_rx": ring, "ring_ry": ring,
     }
 
 
-def _gape_seat(unit, height_k, seam, side, side_yaw_deg, ring, w, tall, thick,
-               maw=None, scale=1.0):
-    """A path A unit built as two flared cups. `seam` is (y, z) on the axis and
-    `side` is (x, y, z) at the mouth corner -- both MEASURED off the built body
-    by ray probe, because the crossing of two tilted cones is not a number that
-    can be read off the call that made them. `ring` is (y, z, radius): these
-    animals are not bodies of revolution about the tower centre, so the band
-    that fits them is centred on the mass it goes round, not on the origin."""
-    r = R(UNIT_FOOTPRINT[unit]) * scale
+def _lens_seat(unit, size, centre, face_z, face_r, mouth_dz, span, tiles, tall,
+               lens, ring_z, proud):
+    """BLUB II, the one path A body that is a single `td.ellipsoid` -- broader
+    than it is deep on purpose, so that "wide and low" does not quietly become
+    "tall" the moment the unit turns ninety degrees.
+
+    `size` and `centre` are its own call's arguments in r, so the girth at any
+    height is the ellipsoid's own: semi-axes scaled by sqrt(1 - k^2) at k of the
+    way up. `proud` is the one number that is not read off the body: `face()`
+    seats this unit's mouth 0.08 r OUTSIDE the lens (front=0.64 of a face radius
+    of 0.88 r, against a surface at 0.51 r there), so the light has to stand off
+    the lens by that much to be over the mouth rather than behind it."""
+    r = R(UNIT_FOOTPRINT[unit])
+    ax, ay, az = (v * 0.5 * r for v in size)
+    cy, cz = centre[1] * r, centre[2] * r
+
+    def girth(z):
+        k = (z - cz) / az
+        s = math.sqrt(max(0.0, 1.0 - k * k))
+        return ax * s, ay * s
+
+    z = r * face_z - r * face_r * mouth_dz
+    rx, ry = girth(z)
+    zr = r * ring_z
+    rrx, rry = girth(zr)
     return {
-        "r": r, "h": r * height_k,
-        "mouth_kind": "maw" if maw else "seam",
-        "maw_z": r * maw[0] if maw else 0.0,
-        "maw_r": r * maw[1] if maw else 0.0,
-        "seam": (r * seam[0], r * seam[1]),
-        "side": (r * side[0], r * side[1], r * side[2]),
-        "side_yaw": math.radians(side_yaw_deg),
-        "seam_w": r * w, "seam_h": r * tall, "seam_t": r * thick,
-        "ring_y": r * ring[0], "ring_z": r * ring[1], "ring_r": r * ring[2],
+        "r": r, "h": cz + az,
+        "mouth_kind": "arc", "mouth_z": z,
+        "mouth_rx": rx, "mouth_ry": ry, "mouth_cy": cy,
+        "mouth_span": span, "mouth_tiles": tiles,
+        "mouth_tall": r * tall, "mouth_lens": lens,
+        "mouth_thick": r * TILE_THICK,
+        "mouth_push": r * (TILE_THICK * (0.5 - TILE_SINK) + proud),
+        "mouth_w": 2.0 * rx * math.sin(span * 0.5),
+        "ring_z": zr, "ring_y": cy,
+        "ring_rx": rrx * 0.99, "ring_ry": rry * 0.99,
+    }
+
+
+def _wedge_seat(unit, mouth_y, mouth_z, mouth_w, tiles, tall, lens, proud,
+                ring, jaw):
+    """THE HUNGRY BLUB, whose head is two box wedges and a domed cranium and
+    whose gape is the dark `gullet` slab between them. Nothing about it is a
+    body of revolution, so both marks are given the flat geometry it has:
+
+      mouth  a straight row of tiles on the gullet's own front face, at the
+             height the two rows of teeth leave clear, `mouth_y` and `mouth_z`
+             being that slab's front plane and centre out of unit_hungry.
+      ring   the ellipse that fits the JAW -- `jaw` is (half width, half depth,
+             centre y) off the `jaw` box. Set a hair outside it the band stands
+             proud at the four face centres and is buried towards the corners
+             and inside `jaw_mid`, which is what fastened looks like on a box."""
+    r = R(UNIT_FOOTPRINT[unit])
+    return {
+        "r": r, "h": r * 1.37,              # the cranium's top, for reference
+        "mouth_kind": "bar", "mouth_z": r * mouth_z, "mouth_y": r * mouth_y,
+        "mouth_span": 0.0, "mouth_tiles": tiles,
+        "mouth_tall": r * tall, "mouth_lens": lens,
+        "mouth_thick": r * TILE_THICK,
+        "mouth_push": r * (TILE_THICK * (0.5 - TILE_SINK) + proud),
+        "mouth_w": r * mouth_w,
+        "ring_z": r * ring[1], "ring_y": r * jaw[2],
+        "ring_rx": r * ring[0], "ring_ry": r * ring[2],
     }
 
 
 def _machine_seat(unit, joint, joint_yaw, joint_r, plate, plate_yaw, plate_w,
                   plate_h, plate_t):
     """A path B unit. `joint` is a real seam on the machine and `plate` sits on
-    a flat flank, both in r."""
+    a flat flank, both in r. These three chassis were not re-profiled and their
+    seats have not moved."""
     r = R(UNIT_FOOTPRINT[unit])
     return {
         "r": r,
@@ -449,41 +518,85 @@ def _machine_seat(unit, joint, joint_yaw, joint_r, plate, plate_yaw, plate_w,
     }
 
 
+def _gel_seat(unit, profile, height_k, body_k, joint_z, joint_yaw, joint_r,
+              joint_bite, joint_dy, plate_z, plate_yaw, plate_w, plate_h,
+              plate_t):
+    """THE CYBERBLUB, and it is the reason this function exists at all. It wears
+    the two PATH B marks, but underneath the chrome it is still a blub: its
+    chassis is not a chassis, it is the same EGG profile Blub I is stacked from,
+    at 0.90 r and 1.88 r tall. So its two seats are found the path A way, with
+    `radius_at`, and only then handed to the path B builders -- which is exactly
+    what stopped being true when the gel body stopped being a `drop()` and left
+    the lichen 0.13 r low and the stone plate floating 0.15 r off the belly."""
+    r = R(UNIT_FOOTPRINT[unit])
+    rb = r * body_k
+    h = r * height_k
+    zj = h * joint_z
+    zp = h * plate_z
+    dj = radius_at(profile, rb, h, zj) - r * joint_bite
+    dp = radius_at(profile, rb, h, zp)
+    return {
+        "r": r, "h": h,
+        "joint": (math.cos(joint_yaw) * dj, math.sin(joint_yaw) * dj + r * joint_dy,
+                  zj),
+        "joint_yaw": joint_yaw, "joint_r": joint_r * r,
+        "plate": (math.cos(plate_yaw) * dp, math.sin(plate_yaw) * dp, zp),
+        "plate_yaw": plate_yaw, "plate_w": plate_w * r,
+        "plate_h": plate_h * r, "plate_t": plate_t * r,
+    }
+
+
 BODIES = {
     # --- path A ---------------------------------------------------------
-    # drop(r*2.30) + face "happy": mouth ball at z = h*0.58 - r*0.34.
-    "blub1": _drop_seat("blub1", 2.30, 0.58, 0.34, 0.20, 0.00, 0.28, "disc"),
-    # drop(r*2.05) + face "brow": mouth box r*0.44 wide at h*0.58 - r*0.36.
-    "blub2": _drop_seat("blub2", 2.05, 0.58, 0.36, 0.25, 0.09, 0.28),
-    # drop(r*1.85) + face "serious": jaw box r*0.66 wide at h*0.60 - r*0.42.
-    # This one is squat and its face sits low -- its mouth is at 0.37 h where
-    # the Blub I's is at 0.44 h -- so its band goes lower again. At 0.24 h the
-    # SIDES of the ring still crossed the ends of the lit mouth on screen, even
-    # though the front of the ring cleared it by 4 px: a ring is highest on
-    # screen at its sides and lowest at its front, and it is the sides that
-    # have to clear.
-    "blub3": _drop_seat("blub3", 1.85, 0.60, 0.42, 0.36, 0.12, 0.15),
-    # _mini_body + face("one_eye"/"two_eye"): the dark bore is a frustum whose
-    # top cap lands at 1.383 r (mini1) and 1.363 r (mini2). That cap IS the
-    # mouth as the camera sees it, so it is what lights up. The collar sits at
-    # 0.24 h, where the lower cup measures 0.74 .. 0.82 r all the way round.
-    "mini1": _gape_seat("mini1", 1.55, (0.98, 0.78), (0.36, 0.92, 0.79), 60.0,
-                        (0.0, 1.55 * 0.24, 0.86), 0.50, 0.20, 0.12,
-                        (1.383, 0.52), 0.78),
-    "mini2": _gape_seat("mini2", 1.55, (0.98, 0.78), (0.36, 0.92, 0.79), 60.0,
-                        (0.0, 1.55 * 0.24, 0.86), 0.50, 0.20, 0.12,
-                        (1.363, 0.50), 0.78),
-    # unit_hungry: jaw_low (0.44 -> 1.06 r, tilted +0.30) against jaw_up (1.04
-    # -> 0.40 r, tilted -0.46). Probed valley: y 1.00 r at z 0.62 r, falling to
-    # 0.91 r by x 0.42 r -- the mouth line, and it renders as one.
+    # unit_blub1: _stack(EGG, r, r*3.70) + face "happy" at h*0.56, its round
+    # mouth a ball at z = h*0.56 - r*0.34. A round mouth gets a round light, so
+    # the tile heights fall off hard (lens 0.45) and the band is short.
+    "blub1": _round_seat("blub1", EGG, 3.70, 0.56, 0.34,
+                         span=1.90, tiles=5, tall=0.46, lens=0.45,
+                         ring_k=0.18),
+    # unit_blub2: td.ellipsoid(r*1.86, r*1.24, r*1.06) at z r*0.50, + face
+    # "brow" at z r*0.54 on a face radius of r*0.88, its slot mouth a box at
+    # z - 0.88*0.36 r. Its band is the lowest of the six because this animal is
+    # a pancake and its mouth is already at a fifth of its height.
+    "blub2": _lens_seat("blub2", (1.86, 1.24, 1.06), (0.0, -0.02, 0.50),
+                        face_z=0.54, face_r=0.88, mouth_dz=0.36,
+                        span=2.00, tiles=5, tall=0.30, lens=0.35,
+                        ring_z=0.46, proud=0.10),
+    # unit_blub3: drop(r, r*1.85) -- the last one -- + face "serious", its slot
+    # jaw a box r*0.66 wide at h*0.60 - r*0.42. The BODY has not moved and its
+    # ring has not moved with it: at 0.24 h the sides of the band still crossed
+    # the ends of the lit mouth on screen even though the front cleared it by
+    # 4 px, and 0.15 h is where a capture said it stopped. Only the mouth is
+    # rebuilt, because 7 px is 7 px whatever the body is doing.
+    "blub3": _round_seat("blub3", DROP, 1.85, 0.60, 0.42,
+                         span=1.30, tiles=5, tall=0.26, lens=0.35,
+                         ring_k=0.15),
+    # unit_mini1: _stack(SPIRE, r, r*3.05) at R(10)*0.78, with maw() cut into
+    # the wide bottom half at h*0.24 and a real head standing over it. The band
+    # is as tall as that gape allows and spans nearly as much of the front,
+    # because at 7.8 u.l. of radius this is the smallest mouth in the game.
     #
-    # ITS BAND IS OFF-CENTRE, at y +0.10 r. The jaw overhangs everything below
-    # it, so a band on the tower axis at any height that clears the legs sits
-    # UNDER that overhang and the camera never sees it. Measured round y +0.10
-    # instead, the surface holds 0.93 .. 0.96 r right across the front, and the
-    # band sits on the animal's own girth rather than the tower's.
-    "hungry": _gape_seat("hungry", 1.60, (1.00, 0.62), (0.42, 0.91, 0.62), 60.0,
-                         (0.10, 0.55, 0.97), 0.50, 0.20, 0.10),
+    # The r*0.78 is not a footprint drift and never was: it is the body radius
+    # tower_summoner stacks a Mini at, and the GAMEPLAY footprint is still the
+    # full 10 out of UNIT_FOOTPRINT, which is what R() is called with here.
+    "mini1": _round_seat("mini1", SPIRE, 3.05, 0.24, 0.0,
+                         span=2.60, tiles=7, tall=0.44, lens=0.30,
+                         ring_k=0.09, scale=0.78),
+    # unit_mini2: _stack(SQUAT, r*1.10, r*0.86) at R(10)*0.78 -- note the 1.10,
+    # which is the whole reason its old band vanished -- with maw() at h*0.42
+    # under a stone lid. Wide and only 0.86 r tall, so the band goes as low as
+    # it can and the mouth takes the rest.
+    "mini2": _round_seat("mini2", SQUAT, 0.86, 0.42, 0.0,
+                         span=2.60, tiles=7, tall=0.36, lens=0.30,
+                         ring_k=0.16, scale=0.78, body_k=1.10, ring_out=1.17),
+    # unit_hungry: the `gullet` slab is (r*1.52, r*1.34, r*0.14) centred at
+    # y r*0.30, z r*0.82, so its front plane is y r*0.97 and the two rows of
+    # teeth stand at r*0.96 and r*0.98 -- the light goes on the slab, BEHIND the
+    # teeth, and they draw across it. The ring is the ellipse of the `jaw` box
+    # (r*1.90 x r*0.92 at y -r*0.04), a hair outside it.
+    "hungry": _wedge_seat("hungry", mouth_y=0.97, mouth_z=0.83, mouth_w=1.34,
+                          tiles=5, tall=0.17, lens=0.30, proud=0.03,
+                          ring=(1.04, 0.58, 0.58), jaw=(0.95, 0.46, -0.04)),
 
     # --- path B ---------------------------------------------------------
     # Every joint seat below is a PROBED point on the seam it names, 0.03 ..
@@ -491,15 +604,22 @@ BODIES = {
     # stand out. Seating them on the limb's AXIS -- which is what the body call
     # gives you -- buried the whole patch inside the leg on three of the four.
     #
-    # cyber: the -X chrome graft breaks out through the gel near its top.
-    # Plate on the +X flank, on the facet centred at +15 deg, where the belly
-    # measures 0.97 r -- forward of the facet at -45 deg it started on, which
-    # rendered as a plate nobody could see without orbiting behind the unit.
-    # It is the one plate on a curved flank, so it is thicker than the rest or
-    # the corners sink.
-    "cyber": _machine_seat("cyber", (-0.82, -0.06, 0.96), math.pi, 0.19,
-                           (0.910, 0.244, 0.377), math.radians(15.0),
-                           0.42, 0.34, 0.14),
+    # cyber: the -X chrome graft is a BOX 0.30 r deep bolted onto a round body,
+    # and the seam is its front lip, not its middle. Seated straight down -X the
+    # whole patch lands inside the graft and renders at 4 px -- measured -- so
+    # the bearing is carried round to 165 degrees, where the crust straddles the
+    # lip with the beads out on open gel, and down to h*0.42, under the graft's
+    # bottom corner. Away from the body's own bead at +52 degrees, as the mark
+    # requires. The plate is on the +X flank at +15 degrees -- forward of the
+    # -45 it started on, which rendered as a plate nobody could see without
+    # orbiting behind the unit -- and low enough to sit under the root of the
+    # cyan vein. It is the one plate on a curved flank, so it is thicker than
+    # the rest or the corners sink.
+    "cyber": _gel_seat("cyber", EGG, 1.88, 0.90,
+                       joint_z=0.42, joint_yaw=math.radians(165.0),
+                       joint_r=0.19, joint_bite=0.03, joint_dy=0.0,
+                       plate_z=0.33, plate_yaw=math.radians(15.0),
+                       plate_w=0.42, plate_h=0.34, plate_t=0.14),
     # mecha: the hip, where the -X leg tube leaves the chassis underside.
     # Plate on the +X chassis flank, aft of the cannon root and above the
     # body's own lichen bead.
@@ -566,26 +686,26 @@ def main():
                          (lo[2] + hi[2]) * 0.5, flag))
     print("  %d marks, %d triangles total, worst %d (budget %d)"
           % (len(PATH_A) * 2 + len(PATH_B) * 2, total, worst, BUDGET))
+    # THE SEAT TABLE. Every number here was read off the body's own profile at
+    # build time, so a re-profiled unit prints a different seat the same minute
+    # it is re-profiled. `px` is the mouth band's width at the review's
+    # reference viewport -- the measurement revue 1 failed these marks on.
     print("  MARK SEATS -- a mark is drawn OVER an untouched body:")
-    print("    %-7s %7s %7s  %s" % ("unit", "radius", "px", "seat"))
+    print("    %-7s %6s %6s  %s" % ("unit", "r px", "mouth", "seat"))
     for unit in PATH_A:
         b = BODIES[unit]
-        kind = b["mouth_kind"]
-        if kind == "seam":
-            where = "seam y %.3f z %.3f" % (b["seam"][0], b["seam"][1])
-        elif kind == "maw":
-            where = "bore z %.3f r %.3f " % (b["maw_z"], b["maw_r"])
-        else:
-            where = "%-4s      z %.3f" % (kind, b["mouth_z"])
-        seat = "mouth %-20s | ring y %.2f z %.3f r %.3f" % (
-            where, b["ring_y"], b["ring_z"], b["ring_r"])
-        print("    %-7s %7.3f %7.1f  %s"
-              % (unit, b["r"], b["r"] * PX_PER_UNIT, seat))
+        px = b["mouth_w"] * PX_PER_UNIT * PX_PER_UL
+        tall = b["mouth_tall"] * PX_PER_UNIT * PX_PER_UL
+        print("    %-7s %6.1f %6.1f  mouth %-3s z %.3f  %d tiles %4.1f x %4.1f "
+              "px | ring z %.3f  %.3f x %.3f"
+              % (unit, b["r"] * PX_PER_UNIT, px, b["mouth_kind"],
+                 b["mouth_z"], b["mouth_tiles"], px, tall,
+                 b["ring_z"], b["ring_rx"], b["ring_ry"]))
     for unit in PATH_B:
         b = BODIES[unit]
-        print("    %-7s %7.3f %7.1f  joint %6.3f %6.3f %6.3f  |  plate "
+        print("    %-7s %6.1f          joint %6.3f %6.3f %6.3f  |  plate "
               "%6.3f %6.3f %6.3f"
-              % (unit, b["r"], b["r"] * PX_PER_UNIT,
+              % (unit, b["r"] * PX_PER_UNIT,
                  b["joint"][0], b["joint"][1], b["joint"][2],
                  b["plate"][0], b["plate"][1], b["plate"][2]))
 
