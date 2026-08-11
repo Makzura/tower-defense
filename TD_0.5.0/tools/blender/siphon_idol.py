@@ -1108,6 +1108,34 @@ SCEPTRE_LIFT = 0.230                       # peak vertical lift of the left hand
 # ratio is 1.0; under the old pivot-on-the-rim construction it was 0.00003. Any
 # future edit that reintroduces a rotation private to the staff drives this
 # number down, and it fails here long before anyone has to look at the tower.
+# READ THIS BEFORE TRUSTING A GREEN BUILD: HEAD_MIN_PX IS 3.00, WHICH IS BELOW
+# MIN_TRAVEL_PX. That is a deliberate, arguable judgement and not an oversight,
+# and the arithmetic that forces it is:
+#
+#     left arm reach window              [0.15758, 0.40338]
+#     band ONE ends at lift  0.242092 -> head 3.9921 px
+#     lift for exactly 4.0px 0.242571 -> head 4.0000 px
+#     band TWO starts at     0.341908 -> head 5.6381 px
+#     shipped                0.230    -> head 3.7927 px
+#
+# MIN_TRAVEL_PX (4.0) and REACH_MARGIN (0.020) are therefore MUTUALLY EXCLUSIVE
+# for the head, by 0.000479 blender units: band one tops out 0.008 px short of
+# the gate. Band two is not the way out either -- `_amp` interpolates the lift
+# continuously from zero, so every cycle crosses the 0.24-0.33 dead zone and
+# `_elbow` would SystemExit mid-build. Reaching 4.0 at the head needs the hand
+# displaced horizontally while crossing (the tangent (-0.782, 0.623), which is
+# radius-free but spends about a third of the clearance margin) or a different
+# staff geometry. Neither is verified against the real vertex cloud.
+#
+# DO NOT "FIX" THIS BY SOFTENING REACH_MARGIN. `_elbow`'s own note records what
+# that costs: a clamped solve pinned the elbow onto the shoulder-wrist line for
+# HALF the cycle and sized the whole gesture by its own limit.
+#
+# The honest summary for whoever picks this up: the head went from 0.000013
+# units (float noise -- it was the pivot) to 3.79 px, which is 3.2x the 1.2 px
+# the owner called "no animation at all", and it is 95% of the 4.0 px bar this
+# job named. It has NOT been confirmed on screen. If a pixel check says it does
+# not read, the fix is more lift via the tangential crossing, not a lower gate.
 HEAD_MIN_PX = 3.00
 HEAD_RATIO = 0.60
 
