@@ -46,6 +46,18 @@ function BeamTower(x, y, path) {
   this.locks = [];              // enemies currently held by a beam
   this.tickTimer = 0;           // accumulates toward the next damage tick
 
+  // WHICH WAY HE IS FACING. Every other tower carries this and gl-world's
+  // tower loop reads it -- `drawYaw = warbringerFullCircle(t) ? 0 : (t.aim || 0)`
+  // -- but BeamTower does not inherit from Tower and never declared it, so the
+  // expression fell to 0 on every frame and the Siphon stood facing one fixed
+  // direction while draining something behind him. Owner: "the siphon tower
+  // doesn't turn towards the enemies he attacks, he should."
+  //
+  // -pi/2 is the same rest facing Tower, Soldier, Smasher and Longshot all
+  // start at, and it is also SIPHON_YAW, so a Siphon that has never acquired
+  // anything is drawn exactly as it was before this existed.
+  this.aim = -Math.PI / 2;
+
   // damageDealt and kills, through the shared scorer -- the beam applied its
   // own damage and so counted no kills at all, while the gunner beside it did.
   TowerScore.init(this);
@@ -249,6 +261,7 @@ BeamTower.prototype.update = function (dt, enemies, bullets, world) {
   if (this.healGlow > 0) this.healGlow = Math.max(0, this.healGlow - dt * 2);
 
   this.updateLocks(enemies);
+  this.faceLocks(dt);
   this.ramp.update(dt, this.locks);
 
   var stats = this.core.stats;
