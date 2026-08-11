@@ -269,6 +269,38 @@
     // Wraps World3D.drawWorld rather than reaching inside it: by the time the
     // wrapper runs, the frame's view-projection is already bound and the
     // renderer will happily take more draws in the same pass.
+    // One posed instance, drawn group by group exactly the way gl-world's
+    // drawActor does it: the instance matrix, then each group multiplied by its
+    // matrix for this frame. Anything else shows frame 0 forever.
+    _drawPosed: function (r, m, it) {
+      var inst = new Float32Array(16), gm = new Float32Array(16);
+      GLMath.modelYaw(inst, it.x, it.y, it.z || 0, it.yaw || 0,
+        m.unitsToPx * (it.scale || 1));
+      var n = m.frames.length;
+      var pose = m.frames[(((it.frame | 0) % n) + n) % n];
+      r.bind(m.gpu);
+      for (var g = 0; g < m.groups.length; g++) {
+        var grp = m.groups[g];
+        if (!grp.count) continue;
+        var pg = pose[g];
+        r.drawRange(pg ? GLMath.multiply(gm, inst, pg) : inst,
+          grp.first, grp.count);
+      }
+    },
+
+    // Every frame of an animated model in one row, so a review can see the
+    // whole cycle at once instead of guessing from a still.
+    filmstrip: function (model, radius, opts) {
+      var r = World3D.renderer();
+      var m = GLModels.get(r, model);
+      if (!m) return "no such model: " + model;
+      var n = Math.max(1, m.frames.length);
+      var items = [];
+      for (var f = 0; f < n; f++) items.push({ model: model, radius: radius, frame: f });
+      TDObs.showcase(items, (opts && opts.gap) || undefined, opts);
+      return { model: model, frames: n };
+    },
+
     showcase: function (items, gapPx, opts) {
       TDObs._showcaseGlow = (opts && opts.glow) || 0;
       TDObs._showcaseTint = (opts && opts.tint) || null;
@@ -295,6 +327,17 @@
             if (g) r.setGlow(g, TDObs._showcaseTint || null);
             for (var i = 0; i < list.length; i++) {
               var it = list[i];
+              // ANIMATED MODELS: draw group by group with the frame's pose.
+              //
+              // This used to draw the whole vertex buffer with ONE matrix, which
+              // meant showcase ALWAYS rendered frame 0 and could never reveal an
+              // animation -- the rig was structurally blind to the thing it was
+              // being used to review. Pass {frame: n} on an item to pose it.
+              var mm = GLModels.get(r, it.model);
+              if (mm && mm.frames && mm.frames.length > 1 && it.frame) {
+                TDObs._drawPosed(r, mm, it);
+                continue;
+              }
               var m = GLModels.get(r, it.model);
               if (!m) continue;
               r.draw(m.gpu, it.x, it.y, it.z || 0, it.yaw || 0,
