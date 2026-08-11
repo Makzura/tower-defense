@@ -502,9 +502,11 @@ var SiphonFXRitual = (function () {
   // ---- the circle in space -------------------------------------------------
   //
   // Centre C, radius R, and an orthonormal in-plane pair (U, V). U is
-  // horizontal and across the cast; V leans back over the caster by the tilt
-  // solved for below. A rim point at angle p is C + U*R*cos(p) + V*R*sin(p),
-  // and that is the form the whole file uses -- on the screen as well as here.
+  // horizontal and across the cast; V is world up. A rim point at angle p is
+  // C + U*R*cos(p) + V*R*sin(p), and that is the form the whole file uses -- on
+  // the screen as well as here. The disc therefore stands perpendicular to the
+  // ground, facing along the cast; see screenBasis for why it is no longer
+  // tilted to suit the camera.
 
   function geom(tower, rec) {
     var k = unitsToPx();
@@ -523,47 +525,52 @@ var SiphonFXRitual = (function () {
     rec.ux = -rec.dy; rec.uy = rec.dx;           // horizontal; uz is 0
   }
 
-  // THE SCREEN BASIS, AND THE TILT, in five projections.
+  // THE SCREEN BASIS, in three projections.
   //
-  // Probe the centre and the three unit directions the disc could be built out
-  // of -- U (horizontal, across the cast), f (the cast itself) and z (world up)
-  // -- and take differences. Over a patch this small the projection is affine,
-  // so the screen image of the disc is exactly the ellipse
+  // THE DISC STANDS UP. Its plane is perpendicular to the ground and its normal
+  // is the cast direction, so it is parallel to the Siphon's own frontal plane
+  // -- a portal held up in front of his chest, facing whatever he is draining,
+  // and the cords leave through it. In world terms that is exactly
   //
-  //     Cs + Us*cos(p) + Vs*sin(p),      Vs = -sin(T)*fs + cos(T)*zs
+  //     U = (-dy, dx, 0)   horizontal, across the cast
+  //     V = (0, 0, 1)      straight up
   //
-  // and its area is `|Us x Vs| = cos(T)*A + sin(T)*B` with A = Us x zs and
-  // B = -(Us x fs). That is a single sinusoid in T, so the widest ellipse this
-  // view allows is at T = atan2(B, A) -- one call, no search. T and T+pi give
-  // the same ellipse, which is what lets the answer be folded into [0, pi)
-  // before it is clamped into the band a held disc is allowed to occupy.
+  // and both are constants of the tower's facing alone. Nothing here consults
+  // the camera, which is the entire point of the rewrite.
+  //
+  // WHAT THIS REPLACED, AND WHY IT HAD TO GO. The previous version solved for
+  // the tilt T that maximises the ellipse's AREA ON SCREEN -- a genuinely neat
+  // closed form, |Us x Vs| being a single sinusoid in T so the best T is one
+  // atan2 with no search -- and then clamped it into [0.45, 1.30]. But a disc
+  // whose world orientation is chosen to look biggest from where you happen to
+  // be standing is a weathervane pointing at the camera. Measured on one fixed
+  // scene, turning the camera alone swung the disc's normal from vz 0.852 to
+  // vz 0.267 and collapsed its screen image to 66 x 1.5 px -- a line across his
+  // chest, no circle at all. The owner called it "a goofy position" and asked
+  // for perpendicular to the ground and parallel to the body at all times.
+  //
+  // THE COST, STATED PLAINLY: a real vertical disc IS edge-on when the Siphon
+  // faces the camera or directly away from it. That is honest 3D and not a
+  // regression -- it is what a held portal does -- but it does mean the circle
+  // is not equally readable from every angle, which is what the old code was
+  // buying at the price of the disc having no fixed orientation at all.
   function screenBasis(api, rec) {
     var R = rec.R;
     if (!(R > 0.01)) return false;
     var p0 = api.project(rec.cx, rec.cy, rec.cz);
     if (!p0) return false;
     var pu = api.project(rec.cx + rec.ux * R, rec.cy + rec.uy * R, rec.cz);
-    var pf = api.project(rec.cx + rec.dx * R, rec.cy + rec.dy * R, rec.cz);
     var pz = api.project(rec.cx, rec.cy, rec.cz + R);
-    if (!pu || !pf || !pz) return false;
+    if (!pu || !pz) return false;
 
-    var usx = pu.x - p0.x, usy = pu.y - p0.y;
-    var fsx = pf.x - p0.x, fsy = pf.y - p0.y;
-    var zsx = pz.x - p0.x, zsy = pz.y - p0.y;
+    // World V is world up, unconditionally. plan() reads vx/vy/vz to place the
+    // rim anchors, so it gets the standing disc for free.
+    rec.vx = 0; rec.vy = 0; rec.vz = 1;
+    rec.tilt = Math.PI / 2;            // kept only as a record of the invariant
 
-    var A = usx * zsy - usy * zsx;
-    var B = -(usx * fsy - usy * fsx);
-    var T = Math.atan2(B, A);
-    if (T < 0) T += Math.PI;
-    T = clamp(T, TILT_MIN, TILT_MAX);
-    var ct = Math.cos(T), st = Math.sin(T);
-
-    rec.tilt = T;
-    rec.vx = -st * rec.dx; rec.vy = -st * rec.dy; rec.vz = ct;   // world
     rec.sx = p0.x; rec.sy = p0.y;
-    rec.sux = usx; rec.suy = usy;
-    rec.svx = -st * fsx + ct * zsx;
-    rec.svy = -st * fsy + ct * zsy;
+    rec.sux = pu.x - p0.x; rec.suy = pu.y - p0.y;
+    rec.svx = pz.x - p0.x; rec.svy = pz.y - p0.y;
     return true;
   }
 
