@@ -258,3 +258,153 @@ is about their width, not about depth.
   drew, because re-rendering bigger answers a question nobody asked.
 - `TDObs.screenOf(ent)` — borrows `api.project` from the next FX draw, since the
   projector is module-private inside gl-world.
+
+---
+
+## Owner feedback on the Siphon, 2026-08-11
+
+Six things reported against the wired-up tower. Each was REPRODUCED in the rig
+and captured before anything was changed, because "I think I see what he means"
+is not a diagnosis.
+
+| # | report | state |
+|---|---|---|
+| 1 | passive rays draw through everything, other towers included | reproduced, NOT fixed |
+| 2 | he does not turn towards the enemies he attacks | **fixed, verified** |
+| 3 | the circle is in a goofy position | **fixed, verified** |
+| 4 | the idle rays do not fit the attack ray | **fixed, verified** |
+| 5 | A3+ sceptre: handle dances, head does not move, he does not hold it | reproduced, BLOCKED |
+| 6 | "otherwise model is great" | — |
+
+### 1. Rays through geometry — reproduced, not fixed
+
+`captures/owner-P1-through-tower.png`: a Siphon draining an enemy with a
+Rifleman planted between the cord and the camera. The cord runs straight across
+the Rifleman's hat and coat. It is not subtle and it is exactly what he sent.
+
+The cause is structural. Every Siphon cord is painted in `drawOverlays` on the
+2D canvas stacked over the WebGL canvas, and that layer has no depth buffer at
+all. Established directly in the page rather than assumed:
+
+  * the context is **WebGL 2.0**;
+  * the scene renders to the **default framebuffer** (`FRAMEBUFFER_BINDING` is
+    null), so there is no offscreen target whose depth could be sampled;
+  * every buffer in `gl-renderer.js` is created once with `STATIC_DRAW` and
+    there is **no dynamic/streaming geometry path** at all.
+
+So both of the honest fixes -- move the cords into the GL pass as real geometry
+(which is what the Warbringer's charge effect does, and gl-world.js says so in
+as many words), or render depth to an offscreen target and clip the 2D cords
+against it -- require adding something real to the renderer. Neither is a small
+change and neither should be made blind. Left for the owner to choose.
+
+### 2. He turns now
+
+`BeamTower` does not inherit from `Tower` and never declared `this.aim`, so
+gl-world's `drawYaw = warbringerFullCircle(t) ? 0 : (t.aim || 0)` fell to zero
+every frame. `faceLocks()` aims him at the CENTROID of his locks -- not the
+first one, because the beams fan to all of them -- rate-limited at the ritual's
+own 3.2 rad/s and HELD through a gap rather than springing back to a rest angle,
+which is the same anti-flicker lesson the ritual's latch records.
+
+Verified by walking an enemy along the road: `aim` tracks across a 2.5 rad sweep
+to within 0.021 rad. `captures/fix-P2-facing-0.png` and `-1.png`.
+
+**Nothing else had to change for the origins to follow.** Both
+`siphon-ritual.js originWorld()` and `siphon-beam-draw.js originWorld()` already
+transform their authored origin by `tower.aim + SIPHON_YAW`. The code was
+written expecting a turning body; `aim` was simply always 0.
+
+### 3. The circle stands up
+
+It had no fixed world orientation at all. `screenBasis()` solved every frame for
+the tilt T that maximises the ellipse's AREA ON SCREEN and clamped it into
+[0.45, 1.30]. Elegant -- |Us x Vs| is a single sinusoid in T so the best T is one
+atan2 with no search -- and wrong, because it makes the disc a weathervane
+pointing at the camera.
+
+Measured on one fixed scene, turning ONLY the camera:
+
+| camera yaw | disc normal vz | screen semi-axes |
+|---|---|---|
+| -1.57 | 0.852 | 48 x 76 |
+| -0.47 | 0.267 | 42 x 57 |
+| +0.63 | 0.267 | **66 x 1.5** |
+
+At the third yaw the circle is a line across his chest. That is the "goofy
+position". It is now `U = (-dy, dx, 0)`, `V = (0, 0, 1)` -- perpendicular to the
+ground, normal along the cast, parallel to his frontal plane -- and `vz == 1` at
+every camera yaw. `captures/fix-P3-vertical-across.png`, `-toward.png`.
+
+The deleted solver carried a TRUE warning and the replacement comment keeps it:
+a vertical disc IS edge-on when he casts across the view. Accepted rather than
+solved -- the cure was the defect being reported -- and it bites less now that
+the body turns, since casting across the view means standing in profile.
+
+Regression-checked: `plan()` places the rim anchors off `rec.vx/vy/vz`, so the
+multi-beam fan changes with this. B3 with three locks still deals three cords
+and the anchors now spread in Z (28 / 50 / 28 about a centre at 35) on a
+standing rim. `captures/fix-P3-multibeam-regression.png`.
+
+### 4. The idle cord is the attack cord, slack
+
+The mismatch was GEOMETRY, not colour -- `seeking` and `thread` already shared
+body/bead/rim roles and differed only in `core`. Against `thread`, `seeking` was:
+
+| | seeking | thread | |
+|---|---|---|---|
+| r_target | 0.0085 | 0.018 | 2.1x thinner |
+| curve.sag | 0.3 | 0.03 | **10x** |
+| curve.sway | 0.16 | 0.022 | **7.3x** |
+| curve.kink | 0.03 (n=3) | 0.0 | kinks vs none |
+| twist.total | 1.1 + waver | 0.62 | 1.8x |
+| scroll.base | 0.3 | 0.55 | 55% of the speed |
+| beads | 9, last third bare | 14, proud, whole run | bunched vs spread |
+| mats | cloth only | **skin** + cloth | cloth rope vs flesh |
+
+Together that read as frayed straw rather than as the same cord drawing in --
+`captures/owner-P4-idle-seeking.png` against any attack capture makes it
+obvious. Each value is moved most of the way to thread's, `skin` added to
+`seeking`'s `mats`, and `ROLES.seeking.core` changed from `hem_fray` to `skin`.
+It stays thinner and keeps the droop and the sweep, because idle must still read
+as weaker and searching. `captures/fix-P4-idle.png` / `fix-P4-attack.png`.
+
+### 5. The sceptre — reproduced, and BLOCKED on a broken build
+
+`captures/owner-P5-sceptre-loop.png` lays frames 0 / 6 / 12 / 18 of `siphon-a3`
+side by side. The gold ring sits in the IDENTICAL place in all four while only
+the shaft swings, and no hand grips it. Exactly as reported.
+
+It is deliberate. `siphon_idol.py` froze the ring because it is the beam origin
+("THE RING DID NOT MOVE. RING stays exactly (0.315, 0.395, 1.190), the socle's
+frozen beam origin, asserted to 1e-6") and animated the shaft beneath it. The
+owner is asking for the opposite: the whole sceptre held in one hand and carried
+forward, which means the beam origin has to move with the ring.
+
+That is possible -- the origin would become PER-FRAME rather than per-tier -- but
+it needs the runtime to know which frame is showing when it asks. It does not
+today: the frame is derived locally in gl-world's tower loop from `state.now`
+(`sphase = (now*0.42) % 1`) and never stored on the tower, while
+`originPoint(tower)` reads a static per-tier origin. Duplicating that formula in
+a second file is precisely the class of bug this tower keeps producing, so the
+frame would have to be stamped on the tower and read from there.
+
+**THE BUILD DOES NOT RUN AT HEAD.** `py siphon_idol.py` fails its own reach gate
+before writing anything:
+
+    the l arm cannot make this pose: the hand ends up 0.2101 from the
+    shoulder and a 0.309 + 0.114 chain only reaches between 0.215 and 0.404
+
+Pre-existing -- no `.py` file was touched this session -- and it fails safely
+(the models and `siphon_origins.json` are byte-identical afterwards). The models
+on disk were produced by an earlier version of the script, so the source of
+truth for this model currently does not reproduce what ships. This is the
+"models CI job red" known-open, and it is not cosmetic: no sceptre change can be
+built until it is cleared.
+
+The error's own advice is misleading. Scanning `HAND_OPEN` from 0.140 down to
+0.100 moves the span 0.2101 -> 0.2148 and then back DOWN to 0.1991 -- it never
+clears 0.215 and it is not monotonic. `ROLL_TILT` is the lever that matters, and
+the build passes at **ROLL_TILT = 0.20** (from 0.95). That is a large change to
+the character of the hands-out presentation, which the owner did not ask for and
+explicitly likes, so it is reported rather than committed.
