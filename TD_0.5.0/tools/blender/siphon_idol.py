@@ -2042,7 +2042,7 @@ def origin_drift(scene, pose, frames):
         if rings:
             track.append(centre(rings[0]))
     pose(0)
-    return hands_worst, ring_worst
+    return hands_worst, track
 
 
 # ---------------------------------------------------------------------------
@@ -2239,61 +2239,112 @@ def _audit_sceptre(tier, model, scene, pen):
             "round a haft that ran through a man's chest. Move the shaft OFF "
             "the centreline, do not soften PEN_SLACK." % (tier, worst, who))
 
-    # THE RING IS THE BEAM ORIGIN, read out of siphon_origins.json by
-    # js/gl/siphon-beam-draw.js. If a ring ever picked up an animated ancestor
-    # a pose could move it, and the beam would leave from empty air beside it.
-    # Asked of the scene graph, because that is where the answer lives -- the
-    # flattened model has already thrown the parent chain away.
-    for m in scene.meshes:
-        if not m.name.startswith("ring_"):
-            continue
-        node = m.parent
+    # THE RING MUST NOW BE CARRIED, AND THIS CHECK IS THE INVERSE OF WHAT IT
+    # USED TO BE. It used to fail the build if a ring ever picked up an animated
+    # ancestor, which enforced a frozen beam origin -- and enforced the defect
+    # with it. What has to be true instead is that every ring rides the SAME
+    # animated group as the shaft, because a ring on a different group from the
+    # shaft is a sceptre that comes apart, which is a subtler version of exactly
+    # what the owner reported. Asked of the scene graph, because that is where
+    # the answer lives -- the flattened model has thrown the parent chain away.
+    def _anim_ancestor(mesh):
+        node = mesh.parent
         while node is not None:
             if node.animated:
-                raise SystemExit(
-                    "siphon-%s: %s hangs off the animated node '%s'. The ring "
-                    "is the frozen beam origin and the brief says it never "
-                    "rotates -- only the shaft below it may move."
-                    % (tier, m.name, node.name))
+                return node
             node = node.parent
+        return None
+
+    carried = {}
+    for m in scene.meshes:
+        if not (m.name.startswith("ring_") or m.name.startswith("shaft")):
+            continue
+        node = _anim_ancestor(m)
+        if node is None:
+            raise SystemExit(
+                "siphon-%s: %s is on no animated group. The staff is HELD now "
+                "-- shaft and rings ride the hand together, so all of it must "
+                "be on one animated group or it is not being carried."
+                % (tier, m.name))
+        carried.setdefault(node.name, []).append(m.name)
+    if len(carried) != 1:
+        raise SystemExit(
+            "siphon-%s: the sceptre is split across %d animated groups (%s). "
+            "Head and handle would move independently again -- one rigid body, "
+            "one group." % (tier, len(carried), carried))
 
     names = [g["name"] for g in model["groups"]]
-    if "sceptre" not in names:
-        raise SystemExit("siphon-%s has a sceptre but no animated group for it"
-                         % tier)
+    holder = next(iter(carried))
+    if holder not in names:
+        raise SystemExit("siphon-%s: the sceptre rides '%s', which is not an "
+                         "exported group" % (tier, holder))
+    if holder != "hand_l":
+        raise SystemExit(
+            "siphon-%s: the sceptre rides '%s', not the left hand. The weld is "
+            "on the left index tip and RING is at x=+0.315, outboard of "
+            "PALM_L -- if it is carried by anything else he is not holding it."
+            % (tier, holder))
     if len(model["frames"]) != ATTACK_FRAMES:
         raise SystemExit("siphon-%s shipped %d frames, not %d"
                          % (tier, len(model["frames"]), ATTACK_FRAMES))
 
-    # Where every frame actually puts the shaft head and the butt. The head is
-    # the pivot, so its travel is a float-rounding artefact and nothing else;
-    # the butt's travel is the animation, and it is printed rather than claimed.
+    # WHERE EVERY FRAME ACTUALLY PUTS THE HEAD AND THE BUTT. Both travels are
+    # now the animation -- the head's especially, since a motionless head was
+    # the defect. Measured in SCREEN px over every bearing, the same way
+    # `screen_travel` does, because this file has already shipped one animation
+    # that was sized against the board's 31.8 px/unit instead of the screen's
+    # 10.9-19.7 and turned out to be a single pixel.
     join, butt, _up = _sceptre_axis()
-    gi = names.index("sceptre")
-    head, tail = 0.0, 0.0
+    gi = names.index(holder)
+    mats = []
     for frame in model["frames"]:
         m = frame[gi]
         if m is None:
-            raise SystemExit("siphon-%s: sceptre group has no matrix" % tier)
-        mm = [[m[c * 4 + r] for c in range(4)] for r in range(4)]
-        head = max(head, math.dist(td.apply(mm, join), join))
-        tail = max(tail, math.dist(td.apply(mm, butt), butt))
-    if head > 1e-4:
-        raise SystemExit("siphon-%s: the shaft head moves %.5f off the ring "
-                         "rim -- it must pivot AT the join or it detaches from "
-                         "the beam" % (tier, head))
-    # RAISED from 0.020. That floor was written against 31.8 px per unit, where
-    # 0.020 looked like two thirds of a pixel; at the reference viewport's
-    # measured 10.9-19.7 px per unit it is a fifth of one, so it would have
-    # passed the very animation the owner could not see. The real gate is
-    # `screen_travel` in `main`; this stays as the cheap local one and is set
-    # where a raked staff belongs.
-    if tail < 0.220:
-        raise SystemExit("siphon-%s: the sceptre butt travels %.4f, under the "
-                         "0.220 the staff needs to read at board scale -- the "
-                         "owner reported the last one as no animation at all"
-                         % (tier, tail))
-    return head, tail
+            raise SystemExit("siphon-%s: '%s' has no matrix" % (tier, holder))
+        mats.append([[m[c * 4 + r] for c in range(4)] for r in range(4)])
+
+    heads = [td.apply(mm, join) for mm in mats]
+    butts = [td.apply(mm, butt) for mm in mats]
+
+    # RIGIDITY. One group cannot shear, so this is a tautology -- and it is
+    # measured anyway, because "by construction" has been wrong in this file
+    # before and a future edit that re-splits the staff would land here first.
+    span0 = math.dist(heads[0], butts[0])
+    slack = max(abs(math.dist(h, b) - span0) for h, b in zip(heads, butts))
+    if slack > 1e-9:
+        raise SystemExit(
+            "siphon-%s: head-to-butt distance varies by %.3e across the cycle. "
+            "The staff is being sheared, not carried." % (tier, slack))
+
+    def _worst_bearing_travel(points):
+        worst = 1e9
+        for a in range(AIM_SAMPLES):
+            aim = math.tau * a / AIM_SAMPLES
+            rest = _screen(points[0], aim)
+            worst = min(worst, max(math.dist(_screen(p, aim), rest)
+                                   for p in points))
+        return worst
+
+    head_px = _worst_bearing_travel(heads)
+    tail_px = _worst_bearing_travel(butts)
+
+    # THE GATE THAT DID NOT EXIST, and the defect it encodes. The build used to
+    # print "butt travels 0.428, head 0.000013" as a fact and pass. 0.000013 is
+    # float noise: the head was the pivot and could not move. The owner saw that
+    # and said so -- "the head of the scepter doesn't move".
+    if head_px < MIN_TRAVEL_PX:
+        raise SystemExit(
+            "siphon-%s: the sceptre HEAD travels %.2f screen px at its worst "
+            "bearing, under the %.1f this gate demands. A staff whose head is "
+            "still while its handle swings is the defect the owner reported; "
+            "the head is the ring, the ring is the beam origin, and it is "
+            "supposed to be carried. Do not lower this number."
+            % (tier, head_px, MIN_TRAVEL_PX))
+    if tail_px < MIN_TRAVEL_PX:
+        raise SystemExit(
+            "siphon-%s: the sceptre BUTT travels %.2f screen px, under %.1f"
+            % (tier, tail_px, MIN_TRAVEL_PX))
+    return head_px, tail_px, span0
 
 
 def audit(tier, model, origins):
