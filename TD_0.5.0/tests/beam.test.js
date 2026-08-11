@@ -244,25 +244,34 @@ test("progressFraction reports how far along the current charge it is", function
 // ---------------------------------------------------------------------------
 group("gold income");
 
-test("the beam earns the same rate as every other damage source", function (t) {
-  // Not the spec's suggested 1/200: a beam that paid 1/200 was earning ~8 gold
-  // for 1500 damage while a gunner beside it earned 1500.
+test("the A3 charge bonus is priced off baseGoldPerDamage, which is a unit and not income", function (t) {
+  // baseGoldPerDamage is NOT income and never reaches the wallet. It is the
+  // UNIT the A3 charge multiplier is priced in: settleEconomy banks
+  // `earned - baseIncome`, i.e. only the extra the charges bought.
   //
-  // NOTE (2026-07-30): this used to be "the same rate as CASH_PER_DAMAGE" and no
-  // longer is -- the economy revamp took CASH_PER_DAMAGE to 3 and left this at 1.
-  // The beam's BASE income is unaffected: the game loop pays that at
-  // CASH_PER_DAMAGE like every other tower's. What shrank is the A3 charge
-  // BONUS, which is derived from this number. Flagged in AGENTS.md rather than
-  // silently re-pegged here, because the multiplier's size is the owner's call.
+  // The old name and note here claimed the beam "earns the same rate as every
+  // other damage source" at CASH_PER_DAMAGE. Both halves are gone: there is no
+  // CASH_PER_DAMAGE any more, and no tower earns anything for damage -- the
+  // economy is a bounty per kill. This test stayed green through all of it
+  // because it requires the pure modules and never boots a game, so it can
+  // only ever see arithmetic, never the banking decision.
+  //
+  // Verified at runtime 2026-08-11 against a booted game, reading `cash`:
+  // wallet delta == bonus in every trial and == earned in none; with A3 unbought
+  // the Siphon banks nothing at all; and changing this number 1 -> 7 scaled the
+  // payout 10 -> 70, which is what makes it live rather than a fossil.
+  //
+  // The assertion below cannot go vacuous: with the flag off the bonus is
+  // baseIncome - baseIncome = 0 BY CONSTRUCTION rather than by tuning.
   var withoutA3 = resolved(0, 0).mechanics.charge_to_gold;
   t.eq(withoutA3.baseGoldPerDamage, 1,
-    "base rate is 1 -- deliberately NOT re-pegged to CASH_PER_DAMAGE yet");
+    "the unit the charge multiplier is priced in");
 
   var withA3 = resolved(3, 0).mechanics.charge_to_gold;
-  t.eq(withA3.baseGoldPerDamage, 1, "A3 does not change the base rate");
+  t.eq(withA3.baseGoldPerDamage, 1, "A3 does not change the unit either");
 });
 
-test("A3 multiplies that income rather than replacing it", function (t) {
+test("A3 scales the bonus with charges, and banks only the part the charges added", function (t) {
   var params = resolved(3, 0).mechanics.charge_to_gold;
   var m = new ChargeMeter(params);
 
@@ -273,8 +282,11 @@ test("A3 multiplies that income rather than replacing it", function (t) {
   var multiplier = m.goldMultiplier(params.perCharge, params.capTotal);
   t.near(multiplier, 2.0, 1e-9, "1 + 2 charges x 0.5");
 
+  // `earned` is a real intermediate in settleEconomy, but it is NOT what the
+  // wallet receives -- the bonus is. At x2 the player banks 1459, not 2918.
   var earned = damage * params.baseGoldPerDamage * multiplier;
-  t.near(earned, 2918, 1e-9, "1459 damage at x2 is 2918 gold, not 8");
+  t.near(earned, 2918, 1e-9,
+    "1459 damage at x2 banks 1459 of BONUS -- earned(2918) minus base(1459)");
 });
 
 test("with no charges the multiplier is exactly 1, so income is unchanged", function (t) {

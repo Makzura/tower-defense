@@ -301,8 +301,8 @@ function boot(mapId) {
     //
     // Pinning it at the old 5 s is not the tests dodging the change. Wave
     // spacing is a PACING choice the player makes with the skip button, and it
-    // is orthogonal to everything these tests are about -- income is $1 per
-    // point of damage and never a trickle per second, so the economy is
+    // is orthogonal to everything these tests are about -- income is a fixed
+    // bounty per kill and nothing per second, so the economy is
     // identical either way. Holding the pacing fixed is what leaves the route,
     // the tower count or the unit length as the only variable, and it keeps
     // these figures comparable with the ones recorded before 2026-07-29.
