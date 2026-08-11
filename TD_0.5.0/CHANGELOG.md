@@ -97,7 +97,8 @@ opposite. The lesson is the general one: an isolation without a null control is
 not an isolation.
 
 **2026-08-12 — twelve corrections in `AGENTS.md`, seven of them the same dead
-cash rule, and this file put back into date order.**
+cash rule; this file put back into date order; and nine mirroring source
+comments found and routed.**
 
 Documentation only. No game code, test, asset or generator was touched, and
 nothing below implies a balance change. Each correction names the symbol or the
@@ -124,15 +125,31 @@ nothing else, so that is what the row says. Path B has no rows at all, by the
 contract `siphon-beam-draw.js` states at `noteKeyMiss`, and pours from the
 static hands.
 
-**`spoutPoint` is not dead code, and the row does not call it that — but the
-gate is not the one it looks like.** `BeamTower.prototype.draw` opens with
-`VisualModels.draw("tower", BeamTower.ID + ":complete", ...)`, and nothing in
-the tree registers a `siphon:complete` model, so that call always returns false
-and gates nothing today. What decides is one level up, in `game.js`'s render
-loop: `World3D.isEnabled() && World3D.drawWorld(...)` replaces the entire 2D
-world layer, and only when that returns false does any tower's `draw(ctx)` run
-at all. The spout is therefore the live 2D origin on a path that still exists —
-a load with no WebGL — which is why the row keeps it instead of deleting it.
+**`spoutPoint` is neither dead nor live, and the row now says both halves.**
+Three people got one half each. It was called dead code; it was corrected to a
+live fallback; a runtime probe settled it at **zero calls to
+`BeamTower.prototype.draw` and zero to `spoutPoint` across five real draws in
+the shipping configuration**. Both descriptions were half right. It must be
+kept, because it is the Siphon's ONLY 2D origin — `js/skins/draw-pack.js`
+registers `longshot:` and `soldier:` bodies and nothing at all for `siphon`,
+`smasher` or `blub` — and it must not be read as live, because
+`World3D.drawWorld` replaces the entire layer that would call any tower's
+`draw()`. The row carries both clauses; describing it as "the fallback when a
+skin is missing" understates it and describing it as live overstates it.
+
+**The gate is `World3D`, not the `:complete` line, and the reasoning that got
+me there was wrong.** `BeamTower.prototype.draw` opens with
+`VisualModels.draw("tower", BeamTower.ID + ":complete", ...)`, and I argued it
+gates nothing because nothing registers a `siphon:complete` model. That is
+false. `js/visual-models.js`'s `renderer()` returns
+`group[id] || group["*"] || null`, and the file's own header describes `*` as a
+category-wide fallback "so a complete skin pack can replace every enemy or map
+at once" — a pack registering `tower` → `*` lights up all four `:complete`
+sites, the Siphon's included. **Nothing registering it today is not the same as
+it gating nothing**, and that reasoning is deliberately kept out of the
+document: a reader who inherits it eventually deletes an extension point. The
+outer gate really is `World3D.isEnabled() && World3D.drawWorld(...)` in
+`game.js`'s render loop, which is what the row cites.
 
 **`sizeScale`'s "(0.55 swarm … 1.8 midboss)" was the only ellipsis-as-range in
 that table, and 1.8 is not the maximum.** Enumerated from `Enemy.TYPES` in a
@@ -275,6 +292,73 @@ entry below cited the spout figure as `AGENTS.md:4356`; it now cites the
 pass, and it moved again while this entry was being written — drift inside a
 single session, which is the entire argument for the rule. A phrase survives an
 edit above it; a line number does not.
+
+**THE MIRROR SWEEP: nine source comments that still generate the errors this
+document was repaired of. Found, not fixed — a documentation pass does not
+touch game code.** Run as ONE search rather than as separate bugs: for every
+number the 2026-08-12 pass corrected in `AGENTS.md`, grep `js/`, `tests/` and
+`tools/` for the OLD value. It is the `spoutPoint` spout defect repeated — the
+document got fixed and the comment that generated the error kept generating it.
+Each is given as file plus the PHRASE that locates it, because line numbers in
+these files move as fast as they do in `AGENTS.md`.
+
+*The Tyrant, mirroring the boss roster row and the Tyrant section:*
+- `js/enemy.js`, the section banner "2500 HP, the slowest thing in the game" —
+  ships 5000. Number only; the rest of the banner is right.
+- `js/enemy.js`, in the `health: 5000` note: "the 200 point shield it conjures
+  there is unchanged -- so the phase is a smaller fraction of the fight than it
+  used to be, deliberately. The wall is what got bigger." **Wrong in reason AND
+  conclusion; it goes entirely.** The shield became 1000 on 2026-08-01, and the
+  phase block forty lines below says so in its own dated note — "A fifth of its
+  own health, conjured at the halfway line, is a wall", the exact opposite
+  reading. Repaired and unrepaired text in one block again. **Do not delete the
+  neighbouring clause "the roar still fires at half, which is now 2500" — that
+  2500 is half of 5000 and is CORRECT.** Two different 2500s, ten words apart.
+- `js/enemy.js`, "Its 2500 is meant to be a wall you grind, not a wall that
+  also taxes you" — number stale, conclusion (no armor, no defense, and why)
+  survives. Replace the figure, keep the sentence.
+- `tests/content.test.js`, `t.eq(phase.shield, 200, "gaining a 200 point
+  shield")` — asserts 200 against a shipping 1000. This is the test being
+  stale rather than the boss; the owner asked for 1000 in writing. Quality's,
+  not simulation's.
+
+*The Rifleman's $15, mirroring the price defect corrected in the build-bar
+section:*
+- `js/soldier.js`, its own file header: "The game's primary starter unit: $15".
+  `Soldier.COST` is 300. The same header adds "the gunner is untouched and
+  still in the bar" — the gunner left the catalogue on 2026-07-30. The BURST
+  distinction the header exists to draw is correct and must survive both fixes.
+- `js/tower.js`, "losing one is a $15 lesson rather than a disaster" —
+  `Tower.COST` is 100.
+- `js/towers/long-range-dps.config.js`, the CAVEAT block: "the schedule is 35
+  waves / 13 498 effective HP, and the economy revamp took income to $3 per
+  damage, which puts a full run's purse near $42 400". **Three dead figures in
+  one sentence** — 25 969 effective, no per-damage income since 2026-07-31, and
+  an authored purse of $36 204. **Its conclusion survives and must be kept:**
+  "These prices are payable now. A full path A ($20 250 all in) fits inside ONE
+  run." Verified — the path A tiers are 300/500/850/3800/13900 on a $900 base,
+  $20 250 all in, against $36 204. The margin is smaller than the sentence
+  implies but the claim holds.
+
+*Correct, and listed so nobody sweeps them up with their neighbours:*
+- `js/meta.js`, "The old $15 Rifleman hid this mistake behind the $20 fallback"
+  — says "old", correctly scoped, leave it.
+- `js/towers/long-range-dps.config.js`, "the gunner's rate of $15 per DPS" —
+  this describes the model AS BUILT and the same block already records that the
+  peg moved to $100/DPS. Self-aware, not stale.
+- `tests/harness.js`, the `meter:` note ending "the cash delta stopped being a
+  damage meter the moment bounties replaced `CASH_PER_DAMAGE`" — current and
+  correct. Its neighbour twelve lines up, justifying the wave-break pin with
+  "income is $1 per damage", is the dead one — and **the pin itself stays**: a
+  dead rationale whose conclusion is still true. Deleting a true conclusion
+  because its reasoning rotted does more damage than the fossil did.
+
+*Not mine to list further:* `js/game.js` is simulation's and already queued
+there — the wave-35 header's four wrong Tyrant figures, the `BUILD_SLOTS` note
+claiming a fresh profile owns the gunner, the build-bar order "($15, $200, $75,
+$800, $15)" against a shipping $700/$900/$800/$300/$450, and the sell-refund
+illustration "a $15 gunner gives back $8" whose rounding rule survives its
+example.
 
 **Two things noted and deliberately NOT fixed.** This file's header says
 "Newest at the top" and there are older violations further down: a
