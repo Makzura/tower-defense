@@ -215,6 +215,48 @@ BeamTower.prototype.canHold = function (enemy) {
   );
 };
 
+// TURN TO FACE WHAT HE IS DRAINING.
+//
+// Aimed at the CENTROID of the held locks, not at the first one, because the
+// beams fan to all of them and facing one of five reads as facing away from the
+// other four. This is the same quantity siphon-ritual.js's aimDirection()
+// points the ritual circle at, deliberately: body and circle turn together, so
+// the disc stays square to his chest instead of drifting off it.
+//
+// RATE-LIMITED at the ritual's own slew, and HELD when nothing is locked.
+// Both matter and both are the same lesson the ritual circle's latch records.
+// A Siphon re-acquires many times a second on a moving group; snapping `aim`
+// straight to the new centroid the way Soldier and Smasher do would make the
+// body flick between headings several times a second. Holding the last facing
+// through a gap -- rather than springing back to a rest angle -- is what keeps
+// a lock that drops and is retaken from spinning him.
+//
+// The beam and ritual origins need no change to follow this. Both already
+// transform their authored origin by `tower.aim + SIPHON_YAW`
+// (siphon-ritual.js originWorld, siphon-beam-draw.js originWorld); `aim` was
+// simply always 0. Turning the body therefore carries the hands, the ring and
+// the circle around with it by construction.
+BeamTower.SLEW_RAD_PER_SEC = 3.2;         // == siphon-ritual.js SLEW_RAD_PER_SEC
+
+BeamTower.prototype.faceLocks = function (dt) {
+  var live = this.visibleLocks();
+  var n = live.length;
+  if (!n) return;                         // nothing to face: hold, do not spring back
+
+  var cx = 0, cy = 0;
+  for (var i = 0; i < n; i++) { cx += live[i].pos.x; cy += live[i].pos.y; }
+  var want = Math.atan2(cy / n - this.y, cx / n - this.x);
+
+  var cur = (typeof this.aim === "number" && isFinite(this.aim)) ? this.aim : want;
+  var d = want - cur;
+  while (d > Math.PI) d -= Math.PI * 2;   // turn the short way round
+  while (d < -Math.PI) d += Math.PI * 2;
+
+  var cap = BeamTower.SLEW_RAD_PER_SEC * (dt > 0 ? dt : 0);
+  if (d > cap) d = cap; else if (d < -cap) d = -cap;
+  this.aim = cur + d;
+};
+
 // Keep what is already held, then fill the free slots.
 //
 // Existing locks are NEVER re-sorted or dropped for a "better" target. The
