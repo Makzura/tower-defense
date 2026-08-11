@@ -13,6 +13,194 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the three source comments that stated the same false facts
+`AGENTS.md` had just been repaired of.**
+
+Comments only. No behaviour changed, and the whole diff across both files is
+lines beginning `//` — verified by filtering the commit's diff for a single
+changed line of code and finding none. The documentation pass above fixed the
+document; this fixes the place the document got it from, because a source
+comment that lies is worse than no comment: it reads as measured, and it gets
+copied into `AGENTS.md` as though it were.
+
+**`js/towers/beam-adapter.js` — the Siphon spout said 0.62 and the code does
+0.86.** The comment above `spoutPoint` claimed 0.62 was as tall as the water
+column could go "before the tower stops reading as a round basin", and that
+"taller was tried and looked wrong". The line under it has shipped
+`footprintPx * 0.86` throughout — taller than the ceiling the comment declared,
+so the rationale was not merely a stale number but inverted. This is the origin
+of the wrong figure that reached `AGENTS.md`; that table now reads 0.86
+(`AGENTS.md:4356`) and so does the comment. **The unverifiable aesthetic claim
+was dropped rather than re-attached to 0.86** — restating a rationale nobody can
+check is how the first one survived. What replaces it is checkable: the number,
+the 8 px lift, the 15 u.l. footprint it was judged against, and the fact that
+the same 0.86 is written a second time where `draw()` builds the column, so the
+two must move together or the beams leave from mid-air.
+
+**`js/enemy.js` — "four UNSCHEDULED types" describes four scheduled types.**
+The section header claimed "NONE of these four appears in WAVES". All four do,
+on all three difficulties: in `EASY_WAVES`, Shieldbearer wave 27, Camo Heavy 28,
+Healer 32, Vanguard 34 (`js/game.js:349`, `:365`, `:415`, `:443`); Normal and
+Hard inherit those and add more. The same block also claimed the coverage test
+"now demands instead that every SCHEDULED type be reachable" — it demands both
+directions, and its name says so: `every enemy type is scheduled, and every
+scheduled type exists` (`tests/run.js:471`), which passes. Nothing carries
+`sandboxOnly` any more, so the "type with an empty wave list" the comment
+described does not exist either. Rewritten to state the four wave numbers, the
+real contract the test enforces, and the fact that of the three `support`
+blocks two act on other bodies while the Vanguard's is `pick: "self"`
+(`js/enemy.js:1456`) — the old line called all three abilities that "act on
+OTHER enemies".
+
+**`js/enemy.js` — the midboss arrives at wave 11, not wave 9.** Its only
+appearance is wave 11 on every difficulty (`js/game.js:246`), one body on Easy
+and two on Normal and Hard. Corrected, and the row now also records that the
+schedule overrides the type's 250 HP *upwards* — 420 on Easy — so the figures in
+the type block are read as its floor rather than as what walks in. The 250 is
+still right where it sits (`tests/content.test.js:190` asserts it) and the "250
+against a 100 HP base ends the run" reasoning still holds: `BASE_MAX_HP` is 100
+and a leak subtracts the body's remaining health (`js/game.js:2552`).
+
+**Suites unchanged, compared by failure NAME.** 105/3, 182/30, beam 45/0, blub
+53/0, long-range-dps 70/1, sandbox 2 failed. The 36 failures are the same 36:
+three Arcane Sniper B5 / AoE-impact tests in `run.js`, the Tyrant and
+Soldier/Longshot panel groups in `content.test.js`, `ConfiguredTower gates the
+ability behind the B5 flag`, and the two sandbox ability-click smokes. None of
+them is near a schedule, a spout or a midboss.
+
+**2026-08-12 — the Siphon's cords are occluded by the bodies in front of them,
+and the body's animation frame is derived in exactly one place.**
+
+Two changes in `js/gl/siphon-beam-draw.js` and `js/gl/gl-world.js`. Nothing in
+`update()` was touched and no property the simulation reads was added.
+
+**The cords used to be visible through everything.** The owner's words: "the
+siphon's passive rays are seeable through everything, other towers included."
+Structurally so — they are painted in `drawOverlays` on the 2D canvas stacked
+over the WebGL one, and that canvas has no depth buffer, so everything on it is
+drawn over the whole board by construction.
+
+Fixed with screen-space occluders plus the depth `project` has always returned
+and this file always discarded (`gl-camera.js:252` sets `out.depth = w`). One
+flat-capped capsule per tower and per enemy, from its feet to the top of its
+own model, and a polyline that splits into visible spans. Every layer respects
+the same spans — halo, ripen bands, body, rim, core, knots and the intake bell —
+because a cord whose core is clipped while its halo still glows through a tower
+photographs as fixed. Three alternatives were compared and rejected, and the
+reasons are written into the file so they are not relitigated: moving the cords
+into the GL pass means streaming buffers and a blend mode on a STATIC_DRAW
+renderer and still loses the halo and rim that keep the non-emissive states
+legible; WebGL cannot read a depth buffer; and `readPixels` is measured at
+3.6–7.1 ms a call in `js/gl/tower-preview.js`.
+
+**Two things the reference implementation in `js/gl/siphon-ground.js` gets
+wrong, which this deliberately does not inherit.** That module is dead code —
+in no script tag, referenced by nothing — which made it a free reference, but
+it is a reference for a decal lying on the ground, not for a cord.
+
+- *It compares against the occluder's BASE depth.* Fair only when the sample is
+  also at z = 0. Depth is `w`, so bigger is farther, and under this camera's
+  downward pitch a higher point is NEARER: measured at the Siphon's own footing,
+  z = 0 → 175.24, z = 30 → 158.30, z = 60 → 141.36. A tower's feet are the
+  farthest point of its own body, so a cord crossing its chest compares against
+  the feet, comes out smaller, is judged "in front" and draws straight through —
+  through most of the tower. **A verification that sampled near the feet would
+  have passed while the visible half of the defect stood untouched.** Here the
+  compare is made at the sample's own height, which is exact rather than
+  interpolated because `w` is affine in world position: `175.24 − 0.5647·z`
+  reproduces all three measurements, where interpolating by screen y is out by
+  5% at mid-body.
+- *It guesses the crown* (`b0.y − 40`) and it gates on 70 px of world
+  proximity. The crown is now measured from the model's own `top` through new
+  `towerTop` / `enemyTop` helpers in `gl-world.js`, and there is no proximity
+  gate: on a 180 px cord it would exempt very nearly every occluder crossed.
+
+**The capsule has FLAT caps, and that was measured, not assumed.** Clamping the
+axis parameter before measuring — the usual capsule form — puts a dome of one
+full radius above the model's head. A cord passing a measured 26 px clear of a
+Smasher's crown was being hidden by a dome standing in for nothing, and it looks
+exactly like a success: the cord vanishes behind a tower, just not for the
+reason claimed.
+
+**The limitation, stated plainly and in the code beside the exemption it
+describes: this cannot hide a cord behind the CASTER'S OWN body.** The origin
+sits inside his own footprint, so every cord begins inside his own occluder and
+he must be exempt or every cord loses its root — the intake bell, which is the
+fattest part of the effect and carries the "it flows toward the tower" message.
+A cord that swings behind his own shoulder will draw over him. Nothing cheap
+fixes that; it needs per-pixel depth for one actor, which is the readback this
+approach exists to avoid. Every other tower, blub and enemy occludes him
+normally.
+
+**The animation frame now has one owner: `SiphonFXBeam.animFrame`.** suki is
+making the sceptre's ring — which is the beam's origin — move per frame, so
+`siphon-beam-draw.js` must read the origin for the frame `gl-world.js` actually
+draws the body at. Two copies of that clock drift the moment either is tuned,
+and the symptom is a cord starting a few pixels off the ring, which reads as a
+modelling fault and is not one. `gl-world.js` holds NO fallback copy of the
+formula: without the module the body holds frame 0, because the fallback copy is
+the one that would go stale.
+
+`_chanEase` is mutated per call and there are now at least two callers per
+rendered frame — the GL body pass and the overlay pass — so the step is memoised
+on the tower keyed by `now`. Measured over 20 rendered frames from rest with a
+lock held: ease 0.709894, which is `1 − 0.94²⁰` exactly; a double step would
+give 0.915838. A paused game holds `now` and therefore holds the frame, which is
+what the beam already does.
+
+**`originPoint(tower, frame)` reads `SiphonBeamSpec.originFrames`,** indexed by
+`bodyKey()` — a mirror of `gl-world.js:377 siphonGroup()`, not a re-derivation
+from `tiers(tower).a >= 3`, because the origin table is per BODY and an a4 body
+read against a3's row is wrong in a way nobody spots by eye. With the table
+absent it is exactly the old static HANDS/RING behaviour, so the tree runs while
+the generator is mid-flight. That fallback is also perfect camouflage for a key
+miss, so: an a-tier or base miss warns once naming the key and the keys the
+table does have, a b-tier miss is silent by contract (the b bodies come from
+`siphon_abyss.py`, which never writes the origins file, and a B-path Siphon
+pours from the hands), a table/model frame-count disagreement is clamped AND
+reported rather than absorbed, and `originAnimated()` is exported so a test can
+assert which of the two it just measured.
+
+**Verified by driving the real game and reading pixels back**, per the rule in
+`AGENTS.md`. An A5 Siphon (`column`: gold `#C9A227`, core `white_warm`
+`#F0E2C0`) with one lock, a Smasher moved between "in front of the cord" and
+"behind the cord", at 1280×720:
+
+- *Occluder in front.* At the cord pixel (682, 245), 11×11: with occlusion off
+  98/121 pixels match an authored cord colour, the closest being (240, 227, 193)
+  at distance 1 from `white_warm`; with occlusion on, 0/121, closest 161, centre
+  (80, 92, 122) — the Smasher's body. All 121 differ. The same pair with the
+  blocking tower present versus absent gives the same answer, so it is not the
+  flag doing it.
+- *Every layer, not just the core.* Over a 704-pixel region inside the occluded
+  stretch, the frame drawn with occlusion on is BIT-IDENTICAL to a frame in
+  which the beam module drew nothing at all (0/704 differ, max delta 0), while
+  the same region with occlusion off differs from it in all 704 pixels at a max
+  channel delta of 234. No halo, rim, knot or bell leaks through.
+- *The negative case, because over-occluding photographs as success.* With the
+  Smasher moved behind the cord and its screen box still covering it (three cord
+  samples inside the box), occlusion on and off are identical over 512 pixels
+  (0 differ) and 479/512 match an authored cord colour. Nothing is hidden that
+  should not be.
+- *The frame index, as a sequence.* Over 150 consecutive rendered frames the
+  frame `gl-world` drew the body at and the frame `siphon-beam-draw` read the
+  origin at agreed on every single one (0 mismatches), both off the same `now`,
+  running 1→24 and wrapping — the right order, not merely plausible stills.
+
+**One thing that turned out to be a different bug, reported and NOT fixed
+here.** `js/gl/siphon-ritual.js` discards the origin the beam module hands it.
+`plan()` installs it at :660–662 — its comment says "the beam module's own
+origin is authoritative when it hands one over" — and three lines later
+`advance()` calls the ritual's OWN static `originWorld` at :466, overwriting
+`rec.ox/oy/oz` from a third private copy of the HANDS/RING derivation
+(:374–380) that has no frame parameter. It is invisible today because both
+compute the same static point. Measured with a synthetic per-frame table
+injected at runtime: over 26 rendered frames the origin handed to `plan()` moved
+47 world px while the cord root actually drawn stayed at z = 58, range 0. So the
+moment the per-frame table lands, every cord root and the ritual circle stay
+welded to the static point while the ring moves. That file was not in scope for
+this change and is untouched.
+
 **2026-08-12 — a documentation repair pass over `AGENTS.md`, and eight missing
 change log entries reconstructed.**
 
