@@ -82,6 +82,21 @@
 # modelled (`_weld`). The ring is the beam origin from A3, at the socle's RING.
 # It gains a second concentric circle at A4 and a third at A5, deliberately
 # MISALIGNED. The ring never rotates; the beam rotates inside it.
+#
+# THE SHAFT IS HELD AT HIS SIDE AND IT IS OFF THE CENTRELINE. It used to run
+# through the palm and out through his hip, because the ring is outboard of the
+# hand and any straight line through both dives across the body -- the block
+# above `_sceptre_axis` has the arithmetic and the warbringer's recorded lesson.
+# It now hangs plumb under the ring, outside the cloth the whole way down, and
+# `penetration` FAILS THE BUILD if any part of it is ever inside him, on any
+# frame. That check is the second thing this file measures rather than trusts,
+# and like the 360 test it is worth what it rejects: run it against the shaft it
+# replaced and all three tiers are refused.
+#
+# IT MOVES, four frames, keyed on an empty. A slow settle, never a swing -- this
+# tower channels a continuous beam. The shaft turns about the point where it
+# meets the ring, so the head cannot leave the rim; the RINGS are not in the
+# animated group at all, so the beam origin is structurally incapable of moving.
 # WHAT THE TEST AT THE BOTTOM IS WORTH. Run against the thing the brief names as
 # the lazy reflex -- a td.frustum robe with a td.ball on top -- it returns 1.000
 # on both halves, because a surface of revolution really does give the identical
@@ -237,6 +252,10 @@ def _shell(s, name, rings, mat_ridge, mat_fold, depth, parent, fold_at=0.5):
                         else mat_ridge)
     m = s.add(td.Mesh(name, verts, faces, mat_ridge, parent))
     m.face_mats = mats
+    # The ring stack, kept for `penetration`: a loft is a SHELL, and one AABB
+    # round the whole of it is a slab of mostly air. Given the rings the check
+    # can rebuild the solid wedge by wedge instead. See `_cloth_solids`.
+    m.loft = rings
     return m
 
 
@@ -253,7 +272,14 @@ def _cap(s, name, ring, mat, parent, down=True):
     for i in range(n):
         j = (i + 1) % n
         faces.append((0, 1 + j, 1 + i) if down else (0, 1 + i, 1 + j))
-    return s.add(td.Mesh(name, verts, faces, mat, parent))
+    m = s.add(td.Mesh(name, verts, faces, mat, parent))
+    # A LID, not a volume. `penetration` skips these: a cap closes the end of a
+    # loft whose interior the wedges already cover, so it would add nothing but
+    # a wide flat AABB -- and the shoulder cap's AABB, being a 0.5-wide disc,
+    # reaches far enough in y to collide with the a5 outer ring and report a hit
+    # that is not there.
+    m.is_lid = True
+    return m
 
 
 # ---------------------------------------------------------------------------
@@ -641,10 +667,123 @@ DIGITS_R = [
     ((0.016, 0.294, 1.036), (0.024, 0.278, 1.108)),
 ]
 
-# The sceptre, A3+. It runs THROUGH the welded palm, so the shaft is not a thing
-# he grips -- the hand is on the line of it.
-SCEPTRE_JOIN = (0.246, 0.395, 1.121)       # the ring's lower-left, in its plane
-SCEPTRE_BUTT = (-0.013, 0.178, 0.940)
+# ---------------------------------------------------------------------------
+# THE SCEPTRE, A3+, AND WHY IT IS NOT ON THE LINE HAND -> RING.
+#
+# WHAT WAS WRONG, measured before anything moved. The shaft used to run from a
+# butt at (-0.013, 0.178, 0.940) up THROUGH the welded palm to the ring, on the
+# reasoning that "the hand is on the line of it". That butt is 0.137 from the
+# robe's own axis at a height where the cloth is 0.171 out, so the bottom half
+# of the shaft was inside the man: run the check below against that geometry and
+# it rejects all three tiers with "shaft_0 in robe_torso", 0.011 deep after
+# 0.020 of slack, i.e. 0.031 of raw overlap. In game it read exactly as the
+# owner reported it -- the shaft left the ring, reached the hand and vanished
+# into the cloth, so the sceptre was "hidden inside him".
+#
+# WHY IT COULD NOT BE NUDGED. This is geometry, not a bad number. RING is
+# frozen at (0.315, 0.395, 1.190) and PALM_L is at (0.130, 0.298, 1.040): the
+# ring is 0.185 OUTBOARD of the hand and only 0.150 above it. Any straight line
+# through both, continued downward, therefore rakes hard back across the body --
+# extend it and it is at x = -0.080 by z = 0.824 and x = -0.36 by z = 0.62,
+# which is through his hip and out the far side. Every straight shaft that
+# passes through the palm is inside him. Tilting it only picks which organ.
+#
+# This is tower_warbringer.py's recorded lesson arriving a second time. Its
+# note on the A4/A5 rest pose says a two-handed weapon at rest belongs OFF the
+# centreline, because on the model's own axis it will pass through the torso in
+# some pose whatever the numbers say -- its first haft ran "from behind his
+# shoulder to the ground in front at y = -0.02, which is straight through his
+# chest and hips". `_SIDE` put that weapon out past the ribs. This is the same
+# fix: the shaft comes off the centreline and stays off it.
+#
+# WHERE IT WENT. The shaft hangs nearly PLUMB under the ring instead, dropping
+# from the ring's lower rim and raking out (+x) and back (-y) as it falls, so it
+# is outboard of the cloth the whole way down -- worst clearance is reported by
+# the build. The hand no longer has the shaft through it; the hand REACHES the
+# shaft at the top, which is where his fingers already were: at a3 the index
+# tip is at (0.293, 0.406, 1.136) and the shaft head is 0.060 away, closing to
+# 0.052 by a5 as `stiff` straightens the finger into it. That gap is the weld,
+# and the weld is modelled (`_weld`) because the brief makes the junction of
+# petrified flesh and metal a requirement.
+#
+# THE RING DID NOT MOVE. RING stays exactly (0.315, 0.395, 1.190), the socle's
+# frozen beam origin, asserted to 1e-6 by `audit` as it always was.
+# siphon_origins.json is unchanged -- the beam lot needs no edit.
+# ---------------------------------------------------------------------------
+
+RING_MAJOR = 0.098                         # the inner ring; spec[0] in _sceptre
+SCEPTRE_LEAN = (-0.090, 0.200, 0.976)      # up the shaft; normalised in _axis
+SCEPTRE_DROP = 0.560                       # the butt hangs this far below it
+SCEPTRE_SPLIT = 0.62                       # gold_dark below it, gold above
+
+
+def _sceptre_axis():
+    """(join, butt, up). `join` is ON the inner ring's circle, so the shaft
+    meets the ring rather than floating under it, and it is also the pivot the
+    attack sway turns about -- see SCEPTRE_SWAY."""
+    up = _norm(SCEPTRE_LEAN)
+    join = _add(RING, up, -RING_MAJOR)
+    butt = _add(join, up, -SCEPTRE_DROP)
+    return join, butt, up
+
+
+def _digit_tip(root, tip, stiff):
+    """Where a finger actually ends once `stiff` has straightened it. `_hand`
+    and `_weld` both need this and they must agree, or the weld slides off the
+    fingertip as the mineralisation climbs and the junction stops being one."""
+    t = _add(root, (tip[0] - root[0], tip[1] - root[1], tip[2] - root[2]),
+             1.0 + 0.30 * stiff)
+    return (t[0], t[1], t[2] + 0.045 * stiff)
+
+
+# ---------------------------------------------------------------------------
+# THE ATTACK. Four frames, the house norm, keyed on an EMPTY -- geometry ships
+# once in the group's local space and a frame is one 4x4, per td_mesh.build.
+#
+# THIS TOWER CHANNELS A CONTINUOUS BEAM, so there is no swing to animate and a
+# swing would be a lie about the mechanic: nothing is thrown, nothing recoils,
+# the thing just keeps pouring. What moves is a slow SETTLE of the shaft, the
+# weight of the metal rocking while the current runs through it.
+#
+# TWO THINGS PIN THE MOTION, and between them they decide everything:
+#
+#   * THE RING IS THE BEAM ORIGIN. js/gl/siphon-beam-draw.js reads RING out of
+#     siphon_origins.json, so if the ring moved the beam would come out of thin
+#     air beside it. The rings are therefore NOT in the animated group at all --
+#     they stay on `body` and are structurally incapable of moving. `audit`
+#     fails the build if a ring ever lands in an animated group, which is a
+#     stronger guarantee than a tolerance on a measured drift.
+#   * THE BRIEF SAYS THE RING NEVER ROTATES -- the beam rotates inside it. Same
+#     answer: leaving the rings out of the group satisfies both at once.
+#
+# So only the SHAFT and the WELD ride the group, and they turn about `join`, the
+# point where the shaft meets the ring's rim. Pivoting there means the head of
+# the shaft is the fixed point: it cannot part from the rim by construction, so
+# the sceptre never visibly detaches from the ring or from the beam. The travel
+# is all at the far end -- the butt swings, the head does not.
+#
+# The amplitude is chosen against the screen, not against taste. The figure is
+# ~57 px for 1.79 units, i.e. 31.8 px per unit, and the butt is 0.560 below the
+# pivot, so a peak of 0.106 rad (6.1 degrees) moves it about 0.059 units = 1.9
+# px. Under a degree and it is not there at all; past ten and a hanging staff
+# starts to read as a swing. `main` prints the measured butt travel so this is a
+# number rather than an opinion.
+ATTACK_FRAMES = 4
+SCEPTRE_SWAY = [(0.000, 0.000),            # rest -- what a frame-less runtime
+                (0.048, 0.026),            #         gets, so it must be right
+                (0.106, 0.010),
+                (0.052, -0.028)]           # (rx, ry) radians, about `join`
+
+
+def _sceptre_pose(node, frame):
+    """Turn the shaft about the join. A node's matrix is T(location)*R, i.e.
+    R*p + location, so to spin about a pivot C the location has to carry
+    C - R*C. Getting that wrong is what hangs a weapon a metre off the model."""
+    rx, ry = SCEPTRE_SWAY[frame % len(SCEPTRE_SWAY)]
+    pivot = _sceptre_axis()[0]
+    node.rotation = [rx, ry, 0.0]
+    spun = td.apply(td.trs((0, 0, 0), node.rotation), pivot)
+    node.location = [pivot[k] - spun[k] for k in range(3)]
 
 
 # --- the tier table ---------------------------------------------------------
@@ -921,9 +1060,7 @@ def _hand(s, body, lk, tag, palm, rot, digits):
                body)
     roots = []
     for n, (root, tip) in enumerate(digits):
-        t = _add(root, (tip[0] - root[0], tip[1] - root[1], tip[2] - root[2]),
-                 1.0 + 0.30 * stiff)
-        t = (t[0], t[1], t[2] + 0.045 * stiff)
+        t = _digit_tip(root, tip, stiff)
         thumb = n == 4
         taper(s, "digit_%s%d" % (tag, n), root, t,
               0.025 if thumb else 0.020, 0.017 if thumb else 0.013,
@@ -941,31 +1078,61 @@ def _hand(s, body, lk, tag, palm, rot, digits):
     return m
 
 
-def _weld(s, body, lk):
-    """THE JUNCTION. He does not hold the sceptre; the gold hand is welded to
-    it, and the seam has to be visible or the tier says nothing. A collar, a
-    bead of run metal and a torn lip of petrified flesh."""
-    at = (0.153, 0.294, 1.040)
-    td.box(s, "weld_collar", (0.068, 0.062, 0.048), at, (0.0, 0.5, 0.6),
-           "gold_dark", body)
-    td.box(s, "weld_lip", (0.052, 0.028, 0.036),
-           _add(at, (0.006, -0.030, 0.020)), (0.0, 0.4, 0.9), lk["palm"], body)
-    td.box(s, "weld_bead", (0.030, 0.026, 0.026),
-           _add(at, (0.030, 0.014, -0.020)), (0, 0, 0.3), "amber", body)
+def _weld(s, arm, lk):
+    """THE JUNCTION, and the brief makes it a requirement: he does not hold the
+    sceptre, the gold hand is WELDED to it, and the seam of petrified flesh and
+    metal has to be visible or the tier says nothing.
+
+    It sits where the hand and the metal actually meet, which is NOT the palm.
+    The block above _sceptre_axis has the arithmetic: the palm is 0.185 inboard
+    of the ring, the shaft hangs plumb under the ring, and the nearest the hand
+    ever comes to the metal is his index FINGERTIP against the shaft head just
+    below the rim. So the weld is built there and it is built as a bridge -- a
+    torn lip of flesh drawn out of the fingertip, a bead of run metal in the
+    seam, and a collar clamped round the shaft -- rather than as three pieces
+    floating near each other. It rides the animated group with the shaft; being
+    0.058 from the pivot it travels under a tenth of a millimetre, so the weld
+    stays welded through the sway."""
+    join, butt, up = _sceptre_axis()
+    tip = _digit_tip(DIGITS_L[0][0], DIGITS_L[0][1], lk["stiff"])
+    collar = _add(join, up, -0.058)
+    seam = _mid(tip, collar)
+    along, _n = _axis(tip, collar)         # +Z runs flesh -> metal
+    shaft_rot, _n = _axis(butt, join)
+    made = [
+        td.box(s, "weld_collar", (0.060, 0.056, 0.052), collar, shaft_rot,
+               "gold_dark", arm),
+        td.box(s, "weld_lip", (0.044, 0.030, 0.062), _lerp(tip, seam, 0.45),
+               along, lk["palm"], arm),
+        td.box(s, "weld_bead", (0.032, 0.028, 0.030), seam, along, "amber",
+               arm),
+    ]
+    return made
 
 
-def _sceptre(s, body, lk):
+def _sceptre(s, body, arm, lk):
     """NOT a weapon and NOT a point: a HOLLOW RING on a shaft, echoing the
-    cupped hands it replaces. The shaft runs THROUGH the welded palm. The rings
-    are concentric on the socle's RING and deliberately MISALIGNED -- A4 adds
-    the second, A5 the third. The ring never turns; the beam turns inside it."""
-    taper(s, "shaft_0", SCEPTRE_BUTT, (0.153, 0.294, 1.040), 0.019, 0.026,
-          "gold_dark", body, 5)
-    taper(s, "shaft_1", (0.153, 0.294, 1.040), SCEPTRE_JOIN, 0.026, 0.021,
-          "gold", body, 5)
-    _weld(s, body, lk)
+    cupped hands it replaces. The rings are concentric on the socle's RING and
+    deliberately MISALIGNED -- A4 adds the second, A5 the third.
+
+    WHAT RIDES WHAT. The shaft and the weld go on `arm`, the animated group, so
+    they can settle while he channels. The RINGS go on `body` and do not move:
+    the ring is the beam origin and the brief says it never rotates -- the beam
+    rotates inside it. Keeping them out of the group is what makes both true by
+    construction rather than by a tolerance.
+
+    Every piece here is marked `is_weapon`, which is how `penetration` below
+    tells the sceptre from the man."""
+    join, butt, up = _sceptre_axis()
+    split = _add(butt, up, SCEPTRE_DROP * SCEPTRE_SPLIT)
+    shaft = [
+        taper(s, "shaft_0", butt, split, 0.021, 0.025, "gold_dark", arm, 5),
+        taper(s, "shaft_1", split, join, 0.025, 0.020, "gold", arm, 5),
+    ]
+    for m in shaft + _weld(s, arm, lk):
+        m.is_weapon = True
     spec = (
-        (0.098, 0.020, (math.pi / 2 - 0.14, 0.10, 0.0), "gold"),
+        (RING_MAJOR, 0.020, (math.pi / 2 - 0.14, 0.10, 0.0), "gold"),
         (0.140, 0.015, (math.pi / 2 + 0.06, -0.17, 0.0), "brass"),
         (0.178, 0.012, (math.pi / 2 - 0.28, 0.22, 0.0),
          lk["glint"] or "gold_dark"),
@@ -973,8 +1140,9 @@ def _sceptre(s, body, lk):
     made = []
     for n in range(lk["rings"]):
         major, minor, rot, mat = spec[n]
-        made.append(td.torus(s, "ring_%d" % n, major, minor, RING, rot, mat,
-                             body, 8, 3))
+        m = td.torus(s, "ring_%d" % n, major, minor, RING, rot, mat, body, 8, 3)
+        m.is_weapon = True
+        made.append(m)
     return made
 
 
@@ -1049,6 +1217,10 @@ def build_body(tier, flat):
     root = s.node("root")
     fixed = s.node("world_fixed", parent=root, world_fixed=True)
     body = s.node("body", parent=root)
+    # The animated empty exists only where there is a sceptre to move. base, a1
+    # and a2 keep building exactly the frame-less models they always did.
+    arm = (s.node("sceptre", parent=root, animated=True)
+           if lk["sceptre"] else None)
 
     rings = _robe(s, body, lk)
     _hem_detail(s, body, lk, rings)
@@ -1058,13 +1230,205 @@ def build_body(tier, flat):
     pl = _hand(s, body, lk, "l", PALM_L, PALM_ROT_L, DIGITS_L)
     pr = _hand(s, body, lk, "r", PALM_R, PALM_ROT_R, DIGITS_R)
     _cowl(s, body, lk)
-    made = _sceptre(s, body, lk) if lk["sceptre"] else []
+    made = _sceptre(s, body, arm, lk) if lk["sceptre"] else []
     _pour(s, fixed, lk)
+
+    def pose(frame):
+        if arm is not None:
+            _sceptre_pose(arm, frame)
+
+    frames = ATTACK_FRAMES if arm is not None else 0
+    pen = penetration(s, pose, frames or 1)
+    gap = clearance(s, pose, frames or 1) if made else None
+    model = td.build(s, "siphon-" + tier, frames=frames,
+                     pose=pose if frames else None)
 
     origins = {"HANDS": _mid(_mean(pl), _mean(pr))}
     if made:
         origins["RING"] = _mean(made[0])
-    return td.build(s, "siphon-" + tier), s, origins
+    return model, s, origins, (pen, gap)
+
+
+# ---------------------------------------------------------------------------
+# IS THE SCEPTRE INSIDE HIM? Ported from tower_warbringer.py's `penetration`.
+#
+# THE REASON THAT CHECK EXISTS, in its own words: its first version compared
+# VERTEX to VERTEX and was worthless, because two boxes interpenetrate happily
+# with their corners far apart -- it reported a comfortable 10 mm of clearance
+# while a haft ran through a man's chest. Distance between vertices is not
+# distance between solids. So it tests solids as BOXES, per part, per frame, and
+# fails the build on overlap. That is what is ported here, and it is what turned
+# "the shaft looks like it might be in the robe" into 0.034.
+#
+# TWO THINGS HAD TO CHANGE ON THE WAY OVER, and both are about shape. The
+# warbringer is built out of compact primitives, so a box round each part is a
+# fair likeness of it. Neither solid here is compact:
+#
+#   * THE ROBE IS A LOFT, not a primitive. One AABB round it is a 1.3-wide slab
+#     of mostly air and would fail a sceptre held cleanly at arm's length. So
+#     the cloth is decomposed into one box per (band, sample) WEDGE, each
+#     spanning from the two ring centroids out to its own quad. The wedge lies
+#     inside the convex hull of those six points, so its AABB CONTAINS it: the
+#     cover is an over-estimate of the cloth and never an under-estimate, which
+#     is the direction a safety gate has to err in. A pass is a real pass.
+#   * THE SHAFT IS A LONG DIAGONAL ROD, and its own AABB is mostly air too --
+#     the identical blunder pointing the other way, which reports a hit that is
+#     not there. Measured: the shaft's whole-mesh box misses the skirt's band-1
+#     wedges by 0.004, which is luck, not clearance. So each weapon face is cut
+#     into 4x4 patches before it is boxed. It costs no triangles; the
+#     subdivision exists only in this check.
+#
+# EXCLUDED, AND ONLY THIS: the left hand -- palm, digits, nails, the A2 hinge.
+# The brief has the gold hand WELDED to the metal, so the hand and the weld are
+# SUPPOSED to occupy the same space, and a check that failed on them would be
+# measuring the requirement rather than the defect. Nothing else is exempt:
+# cloth, cowl, arms, sleeves, sash, coins, foot and the gold pour are all off
+# limits to the sceptre, and so is the RIGHT hand, which has no business
+# touching it.
+# ---------------------------------------------------------------------------
+
+_TOUCHABLE = ("palm_l", "digit_l", "nail_l", "hinge_l", "hinge_plate_l")
+
+PEN_SLACK = 0.020                          # touching is fine, sinking in is not
+PEN_PATCH = 4                              # weapon faces cut PATCH x PATCH
+
+
+def _aabb(points):
+    return ([min(p[k] for p in points) for k in range(3)],
+            [max(p[k] for p in points) for k in range(3)])
+
+
+def _cloth_solids(mesh, matrix):
+    """A loft, wedge by wedge. Each box holds one quad of the shell plus the
+    centroids of the two rings it spans -- that is the solid slice of cloth
+    behind that quad, and boxing its six corners can only over-state it."""
+    rings = mesh.loft
+    out = []
+    for k in range(len(rings) - 1):
+        lo_r, hi_r = rings[k], rings[k + 1]
+        n = len(lo_r)
+        pair = []
+        for ring in (lo_r, hi_r):
+            c = tuple(sum(p[a] for p in ring) / n for a in range(3))
+            pair.append(td.apply(matrix, c) if matrix else c)
+        for i in range(n):
+            j = (i + 1) % n
+            pts = [lo_r[i], lo_r[j], hi_r[i], hi_r[j]]
+            if matrix:
+                pts = [td.apply(matrix, p) for p in pts]
+            out.append(("%s[%d,%d]" % (mesh.name, k, i), _aabb(pts + pair)))
+    return out
+
+
+def _patch_boxes(mesh, matrix):
+    """The weapon side, face by face, each face cut into PATCH x PATCH. Every
+    face on the sceptre is planar, so bilinear interpolation of its corners
+    stays on the face and the patch AABBs cover it.
+
+    FAN FIRST, and this was a bug in the first version of this function. A
+    frustum's end caps are n-gons -- `taper(..., verts=5)` gives pentagons --
+    and reading four corners off a pentagon quietly drops the region near the
+    fifth, which means the check could MISS a penetration. Under-covering the
+    weapon is the one error this whole file cannot afford, so anything that is
+    not a quad is fanned into triangles and each triangle is covered as a
+    degenerate quad."""
+    verts = [td.apply(matrix, v) for v in mesh.verts] if matrix else mesh.verts
+    k = PEN_PATCH
+    out = []
+    for face in mesh.faces:
+        p = [verts[i] for i in face]
+        quads = [p] if len(p) == 4 else [
+            [p[0], p[t], p[t + 1], p[t + 1]] for t in range(1, len(p) - 1)]
+        for q in quads:
+            for a in range(k):
+                for b in range(k):
+                    corners = []
+                    for (du, dv) in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                        u, v = (a + du) / k, (b + dv) / k
+                        corners.append(_lerp(_lerp(q[0], q[1], u),
+                                             _lerp(q[3], q[2], u), v))
+                    out.append(_aabb(corners))
+    return out
+
+
+def penetration(scene, pose, frames):
+    """Worst (depth, who) per frame. Zero means the sceptre is outside him."""
+    weapon = [m for m in scene.meshes if getattr(m, "is_weapon", False)]
+    body = [m for m in scene.meshes
+            if not getattr(m, "is_weapon", False)
+            and not getattr(m, "is_lid", False)
+            and not any(k in m.name for k in _TOUCHABLE)]
+    out = []
+    for f in range(frames):
+        pose(f)
+        mats = {}
+        for m in scene.meshes:
+            key = id(m.parent)
+            if key not in mats:
+                mats[key] = m.parent.matrix_world() if m.parent else None
+        # The sceptre group's rest matrix is the identity (SCEPTRE_SWAY[0] is
+        # all zeros), so a mesh's authored world verts pushed through the node's
+        # current matrix land where that frame actually draws them.
+        solids = []
+        for b in body:
+            mx = mats[id(b.parent)]
+            if getattr(b, "loft", None):
+                solids.extend(_cloth_solids(b, mx))
+            else:
+                pts = [td.apply(mx, v) for v in b.verts] if mx else b.verts
+                solids.append((b.name, _aabb(pts)))
+        worst, who = 0.0, ""
+        for m in weapon:
+            mx = mats[id(m.parent)]
+            pts = [td.apply(mx, v) for v in m.verts] if mx else m.verts
+            coarse = _aabb(pts)
+            fine = None
+            for name, bb in solids:
+                # Cheap reject on the whole part first; only the handful of
+                # solids that survive it pay for the subdivision.
+                if td.overlap(coarse, bb, PEN_SLACK) <= 0.0:
+                    continue
+                if fine is None:
+                    fine = _patch_boxes(m, mx)
+                for fb in fine:
+                    d = td.overlap(fb, bb, PEN_SLACK)
+                    if d > worst:
+                        worst, who = d, m.name + " in " + name
+        out.append((worst, who))
+    pose(0)
+    return out
+
+
+def clearance(scene, pose, frames):
+    """How much AIR is between the shaft and the cloth at its tightest, over
+    every frame. `penetration` proves the sceptre is not inside him; this says
+    whether it reads as CLEAR of him, which is the actual brief -- held at his
+    side, not grazing the robe. Measured between patch boxes and cloth wedges,
+    so it is the same decomposition and the two numbers are comparable."""
+    weapon = [m for m in scene.meshes if getattr(m, "is_weapon", False)]
+    cloth = [m for m in scene.meshes
+             if getattr(m, "loft", None) and not getattr(m, "is_lid", False)]
+    best = 1e9
+    for f in range(frames):
+        pose(f)
+        mats = {}
+        for m in scene.meshes:
+            key = id(m.parent)
+            if key not in mats:
+                mats[key] = m.parent.matrix_world() if m.parent else None
+        solids = []
+        for b in cloth:
+            solids.extend(_cloth_solids(b, mats[id(b.parent)]))
+        for m in weapon:
+            if not m.name.startswith("shaft"):
+                continue
+            for fb in _patch_boxes(m, mats[id(m.parent)]):
+                for _name, bb in solids:
+                    gap = max(max(fb[0][k] - bb[1][k], bb[0][k] - fb[1][k])
+                              for k in range(3))
+                    best = min(best, gap)
+    pose(0)
+    return best
 
 
 # ---------------------------------------------------------------------------
@@ -1238,6 +1602,69 @@ def _extent(model, group=None):
     return lo, hi, rad
 
 
+def _audit_sceptre(tier, model, scene, pen):
+    """The three things the sceptre can silently break, all checked rather than
+    trusted: it must not be inside him on ANY frame, the ring must be incapable
+    of moving, and the shaft head must stay on the ring."""
+    worst, who = max(pen, key=lambda p: p[0])
+    if worst > 0.0:
+        raise SystemExit(
+            "siphon-%s: the sceptre is INSIDE HIM by %.4f -- %s. Boxes, per "
+            "frame, per part; this is the check tower_warbringer.py added "
+            "after a vertex-to-vertex version reported 10 mm of clearance "
+            "round a haft that ran through a man's chest. Move the shaft OFF "
+            "the centreline, do not soften PEN_SLACK." % (tier, worst, who))
+
+    # THE RING IS THE BEAM ORIGIN, read out of siphon_origins.json by
+    # js/gl/siphon-beam-draw.js. If a ring ever picked up an animated ancestor
+    # a pose could move it, and the beam would leave from empty air beside it.
+    # Asked of the scene graph, because that is where the answer lives -- the
+    # flattened model has already thrown the parent chain away.
+    for m in scene.meshes:
+        if not m.name.startswith("ring_"):
+            continue
+        node = m.parent
+        while node is not None:
+            if node.animated:
+                raise SystemExit(
+                    "siphon-%s: %s hangs off the animated node '%s'. The ring "
+                    "is the frozen beam origin and the brief says it never "
+                    "rotates -- only the shaft below it may move."
+                    % (tier, m.name, node.name))
+            node = node.parent
+
+    names = [g["name"] for g in model["groups"]]
+    if "sceptre" not in names:
+        raise SystemExit("siphon-%s has a sceptre but no animated group for it"
+                         % tier)
+    if len(model["frames"]) != ATTACK_FRAMES:
+        raise SystemExit("siphon-%s shipped %d frames, not %d"
+                         % (tier, len(model["frames"]), ATTACK_FRAMES))
+
+    # Where every frame actually puts the shaft head and the butt. The head is
+    # the pivot, so its travel is a float-rounding artefact and nothing else;
+    # the butt's travel is the animation, and it is printed rather than claimed.
+    join, butt, _up = _sceptre_axis()
+    gi = names.index("sceptre")
+    head, tail = 0.0, 0.0
+    for frame in model["frames"]:
+        m = frame[gi]
+        if m is None:
+            raise SystemExit("siphon-%s: sceptre group has no matrix" % tier)
+        mm = [[m[c * 4 + r] for c in range(4)] for r in range(4)]
+        head = max(head, math.dist(td.apply(mm, join), join))
+        tail = max(tail, math.dist(td.apply(mm, butt), butt))
+    if head > 1e-4:
+        raise SystemExit("siphon-%s: the shaft head moves %.5f off the ring "
+                         "rim -- it must pivot AT the join or it detaches from "
+                         "the beam" % (tier, head))
+    if tail < 0.020:
+        raise SystemExit("siphon-%s: the sceptre travels %.4f, which is under "
+                         "a pixel at 31.8 px/unit -- the owner asked for it to "
+                         "move a bit while attacking" % (tier, tail))
+    return head, tail
+
+
 def audit(tier, model, origins):
     lk = LOOKS[tier]
     lo, hi, rad = _extent(model)
@@ -1311,12 +1738,16 @@ def main():
     total = 0
     base_rad = None
     exported = {}
-    print("  %-12s %5s %6s %6s  %-7s %-7s  %-7s %-7s %s"
+    print("  %-12s %5s %6s %6s  %-7s %-7s  %-7s %-7s %-6s %-6s %s"
           % ("model", "tris", "height", "radius", "quarter", "mirror",
-             "cowl q", "cowl m", "360"))
+             "cowl q", "cowl m", "in-him", "gap", "360"))
+    sceptre_rows = []
     for tier in TIERS:
-        model, _scene, origins = build_body(tier, flat)
+        model, scene, origins, (pen, gap) = build_body(tier, flat)
         lo, hi, rad = audit(tier, model, origins)
+        if LOOKS[tier]["sceptre"]:
+            head, tail = _audit_sceptre(tier, model, scene, pen)
+            sceptre_rows.append((tier, gap, head, tail))
         if base_rad is None:
             base_rad = rad
         elif rad > base_rad + 1e-6:
@@ -1338,8 +1769,11 @@ def main():
         exported[tier] = ("RING" if LOOKS[tier]["sceptre"] else "HANDS",
                           origins["RING"] if LOOKS[tier]["sceptre"]
                           else origins["HANDS"])
-        print("  siphon-%-5s %5d %6.3f %6.3f  %-7.2f %-7.2f  %-7.2f %-7.2f %s"
-              % (tier, model["triangles"], hi[2], rad, q, m, cq, cm, "PASS"))
+        worst = max(p[0] for p in pen)
+        print("  siphon-%-5s %5d %6.3f %6.3f  %-7.2f %-7.2f  %-7.2f %-7.2f "
+              "%-6.3f %-6s %s"
+              % (tier, model["triangles"], hi[2], rad, q, m, cq, cm, worst,
+                 "%.3f" % gap if gap is not None else "-", "PASS"))
 
     print("  %d models, %d triangles total" % (len(TIERS), total))
     print("  footprint %.1f u.l. = radius %.4f, IDENTICAL at every tier; the "
@@ -1352,6 +1786,23 @@ def main():
           "point ALONE, because the robe's train was hiding a witch hat: the "
           "a5 cowl measured 0.925 / 0.870 on its own while siphon-a5 as a "
           "whole measured 0.75 / 0.71")
+
+    if sceptre_rows:
+        join, butt, _up = _sceptre_axis()
+        print("  THE SCEPTRE is held at his side, and 'in-him' above is the "
+              "proof: weapon solids against body solids AS BOXES, %d frames, "
+              "%.3f of slack. Zero on every tier. Run the same check against "
+              "the shaft this replaced and it rejects all three: 'shaft_0 in "
+              "robe_torso', 0.011 deep." % (ATTACK_FRAMES, PEN_SLACK))
+        print("    shaft  butt %s -> join %s, %.3f long, off the centreline "
+              "the whole way" % (_fmt(butt), _fmt(join), SCEPTRE_DROP))
+        for (tier, gap, head, tail) in sceptre_rows:
+            print("      siphon-%-5s clear of the cloth by %.3f (%.1f px at "
+                  "%.1f px/unit); butt travels %.3f, head %.6f"
+                  % (tier, gap, gap * PX_PER_UNIT, PX_PER_UNIT, tail, head))
+        print("    the head is the pivot, so it CANNOT leave the ring's rim, "
+              "and the rings are not in the animated group at all -- the ring "
+              "never rotates and the beam origin never moves.")
 
     print("  BEAM ORIGINS, measured off the built geometry -- the beam lot "
           "READS these, it never retypes them:")

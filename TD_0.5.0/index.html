@@ -165,12 +165,16 @@
 <script src="js/gl/gl-world.js"></script>
 <script src="js/gl/siphon-beam-spec.js"></script>
 <script src="js/gl/siphon-beam-draw.js"></script>
-<!-- The Summoner's three effect modules. Presentation only: each one reads the
+<!-- The Summoner's effect modules. Presentation only: each one reads the
      live objects, keeps its own records beside them and draws. They are called
      from gl-world.js through bound helper objects, and every entry point
      no-ops if bind() never ran -- so they load AFTER it and the order between
-     the three does not matter. -->
+     them does not matter.
+     blub-summon.js sits after blub-circles.js because its descentLift() ADDS
+     to that one's -- a reading order, not a load-order dependency: the
+     reference is resolved per call. -->
 <script src="js/gl/blub-circles.js"></script>
+<script src="js/gl/blub-summon.js"></script>
 <script src="js/gl/blub-projectiles.js"></script>
 <script src="js/gl/blub-systems.js"></script>
 <script src="js/gl/models/sniper-base.js"></script>

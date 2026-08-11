@@ -466,7 +466,7 @@ var BlubFXSummon = (function () {
       phase: 0,          // 0 call, 1 hold, 2 arrival, 3 collapsing
       u: 0,              // 0..1 through the call
       left: 0, lastLeft: 0,
-      holdT: 0, aT0: 0, dieT: 0, dieFor: 0,
+      holdT: 0, holdStart: 0, aT0: 0, dieT: 0, dieFor: 0,
       blub: null, px: 0, py: 0, top: 0, extra: 0, gateR: 20,
       ox: 0, oy: 0, stage: 0, focus: 0
     };
@@ -506,6 +506,14 @@ var BlubFXSummon = (function () {
     r.left = left;
     r.lastLeft = left;
     r.holdT = 0;
+    // RESET WITH THE REST OF THE RECORD. Records are pooled, and the hold's
+    // start stamp is created lazily where it is read -- so a record that
+    // fizzled once and was reused carried the OLD stamp into its next rite,
+    // where `clock - holdStart` is already minutes past HOLD_MAX and the
+    // climax collapses on the first frame of the hold instead of being held.
+    // Zero is the sentinel the lazy init already tests for, so nothing else
+    // moves.
+    r.holdStart = 0;
     r.aT0 = 0;
     r.dieT = 0;
     r.dieFor = 0;

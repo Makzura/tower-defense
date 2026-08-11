@@ -40,8 +40,9 @@
 #    anywhere else in the game: `attacksPerSecond()` carries the swarm bonus, so
 #    a Mini Blub's 0.333 s becomes 0.238 s with a full fleet around it, and any
 #    animation authored in seconds would be 40 % too long the moment the tower
-#    is played well. See the block above `attack_cycle` for the exact mapping,
-#    and CHANGELOG for the runtime side.
+#    is played well. `--check` prints the budget it buys: the slowest pose any
+#    unit can hold, at its own rate, with and without a full swarm. See the
+#    block above `strip_phase` for the exact mapping and the runtime patch.
 #
 # 2. THE SHOT IS THE DISCONTINUITY. Phase 0 is the instant the gob left, so the
 #    cycle runs RELEASE -> follow-through -> settle -> wind-up, and the wind-up
@@ -52,25 +53,48 @@
 #    intake -- neither extreme is the rest pose, which is what stops it reading
 #    as a metronome.
 #
-# 3. FRAME 0 IS REST, AND REST IS IDENTITY. Every animated empty sits at its
-#    pivot with zero rotation on frame 0, so frame 0 is the model that revue 1
-#    measured, vertex for vertex -- `check_rest_pose()` fails the build if it is
-#    not. The three profiles, the maw on the head's curve, the footprints and
-#    the >= 0.85 shape-IoU family are all properties of frame 0 and none of them
-#    can move by adding a pose. js/blub.js holds `cooldown` at exactly zero
-#    while a blub has nothing to shoot, so an idle blub shows frame 0 and only
-#    a firing one animates.
+# 3. FRAME 0 IS REST, AND REST IS THE IDENTITY -- not merely "the rest values",
+#    literally the 4x4 identity on every group. `set_pose` folds the pivot
+#    correction into the node's own location, so a group at rest contributes
+#    nothing at all, td_mesh's group-local storage collapses to world space, and
+#    THE VERTICES ON DISK ARE THE ONES THE UN-ANIMATED BUILD WROTE. Not "close
+#    enough": `--check` diffs the animated build's frame 0 against a frames=0
+#    build of the same scene, triangle for triangle, and fails the build on a
+#    single differing coordinate. The three profiles, the maw laid on the head's
+#    curve by radius_at(), the ten footprints and the empty >= 0.85 shape-IoU
+#    family are all properties of frame 0, and this is what makes it arithmetic
+#    rather than a promise that none of them moved.
+#
+#    Rest is also a FRAME OF ITS OWN rather than phase 0, because js/blub.js
+#    holds `cooldown` at exactly zero while a blub has nothing to shoot -- and
+#    zero cooldown reads as phase 1, the deepest part of the wind-up. Without a
+#    rest frame an idle board would sit permanently coiled. Frame 0 is equally
+#    what every path that does not animate draws: the dying-body pass in
+#    blub-systems.js, the crosspath-mark overlay, TDObs.showcase. They keep
+#    working untouched precisely because frame 0 is the identity.
 #
 # 4. RIGID GROUPS ONLY. td_mesh emits one 4x4 per group per frame and a 4x4
 #    from `trs()` has no scale in it, so nothing here can squash or inflate by
 #    scaling. The Hungry Blub's "il se gonfle" is therefore a PISTON: its
-#    stomach cap is sunk inside the sac at rest and rides out of it on the
-#    intake, which grows the outline for real instead of pretending to.
+#    stomach is a separate group sunk flush at rest that rides BACKWARDS out of
+#    the body on the shot, which grows the outline for real instead of
+#    pretending to.
 #
-# Eight frames per cycle, sampled uniformly, with the EASING IN THE KEY STOPS --
-# the same trick tower_warbringer.py uses. A release that owns 12 % of the
-# cycle and a settle that owns 40 % are two key positions, not two frame counts,
-# so the strip stays uniform and one runtime rule drives all ten units.
+# 5. A GROUP IS A DRAW CALL, so the swarm pays for the rig. drawActor binds once
+#    and issues one drawRange per group, and the brief's stress case is three
+#    hundred units -- which is three hundred Mini Blubs. So every unit whose
+#    attack is a whole-body motion has exactly ONE group and costs exactly what
+#    it cost before the rig existed: both Minis, all three Blubs. Only the units
+#    with a part that must move independently of the body pay for a second or a
+#    third, and the largest of them is the rarest.
+#
+# THE STRIP. One rest frame, then eight cycle frames sampled uniformly, with the
+# EASING IN THE KEY STOPS -- the same trick tower_warbringer.py uses. A release
+# that owns 13 % of the cycle and a settle that owns 30 % are two key positions,
+# not two frame counts, so the strip stays uniform and ONE runtime rule drives
+# all ten units. The SuperBlub alone carries a second band of eight, for the
+# interval whose next shot is the piercing beam; the runtime picks the band from
+# `attacksMade`, which is the only reason the patch reads that field.
 # ---------------------------------------------------------------------------
 
 import math
@@ -317,6 +341,231 @@ def face(s, cx, cy, z, r, parent, kind, flat, scale=1.0, front=0.80):
 
 
 # ---------------------------------------------------------------------------
+# THE RIG. Read the four rules at the top of the file first; this is how they
+# are spelled.
+#
+# A unit builder is handed the animated `body` empty and hangs its solids on it
+# exactly as before -- not one coordinate in the ten units below has moved. If a
+# part has to move independently it gets a nested empty of its own, and NESTING
+# IS FREE: matrix_world composes, both nodes rest at the identity, so a mast can
+# drag behind a body without either of them being expressed in the other's
+# frame. The builder returns its `pose(frame)`; a builder that returns None is
+# simply not animated.
+#
+# The unanimated `root` is reachable as `body.parent`, and that is where a part
+# goes that must stay PLANTED while the body moves -- the Hungry Blub's legs.
+# ---------------------------------------------------------------------------
+
+CYCLE = 8                      # poses in one reload cycle; frame 0 is rest
+
+# The SuperBlub's second band is the interval that ENDS in the piercing beam.
+BANDS = {"superb": 2}
+
+
+def set_pose(node, pivot, rot=(0.0, 0.0, 0.0), shift=(0.0, 0.0, 0.0)):
+    """Turn a group about `pivot`, then slide it by `shift`.
+
+    The pivot correction is folded into the node's OWN location, which is the
+    whole trick: at rest -- no rotation, no shift -- the location comes out
+    exactly (0, 0, 0) and the group's matrix is the identity. td_mesh stores
+    geometry in the group's frame-0 local space, so an identity rest matrix
+    means local space IS world space and the vertices written to disk are the
+    ones the un-animated build wrote, to the last rounding step.
+
+    The alternative -- an empty parked at the pivot, the way tower_warbringer.py
+    rigs its shoulder -- bakes the pivot into the rest matrix and offsets every
+    vertex on disk by it. That is correct through drawActor and wrong through
+    everything that draws a model without asking for a pose, which here is the
+    dying-body pass, the mark overlay and the review harness. Same motion, and
+    this one cannot break them.
+    """
+    m = td.trs((0.0, 0.0, 0.0), rot)
+    p = td.apply(m, pivot)
+    node.rotation = [rot[0], rot[1], rot[2]]
+    node.location = [pivot[0] - p[0] + shift[0],
+                     pivot[1] - p[1] + shift[1],
+                     pivot[2] - p[2] + shift[2]]
+
+
+def rest(*nodes):
+    for n in nodes:
+        n.rotation = [0.0, 0.0, 0.0]
+        n.location = [0.0, 0.0, 0.0]
+
+
+# THE MAPPING, and the runtime patch that has to match it.
+#
+#   phase = 1 - cooldown / (1 / attacksPerSecond())      0 at the shot, ->1 at
+#                                                        the next one
+#   frame = 1 + band * CYCLE + floor(phase * CYCLE)
+#   frame = 0                                            when cooldown <= 0
+#
+# The last line is not a detail. An idle blub holds `cooldown` at exactly zero
+# (js/blub.js refuses to bank time it cannot spend), and 1 - 0/interval is 1,
+# not 0 -- so the naive formula parks every idle unit on the LAST frame of the
+# wind-up. Reading a cooldown of zero as rest is what makes an idle board still.
+#
+# Spelled for js/gl/gl-world.js, in the tower loop beside the gearPhase and
+# swingProgress branches, which is the only place that has to change. Verified
+# against the live simulation, not reasoned about: sweeps 1..8 uniformly while
+# firing, holds 0 for a live blub with nothing to shoot, FINISHES its reload and
+# then rests when the target dies mid-cycle, and stays in range when the swarm
+# buff takes the rate from 1.31 to 2.50 in the middle of an interval.
+#
+#     var BLUB_CYCLE = 8;                      // poses per reload, frame 0 rest
+#
+#     // A blub has neither gearPhase nor swingProgress: its animation IS its
+#     // cooldown, so the strip is indexed by the reload phase and can neither
+#     // overrun the interval nor lag a rate change.
+#     if (m && m.frames.length > 1 && t.isSummon &&
+#         typeof t.attacksPerSecond === "function") {
+#       frame = 0;                                       // idle blubs rest
+#       var brate = t.attacksPerSecond();
+#       if (t.cooldown > 0 && brate > 0) {
+#         var bphase = 1 - t.cooldown * brate;
+#         if (!(bphase > 0)) bphase = 0;                 // a rate that just rose
+#         if (bphase > 0.999999) bphase = 0.999999;
+#         // The SuperBlub carries a second band for the interval that ENDS in
+#         // the piercing beam, so the shoulder gun has somewhere to come up.
+#         // Nine units have one band and never take this branch.
+#         var bands = Math.max(1, Math.round((m.frames.length - 1) / BLUB_CYCLE));
+#         var band = (bands > 1 && t.laser && t.laser.every &&
+#                     ((t.attacksMade + 1) % t.laser.every === 0)) ? 1 : 0;
+#         frame = 1 + band * BLUB_CYCLE + Math.floor(bphase * BLUB_CYCLE);
+#       }
+#     }
+#
+# Both reads are read-only and neither is a simulation value: `cooldown` and
+# `attacksMade` are already what js/blub.js publishes. Nothing else in the draw
+# path changes -- BlubFXShots.recoil keeps its positional kick, which is meant
+# to be seen ON TOP of the MK2's chassis rotation and not instead of it.
+def strip_phase(frame):
+    """(band, phase) for a strip frame, or None for the rest frame.
+
+    Phase is `i / CYCLE`, never `i / (CYCLE - 1)`: this is a LOOP, so the last
+    sample sits at 7/8 and phase 1 is phase 0 of the next interval. Sampling to
+    1.0 would play the wind-up extreme and the release back to back and swallow
+    the snap that the whole cycle is built around.
+    """
+    if frame <= 0:
+        return None
+    i = (frame - 1) % CYCLE
+    return ((frame - 1) // CYCLE, i / float(CYCLE))
+
+
+def keys(t, stops):
+    """Sample a curve given as (phase, value) stops, linear between them.
+
+    Linear on purpose. The easing lives in WHERE the stops are -- a release that
+    owns an eighth of the cycle and a settle that owns a third are two key
+    positions -- and at eight samples a smoothstep between stops only flattens
+    the velocity at every key, which is what makes an animation read as sticky.
+    The last stop is at phase 1.0 and is never sampled: it is the pose the
+    wind-up is heading for when the shot cuts it off.
+    """
+    for i in range(len(stops) - 1):
+        t0, v0 = stops[i]
+        t1, v1 = stops[i + 1]
+        if t <= t1:
+            return v0 + (v1 - v0) * ((t - t0) / ((t1 - t0) or 1e-9))
+    return stops[-1][1]
+
+
+# --- the lob ---------------------------------------------------------------
+#
+# Blub I, II and III throw the same gob on the same high arc and differ only in
+# weight, so they share one curve and scale it. Read down the PITCH column and
+# the shape of every attack in this file is visible in one place:
+#
+#   0.00  thrown       the gob is gone, the body is already forward
+#   0.13  overshoot    the mass keeps going -- follow-through, and it is the
+#                      EXTREME, not the release: an attack whose furthest pose
+#                      is the shot frame has no follow-through in it at all
+#   0.30  rebound      back PAST neutral, the gelatine arriving late
+#   0.46  settle       a small counter-swing, dying out
+#   0.62  rest         the only frame in the cycle that is the rest pose
+#   0.80  intake       and from here it is coiling, not settling
+#   1.00  coil         never sampled; the shot happens on the way to it
+#
+# Neither extreme is neutral, which is the rule that stops a motion played four
+# hundred times in a wave reading as a metronome.
+LOB_PITCH = [(0.00, -0.21), (0.13, -0.30), (0.30, 0.14), (0.46, 0.02),
+             (0.62, 0.00), (0.80, 0.13), (1.00, 0.30)]
+LOB_PUSH = [(0.00, 0.11), (0.13, 0.15), (0.30, -0.09), (0.46, 0.01),
+            (0.62, 0.00), (0.80, -0.11), (1.00, -0.24)]
+LOB_LIFT = [(0.00, 0.13), (0.13, 0.09), (0.30, -0.05), (0.46, 0.02),
+            (0.62, 0.00), (0.80, -0.05), (1.00, -0.09)]
+
+
+def roll_up(angle, foot, r):
+    """A body rocking on a base of radius `foot` climbs onto the rim of it.
+
+    Without this term a blub pitched about its ground contact drives its own
+    front rim through the road -- three pixels of Blub III were under the map
+    at the far end of the throw, which reads as a hole in the world rather than
+    as a mistake in an animation. It is also simply true: a round-bottomed thing
+    that tips rises, and the little bob it adds at both extremes is free
+    character. `check_strip` fails the build if any unit still sinks."""
+    return foot * r * abs(math.sin(angle))
+
+
+def lob(node, t, r, pitch=1.0, push=1.0, lift=1.0, foot=0.0,
+        pivot=(0.0, 0.0, 0.0)):
+    """One blub throwing. Shifts are in radii, and a radius IS the unit's
+    footprint in screen pixels -- R() divides by exactly the px-per-unit the
+    board runs at -- so `push = 0.15` reads as "one and a half pixels forward"
+    for a Blub I without converting anything."""
+    a = keys(t, LOB_PITCH) * pitch
+    set_pose(node, pivot, (a, 0.0, 0.0),
+             (0.0, keys(t, LOB_PUSH) * push * r,
+              keys(t, LOB_LIFT) * lift * r + roll_up(a, foot, r)))
+
+
+# --- the buzz --------------------------------------------------------------
+#
+# The Minis are the one pair that must NOT get a curve. Section 10 calls them
+# machine-gun pellets and the brief is explicit that a third of a second buys a
+# vibration and not a ceremony -- so these eight poses are authored one by one
+# rather than sampled off a spline, because a vibration that interpolates is a
+# wobble. The numbers deliberately do not sit on a curve: alternating signs, no
+# two consecutive frames on the same side, which is what reads as a buzz instead
+# of a swing at 24 poses a second.
+#
+# The accent is still there, and it has to be, or the shot is invisible inside
+# the shudder: FRAME 1 (phase 0, the instant a pellet left) is three times the
+# amplitude of the buzz around it and the only pose that is clearly forward, and
+# the last frame is the only one clearly back. Everything between is noise. That
+# is the whole anticipation budget a third of a second can pay for.
+#
+# Columns: (rx, ry, rz, push, lift) -- radians, then radii.
+MINI1_BUZZ = [
+    (-0.20, 0.000, 0.02, 0.20, 0.10),      # the shot
+    (-0.09, 0.045, -0.05, 0.05, 0.03),
+    (0.07, -0.040, 0.05, -0.06, -0.03),
+    (-0.04, 0.055, -0.03, 0.03, 0.02),
+    (0.06, -0.050, 0.04, -0.05, -0.02),
+    (-0.03, 0.040, -0.05, 0.04, 0.02),
+    (0.07, -0.035, 0.03, -0.06, -0.03),
+    (0.13, -0.015, -0.02, -0.12, -0.04),   # the intake
+]
+MINI2_BUZZ = [
+    (-0.13, 0.010, 0.09, 0.22, 0.07),      # the shot
+    (-0.05, 0.075, -0.08, 0.06, 0.02),
+    (0.05, -0.070, 0.09, -0.07, -0.02),
+    (-0.02, 0.085, -0.07, 0.04, 0.02),
+    (0.04, -0.080, 0.08, -0.06, -0.02),
+    (-0.02, 0.070, -0.09, 0.05, 0.01),
+    (0.05, -0.060, 0.07, -0.07, -0.02),
+    (0.09, -0.020, -0.04, -0.13, -0.03),   # the intake
+]
+
+
+def buzz(node, frame_index, table, r, pivot=(0.0, 0.0, 0.0)):
+    rx, ry, rz, push, lift = table[frame_index]
+    set_pose(node, pivot, (rx, ry, rz), (0.0, push * r, lift * r))
+
+
+# ---------------------------------------------------------------------------
 # The ten units. Radii come straight from js/blub.js UNITS[].footprintUl.
 # ---------------------------------------------------------------------------
 
@@ -334,6 +583,20 @@ def unit_blub1(s, body, flat):
     r = R(10)
     h = _stack(s, "b", 0, 0, r, r * 3.70, EGG, "moss", body)
     face(s, 0, 0, h * 0.56, r, body, "happy", flat, front=0.94)
+
+    # ONE GROUP, and that is the design and not a shortcut. A drop with no
+    # appendages has nothing that can move on its own, so the whole animal
+    # throws -- which also means Blub I costs exactly one draw call animated,
+    # the same as it cost with no rig at all. It rocks about the ground contact
+    # because that is where a heavy gelatinous thing is anchored; a body pivot
+    # would slide the foot instead of leaning the mass over it. Full amplitude:
+    # it is the goofiest and the slowest at 1.00 s, so it gets the whole lob.
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body)
+        lob(body, ph[1], r, foot=EGG[0][0])
+    return pose
 
 
 def unit_blub2(s, body, flat):
@@ -374,6 +637,19 @@ def unit_blub2(s, body, flat):
         td.frustum(s, "crust_spike", r * 0.13, r * 0.03, r * 0.16,
                    (0, r * fy, r * 1.40), "stone_dark", body, 4, (0, 0, 0.5))
 
+    # THE SAME THROW UNDER A ROCK. A slab that leant as far as Blub I would
+    # tip its carapace off, and the T-profile the revue measured is the one
+    # thing this unit has -- so half the pitch and half again as much shove.
+    # It is the one that thinks it is strong, so the recoil is what moves it:
+    # the crest dips, the whole plate slides back on the ground, and it hauls
+    # itself forward again to reload.
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body)
+        lob(body, ph[1], r, pitch=0.52, push=1.55, lift=0.70, foot=1.40)
+    return pose
+
 
 def unit_blub3(s, body, flat):
     r = R(20); h = drop(s, "b", 0, 0, r, r * 1.85, "moss", body)
@@ -384,6 +660,43 @@ def unit_blub3(s, body, flat):
                (sx * r * 0.74, -r * 0.06, h * 0.74), (0, sx * -0.38, 0), "stone", body)
         td.box(s, "pauldron_lip", (r * 0.54, r * 0.60, r * 0.12),
                (sx * r * 0.80, -r * 0.06, h * 0.90), (0, sx * -0.38, 0), "stone_dark", body)
+
+    # THE ONE THAT THROWS LIKE A SOLDIER -- and the one held on the shortest
+    # leash, deliberately. Same lob, a third faster at 0.67 s, and led by a
+    # shoulder: the twist runs on the same curve as the pitch, so the right
+    # pauldron comes over the top and the left one trails. That is what the two
+    # stone plates are FOR in motion, and it is also an answer to the one thing
+    # the revue still had against this unit -- its ears leave the outline at
+    # yaw 0 and vanish at 45 and 90. A body that turns on its own axis while it
+    # throws puts them back in the profile from angles where a static blub3 has
+    # nothing.
+    #
+    # WHY 0.70 AND NOT FULL WEIGHT, honestly: because a fast unit wants a
+    # compact throw, and NOT because it was measured to fix anything.
+    #
+    # blub3/cyber is the open failure of SUMMONER-REVUE1 -- shape IoU 0.853,
+    # raw 0.715 at all three yaws, 99.5 % containment -- so this is the one body
+    # whose poses could make a RECORDED defect worse, and it was measured to
+    # find out. Every pose of every unit against every pose of every other,
+    # three yaws, at the reference viewport: full weight gave blub3/cyber 0.870
+    # and 0.70 weight gave 0.868. Nothing. The control says why -- run the SAME
+    # 243-way search over nine yaw jitters of +/- 5.7 degrees on the STATIC
+    # frame-0 model, with no animation at all, and blub3/cyber reaches 0.864 in
+    # 56 of 243 samples where the animated strip reaches 0.868 in 37. Searching
+    # 243 poses finds a higher maximum than searching 3 whatever the poses are;
+    # that is the search, not the motion, and trimming an animation to chase it
+    # would be paying real quality for a measurement artefact. Recorded here so
+    # the next pass does not repeat the experiment.
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body)
+        t = ph[1]
+        a = keys(t, LOB_PITCH) * 0.70
+        set_pose(body, (0.0, 0.0, 0.0), (a, 0.0, a * -0.24),
+                 (0.0, keys(t, LOB_PUSH) * 0.85 * r,
+                  keys(t, LOB_LIFT) * 0.75 * r + roll_up(a, 0.62, r)))
+    return pose
 
 
 # THE TWO MINIS SHARE NOTHING BUT A FOOTPRINT.
@@ -417,6 +730,17 @@ def unit_mini1(s, body, flat):
         td.tube(s, "leg", r * 0.11, (sx * r * 0.44, -r * 0.06, h * 0.12),
                 (sx * r * 0.66, -r * 0.10, 0), "moss_dark", body, 6)
 
+    # A SPIRE VIBRATES LIKE A TUNING FORK -- about its foot, and mostly in
+    # pitch, because that is the axis a tall narrow thing is weakest on. One
+    # group: three hundred of these is the brief's stress case and the swarm
+    # must not pay a second draw call for a shudder.
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body)
+        buzz(body, int(ph[1] * CYCLE), MINI1_BUZZ, r)
+    return pose
+
 
 def unit_mini2(s, body, flat):
     # LOW -- the exact opposite proportion, which is the only lever that exists
@@ -444,6 +768,19 @@ def unit_mini2(s, body, flat):
             td.tube(s, "leg", r * 0.12, (sx * r * 0.74, r * fy, h * 0.34),
                     (sx * r * 1.14, r * fy, 0), "moss_dark", body, 6)
 
+    # A SLAB RATTLES INSTEAD. Mini II is wide and low on four splayed legs, so
+    # it cannot pitch the way Mini I does -- it shakes about its vertical axis
+    # and the stone lid skates on top of it. Hence twice the yaw and two thirds
+    # the pitch of its twin: the two Minis share a footprint and a fire rate and
+    # they now do not even shake alike, which is the same separation-by-
+    # proportion argument that got them out of the 0.95 IoU they used to sit at.
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body)
+        buzz(body, int(ph[1] * CYCLE), MINI2_BUZZ, r)
+    return pose
+
 
 def unit_hungry(s, body, flat):
     # "Une machoire sur pattes, corps reduit." LOW and SPRAWLING -- 1.40 radii
@@ -461,12 +798,19 @@ def unit_hungry(s, body, flat):
     # The long legs are what give this unit the one thing nothing else in the
     # family has: HOLES in its outline.
     r = R(25)
+    # THE STOMACH IS ITS OWN GROUP, because "il se gonfle en tirant" cannot be
+    # done by scaling -- td_mesh emits rigid 4x4s and there is no scale in one.
+    # So the swelling is a PISTON: the sac rides backwards out of the animal on
+    # the shot and is drawn flush again as it reloads, which grows the rendered
+    # outline for real. It is nested under the body, so it swings with the heave
+    # and pumps on top of it.
+    sac = s.node("sac", parent=body, animated=True)
     # ce qui reste du corps: a sac slung low at the back, a remnant, and set
     # BELOW the skull line so there is a step in the profile behind the head.
     td.frustum(s, "gut", r * 0.44, r * 0.32, r * 0.38, (0, -r * 0.62, r * 0.62),
-               "moss", body, 10)
+               "moss", sac, 10)
     td.frustum(s, "gut_cap", r * 0.32, r * 0.10, r * 0.14, (0, -r * 0.62, r * 0.86),
-               "moss", body, 10)
+               "moss", sac, 10)
     # LA MACHOIRE -- and it is the animal. Three plates of falling width make a
     # WEDGE in plan: broad at the hinge, tapering to a snout. A stack of equal
     # boxes is a crate, which is what the first attempt at this looked like.
@@ -503,13 +847,49 @@ def unit_hungry(s, body, flat):
     # clear of the ground, so the daylight between the legs is the only pierced
     # outline in the ten -- and a hole is the one contour feature that survives
     # being normalised into somebody else's bounding box.
+    #
+    # AND THE LEGS DO NOT MOVE. They hang off `body.parent`, the un-animated
+    # root, so they are the one thing in this file that stays where it is while
+    # the group above it heaves. That is not a saving, it is the point: the
+    # daylight between them is the only pierced outline in the ten units and the
+    # only contour feature that survives a review normalising the size away, so
+    # it must not swing about. The animal heaves ON its legs.
+    ground = body.parent
     for sx in (-1, 1):
         for fy in (-0.34, 0.42):
             td.tube(s, "leg", r * 0.11, (sx * r * 0.56, r * fy, r * 0.56),
-                    (sx * r * 0.90, r * fy * 1.10, 0), "moss_dark", body, 6)
+                    (sx * r * 0.90, r * fy * 1.10, 0), "moss_dark", ground, 6)
             td.box(s, "foot", (r * 0.26, r * 0.38, r * 0.10),
                    (sx * r * 0.90, r * fy * 1.10, r * 0.05), (0, 0, 0),
-                   "moss_dark", body)
+                   "moss_dark", ground)
+
+    # THE HEAVE. 1.33 s is the longest interval in the family and it buys the
+    # only real ceremony in the file: the whole animal see-saws about its hips,
+    # the snout swinging from a rear-back at chest height down to a hand's
+    # breadth off the road as the gob leaves. Wider stops than the lob, because
+    # a slow curve sampled at eight needs its extremes further apart to keep any
+    # velocity between them.
+    HEAVE = [(0.00, -0.30), (0.11, -0.36), (0.27, 0.13), (0.44, -0.03),
+             (0.60, 0.00), (0.82, 0.17), (1.00, 0.33)]
+    # The piston: out on the shot, drawn flush again as it reloads, and PAST
+    # flush -- sucked in -- on the intake, so the swell has something to swell
+    # from. Same past-neutral rule as every other unit here.
+    PUMP = [(0.00, 0.44), (0.14, 0.48), (0.34, 0.24), (0.55, 0.10),
+            (0.78, -0.06), (1.00, -0.15)]
+
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body, sac)
+        t = ph[1]
+        set_pose(body, (0.0, -r * 0.25, r * 0.62),
+                 (keys(t, HEAVE), 0.0, 0.0),
+                 (0.0, keys(t, LOB_PUSH) * 0.55 * r,
+                  keys(t, LOB_LIFT) * 0.60 * r))
+        k = keys(t, PUMP)
+        set_pose(sac, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0),
+                 (0.0, -k * 0.90 * r, k * 0.30 * r))
+    return pose
 
 
 def unit_cyber(s, body, flat):
@@ -524,12 +904,15 @@ def unit_cyber(s, body, flat):
          front=0.84)
     td.box(s, "visor", (r * 0.82, r * 0.32, r * 0.15), (0, r * 0.60, h * 0.72),
            (0.42, 0, 0), "chrome", body)
-    # le mat: the graft that breaks the top of the profile
+    # le mat: the graft that breaks the top of the profile -- and a graft is
+    # bolted on, not grown, so it does not move WITH the body. Its own group,
+    # nested, dragging behind.
+    mast = s.node("mast", parent=body, animated=True)
     td.frustum(s, "mast", r * 0.20, r * 0.08, r * 0.50, (0, -r * 0.10, r * 2.02),
-               "chrome", body, 6)
+               "chrome", mast, 6)
     td.torus(s, "mast_ring", r * 0.18, r * 0.05, (0, -r * 0.10, r * 2.10),
-             (0, 0, 0), "cyan", body, 8, 5)
-    td.ball(s, "mast_lamp", r * 0.14, (0, -r * 0.10, r * 2.32), "cyan", body, 8, 5)
+             (0, 0, 0), "cyan", mast, 8, 5)
+    td.ball(s, "mast_lamp", r * 0.14, (0, -r * 0.10, r * 2.32), "cyan", mast, 8, 5)
     for sx in (-1, 1):
         # greffes d'epaule: hard rectilinear boxes on a round body, and they
         # stay INSIDE the width the profile already has. A grafted thing is
@@ -548,6 +931,27 @@ def unit_cyber(s, body, flat):
     td.ball(s, "heritage_lichen", r * 0.16, (r * 0.44, r * 0.56, h * 0.18),
             "lichen", body, 6, 4)
 
+    # AN ENERGISED SPIT, and the mast is what makes it read as energised rather
+    # than as a bigger Blub I. The body throws on the shared lob at three
+    # quarters weight -- it is a graft-laden thing and moves stiffly -- and the
+    # mast DRAGS: its own angle is literally what the body was doing an eighth
+    # of a cycle ago minus what it is doing now, which is overlapping action
+    # written as arithmetic instead of as a second set of keys. It cannot fall
+    # out of step with the body, and at the seam -- coiled hard back, then
+    # thrown -- the difference is at its largest, so the antenna whips exactly
+    # on the shot and the lamp on top of it draws the arc.
+    LAG = 0.125
+
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body, mast)
+        t = ph[1]
+        lob(body, t, r, pitch=0.72, push=0.85, lift=0.80)
+        drag = keys((t - LAG) % 1.0, LOB_PITCH) - keys(t, LOB_PITCH)
+        set_pose(mast, (0.0, -r * 0.10, r * 1.77), (drag * 0.72, 0.0, 0.0))
+    return pose
+
 
 def unit_mecha(s, body, flat):
     # Chassis + deux canons de bras. The creature becomes a weapon here.
@@ -562,18 +966,47 @@ def unit_mecha(s, body, flat):
     face(s, 0, 0, r * 1.22, r * 0.34, body, "visor_down", flat, FACE_SCALE["mecha"])
     td.box(s, "visor", (r * 0.42, r * 0.16, r * 0.12), (0, r * 0.44, r * 1.24),
            (0, 0, 0), "chrome", body)
+    # THE GUNS RUN IN THEIR MOUNTS. Section 10 asks for mechanical recoil, and
+    # mechanical is the opposite of the gelatinous lob above it: the barrels
+    # slam straight back along their own axis and are pushed out again by a
+    # spring, and NOTHING about that is a body motion. Their own nested group.
+    guns = s.node("guns", parent=body, animated=True)
     for sx in (-1, 1):
         td.tube(s, "cannon", r * 0.17, (sx * r * 0.62, r * 0.10, r * 0.72),
-                (sx * r * 0.66, r * 1.10, r * 0.68), "chrome", body, 8)
+                (sx * r * 0.66, r * 1.10, r * 0.68), "chrome", guns, 8)
         td.torus(s, "muzzle", r * 0.19, r * 0.05,
                  (sx * r * 0.66, r * 1.08, r * 0.68), (math.pi / 2, 0, 0),
-                 "cyan_dim", body, 8, 5)
+                 "cyan_dim", guns, 8, 5)
         td.tube(s, "leg", r * 0.15, (sx * r * 0.42, 0, r * 0.24),
                 (sx * r * 0.66, 0, 0), "chrome_dk", body, 6)
     td.box(s, "heritage_stone", (r * 0.40, r * 0.14, r * 0.30),
            (-r * 0.60, -r * 0.30, r * 0.70), (0, 0, 0), "stone", body)
     td.ball(s, "heritage_lichen", r * 0.13, (r * 0.58, -r * 0.34, r * 0.34),
             "lichen", body, 6, 4)
+
+    # Tracers at 2.5 a second: 0.40 s a cycle, so this is the fastest thing in
+    # the file that is not a Mini. The hull leans INTO the shot and is knocked
+    # back off it -- the anticipation is a brace, the follow-through is a rock
+    # back onto the heels -- and the barrels run 0.18 r into their mounts and
+    # creep forward again past neutral as the next round is rammed home. The
+    # ejected casings are blub-projectiles' job and are deliberately not here:
+    # a casing baked into the mesh would fly on a fixed path whatever the
+    # unit's facing, and it would still be flying with the unit dead.
+    NOD = [(0.00, 0.09), (0.12, 0.12), (0.30, -0.03), (0.50, 0.01),
+           (0.70, 0.00), (0.88, -0.02), (1.00, -0.05)]
+    RUN = [(0.00, -0.16), (0.10, -0.18), (0.28, -0.07), (0.46, -0.01),
+           (0.64, 0.00), (0.86, 0.02), (1.00, 0.05)]
+
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body, guns)
+        t = ph[1]
+        set_pose(body, (0.0, 0.0, 0.0), (keys(t, NOD), 0.0, 0.0),
+                 (0.0, keys(t, RUN) * 0.45 * r, 0.0))
+        set_pose(guns, (0.0, r * 0.10, r * 0.72), (keys(t, NOD) * -0.35, 0.0, 0.0),
+                 (0.0, keys(t, RUN) * r, 0.0))
+    return pose
 
 
 def unit_mecha2(s, body, flat):
@@ -588,17 +1021,24 @@ def unit_mecha2(s, body, flat):
            (0, 0, 0), "chrome_dk", body)
     td.box(s, "armour_f", (r * 1.34, r * 0.26, r * 0.54), (0, r * 0.56, r * 0.54),
            (0, 0, 0), "steel_bru", body)
+    # Three groups, and each one is a sentence of section 10. `guns` is where
+    # "heavy shells" lives, `body` is the VISIBLE CHASSIS RECOIL the brief puts
+    # in capitals, and `tanks` is "instables et apparents" -- they are the only
+    # part of any unit here that is still moving after the thing that moved it
+    # has stopped.
+    guns = s.node("guns", parent=body, animated=True)
+    tanks = s.node("tanks", parent=body, animated=True)
     for sx in (-1, 1):
         # les reservoirs instables: portes HAUT, en dehors du profil du chassis
         td.frustum(s, "tank", r * 0.30, r * 0.30, r * 0.72,
-                   (sx * r * 0.92, -r * 0.30, r * 1.10), "chrome", body, 8,
+                   (sx * r * 0.92, -r * 0.30, r * 1.10), "chrome", tanks, 8,
                    (0, sx * 0.26, 0))
         td.torus(s, "tank_band", r * 0.33, r * 0.06,
-                 (sx * r * 0.92, -r * 0.30, r * 1.16), (0, 0, 0), "cyan", body, 10, 5)
+                 (sx * r * 0.92, -r * 0.30, r * 1.16), (0, 0, 0), "cyan", tanks, 10, 5)
         td.tube(s, "tank_pipe", r * 0.07, (sx * r * 0.86, -r * 0.30, r * 0.78),
-                (sx * r * 0.40, -r * 0.10, r * 0.62), "chrome_dk", body, 6)
+                (sx * r * 0.40, -r * 0.10, r * 0.62), "chrome_dk", tanks, 6)
         td.tube(s, "cannon", r * 0.22, (sx * r * 0.74, r * 0.16, r * 0.56),
-                (sx * r * 0.78, r * 1.16, r * 0.52), "chrome", body, 8)
+                (sx * r * 0.78, r * 1.16, r * 0.52), "chrome", guns, 8)
         td.tube(s, "leg", r * 0.18, (sx * r * 0.56, 0, r * 0.18),
                 (sx * r * 0.86, 0, 0), "chrome_dk", body, 6)
     # the pilot is now a slit in a hatch
@@ -610,6 +1050,38 @@ def unit_mecha2(s, body, flat):
     td.ball(s, "heritage_lichen", r * 0.12, (r * 0.62, -r * 0.16, r * 0.30),
             "lichen", body, 6, 4)
 
+    # The chassis rocks back a fifth of a radius -- eight screen pixels on a
+    # sixty-eight-pixel hull -- and pitches with it, so the MK2 visibly shoves
+    # itself backwards where the Mechablub only nods. It arrives on TOP of
+    # BlubFXShots.recoil, which already slides the whole draw back along the
+    # aim for about 0.13 s; that one is a position and this one is the body
+    # rotating on its legs, and they are meant to be seen together.
+    #
+    # The tanks are the joke and they get the drag treatment: an eighth of a
+    # cycle behind the hull, at nearly double the amplitude, so they are still
+    # swinging when the chassis has settled. Nothing else in the file is left
+    # moving after its cause has stopped.
+    NOD = [(0.00, 0.13), (0.11, 0.17), (0.28, -0.05), (0.46, 0.02),
+           (0.64, 0.00), (0.86, -0.04), (1.00, -0.08)]
+    SHOVE = [(0.00, -0.17), (0.11, -0.20), (0.28, 0.05), (0.46, -0.02),
+             (0.64, 0.00), (0.86, 0.04), (1.00, 0.08)]
+    RUN = [(0.00, -0.20), (0.09, -0.23), (0.26, -0.09), (0.44, -0.02),
+           (0.62, 0.00), (0.86, 0.02), (1.00, 0.05)]
+    LAG = 0.125
+
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body, guns, tanks)
+        t = ph[1]
+        set_pose(body, (0.0, 0.0, 0.0), (keys(t, NOD), 0.0, 0.0),
+                 (0.0, keys(t, SHOVE) * r, 0.0))
+        set_pose(guns, (0.0, r * 0.16, r * 0.56), (keys(t, NOD) * -0.30, 0.0, 0.0),
+                 (0.0, keys(t, RUN) * r, 0.0))
+        drag = keys((t - LAG) % 1.0, NOD) - keys(t, NOD)
+        set_pose(tanks, (0.0, -r * 0.30, r * 0.74), (drag * 0.85, 0.0, 0.0))
+    return pose
+
 
 def unit_superb(s, body, flat):
     # Colosse, laser d'epaule, et un bebe blub terrifie dans un hublot.
@@ -618,18 +1090,20 @@ def unit_superb(s, body, flat):
            (0, 0, 0), "chrome_dk", body)
     td.frustum(s, "core", r * 0.52, r * 0.44, r * 0.50, (0, 0, r * 1.46),
                "steel_bru", body, 10)
+    arms = s.node("arms", parent=body, animated=True)
+    lance = s.node("lance", parent=body, animated=True)
     for sx in (-1, 1):
         td.box(s, "pauldron", (r * 0.44, r * 0.72, r * 0.50),
-               (sx * r * 0.72, 0, r * 1.24), (0, sx * -0.22, 0), "chrome", body)
+               (sx * r * 0.72, 0, r * 1.24), (0, sx * -0.22, 0), "chrome", arms)
         td.tube(s, "arm", r * 0.20, (sx * r * 0.66, r * 0.08, r * 1.02),
-                (sx * r * 0.72, r * 0.86, r * 0.66), "chrome_dk", body, 8)
+                (sx * r * 0.72, r * 0.86, r * 0.66), "chrome_dk", arms, 8)
         td.tube(s, "leg", r * 0.22, (sx * r * 0.40, 0, r * 0.30),
                 (sx * r * 0.60, 0, 0), "chrome_dk", body, 8)
     # le laser d'epaule, sur une seule epaule pour rester lisible
     td.tube(s, "laser", r * 0.13, (r * 0.72, -r * 0.10, r * 1.52),
-            (r * 0.72, r * 0.96, r * 1.46), "chrome", body, 8)
+            (r * 0.72, r * 0.96, r * 1.46), "chrome", lance, 8)
     td.ball(s, "laser_lens", r * 0.15, (r * 0.72, r * 0.98, r * 1.46),
-            "white_hot", body, 8, 5)
+            "white_hot", lance, 8, 5)
     # LE HUBLOT: the whole joke. A tiny frightened blub behind glass.
     td.torus(s, "port_ring", r * 0.26, r * 0.06, (0, r * 0.50, r * 1.02),
              (math.pi / 2, 0, 0), "chrome", body, 12, 5)
@@ -643,6 +1117,47 @@ def unit_superb(s, body, flat):
     td.ball(s, "heritage_lichen", r * 0.11, (r * 0.60, -r * 0.36, r * 0.40),
             "lichen", body, 6, 4)
 
+    # TWO BANDS, AND THIS IS THE ONLY UNIT THAT HAS ANY BUSINESS WITH ONE.
+    #
+    # Band 0 is the shell: a colossus recoiling, which means a SMALL motion --
+    # a fifth of the amplitude a Blub I gets, because weight on screen is
+    # travel relative to size and this thing is fifty pixels across. Anything
+    # more and it reads as light.
+    #
+    # Band 1 is the interval that ENDS in the piercing beam, and it is where the
+    # anticipation for the beam has to live -- there is nowhere else. The lance
+    # fires on attack 10, 20, 30..., so at the moment shell 9 leaves, the unit
+    # already knows: `attacksMade` is 9, the next shot is the tenth, and
+    # gl-world picks this band for the whole of that reload. The shoulder gun
+    # rises and swings out over the interval on a curve that is almost flat for
+    # the first third and then runs, so the last two frames before a beam are
+    # unmistakably a weapon coming up. Then it discharges and the strip is back
+    # in band 0 with the gun stowed -- the snap IS the shot, exactly as
+    # everywhere else in this file.
+    #
+    # A blub with no `laser` never leaves band 0, so the one runtime branch that
+    # reads `attacksMade` is dead code for the other nine units.
+    CHARGE = [(0.00, 0.00), (0.34, 0.08), (0.62, 0.40), (0.86, 0.84),
+              (1.00, 1.00)]
+
+    def pose(frame):
+        ph = strip_phase(frame)
+        if ph is None:
+            return rest(body, arms, lance)
+        band, t = ph
+        c = keys(t, CHARGE) if band else 0.0
+        set_pose(body, (0.0, 0.0, 0.0),
+                 (keys(t, LOB_PITCH) * 0.22 + c * 0.05, 0.0, 0.0),
+                 (0.0, keys(t, LOB_PUSH) * 0.35 * r,
+                  keys(t, LOB_LIFT) * 0.30 * r - c * 0.04 * r))
+        set_pose(arms, (0.0, 0.0, r * 1.10),
+                 (keys(t, LOB_PITCH) * -0.34 - c * 0.16, 0.0, 0.0),
+                 (0.0, keys(t, LOB_PUSH) * -0.30 * r, 0.0))
+        set_pose(lance, (r * 0.72, -r * 0.10, r * 1.52),
+                 (c * 0.20, 0.0, 0.0),
+                 (0.0, c * 0.08 * r, c * 0.20 * r))
+    return pose
+
 
 UNITS = [
     ("blub1", unit_blub1), ("blub2", unit_blub2), ("blub3", unit_blub3),
@@ -652,12 +1167,138 @@ UNITS = [
 ]
 
 
-def build_unit(unit_id, fn, flat):
+def build_unit(unit_id, fn, flat, animate=True):
+    """One unit. `animate=False` builds the same scene with no strip at all --
+    td_mesh drops every group when `frames` is 0 -- which is the reference
+    `check_rest_pose` diffs frame 0 against."""
     s = td.Scene(palette(flat))
     root = s.node("root")
-    body = s.node("body", parent=root)
-    fn(s, body, flat)
-    return td.build(s, "blub-" + unit_id)
+    body = s.node("body", parent=root, animated=animate)
+    pose = fn(s, body, flat)
+    if not (animate and pose):
+        return td.build(s, "blub-" + unit_id)
+    return td.build(s, "blub-" + unit_id,
+                    frames=1 + CYCLE * BANDS.get(unit_id, 1), pose=pose)
+
+
+# ---------------------------------------------------------------------------
+# THE CHECKS. They run on every build, not behind a flag, because the thing
+# they protect is the reason this file was rewritten twice.
+# ---------------------------------------------------------------------------
+
+IDENTITY_4X4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+
+
+def _mat(flat_col_major):
+    """td_mesh emits column-major; read it back as rows."""
+    return [[flat_col_major[c * 4 + r] for c in range(4)] for r in range(4)]
+
+
+def _tris(model):
+    """The model as a comparable multiset of triangles: nine coordinates, a
+    normal, and the RESOLVED colour -- resolved, because two builds may order
+    their palettes differently and an index would compare the wrong thing."""
+    out = []
+    p, n, c, pal = (model["positions"], model["normals"],
+                    model["colourIndex"], model["palette"])
+    for i in range(model["triangles"]):
+        out.append((tuple(p[i * 9:i * 9 + 9]), tuple(n[i * 3:i * 3 + 3]),
+                    tuple(pal[c[i]])))
+    return sorted(out)
+
+
+def check_rest_pose(unit_id, fn, flat, live):
+    """FRAME 0 IS THE MODEL THE REVUE MEASURED, and this is the proof.
+
+    Two claims, both arithmetic:
+
+      1. every group's frame-0 matrix is the identity, so td_mesh's group-local
+         storage is world storage and a renderer that ignores the pose entirely
+         still draws the right thing;
+      2. the animated build's triangles are the un-animated build's triangles,
+         as multisets -- same coordinates, same normals, same colours. The
+         ORDER differs, because grouping re-buckets the meshes, and that is the
+         only thing allowed to differ.
+
+    Everything the last pass measured -- the EGG/SPIRE/SQUAT profiles, the maw
+    laid on the head's curve by radius_at(), the ten footprints, the empty
+    >= 0.85 shape-IoU family -- is a property of these triangles. If they are
+    the same triangles, none of it moved, and no re-measurement can say
+    otherwise.
+    """
+    for gi, group in enumerate(live["groups"]):
+        m = live["frames"][0][gi]
+        if m is None:
+            continue
+        for a, b in zip(m, IDENTITY_4X4):
+            if abs(a - b) > 1e-9:
+                raise SystemExit(
+                    "REST POSE MOVED: %s group %r frame 0 is not the identity"
+                    % (unit_id, group["name"]))
+    ref = _tris(build_unit(unit_id, fn, flat, animate=False))
+    got = _tris(live)
+    if got != ref:
+        bad = sum(1 for a, b in zip(got, ref) if a != b) + abs(len(got) - len(ref))
+        raise SystemExit("REST POSE MOVED: %s differs from the un-animated "
+                         "build in %d triangles" % (unit_id, bad))
+    return len(ref)
+
+
+def frame_extent(model, frame):
+    """World bounds and the furthest any vertex has travelled from rest, in
+    SCREEN PIXELS -- the board runs at ~1 px per unit length and R() divides by
+    exactly the px-per-unit td_mesh emits, so this is what a player sees."""
+    lo = [1e9] * 3
+    hi = [-1e9] * 3
+    moved = 0.0
+    p = model["positions"]
+    for gi, group in enumerate(model["groups"]):
+        m = model["frames"][frame][gi]
+        mm = _mat(m) if m else None
+        for i in range(group["first"], group["first"] + group["count"]):
+            v = (p[i * 3], p[i * 3 + 1], p[i * 3 + 2])
+            w = td.apply(mm, v) if mm else v
+            d = math.sqrt(sum((w[k] - v[k]) ** 2 for k in range(3)))
+            if d > moved:
+                moved = d
+            for k in range(3):
+                if w[k] < lo[k]:
+                    lo[k] = w[k]
+                if w[k] > hi[k]:
+                    hi[k] = w[k]
+    return lo, hi, moved * PX_PER_UNIT
+
+
+def check_strip(unit_id, model):
+    """What the strip costs and what it is allowed to do.
+
+    THE BUDGET IS STRUCTURAL, not a number checked here: the cycle is indexed by
+    the reload phase, so it occupies the interval exactly whatever the rate. The
+    figures printed are what that buys -- the wall time one pose is held, at the
+    unit's own rate and again with a full swarm doubling it, which is the case a
+    hand-timed animation would have got wrong by 50 %.
+
+    What IS checked: nothing sinks into the road. A group rotating about a
+    ground pivot is one sign error away from putting a body under the map, and
+    that reads as a hole in the world rather than as a mistake in an animation.
+    """
+    rest_lo, rest_hi, _ = frame_extent(model, 0)
+    worst_z, worst_move = rest_lo[2], 0.0
+    for f in range(1, len(model["frames"])):
+        lo, hi, moved = frame_extent(model, f)
+        worst_z = min(worst_z, lo[2])
+        worst_move = max(worst_move, moved)
+    sink = (rest_lo[2] - worst_z) * PX_PER_UNIT
+    if sink > 3.0:
+        raise SystemExit("%s sinks %.1f px below its rest footing" % (unit_id, sink))
+    return worst_move
+
+
+UNIT_RATE = {                  # js/blub.js UNITS[].rate, attacks per second
+    "blub1": 1.0, "blub2": 1.25, "blub3": 1.5, "mini1": 3.0, "mini2": 3.0,
+    "hungry": 0.75, "cyber": 2.0, "mecha": 2.5, "mecha2": 2.0, "superb": 1.25,
+}
+SWARM_MAX = 1.0                # BlubTower.swarmCap at A4; doubles the rate
 
 
 def main():
@@ -667,11 +1308,24 @@ def main():
     total = 0
     for unit_id, fn in UNITS:
         model = build_unit(unit_id, fn, flat)
+        check_rest_pose(unit_id, fn, flat, model)
+        travel = check_strip(unit_id, model)
         td.write_js(model, "blub-%s.js" % unit_id)
         total += model["triangles"]
-        print("  blub-%-7s %5d tris   ground radius %5.1f px"
-              % (unit_id, model["triangles"], R_of(unit_id) * PX_PER_UNIT))
+        interval = 1.0 / UNIT_RATE[unit_id]
+        print("  blub-%-7s %5d tris  r %4.1f px  %2d frames  %d group(s)  "
+              "%5.1f ms/pose (%4.1f swarmed)  travel %4.1f px"
+              % (unit_id, model["triangles"], R_of(unit_id) * PX_PER_UNIT,
+                 len(model["frames"]), len(model["groups"]),
+                 interval / CYCLE * 1000.0,
+                 interval / (1.0 + SWARM_MAX) / CYCLE * 1000.0, travel))
     print("  %d units, %d triangles total" % (len(UNITS), total))
+    print("  rest pose verified against the un-animated build for all %d"
+          % len(UNITS))
+    if flat:
+        print("  *** THESE TEN FILES ARE NOW FLAT GREY. --silhouette is a")
+        print("  *** REVIEW build: re-run without it before committing, or the")
+        print("  *** game ships grey models. It has happened once already.")
 
 
 UNIT_FOOTPRINT = {
