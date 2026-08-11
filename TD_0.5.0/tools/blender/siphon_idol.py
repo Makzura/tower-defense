@@ -1085,7 +1085,31 @@ def _hand_motion(side, amp_roll, amp_open):
 # direction whose radial component against the ring is exactly zero. That is a
 # bigger change than this defect needs; it is written down here so the next
 # person does not have to re-derive it.)
-SCEPTRE_LIFT = 0.200                       # peak vertical lift of the left hand
+SCEPTRE_LIFT = 0.230                       # peak vertical lift of the left hand
+
+# WHAT THE HEAD IS HELD TO, AND WHY IT IS NOT MIN_TRAVEL_PX.
+#
+# MIN_TRAVEL_PX (4.0) is a WHOLE-MODEL gate: it answers "is there an animation
+# here at all", which is the question the owner asked when he said "there is no
+# attack animation for the siphon". The head has a second, different question to
+# answer -- "is the staff being CARRIED or PIVOTED" -- and it needs its own
+# gate, because a staff can pass the model gate on its handle alone. That is
+# precisely what the build this replaces did: 0.428 of butt travel, 0.000013 of
+# head travel, and a PASS.
+#
+# The head cannot reach 4.0 px, and that is geometry rather than laziness.
+# Vertical is the only affordable axis (see above) and the two-bone solve caps
+# the lift at 0.24 before the wrist walks inside the reach window -- 0.24 buys
+# 3.96 px and leaves 0.0007 of margin on the floor, which is not a number to
+# ship against. So the lift is 0.23, worth 3.79 px, with 0.0042 of margin.
+#
+# HEAD_RATIO is the gate that actually encodes the defect. Under a pure
+# translation the head and the butt travel exactly the same distance, so the
+# ratio is 1.0; under the old pivot-on-the-rim construction it was 0.00003. Any
+# future edit that reintroduces a rotation private to the staff drives this
+# number down, and it fails here long before anyone has to look at the tower.
+HEAD_MIN_PX = 3.00
+HEAD_RATIO = 0.60
 
 
 def _sceptre_hand_motion(amp):
@@ -2668,8 +2692,13 @@ def main():
     print("    HANDS  base a1 a2   %s   (socle %s)" % (_fmt(HANDS), _fmt(HANDS)))
     print("    RING   a3 a4 a5     %s   (socle %s)" % (_fmt(RING), _fmt(RING)))
     for tier in TIERS:
-        name, p = exported[tier]
-        print("      siphon-%-5s -> %-5s %s" % (tier, name, _fmt(p)))
+        name, p, tr = exported[tier]
+        lo = [min(q[k] for q in tr) for k in range(3)]
+        hi = [max(q[k] for q in tr) for k in range(3)]
+        span = max(hi[k] - lo[k] for k in range(3))
+        print("      siphon-%-5s -> %-5s %s   track %d frames, widest axis "
+              "%.4f (%.2f px)"
+              % (tier, name, _fmt(p), len(tr), span, span * SCREEN_PX[2]))
 
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "siphon_origins.json")
@@ -2681,10 +2710,21 @@ def main():
                       "VEIN_ROOT": list(VEIN_ROOT),
                       "footprintUl": FOOTPRINT_UL,
                       "footprintRadius": round(FOOTPRINT_R, 4)},
+            # `frames` is the beam origin ON EVERY ANIMATION FRAME, measured off
+            # the posed geometry rather than derived. frames[0] IS `point` --
+            # asserted above, not hoped for -- because gl-world draws frame 0 to
+            # an idle Siphon, so any disagreement would jump the cord the
+            # instant a lock was acquired and jump it back when the lock drops.
+            # tools/blender/siphon_beam.py reads this into
+            # SiphonBeamSpec.originFrames, keyed by the LOWERCASE body names
+            # gl-world.js:377 `siphonGroup()` produces.
+            "frameCount": ATTACK_FRAMES,
             "origins": dict((t, {"name": exported[t][0],
                                  "point": [round(v, 4)
                                            for v in exported[t][1]],
-                                 "height": LOOKS[t]["height"]})
+                                 "height": LOOKS[t]["height"],
+                                 "frames": [[round(v, 4) for v in q]
+                                            for q in exported[t][2]]})
                             for t in TIERS),
         }, handle, indent=2)
     print("  wrote %s" % path)
