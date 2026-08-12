@@ -61,7 +61,14 @@ var FAIL_LINE = /^[ \t]+FAIL[ \t]+(.+?)[ \t]*$/;
 
 var BASELINE = [
   {
-    file: "tests/run.js", pass: 108, fail: 0,
+    // 109, not 108: one test was ADDED on 2026-08-12 -- "a scheduled fractal
+    // slime reaches the board at its declared tier". Nothing in any suite
+    // asserted that a scheduled body arrives carrying what the schedule
+    // declared, which is why a dropped `tier` argument shipped a 4 HP body
+    // where wave 25 authored a 64 HP one, with all six suites green before AND
+    // after the fix. Self-tested by reverting that argument: it goes red on
+    // all four assertions, the descendant count falling 84 -> 4.
+    file: "tests/run.js", pass: 109, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

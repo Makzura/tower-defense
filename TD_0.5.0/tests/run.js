@@ -1010,6 +1010,76 @@ test("auto-send keeps its three seconds through a cleared board", function (t) {
     "three, not five (" + h.game.waveCountdown.toFixed(2) + ")");
 });
 
+// A SCHEDULED BODY MUST REACH THE BOARD CARRYING WHAT THE SCHEDULE DECLARED.
+//
+// This exists because its absence hid a real defect for the life of the
+// project. `spawnScheduledEnemy` called `spawnEnemy` with four arguments where
+// it takes five, so the group's `tier` was dropped on the floor and wave 25's
+// authored T3 Fractal Slime arrived as a T1 -- 4 HP instead of 64. Every suite
+// stayed green throughout, and stayed green when it was fixed, because nothing
+// anywhere asserted the link between the declaration and the body.
+//
+// The two tests that look like they cover this do not:
+//   - the fractal_slime TYPE row test pins the DATA, not the scheduler.
+//   - the AoE/pierce tests construct `new Enemy(..., { tier: 2 })`, passing the
+//     tier in by hand. A test that supplies the tier itself cannot see a caller
+//     that fails to supply it, which is exactly where the bug was.
+// So this drives the REAL `spawnScheduledEnemy()` and reads the body back.
+//
+// Easy only. Normal and Hard are unfinished placeholder schedules and their
+// wave 25 declares no tier at all, so they would prove nothing here.
+test("a scheduled fractal slime reaches the board at its declared tier", function (t) {
+  var h = harness.boot("null-meridian");
+
+  // Find the group rather than typing its cursor: the wave-25 fractal group is
+  // index 3 at spawn cursor 35 today, and both move if the schedule is edited.
+  var found = h.run("(function () {" +
+    "  var groups = waveGroups(WAVES[24]);" +
+    "  var cursor = 0;" +
+    "  for (var i = 0; i < groups.length; i++) {" +
+    "    if (groups[i].type === 'fractal_slime')" +
+    "      return { cursor: cursor, tier: groups[i].tier, count: groups[i].count };" +
+    "    cursor += groups[i].count;" +
+    "  }" +
+    "  return null; })()");
+  t.ok(found !== null, "wave 25 still declares a fractal slime group");
+  t.eq(found.tier, 3, "declared at tier 3");
+
+  var body = h.run("(function () {" +
+    "  enemies.length = 0; bullets.length = 0;" +
+    "  waveIndex = 24; waveSpawned = " + found.cursor + ";" +
+    "  spawnScheduledEnemy();" +
+    "  var e = enemies[0];" +
+    "  return e ? { type: e.type && e.type.id, maxHealth: e.maxHealth," +
+    "               fractalTier: e.fractalTier, bounty: e.bounty() } : null; })()");
+  t.ok(body !== null, "the scheduled beat put a body on the board");
+
+  // 64, not 4. An untiered slime is 4 HP, so this single number is the whole
+  // difference between the fix being present and absent.
+  t.eq(body.type, "fractal_slime", "the declared type arrived");
+  t.eq(body.maxHealth, 64, "at the tier's health, not the untiered 4");
+  t.eq(body.fractalTier, 3, "carrying the declared tier itself");
+  t.eq(body.bounty, 32, "and worth the tier's bounty");
+
+  // THE STRONGEST OF THE FOUR. A health number could be right by coincidence --
+  // a generation count cannot. 84 bodies is 4 T2 + 16 T1 + 64 T0, which only a
+  // genuinely tiered root can produce; a T1 root leaves 4 and a T0 leaves none.
+  // Driven through the game's own death sweep in update(), not by calling
+  // splitOnDeath directly, so the scoring and removal path is the real one.
+  var brood = h.run("(function () {" +
+    "  var seen = 0, guard = 0;" +
+    "  while (enemies.length > 0 && guard++ < 40) {" +
+    "    for (var i = 0; i < enemies.length; i++) enemies[i].takeDamage(1e9);" +
+    "    var before = enemies.slice();" +
+    "    update(FIXED_STEP);" +
+    "    for (var j = 0; j < enemies.length; j++)" +
+    "      if (before.indexOf(enemies[j]) === -1) seen++;" +
+    "  }" +
+    "  return { descendants: seen, left: enemies.length }; })()");
+  t.eq(brood.descendants, 84, "84 descendants: 4 T2, 16 T1 and 64 T0");
+  t.eq(brood.left, 0, "and the board empties");
+});
+
 group("game speed");
 
 test("the corner button cycles 1x, 2x, 3x and back", function (t) {
