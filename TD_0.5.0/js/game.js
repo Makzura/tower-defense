@@ -330,11 +330,21 @@ var EASY_WAVES = [
   // Wave 25 introduces the Fractal Slime at T3: one 64 HP body which divides
   // through T2, T1 and T0 when killed. Only the root is authored here; all 84
   // descendants are produced by the one type's `fractal` block.
+  //
+  // The root's `lead` is 6, not the 3 the rest of the wave is spaced on. Until
+  // 2026-08-12 the tier never reached the spawner, so this group put a 4 HP T1
+  // on the road and the gap did not matter; with the tier arriving, the same
+  // beat has to cover a body that divides four times. The longer lead lets the
+  // wave's other 35 bodies clear first, so the cascade resolves on an empty
+  // road instead of on top of the Armored. It buys ROOM, not difficulty: the
+  // cascade conserves health -- four bodies at a quarter each, so never more
+  // than the root's 64 points are in flight -- and measured peak concurrency
+  // does not rise.
   { groups: [                                                     // 984 effective HP + split generations
     { count: 20, interval: 0.45, health: 22 },
     { count: 5,  interval: 1.8,  type: "shielded", health: 20, lead: 2 },
     { count: 10, interval: 0.7,  type: "armored", health: 18, lead: 2 },
-    { count: 1,  interval: 1,    type: "fractal_slime", tier: 3, lead: 3 }
+    { count: 1,  interval: 1,    type: "fractal_slime", tier: 3, lead: 6 }
   ] },
   { count: 2,  interval: 5,    type: "hive", health: 220 },       // 440 HP  first spawner -- its BROOD is the cost
 

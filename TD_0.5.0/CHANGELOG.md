@@ -13,6 +13,35 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — wave 25's Fractal Slime gets its own beat: `lead` 3 → 6, so the
+cascade the tier fix restored resolves on a clear road.**
+
+Balance change, nadia's, following the mechanism fix in the entry below. One
+number on one group.
+
+Until the tier reached the spawner, wave 25's fractal group put a **4 HP T1** on
+the road and its spacing did not matter. With the tier arriving it is a **64 HP
+T3** that divides four times into **84 descendants**, and the authored `lead` of
+3 dropped it on top of the ten Armored still walking. The root now leads by 6,
+which lets the wave's other 35 bodies clear first.
+
+**This buys ROOM, not difficulty, and that distinction was measured rather than
+assumed.** A fractal cascade CONSERVES health — each tier splits into four
+bodies of a quarter its health, so `4 × 4^(t-1) = 4^t` and never more than the
+root's 64 points are in flight. The generations are serial, not simultaneous: a
+generation exists only once the one above it dies. Measured peak concurrency on
+wave 25 is 23–29 bodies and **does not rise** with the longer lead; in most runs
+the wave's peak is now *lower*, because the slime arrives last on a board that
+is already clear. An earlier claim that 84 bodies constituted a throughput
+problem was withdrawn when concurrency was actually measured.
+
+Nothing in the declared schedule moves: `lead` is spacing only, so scheduled
+**23 867**, effective **25 969**, **$23 503** of kill bounties and wave 25's own
+**984** effective HP are all unchanged — recomputed on both the unretuned and
+retuned trees to prove it. The six suites are identical either side, by name,
+measured with both arms extracted from commit `0f82edd` rather than read off a
+shared working tree.
+
 **2026-08-12 — `AGENTS.md` said nothing about where the repository starts, and
 a tracked design document was nearly reconstructed because of it.**
 
