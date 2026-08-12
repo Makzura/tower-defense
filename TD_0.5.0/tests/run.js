@@ -18,22 +18,10 @@ var runner = require("./assert");
 var group = runner.group;
 var test = runner.test;
 
-// ---------------------------------------------------------------------------
-// Map coordinates in this file are given in the pixel positions the road was
-// originally DRAWN at. w() maps them onto wherever that point actually sits
-// now: the path is authored in u.l. (PATH_POINTS_UL = drawn pixels /
-// AUTHORED_AT_PX_PER_UL) and rendered through ul(), so the same ratio maps a
-// drawn coordinate to a live one. Reading both constants from the game means
-// retuning either cannot invalidate a single coordinate in this file --
-// which has already happened twice.
-//
-// INTERFACE coordinates -- build slots, the Sell button, the panel -- are
-// NOT passed through this. Chrome is anchored to the 1280x720 viewport and
-// deliberately does not scale (see AGENTS.md).
-// ---------------------------------------------------------------------------
-function w(h, value) {
-  return value * h.game.UNIT_LENGTH / h.game.AUTHORED_AT_PX_PER_UL;
-}
+// Authored-pixel coordinates -> live ones. Defined in the harness, where
+// content.test.js can reach the SAME copy; see the note on it there for why
+// this is not four lines in each suite.
+var w = harness.w;
 
 // ---------------------------------------------------------------------------
 // The Arcane Sniper's B5 ability is CHANNELLED, not instant. performAction()

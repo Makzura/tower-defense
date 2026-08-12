@@ -21,6 +21,12 @@ var runner = require("./assert");
 var group = runner.group;
 var test = runner.test;
 
+// Authored-pixel coordinates -> live ones, shared with tests/run.js rather than
+// copied. Twelve call sites in this file used w() while nothing here defined
+// it, so four tests threw `ReferenceError: w is not defined` and had never run
+// a single assertion. See the note on w() in tests/harness.js.
+var w = harness.w;
+
 // Lived outside the extracted groups in the original suite.
 function Targeting_MODES(h) {
   return h.game.Targeting.MODES;

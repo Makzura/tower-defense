@@ -457,4 +457,32 @@ function boot(mapId) {
 }
 
 
-module.exports = { boot: boot, gameScripts: gameScripts };
+// ---------------------------------------------------------------------------
+// AUTHORED-PIXEL COORDINATES -> LIVE ONES.
+//
+// Map coordinates in the suites are written as the pixel positions the road was
+// originally DRAWN at. w() maps them onto wherever that point actually sits
+// now: the path is authored in u.l. (PATH_POINTS_UL = drawn pixels /
+// AUTHORED_AT_PX_PER_UL) and rendered through ul(), so the same ratio maps a
+// drawn coordinate to a live one. Reading both constants from the game means
+// retuning either cannot invalidate a single coordinate in a suite -- which has
+// already happened twice.
+//
+// INTERFACE coordinates -- build slots, the Sell button, the panel -- are NOT
+// passed through this. Chrome is anchored to the 1280x720 viewport and
+// deliberately does not scale (see AGENTS.md).
+//
+// It lives HERE, in the harness, rather than in either suite, because both need
+// it and a second copy of one conversion reading the same two game constants is
+// how the two quietly diverge. content.test.js had no copy at all: four of its
+// tests called w() and threw `ReferenceError: w is not defined`, so they had
+// never executed a single assertion. Copying the four lines across would have
+// fixed those four and created exactly the duplication this project keeps
+// paying for -- so it moved instead. Same precedent as slotOf above.
+// ---------------------------------------------------------------------------
+function w(h, value) {
+  return value * h.game.UNIT_LENGTH / h.game.AUTHORED_AT_PX_PER_UL;
+}
+
+
+module.exports = { boot: boot, gameScripts: gameScripts, w: w };
