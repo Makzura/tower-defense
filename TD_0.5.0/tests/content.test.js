@@ -785,13 +785,18 @@ test("the Tyrant's aimed shot takes the HIGHEST DPS tower, not the nearest", fun
   t.ok(boss.currentSpeedUlps() > 0, "it walks again once the shot is away");
 });
 
-test("the leap jumps 50 u.l. and shockwaves everything it lands beside", function (t) {
+test("the leap jumps 90 u.l. and shockwaves everything it lands beside", function (t) {
   var h = harness.boot();
   h.run("cash = 1000000; waveIndex = WAVES.length; enemies = []; bullets = []; towers = []");
 
-  var a = h.placeGunner(w(h, 600), w(h, 455));
-  var b = h.placeGunner(w(h, 660), w(h, 455));
-  var away = h.placeGunner(w(h, 900), w(h, 455));
+  // y=505, not 455. The road runs at y=460, so 455 is five pixels off its
+  // centre line and every one of these placements was refused as "too close to
+  // the path" -- placeGunner returned null and the test died on null.currentHp.
+  // 505 is the offset the rest of the suites stand towers at.
+  var a = h.placeGunner(w(h, 600), w(h, 505));
+  var b = h.placeGunner(w(h, 660), w(h, 505));
+  var away = h.placeGunner(w(h, 900), w(h, 505));
+  t.ok(a && b && away, "three towers actually stand beside the road");
 
   h.run("enemies = [new Enemy(path, undefined, 'boss')]");
   h.run("enemies[0].progress = path.progressAtPoint(" + w(h, 580) + ", " + w(h, 505) + ")");
@@ -800,11 +805,23 @@ test("the leap jumps 50 u.l. and shockwaves everything it lands beside", functio
 
   // Roar first -- the leap is not in the pool until then -- and drain the
   // summons so only the boss is on the board.
-  boss.takeDamage(1251);
+  //
+  // DERIVED from the boss's own maximum rather than typed. This read 1251, which
+  // crossed the 50% mark when the Tyrant had 2500 HP. It has 5000, so 1251 left
+  // it at 74.98%, the phase never fired, the leap was never added to its attack
+  // list and the "leap" this test measured was simply the boss walking.
+  boss.takeDamage(Math.floor(boss.maxHealth / 2) + 1);
   boss.spawnMinions(1 / 60);
   h.run("enemies = [enemies[0]]");
+  t.ok(boss.health < boss.maxHealth * 0.5, "the roar threshold was actually crossed");
 
-  boss.attackIndex = 1;                    // next in the cycle is the leap
+  // Ask which slot the leap landed in rather than assuming it is second: it is
+  // appended by the phase, so a second added attack would silently shift it.
+  var leapIndex = h.run("(function () { var A = enemies[0].attacks;" +
+    "  for (var i = 0; i < A.length; i++) if (A[i].id === 'leap') return i;" +
+    "  return -1; })()");
+  t.ok(leapIndex >= 0, "the roar added the leap to its attacks");
+  boss.attackIndex = leapIndex;
   boss.attackTimer = 0.01;
 
   // Measure the jump on the step it happens: afterwards the boss walks on, and
@@ -817,9 +834,14 @@ test("the leap jumps 50 u.l. and shockwaves everything it lands beside", functio
     if (moved > h.game.ul(10)) jumped = moved;
   }
 
-  t.near(jumped / h.game.UNIT_LENGTH, 50, 0.01, "it jumps exactly 50 u.l.");
-  t.ok(a.currentHp < a.maxHp && b.currentHp < b.maxHp, "both nearby towers took the shockwave");
-  t.eq(a.maxHp - a.currentHp, 30, "for 30 each");
+  t.near(jumped / h.game.UNIT_LENGTH, 90, 0.01, "it jumps exactly 90 u.l.");
+
+  // The shockwave deals 80 and the reference tower has 60 hit points, so
+  // anything it lands beside is destroyed outright rather than merely dented.
+  // That is why this asserts death and not a damage figure: a "30 each" reading
+  // would be measuring the clamp, not the blast.
+  t.ok(a.currentHp === 0 && b.currentHp === 0, "both nearby towers are emptied");
+  t.ok(a.isDestroyed() && b.isDestroyed(), "which destroys them outright");
   t.ok(h.game.TowerHealth.isStunned(a) && h.game.TowerHealth.isStunned(b), "and both are stunned");
   t.eq(away.currentHp, away.maxHp, "the one outside the radius is untouched");
 });
@@ -830,7 +852,15 @@ test("after the roar it alternates shot and leap, and still attacks rarely", fun
 
   // Towers all along the road, so it always has something to attack and the
   // cycle is what is being measured rather than target availability.
-  for (var i = 0; i < 14; i++) h.placeGunner(w(h, 300 + i * 70), w(h, 455));
+  //
+  // y=505, not 455: the road's centre line is y=460, so every one of these
+  // fourteen placements was refused as "too close to the path" and the board
+  // this test describes was empty.
+  var standing = 0;
+  for (var i = 0; i < 14; i++) {
+    if (h.placeGunner(w(h, 300 + i * 70), w(h, 505))) standing++;
+  }
+  t.ok(standing >= 10, "a row of towers actually stands along the road (" + standing + ")");
 
   h.run("enemies = [new Enemy(path, undefined, 'boss')]");
   h.run("enemies[0].progress = path.progressAtPoint(" + w(h, 320) + ", " + w(h, 505) + ")");
@@ -847,9 +877,14 @@ test("after the roar it alternates shot and leap, and still attacks rarely", fun
   t.ok(before >= 3 && before <= 6,
     "pre-roar it attacks " + before + " times in 45 s (it was ~12 at 3.5 s)");
 
-  boss.takeDamage(1251);
+  // Derived from the boss's own maximum, not typed. 1251 crossed the 50% mark
+  // when the Tyrant had 2500 HP; it has 5000, so the roar never fired, the leap
+  // was never added, and every attack in `order` below was the same "aimed" --
+  // which is exactly why "never the same attack twice running" was false.
+  boss.takeDamage(Math.floor(boss.maxHealth / 2) + 1);
   boss.spawnMinions(1 / 60);
   h.run("enemies = [enemies[0]]");
+  t.ok(boss.attacks.length >= 2, "the roar gave it a second attack to alternate with");
 
   var order = [];
   for (var k = 0; k < 45 * 60; k++) {

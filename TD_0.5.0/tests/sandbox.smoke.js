@@ -138,7 +138,7 @@ function makeElement(tag) {
 var IDS = [
   "sidebar",
   "game", "towerList", "enemyHp", "enemyType", "enemyTier", "spawnOne", "spawnFive", "spawnWave1",
-  "spawnWave2", "spawnTanky", "clearEnemies", "waveDifficulty", "autoWaves", "selectedName",
+  "spawnWave2", "spawnTanky", "clearEnemies", "autoWaves", "selectedName",
   "mapList", "selectedStats", "upgradeControls", "buyA", "buyB", "reaimCone", "useAbility",
   "upgradeNote", "maxField", "maxFieldStatus", "showRange", "showDeadzone", "showFootprint", "showLabels",
   "unitLength", "resetBoard", "exitToMenu", "runState", "log",
@@ -304,38 +304,43 @@ step(5);
 check("no enemies appear on their own with waves off",
   sandbox.enemies.length === 0, "enemies = " + sandbox.enemies.length);
 
-// --- difficulty tiers ------------------------------------------------------
+// --- the schedule switch ----------------------------------------------------
 //
-// This version keeps the Easy/Normal/Hard picker, so the Sandbox has to keep
-// offering it. Built from the same registry as the shipping chooser, which is
-// what stops a renamed difficulty leaving the workbench behind.
-
-check("the wave picker offers Easy, Normal and Hard",
-  elements.waveDifficulty.childNodes.map(function (option) { return option.value; })
-    .join(",") === "easy,normal,hard");
-
-elements.waveDifficulty.value = "hard";
-elements.waveDifficulty.fire("change");
-check("Sandbox can select the Hard schedule",
-  sandbox.selectedDifficultyId === "hard" &&
-  sandbox.WAVES === sandbox.DIFFICULTIES.hard.waves &&
-  sandbox.waveIndex === sandbox.WAVES.length);
+// There is ONE schedule since 2026-08-12. Normal and Hard were deleted as
+// unfinished placeholders, and the difficulty concept went with them, so the
+// picker and everything that drove it are gone: no `waveDifficulty` element,
+// no `selectedDifficultyId`, no `DIFFICULTIES`. What survives is the only part
+// that was ever about the workbench -- the auto-waves switch, which runs the
+// campaign schedule on a board that otherwise only spawns what you ask it to.
+//
+// Two checks were DELETED here rather than repaired, because their subject was
+// deleted: "the wave picker offers Easy, Normal and Hard" and "Sandbox can
+// select the Hard schedule".
+//
+// The bare `elements.waveDifficulty.fire("change")` that used to sit between
+// them went too, and it mattered more than either: it was a loose statement
+// outside any check(), and fire() throws when nothing is listening. With the
+// dropdown gone it killed the process, so this file stopped REPORTING rather
+// than started failing -- and the three checks below it never ran at all. A
+// suite that dies quietly reads downstream as an improvement, which is the
+// most dangerous output there is.
 
 elements.autoWaves.checked = true;
 elements.autoWaves.fire("change");
 step(sandbox.FIXED_STEP);
-check("the selected schedule runs from wave 1",
+check("the schedule runs from wave 1",
   sandbox.waveIndex === 0 && sandbox.waveSpawned === 1 &&
-  sandbox.enemies.length > 0);
+  sandbox.enemies.length > 0,
+  "waveIndex " + sandbox.waveIndex + ", spawned " + sandbox.waveSpawned +
+  ", enemies " + sandbox.enemies.length);
 
 elements.autoWaves.checked = false;
 elements.autoWaves.fire("change");
-elements.waveDifficulty.value = "easy";
-elements.waveDifficulty.fire("change");
 check("turning schedules off restores the empty manual-spawn board",
   sandbox.enemies.length === 0 &&
-  sandbox.waveIndex === sandbox.WAVES.length &&
-  sandbox.selectedDifficultyId === "easy");
+  sandbox.waveIndex === sandbox.WAVES.length,
+  "enemies " + sandbox.enemies.length + ", waveIndex " + sandbox.waveIndex +
+  " of " + sandbox.WAVES.length);
 
 // --- spawning --------------------------------------------------------------
 

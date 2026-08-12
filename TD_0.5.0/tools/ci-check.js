@@ -81,7 +81,7 @@ var BASELINE = [
     failing: []
   },
   {
-    file: "tests/content.test.js", pass: 204, fail: 8,
+    file: "tests/content.test.js", pass: 205, fail: 7,
     // Was 182/30. Twenty-two repaired on 2026-08-12, none of them by changing
     // product code: the gunner-deletion roster shift (3), two renames, the
     // recruit cooldown (2), and the 2026-08-01 upgrade retune (15) -- upgrades
@@ -104,7 +104,6 @@ var BASELINE = [
       "the roar shields it, speeds it up, and calls the wave back",
       "a stunned tower goes completely silent, cooldown and all",
       "the Tyrant's aimed shot takes the HIGHEST DPS tower, not the nearest",
-      "the leap jumps 50 u.l. and shockwaves everything it lands beside",
       "after the roar it alternates shot and leap, and still attacks rarely",
       "B4 pierces DEFENCE in flat percentage points, never below zero",
       "path B answers a brute with damage, not with pierce"
