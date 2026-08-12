@@ -491,6 +491,28 @@ test("ConfiguredTower gates the ability behind the B5 flag", function (t) {
     "tower stunned for the configured exhaustion");
 });
 
+// Neither test above pins what the tower SHIPS with. The one before passes its
+// own stunSeconds, so it proves "given 10 you get 10"; the one above reads the
+// config, so it proves the gate wires through whatever is there. Between them
+// the shipped 7 was pinned nowhere, and the ability could have been retuned to
+// any number at all without a suite noticing.
+//
+// This pins the DECISION instead of the number, which is what the config
+// records at activeAbility.channelSeconds: the ability was split into a
+// visible ritual and an exhaustion, and the owner's stated condition was that
+// the total cost to the player did not change. So the two knobs are
+// independent but their sum is not free, and the realistic mistake -- moving
+// the channel and forgetting the stun -- is exactly what this catches. The 10
+// is typed on purpose: derive it and this asserts only that a sum equals
+// itself.
+test("the ritual and the exhaustion still cost ten seconds between them", function (t) {
+  var ability = CONFIG.mechanics.activeAbility;
+  t.ok(ability.channelSeconds > 0, "there is a ritual to watch");
+  t.ok(ability.stunSeconds > 0, "and an exhaustion after it");
+  t.eq(ability.channelSeconds + ability.stunSeconds, 10,
+    "three seconds of channel plus seven of stun, as before the split");
+});
+
 
 // ---------------------------------------------------------------------------
 group("pricing");

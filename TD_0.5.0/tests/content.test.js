@@ -1835,21 +1835,35 @@ test("it shares the gunner footprint, so spacing rules are identical", function 
   t.eq(h.run("whyCannotBuild(600, 460, Smasher)"), "too close to the path", "on the road");
 });
 
-test("it is placed from build slot 2 and does not disturb the gunner", function (t) {
+test("it is placed from its own build slot, and the shared reference is untouched",
+function (t) {
   var h = harness.boot();
   h.run("cash = 100000");
-  h.key("2");
-  t.eq(h.game.selectedSlot, 1, "slot 2 arms");
+
+  // Ask which slot holds the Warbringer rather than typing one. Deleting the
+  // gunner on 2026-07-30 shed the first catalogue entry and shifted every slot
+  // down by one, so the typed 2 in this test had been arming the Arcane Sniper
+  // and then asserting it was a Smasher. The number keys are 1-based over the
+  // same list, so the key follows the slot rather than being typed either.
+  var slot = h.slotOf(h.game.Smasher);
+  t.ok(slot >= 0, "the Warbringer is somewhere in the build bar");
+  h.key(String(slot + 1));
+  t.eq(h.game.selectedSlot, slot, "its own slot arms");
 
   h.click(600, 500);
   t.eq(h.game.towers.length, 1, "a tower was placed");
   // "Warbringer" since the 2026-07-30 reskin; the constructor and the save id
-  // are both still `Smasher`, which is what slot 2 actually holds.
+  // are both still `Smasher`, which is what that slot actually holds.
   t.eq(h.game.towers[0].name, "Warbringer", "and it is a smasher");
 
-  t.eq(h.game.Tower.COST, 100, "gunner cost unchanged");
-  t.eq(h.game.Tower.BASE_DAMAGE, 1, "gunner damage unchanged");
-  t.eq(h.game.Tower.BASE_RANGE_UL, 100, "gunner range unchanged");
+  // js/tower.js OUTLIVED the gunner's deletion: it is still loaded as the
+  // shared footprint/hit-test source and the 100 u.l. reference every tower is
+  // authored against. So these constants still have to hold -- what changed is
+  // that nobody can build the thing any more, which is the first assertion.
+  t.eq(h.slotOf(h.game.Tower), -1, "but the gunner itself is no longer buildable");
+  t.eq(h.game.Tower.COST, 100, "reference cost unchanged");
+  t.eq(h.game.Tower.BASE_DAMAGE, 1, "reference damage unchanged");
+  t.eq(h.game.Tower.BASE_RANGE_UL, 100, "the 100 u.l. reference range unchanged");
   t.eq(h.game.Enemy.BASE_HEALTH, 4, "enemy health unchanged");
   t.eq(h.game.Enemy.BASE_SPEED_ULPS, 50, "enemy speed unchanged");
 });
@@ -3851,26 +3865,99 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   t.deep(fractal.waves, [25], "with its wave 25 introduction");
 });
 
-test("the enemy index is a compact list with a clickable detail selection", function (t) {
+// The roster became a SCROLLING VIEWPORT on 2026-08-01, at the owner's request
+// for bigger rows with about ten visible at once (js/codex.js, above
+// ENEMY_ROW_H). This test used to assert that every row fitted on one screen
+// and that rows were compact; both are now false BY DESIGN rather than by
+// drift, and neither was a bug when it was written.
+//
+// They are not simply deleted here. Each was protecting something that outlived
+// the redesign, and the replacement pins that instead:
+//
+//  - "every row fits on one screen" was protecting REACHABILITY. In a list that
+//    does not scroll, on-screen and reachable are the same thing; scrolling
+//    separated them. So the pair of scroll-extreme assertions below replaces it
+//    -- a clamp that strands the last row fails one of them, and a clamp that
+//    lets the list be pushed off into nothing fails the other.
+//  - "the roster uses compact list rows" was protecting the LAYOUT UNIT. The
+//    unit is the visible ROW COUNT, which js/codex.js is explicit about
+//    ("TEN ROWS IS THE UNIT OF THE LAYOUT") and derives the viewport height
+//    from. So that is what is asserted, read from the module rather than typed,
+//    because a typed 10 would be a second copy of the same truth.
+test("the enemy index is a scrolling roster with a clickable detail selection",
+function (t) {
   var h = bootIndex();
   var tab = h.run("Codex.tabRect(1)");
   h.click(tab.x + tab.w / 2, tab.y + tab.h / 2);
 
-  var enemies = h.run("Codex.models()" ).enemies;
-  var last = h.run("Codex.enemyCardRect(" + (enemies.length - 1) + ")");
-  t.ok(last.y + last.h <= h.game.VIEW_HEIGHT,
-    "every enemy row fits on one screen");
-  t.ok(last.h <= 30, "the roster uses compact list rows");
+  var enemies = h.run("Codex.models()").enemies;
+  var view = h.run("Codex.enemyListViewport()");
+  var visibleRows = h.run("Codex.enemyVisibleRows()");
+  var lastIndex = enemies.length - 1;
 
-  var detail = h.run("Codex.enemyDetailRect()");
-  t.ok(detail.w > last.w && detail.h > last.h * 10,
-    "the selected enemy gets a large detail panel");
+  function rectOf(i) { return h.run("Codex.enemyCardRect(" + i + ")"); }
+  function fullyInside(i) {
+    var r = rectOf(i);
+    return r.y >= view.y && r.y + r.h <= view.y + view.h;
+  }
+  function rowsFullyInside() {
+    var n = 0;
+    for (var i = 0; i < enemies.length; i++) if (fullyInside(i)) n++;
+    return n;
+  }
 
+  // Without this the two reachability assertions below could both be satisfied
+  // by a roster short enough to need no scrolling at all.
+  t.ok(enemies.length > visibleRows,
+    "the roster is longer than the viewport, so there is a real scroll to test");
+  t.ok(h.run("Codex.enemyScrollMax()") > 0, "and a scroll range to move through");
+
+  t.ok(fullyInside(0), "at rest the first row is fully inside the viewport");
+  t.eq(rowsFullyInside(), visibleRows,
+    "exactly the declared number of rows is visible at once");
+
+  // The viewport GATE. A row scrolled out of the list must not be clickable
+  // even though it is still on the screen -- js/codex.js tests the viewport
+  // before the row. The index is derived: the first row past the visible ones
+  // is the first that is out of view, whatever the roster length becomes.
+  var hiddenIndex = visibleRows;
+  var hidden = rectOf(hiddenIndex);
+  var hiddenCentreY = hidden.y + hidden.h / 2;
+  t.ok(!fullyInside(hiddenIndex), "the row past the last visible one is out of view");
+  t.ok(hiddenCentreY < h.game.VIEW_HEIGHT,
+    "and still on the screen, so clicking it is a real test of the gate");
+  var selectedBefore = h.run("Codex.state().enemyIndex");
+  h.click(hidden.x + hidden.w / 2, hiddenCentreY);
+  t.eq(h.run("Codex.state().enemyIndex"), selectedBefore,
+    "clicking a row outside the viewport selects nothing");
+
+  // A visible row still selects. This used to pass by luck: it picks the
+  // colossus, which happens to sit inside the visible ten, so adding one enemy
+  // ahead of it would have turned this into a silent no-op against the gate
+  // above. The assertion that it is visible is what stops that.
   var colossusIndex = enemies.map(function (enemy) { return enemy.id; }).indexOf("colossus");
-  var row = h.run("Codex.enemyCardRect(" + colossusIndex + ")");
+  t.ok(colossusIndex >= 0, "the colossus is in the roster");
+  t.ok(fullyInside(colossusIndex), "and it is one of the visible rows");
+  var row = rectOf(colossusIndex);
   h.click(row.x + row.w / 2, row.y + row.h / 2);
-  t.eq(h.run("Codex.state()").enemyIndex, colossusIndex,
-    "clicking a list row selects that enemy");
+  t.eq(h.run("Codex.state().enemyIndex"), colossusIndex,
+    "clicking a visible list row selects that enemy");
+
+  // The other end of the scroll: the last row has to be reachable.
+  h.run("Codex.onWheel(" + (view.x + 5) + ", " + (view.y + 5) + ", 100000)");
+  t.eq(h.run("Codex.state().enemyScroll"), h.run("Codex.enemyScrollMax()"),
+    "the wheel clamps at the bottom rather than running past it");
+  t.ok(fullyInside(lastIndex),
+    "scrolled to the end, the last row is fully inside the viewport");
+  t.eq(rowsFullyInside(), visibleRows, "and it is still showing a full viewport");
+
+  // Measured against the list viewport, not against a row height. Comparing it
+  // to a multiple of the row height meant retuning ENEMY_ROW_H could fail this
+  // for a reason that has nothing to do with the detail panel.
+  var detail = h.run("Codex.enemyDetailRect()");
+  t.ok(detail.w > view.w, "the detail panel is wider than the list it sits beside");
+  t.ok(detail.h >= view.h, "and at least as tall, so the two columns bottom out level");
+
   h.draw();
   t.ok(true, "the selected enemy detail draws");
 });
@@ -4011,17 +4098,22 @@ test("a fresh profile owns the starter kit and nothing else", function (t) {
   h.run("MetaProgress.reset(); rebuildBuildBar()");
 
   var profile = h.run("MetaProgress.snapshot()");
-  t.deep(profile.owned, ["gunner", "smasher", "soldier"],
-    "gunner, Smasher and Soldier to start");
+  // The gunner was DELETED from the catalogue on 2026-07-30, so the starter kit
+  // is two towers rather than three. These are typed on purpose: this test's
+  // subject IS the starter kit, so reading it from MetaProgress would only
+  // assert that the kit equals itself and would pass whatever it became.
+  t.deep(profile.owned, ["smasher", "soldier"],
+    "the Smasher and the Soldier to start");
   t.eq(profile.coins, 0, "no coins");
 
   // The Soldier is LAST in the catalogue, which is what puts it in the fifth
   // slot once everything is owned -- but defaultLoadout compacts, so on a
-  // fresh profile it sits in the third rather than leaving two holes.
+  // fresh profile it sits directly behind the Warbringer rather than leaving
+  // holes. That is the second slot now the gunner is not in front of it.
   var bar = h.run("BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; })");
   // Display names, so they carry the 2026-07-30 reskin; the ids above are the
   // persistence format and are deliberately unchanged.
-  t.deep(bar, ["Gunner", "Warbringer", "Rifleman", null, null],
+  t.deep(bar, ["Warbringer", "Rifleman", null, null, null],
     "and a bar to match");
 
   // The bar's LENGTH is the one thing that must never move: its geometry is
@@ -4068,7 +4160,14 @@ test("a run banks its coins exactly once", function (t) {
 
 test("buying a tower spends coins and puts it in the bar", function (t) {
   var h = bootStore();
-  var card = h.run("Store.cardRect(2)");        // the Longshot
+  // Ask the catalogue where the Longshot's card is rather than typing an
+  // index, for the same reason h.slotOf exists: deleting the gunner shed the
+  // first catalogue entry, so the typed 2 here had come to mean the Siphon and
+  // this test was quietly buying a different tower than it names.
+  var cardIndex = h.run(
+    "MetaProgress.catalogue().map(function (c) { return c.id; }).indexOf('longshot')");
+  t.ok(cardIndex >= 0, "the Longshot is in the catalogue");
+  var card = h.run("Store.cardRect(" + cardIndex + ")");
   h.run("Store.onClick(" + (card.x + 10) + ", " + (card.y + 10) + ")");
   t.eq(h.run("Store.state()").picked, "longshot", "its card is open");
 
@@ -4082,12 +4181,16 @@ test("buying a tower spends coins and puts it in the bar", function (t) {
 
   h.run("Store.onClick(" + (action.x + 10) + ", " + (action.y + 10) + ")");
   t.eq(h.run("MetaProgress.owns('longshot')"), true, "now it is owned");
+  // 64 banked less the Longshot's price of 40. Typed rather than read back
+  // from the catalogue: what this line is for is that buying CHARGES, and an
+  // expectation computed from the same price the purchase used would hold even
+  // if nothing were deducted at all.
   t.eq(h.run("MetaProgress.coins()"), 24, "and paid for");
 
-  // Into the first FREE slot, which is the fourth now that the Soldier is a
-  // starter sitting in the third.
+  // Into the first FREE slot, which is the third now that the gunner is gone
+  // from in front of the two starters.
   var bar = h.run("BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; })");
-  t.deep(bar, ["Gunner", "Warbringer", "Rifleman", "Arcane Sniper", null],
+  t.deep(bar, ["Warbringer", "Rifleman", "Arcane Sniper", null, null],
     "a purchase goes straight into the bar");
 });
 
@@ -4612,7 +4715,12 @@ test("recruits march the road backwards and are not towers", function (t) {
 
   t.eq(s.callRecruits(), null, "the ability fires");
   t.eq(s.recruitCooldown, s.recruitCooldownSeconds, "the cooldown starts");
-  t.eq(s.recruitCooldownSeconds, 40, "and at B4 that is still 40 s");
+  // 45 since 2026-08-01, at the owner's instruction that B4 and B5 both call on
+  // the same 45 s -- so what B5 buys is a bigger squad, not a more frequent one
+  // (js/soldier.js, RECRUIT_COOLDOWN_SECONDS and the B5 tier's cooldownSeconds).
+  // Typed, not read back off the tower: the subject of this line IS the period,
+  // and reading it from the Soldier would assert only that it equals itself.
+  t.eq(s.recruitCooldownSeconds, 45, "and at B4 that is 45 s");
 
   // The first arrives at once, the second after the stagger.
   var bullets = [];
@@ -5009,14 +5117,26 @@ test("an auto switch fires its ability the moment it is ready", function (t) {
   t.eq(s.recruitPending.length + s.recruits.length, 2, "and the group is on its way");
 
   // And it re-fires when the cooldown runs out, which is the whole point.
+  //
+  // The wait and the threshold are both DERIVED from the period rather than
+  // typed. They were 41 s and "> 30", which worked only while the period was
+  // 40: at 45 the wait now ends four seconds SHORT of the first call expiring,
+  // so the timer read 4.0 and the test failed for the wrong reason -- not
+  // "no second call" but "we never waited long enough to deserve one".
+  //
+  // The threshold has to stay near the TOP of the period to mean anything. A
+  // restarted timer reads just under the full period; one that was never
+  // restarted has run down to nothing. Something like "> 0" would be satisfied
+  // by either and would pin nothing at all.
   var firstGroup = s.recruits.length + s.recruitPending.length;
   t.ok(firstGroup > 0, "first group out");
-  for (var j = 0; j < Math.round(41 / h.game.FIXED_STEP); j++) {
+  var period = s.recruitCooldownSeconds;
+  for (var j = 0; j < Math.round((period + 1) / h.game.FIXED_STEP); j++) {
     s.update(h.game.FIXED_STEP, [], bullets);
   }
-  t.ok(s.recruitCooldown > 30,
-    "41 s later the cooldown has been restarted by a second automatic call: " +
-      s.recruitCooldown.toFixed(1));
+  t.ok(s.recruitCooldown > period - 2,
+    "a second past the period the cooldown has been restarted by a second " +
+      "automatic call: " + s.recruitCooldown.toFixed(1) + " of " + period);
 });
 
 test("the auto switch can be flipped while its ability is on cooldown", function (t) {
@@ -5129,15 +5249,27 @@ test("the Soldier's panel speaks the shared vocabulary", function (t) {
   t.eq(rows.indexOf("Target"), -1, "and no Target row -- the button under it says that");
 
   // The three conditional rows appear only once their tier is owned.
+  //
+  // The Soldier's row is "Defense pierce", not "Pierce". They are different
+  // stats, not two names for one: the Longshot's Pierce is a COUNT of bodies a
+  // shot passes through, while the Soldier's B4 is a flat percentage taken off
+  // defence (js/soldier.js, upgrade B4 defenseFlatPierce). This test had the
+  // Longshot's label AND the Longshot's value of 6 on the Soldier's panel, so
+  // the row lookup found nothing and the test died reading [1] off undefined.
+  // The "before B4" line below had been passing vacuously all along -- there is
+  // no row called "Pierce" on this tower at any tier, so it could never fail.
   t.eq(rows.indexOf("Camo"), -1, "no Camo row before B3");
-  t.eq(rows.indexOf("Pierce"), -1, "no Pierce row before B4");
+  t.eq(rows.indexOf("Defense pierce"), -1, "no Defense pierce row before B4");
 
   buyPath(h, s, "B", 4);
   rows = labels();
   var camo = s.statLines().filter(function (r) { return r[0] === "Camo"; })[0];
-  var pierce = s.statLines().filter(function (r) { return r[0] === "Pierce"; })[0];
+  var pierce = s.statLines().filter(function (r) { return r[0] === "Defense pierce"; })[0];
+  t.ok(camo, "the Camo row exists once B3 is owned");
+  t.ok(pierce, "the Defense pierce row exists once B4 is owned");
   t.eq(camo[1], "Yes", "B3 shows Camo: Yes");
-  t.eq(pierce[1], "6", "B4 shows Pierce: 6");
+  // Percentage points, so the row carries its unit -- 10%, not a bare 10.
+  t.eq(pierce[1], "10%", "B4 shows Defense pierce: 10%");
 
   // The DPS row and the two rows it summarises always multiply out.
   var damage = s.statLines().filter(function (r) { return r[0] === "Damage"; })[0];

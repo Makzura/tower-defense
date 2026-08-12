@@ -43,8 +43,11 @@
 // the failure this file exists to catch. Regenerate with --names, never by
 // hand.
 //
-// Measured 2026-08-12 at commit 410e7a9 on branch master, node v24, after the
-// Arcane-Sniper B5 channel repairs. 36 standing names -> 30.
+// Measured 2026-08-12 on branch visual-pass, node v24, after the authorised
+// fixture repairs: the Arcane-Sniper B5 channel, the gunner-deletion roster
+// shift, two renames and the recruit cooldown. 36 standing names -> 23, none
+// added. The remaining 23 are the held upgrade retune, the Tyrant, and the
+// test-file bugs; see the per-suite notes below.
 // ---------------------------------------------------------------------------
 
 var cp = require("child_process");
@@ -64,13 +67,20 @@ var BASELINE = [
     failing: []
   },
   {
-    file: "tests/content.test.js", pass: 182, fail: 30,
+    file: "tests/content.test.js", pass: 189, fail: 23,
+    // Was 182/30. Seven repaired on 2026-08-12: three roster-shift names (the
+    // gunner's deletion moved every slot and every catalogue card down one),
+    // two renames (the Soldier's row is "Defense pierce", and the enemy index
+    // became a scrolling viewport), and two recruit-cooldown names (40 -> 45).
+    //
+    // What is LEFT, and why none of it is drift:
     // Boss/Tyrant (6): fixtures one retune behind the code. nadia ruled the
     // CODE canonical on 2026-08-12 -- shield 1000, aimed 12 s, 9 s post-roar,
     // leap 90 u.l., roar summon 40 bodies. Do not "fix" these towards the test.
-    // Smasher roster shift and pricing (13) and index/meta (3): the gunner was
-    // deleted on 2026-07-30 and the whole roster moved down a slot.
-    // The Soldier (7) and the tower health contract (1) round it out.
+    // The 2026-08-01 upgrade retune (13): upgrades now grant HP and A1/A2/B1/B2
+    // were repriced. HELD pending nadia confirming the retune is settled.
+    // Four test-file bugs remain in here: `w is not defined` (4) and two
+    // towers[-1] throws, plus the tower health contract.
     failing: [
       "the Tyrant's numbers are the ones that were asked for",
       "the roar shields it, speeds it up, and calls the wave back",
@@ -79,7 +89,6 @@ var BASELINE = [
       "the leap jumps 50 u.l. and shockwaves everything it lands beside",
       "after the roar it alternates shot and leap, and still attacks rarely",
       "every tower type answers the health contract",
-      "it is placed from build slot 2 and does not disturb the gunner",
       "A1, A2, B1 and B2 can all be owned at once",
       "upgrades cost money and are refused when unaffordable",
       "selling refunds half of everything invested, upgrades included",
@@ -92,22 +101,20 @@ var BASELINE = [
       "an unaffordable button is shown dead and cannot be clicked through",
       "the sell button still works with the upgrade row present",
       "it still sells, inspects and draws when fully upgraded",
-      "the enemy index is a compact list with a clickable detail selection",
-      "a fresh profile owns the starter kit and nothing else",
-      "buying a tower spends coins and puts it in the bar",
       "path B buys utility and abandons the burst at B3",
       "the Soldier crosspaths like the Smasher and the Longshot",
       "B4 pierces DEFENCE in flat percentage points, never below zero",
-      "path B answers a brute with damage, not with pierce",
-      "recruits march the road backwards and are not towers",
-      "an auto switch fires its ability the moment it is ready",
-      "the Soldier's panel speaks the shared vocabulary"
+      "path B answers a brute with damage, not with pierce"
     ]
   },
   {
-    file: "tests/long-range-dps.test.js", pass: 71, fail: 0,
-    // Was 70/1. Repaired 2026-08-12: the stun is now read from the config
-    // rather than typed, so the 10 -> 7 cut cannot strand it again.
+    // 72, not 71: one test was ADDED on 2026-08-12. Repairing the B5 gate to
+    // read stunSeconds from the config left the SHIPPED 7 pinned nowhere at
+    // all -- the sibling test passes its own 10 to the mechanism -- so the
+    // ability could have been retuned to any value with every suite still
+    // green. The new test pins the owner's stated intent instead: channel plus
+    // stun still costs ten seconds between them.
+    file: "tests/long-range-dps.test.js", pass: 72, fail: 0,
     failing: []
   },
   { file: "tests/beam.test.js", pass: 45, fail: 0, failing: [] },
