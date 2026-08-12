@@ -1665,9 +1665,20 @@ Enemy.prototype.attackTowers = function (dt, towers) {
   // attack speed the same"). The pool still cycles in order, but a spec with
   // nothing in reach no longer ENDS the turn -- it steps to the next one and
   // the enemy attacks with that instead. For the Tyrant that means the leap,
-  // which only fires at a tower within 150 u.l., falls through to the aimed
-  // shot, which since this same change reaches the whole map. So the fight
-  // has no quiet stretches in it any more.
+  // which only fires at a tower inside its own `reachUl`, falls through to the
+  // aimed shot, which since this same change reaches the whole map. So the
+  // fight has no quiet stretches in it any more.
+  //
+  // The leap's reach is NOT repeated here -- read it off the spec. This
+  // sentence carried "150 u.l." until 2026-08-12 while the spec said 220, one
+  // retune behind, in the exact clause that defines the fall-through rule.
+  //
+  // AND THE SELECTION IS ROUND-ROBIN, NOT A PRIORITY ORDER. It takes the FIRST
+  // option from `attackIndex` that has candidates, so when the index points at
+  // the aimed shot, aimed fires and the leap is never consulted whatever is in
+  // its reach. "Aimed fired while the leap had targets" is therefore ORDINARY
+  // -- it means it was not the leap's turn. Only "the leap's turn came up, it
+  // had candidates at that instant, and something else fired" is a defect.
   //
   // The RATE is untouched: whichever attack lands sets the timer to its own
   // intervalSeconds, exactly as before. This makes the boss attack more often

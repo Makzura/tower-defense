@@ -13,6 +13,24 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the Tyrant's fall-through comment named the wrong leap reach, in
+the clause that defines the rule.**
+
+Comment only; no behaviour changed. `attackTowers`'s explanation said the leap
+"only fires at a tower within **150 u.l.**" while the spec has carried
+`reachUl: 220` since its retune — one revision behind, in the exact sentence a
+reader consults to understand the fall-through. The prose no longer repeats the
+number at all: it points at `reachUl`, so the two cannot drift again.
+
+Also recorded there, because it produced a false defect report before it was
+caught: **the selection is round-robin, not a priority order.** It takes the
+first option from `attackIndex` that has candidates, so when the index points at
+the aimed shot, aimed fires and the leap is never consulted whatever sits in its
+reach. "Aimed fired while the leap had targets" is ordinary — it means it was
+not the leap's turn. Only "the leap's turn came up, it had candidates at that
+instant, and something else fired" would be a defect, and a measurement at 91
+towers found the alternation exact.
+
 **2026-08-12 — `HOUSE-STANDARD.md` carried its `sniper-a4` worked example
 twice; merged by its author.**
 
