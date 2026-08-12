@@ -13,6 +13,58 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — `AGENTS.md` followed the difficulty deletion out of the code.**
+
+Documentation only, after `a94ca3b` removed `DIFFICULTIES`, `setDifficulty`,
+`selectedDifficultyId`, `buildDifficultyWaves` and `difficultyGroup`.
+`EASY_WAVES` survives and `WAVES` is now an alias for it; the `EASY_` prefix is
+historical and the file now says so rather than leaving the next reader to infer
+a sibling that no longer exists.
+
+Repaired: the version header (three difficulties → one schedule); the waves
+section, where a three-row difficulty table became a one-row schedule table; the
+income paragraph, reframed from "difficulty levers" to what it always actually
+described, which is authoring a wave; the roster-coverage rule; the codex and
+index provenance, which now derive appearances from the schedule rather than
+from `DIFFICULTIES`; the mixed-wave field list; four rows of the current-values
+table; and the screens row.
+
+**The enemy roster table's "first seen" column cited waves that no longer
+exist** — `N12 / H12`, `N16 / H15`, `N24 / H24`, `N32 / H32`, `N18 / H18` for
+Aether Wisp, Shieldbearer, Healer, Vanguard and Camo Heavy. Every one named a
+Normal or Hard wave and none named the schedule that shipped. Replaced with the
+measured first appearance: 24, 27, 32, 34, 28. Found by reading the staged diff
+in full rather than as a summary — the rows are unchanged context, so no diff
+would ever have flagged them, and a keyword sweep for "difficulty" does not
+match `N32 / H32`.
+
+**Measured rather than carried over**, by summing `waveCount` and
+`waveEffectiveHealth` over `WAVES` at 08:44Z: **35 waves, 797 bodies, 23 867
+scheduled HP, 25 969 effective.** Both totals are still pinned by `tests/run.js`.
+The five late-arriving types were re-derived from the surviving schedule —
+Aether Wisp 24/31/35, Shieldbearer 27/29/30/34, Camo Heavy 28, Healer 32,
+Vanguard 34 — and wave 28 confirmed pure camo (`camo_normal` ×12 plus
+`camo_heavy` ×6), which is the condition the Warbringer collateral rule needs.
+
+**The placeholder caveat written into this file eight hours ago is gone with its
+subject.** It existed to stop people quoting Normal and Hard; there is nothing
+left to quote. Its `Lands in` list in `OPEN-ITEMS.md` had named these exact
+sites as outstanding against this event, which is the first time that rule paid
+for itself.
+
+**Three "difficulty" mentions were deliberately left alone.** `Maps.analyse`
+still derives a per-map difficulty label from how much road a spot can cover —
+a different concept, still live, and the near-match a keyword sweep would have
+destroyed.
+
+**Known still wrong, and left knowingly rather than guessed at:**
+`tools/simulate-campaign.js` is cited as "the reproducible arithmetic behind"
+the per-wave HP table. The table is sound — `waveEffectiveHealth` computes it —
+but the attribution is void, because the tool is reported to place no towers at
+all. Correcting it needs the tool run rather than read, and the sweep for other
+claims sourced to that instrument is not done. Tomorrow's job, with the test
+baseline block.
+
 **2026-08-12 — the sandbox's orphaned schedule picker, left behind by the
 difficulty deletion.**
 

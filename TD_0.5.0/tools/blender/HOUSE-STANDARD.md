@@ -250,13 +250,27 @@ points means something different at the dark end than at the light end, and the
 raw-gap version of this table over-flags the shadows and under-flags the
 highlights. I made that mistake first and the table below is the corrected one.
 
-**Proposed thresholds — kaz's to ratify, not mine to impose:**
+**RATIFIED by kaz 2026-08-12** as the working standard, flagged for screen-pixel
+calibration later. He re-derived the arithmetic independently and confirmed that
+contrast ratio, not luminance gap, is the right instrument.
 
 | CR between two adjacent parts | what happens at this size |
 |---|---|
 | **under 1.25** | they are the same value. They merge into one shape. |
 | **1.25 – 1.6** | separates only across a long, roughly straight boundary |
 | **over 2.0** | reads as two things anywhere, including across a jagged 3 px edge |
+
+**Every figure in the table below is a CEILING, never an underestimate.** This is
+kaz's addition and it is the half I could not have reached: the shader lights
+palette colours before they reach the screen, and shading a pair **down** drives
+their ratio toward 1.0, while shading **up** only ever approaches the raw
+luminance ratio. So the raw palette figure is the best case a pair can achieve
+under any lighting at all, and real shadow can only be worse.
+
+**Consequence: a pair that fails on paper cannot be rescued by lighting.** When a
+CR figure here says two parts merge, that is a proof and not a prediction. It
+also means this table can be used to reject a palette *before* anything is
+lit — which is the whole point of having it.
 
 ### The Siphon palette, measured
 
@@ -296,10 +310,32 @@ that arc is worth on screen:
 **On the shadow side the mineralisation is literally invisible — CR 1.02.** On
 the lit side it is CR 1.30, on parts a few pixels across.
 
-**Consequence, and it is a hard one: A1 and A2 cannot be legible tier purchases
-at game scale, and no amount of modelling will make them so.** They are hue
-changes at constant value on small parts. Anyone briefing a tier ladder should
-plan around that rather than discover it after a build. See section 5.
+**Kaz's lighting proof makes this absolute rather than merely severe:
+`skin_dark → gold_dark` cannot exceed CR 1.025 under any lighting whatsoever.**
+Not hard to separate — *incapable* of separating. No modelling change and no
+lighting change reaches it.
+
+**Consequence: A1 and A2 cannot be legible tier purchases at game scale.** They
+are hue changes at constant value on small parts. Anyone briefing a tier ladder
+should plan around that rather than discover it after a build. See section 5.
+
+**Measured 2026-08-12, and the honest result is softer than the prediction.**
+Through the game's real `drawActor` path, `siphon-base` and `siphon-a1` differ by
+**20 px at the default camera and 1,415 px at max zoom-in**.
+
+So A1 is not invisible. **A1 is a reward, not a read** — section 2's distinction,
+arriving on its own: 20 px on a ~447 px figure is under 5% at the view the game
+is played in, and 1,415 px is unmistakable to a player who zooms in on what they
+bought. Whether a $600 tier should be a reward rather than a read is a design
+question for vera and Diego, not a defect for me to route as one.
+
+**Recorded because I got this wrong in a way worth keeping.** An earlier
+measurement reported *zero* differing pixels and I wrote it up as a shipped
+scandal. It was a rig artefact — a standalone model-draw path rather than the
+game's real per-group `drawActor` — and juno caught and retracted it herself.
+**My CR reasoning survived; my eagerness to see it confirmed did not.** A
+prediction of mine being "confirmed more strongly than I made it" should have
+been the moment I asked how, not the moment I wrote it down. See `TIER-READS.md`.
 
 ---
 
@@ -322,6 +358,155 @@ What is available, in descending order of legibility:
    1.67 is the largest legible material change on path A.
 5. **A change in how the piece MOVES.** Free — see section 6 — and under-used.
 6. Hue at constant value. CR ≈ 1.0. Not a signal. Do not spend a tier on it.
+
+### A tier read is a property of a PAIR, not of a model
+
+**This is the most valuable thing to come out of the 2026-08-12 measurements, and
+it is suki's sentence:** *nothing in this generator has ever compared one tier to
+another. Every gate it has is single-model. Tier ordering is an emergent property
+of eleven independent builds.*
+
+That is almost certainly true across all sixteen generators. **Tier ordering is
+unverified everywhere in this game, and no build-time gate can see it by
+construction** — a gate that loads one model cannot know what the tier below it
+looks like.
+
+So a tier read must be **asserted between adjacent tiers**, and in three ways
+because they answer different questions:
+
+- **At matched frames** — frame 0 against frame 0. This is authoring
+  correctness: is the ladder ordered at all?
+- **Across mismatched frames** — every frame of one against every frame of the
+  other. This is what a player actually sees, because two towers on a board are
+  never in step.
+- **Frame to frame within one model** — consecutive frames of the same tier.
+  **This one is invisible to the other two and it caught the largest thing on the
+  Warbringer.**
+
+### Why the third check is not optional
+
+Because frame 0 is the held pose and base/a3's strip ends with the hammer down,
+**an a3 snaps back at the loop wrap on every attack, once every four seconds.**
+Measured apex to apex: **9 rows against the Siphon gesture's 4** — about **2.25x**
+the Siphon's entire channelling gesture, delivered in one frame instead of seven.
+
+**Juno's qualifier, which matters more than the multiple:** the snap is the
+biggest thing a3 does, but it is not big. **251 px changed and 6.35 px of
+centroid travel, against a4's *ordinary* frames at 461–572 px and 10.7 px.** It
+is a **rate** discontinuity in a gentle animation — the rate jumps roughly 5x
+while absolute displacement stays modest. She states plainly that she cannot
+settle from pixels whether that reads as a glitch to a player.
+
+So the correct description is **"the largest unauthored discontinuity in the two
+tiers every player sees"**, not "a large movement". Those are different claims and
+only the first is supported.
+
+**I first wrote this as 12.7 screen px and 3.3x, and that was wrong — a metric
+mismatch, in the document that warns about metric mismatches.** 12.7 px was
+**haft-tip displacement**; the Siphon's ~4 px is **apex travel**. Comparing them
+is the same class of error as board px against screen px, and it inflated the
+finding by about 50%. **Name the part as well as the space and the denominator:
+"9 rows (screen, apex)" is the only safe form.**
+
+**Every frame either side of it is a legal authored pose.** Matched-frame
+comparison sees nothing. Mismatched-frame comparison sees nothing. Only
+consecutive frames of the same model show it, and no single-model gate in the
+project looks for it.
+
+It also explains the instrument rule rather than merely illustrating it: **that
+pop *is* the animation-driven variation** that makes apex unusable as a
+Warbringer tier instrument. A discontinuity and a dead instrument turned out to
+be the same fact seen from two directions.
+
+The distinction is not academic. It is exactly what separated a withdrawn
+Warbringer finding from a real one: the a4→a5 "inversion" was a swinging tower
+compared with an idle one and reproduces between two a5s, while the a3→a4
+inversion is **frame 0 against frame 0** — permanent, at rest, in the pose the
+tower holds 88% of the time.
+
+**Two anecdotes are not a survey.** Both defects found so far came from comparing
+adjacent pairs, which suggests the comparison is the missing instrument rather
+than that two models were unlucky. The sweep worth running: **every adjacent pair
+in every family and both paths, reporting gained/vacated silhouette and
+colour-difference area, ranked worst first.**
+
+### Compare the same feature — a tier comparison must not straddle an owner change
+
+**This clause replaces a wrong one, and the wrong one was mine to promote.** The
+version I carried was *"the apex must remain the topmost point on every frame,
+including the wrap."* Read verbatim it **fails all seven Warbringer bodies**,
+because every one of them hands the topmost position between haft and body at
+least twice a cycle — and that is the design working, not a defect. A rule that
+condemns seven deliberate design decisions to catch one bug is not a rule.
+
+**Suki's replacement, corroborated by juno from pixels, and adopted here:**
+
+> Not *"does the apex stay topmost"* but **"does the tier ordering survive the
+> handover"** — a tier comparison must not straddle an owner change.
+
+It flags one real defect instead of seven design decisions, and it explains the
+Warbringer a3/a4 case exactly: **a3's topmost part at rest is the haft; a4's is
+the body.** The two tiers were never being compared on the same feature. The
+inversion is not that a4 got shorter — it is that the measurement changed what it
+was pointing at, and the authored poses let it.
+
+**How to apply:** before quoting any tier comparison, ask which part owns the
+measurement on *each* side. If the owner differs, the comparison is meaningless
+until you either fix the pose so ownership matches or pick an instrument both
+tiers share. This generalises past apex to any extremal measure — widest point,
+lowest point, brightest region.
+
+### The instrument rule — an instrument must beat the animation
+
+**An instrument may only be used to judge a tier read when the tier's signal
+exceeds that instrument's animation-driven variation. State the ratio. If it is
+under 1, that instrument cannot carry that tier and reaching for it is wasted
+work.** Kaz's rule, adopted here.
+
+The Warbringer's apex is the worked example. Signal-to-noise for its **a4→a5**
+pair comes out at **0.047 (juno, from pixels) against 0.07 (kaz, from geometry)**
+— the same finding by two independent routes, and both far under 1. For **a3→a4**
+it is **0.417**. Under 1 in every case: **apex cannot carry a tier read anywhere
+on this family**, and effort spent making Warbringer tiers differ in height is
+spent on something no instrument can measure and no player can see.
+
+Contrast the Siphon, where **apex travel measures zero rows** because the idol's
+head does not move at all. Zero noise is why apex carries the tier cleanly there
+and cannot on a family that swings a hammer over its own head. **The same
+instrument is excellent on one model and useless on another, and only the ratio
+tells you which.**
+
+**An instrument can also be absent rather than merely weak. CONFIRMED POSED
+2026-08-12 — this rule now rests on measurement, not on indication.** Juno
+re-measured the Warbringer's b3, b4 and b5 through the posed real-tower path with
+a **sensitivity floor of 2 board px (~1.06 screen px)** and a **same-run positive
+control on a3/a4 that varied as expected**. Result: **bit-identical apex tracks
+across all three B tiers on all eight frames; matched-frame gaps exactly 0.**
+
+**Apex carries zero tier information for any Warbringer B tier.** "Make it taller"
+there is not a weak suggestion — it is a request for something the model cannot
+express.
+
+**One precision, so nobody over-reads the zero:** across *mismatched* frames the
+B-tier apex gap runs **−3 to +3**. That is not tier signal. It is the model's own
+animation phase, and reading it as tier separation would invent a difference that
+does not exist. A zero at matched frames and a non-zero across mismatched frames
+is the expected signature of *no tier signal plus normal animation* — see the
+three checks above.
+
+**Note what made the zero mean anything: the floor and the positive control.** A
+measurement that reports "no difference" is worthless without evidence the
+instrument could have seen one. That is juno's discipline and it should be
+demanded of every null result quoted in this document, including mine.
+
+**A ratio under 1 does not excuse a wrong signal, and this is the distinction
+that matters most.** Juno's framing, which I have adopted: *a3/a4 is authored
+with an inverted idle apex, AND apex is not a usable tier instrument there —
+both are true, and the second does not excuse the first.* A weak signal is
+merely useless. An **inverted** one actively tells the player the upgrade made
+the tower smaller. So the remedy for an inversion is never "make this instrument
+carry the tier" — it is **"stop this instrument from lying"**, and the success
+criterion is *not shorter*, never *taller by N*.
 
 ---
 
@@ -357,6 +542,33 @@ are always drawn; they are the tower working, not an effect on top of it.
 model where a fifth of what is built is covered by something else in exactly the
 frames that matter.
 
+**And it is worse than occlusion — the beam is competing noise.** Juno measured
+the cord as the **highest-contrast element on the tower**, repainting **975 px of
+itself between two frames** at the same origin height. So a gesture placed near
+the beam is not merely partly hidden; it is asked to be noticed next to the
+loudest and busiest thing on screen. **Put a gesture that must be seen on the GL
+body, away from the cord.** This is the measured basis for the Siphon brief's
+"without reading the beam", which turned out to be righter than I knew when I
+wrote it as an intent rather than as a constraint.
+
+> **⚠ EVERY NUMBER IN THIS SECTION IS PENDING RE-MEASUREMENT.** Diego has
+> commissioned work to stop the Siphon's idle beams drawing through towers and
+> enemies — to make them behave like light. Otto is on cause, juno on
+> verification.
+>
+> **That changes the inputs this whole section rests on.** The 21% overlay
+> occlusion, the ~38 px post-cord sceptre, and the 975 px repaint were all
+> measured against beams that draw over everything. If beams start being occluded
+> properly, the sceptre may recover pixels it currently loses and the cord may
+> stop being the loudest thing on the tower.
+>
+> **Do not re-derive these figures from the old ones — ask for fresh ones once
+> the beam work lands.** The conclusion (*don't spend detail at a beam origin*)
+> will probably survive in weakened form; the numbers will not. Flagged here
+> because a document in the repo outlives the conversation that produced it, and
+> the next person to quote 21% will have no way to know it was measured against a
+> beam that no longer exists.
+
 ### The worked example — a feature that is reward detail, not a read
 
 The A5 sceptre carries three "deliberately misaligned" concentric rings, at major
@@ -379,9 +591,17 @@ something the player finds when they zoom in on what they bought; useless as the
 thing that tells them A5 from A4 during play. Whatever signals that tier has to
 be a silhouette event, and the rings are not one.
 
-The cost question is separate and still live: per kaz the outer ring eats all of
-a5's 0.018 u of ground-radius headroom, which constrains the gesture in the brief.
-Reward detail that constrains a read is the wrong trade in either direction.
+The cost question is separate and still live: per kaz the outer ring eats a5's
+**0.018 u of ground-radius headroom.** **Corrected 2026-08-12 — that 0.018 is the
+sceptre's own constraint and nothing else's.** I had propagated it to the cowl and
+used it to cap the gesture in the Siphon brief; it never applied there. The cowl
+has roughly eighteen times the room. Kaz found and corrected his own figure, and
+the lesson generalises: **a headroom number belongs to the part it was measured
+on, and carrying it to a neighbouring part is not conservatism, it is a
+fabricated constraint.** It cost a real amplitude cap in a shipped brief.
+
+What stands: reward detail that constrains a read is the wrong trade. The rings
+still spend a5's remaining radius on something the default view cannot resolve.
 
 **This is arithmetic from the file's own constants times the measured projection.
 It is not a measurement.** The question for juno, routed through kaz: at the

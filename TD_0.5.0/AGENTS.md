@@ -1,15 +1,15 @@
 # Tower Defense — project context
 
-**Version 0.5.0** — three thirty-five-wave campaign difficulties: the original
-**Easy** schedule at 797 bodies / 25 969 effective HP, **Normal** at 918 /
-43 844, and **Hard** at 1039 / 56 895. All can be won or lost and end on a boss.
+**Version 0.5.0** — one thirty-five-wave campaign schedule at 797 bodies /
+25 969 effective HP, which can be won or lost and ends on a boss. (Three
+selectable difficulties existed from 2026-07-30 to 2026-08-12; Normal and Hard
+were placeholders and the whole concept was deleted. See the change log.)
 A **twenty-one**-type enemy roster (swarms, armor, camo,
 an early midboss, one that attacks your towers, one behind a shield that
 doubles its speed when the shield breaks, one that gets back up once, a spawner
 whose brood is shielded and pays nothing, and the Tyrant at wave 35). **All
-twenty-one are scheduled on every difficulty**, including the four v0.4.9
-additions and the flying Aether Wisp imported from v0.4.10.0; Normal and Hard
-simply bring them in earlier.
+twenty-one are scheduled**, including the four v0.4.9
+additions and the flying Aether Wisp imported from v0.4.10.0.
 **A shield now pays nothing, ever**, and so does healed health;
 waves
 that mix three or four types at once; a clear bonus of a tenth of each wave;
@@ -465,7 +465,7 @@ js/codex.js         the index screen (screen === "index"): the tower/enemy
                      field guide. DERIVES everything it shows -- tower stats
                      from statLines(), the upgrade tree by walking each path
                      on a throwaway instance through panelActions(), enemies
-                     from Enemy.TYPES + DIFFICULTIES -- so it cannot go stale
+                     from Enemy.TYPES + EASY_WAVES -- so it cannot go stale
 js/game.js          setup, map chooser, waves, victory/loss, base HP,
                      placement, main loop, all drawing
 js/debug-cash.js    TEMPORARY debug panel -- delete before release
@@ -579,10 +579,14 @@ That is deliberate, and documented in the file as a known limitation.
 
 ## Waves, base health, loss, victory, and restart
 
-`EASY_WAVES` in `game.js` is the original finite enemy schedule, unchanged.
-`DIFFICULTIES` owns the three selectable schedules, and `WAVES` is the active
-run's compatibility reference. `setDifficulty(id)` is the one place that moves
-that reference; do not copy a selected schedule into a second run-state array.
+`EASY_WAVES` in `game.js` is the campaign's finite enemy schedule, and `WAVES`
+is an alias for it — one schedule, nothing to select. **The `EASY_` prefix is
+historical.** Three selectable difficulties existed between 2026-07-30 and
+2026-08-12 and were deleted along with the whole concept: `DIFFICULTIES`,
+`setDifficulty`, `selectedDifficultyId`, `buildDifficultyWaves` and
+`difficultyGroup` are all gone. Normal and Hard were placeholder modes a
+collaborator added in a few seconds and the owner had forgotten existed; the
+schedule below is the only one that ever meant anything. See the change log.
 
 Each wave entry supplies `count`, `interval`, and optionally a `type` (a row of
 `Enemy.TYPES`; missing means a stock normal) and a `health` override. A wave's
@@ -590,88 +594,51 @@ first enemy spawns immediately; `interval` is the delay between later enemies
 in that wave. When a wave's last enemy spawns, the `WAVE_BREAK` countdown
 begins. The next wave starts when that countdown reaches zero.
 
-**The three campaign difficulties were added 2026-07-30. TWO OF THE THREE ARE
-PLACEHOLDERS** — read the caveat under this table before quoting any figure
-from the Normal or Hard rows.
+**The schedule, measured 2026-08-12** by summing `waveCount` and
+`waveEffectiveHealth` over `WAVES`:
 
-| tier | waves | scheduled bodies | effective HP | authored pressure |
-|---|---:|---:|---:|---|
-| Easy | 35 | 797 | 25 969 | the original spine, rescaled once; pinned by `tests/run.js` |
-| Normal | 35 | 918 | 43 844 | 8% more bodies, 15% more health, 16% tighter intervals, five roster additions |
-| Hard | 35 | 1039 | 56 895 | 20% more bodies, 35% more health, 32% tighter intervals, repeated support threats |
+| waves | scheduled bodies | scheduled HP | effective HP |
+|---:|---:|---:|---:|
+| 35 | 797 | 23 867 | 25 969 |
 
-**EASY IS THE ONLY SOURCE OF TRUTH: 35 waves, Vanguard at wave 34.** Normal and
-Hard are placeholder modes a collaborator added in a few seconds; the owner had
-forgotten they existed until asked on 2026-08-12, and has since authorised
-deleting them. Whether they actually go is a conversation between him and their
-author and is tracked in `OPEN-ITEMS.md`. **Until then they ship, and they mean
-nothing.** Every claim that cites Normal or Hard carries this caveat — census
-counts, schedule totals, enemy coverage, balance comparisons, and the two rows
-above.
+Both totals are pinned by `tests/run.js` (`scheduled health across the full
+schedule` / `and what it actually takes to clear it`). Effective exceeds
+scheduled because `waveEffectiveHealth` multiplies each body by its shield
+ratio and revive count — what must actually be removed, not what is declared.
 
-**They do not look unfinished, and that is the danger.** They derive
-programmatically from `EASY_WAVES`, they appear in `DIFFICULTIES`, they produce
-complete 35-wave schedules, and they answer every query put to them with
-plausible numbers. So the failure mode is not that somebody notices they are
-broken. It is that **somebody cites them as corroboration** — three difficulties
-agreeing looks like triangulation and is not.
+**Authoring a wave: `health` and `count` pay for themselves, `interval` and
+`lead` do not.** A wave's `health` override scales income — `Enemy.bountyOf`
+prices a body at `type.bounty × health / type.health`, so raising health raises
+its bounty in the same proportion — and more bodies means more bounties.
+Tightening an interval or a lead adds neither, which makes compression the
+cheapest pressure available in this file. (This sentence used to end "they do
+not simply pay for their own answer through damage income"; it was right, for a
+mechanism retired on 2026-07-31.)
 
-The demonstration: `difficultyGroup` rebuilds each derived group through a field
-whitelist (`count`, `interval`, `health`, plus `type` and `lead` when present)
-and **`tier` is not on it.** Wave 25 authors a Fractal Slime at tier 3, which on
-Easy is one body of 64 HP; on Normal and Hard the tier is dropped and it arrives
-as two untiered bodies of 5 HP each. Harder is weaker. Nothing catches it,
-because the *declaration* is what is wrong — the schedule sums, the pinned
-totals, the in-game enemy guide and all six suites recompute from that same
-declaration and agree with each other perfectly. Measured across all three
-difficulties on 2026-08-12.
+**The five formerly sandbox-only types are all scheduled:** Aether Wisp (waves
+24, 31 and 35), Shieldbearer (27, 29, 30, 34), Camo Heavy (28), Healer (32) and
+Vanguard (34). Camo Heavy appears only in wave 28, which is already pure camo
+(`camo_normal` ×12 plus `camo_heavy` ×6), and that preserves the Warbringer
+collateral rule below. Measured 2026-08-12.
 
-**Do not "fix" this by adding `tier` to the whitelist.** `Enemy.healthOf` gives
-a fractal tier precedence over the `health` override and discards the override
-entirely, so carrying the field alone would flatten Normal and Hard onto Easy's
-exact numbers with `healthScale` silently ignored. The only other knob is the
-tier itself, which steps ×4. That is a real design decision, and not one worth
-making for modes that may be deleted.
+**Type ids do not match display names, and a search on the wrong one proves
+nothing.** Vanguard is `boss_fast`, Aether Wisp is `flying`, Bulwark is
+`shielded`, the Tyrant is `boss`. A search for `type === "vanguard"` returns an
+empty list, which reads as "not scheduled" and is wrong — it once came within a
+step of putting a document into this file that contradicted the owner's own
+ruling. Resolve the id from `Enemy.TYPES` before searching for a type.
 
-Normal and Hard are built from Easy's proven spine by
-`buildDifficultyWaves(tuning, additions)`. The transform is deterministic and
-mechanical, not simulated — but it is **not "authored" in the sense Easy is**,
-per the caveat above. Health/count increase the workload; interval/lead
-compression and the supporters are the important difficulty levers because
-**they pay nothing at all.** A wave's `health` override still scales income —
-`Enemy.bountyOf` prices a body at `type.bounty × health / type.health`, so
-raising health raises its bounty in the same proportion — and more bodies means
-more bounties. Tightening an interval or a lead adds neither. (This sentence
-used to end "they do not simply pay for their own answer through damage
-income"; it was right, for a mechanism retired on 2026-07-31.)
-
-**All five formerly sandbox-only types appear in both Normal and Hard:**
-Aether Wisp, Shieldbearer, Healer, Vanguard and Camo Heavy. Normal introduces
-each once; Hard repeats support enemies and brings Vanguard into the finale.
-Camo Heavy is added only to already-pure camo waves. That preserves the
-Warbringer collateral rule below.
-
-**All five are already in Easy** — this paragraph is about the *extra*
-appearances the derived modes add, not about where the types live. The types
-are shipping content; only the additions are placeholder scaffolding. (Verified
-across all three difficulties on 2026-08-12. The type ids do not match the
-display names: Vanguard is `boss_fast` and Aether Wisp is `flying`, so a grep
-for either name in the schedule finds nothing and proves nothing.)
-
-`selectedDifficultyId` and the active `WAVES` reference survive
-`restartGame()`: Restart means replay this route and difficulty. Choosing
-another difficulty through the run chooser calls `setDifficulty` before the
-route starts. Difficulty is not saved to `MetaProgress`.
+The active `WAVES` reference survives `restartGame()`: Restart means replay this
+route. Nothing about the schedule is saved to `MetaProgress`.
 
 **A wave may be MIXED** (2026-07-29, v0.4.7, at the owner's request — "make the
 wave a bit more chaotic, still deterministic but with more than 1 type"). In
 place of the flat fields a wave may carry `groups: [...]`, a list of groups
 each with its own `count`/`interval`/`type`/`health` and an optional `lead` —
 the pause before that group's first body, used instead of its `interval` — plus
-an optional `tier` on a fractal type. **`tier` is the one group field the
-difficulty derivation drops**, which is the caveat above. The
-groups deploy in order, so a wave reads top to bottom as the thing the player
-watches arrive.
+an optional `tier` on a fractal type (wave 25 is the only group that authors
+one). The groups deploy in order, so a wave reads top to bottom as the thing
+the player watches arrive.
 
 **The flat form is not legacy, it is the single-group case**, and half the
 schedule still uses it deliberately: a wave of one type is a question with one
@@ -844,11 +811,10 @@ two more numbers matter:
   boss's roar calls in another 2780 HP at 1.5× speed. Neither is a gap in the
   arithmetic; both are the point of the enemy that produces them.
 
-On top of that, **finishing a wave pays a tenth of it** — about $1350 across
-an Easy run. Normal and Hard derive the same per-wave rule from their larger
-waves. See "Finishing a wave pays a tenth of it" below.
+On top of that, **finishing a wave pays a tenth of it** — about $1350 across a
+run. See "Finishing a wave pays a tenth of it" below.
 
-Easy waves 1–10 are the introduction and are pinned exactly: single-type, no
+Waves 1–10 are the introduction and are pinned exactly: single-type, no
 `groups`, no v0.4.7 content, with waves 1–2 byte-identical to the original
 opening the starting-stake economy is measured against.
 
@@ -860,15 +826,13 @@ brute still carries its 5 flat armor, a scaled camo is still camo, and a scaled
 Bulwark still gets twice its *new* health in shield, because the shield is
 sized off the instance rather than declared as a number.
 
-**Every wave must be claimed by a type, and Normal/Hard must cover the whole
+**Every wave must be claimed by a type, and the schedule must cover the whole
 roster** (revised 2026-07-30). The index derives each type's appearances per
-GROUP across all three `DIFFICULTIES`, rather than from whichever schedule
-happened to run last. A type present at the same wave numbers everywhere reads
-"All modes"; the five additions state their Normal/Hard appearances.
+GROUP from the schedule itself rather than from whatever ran last.
 
-Every difficulty now schedules all twenty-one types; Aether Wisp, Shieldbearer,
-Healer, Vanguard and Camo Heavy arrive late on Easy and earlier on the higher
-tiers. `tests/run.js` asserts that every type is scheduled
+The schedule carries all twenty-one types; Aether Wisp, Shieldbearer, Healer,
+Vanguard and Camo Heavy all arrive late. `tests/run.js` asserts that every type
+is scheduled
 and also resolves every scheduled id through `Enemy.typeOf`, so a typo fails
 loudly.
 
@@ -1459,7 +1423,7 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   tab (every roster tower, its stats, and its full upgrade tree — click a
   tier and the SAME preview card the in-game hover shows is drawn by the same
   renderer, `drawCardBox`) and an Enemies tab (every `Enemy.TYPES` row with
-  its real sprite, and wave appearances derived from all `DIFFICULTIES`). Everything on
+  its real sprite, and wave appearances derived from the schedule). Everything on
   it is measured off real instances at open time; nothing is a second copy.
   The preview walker advances throwaway instances through `purchase()` /
   `applyUpgrade()` — deliberately BELOW `buyUpgrade`, which is the economy —
@@ -2502,8 +2466,8 @@ walks past every tower regardless, so length only changes how long you have
 before the first leak. What actually moves the number is whether the road
 comes back *near itself*, within the Rifleman's reach of a second lane.
 
-**Enemy types (`Enemy.TYPES`).** Twenty-one, and **all twenty-one are scheduled
-on every difficulty** — a passing test in `tests/run.js` pins that.
+**Enemy types (`Enemy.TYPES`).** Twenty-one, and **all twenty-one are
+scheduled** — a passing test in `tests/run.js` pins that.
 
 | id | HP | speed | armor | defense | camo | size | first seen | what it asks of the player |
 |---|---|---|---|---|---|---|---|---|
@@ -2515,21 +2479,22 @@ on every difficulty** — a passing test in `tests/run.js` pins that.
 | `midboss` | 250 | ×0.45 | — | 10% | — | 1.8 | 11 | that a board exists at all by wave 11 |
 | `angry` | 14 | ×0.7 | — | — | — | 1.25 | 13 | that you can afford to LOSE towers — it hits them for 20 every 2.5 s |
 | `camo_normal` | 4 | ×1.0 | — | — | **yes** | 1.0 | 14 | camo detection (Longshot A1 / beam B1) |
-| `flying` | 6 | ×1.2 | — | — | — | 0.85 | N12 / H12 | air eligibility — ground-only towers cannot target it |
+| `flying` | 6 | ×1.2 | — | — | — | 0.85 | 24 | air eligibility — ground-only towers cannot target it |
 | `shielded` | 12 **+24 shield** | ×0.9, **×1.8 broken** | — | — | — | 1.15 | 15 | that the damage is READY when the shell pops, not that there is more of it |
 | `camo_fast` | 2 | ×1.75 | — | — | **yes** | 1.0 | 18 | the same as camo_normal, under time pressure |
 | `brute` | 40 | ×0.55 | **5** | — | — | 1.5 | 20 | a weapon that hits for more than 5 — gunners and the beam do **zero** |
 | `revenant` | 16 **×2 lives** | ×0.85, **0 after** | — | — | — | 1.2 | 21 | attention — a parked body keeps eating shots meant for the wave behind it |
 | `hive` | 150 | ×0.4 | — | — | — | 1.6 | 26 | speed of kill — it seeds 5 normals every 7 s, and each of THOSE wears a shield equal to its life and pays nothing |
 | `boss` | 5000 **+1000 at half** | ×0.3, **×0.405 after** | — | — | — | 2.4 | 35 | DEPTH — it stops, aims, and hits your single best tower for 45 and a stun; after the roar it also leaps 90 u.l. and shockwaves whatever it lands beside |
-| `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | N16 / H15 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays |
-| `healer` | 200 | ×0.4 | — | — | — | 1.45 | N24 / H24 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either |
-| `boss_fast` | 750 | ×3.5 **for the first 400 u.l.**, then ×1.75 | — | — | — | 1.9 | N32 / H32 | TEMPO — 100 shield every 7 s that never stacks, on a body that crosses the opening stretch faster than anything else in the game |
-| `camo_heavy` | 20 | ×0.65 | **5** | 20% | **yes** | 1.4 | N18 / H18 | that SEEING it and KILLING it are two separate purchases |
+| `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | 27 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays |
+| `healer` | 200 | ×0.4 | — | — | — | 1.45 | 32 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either |
+| `boss_fast` | 750 | ×3.5 **for the first 400 u.l.**, then ×1.75 | — | — | — | 1.9 | 34 | TEMPO — 100 shield every 7 s that never stacks, on a body that crosses the opening stretch faster than anything else in the game |
+| `camo_heavy` | 20 | ×0.65 | **5** | 20% | **yes** | 1.4 | 28 | that SEEING it and KILLING it are two separate purchases |
 
-The four v0.4.9 additions and the Aether Wisp are scheduled on all three tiers
-and simply arrive earlier on Normal and Hard. The index derives per-difficulty appearances;
-the sandbox's type dropdown still exposes every roster row individually.
+The four v0.4.9 additions and the Aether Wisp are all scheduled, and all arrive
+late — Aether Wisp 24/31/35, Shieldbearer 27/29/30/34, Camo Heavy 28, Healer 32,
+Vanguard 34. The index derives those appearances from the schedule itself; the
+sandbox's type dropdown still exposes every roster row individually.
 
 Speeds are stored as **multipliers** of `BASE_SPEED_ULPS` so retuning the
 walking speed moves the whole roster in proportion; health is stored as plain
@@ -4420,10 +4385,7 @@ no mechanic was moved to match the description.
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
-| Campaign difficulties | Easy / Normal / Hard, selected before the route; Restart keeps the selected tier | `DIFFICULTIES`, `setDifficulty`, `selectedDifficultyId` |
-| Easy schedule | 35 waves, 797 enemies, 23 867 scheduled HP / **25 969 effective**, plus each Hive's brood and the boss's summons | `EASY_WAVES` in game.js |
-| Normal schedule | 35 waves, 918 enemies / **43 844 effective HP**, all twenty-one types | `DIFFICULTIES.normal` |
-| Hard schedule | 35 waves, 1039 enemies / **56 895 effective HP**, all twenty-one types with repeated support threats | `DIFFICULTIES.hard` |
+| The schedule | 35 waves, 797 enemies, 23 867 scheduled HP / **25 969 effective**, plus each Hive's brood and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
 | Wave clear bounty | a tenth of the wave's effective HP, ~$2596 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
 | Wave reward, all in | clear bounty + redistributed opening cash + rising allowance | `waveReward`, `waveProgressionReward`, `waveEscalatingReward` |
 | The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
@@ -4432,7 +4394,7 @@ no mechanic was moved to match the description.
 | Wave bonus timing | owed on deploy; paid on board-clear, on a skip, or when the next wave arrives | `pendingBounty`, `payWaveBounty` |
 | Tower stun | longest wins; no update, cooldown, aim tracking or live Siphon beam presentation while stunned | `TowerHealth.stun / isStunned / tickStun`, `BeamTower.visibleLocks` |
 | Waves 1-11 | the introduction, single-type, pinned exactly | `WAVES.slice(0, 11)` — deep-equal test in run.js |
-| Mixed waves | `groups: [...]`, each with its own count/interval/type/health/lead, plus `tier` on a fractal — and `tier` is the one field the difficulty derivation drops | `waveGroups`, `waveCount`, `waveGroupAt`, `waveSummary` |
+| Mixed waves | `groups: [...]`, each with its own count/interval/type/health/lead, plus `tier` on a fractal (wave 25 only) | `waveGroups`, `waveCount`, `waveGroupAt`, `waveSummary` |
 | Wave break | 90 s ceiling; 3 s once called in; 5 s once the board is cleared | `WAVE_BREAK`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave` in game.js |
 | Run opening | 10 s before wave 1, or the Start button; 0 with auto-send | `RUN_START_DELAY`, `beforeFirstWave`, `waveSkipButtonLabel` in game.js |
 | Wave call triggers | the Send button, an empty board, or the 90 s running out | `callNextWave` in game.js |
@@ -4444,7 +4406,7 @@ no mechanic was moved to match the description.
 | Run-over buttons | Restart (R/Enter), Choose another route (M), Main menu (Escape) | `restartButtonRect`, `changeMapButtonRect`, `mainMenuButtonRect` |
 | Victory | all waves naturally deployed + board clear + base standing | `allWavesDeployed`, `victory` in game.js |
 | Wave banner | 2.4 s, on each wave's first spawn | `BANNER_SECONDS` in js/effects.js |
-| Enemy roster | 21 types, all 21 scheduled on every difficulty, including the flying Aether Wisp | `Enemy.TYPES`, difficulty additions |
+| Enemy roster | 21 types, all 21 scheduled, including the flying Aether Wisp | `Enemy.TYPES`, `EASY_WAVES` |
 | Enemy mechanic blocks | `attack`, `shield`, `revive`, `spawns`, `phases`, `support`, `sprint` — data, never a branch on the id | `Enemy.TYPES`, and one method per block |
 | What a shield pays | **nothing, ever** (2026-07-30). Healed HP too. Only health pays | `Enemy.takeDamage`, `Enemy.bounty` |
 | Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks | `Enemy.TYPES.shielded` |
@@ -4544,7 +4506,7 @@ no mechanic was moved to match the description.
 | Compact panel actions | `action.compact` — 34 px, two per row, so six action rows still fit | `inspectionLayout` in game.js |
 | Build slots | 5, ALL FIVE FILLED since 2026-08-09: Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner | `BUILD_SLOTS` in game.js |
 | Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 150–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
-| Screens | menu → difficulty + route chooser / index → play | `screen` in game.js |
+| Screens | menu → route chooser (`select`) / index / store → play | `screen` in game.js |
 | Pause menu | Escape only, no HUD button | `paused`, `drawPauseMenu` |
 | Build slot size | 76 px, 10 px gap | `SLOT_SIZE`, `SLOT_GAP` |
 | Attack speed unit | attacks per second, on every tower | `TowerStats.rate` |

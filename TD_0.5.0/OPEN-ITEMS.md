@@ -26,47 +26,18 @@ belongs in `AGENTS.md` and this file points at it.
 
 ---
 
-## 1. Normal and Hard are placeholders — are they deleted?
+## 1. Normal and Hard are placeholders — are they deleted?  CLOSED
 
-**Status:** the caveat is **ruled and has moved out of this file.** What remains
-open is only whether the two modes are deleted.
+**Closed 2026-08-12.** They were deleted, with the whole difficulty concept,
+in `a94ca3b`. Nothing about this entry is open any more.
 
-### The ruled part is no longer here — deliberately
+Per rule 2 above, the entry does not linger now that its decision has landed.
+Its `Lands in` list has moved into the `CHANGELOG.md` entry that records the
+documentation repair, which is where the record of what it obligated belongs.
+The rule it was waiting on — one schedule, no selection — is in `AGENTS.md`.
 
-The owner's ruling of 2026-08-12 — what Easy is, what Normal and Hard are, the
-caveat every citing claim must carry, and the dropped `tier` on wave 25 that
-demonstrates it — now lives in `AGENTS.md`, under the three-campaign-difficulties
-table, and that is its only home. Moved 2026-08-12 by petra in the same edit
-that recorded the ruling, per rule 2 above. **Do not restate any of it here.**
-
-### What is still open
-
-The owner has authorised deleting the two modes outright. That is deliberately
-not being done unilaterally: they are a collaborator's contribution, that
-collaborator is actively working in this repository, and removing another
-person's work without their knowledge is not a call this project makes on their
-behalf. It stays a conversation between the two of them.
-
-Until it happens, the modes ship and the caveat in `AGENTS.md` governs.
-
-### Lands in
-
-**Done 2026-08-12** — the caveat is written into `AGENTS.md` at the four sites
-that stated or implied the opposite:
-
-- the difficulty table whose last column is headed **"authored pressure"**;
-- **"Normal and Hard are built from Easy's proven spine"**, whose
-  **"authored, not simulated"** clause was the exact contradiction;
-- **"All five formerly sandbox-only types appear in both Normal and Hard"**;
-- both mixed-wave field lists — the prose **"each with its own
-  `count`/`interval`/`type`/`health` and an optional `lead`"** and the current
-  values row **"Mixed waves"** — which omitted `tier` and so read as though it
-  were not a group field. It is one (`js/game.js` authors `tier: 3` on wave 25),
-  and it is the one the derivation drops.
-
-**Outstanding, only if the modes are deleted** — all four of those sites change
-again, along with `DIFFICULTIES`, the run chooser, and the `selectedDifficultyId`
-paragraph. This entry cannot close until they do, and closing it moves this list
-into the `CHANGELOG.md` entry.
+**Left here as a stub rather than erased**, because this entry is the worked
+example the two rules above were written from, and a queue with no history of
+having drained is a queue nobody trusts. Delete it once a second entry exists.
 
 ---

@@ -106,30 +106,77 @@ open side and vacating it on the trailing side.
 
 Hard constraints on the shape, and these are what make two builders agree:
 
-- **The apex must remain the topmost point of the figure on every frame of the
-  cycle.** If a shoulder or the sceptre becomes the top partway through, the top
-  of the silhouette changes owner mid-gesture and reads as a glitch, not a
-  gesture. This is the clause most likely to be violated by accident.
+- **The cowl must keep ownership of the topmost pixel for the whole cycle — on
+  THIS model, for a reason specific to it.** The cowl apex sits nine rows above
+  the sceptre and the gesture is only three or four pixels, so nothing here
+  should ever come close to taking the top. If something does, the amplitude has
+  gone somewhere unintended.
+
+  **This is a Siphon constraint, not a general law, and I originally wrote it as
+  one.** The general version — *"the apex must remain topmost on every frame"* —
+  **fails all seven Warbringer bodies**, each of which hands the topmost position
+  between haft and body twice a cycle by design. Suki's corrected general rule is
+  in the standard: *a tier comparison must not straddle an owner change.* Handover
+  is fine; **comparing across one is not.** It holds here because the Siphon's
+  ownership never changes, which makes its apex a clean instrument — and the
+  measured reason apex works on this family and not on the Warbringer.
 - **The displacement must be diagonal, not vertical.** A purely downward apex
   reads as the figure shrinking. Forward-and-down reads as leaning.
 - **The bow deepens the existing 8° forward torso tilt rather than opposing it.**
   The figure is already authored as leaning forward in tension; this is more of
   what it already is.
 
-**Proportion, as a starting point rather than a specification:** apex travel of
-about **one tenth of the figure height** — roughly 3 screen px on a 29.5 px
-figure — which is a rotation in the region of 10–20° about the shoulder line
-(SH_L z 1.300, SH_R z 1.240; apex z 1.790, so a lever of about 0.52 u). Suki
-should take whichever value clears the geometry, not the number I wrote.
+**Proportion:** apex travel of about **one tenth of the figure height** — roughly
+3 screen px on a 29.5 px figure — which is a rotation in the region of **10–20°**
+about the shoulder line (SH_L z 1.300, SH_R z 1.240; apex z 1.790, so a lever of
+about 0.52 u).
 
-**The outcome test replaces the number.** The gesture is finished when juno's
-rest-versus-hold mask difference reports:
+**Measured 2026-08-12: 10–20° fits at every tier.** Kaz reports the cowl's actual
+rotational headroom as **54.5° at a3, 38.75° at a4, 28.0° at a5** — see the
+constraint section below for the correction that unblocked this.
 
-> **at least 25 px of gained silhouette** (2.5x the current 10), **of which at
-> least half falls in the top third of the figure.**
+### The one hard constraint on the bow: a 3 px apex-drop budget
 
-That is the gate I would like this rework judged by. It is measurable, it is
-juno's to run, and it is the thing that actually correlates with her verdict.
+**A bow that lowers a5's apex by more than 3 screen px erases "a5 is taller".**
+The a4/a5 tier tell is only 3 rows deep, and the bow carries the apex forward
+*and down*. Everything under 3 px of drop is free; past it the gesture starts
+eating a tier read to buy a channelling read, which is a bad trade in a game
+where tier legibility is already the weakest thing on the board.
+
+Suki's worst-bearing figure is **0.71 px**, so there is comfortable room. This is
+the number to check when the amplitude is finally chosen — not the radius, which
+was never the constraint.
+
+### The gate I proposed, and why it is withdrawn
+
+**I wrote: "at least 25 px of gained silhouette, of which at least half falls in
+the top third of the figure." That number was mine and it was wrong twice over.
+Do not design to it.** Kaz has generously described it as his amendment; it is in
+my brief in my words and I am recording it as mine, because a gate that shapes
+what suki builds has to have an accurate author.
+
+Juno measured it:
+
+- **Unreachable.** Gained silhouette peaks at **21 px against a 25 px bar** across
+  the entire usable lean range — short by roughly 2x, so the gesture could never
+  have passed however well it was built.
+- **The second clause is anti-correlated with the first.** Top-third gained falls
+  from **6 px at 10° to 0 px at 25°**, because the third was pinned to the rest
+  bounding box and the bow carries the apex forward and *down*, out of it. A gate
+  whose second clause is maximised by doing **less** of the thing it rewards is a
+  broken instrument, and it would have taught suki to build a smaller gesture
+  than the brief asks for.
+
+**No replacement number until someone measures the actual arm-and-cowl
+mechanism.** Juno's test was a whole-body lean proxy and she flagged that herself,
+unprompted. Inventing a second threshold before measuring the real thing is
+exactly how the 4.0 px travel gate happened, and this brief is not going to
+produce a third one.
+
+**Until then the gesture is judged by the intent statement above, not by a
+number** — and the honest reading of the 21 px ceiling is that *the bow alone may
+not be enough*, which is an argument for keeping all three components rather than
+for making the bow bigger.
 
 ### 2. THE SCEPTRE — unchanged, and demoted
 
@@ -214,12 +261,33 @@ tower is strongest. The mitigation is that A5's peak displacement is unchanged �
 what it loses is softness, not size — and its loudness comes from silhouette it
 already has: the spire, the plinth, the frozen pour.
 
-**This also happens to agree with the tightest constraint on the model.** A5 has
-only **0.018 u of ground-radius headroom** and its tightest weapon/cloth pair sits
-at 0.0244 — so A5 is the tier least able to afford a forward lean. The tier that
-should move most rigidly is also the tier that can move least. **Intent and
-constraint point the same way, which is the sign that this brief will not need a
-rebuild.**
+**CORRECTED 2026-08-12 — I claimed this agreed with the model's tightest
+constraint, and it did not, because the constraint was not on this part.**
+
+What I wrote: that A5 has only 0.018 u of ground-radius headroom, is therefore
+the tier least able to afford a forward lean, and that intent and constraint
+pointed the same way. Kaz found the error in his own figure: **the 0.018 u is
+`ring_2`'s headroom — the sceptre's — and it never applied to the cowl at all.
+The cowl has roughly eighteen times the room: 54.5° at a3, 38.75° at a4, 28.0° at
+a5.**
+
+**So the tier plan stands on its own merits and gets no support from geometry.**
+A5 moves rigidly because it is an idol, not because it cannot move. That is a
+weaker argument than the one I made and it is the true one. The reason to keep
+the plan is the authored arc and `sniper-a4`'s precedent, and if kaz or suki
+think that is not enough, the plan should be argued on those grounds rather than
+propped up by a constraint that was never there.
+
+**The lesson, and it is mine to carry: a headroom number belongs to the part it
+was measured on.** I took a figure measured on the sceptre and applied it to the
+cowl. That is not conservatism — it fabricates a constraint, and this one capped
+the amplitude of the gesture the brief exists to enlarge.
+
+**One genuine agreement survives, and it inverts what I feared.** Kaz withdraws
+the collision he had raised as blocking: separation goes from **30 px at rest to
+76 px through the hold**, so a channelling a5 is **two and a half times more
+distinguishable**, not less. The gesture improves the tier read rather than
+threatening it.
 
 ---
 
@@ -259,24 +327,31 @@ Per the census, `frames` cost bytes at **zero triangle cost**. One new animated
 group across 25 frames is 25 x 16 floats — about 1.6 KB, and nothing at all
 against either ceiling.
 
-**Where a number would change this brief:** only if the bow requires the cowl to
-be re-lofted with more angular samples to stop the crest reading as a facet under
-rotation. That is the one place suki may need to add geometry, and it is the one
-question to put to kaz's ceiling. `siphon-a5` is **1,092 triangles** and the
-Siphon family mean is **950**, against a library mean of 1,773 and a rifleman
-mean of 10,635. Measured: `siphon-base` runs at **2.04 triangles per covered
-pixel at the default camera** and **0.02 at max zoom-in**, against
-`rifleman-base` at 33.42 and 0.26. So the Siphon is one of the two families
-already sized close to the display at the view the game is played in, and a
-modest addition here is very unlikely to be budget-bound under any of the three
-ceilings kaz has put to Diego. **Confirm with kaz rather than assuming it.**
+**The renderer sets no ceiling — render is not the bottleneck by about 7x.** But
+that was only ever half the answer, and kaz has supplied the other half:
 
-**Constraint to check before building, not after** — kaz's, and it is real: a
-forward cowl lean adds `posed_radius`, and A5 has 0.018 u of headroom that the
-outer ring already eats. If A5 cannot afford the lean, the tier plan above
-already wants A5's gesture to be the most rigid — but the *displacement* still
-has to fit. **Suki's call, and it should be measured before the bow amplitude is
-chosen, not discovered by a failing build.**
+**`siphon_idol.py` enforces its own gate — `700 <= triangles <= 1100`, at line
+2512 — and `siphon-a5` sits at 1,092. Eight triangles of room.**
+
+That is the real constraint on this brief and it is nothing like "no ceiling".
+Anything that adds geometry to a5 fails the build immediately. The gate holds
+unless a build demonstrates the crest actually facets, in which case kaz will
+authorise a measured increase.
+
+**So the zero-triangle framing above is not a nicety, it is the only version of
+this brief that can be built today.** If the bow needs the cowl re-lofted with
+more angular samples, that is a gate conversation with kaz *before* suki starts,
+not a discovery at export.
+
+For context, unchanged: the Siphon family mean is **950** triangles against a
+library mean of 1,773 and a rifleman mean of 10,635, and `siphon-base` runs at
+**2.04 triangles per covered pixel at the default camera** (0.02 at max zoom-in)
+against `rifleman-base` at 33.42. The Siphon is one of the two families already
+sized close to the display at the view the game is played in.
+
+**The general lesson, which is kaz's and worth more than the number: "no ceiling"
+was true of the renderer and false of the generator.** Ask both. A model can be
+free to draw and still be forbidden to build.
 
 ---
 
@@ -292,10 +367,27 @@ The animation strip cannot express it as built: `gl-world.js` indexes it with a
 free-running wall clock, `sphase = (now * 0.42) % 1`, which knows nothing about
 the ramp.
 
-**Question for otto, via kaz: can the strip be indexed by a mechanic's state
-instead of by wall clock — so the bow deepens as the ramp climbs?** If yes, that
-is the best gesture available on this tower and I will write it as a second
-brief. If no, the brief above stands as written and is complete on its own.
+**ANSWERED 2026-08-12 by otto, and the answer is better than the question.**
+
+Direct indexing **cannot** work, and the reason is the thing I praised about the
+strip: it is a genuinely seamless loop, so a full ramp lands on the same pose as
+just-latched. Driving the phase from the ramp would destroy the exact distinction
+the gesture exists to create. My proposal would have quietly deleted its own
+purpose.
+
+**The answer is band selection with the clock still running the phase** — the
+house idiom already, per the Summoner, which takes its band from blub count and
+its phase from the clock.
+
+**Kaz has asked for that second brief and it is written — `BRIEF-siphon-ramp-bands.md`,
+held in mira's memory pending petra's call on whether it ships here.**
+
+**Read it before building this one.** It rules that the ramp takes follow-through
+and that **the tier-differentiation table below gives it up** — they cannot both
+have that channel, and they collide worst at A5, which under the tier plan has no
+follow-through to spend and is the tier where the ramp matters most. The tier
+plan keeps its silhouette events; it loses the follow-through decay. Kaz's to
+confirm.
 
 I am raising it rather than designing around it because a model being asked to
 carry a meaning the runtime does not supply is exactly the gap this role exists
@@ -307,11 +399,13 @@ to close, and it is cheaper to ask now than to rebuild later.
 
 All route through kaz; nothing resolves by name.
 
-| question | owner |
-|---|---|
-| Does the moving beam root add visible travel the 134 px did not count? | juno |
-| Does A5 read as three rings, two, or one? | juno |
-| Will the gained-silhouette gate (≥25 px, half in the top third) replace the travel gate? | kaz |
-| Can a forward cowl lean fit A5's 0.018 u of radius headroom? | suki |
-| Can the strip be indexed by ramp state rather than wall clock? | otto |
-| ~~Does this document belong in the repo beside `WARBRINGER_CONCEPT.md`?~~ **Answered 2026-08-12: yes — it is here now.** | petra |
+| question | owner | status |
+|---|---|---|
+| Measure gained silhouette on the **real arm-and-cowl mechanism**, not a whole-body lean proxy | juno | **the one open blocker.** No gate number can be set until this exists |
+| Does A5 read as three rings, two, or one? | juno | open |
+| Does the moving beam root add visible travel the 134 px did not count? | juno | open — and now lower priority: the cord is competing noise, so beam-adjacent motion is the wrong place to look for a read |
+| Will the crest facet under rotation, and does that need geometry a5 has no room for? | suki, then kaz | open — 8 triangles of headroom |
+| ~~Gained-silhouette gate ≥25 px, half in top third~~ | mira | **WITHDRAWN — mine, and wrong twice over. See the section above.** |
+| ~~Can a forward cowl lean fit A5's 0.018 u of radius headroom?~~ | suki | **Void — the 0.018 was the sceptre's. Cowl has 28.0–54.5°.** |
+| ~~Can the strip be indexed by ramp state?~~ | otto | **Answered: no, and banding is better. See `BRIEF-siphon-ramp-bands.md`.** |
+| ~~Does this document belong in the repo beside `WARBRINGER_CONCEPT.md`?~~ | petra | **Answered: yes — it is here now.** |
