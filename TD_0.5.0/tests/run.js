@@ -929,62 +929,21 @@ test("the restart button restores a clean run", function (t) {
 
 
 
-// --- difficulty tiers -------------------------------------------------------
+// --- difficulty tiers, removed ----------------------------------------------
 //
-// Easy/Normal/Hard is this version's answer to "the game is too easy", and it
-// is independent of the 2026-07-30 schedule rescale that Easy itself now
-// carries. These check that the three tiers stay ordered and that the chooser
-// and restart remember which one was picked.
-
-test("Easy stays original; Normal and Hard are progressively tougher schedules", function (t) {
-  var h = harness.boot();
-  var D = h.game.DIFFICULTIES;
-
-  t.eq(h.game.selectedDifficultyId, "easy", "new runs default to Easy");
-  t.eq(D.easy.waves, h.game.EASY_WAVES, "Easy is the original schedule itself");
-  t.eq(D.easy.waves.length, 35, "Easy keeps all thirty-five waves");
-  t.eq(D.normal.waves.length, 35, "Normal keeps the same campaign arc");
-  t.eq(D.hard.waves.length, 35, "Hard keeps the same campaign arc");
-
-  var easyBodies = h.game.scheduleEnemyCount(D.easy.waves);
-  var normalBodies = h.game.scheduleEnemyCount(D.normal.waves);
-  var hardBodies = h.game.scheduleEnemyCount(D.hard.waves);
-  var easyHp = h.game.scheduleEffectiveHealth(D.easy.waves);
-  var normalHp = h.game.scheduleEffectiveHealth(D.normal.waves);
-  var hardHp = h.game.scheduleEffectiveHealth(D.hard.waves);
-
-  t.ok(normalBodies > easyBodies, "Normal sends more bodies (" +
-    easyBodies + " -> " + normalBodies + ")");
-  t.ok(hardBodies > normalBodies, "Hard sends more again (" +
-    normalBodies + " -> " + hardBodies + ")");
-  t.ok(normalHp > easyHp, "Normal has more effective HP (" +
-    easyHp + " -> " + normalHp + ")");
-  t.ok(hardHp > normalHp, "Hard has more again (" +
-    normalHp + " -> " + hardHp + ")");
-});
-
-test("the run chooser selects a difficulty and restart keeps it", function (t) {
-  var h = harness.boot(null);
-  var normal = h.game.difficultyRect(1);
-  h.click(normal.x + normal.w / 2, normal.y + normal.h / 2);
-
-  t.eq(h.game.selectedDifficultyId, "normal", "Normal is selected");
-  t.eq(h.game.WAVES, h.game.DIFFICULTIES.normal.waves,
-    "the live scheduler points at Normal");
-
-  h.chooseMap(h.game.Maps.DEFAULT_ID);
-  t.eq(h.game.screen, "play", "choosing a route starts the selected run");
-  t.eq(h.game.selectedDifficultyId, "normal", "the run is Normal");
-
-  h.run("restartGame()");
-  t.eq(h.game.selectedDifficultyId, "normal", "restart keeps the difficulty");
-  t.eq(h.game.WAVES, h.game.DIFFICULTIES.normal.waves,
-    "and replays the same schedule");
-
-  h.run("openMapSelect()");
-  h.key("h");
-  t.eq(h.game.selectedDifficultyId, "hard", "H selects Hard from the keyboard");
-});
+// COVERAGE DELIBERATELY REMOVED, 2026-08-12. Two tests lived here:
+// "Easy stays original; Normal and Hard are progressively tougher schedules"
+// and "the run chooser selects a difficulty and restart keeps it".
+//
+// Both PASSED. They were not repaired, because the thing they asserted has been
+// deleted: Diego ruled Normal and Hard unfinished placeholders -- added in a
+// few seconds and forgotten -- and Easy is the only schedule. A test kept alive
+// past its subject by being weakened is a green test carrying a false claim,
+// which is the exact failure this suite spent the day removing.
+//
+// Easy's own properties are not lost with them. The schedule's shape, totals
+// and thirty-five waves are pinned by the "waves and base" tests above, which
+// never went through the difficulty registry to reach them.
 
 test("auto-send keeps its three seconds through a cleared board", function (t) {
   var h = harness.boot();
