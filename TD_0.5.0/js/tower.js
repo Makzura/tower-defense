@@ -105,9 +105,7 @@ function Tower(x, y, path) {
 // "delete this tower, but it stays in code as a placeholder for now". So it
 // keeps its name and its artwork and is the one tower on the board that still
 // looks like the old game -- which is the correct signal for a unit on its way
-// out. Nothing was removed: it is still in BUILD_SLOTS, still in the meta
-// catalogue as a starter, still the reference tower every distance in
-// js/units.js is anchored to, and every test that leans on it still passes.
+// out.
 // When it does go, that is a mechanics change and needs its own decision.
 Tower.DISPLAY_NAME = "Gunner";
 
@@ -118,7 +116,7 @@ Tower.BASE_FIRE_RATE = 1;    // shots per second
 // Hit points. 60 is exactly three swings from an Angry enemy (20 each), which
 // is the number that makes the threat legible: you get to watch it happen and
 // you have time to do something about it. The cheapest tower is also the
-// squishiest, so losing one is a $15 lesson rather than a disaster.
+// squishiest, so losing one is a lesson rather than a disaster.
 Tower.BASE_HP = 60;
 
 // Stable id for the meta catalogue and for save data. See js/meta.js -- these

@@ -11,9 +11,8 @@
 // existing player or breaks the armoury outright. DISPLAY_NAME is the one
 // string that is purely cosmetic, so it is the one string that moved.
 //
-// The game's primary starter unit: $15, reliable in the early waves, and the
-// intended replacement for the gunner when the gunner is eventually retired.
-// It is NOT a retuned gunner -- the gunner is untouched and still in the bar.
+// The game's primary starter unit: reliable in the early waves.
+// It is NOT a retuned gunner.
 //
 // What makes it different from the gunner is the BURST. A gunner fires one
 // bullet a second forever; a Soldier fires a fixed number of shots in quick

@@ -955,7 +955,7 @@ WHAT'S IN THE GAME
   base is hit, and a banner announcing each wave. All drawn in code like the
   rest of the game -- still no images, sounds or files to load.
 - ALL FOUR TOWERS, in the build bar, in the real game:
-    Automaton Rifleman  $300  burst starter; B path goes automatic and recruits.
+    Rifleman            $300  burst starter; B path goes automatic and recruits.
     Warbringer          $700  melee AOE wedge with two 5-tier paths.
     Siphon              $800  continuous beam with two 5-tier paths.
     Arcane Sniper       $900  long-range pierce with two 5-tier paths.
