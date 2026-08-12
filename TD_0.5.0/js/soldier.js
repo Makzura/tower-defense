@@ -30,8 +30,13 @@
 // shot of a burst. That is what makes the DPS arithmetic the owner specified
 // come out exactly:
 //
-//   base   3 shots x 1 dmg / 1.2 s = 2.5 DPS
-//   A5     5 shots x 8 dmg / 0.6 s = 66.7 DPS
+//   base   3 shots x 1 dmg / 1.2   s = 2.5 DPS
+//   A5     5 shots x 8 dmg / 34/60 s = 70.6 DPS   (0.6 s and 66.7 until
+//                                                  2026-08-12)
+//
+// It comes out exactly only because every period in the table is a whole
+// number of 1/60 s steps -- the clock cannot deliver anything else. See the
+// note on A3-A5 for why A5's is written as a fraction.
 //
 // The shot spacing is therefore a shape, not a cost: it decides how bunched a
 // burst is, never how often one happens. Every tier in the table below keeps
@@ -224,9 +229,14 @@ Soldier.FOOTPRINT_RADIUS_UL = Tower.FOOTPRINT_RADIUS_UL;
 // ramped -- and the Rifleman was selling its 66.7 DPS path A for $3 000, i.e.
 // $45. Both paths now land at about $100 per finished DPS:
 //
-//   path A  $300 + $6 400 = $6 700 for 66.7 DPS   ($100 / DPS)
-//   path B  $300 + $7 200 = $7 500 for ~75 DPS    ($100 / DPS, recruits and
+//   path A  $300 + $6 400 = $6 700 for 70.6 DPS   ($95 / DPS since the
+//                                                  2026-08-12 burst-clock pass;
+//                                                  it was 66.7 and $100)
+//   path B  $300 + $7 200 = $7 500 for ~79 DPS    ($95 / DPS, recruits and
 //                                                  defence pierce counted in)
+//
+// The two land on the SAME money-per-DPS on purpose (2026-08-12). They are not
+// meant to be ranked against each other on one number -- see the note on A3-A5.
 //
 // The BUILD price is deliberately untouched at $300: `STARTING_CASH` is 600
 // precisely so the opening buys two of these, and that pair is a documented
@@ -241,15 +251,90 @@ Soldier.UPGRADES = [
     fireRate: 0.25, hp: 20 },
   { id: "A2", branch: "A", cost: 325, damage: 1, shots: 4, spacing: 0.11, cooldown: 1.0,
     fireRate: 0.25, hp: 30, requires: "A1" },
-  { id: "A3", branch: "A", cost: 700, damage: 2, shots: 4, spacing: 0.10, cooldown: 0.9,
-    hp: 50, requires: "A2", locksPath: true },
+  // A3-A5 CARRY RANGE AND A TIGHTER BURST CLOCK since 2026-08-12, at the
+  // owner's instruction: *"keep the A path just as cheap, but give it a bit
+  // more range upgrade from a3 to a5, and a bit more DPS from a3 to a5, without
+  // making it broken nor changing the price."*
+  //
+  // **THE RANGE IS NEW, NOT BIGGER.** Path A had NO range upgrade at all --
+  // 100 u.l. at build and 100 u.l. at a finished A5, measured at every tier
+  // against B1's +25 as a control. B1 was the only row in this table carrying a
+  // `rangeUl` key. So the engagement window was the same 3.9 s at A5 as at
+  // build, and every tier bought density inside a window it could not widen.
+  // +5 u.l. a tier takes a finished path A to 115 u.l., which is DELIBERATELY
+  // STILL SHORT OF B1's 125: on a PURE path A, reach stays path B's stat,
+  // bought at tier one for $200, and $5 875 of path A tiers still does not buy
+  // as much of it.
+  //
+  // **BUT IT DOES NOT STAY B's STAT ON A CROSSPATH, AND THAT IS A REAL
+  // CONSEQUENCE OF THIS CHANGE.** `rangeUl` is a DELTA channel here --
+  // recalcStats does `this.rangeUl += u.rangeUl` -- so B1's +25 and A3-A5's +15
+  // STACK. Measured by bisecting the tower's own picker, before and after:
+  //   A3+B1        $1 725   125 -> 130 u.l.
+  //   A4+B1+B2     $3 975   125 -> 135 u.l.
+  //   A5+B1+B2     $7 250   125 -> 140 u.l.
+  //   B1..B5       $7 500   125 -> 125 u.l.  (path B is untouched)
+  // Before this change 125 u.l. was a HARD CEILING for every Rifleman at every
+  // price; it is now beaten for $1 725, and the longest reach in the tower is a
+  // crosspath rather than a finished path B. The owner did not ask for that and
+  // has not ruled on it -- it is asserted in tests/content.test.js so it cannot
+  // drift silently, and it is on his desk. Holding the old ceiling would mean
+  // giving this table the Smasher's `Math.max` range semantics (js/smasher.js)
+  // and rewriting B1's +25 as an absolute 125, which is a change to a path B
+  // row that he did not authorise.
+  //
+  // **THE DPS IS BOUGHT WITH THE BURST CLOCK, NOT WITH DAMAGE PER SHOT**, and
+  // that is measured rather than stylistic. An 8-damage A5 shot into the 4 HP
+  // body the game actually sends has half of it clamped away by
+  // Enemy.lastDamageTaken, so A5's advertised 66.7 DPS was 33.3 in real play
+  // and MORE damage per shot would have been very nearly invisible. Shortening
+  // the burst period pays out in full against every body on the road.
+  // THESE ARE MEASURED FIGURES, timed off the tower's own burst openings and
+  // not damage x shots / cooldown:
+  //   A3  0.90 -> 0.85     s   8.89 -> 9.41 DPS
+  //   A4  0.80 -> 0.75     s  25.00 -> 26.67 DPS
+  //   A5  0.60 -> 34/60    s  66.67 -> 70.59 DPS  (33.3 -> 35.3 effective)
+  // The burst still fits inside the period at every tier (A5 is 5 shots of
+  // 0.07 s spacing = 0.28 s inside 0.567 s), so this tightens the rhythm
+  // without turning the weapon into a steady rifle -- A5 is idle over half the
+  // time, and its 40-damage alpha strike is untouched.
+  //
+  // **A5's PERIOD IS WRITTEN `34 / 60`, AND THAT IS NOT DECORATION.** `cooldown`
+  // is set to `burstCooldown` and then decremented by FIXED_STEP once a step,
+  // and the burst reopens on `cooldown <= 0` -- so the realised period is
+  // ALWAYS a whole number of 1/60 s steps, whatever the table says. Every other
+  // row happens to land on one exactly (1.2 -> 72 steps, 1.1 -> 66, 1.0 -> 60,
+  // 0.9 -> 54, 0.85 -> 51, 0.8 -> 48, 0.75 -> 45, 0.6 -> 36), which is why the
+  // panel's `shots / cooldown` has always printed the truth here.
+  //
+  // A plain `0.55` would have BROKEN that. It does not land on 33 steps:
+  // thirty-three sequential subtractions of 1/60 come to 0.5499999999999999 and
+  // leave a positive residue, so the burst opens on step 34 for a real period of
+  // 0.566667 s -- while the shop card, the upgrade preview and the inspection
+  // panel all divide by the 0.55 in the table and print 72.7 DPS and 9.09
+  // shots/s against a tower delivering 70.6 and 8.82. MEASURED, both ways, by
+  // timing the tower's own burst openings: 0.55 and 34/60 are the SAME 34 steps
+  // and the SAME 70.6 DPS, and only 34/60 says so out loud.
+  //
+  // There is no two-decimal value between 0.50 and 0.60 that realises exactly
+  // (0.54 declares 74.07 and delivers 72.73; 0.56 declares 71.43 and delivers
+  // 70.59; the whole range was scanned), so the choice was a truthful fraction
+  // or a card that overstates. If this row is ever retuned again, TIME THE
+  // PERIOD -- do not divide -- and prefer `n / 60`.
+  //
+  // A1 AND A2 ARE DELIBERATELY NOT TOUCHED. The owner's "cheap early game DPS"
+  // role is carried by the $300 BUILD price, not by those tiers, and both of
+  // them also feed path B through `fireRate` -- a change there would be a
+  // crosspath change he did not ask for.
+  { id: "A3", branch: "A", cost: 700, damage: 2, shots: 4, spacing: 0.10, cooldown: 0.85,
+    rangeUl: 5, hp: 50, requires: "A2", locksPath: true },
   // A4 and A5 were retuned up on 2026-07-30 (A4 2 -> 4 damage; A5 3 -> 8 damage
   // and 0.7 -> 0.6 s between bursts), which is what stops the rebuilt path B
   // dominating this one -- see The paths in AGENTS.md.
-  { id: "A4", branch: "A", cost: 1900, damage: 4, shots: 5, spacing: 0.08, cooldown: 0.8,
-    hp: 80, requires: "A3", locksPath: true },
-  { id: "A5", branch: "A", cost: 3275, damage: 8, shots: 5, spacing: 0.07, cooldown: 0.6,
-    hp: 120, requires: "A4", locksPath: true },
+  { id: "A4", branch: "A", cost: 1900, damage: 4, shots: 5, spacing: 0.08, cooldown: 0.75,
+    rangeUl: 5, hp: 80, requires: "A3", locksPath: true },
+  { id: "A5", branch: "A", cost: 3275, damage: 8, shots: 5, spacing: 0.07, cooldown: 34 / 60,
+    rangeUl: 5, hp: 120, requires: "A4", locksPath: true },
 
   { id: "B1", branch: "B", cost: 200,  rangeUl: 25, hp: 25 },
   { id: "B2", branch: "B", cost: 350, hp: 40, damageDelta: 1, requires: "B1" },

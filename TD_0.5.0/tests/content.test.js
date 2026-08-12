@@ -4509,14 +4509,25 @@ test("path A tightens the burst exactly as the table says", function (t) {
   h.run("inspected = towers[towers.indexOf(towers.filter(function (x) " +
     "{ return x instanceof Soldier; })[0])]");
 
+  // `range` is the tier's CUMULATIVE reach, not its delta. Path A carried no
+  // range at all until 2026-08-12 -- 100 u.l. from build to a finished A5 --
+  // and A3-A5 now add 5 each. A1 and A2 deliberately still add none, which is
+  // why the first two rows repeat 100.
   var TABLE = [
-    { tier: 1, damage: 1, shots: 3, spacing: 0.13, cooldown: 1.1 },
-    { tier: 2, damage: 1, shots: 4, spacing: 0.11, cooldown: 1.0 },
-    { tier: 3, damage: 2, shots: 4, spacing: 0.10, cooldown: 0.9 },
+    { tier: 1, damage: 1, shots: 3, spacing: 0.13, cooldown: 1.1,  range: 100 },
+    { tier: 2, damage: 1, shots: 4, spacing: 0.11, cooldown: 1.0,  range: 100 },
+    // A3-A5 retuned 2026-08-12: +5 u.l. each and a tighter burst clock
+    // (0.9 -> 0.85, 0.8 -> 0.75, 0.6 -> 34/60).
+    { tier: 3, damage: 2, shots: 4, spacing: 0.10, cooldown: 0.85,  range: 105 },
     // A4 and A5 retuned up 2026-07-30: A4 2 -> 4 damage, A5 3 -> 8 damage and
     // 0.7 -> 0.6 s between bursts.
-    { tier: 4, damage: 4, shots: 5, spacing: 0.08, cooldown: 0.8 },
-    { tier: 5, damage: 8, shots: 5, spacing: 0.07, cooldown: 0.6 }
+    { tier: 4, damage: 4, shots: 5, spacing: 0.08, cooldown: 0.75,  range: 110 },
+    // A5's period is a FRACTION, not a decimal, and the test says so in the
+    // same shape the table does. See the note on A3-A5 in js/soldier.js: the
+    // engine can only deliver whole 1/60 s steps, and 0.55 would have realised
+    // 34 of them while the panel divided by 0.55 and printed a rate 3% higher
+    // than the tower fires at.
+    { tier: 5, damage: 8, shots: 5, spacing: 0.07, cooldown: 34 / 60, range: 115 }
   ];
 
   TABLE.forEach(function (row) {
@@ -4525,15 +4536,39 @@ test("path A tightens the burst exactly as the table says", function (t) {
     t.eq(s.shotsPerBurst, row.shots, "A" + row.tier + " shots per burst");
     t.ok(Math.abs(s.shotSpacing - row.spacing) < 1e-9, "A" + row.tier + " spacing");
     t.ok(Math.abs(s.burstCooldown - row.cooldown) < 1e-9, "A" + row.tier + " cooldown");
+    t.eq(s.rangeUl, row.range, "A" + row.tier + " range in u.l.");
   });
 
-  // 5 x 8 / 0.6 = 66.7 DPS. It was 21.4 (5 x 3 / 0.7) until 2026-07-30 -- see
-  // The paths in AGENTS.md for why the whole top of this branch moved.
-  t.ok(Math.abs(h.game.TowerStats.dps(s) - 66.67) < 0.01, "A5 lands on 66.7 DPS");
+  // 5 x 8 / (34/60) = 70.6. It was 66.7 (5 x 8 / 0.6) until 2026-08-12 and 21.4
+  // (5 x 3 / 0.7) until 2026-07-30 -- see The paths in AGENTS.md.
+  t.ok(Math.abs(h.game.TowerStats.dps(s) - 70.59) < 0.01, "A5 lands on 70.6 DPS");
+
+  // AND THE TOWER ACTUALLY FIRES AT THE RATE THE PANEL PRINTS. This is the
+  // assertion the row above cannot make: TowerStats.dps just divides the two
+  // numbers sitting beside it in the table, so it would report 72.7 just as
+  // happily for a `0.55` the 60 Hz clock rounds up to 34 steps and delivers
+  // 70.6 at. This one TIMES the tower instead -- real update(), real fixed
+  // step, one bullet counted per shot -- so a period the engine cannot realise
+  // fails here even though the arithmetic above stays green.
+  //
+  // Self-tested by putting `0.55` back in the table: this assertion goes red
+  // (delivered 70.6 against a declared 72.7) while every other assertion in
+  // this test stays green. A check that cannot fail is not a check.
+  var pinned = h.spawnAt(305, 100000000);
+  pinned.laneOffsetUl = 0;
+  pinned.refreshPos();
+  var WINDOW = 300;
+  var timed = fireFor(h, s, [pinned], WINDOW);
+  var deliveredDps = timed.bullets.length * s.damage / WINDOW;
+  // 0.25 is comfortably inside the 2.1 DPS a `0.55` would be out by, and
+  // comfortably outside the 0.13 that one unfinished burst at the end of the
+  // window can cost.
+  t.ok(Math.abs(deliveredDps - h.game.TowerStats.dps(s)) < 0.25,
+    "and it DELIVERS that rate over 300 s (" + deliveredDps.toFixed(2) + " measured)");
 
   // And the burst still finishes inside its own cycle: 4 gaps of 0.07 is
-  // 0.28 s against a 0.6 s cooldown. If a future retune ever inverts that, the
-  // rate this tower reports stops being the rate it fires at.
+  // 0.28 s against a 0.567 s cooldown. If a future retune ever inverts that,
+  // the rate this tower reports stops being the rate it fires at.
   t.ok((s.shotsPerBurst - 1) * s.shotSpacing < s.burstCooldown,
     "a burst still fits inside its cooldown");
 });
@@ -4679,8 +4714,20 @@ test("the Soldier crosspaths like the Smasher and the Longshot", function (t) {
   buyPath(h, s, "A", 2);
   t.eq(s.shotsPerBurst, 5, "A5+B2: five shots");
   t.ok(Math.abs(s.shotSpacing - 0.07) < 1e-9, "A5+B2: 0.07 s spacing");
-  t.ok(Math.abs(s.burstCooldown - 0.6) < 1e-9, "A5+B2: 0.6 s cooldown");
-  t.eq(s.rangeUl, 125, "A5+B2: 125 u.l. -- B1's +25");
+  t.ok(Math.abs(s.burstCooldown - 34 / 60) < 1e-9, "A5+B2: 34/60 s cooldown");
+  // 140, not 125: B1's +25 AND the +5 each that A3, A4 and A5 gained on
+  // 2026-08-12. `rangeUl` is a delta channel here (recalcStats does `+=`), so
+  // the two branches' range STACKS on a crosspath.
+  //
+  // THIS IS PINNED BECAUSE IT IS A CONSEQUENCE THE OWNER HAS NOT RULED ON, not
+  // because it is a design he asked for. Until 2026-08-12, 125 u.l. was a hard
+  // ceiling for every Rifleman at every price; it is now beaten at $1 725 by
+  // A3+B1 (130 u.l.), and this $7 250 endpoint is the longest reach the tower
+  // can have -- further than a finished $7 500 path B, which is unchanged at
+  // 125. If he rules against it, holding the old ceiling means giving this
+  // table the Smasher's Math.max range semantics and rewriting B1's +25 as an
+  // absolute 125, which changes a path B row.
+  t.eq(s.rangeUl, 140, "A5+B2: 140 u.l. -- B1's +25 and A3-A5's +15");
   // Since the 2026-08-01 retune EVERY tier grants HP, so this is no longer
   // "base plus B2" -- it is the base 80 plus all seven owned tiers:
   // 20+30+50+80+120 down A, and 25+40 from the two B crosspaths.
@@ -4692,7 +4739,8 @@ test("the Soldier crosspaths like the Smasher and the Longshot", function (t) {
   // its +1, and 9 since A5 was retuned -- so it is asserted rather than assumed.
   t.eq(s.damage, 9, "A5+B2: 9 damage -- A5's absolute 8 plus B2's +1");
   t.eq(s.automatic, false, "A5+B2: still a burst weapon, because B3 is locked out");
-  t.ok(Math.abs(h.game.TowerStats.dps(s) - 75) < 0.01, "A5+B2: 5 x 9 / 0.6 = 75 DPS");
+  t.ok(Math.abs(h.game.TowerStats.dps(s) - 79.41) < 0.01,
+    "A5+B2: 5 x 9 / (34/60) = 79.4 DPS");
 });
 
 test("each shot of a burst finds its own target", function (t) {
