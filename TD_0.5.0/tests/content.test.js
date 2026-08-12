@@ -1366,22 +1366,39 @@ test("every type draws without throwing", function (t) {
 group("tower health and the range circle");
 
 test("every tower type answers the health contract", function (t) {
-  var h = harness.boot();
-  h.run("cash = 1000000");
-
-  // Duck-typed across all four, which is the point of js/systems/
+  // Duck-typed across every type in the bar, which is the point of js/systems/
   // tower-health.js: a new type that forgets one of these fails here rather
   // than silently becoming immortal.
-  h.game.BUILD_SLOTS.forEach(function (Type, slot) {
-    if (!Type) return;
+  //
+  // ONE FRESH BOARD PER TYPE, the same way the stunned-facing test above does
+  // it and for the same reason. All five used to go down on ONE board, each
+  // looking up its own legal spot -- but that search returns the FIRST legal
+  // coordinate, which is exactly where the previous tower is already standing,
+  // and a click on an existing tower SELECTS it rather than building beside it.
+  // So the second placement returned null and the test died there. Only the
+  // Warbringer was ever actually checked; the other four never ran at all.
+  var slotCount = harness.boot().game.BUILD_SLOTS.length;
+
+  for (var slot = 0; slot < slotCount; slot++) {
+    var h = harness.boot();
+    var Type = h.game.BUILD_SLOTS[slot];
+    if (!Type) continue;
+    h.run("cash = 1000000");
+
     var spot = h.run("(function () {" +
       "  for (var x = 24; x < VIEW_WIDTH - 24; x += 8)" +
       "    for (var y = 24; y < VIEW_HEIGHT - 80; y += 8)" +
       "      if (whyCannotBuild(x, y, BUILD_SLOTS[" + slot + "]) === null) return { x: x, y: y };" +
       "  return null; })()");
     t.ok(spot !== null, Type.DISPLAY_NAME + " has somewhere legal to stand");
+    if (!spot) continue;
 
     var tower = h.place(spot.x, spot.y, slot);
+    // Checked rather than assumed: a null here used to end the whole test in a
+    // TypeError, which said nothing about which type had failed to place.
+    t.ok(tower !== null, Type.DISPLAY_NAME + " actually places there");
+    if (!tower) continue;
+
     t.ok(tower.maxHp > 0, Type.DISPLAY_NAME + " has max HP");
     t.eq(tower.currentHp, tower.maxHp, Type.DISPLAY_NAME + " starts full");
     t.eq(tower.isDestroyed(), false, Type.DISPLAY_NAME + " starts alive");
@@ -1393,7 +1410,7 @@ test("every tower type answers the health contract", function (t) {
     tower.takeDamage(1e9);
     t.eq(tower.currentHp, 0, Type.DISPLAY_NAME + " clamps at zero, never negative");
     t.eq(tower.isDestroyed(), true, Type.DISPLAY_NAME + " is destroyed at zero");
-  });
+  }
 });
 
 test("the range circle is drawn only for the selected tower", function (t) {
@@ -2139,22 +2156,31 @@ test("A1, A2, B1 and B2 can all be owned at once", function (t) {
   });
   t.eq(s.lockedBranch(), null, "none of them lock a branch");
   t.eq(s.damage, 21, "12+4+5+0+0");
-  t.eq(s.rangeUl, 43.75, "range from A2");
+  // A2's own 43.75 plus B2's +15 crosspath range bonus. B2 has granted range
+  // since the 2026-08-01 retune, so this is no longer "the range from A2"
+  // alone -- it is the whole point of holding both branches at once.
+  t.eq(s.rangeUl, 58.75, "43.75 from A2, plus B2's +15");
   t.eq(s.cooldownSeconds, 2.2, "hit speed from B2");
 });
 
 test("upgrades cost money and are refused when unaffordable", function (t) {
   var h = harness.boot();
-  // The purse is the smasher's price plus $200, so the tower leaves exactly
-  // $200 behind and the A1/A2 affordability boundary below is unchanged. Was
-  // $400 while the smasher cost $200; it costs $700 since 2026-07-30.
-  h.run("cash = " + (700 + 200));
-  var s = h.placeSmasher(600, 500);      // leaves 200
-  t.eq(h.game.cash, 200, "cash after building");
+  // The purse is the smasher's price plus $250, so the tower leaves $250 behind
+  // and the A1/A2 affordability boundary is straddled: A1 at 200 is affordable,
+  // A2 at 350 is not. Was $400 while the smasher cost $200 and A1 cost $150.
+  //
+  // The remainder is 250 rather than exactly A1's price ON PURPOSE. Leaving
+  // exactly 200 would buy A1 down to zero, and "no cash taken for a refused
+  // upgrade" would then be checking that nothing moved a purse that was already
+  // empty -- true whether or not the refusal is honest. A non-zero 50 is a
+  // witness that can actually change.
+  h.run("cash = " + (700 + 250));
+  var s = h.placeSmasher(600, 500);      // leaves 250
+  t.eq(h.game.cash, 250, "cash after building");
 
-  t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 affordable at 150");
+  t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 affordable at 200");
   t.eq(h.game.cash, 50, "cash after A1");
-  t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough cash", "A2 refused at 225");
+  t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough cash", "A2 refused at 350");
   t.eq(s.hasA2, false, "and not granted");
   t.eq(h.game.cash, 50, "no cash taken for a refused upgrade");
 
@@ -2177,9 +2203,10 @@ test("selling refunds half of everything invested, upgrades included", function 
   t.eq(h.run("sellValue(towers[0])"), 350, "half of the 700 build cost");
 
   h.run("buyUpgrade(towers[0], 'A1')");
-  t.eq(s.totalSpent, 850, "700 + 150 invested");
+  // A1 is $200 since the 2026-08-01 retune, so the investment is 700 + 200.
+  t.eq(s.totalSpent, 900, "700 + 200 invested");
   t.eq(s.cost, 700, "and the build price itself never moved");
-  t.eq(h.run("sellValue(towers[0])"), 425, "half of everything invested");
+  t.eq(h.run("sellValue(towers[0])"), 450, "half of everything invested");
 });
 
 group("smasher: slow");
@@ -2697,21 +2724,25 @@ test("the panel offers the next tier on each branch, with its price", function (
   t.eq(buttons.length, 2, "one button per branch");
   // Three things on every upgrade button: which tier, what it costs, what it
   // does. All three are readable BEFORE the purchase.
+  // Prices are the 2026-08-01 ladder: A 200/350/600/1400/1950 and
+  // B 200/400/900/1900/2900. Typed, because this test is ABOUT what the panel
+  // prints -- reading them back from Smasher.UPGRADES would assert only that
+  // the panel echoes the table it was built from.
   t.eq(buttons[0].label, "Path A → A1", "branch A offers A1");
-  t.eq(buttons[0].detail, "$150", "with its price");
+  t.eq(buttons[0].detail, "$200", "with its price");
   t.eq(buttons[1].label, "Path B → B1", "branch B offers B1");
-  t.eq(buttons[1].detail, "$150", "with its price");
+  t.eq(buttons[1].detail, "$200", "with its price");
 
   h.run("buyUpgrade(inspected, 'A1')");
   buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[0].label, "Path A → A2", "branch A moves on to A2");
-  t.eq(buttons[0].detail, "$225", "at the next tier's price");
+  t.eq(buttons[0].detail, "$350", "at the next tier's price");
   t.eq(buttons[1].label, "Path B → B1", "branch B is unaffected");
 });
 
 test("clicking a branch button buys that upgrade", function (t) {
   var h = harness.boot();
-  // Priced off Smasher.COST so the $800 left behind -- and the "800 - 150"
+  // Priced off Smasher.COST so the $800 left behind -- and the "800 - 200"
   // assertion below -- survives a change to the build price.
   h.run("cash = " + (h.game.Smasher.COST + 800));
   var s = h.placeSmasher(600, 500);      // leaves 800
@@ -2721,7 +2752,7 @@ test("clicking a branch button buys that upgrade", function (t) {
   h.click(b.x + b.w / 2, b.y + b.h / 2);
 
   t.eq(s.hasA1, true, "A1 bought");
-  t.eq(h.game.cash, 650, "800 - 150");
+  t.eq(h.game.cash, 600, "800 - 200");
   t.eq(s.damage, 16, "stats recalculated");
   t.eq(h.game.towers.length, 1, "the click did not place or sell anything");
 });
@@ -2792,12 +2823,12 @@ test("the B button keeps offering B1 and B2 after committing to path A", functio
   h.run("buyUpgrade(inspected, 'A3')");
   var buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[1].label, "Path B → B1", "B1 still available");
-  t.eq(buttons[1].detail, "$150", "at its price");
+  t.eq(buttons[1].detail, "$200", "at its price");
 
   h.run("buyUpgrade(inspected, 'B1')");
   buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[1].label, "Path B → B2", "then B2");
-  t.eq(buttons[1].detail, "$225", "at its price");
+  t.eq(buttons[1].detail, "$400", "at its price");
 });
 
 test("the locked-out branch is greyed, not removed, and says why", function (t) {
@@ -2851,18 +2882,22 @@ test("each button spells out what the upgrade does", function (t) {
   h.click(600, 500);
 
   var buttons = h.run("inspectionLayout(inspected).upgrades");
+  // Every tier grants HP since the 2026-08-01 retune, so every effects string
+  // carries an HP clause it did not used to. That is the retune showing up in
+  // the panel, not the panel changing how it spells things.
   t.eq(buttons[0].label, "Path A → A1", "which tier");
-  t.eq(buttons[0].detail, "$150", "what it costs");
-  t.eq(buttons[0].effects, "+4 dmg, +6.25 u.l. range", "A1 effects");
+  t.eq(buttons[0].detail, "$200", "what it costs");
+  t.eq(buttons[0].effects, "+4 dmg, +6.25 u.l. range, +30 HP", "A1 effects");
 
   // Spelled by the SAME formatter the config-driven towers use, in the same
   // unit every tower's panel now reports its rate in. It used to read "-1.0 s"
   // -- a different quantity, in a different direction, under a different name.
-  t.eq(buttons[1].effects, "+0.08 atk/s", "B1 only changes attack speed");
+  // B1 still moves nothing but the swing rate, and now the hit points.
+  t.eq(buttons[1].effects, "+0.08 atk/s, +35 HP", "B1 changes attack speed and HP");
 
   ["A1", "A2"].forEach(function (id) { h.run("buyUpgrade(inspected, '" + id + "')"); });
   buttons = h.run("inspectionLayout(inspected).upgrades");
-  t.eq(buttons[0].effects, "+7 dmg, +6.25 u.l. range", "A3 effects");
+  t.eq(buttons[0].effects, "+7 dmg, +6.25 u.l. range, +70 HP", "A3 effects");
 });
 
 test("effects are diffed against this tower, not read off the table", function (t) {
@@ -2880,7 +2915,13 @@ test("effects are diffed against this tower, not read off the table", function (
   var buttons = h.run("inspectionLayout(inspected).upgrades");
   var bButton = buttons.filter(function (b) { return b.branch === "B"; })[0];
   t.eq(bButton.id, "B2", "B2 is next");
-  t.eq(bButton.effects, "+0.12 atk/s", "measured from 3.0 s, not from the 4.0 s base");
+  // The atk/s clause is what this test is really about: +0.12 is 0.33/s -> 0.45/s
+  // measured from B1's 3.0 s, where reading the table against the 4.0 s base
+  // would have said +0.20. The range and HP clauses ride along because B2 grants
+  // both since the retune; they are listed here so the string is the whole
+  // string rather than a prefix that would pass while hiding a fourth clause.
+  t.eq(bButton.effects, "+15 u.l. range, +0.12 atk/s, +55 HP",
+    "measured from 3.0 s, not from the 4.0 s base");
 });
 
 test("every smasher tier describes itself before it is bought", function (t) {
@@ -2951,7 +2992,7 @@ test("hovering a button opens a card with the whole story", function (t) {
   h.move(button.x + button.w / 2, button.y + button.h / 2);
 
   var card = h.run("hoveredCard(inspectionLayout(inspected)).model");
-  t.eq(card.subtitle, "$150", "what it costs");
+  t.eq(card.subtitle, "$200", "what it costs");
 
   var byLabel = {};
   card.changes.forEach(function (c) { byLabel[c.label] = c; });
@@ -3052,7 +3093,7 @@ test("previewing an upgrade does not change the tower", function (t) {
 
 test("an unaffordable button is shown dead and cannot be clicked through", function (t) {
   var h = harness.boot();
-  // $60 left behind is the point of the fixture -- below A1's $150. Priced off
+  // $60 left behind is the point of the fixture -- below A1's $200. Priced off
   // the build cost so it stays $60 whatever the smasher costs.
   h.run("cash = " + (h.game.Smasher.COST + 60));
   var s = h.placeSmasher(600, 500);      // leaves 60
@@ -3060,8 +3101,8 @@ test("an unaffordable button is shown dead and cannot be clicked through", funct
 
   var b = h.run("inspectionLayout(inspected).upgrades[0]");
   t.eq(b.label, "Path A → A1", "still shows what it would buy");
-  t.eq(b.detail, "$150", "and what that would cost");
-  t.eq(b.effects, "+4 dmg, +6.25 u.l. range", "and what it would do");
+  t.eq(b.detail, "$200", "and what that would cost");
+  t.eq(b.effects, "+4 dmg, +6.25 u.l. range, +30 HP", "and what it would do");
   t.eq(b.enabled, false, "but is not live at $60");
 
   h.click(b.x + b.w / 2, b.y + b.h / 2);
@@ -3105,7 +3146,7 @@ test("the sell button still works with the upgrade row present", function (t) {
   h.run("buyUpgrade(inspected, 'A1')");
 
   var refund = h.run("sellValue(inspected)");
-  t.eq(refund, 425, "half of 700 + 150");
+  t.eq(refund, 450, "half of 700 + 200");
 
   var b = h.run("inspectionLayout(inspected).sell");
   var before = h.game.cash;
@@ -3295,9 +3336,12 @@ test("it still sells, inspects and draws when fully upgraded", function (t) {
     return rows.filter(function (r) { return r[0] === name; })[0][1];
   }
   t.eq(row("Damage"), "39", "damage row");
-  t.eq(row("Range"), "43.75 u.l.", "range is in u.l., not the 'm' it used to print");
+  // 83.75 = A2's 43.75 plus the range B2, B4 and B5 each grant (+15, +10, +15)
+  // since the 2026-08-01 retune. This build holds A1-A2 and all of B, so it
+  // collects every one of them.
+  t.eq(row("Range"), "83.75 u.l.", "range is in u.l., not the 'm' it used to print");
   t.eq(row("Attack speed"), "0.45/s", "and the swing rate is attacks per second");
-  t.eq(row("On kill"), "3 in 18.75 u.l.", "the blast radius too");
+  t.eq(row("On kill"), "15 in 18.75 u.l., chains", "the blast radius too");
   t.eq(rows[rows.length - 1][0], "DPS", "DPS is the last row");
   t.near(parseFloat(rows[rows.length - 1][1]), 39 / 2.2, 0.05, "DPS derived");
 
@@ -4432,11 +4476,16 @@ test("path B buys utility and abandons the burst at B3", function (t) {
   t.eq(s.rangeUl, 125, "B1 adds 25 u.l. of reach");
   t.eq(s.rangePx, h.run("ul(125)"), "and the cached world radius follows");
 
-  // B2 heals to the new maximum, so a chewed-up Soldier is repaired by it.
+  // B2 grants its HP as a DELTA rather than healing to the new maximum. That
+  // changed on 2026-08-01 when all ten tiers gained HP: healing to full would
+  // have made every upgrade a full repair, so a tower under fire could be
+  // topped up for the price of the next tier. js/soldier.js is explicit that
+  // this was rejected -- "without making the shop a hospital". A damaged
+  // Soldier stays damaged by the same amount, and the new points are its own.
   s.currentHp = 40;
   buyPath(h, s, "B", 1);
-  t.eq(s.maxHp, 110, "B2 adds 30 max HP");
-  t.eq(s.currentHp, 110, "and heals to the new max");
+  t.eq(s.maxHp, 145, "B2 adds 40 max HP");
+  t.eq(s.currentHp, 80, "and the same 40 points go onto current HP, not a heal");
 
   t.eq(s.damage, 2, "B2 also adds +1 damage");
   t.eq(s.automatic, false, "and B2 is still a burst weapon");
@@ -4457,7 +4506,7 @@ test("path B buys utility and abandons the burst at B3", function (t) {
   t.eq(s.defenseFlatPierce, 10, "B4 grants 10 points of defence pierce");
   t.eq(s.damage, 5, "and +2 damage: 1 + 1 + 1 + 2");
   t.eq(s.hasRecruitAbility, true, "and B4 is what unlocks recruits");
-  t.eq(s.recruitCooldownSeconds, 40, "recruits are on a 40 s cooldown at B4");
+  t.eq(s.recruitCooldownSeconds, 45, "recruits are on a 45 s cooldown at B4");
 
   buyPath(h, s, "B", 1);
   // The owner's figure, 2026-07-30: "make him do 20 damage, so +15 ad instead
@@ -4470,7 +4519,11 @@ test("path B buys utility and abandons the burst at B3", function (t) {
   t.ok(Math.abs(h.game.TowerStats.dps(s) - 50) < 0.01, "B5 lands on 50 DPS");
   t.eq(h.game.Soldier.upgradeById("B5").fireRate, undefined,
     "and B5 grants no attack speed at all");
-  t.eq(s.recruitCooldownSeconds, 30, "and B5 drops the recruit cooldown to 30 s");
+  // B5 NO LONGER shortens the cooldown. Both tiers call on the same 45 s since
+  // 2026-08-01 ("make the recruits cooldown of both b4 and b5 45sec"), so what
+  // B5 buys is a bigger, harder squad rather than a more frequent one -- which
+  // is what the recruitBoost row above it is for.
+  t.eq(s.recruitCooldownSeconds, 45, "and B5 leaves the recruit cooldown at 45 s");
   t.eq(s.recruitRangeUl, 125, "and raises recruit range to 125 u.l.");
 
   // The burst fields are still on the tower and still at their base values --
@@ -4557,7 +4610,10 @@ test("the Soldier crosspaths like the Smasher and the Longshot", function (t) {
   t.ok(Math.abs(s.shotSpacing - 0.07) < 1e-9, "A5+B2: 0.07 s spacing");
   t.ok(Math.abs(s.burstCooldown - 0.6) < 1e-9, "A5+B2: 0.6 s cooldown");
   t.eq(s.rangeUl, 125, "A5+B2: 125 u.l. -- B1's +25");
-  t.eq(s.maxHp, 110, "A5+B2: 110 HP -- B2's +30");
+  // Since the 2026-08-01 retune EVERY tier grants HP, so this is no longer
+  // "base plus B2" -- it is the base 80 plus all seven owned tiers:
+  // 20+30+50+80+120 down A, and 25+40 from the two B crosspaths.
+  t.eq(s.maxHp, 445, "A5+B2: 445 HP -- 80 base plus all seven tiers");
   t.eq(s.seesCamo, false, "A5+B2: still no camo, because B3 is locked out");
 
   // The two damage channels meeting: path A's absolute 8 plus B2's delta of 1.

@@ -67,20 +67,24 @@ var BASELINE = [
     failing: []
   },
   {
-    file: "tests/content.test.js", pass: 189, fail: 23,
-    // Was 182/30. Seven repaired on 2026-08-12: three roster-shift names (the
-    // gunner's deletion moved every slot and every catalogue card down one),
-    // two renames (the Soldier's row is "Defense pierce", and the enemy index
-    // became a scrolling viewport), and two recruit-cooldown names (40 -> 45).
+    file: "tests/content.test.js", pass: 204, fail: 8,
+    // Was 182/30. Twenty-two repaired on 2026-08-12, none of them by changing
+    // product code: the gunner-deletion roster shift (3), two renames, the
+    // recruit cooldown (2), and the 2026-08-01 upgrade retune (15) -- upgrades
+    // now grant HP on every tier and the Smasher ladders were repriced to
+    // A 200/350/600/1400/1950 and B 200/400/900/1900/2900.
     //
-    // What is LEFT, and why none of it is drift:
-    // Boss/Tyrant (6): fixtures one retune behind the code. nadia ruled the
-    // CODE canonical on 2026-08-12 -- shield 1000, aimed 12 s, 9 s post-roar,
-    // leap 90 u.l., roar summon 40 bodies. Do not "fix" these towards the test.
-    // The 2026-08-01 upgrade retune (13): upgrades now grant HP and A1/A2/B1/B2
-    // were repriced. HELD pending nadia confirming the retune is settled.
-    // Four test-file bugs remain in here: `w is not defined` (4) and two
-    // towers[-1] throws, plus the tower health contract.
+    // What is LEFT is six Tyrant-family names plus two test-file bugs, and
+    // none of it is drift:
+    //   - FOUR of the six throw `ReferenceError: w is not defined` and have
+    //     therefore never executed a single assertion. They are Tyrant tests,
+    //     so they are not separable from the Tyrant work.
+    //   - `the roar ...` carries the 601/610 trap: :601 reads a key the TYPE
+    //     row has never had, and repairing it exposes :610 underneath.
+    //   - `the Tyrant's numbers ...` is the plain stale-retune repair; nadia
+    //     ruled the CODE canonical -- shield 1000, leap 90 u.l., 9 s post-roar,
+    //     roar summon 40 bodies. Do not "fix" these towards the test.
+    //   - two `towers[-1]` throws, which are fixture bugs of their own.
     failing: [
       "the Tyrant's numbers are the ones that were asked for",
       "the roar shields it, speeds it up, and calls the wave back",
@@ -88,21 +92,6 @@ var BASELINE = [
       "the Tyrant's aimed shot takes the HIGHEST DPS tower, not the nearest",
       "the leap jumps 50 u.l. and shockwaves everything it lands beside",
       "after the roar it alternates shot and leap, and still attacks rarely",
-      "every tower type answers the health contract",
-      "A1, A2, B1 and B2 can all be owned at once",
-      "upgrades cost money and are refused when unaffordable",
-      "selling refunds half of everything invested, upgrades included",
-      "the panel offers the next tier on each branch, with its price",
-      "clicking a branch button buys that upgrade",
-      "the B button keeps offering B1 and B2 after committing to path A",
-      "each button spells out what the upgrade does",
-      "effects are diffed against this tower, not read off the table",
-      "hovering a button opens a card with the whole story",
-      "an unaffordable button is shown dead and cannot be clicked through",
-      "the sell button still works with the upgrade row present",
-      "it still sells, inspects and draws when fully upgraded",
-      "path B buys utility and abandons the burst at B3",
-      "the Soldier crosspaths like the Smasher and the Longshot",
       "B4 pierces DEFENCE in flat percentage points, never below zero",
       "path B answers a brute with damage, not with pierce"
     ]
