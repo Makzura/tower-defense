@@ -13,6 +13,95 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the Siphon's idle "seeking" filaments are deleted. A tower with
+nothing to drain now draws nothing.**
+
+The owner, twice: "the beam is unreadable as it just passes through the siphon
+body… maybe delete the beam", then unprompted, "so it cause buggs" and "it's
+not clean". His screenshot showed a serrated tendril down the front of the robe
+and a second one detached in mid-air beside it.
+
+**The first thing checked was whether this still reproduced after `7506bf4`,
+which had made the Siphon occlude its own cords. It did.** Over a 24-phase
+sweep of a full filament revolution at the default camera (1280x720, distance
+2022, pitch 0.5945), with self-occlusion ON, the idle cord painted a mean of
+**79.6 px per phase over the Siphon's own body — 39.9% of its own ink, worst
+144 px** — and at **7 of the 24 phases** it left a blob with no ink connecting
+it to the tower (worst 90 px, up to 12.2 px clear). Both symptoms in the
+screenshot, live at HEAD.
+
+**Why `7506bf4` read as clean and was not.** It measured the cord's centre-line
+polyline against the occlusion predicate and got 0 leak beyond the root. The
+cord is a ribbon: a centre-line sample that is legitimately visible still paints
+its full half-width, plus halo, rim and knots. The polyline cleared the body;
+the ink did not. A predicate-space proof is not a pixel-space proof, and only
+the second one is what the owner sees.
+
+**Why it was deleted rather than re-anchored.** The cord's origin projects
+**inside** the Siphon's own rendered silhouette — 6.6 px from the nearest pixel
+outside it. A cord that begins inside the body must cross the body to leave, at
+any length, so neither moving the anchor nor shortening the reach removes the
+crossing; moving the anchor clear of the silhouette produces exactly the
+detached tendril already complained about. The whole effect spans 26 x 17 px
+against a 19 x 32 px body: it is the same size as the obstacle it would have to
+route around. It was also louder than the thing it was not doing — **179.5 px of
+idle ink per phase against 29.5 px for a real attack beam**, so the state that
+means nothing outdrew the state that means something six to one.
+
+**What went.** `drawSeeking`, `idleRole`, the `seeking` entries in `ROLES` and
+`BEAD_SHAPE`, and the `seeking` branch in the draw loop. `stateFor` returns
+`null` on no lock instead of `"seeking"`. There is no flag: the idle path is
+gone, not switched off.
+
+**The occluder build is now lazy, which only this deletion made possible.**
+`buildOccluders` ran unconditionally at the top of every overlay pass because
+every Siphon drew idle filaments and so every Siphon needed it. With the idle
+cord gone, a board of idle Siphons needs no occluders at all, and it now builds
+them at most once per frame and only when a cord is actually drawn.
+
+**Measured, 12 towers + 120 bodies, occlusion ON, mean over 300 frames with the
+render clock advancing** (a frozen clock lets memoised effects take a cheap path
+and reads low):
+
+| board | before | after |
+|---|---|---|
+| 12 idle Siphons | 0.733 ms/frame | **0.010 ms/frame** |
+| 12 attacking Siphons | 0.472 ms/frame | **0.435 ms/frame** |
+
+Occluder capsules built on an idle board: **132 → 0**. On an attacking board:
+128, unchanged. The attacking figure was measured by swapping the old file back
+in and re-running, so the saving is demonstrably not bought from the live case.
+
+**The attack beams are unchanged, and this was proved rather than assumed.** The
+comparison needs a scene that rebuilds bit-identically, and the obvious one does
+not: breaking a lock and re-acquiring leaves the ritual's spin and the beam
+record's accumulators where they were, and the same board measured twice that
+way agreed on **0 of 12** phases. Resetting both FX modules and replaying the
+whole scene from a fixed clock reproduces 12/12. Against that baseline, after
+the change: **59 of 60 phase comparisons bit-identical, the exception differing
+by one pixel** — while independent runs of the harness agree with each other on
+only 116 of 120. The residual is the harness's own noise floor, which is larger
+than the effect being looked for. Idle ink after the change is **0 px at every
+phase**, and the tower still locks, still reports `thread`, still fires.
+
+**Terrain occlusion, asked because a separate change was queued on it.** On
+rune-circuit the road is flat at 7 u.l. and terrain reaches 9.4 u.l. The idle
+filaments were authored to end at `groundAt + 6 ± 3` on a full 360° sweep, so
+they descended to **3.02 u.l. and passed 1.43 u.l. UNDER terrain**. An attack
+beam ends on an enemy standing on the road at bite height, so it never drops
+below **19.0 u.l. — clearing the tallest terrain on the map by 12.0 u.l.**
+Every Siphon cord that entered terrain was an idle one, and they are gone. The
+occlusion mechanism still runs for every cord state, so this is not a proof that
+terrain occlusion can never matter — but the defect that motivated it no longer
+has a case on this tower. Measured world-space intersection, not camera-space
+occlusion; a beam could in principle still pass behind a raised block while
+clearing it vertically.
+
+Still standing, deliberately: `siphon-beam-spec.js` keeps its `seeking` state
+and `js/gl/models/siphon-beam-seeking.js` is still in a script tag. Both are
+generated from `tools/blender/siphon_beam.py` and are not editable by hand;
+removing them is a regeneration, and it belongs to whoever owns that pipeline.
+
 **2026-08-12 — the Tyrant's fall-through comment named the wrong leap reach, in
 the clause that defines the rule.**
 

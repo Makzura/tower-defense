@@ -423,10 +423,11 @@ var SiphonFXBeam = (function () {
     return isFinite(m) ? clamp((m - 1) / cap, 0, 1) : 0;
   }
 
-  // Which of the eight states this tower is in. Grounded in the simulation, not
-  // in a cosmetic timer:
+  // Which state this tower is in. Grounded in the simulation, not in a
+  // cosmetic timer:
   //
-  //   no lock            -> seeking   (the spec's detached, groping state)
+  //   no lock            -> null      (nothing is drawn; see THE IDLE CORD IS
+  //                                    GONE at the top of draw())
   //   A5                 -> column
   //   A3 / A4            -> gold
   //   B3+ , >1 lock      -> chain     (it bounces; it does not fork -- see below)
@@ -438,7 +439,11 @@ var SiphonFXBeam = (function () {
   //                         `path: BASE` and ramp/saturated `path: A`.
   function stateFor(tower, lockCount, ramp) {
     var t = tiers(tower);
-    if (lockCount <= 0) return "seeking";
+    // NO LOCK, NO CORD. This returned "seeking" until 2026-08-12; the idle
+    // state was removed, so there is no name to give and null says so. Callers
+    // hand this to stateSpec(), which returns undefined for it and draws
+    // nothing -- but draw() does not rely on that, it bails on `live` first.
+    if (lockCount <= 0) return null;
     if (t.a >= 5) return "column";
     if (t.a >= 3) return "gold";
     if (t.b >= 3) return lockCount > 1 ? "chain" : "tendon";
@@ -573,47 +578,18 @@ var SiphonFXBeam = (function () {
     thread:    { body: "cloth_worn",  core: "skin",       bead: "hem_fray",  rim: "cloth_dark",  glow: null },
     ramp:      { body: "brass",       core: "amber",      bead: "amber",     rim: "gold_dark",   glow: "amber" },
     saturated: { body: "gold_dark",   core: "white_warm", bead: "amber",     rim: "ochre_cloth", glow: "amber" },
-    // seeking takes THREAD's core, not a cloth one. It is the same cord he
-    // drains with, held slack -- so the substance has to be the same substance.
-    // `skin` is in seeking's own `mats` list, so the rule above still holds.
-    seeking:   { body: "cloth_worn",  core: "skin",       bead: "hem_fray",  rim: "cloth_dark",  glow: null },
     gold:      { body: "gold",        core: "white_warm", bead: "gold",      rim: "gold_dark",   glow: "amber" },
     column:    { body: "gold",        core: "white_warm", bead: "gold",      rim: "purple_rich", glow: "white_warm" },
     tendon:    { body: "tendon",      core: "rose_sick",  bead: "oil_black", rim: "oil_black",   glow: "rose_sick" },
     chain:     { body: "membrane",    core: "rose_sick",  bead: "rose_dim",  rim: "oil_black",   glow: "rose_sick" }
   };
 
-  // THE IDLE CORD WEARS THE TIER'S MATERIAL, NOT THE BASE LADDER'S.
-  //
-  // `stateFor` returns "seeking" on lockCount <= 0 ABOVE every tier test, so
-  // one name covered every tier and ROLES.seeking is a base-tier cloth rope.
-  // An A5 whose attack cord is `column` -- gold body, white_warm core, a
-  // purple_rich rim -- therefore groped with grey cloth, and the moment it
-  // acquired a lock the cord changed substance. That is the owner's complaint
-  // ("the passive rays ... doesn't fit the ray he uses when attacking")
-  // surviving at every tier above base, after the geometry retune had already
-  // fixed the shape.
-  //
-  // The GEOMETRY stays seeking's: `stateSpec("seeking")` is looked up
-  // separately, so the idle cord keeps its thinner radii, its droop, its reach
-  // of 0.55 and its sweep. Only the palette follows the tier. Idle still reads
-  // as weaker and searching -- it is the same rope, slack, which is exactly
-  // what the retune note argues for.
-  //
-  // Asked with one lock at ramp 0, which is the state it will actually become
-  // the instant it acquires: A5 -> column, A3/A4 -> gold, B3+ -> tendon, and
-  // the base ladder -> thread, whose roles ARE seeking's old ones. So a base
-  // Siphon is unchanged and nothing below A3/B3 moves.
-  function idleRole(tower) {
-    return ROLES[stateFor(tower, 1, 0)] || ROLES.thread;
-  }
-
   // How the knots are drawn. `wedge` is the chevron; `box` is gold's cast
   // grain; `constriction` is the tendon's peristaltic pinch, which is a band
   // ACROSS the cord rather than a point along it -- its direction comes from
   // travelling inward and from each being larger than the one behind it.
   var BEAD_SHAPE = {
-    thread: "wedge", ramp: "wedge", saturated: "wedge", seeking: "wedge",
+    thread: "wedge", ramp: "wedge", saturated: "wedge",
     gold: "box", column: "wedge", tendon: "constriction", chain: "wedge"
   };
 
@@ -768,8 +744,8 @@ var SiphonFXBeam = (function () {
   //   - Moving the cords into the GL pass. gl-renderer.js is STATIC_DRAW with
   //     no BLEND, so a cord that moves every frame means streaming buffers plus
   //     a blend mode -- and it would STILL lose the halo, the rim and the lifted
-  //     core, which are the three things keeping the two non-emissive states
-  //     (thread, seeking) legible against the board.
+  //     core, which are the three things keeping the one non-emissive state
+  //     (thread) legible against the board.
   //   - Reading the depth buffer. WebGL cannot. `readPixels` on the colour
   //     buffer can, and js/gl/tower-preview.js measures it at 3.6-7.1 ms a call,
   //     which is a frame budget for one query.
@@ -1146,7 +1122,7 @@ var SiphonFXBeam = (function () {
     var ss2 = stateSpec(name);
     if (!ss2) return;
     var project = api.project, groundAt = api.groundAt;
-    var role = (name === "seeking") ? idleRole(tower) : (ROLES[name] || ROLES.thread);
+    var role = ROLES[name] || ROLES.thread;
     var curve = ss2.curve || {};
     var scroll = ss2.scroll || { base: 0.5, gain: 0.5, p: 1 };
     var flow = flowTable(scroll.base || 0.5, scroll.gain || 0, scroll.p || 1);
@@ -1225,8 +1201,8 @@ var SiphonFXBeam = (function () {
     // ---- paint -------------------------------------------------------------
     var last = n - 1;
 
-    // The halo, for the states whose spec says they emit. Non-emissive states
-    // (thread, seeking) get none -- they are matter catching light, and their
+    // The halo, for the states whose spec says they emit. The non-emissive
+    // state (thread) gets none -- it is matter catching light, and its
     // legibility comes from the rim and the core below.
     if (role.glow && ss2.emits) {
       ctx.fillStyle = ink(role.glow, 0.1, 0.13);
@@ -1367,8 +1343,9 @@ var SiphonFXBeam = (function () {
     // acceleration is entirely the warp's doing and no knot can drift out of
     // step with its neighbours.
     var phase = (now * (ss2.scroll ? (ss2.scroll.base || 0.5) : 0.5) * 0.9) % 1;
-    // `seeking` loses its knots in the last third (spec: "none are left in the
-    // last third"), and its beads start at t_from.
+    // A state's beads start at its spec's `t_from`, so a state can keep its
+    // last stretch bare. (`seeking` was the one that used it; it is no longer
+    // drawn, and every state still reads its own value here.)
     var tFrom = (bs.t_from !== undefined) ? bs.t_from : 1;
 
     var twist = ss2.twist || {};
@@ -1513,13 +1490,26 @@ var SiphonFXBeam = (function () {
     // `project` below is ABSOLUTE. See the note at the head of this file: a
     // beam spans two ground heights and must fly a straight line between them.
     api.withGround(0, function () {
-      // OCCLUDERS FIRST, ONCE, inside the same pinned reference the cords are
-      // sampled in -- so every height in `occ` and every height in `sz[]` is
-      // measured from the same z = 0 and the two are comparable without a
-      // second thought. Built here rather than lazily per cord because a board
-      // with five Siphons on it would otherwise rebuild the same list five
-      // times for nothing.
-      buildOccluders(state, api);
+      // OCCLUDERS ONCE PER FRAME AT MOST, AND ONLY IF A CORD IS ACTUALLY DRAWN.
+      //
+      // Built inside this pinned reference so that every height in `occ` and
+      // every height in `sz[]` is measured from the same z = 0 and the two are
+      // comparable without a second thought. `occBuilt` keeps the original
+      // guarantee -- a board with five Siphons on it builds the list once, not
+      // five times -- while skipping it entirely on a frame where no Siphon
+      // holds a lock.
+      //
+      // That case used to be impossible: every Siphon drew idle filaments, so
+      // every Siphon needed the list. With the idle cord gone it is the common
+      // case, and MEASURED on a board of 12 idle Siphons and 120 bodies the
+      // build was the entire remaining cost of this module -- 0.218 ms/frame
+      // with it, 0.020 ms/frame without.
+      //
+      // `occN` is cleared up front so a frame that builds nothing reports
+      // nothing, rather than leaving the previous frame's capsules visible to
+      // the exported `occluders()`.
+      occN = 0;
+      var occBuilt = false;
 
       for (var i = 0; i < towers.length; i++) {
         var t = towers[i];
@@ -1538,7 +1528,47 @@ var SiphonFXBeam = (function () {
           if (e && !e.dead && !e.leaked && e.pos) live.push(e);
         }
 
-        var ramp = live.length ? rampOf(t, live[0]) : 0;
+        // THE IDLE CORD IS GONE. A Siphon with nothing to drain draws nothing.
+        //
+        // It used to cast three groping filaments (`seeking`). The owner
+        // reported it twice -- "the beam is unreadable as it just passes
+        // through the siphon body", "so it cause buggs", "and it's not clean"
+        // -- and the second report was after the self-occlusion fix in 7506bf4,
+        // so that fix did not settle it.
+        //
+        // WHY THIS COULD NOT BE FIXED IN PLACE. All of it measured at the
+        // DEFAULT CAMERA (1280x720, distance 2022, pitch 0.5945) -- the one the
+        // owner plays at, where this whole effect is about 20 px of cord. The
+        // first four are a 24-phase sweep of one idle Siphon at board centre;
+        // the last is the 12-phase canonical scene (Siphon plus one pinned
+        // enemy) that can be rebuilt bit-identically.
+        //
+        //   - The cord's origin projects INSIDE the Siphon's own rendered
+        //     silhouette -- 6.6 px from the nearest pixel outside it. A cord
+        //     that begins inside the body must cross the body to leave, at any
+        //     length, so no re-anchoring or shortening removes the crossing.
+        //     That is what rules out shortening it instead of deleting it.
+        //   - The whole effect spans 26 x 17 px against a 19 x 32 px body.
+        //     There is no room to route around what it has to avoid.
+        //   - Painted ink over its own body: mean 79.6 px per phase, 39.9% of
+        //     the effect's own ink, worst 144 px -- WITH self-occlusion on.
+        //     7506bf4 measured the centre-line polyline and read 0; a visible
+        //     sample still paints its full half-width, so the ribbon crosses
+        //     the body where the centre line does not.
+        //   - At 7 of those 24 phases the effect left a component with no ink
+        //     connecting it to the tower (worst 90 px, 12.2 px clear) -- the
+        //     detached tendril in the owner's screenshot.
+        //   - It was also louder than the thing it was not doing: 179.5 px of
+        //     idle ink per phase against 29.5 px for a real attack beam.
+        //
+        // The attack cords are untouched and are the readable, intentional
+        // ones. Nothing here is behind a flag: there is no idle path left to
+        // turn back on.
+        if (!live.length) continue;
+
+        if (!occBuilt) { buildOccluders(state, api); occBuilt = true; }
+
+        var ramp = rampOf(t, live[0]);
         var name = stateFor(t, live.length, ramp);
         var ss2 = stateSpec(name);
         if (!ss2) continue;
@@ -1572,15 +1602,13 @@ var SiphonFXBeam = (function () {
         var rite = (typeof SiphonFXRitual !== "undefined")
           ? SiphonFXRitual.plan(t, live, ox, oy, oz, now, api) : null;
 
-        // `idle` is the groping filaments' root: the circle's centre while it
-        // is open, the hands once it has closed, blended across the handover so
-        // it cannot pop.
+        // `idle` is the ritual's blended root point: the circle's centre while
+        // it is open, the hands once it has closed, eased across the handover
+        // so it cannot pop. It is named for the idle filaments it was built
+        // for; those are gone, and it now serves only the two fallback paths
+        // below -- the ones taken when the ritual supplies no rim anchors. The
+        // rim-anchor path just above ignores it and starts on the circle.
         if (rite && rite.idle) { ox = rite.idle.x; oy = rite.idle.y; oz = rite.idle.z; }
-
-        if (name === "seeking") {
-          drawSeeking(ctx, api, t, ss2, ox, oy, oz, now, rec);
-          continue;
-        }
 
         // ONE CORD PER ARM. The ritual has already placed `beamCount(tower)`
         // anchors around the rim and dealt every lock to one of them, nearest
@@ -1636,33 +1664,6 @@ var SiphonFXBeam = (function () {
     ctx.lineCap = saveCap;
     ctx.lineJoin = saveJoin;
     prune();
-  }
-
-  // THE IDLE CORD. A Siphon with nothing to drain is not blank: `seeking`
-  // reaches a little over half its range, ends in three groping filaments of
-  // unequal length, and sweeps. It matters more than an idle state usually
-  // would, because it is where a player first meets the tower -- and even with
-  // nothing on the far end it still DRAINS toward the hands (0.0085 against
-  // 0.033, a 3.9x taper), so the one message is on screen before the first
-  // enemy ever walks in.
-  function drawSeeking(ctx, api, tower, ss2, ox, oy, oz, now, rec) {
-    var curve = ss2.curve || {};
-    var reach = clamp((tower.rangePx || 78) * (curve.reach || 0.55), 26, 180);
-    var sweep = now * 0.5;                     // spec: ~0.5 rad/s
-    var fil = [
-      { a: 0, len: 1.0 }, { a: 0.34, len: 0.82 }, { a: -0.27, len: 0.9 }
-    ];
-    for (var f = 0; f < fil.length; f++) {
-      // The filaments LAG the free end, which is what makes three lines read as
-      // one groping hand rather than as a fan.
-      var ang = sweep - f * 0.22 + fil[f].a;
-      var L = reach * fil[f].len;
-      var bx = ox + Math.cos(ang) * L;
-      var by = oy + Math.sin(ang) * L;
-      var bz = api.groundAt(bx, by) + 6 + Math.sin(now * 0.9 + f) * 3;
-      drawBeam(ctx, api, tower, "seeking", 0,
-        [node(0, ox, oy, oz), node(1, bx, by, bz)], now + f * 0.7, null);
-    }
   }
 
   return {
