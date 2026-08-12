@@ -81,18 +81,34 @@ var BASELINE = [
     failing: []
   },
   {
-    file: "tests/content.test.js", pass: 205, fail: 7,
-    // Was 182/30. Twenty-two repaired on 2026-08-12, none of them by changing
-    // product code: the gunner-deletion roster shift (3), two renames, the
-    // recruit cooldown (2), and the 2026-08-01 upgrade retune (15) -- upgrades
-    // now grant HP on every tier and the Smasher ladders were repriced to
-    // A 200/350/600/1400/1950 and B 200/400/900/1900/2900.
+    file: "tests/content.test.js", pass: 207, fail: 5,
+    // Was 182/30. Twenty-five repaired on 2026-08-12, none by changing product
+    // code: the gunner-deletion roster shift (3), three renames, the recruit
+    // cooldown (2), the 2026-08-01 upgrade retune (15) -- upgrades now grant HP
+    // on every tier and the Smasher ladders were repriced to A
+    // 200/350/600/1400/1950 and B 200/400/900/1900/2900 -- and three of the
+    // Tyrant group once `w()` existed to let them run.
     //
-    // What is LEFT is six Tyrant-family names plus two test-file bugs, and
-    // none of it is drift:
-    //   - FOUR of the six throw `ReferenceError: w is not defined` and have
-    //     therefore never executed a single assertion. They are Tyrant tests,
-    //     so they are not separable from the Tyrant work.
+    // THE FOUR `w is not defined` TESTS HAD NEVER EXECUTED AN ASSERTION. Three
+    // are now green and none of them was the stale retune value everyone
+    // expected. A test that has never run is not a stale fixture by default:
+    //   - the leap measured ZERO, which is neither the old 50 nor the current
+    //     90. Its towers were placed at y=455 against a road centred at y=460
+    //     and were all refused, and its 1251-damage blow was calibrated for a
+    //     2500 HP Tyrant that now has 5000, so the 50% roar never fired and the
+    //     leap was never in the pool. The "leap" it measured was walking.
+    //   - the aimed shot had the same y=455 fault, plus an 8 s wait against a
+    //     12 s interval.
+    //   - the stunned tower passed spawnAt a converted PIXEL value where it
+    //     takes a path progress, parking the enemy 307 px from a 104 px reach.
+    //
+    // What is LEFT, and none of it is drift:
+    //   - `after the roar it alternates ...` is left RED deliberately. Its two
+    //     setup faults are fixed; what remains is behavioural and belongs to
+    //     vera. It infers the fired attack from `attacks[prev % length]`, but
+    //     js/enemy.js skips an attack with no target and advances the index by
+    //     more than one, so that inference is invalid -- and observing what
+    //     actually fires shows aimed, aimed, aimed and never a leap.
     //   - `the roar ...` carries the 601/610 trap: :601 reads a key the TYPE
     //     row has never had, and repairing it exposes :610 underneath.
     //   - `the Tyrant's numbers ...` is the plain stale-retune repair; nadia
@@ -102,8 +118,6 @@ var BASELINE = [
     failing: [
       "the Tyrant's numbers are the ones that were asked for",
       "the roar shields it, speeds it up, and calls the wave back",
-      "a stunned tower goes completely silent, cooldown and all",
-      "the Tyrant's aimed shot takes the HIGHEST DPS tower, not the nearest",
       "after the roar it alternates shot and leap, and still attacks rarely",
       "B4 pierces DEFENCE in flat percentage points, never below zero",
       "path B answers a brute with damage, not with pierce"

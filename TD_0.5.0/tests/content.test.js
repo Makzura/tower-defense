@@ -645,7 +645,23 @@ test("a stunned tower goes completely silent, cooldown and all", function (t) {
   t.ok(h.game.TowerHealth.isStunned(tower), "now it is");
 
   // An enemy parked in range, and a stunned tower that must not touch it.
-  var e = h.spawnAt(w(h, 620), 1000);
+  //
+  // spawnAt's first argument is a PROGRESS along the road, not an x coordinate.
+  // This passed w(h, 620) -- a converted pixel value -- which landed the enemy
+  // 307 px from a tower with a 104 px reach, so it was never in range at all
+  // and "it fires nothing while silenced" was passing for the wrong reason.
+  // Put it on the road beside the tower instead, which is what the comment
+  // above always claimed.
+  function parkBeside(health) {
+    return h.run("(function () {" +
+      "  var e = new Enemy(path, " + health + ");" +
+      "  e.progress = path.progressAtPoint(" + tower.x + ", " + tower.y + ");" +
+      "  e.refreshPos(); enemies.push(e); return e; })()");
+  }
+
+  var e = parkBeside(1000);
+  t.ok(Math.hypot(e.pos.x - tower.x, e.pos.y - tower.y) <= tower.rangePx,
+    "the enemy really is inside the tower's reach");
   var before = tower.damageDealt;
   h.step(1.5);
   t.eq(tower.damageDealt, before, "it fires nothing while silenced");
@@ -653,6 +669,12 @@ test("a stunned tower goes completely silent, cooldown and all", function (t) {
 
   h.step(1);
   t.ok(!h.game.TowerHealth.isStunned(tower), "the stun wears off");
+
+  // A FRESH body beside it. Enemies do not park -- the first one has walked
+  // 125 u.l. down the road by now and is out of reach, so leaving it there
+  // would test the tower's range rather than its recovery.
+  h.run("enemies = []");
+  parkBeside(1000);
   h.step(1.5);
   t.ok(tower.damageDealt > before, "and it goes straight back to work");
 
@@ -752,8 +774,11 @@ test("the Tyrant's aimed shot takes the HIGHEST DPS tower, not the nearest", fun
   // reference tower in code, and 1 DPS is exactly the weak-but-real number this
   // test needs on the board beside something much stronger. Placed directly --
   // see harness.placeGunner.
-  var near = h.placeGunner(w(h, 560), w(h, 455));            // 1 DPS, close
-  var far = h.placeGunner(w(h, 700), w(h, 455));             // 1 DPS
+  // y=505, not 455: the road's centre line is y=460, so both of these were
+  // refused as "too close to the path" and came back null -- which is what the
+  // TypeError on null.attackDamage below was.
+  var near = h.placeGunner(w(h, 560), w(h, 505));            // 1 DPS, close
+  var far = h.placeGunner(w(h, 700), w(h, 505));             // 1 DPS
   // Resolved by CONSTRUCTOR: the gunner's deletion shifted every slot index.
   var best = h.place(w(h, 640), w(h, 420), h.slotOf(h.game.LongshotTower));
   t.ok(near && far && best, "two weak towers and an Arcane Sniper are on the board");
@@ -765,7 +790,12 @@ test("the Tyrant's aimed shot takes the HIGHEST DPS tower, not the nearest", fun
   h.run("enemies[0].refreshPos()");
   var boss = h.game.enemies[0];
 
-  h.step(7.9);
+  // The interval is 12 s, not the 8 this used to walk up to. Taken from the
+  // boss's own aimed spec so the walk cannot drift out of step with it again --
+  // this is the CLOCK, not the expectation, and the damage below stays typed.
+  var aimed = boss.attacks[0];
+  t.eq(aimed.id, "aimed", "the pre-roar pool is the aimed shot alone");
+  h.step(aimed.intervalSeconds - 0.1);
   t.eq(boss.windUpTimer, 0, "nothing before the interval is up");
 
   // It STOPS to aim, and that is the trade: the seconds it spends winding up
