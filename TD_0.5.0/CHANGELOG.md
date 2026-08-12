@@ -13,6 +13,22 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the sandbox's orphaned schedule picker, left behind by the
+difficulty deletion.**
+
+`sandbox.html` still carried `<select id="waveDifficulty">`, outside the four
+paths the deletion below was authorised to touch, so the sidebar rendered a
+labelled empty dropdown that nothing populated. Removed, along with the two
+lines of prose that described choosing between Easy, Normal and Hard. The
+checkbox beside it now reads "Run the wave schedule" rather than "Run selected
+wave schedule", there being only one.
+
+Note for whoever repairs `tests/sandbox.smoke.js`: the element-list assertion
+there still names `waveDifficulty`, and separately that file **aborts** rather
+than failing — an unguarded `elements.waveDifficulty.fire("change")` sits
+outside any `check()`, and `fire()` throws when no listener exists, so the
+process dies and every assertion after it never runs.
+
 **2026-08-12 — Normal and Hard are deleted, and with them the whole difficulty
 concept. There is one campaign schedule: `EASY_WAVES`.**
 
