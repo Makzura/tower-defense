@@ -13,6 +13,47 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — wave 25's Fractal Slime reached the board at T1, because
+`spawnScheduledEnemy` calls `spawnEnemy` with four arguments where it takes
+five, dropping the tier.**
+
+The spawner's fifth parameter is `tier`, and the sandbox spawner already filled
+it; only the wave scheduler did not. So the single authored fractal group in the
+whole campaign — wave 25's `{ type: "fractal_slime", tier: 3 }` — arrived with
+`tier === undefined`, and `Enemy.fractalTierOf` resolved that to the type's
+`defaultTier` of **1**.
+
+**Measured through a booted harness playing the real schedule through the real
+loop, before and after.** The board was handing the player a **4 HP** body worth
+**$2** that divided into **4** terminal T0s. Wave 25 is written to deliver — and
+now does — **64 HP**, **$32**, and **84 descendants across three generations
+(4 T2 + 16 T1 + 64 T0)**. One scheduled body, sixteen times the health and
+twenty-one times the bodies.
+
+**The declaration was never wrong; only the board was, and that asymmetry is why
+this survived.** `waveEffectiveHealth` and `waveKillBounty` read `tier` straight
+off the group, so every schedule figure in `AGENTS.md` and every total pinned by
+the suites already described a T3. Scheduled **23 867**, effective **25 969** and
+**$23 503** of kill bounties are unchanged by this fix, and were recomputed on
+both the unpatched and patched trees to prove it rather than assumed. No rule in
+`AGENTS.md` changes: its economy table was already stating the corrected world.
+
+**Normal and Hard are NOT repaired by this, and still put a T1 on the road.**
+`difficultyGroup` rebuilds every authored group from scratch — count, interval,
+health, then type and lead — and never copies `tier`, so the derived schedules
+lose it long before the scheduler is reached. They carry `health: 5` instead,
+which a fractal then ignores, because a tier always outranks a health override
+in `Enemy.healthOf`; they declare a 5 HP body and spawn a 4 HP one, twice. Left
+standing deliberately: Normal and Hard are unfinished placeholder modes derived
+from Easy, which is the only source of truth — the dropped tier is dead weight
+in a placeholder, not a ladder awaiting a balance pass.
+
+A full-schedule census on all three difficulties — every body the scheduler
+creates, by type, tier and health — differs in exactly one row against the
+unpatched tree (that one slime), and all 2 754 other scheduled bodies are
+untouched. Every group that authors no tier now passes `undefined`, which is
+inert: `Enemy.fractalTierOf` returns `null` for non-fractal types.
+
 **2026-08-12 — the Rifleman section argued for a trade-off the game does not
 offer, and two more sites were pegged to the deleted gunner.**
 

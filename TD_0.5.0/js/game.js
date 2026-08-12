@@ -2773,12 +2773,20 @@ function spawnScheduledEnemy() {
   // One scheduled beat is mirrored onto every entrance, then the fixed wave
   // cursor advances once. Two routes mean twice the enemies, not a schedule
   // that runs twice as fast.
+  // The group's `tier` rides along with its health and type. It is the fifth
+  // argument and it is easy to lose: this call read four for a while, so an
+  // authored T3 Fractal Slime reached the board at the default T1 -- 4 HP
+  // instead of 64 -- while waveEffectiveHealth and waveKillBounty, which read
+  // the tier straight off the group, went on describing the wave correctly.
+  // A group that authors no tier passes undefined, which is what every
+  // non-fractal row already meant (see Enemy.fractalTierOf).
   for (var routeIndex = 0; routeIndex < paths.length; routeIndex++) {
     spawnEnemy(
       slot.group.health,
       slot.group.type,
       paths[routeIndex],
-      paths[routeIndex].id
+      paths[routeIndex].id,
+      slot.group.tier
     );
   }
   waveSpawned++;
@@ -2814,6 +2822,8 @@ function spawnScheduledEnemy() {
 
 // `typeId` picks a row of Enemy.TYPES (undefined = normal); `health`
 // overrides the type's health when present, which nothing scheduled does.
+// `tier` is a fractal's tier: undefined means the type's own defaultTier, and
+// a non-fractal type discards it, so every caller may pass it unconditionally.
 function spawnEnemy(health, typeId, routePath, routeId, tier) {
   routePath = routePath || path;
   enemies.push(new Enemy(routePath, health, typeId, {
