@@ -968,6 +968,27 @@ var SiphonFXBeam = (function () {
   // possibly touch this cord.
   var visN = 0;
 
+  // THE SIPHON OCCLUDES ITS OWN CORDS, EXCEPT ACROSS THE ROOT.
+  //
+  // Until 2026-08-12 the caster was exempt from its own capsule, so every cord
+  // it cast was drawn straight across its own chest. The owner overruled that:
+  // a cord should be seeable through nothing, its own body included.
+  //
+  // But the cord ORIGINATES at the sceptre ring or the hands, which sit inside
+  // or against that same capsule -- so a naive self-occlusion clips the cord at
+  // its own attachment and leaves it floating unattached, which reads worse
+  // than the fault it fixes. The first ROOT_FREE samples therefore ignore THE
+  // CASTER ONLY; every other occluder still applies to them, and from there on
+  // the caster is an occluder like any other.
+  //
+  // WHAT WAS ACTUALLY MEASURED FOR THIS 2, so nobody inherits a false claim:
+  // with ROOT_FREE = 2 the root run still draws (4.8 px at the default camera,
+  // 16.7 px at distance 600) and leak beyond the root is 0 at all 24 phases of a
+  // full filament sweep. Values of 1 and 3 were NOT tested -- 2 is the first
+  // value that met the acceptance test, not a proven optimum. If the attachment
+  // ever reads badly, re-measure rather than nudging this.
+  var ROOT_FREE = 2;
+
   function computeVisibility(n, caster) {
     var i;
     visN = 0;
@@ -988,7 +1009,6 @@ var SiphonFXBeam = (function () {
     var live = 0, j;
     for (i = 0; i < occN; i++) {
       var o = occ[i];
-      if (o.actor === caster) continue;
       if (o.maxX < lo || o.minX > hi || o.maxY < loY || o.minY > hiY) continue;
       if (o.nearest >= far) continue;     // behind every sample of this cord
       occHit[live++] = i;
@@ -1002,6 +1022,8 @@ var SiphonFXBeam = (function () {
       var vis = 1;
       for (j = 0; j < live; j++) {
         var q = occ[occHit[j]];
+        // THE ROOT STAYS ATTACHED. Everything else about the caster occludes.
+        if (q.actor === caster && i < ROOT_FREE) continue;
         if (sx[i] < q.minX || sx[i] > q.maxX ||
             sy[i] < q.minY || sy[i] > q.maxY) continue;
         if (sd[i] <= q.nearest) continue;
