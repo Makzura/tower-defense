@@ -498,61 +498,6 @@ var EASY_WAVES = [
   ] }
 ];
 
-// Campaign difficulty. The schedule above is EASY. Normal and Hard are
-// authored from that spine with three explicit levers:
-//
-//   count / health   more work on the road, and therefore more bounty income
-//   interval / lead  denser arrivals, which do NOT fund the player
-//   additions        the five former sandbox-only enemies, whose shields,
-//                    healing, flight and opening sprint create new checks
-//
-// The density and support enemies are what make the tiers genuinely harder.
-// Raising health alone mostly pays for its own answer in this economy --
-// `Enemy.bountyOf` scales a type's bounty with the health a wave authors, so a
-// tougher body is worth proportionally more. That was true when income was
-// $3 per point of damage and it stayed true when bounties replaced it, which
-// is the whole reason these three levers survived the economy change.
-//
-// EASY IS NO LONGER THE v0.4.6 SPINE. The 2026-07-30 rescale roughly doubled
-// it (11,706 -> 23,782 scheduled HP, Tyrant 2500 -> 5000, the last five types
-// scheduled into waves 24-35). These additions were authored against the
-// softer spine and have NOT been retuned for the harder one, so Normal and
-// Hard are currently a smaller step up from Easy than they were designed to
-// be. Retuning them is a separate job.
-//
-// Every tier remains 35 waves so run rewards and the midboss/final-boss arc
-// keep the same shape. The extra groups below are keyed by zero-based wave
-// index. Camo Heavy is only added to already-pure camo waves: mixing a visible
-// body into one would let a detectionless Warbringer hit the camo as
-// collateral and erase the detection check.
-var NORMAL_WAVE_ADDITIONS = {
-  11: [{ count: 10, interval: 0.42, type: "flying", health: 8, lead: 2 }],
-  15: [{ count: 1, interval: 1, type: "shieldbearer", lead: 3 }],
-  17: [{ count: 3, interval: 1.25, type: "camo_heavy", health: 24, lead: 2 }],
-  23: [{ count: 1, interval: 1, type: "healer", lead: 3 }],
-  31: [{ count: 1, interval: 1, type: "boss_fast", health: 850, lead: 4 }]
-};
-
-var HARD_WAVE_ADDITIONS = {
-  11: [{ count: 16, interval: 0.3, type: "flying", health: 10, lead: 1.5 }],
-  14: [{ count: 2, interval: 1.2, type: "shieldbearer", health: 75, lead: 2 }],
-  17: [{ count: 6, interval: 0.9, type: "camo_heavy", health: 30, lead: 1.5 }],
-  21: [{ count: 2, interval: 1.2, type: "shieldbearer", health: 90, lead: 2 }],
-  23: [{ count: 2, interval: 2, type: "healer", health: 240, lead: 2 }],
-  27: [{ count: 4, interval: 1, type: "camo_heavy", health: 36, lead: 1.5 }],
-  28: [{ count: 12, interval: 0.28, type: "flying", health: 14, lead: 1.5 }],
-  29: [{ count: 2, interval: 2, type: "healer", health: 280, lead: 2 }],
-  31: [{ count: 1, interval: 1, type: "boss_fast", health: 1000, lead: 3 }],
-  33: [
-    { count: 3, interval: 1, type: "shieldbearer", health: 110, lead: 2 },
-    { count: 1, interval: 1, type: "healer", health: 320, lead: 2 }
-  ],
-  34: [
-    { count: 1, interval: 1, type: "boss_fast", health: 1200, lead: 3 },
-    { count: 2, interval: 1.2, type: "shieldbearer", health: 120, lead: 2 }
-  ]
-};
-
 // A wave's groups, whichever form it was written in. The flat form IS the
 // single-group case -- returned as a one-element array holding the wave
 // itself, so `count`/`interval`/`type`/`health` are read off the same shape
@@ -709,101 +654,17 @@ function waveEscalatingReward(waveNumber) {
 // plus that wave's share of the redistributed opening cash and its rising
 // $50 + $5-per-wave allowance.
 //
-// Wave-number driven, not difficulty driven: Normal and Hard run the same 35
-// waves, so they inherit the same allowance and the same redistribution. Their
-// extra groups pay for themselves through bounties, which is the lever the
-// difficulty comment above describes.
 function waveReward(wave, waveNumber) {
   return waveBounty(wave) +
     waveProgressionReward(waveNumber) +
     waveEscalatingReward(waveNumber);
 }
 
-function scaledScheduleNumber(value, scale, floor) {
-  var result = Math.round(value * scale * 1000) / 1000;
-  return Math.max(floor, result);
-}
-
-function difficultyGroup(group, tuning) {
-  var copy = {
-    count: Math.max(1, Math.ceil(group.count * tuning.countScale)),
-    interval: scaledScheduleNumber(group.interval, tuning.intervalScale, 0.08),
-    health: Math.max(1, Math.round(
-      Enemy.healthOf(group.type, group.health) * tuning.healthScale
-    ))
-  };
-  if (group.type !== undefined) copy.type = group.type;
-  if (group.lead !== undefined) {
-    copy.lead = scaledScheduleNumber(group.lead, tuning.leadScale, 0.5);
-  }
-  return copy;
-}
-
-function copyAuthoredGroup(group) {
-  var copy = {};
-  Object.keys(group).forEach(function (key) { copy[key] = group[key]; });
-  return copy;
-}
-
-function buildDifficultyWaves(tuning, additions) {
-  return EASY_WAVES.map(function (wave, waveNumber) {
-    var groups = waveGroups(wave).map(function (group) {
-      return difficultyGroup(group, tuning);
-    });
-    (additions[waveNumber] || []).forEach(function (group) {
-      groups.push(copyAuthoredGroup(group));
-    });
-    return { groups: groups };
-  });
-}
-
-var DIFFICULTY_ORDER = ["easy", "normal", "hard"];
-var DIFFICULTIES = {
-  easy: {
-    id: "easy",
-    name: "Easy",
-    description: "The original 35-wave campaign.",
-    waves: EASY_WAVES
-  },
-  normal: {
-    id: "normal",
-    name: "Normal",
-    description: "Denser waves, tougher bodies, all enemy types.",
-    waves: buildDifficultyWaves({
-      countScale: 1.08,
-      healthScale: 1.15,
-      intervalScale: 0.84,
-      leadScale: 0.9
-    }, NORMAL_WAVE_ADDITIONS)
-  },
-  hard: {
-    id: "hard",
-    name: "Hard",
-    description: "Relentless spacing and repeated support threats.",
-    waves: buildDifficultyWaves({
-      countScale: 1.2,
-      healthScale: 1.35,
-      intervalScale: 0.68,
-      leadScale: 0.75
-    }, HARD_WAVE_ADDITIONS)
-  }
-};
-
-var selectedDifficultyId = "easy";
-var WAVES = DIFFICULTIES.easy.waves;
-
-function difficultyOf(id) {
-  var difficulty = DIFFICULTIES[id];
-  if (!difficulty) throw new Error("Unknown difficulty: " + id);
-  return difficulty;
-}
-
-function setDifficulty(id) {
-  var difficulty = difficultyOf(id);
-  selectedDifficultyId = difficulty.id;
-  WAVES = difficulty.waves;
-  return difficulty;
-}
+// The campaign has ONE schedule. There were three -- Easy, plus a Normal and a
+// Hard derived from it by scaling count, health, interval and lead and adding
+// extra groups -- and the derivation is gone (2026-08-12): they were unfinished
+// placeholders, and EASY_WAVES is the only source of truth.
+var WAVES = EASY_WAVES;
 
 function scheduleEnemyCount(schedule) {
   var total = 0;
@@ -1314,8 +1175,7 @@ function loadMap(map) {
   path = paths[0];
 }
 
-function startRun(map, difficultyId) {
-  if (difficultyId !== undefined) setDifficulty(difficultyId);
+function startRun(map) {
   loadMap(map);
   restartGame();
   screen = "play";
@@ -1681,11 +1541,6 @@ function onClick(event) {
       openMenu();
       return;
     }
-    var difficulty = difficultyAt(p.x, p.y);
-    if (difficulty !== null) {
-      setDifficulty(difficulty);
-      return;
-    }
     var card = mapCardAt(p.x, p.y);
     if (card !== null) startRun(Maps.LIST[card]);
     return;
@@ -2026,19 +1881,6 @@ function onKeyDown(event) {
   if (screen === "select") {
     if (event.key === "Escape") {
       openMenu();
-      return;
-    }
-    var key = event.key.toLowerCase();
-    if (key === "e") {
-      setDifficulty("easy");
-      return;
-    }
-    if (key === "n") {
-      setDifficulty("normal");
-      return;
-    }
-    if (key === "h") {
-      setDifficulty("hard");
       return;
     }
     var pick = parseInt(event.key, 10);
@@ -3447,14 +3289,12 @@ function drawBossBar() {
 }
 
 function waveStatusText() {
-  var prefix = difficultyOf(selectedDifficultyId).name.toUpperCase() + "  ·  ";
-
   // The endgame read: everything has spawned, so the only number that matters
   // is how many are still walking.
   if (waveIndex >= WAVES.length) {
     return enemies.length > 0
-      ? prefix + "All waves deployed  ·  " + enemies.length + " still walking"
-      : prefix + "All waves deployed";
+      ? "All waves deployed  ·  " + enemies.length + " still walking"
+      : "All waves deployed";
   }
 
   var number = waveIndex + 1;
@@ -3467,10 +3307,10 @@ function waveStatusText() {
     // betweenWaves and for the same reason: since RUN_START_DELAY the opening
     // ten seconds are a countdown like any other, and "Wave 1 in 10 s" is the
     // line that tells a player the run has started and nothing is coming yet.
-    return prefix + "Wave " + number + " in " +
+    return "Wave " + number + " in " +
       Math.max(0, Math.ceil(waveCountdown)) + " s";
   }
-  return prefix + "Wave " + number + " / " + WAVES.length +
+  return "Wave " + number + " / " + WAVES.length +
     "  ·  " + waveSpawned + " / " + waveCount(WAVES[waveIndex]) + " deployed";
 }
 
@@ -3615,7 +3455,7 @@ function drawGameOver() {
   drawRunOverlay({
     title: "BASE DESTROYED",
     titleColor: "#e0736e",
-    subtitle: difficultyOf(selectedDifficultyId).name + "  ·  Fell on wave " +
+    subtitle: "Fell on wave " +
       reachedWave() + " of " + WAVES.length +
       "  ·  " + runKills + " enemies destroyed"
   });
@@ -3629,7 +3469,7 @@ function drawVictory() {
   drawRunOverlay({
     title: "THE BASE STANDS",
     titleColor: "#8ce69d",
-    subtitle: difficultyOf(selectedDifficultyId).name + "  ·  All " +
+    subtitle: "All " +
       WAVES.length + " waves held  ·  " + runKills +
       " enemies destroyed  ·  " + Math.round(baseHp) + " base HP left"
   });
@@ -3804,7 +3644,7 @@ function drawPauseMenu() {
   ctx.fillStyle = "rgba(199,209,224,0.75)";
   ctx.font = "16px system-ui, sans-serif";
   ctx.fillText((currentMap ? currentMap.name + "  ·  " : "") +
-    difficultyOf(selectedDifficultyId).name + "  ·  Wave " + reachedWave() +
+    "Wave " + reachedWave() +
     " of " + WAVES.length + "  ·  " +
     towers.length + " towers  ·  " + runKills + " destroyed  ·  Base " +
     Math.round(baseHp), VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 52);
@@ -4680,26 +4520,6 @@ window.addEventListener("load", init);
 
 // --- map chooser and enemy hover (merged from the other branch, v0.3.5) ---
 
-function difficultyRect(i) {
-  var width = 236;
-  var gap = 14;
-  var total = DIFFICULTY_ORDER.length * width +
-    (DIFFICULTY_ORDER.length - 1) * gap;
-  return {
-    x: (VIEW_WIDTH - total) / 2 + i * (width + gap),
-    y: 104,
-    w: width,
-    h: 42
-  };
-}
-
-function difficultyAt(x, y) {
-  for (var i = 0; i < DIFFICULTY_ORDER.length; i++) {
-    if (pointInRect(x, y, difficultyRect(i))) return DIFFICULTY_ORDER[i];
-  }
-  return null;
-}
-
 function mapCardRect(i) {
   var col = i % MAP_CARD_COLS;
   var row = Math.floor(i / MAP_CARD_COLS);
@@ -5170,56 +4990,16 @@ function drawMapSelect() {
 
   ctx.fillStyle = "rgba(199,209,224,0.6)";
   ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("Pick a campaign difficulty, then a ley-line.", VIEW_WIDTH / 2, 86);
-
-  drawDifficultySelector();
+  ctx.fillText("Pick a ley-line.", VIEW_WIDTH / 2, 86);
 
   for (var i = 0; i < Maps.LIST.length; i++) drawMapCard(i);
 
   ctx.fillStyle = "rgba(199,209,224,0.5)";
   ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("E / N / H changes difficulty  ·  click a route or press 1 - " +
-    Maps.LIST.length,
+  ctx.fillText("click a route or press 1 - " + Maps.LIST.length,
     VIEW_WIDTH / 2, mapGridBottom() + 16);
 
   ctx.textAlign = "left";
-}
-
-function drawDifficultySelector() {
-  DIFFICULTY_ORDER.forEach(function (id, i) {
-    var difficulty = DIFFICULTIES[id];
-    var r = difficultyRect(i);
-    var selected = id === selectedDifficultyId;
-    var hot = difficultyAt(mouse.x, mouse.y) === id;
-    var colours = TIER_COLOURS[id];
-
-    ctx.fillStyle = selected
-      ? colours.fill
-      : (hot ? "rgba(42,48,62,0.95)" : "rgba(22,25,34,0.9)");
-    ctx.fillRect(r.x, r.y, r.w, r.h);
-    ctx.lineWidth = selected ? 2 : 1;
-    ctx.strokeStyle = selected ? colours.line : "rgba(140,179,230,0.3)";
-    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.font = "700 14px system-ui, sans-serif";
-    ctx.fillStyle = selected ? colours.text : "#c7d1e0";
-    ctx.fillText(difficulty.name.toUpperCase(), r.x + 12, r.y + 6);
-
-    ctx.font = "11px system-ui, sans-serif";
-    ctx.fillStyle = selected
-      ? "rgba(230,238,252,0.85)"
-      : "rgba(199,209,224,0.55)";
-    ctx.fillText(fitText(ctx, difficulty.description, r.w - 24),
-      r.x + 12, r.y + 24);
-
-    ctx.textAlign = "right";
-    ctx.font = "600 11px system-ui, sans-serif";
-    ctx.fillStyle = colours.text;
-    ctx.fillText(id.charAt(0).toUpperCase(), r.x + r.w - 10, r.y + 7);
-  });
-  ctx.textAlign = "center";
 }
 
 // A faint circuit lattice behind the cards. Procedural, like everything else --

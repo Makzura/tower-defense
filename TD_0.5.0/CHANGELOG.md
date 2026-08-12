@@ -13,6 +13,61 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — Normal and Hard are deleted, and with them the whole difficulty
+concept. There is one campaign schedule: `EASY_WAVES`.**
+
+Code half only; the test files that assert the old behaviour are removed
+separately, and `AGENTS.md` is updated after by its owner.
+
+**Why, on the owner's ruling: they were never finished.** Normal and Hard were
+added by a collaborator in seconds and then forgotten, and every claim the code
+made about them was stale — the comment block conceded in writing that they had
+"NOT been retuned" for the 2026-07-30 rescale and were "a smaller step up from
+Easy than they were designed to be". **Easy is the only source of truth.**
+
+**The concept is removed, not reduced to one option.** A one-option chooser is
+ceremony. Gone: both addition tables, `scaledScheduleNumber`, `difficultyGroup`,
+`copyAuthoredGroup`, `buildDifficultyWaves`, `DIFFICULTY_ORDER`, `DIFFICULTIES`,
+`selectedDifficultyId`, `difficultyOf`, `setDifficulty`, `difficultyRect`,
+`difficultyAt`, `drawDifficultySelector`, the E/N/H keys, the chooser's click
+branch, the `difficultyId` parameter on `startRun`, and the four places that
+printed the tier's name — the HUD status line, the defeat subtitle, the victory
+subtitle and the pause-menu summary. `js/codex.js` walked every difficulty to
+build a per-tier wave list and then used only Easy's; it now walks `EASY_WAVES`
+directly, and the unread `wavesByDifficulty` field it exposed is gone.
+
+`copyAuthoredGroup` is not on the deletion list anyone wrote, but it existed
+only to copy the addition groups into a derived wave and had exactly one caller,
+inside `buildDifficultyWaves`.
+
+**What deliberately survives, because it looks like the same thing and is not.**
+`TIER_COLOURS`, `Maps.tierFor` and the map-card badge are the MAP's own
+difficulty rating, derived from its geometry score — a separate table that
+happens to be keyed `easy`/`normal`/`hard` and to print those words on the same
+screen the selector was removed from. Two routes can share a band, so the badge
+and the score beside it are what tell them apart. Also kept:
+`scheduleEnemyCount` and `scheduleEffectiveHealth`, which lost their only
+non-test caller here but are still used by the suites.
+
+**Verified by driving the real screens, not by assertions about them.** A
+dangling reference to a deleted draw helper throws at draw time on one screen
+and nowhere else, and three of the four difficulty readers — the defeat, victory
+and pause overlays — cannot be reached by playing a run at all, so a clean
+end-to-end Easy run would have passed with a broken game-over screen. All four
+readers are now drawn explicitly, in forced states: 16/16 before and after, with
+every difficulty symbol reported present before and absent after.
+
+**Six named suite assertions now fail, and that is correct, not a regression.**
+In `tests/run.js`: "Easy stays original; Normal and Hard are progressively
+tougher schedules" and "the run chooser selects a difficulty and restart keeps
+it". In `tests/sandbox.smoke.js`: "the wave picker offers Easy, Normal and
+Hard", and behind it "Sandbox can select the Hard schedule", "the selected
+schedule runs from wave 1" and "turning schedules off restores the empty
+manual-spawn board". **Note that `sandbox.smoke.js` ABORTS rather than failing
+those last three**: an unguarded `fire("change")` on the removed picker throws
+outside any assertion, so the file exits on an uncaught error and the three
+tests after it never execute. They are not passing — they are unreached.
+
 **2026-08-12 — wave 25's Fractal Slime gets its own beat: `lead` 3 → 6, so the
 cascade the tier fix restored resolves on a clear road.**
 

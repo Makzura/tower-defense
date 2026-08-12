@@ -201,39 +201,21 @@ var Codex = (function () {
       // wave shows up in as many lists as it has types, which is the honest
       // answer to "where do I meet this".
       //
-      // And walked across EVERY difficulty, not just whichever one was
-      // selected most recently: several enemies are only reachable in Normal
-      // and Hard, and a field guide that hid them from an Easy player would be
-      // lying about the roster it claims to cover.
-      var wavesByDifficulty = {};
-      DIFFICULTY_ORDER.forEach(function (difficultyId) {
-        var found = [];
-        var easy = difficultyId === "easy";
-        DIFFICULTIES[difficultyId].waves.forEach(function (wave, i) {
-          var listed = false;
-          waveGroups(wave).forEach(function (g) {
-            if ((g.type || Enemy.DEFAULT_TYPE) !== id) return;
-            if (!listed) { found.push(i + 1); listed = true; }
-            // HP and tier ceilings come from EASY only, deliberately. The panel
-            // prints Easy's wave list beside them, and a Hard-derived 41 HP
-            // sitting next to a list of Easy waves would be two different
-            // campaigns reported as one. Normal and Hard scale the same bodies
-            // up, so the Easy figure is the honest floor for the route the
-            // numbers describe.
-            if (!easy) return;
-            maxHp = Math.max(maxHp, Enemy.healthOf(g.type, g.health, g.tier));
-            if (type.fractal && g.tier !== undefined) {
-              maxTier = Math.max(maxTier, g.tier);
-            }
-          });
+      // One schedule to walk. This used to loop DIFFICULTY_ORDER and build a
+      // list per difficulty, because several enemies were reachable only in
+      // Normal or Hard; those derived schedules are gone (2026-08-12) and
+      // EASY_WAVES is the campaign, so the guide walks it directly.
+      EASY_WAVES.forEach(function (wave, i) {
+        var listed = false;
+        waveGroups(wave).forEach(function (g) {
+          if ((g.type || Enemy.DEFAULT_TYPE) !== id) return;
+          if (!listed) { waves.push(i + 1); listed = true; }
+          maxHp = Math.max(maxHp, Enemy.healthOf(g.type, g.health, g.tier));
+          if (type.fractal && g.tier !== undefined) {
+            maxTier = Math.max(maxTier, g.tier);
+          }
         });
-        wavesByDifficulty[difficultyId] = found;
       });
-
-      // `waves` stays Easy's list: it is what the compact row and the detail
-      // panel print, and Easy is the campaign every player meets first. The
-      // complete answer sits beside it for anything that wants all three.
-      waves = wavesByDifficulty.easy;
 
       var speed = Enemy.BASE_SPEED_ULPS * type.speedMultiplier;
 
@@ -283,8 +265,7 @@ var Codex = (function () {
         // What killing one at its roster health pays. Enemy.bountyOf is the
         // same resolver the till and scaled waves use.
         bounty: type.noBounty ? 0 : Enemy.bountyOf(type.id),
-        waves: waves,
-        wavesByDifficulty: wavesByDifficulty
+        waves: waves
       };
     });
   }

@@ -262,7 +262,6 @@
     // them every 120 ms would fight anyone typing a value into them.
     els.runState.textContent =
       (currentMap ? currentMap.name + "  ·  " : "") +
-      difficultyOf(selectedDifficultyId).name + " schedule  ·  " +
       "Base " + Math.round(baseHp) +
       (baseHp > BASE_MAX_HP ? "" : " / " + BASE_MAX_HP) +
       "  ·  " + formatCash(cash) + " gold" + (lockGold ? " (topped up)" : "") +
@@ -456,7 +455,7 @@
   function wire() {
     [
       "towerList", "enemyHp", "enemyType", "enemyTier", "spawnOne", "spawnFive", "spawnWave1", "spawnWave2",
-      "spawnTanky", "clearEnemies", "waveDifficulty", "autoWaves",
+      "spawnTanky", "clearEnemies", "autoWaves",
       "selectedName", "selectedStats",
       "upgradeControls", "buyA", "buyB", "reaimCone", "useAbility", "upgradeNote",
       "goldInput", "setGold", "goldPresets", "lockGold", "baseHpInput",
@@ -497,17 +496,6 @@
     }
     buildTypeList();
 
-    // The full campaign picker. Built from the same registry as the shipping
-    // chooser so adding or renaming a difficulty cannot leave Sandbox behind.
-    DIFFICULTY_ORDER.forEach(function (id) {
-      var option = document.createElement("option");
-      option.value = id;
-      option.textContent = DIFFICULTIES[id].name + " — " +
-        scheduleEnemyCount(DIFFICULTIES[id].waves) + " scheduled bodies";
-      els.waveDifficulty.appendChild(option);
-    });
-    els.waveDifficulty.value = selectedDifficultyId;
-
     function resetWaveSchedule() {
       enemies = [];
       bullets = [];
@@ -524,13 +512,6 @@
       waveIndex = autoWaves ? 0 : WAVES.length;
       if (typeof Effects !== "undefined") Effects.reset();
     }
-
-    els.waveDifficulty.addEventListener("change", function () {
-      setDifficulty(els.waveDifficulty.value);
-      resetWaveSchedule();
-      log("wave schedule: " + difficultyOf(selectedDifficultyId).name);
-      refreshSidebar();
-    });
 
     els.enemyType.addEventListener("change", function () {
       spawnType = els.enemyType.value || undefined;
@@ -641,9 +622,7 @@
     els.autoWaves.addEventListener("change", function () {
       autoWaves = els.autoWaves.checked;
       resetWaveSchedule();
-      log(autoWaves
-        ? difficultyOf(selectedDifficultyId).name + " wave schedule ON"
-        : "wave schedule OFF");
+      log(autoWaves ? "wave schedule ON" : "wave schedule OFF");
     });
 
     // All three go through the tower's own performAction, the same entry
