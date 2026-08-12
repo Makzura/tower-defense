@@ -13,6 +13,23 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — `HOUSE-STANDARD.md` carried its `sniper-a4` worked example
+twice; merged by its author.**
+
+The two copies said the same thing and closed differently — one on
+view-independence, one on cost and legibility. Mira merged them into a single
+statement keeping both closings, and promoted view-independence to last and
+strongest: a removal is the one choice that does not require first answering
+which view the budget protects, which is the open question section 2 turns on.
+That connection only became visible with the two halves side by side.
+
+**Cause, and it is worth knowing because it is silent:** a rewrite of section 2
+was applied with an edit boundary that fell short of the old copy, so the new
+text was inserted and the old text survived below it. Nothing warns you. The
+mechanical check that catches this in `AGENTS.md` — split the file, keep lines
+starting `|`, flag exact repeats — only covers table rows; a duplicated *prose*
+section has no such guard, and this one survived a full read by two people.
+
 **2026-08-12 — `AGENTS.md` followed the difficulty deletion out of the code.**
 
 Documentation only, after `a94ca3b` removed `DIFFICULTIES`, `setDifficulty`,

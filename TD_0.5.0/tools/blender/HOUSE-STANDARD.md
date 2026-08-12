@@ -198,27 +198,16 @@ gold and emissive.
 
 Cheaper, and more distinct, because of what it takes away.
 
-**That is the shape of a good answer to any brief in this project** — and note
-that it is view-independent: a removal that changes the outline reads at the
-default view *and* at max zoom. A tier that reads differently because something
-was removed beats a tier that reads differently because something was added.
-Look for the removal first. The Siphon brief's A5 is built on this: same gesture,
-with the life taken out of it.
-
-### The worked example: sniper-a4, which is cheaper *and* more distinct
-
-`sniper-a4` is the **cheapest** sniper tier at 2,416 triangles, and that is
-deliberate. The tier **removes the legs** and sockets the body into a gimbal yoke
-with a mounted rail cannon. It paints **6,977 pixels no other tier covers**, in
-gold and emissive.
-
-Cheaper, and more distinct, because of what it takes away.
-
 **That is the shape of a good answer to any brief in this project.** A tier that
-reads differently because something was removed beats a tier that reads
-differently because something was added — it costs less, it resolves better, and
-subtraction is legible at a glance in a way that added parts at 0.5 px are not.
-Look for the removal first. The Siphon brief's A5 is built on this: same
+reads differently because something was **removed** beats a tier that reads
+differently because something was added, on four separate counts: it costs less,
+it resolves better, subtraction is legible at a glance in a way that added parts
+at 0.5 px are not, and — the one that matters most given section 2 — **it is
+view-independent.** A removal that changes the outline reads at the default view
+*and* at max zoom, so it is the rare choice that does not require deciding which
+view the budget protects.
+
+Look for the removal first. The Siphon brief's A5 is built on this: the same
 gesture, with the life taken out of it.
 
 ---
