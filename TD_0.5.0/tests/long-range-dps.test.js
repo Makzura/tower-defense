@@ -478,7 +478,17 @@ test("ConfiguredTower gates the ability behind the B5 flag", function (t) {
   var result = tower.triggerActiveAbility([{ x: 0, y: 0, hp: 10 }]);
   t.eq(result.ok, true, "unlocked at B5");
   t.eq(tower.maxHp, hpBefore - 300, "permanent hp loss applied through the tower");
-  t.eq(tower.stunTimer, 10, "tower stunned");
+  // Read from the config rather than typed. The stun was cut from 10 to 7 when
+  // the ability became channelled: the total lockout is still 10, but three of
+  // those seconds are now the ritual itself and only seven are the exhaustion
+  // this timer carries. A typed number here would be a second copy of a value
+  // that already lives one require away -- and it is the copy that went stale.
+  //
+  // The test above deliberately passes its OWN stunSeconds to ActiveAbility;
+  // that one pins the mechanism, this one pins what the shipping tower is
+  // configured to do, so they are not duplicates.
+  t.eq(tower.stunTimer, CONFIG.mechanics.activeAbility.stunSeconds,
+    "tower stunned for the configured exhaustion");
 });
 
 

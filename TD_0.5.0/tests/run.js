@@ -35,6 +35,33 @@ function w(h, value) {
   return value * h.game.UNIT_LENGTH / h.game.AUTHORED_AT_PX_PER_UL;
 }
 
+// ---------------------------------------------------------------------------
+// The Arcane Sniper's B5 ability is CHANNELLED, not instant. performAction()
+// only ARMS it -- the strongest enemy is locked and the tower stands still --
+// and the tower's own update() resolves the strike channelSeconds later. The
+// damage, the kills, the permanent max-HP cost, the stun and the impact effect
+// are ALL paid on RESOLUTION (resolveChannel in js/towers/longshot-adapter.js),
+// so a fixture that reads any of them straight after the press sees a tower
+// that appears to have done nothing at all.
+//
+// These fixtures build the tower and its targets OFF the board, so h.step() --
+// which advances the game's own tower list -- never reaches them. The tower's
+// update has to be driven directly.
+//
+// The budget is DERIVED from the tower's own configured channel rather than a
+// typed step count, so retuning the ritual cannot quietly turn this helper
+// into a no-op. Returns whether the channel actually resolved, so a caller can
+// assert that rather than silently measuring an unresolved tower.
+// ---------------------------------------------------------------------------
+function resolveB5Channel(h, tower, enemies) {
+  var params = tower.core.stats.mechanics.activeAbility;
+  var budget = Math.ceil((params.channelSeconds + 1) / h.game.FIXED_STEP);
+  for (var i = 0; i < budget && tower.channel; i++) {
+    tower.update(h.game.FIXED_STEP, enemies, []);
+  }
+  return !tower.channel;
+}
+
 
 
 group("units and path");
@@ -1484,6 +1511,8 @@ test("the Arcane Sniper B5 ability counts its landed damage and kills", function
 
   t.eq(sniper.damageDealt, 0, "the counter starts empty");
   sniper.performAction("ability", { enemies: [tank, small] });
+  t.ok(resolveB5Channel(h, sniper, [tank, small]),
+    "the ritual resolved rather than still channelling");
 
   t.eq(tank.health, 5000, "25,000 B5 damage landed on the surviving target");
   t.eq(small.dead, true, "the second target was killed by the blast");
@@ -1533,6 +1562,8 @@ test("Warbringer swings and Arcane Sniper B5 both respect slime AoE resistance",
   blastTarget.refreshPos();
 
   sniper.performAction("ability", { enemies: [blastTarget] });
+  t.ok(resolveB5Channel(h, sniper, [blastTarget]),
+    "the ritual resolved rather than still channelling");
   t.eq(blastTarget.health, 37500, "B5's 25,000-damage blast removes 12,500 HP");
   t.eq(sniper.damageDealt, 12500, "the Sniper counter receives that reduced amount");
 });
@@ -2383,11 +2414,14 @@ test("authored shield variants follow the live shield without hiding the body", 
 test("both AoE towers emit replaceable impact effects", function (t) {
   var h = harness.boot();
   var counts = h.run(
-    "impactCounts = { swing: 0, hit: 0, blast: 0, arcane: 0 };" +
+    "impactCounts = { swing: 0, hit: 0, blast: 0, strike: 0 };" +
     "VisualModels.register('effect', 'warbringer-swing', function () { impactCounts.swing++; });" +
     "VisualModels.register('effect', 'warbringer-hit', function () { impactCounts.hit++; });" +
     "VisualModels.register('effect', 'warbringer-blast', function () { impactCounts.blast++; });" +
-    "VisualModels.register('effect', 'arcane-aoe', function () { impactCounts.arcane++; });" +
+    // The Sniper's impact is emitted under 'b5-strike'. It was 'arcane-aoe'
+    // when the ability was instant; resolveChannel names it for the strike
+    // that lands, not for the button that arms it.
+    "VisualModels.register('effect', 'b5-strike', function () { impactCounts.strike++; });" +
     "impactWarbringer = new Smasher(0, 0, path);" +
     "impactTarget = new Enemy(path, 50, 'normal');" +
     "impactTarget.pos = { x: 100, y: 100 };" +
@@ -2400,12 +2434,21 @@ test("both AoE towers emit replaceable impact effects", function (t) {
     "impactArcaneTarget = new Enemy(path, 50000, 'normal');" +
     "impactArcaneTarget.progress = 500; impactArcaneTarget.refreshPos();" +
     "impactSniper.performAction('ability', { enemies: [impactArcaneTarget] });" +
+    // The strike -- and so its impact effect -- lands when the channel
+    // resolves, not when the button is pressed. Budgeted from the tower's own
+    // channelSeconds for the reason given on resolveB5Channel above.
+    "impactBudget = Math.ceil((impactSniper.core.stats.mechanics.activeAbility" +
+    "  .channelSeconds + 1) / FIXED_STEP);" +
+    "for (impactStep = 0; impactStep < impactBudget && impactSniper.channel; impactStep++)" +
+    "  impactSniper.update(FIXED_STEP, [impactArcaneTarget], []);" +
+    "impactCounts.channelled = !!impactSniper.channel;" +
     "Effects.draw(ctx); impactCounts;"
   );
+  t.eq(counts.channelled, false, "the ritual resolved rather than still channelling");
   t.eq(counts.swing, 1, "the Warbringer wedge has a ground impact");
   t.eq(counts.hit, 1, "each Warbringer victim has a contact impact");
   t.eq(counts.blast, 1, "the B4 explosion has its own impact");
-  t.eq(counts.arcane, 1, "the Arcane Sniper B5 has its own impact");
+  t.eq(counts.strike, 1, "the Arcane Sniper B5 has its own impact");
 });
 
 test("only the B5 fourth round emits its compact contact impact", function (t) {

@@ -47,6 +47,25 @@ function stubContext() {
           return { width: String(text).length * size * 0.55 };
         };
       }
+      // A gradient factory has to return something with addColorStop on it.
+      // The catch-all below returns undefined, which is fine for a draw call
+      // whose result is discarded but not for one whose result is then USED --
+      // and every gradient in js/skins/draw-pack.js is used on the next line.
+      //
+      // This was invisible until the B5 channel was made to resolve in this
+      // file: the strike's impact effect is the first drawn thing on the
+      // sandbox's path that builds a gradient, so the stub gap and the
+      // unresolved channel had been hiding each other. Without this the smoke
+      // test does not fail, it ABORTS partway, which reads as fewer failures.
+      //
+      // NOTE this proves only that the path does not throw. It says nothing
+      // about what any of it LOOKS like -- that needs pixels, not this file.
+      if (k === "createLinearGradient" || k === "createRadialGradient" ||
+          k === "createConicGradient" || k === "createPattern") {
+        return function () {
+          return { addColorStop: function () {} };
+        };
+      }
       return (k in t) ? t[k] : function () { return undefined; };
     },
     set: function (t, k, v) { t[k] = v; return true; }
@@ -637,10 +656,34 @@ elements.game.fire("click", {
   clientY: slotAbility.y + slotAbility.h / 2
 });
 
+// The click only ARMS the ability: it is channelled, and the HP cost and the
+// stun are both paid when the strike resolves channelSeconds later. Step the
+// board until it does, budgeting from the tower's own config rather than a
+// typed number of frames. Expectations read from the same config for the same
+// reason -- the stun moved from 10 to 7 when the ritual took the other three
+// seconds, and a typed 10 here is what went stale.
+(function () {
+  var params = abilityTower.core.stats.mechanics.activeAbility;
+  var budget = Math.ceil((params.channelSeconds + 1) / sandbox.FIXED_STEP);
+  for (var i = 0; i < budget && abilityTower.channel; i++) step(sandbox.FIXED_STEP);
+}());
+// What this check is about is the CLICK PATH -- that the rectangle reaches the
+// ability and that its costs are actually applied -- not what the two numbers
+// are worth. So the expectations come from the config the click is supposed to
+// wire through. The two `> 0` clauses are what stop that from collapsing into
+// "one equals itself": with a maxHpLoss of 0 the subtraction would hold
+// against a tower that was never charged at all, and the check would pass
+// forever without exercising anything. Balance owns the values; this owns the
+// wiring, and refuses to be satisfied by an empty one.
+var abilityParams = abilityTower.core.stats.mechanics.activeAbility;
 check("clicking the ability rectangle fires it and charges the HP cost",
-  abilityTower.core.maxHp === maxHpBefore - 300 && abilityTower.core.stunTimer === 10,
+  abilityParams.maxHpLoss > 0 && abilityParams.stunSeconds > 0 &&
+  !abilityTower.channel &&
+  abilityTower.core.maxHp === maxHpBefore - abilityParams.maxHpLoss &&
+  abilityTower.core.stunTimer === abilityParams.stunSeconds,
   "maxHp " + maxHpBefore + " -> " + abilityTower.core.maxHp +
-  ", stun " + abilityTower.core.stunTimer);
+  ", stun " + abilityTower.core.stunTimer +
+  ", channelling " + !!abilityTower.channel);
 
 // --- pierce: one projectile, travelling a line -----------------------------
 //
@@ -1342,14 +1385,30 @@ check("the sandbox MAX FIELD button makes every tower exact A2/B5",
   maxedRifleman.hasA2 && !maxedRifleman.hasA3 && maxedRifleman.hasB5,
   elements.maxFieldStatus.textContent);
 
+// The Warbringer's quake and the Rifleman's recruits both bite on the press,
+// but the Sniper's ability is channelled: on the frame of the press its
+// evidence is an ARMED CHANNEL, and the stun only appears three seconds later
+// when the strike resolves. So the "immediately" half is recorded before any
+// time passes, and the board is then stepped to collect the rest -- otherwise
+// this would be asserting that a channelled ability is instant.
+var sniperArmedImmediately = !!maxedSniper.channel;
+(function () {
+  var params = maxedSniper.core.stats.mechanics.activeAbility;
+  var budget = Math.ceil((params.channelSeconds + 1) / sandbox.FIXED_STEP);
+  for (var i = 0; i < budget && maxedSniper.channel; i++) step(sandbox.FIXED_STEP);
+}());
+
 check("its three active abilities fire immediately and stay AUTO",
   sandbox.AutoAbility.isOn(maxedWarbringer, "ability") &&
   sandbox.AutoAbility.isOn(maxedSniper, "ability") &&
   sandbox.AutoAbility.isOn(maxedRifleman, "recruits") &&
   maxedWarbringer.quakeCooldown > 0 &&
+  sniperArmedImmediately &&
   maxedSniper.core.stunTimer > 0 &&
   maxedRifleman.recruitCooldown > 0,
-  elements.maxFieldStatus.textContent);
+  elements.maxFieldStatus.textContent +
+  " · sniper armed on the press " + sniperArmedImmediately +
+  ", stun after resolving " + maxedSniper.core.stunTimer);
 
 // --- rendering -------------------------------------------------------------
 

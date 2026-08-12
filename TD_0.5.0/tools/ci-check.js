@@ -43,7 +43,8 @@
 // the failure this file exists to catch. Regenerate with --names, never by
 // hand.
 //
-// Measured 2026-08-12 at commit c099377 on branch visual-pass, node v24.
+// Measured 2026-08-12 at commit 410e7a9 on branch master, node v24, after the
+// Arcane-Sniper B5 channel repairs. 36 standing names -> 30.
 // ---------------------------------------------------------------------------
 
 var cp = require("child_process");
@@ -57,13 +58,10 @@ var FAIL_LINE = /^[ \t]+FAIL[ \t]+(.+?)[ \t]*$/;
 
 var BASELINE = [
   {
-    file: "tests/run.js", pass: 105, fail: 3,
-    // All three are the Arcane-Sniper B5 ability/effect timing drift.
-    failing: [
-      "the Arcane Sniper B5 ability counts its landed damage and kills",
-      "Warbringer swings and Arcane Sniper B5 both respect slime AoE resistance",
-      "both AoE towers emit replaceable impact effects"
-    ]
+    file: "tests/run.js", pass: 108, fail: 0,
+    // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
+    // the ability is channelled and these fixtures never stepped the clock.
+    failing: []
   },
   {
     file: "tests/content.test.js", pass: 182, fail: 30,
@@ -107,21 +105,24 @@ var BASELINE = [
     ]
   },
   {
-    file: "tests/long-range-dps.test.js", pass: 70, fail: 1,
-    // Same B5 drift as run.js: stun 10 where the tower does 7.
-    failing: ["ConfiguredTower gates the ability behind the B5 flag"]
+    file: "tests/long-range-dps.test.js", pass: 71, fail: 0,
+    // Was 70/1. Repaired 2026-08-12: the stun is now read from the config
+    // rather than typed, so the 10 -> 7 cut cannot strand it again.
+    failing: []
   },
   { file: "tests/beam.test.js", pass: 45, fail: 0, failing: [] },
   { file: "tests/blub.test.js", pass: 53, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
-    // pass column is blank by design rather than unmeasured. Both failures are
-    // the same B5 drift again.
-    file: "tests/sandbox.smoke.js", pass: null, fail: 2,
-    failing: [
-      "clicking the ability rectangle fires it and charges the HP cost",
-      "its three active abilities fire immediately and stay AUTO"
-    ]
+    // pass column is blank by design rather than unmeasured.
+    //
+    // Was 2 failing. Repaired 2026-08-12 along with the rest of the B5 group.
+    // Repairing the second one also required teaching this file's canvas stub
+    // what a gradient is: resolving the channel is what first drives a
+    // gradient-building draw path here, and without the stub the suite ABORTS
+    // rather than fails -- which would have read as an improvement.
+    file: "tests/sandbox.smoke.js", pass: null, fail: 0,
+    failing: []
   }
 ];
 
