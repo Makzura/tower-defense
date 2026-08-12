@@ -45,7 +45,14 @@ var Effects = (function () {
   var QUAKE_CRACK_SECONDS = 2.4;
   var QUAKE_SHAKE_PX = 10;
 
-  function spawnParticle(x, y, color, speed, size, life) {
+  // `lift` is how far ABOVE its ground contact the burst starts, in pixels.
+  // Almost everything that throws sparks throws them off the floor and leaves
+  // it at zero. A flier does not: an Aether Wisp dies three and a half radii up
+  // and its debris came out of the road underneath it, which read as something
+  // else exploding. Carried rather than folded into `y`, because on the 3D
+  // board a lift is a real height and baking it into a world coordinate would
+  // slide the burst northwards across the map instead of raising it.
+  function spawnParticle(x, y, color, speed, size, life, lift) {
     if (particles.length >= MAX_PARTICLES) particles.shift();
     var angle = Math.random() * Math.PI * 2;
     var v = speed * (0.35 + Math.random() * 0.65);
@@ -55,7 +62,8 @@ var Effects = (function () {
       vy: Math.sin(angle) * v,
       life: life, maxLife: life,
       size: size * (0.6 + Math.random() * 0.8),
-      color: color
+      color: color,
+      lift: lift || 0
     });
   }
 
@@ -262,7 +270,9 @@ var Effects = (function () {
       var p = particles[i];
       var a = p.life / p.maxLife;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
+      // The flat board spends a launch height as a screen offset, which is the
+      // same trick every other lifted body on it uses.
+      ctx.arc(p.x, p.y - (p.lift || 0), p.size * a, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(" + p.color + "," + (0.85 * a).toFixed(3) + ")";
       ctx.fill();
     }
@@ -276,7 +286,7 @@ var Effects = (function () {
       ctx.fillStyle = pop.bad
         ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
         : "rgba(255,215,110," + alpha.toFixed(3) + ")";
-      ctx.fillText(pop.text, pop.x, pop.y);
+      ctx.fillText(pop.text, pop.x, pop.y - (pop.lift || 0));
     }
 
     ctx.textAlign = "left";
@@ -343,12 +353,16 @@ var Effects = (function () {
     enemyKilled: function (enemy, cashEarned) {
       var c = enemy.type.color;
       var color = c.r + "," + c.g + "," + c.b;
+      // From the BODY, not from the ground under it. `visualBodyLift` is the
+      // one place that knows how high a type is drawn.
+      var lift = enemy.visualBodyLift ? enemy.visualBodyLift() : 0;
       for (var i = 0; i < 10; i++) {
-        spawnParticle(enemy.pos.x, enemy.pos.y, color, 90, 3, 0.5);
+        spawnParticle(enemy.pos.x, enemy.pos.y, color, 90, 3, 0.5, lift);
       }
       popups.push({
         x: enemy.pos.x, y: enemy.pos.y - 18,
         text: "+$" + cashEarned,
+        lift: lift,
         life: 0.9, maxLife: 0.9
       });
     },

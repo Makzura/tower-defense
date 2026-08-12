@@ -4143,12 +4143,23 @@ combination. It intentionally lives beside the gunner rather than inside it:
 
 ## Building a model that looks like the ones that already work
 
-The Arcane Sniper, the Rifleman and the four enemies set the bar. The Warbringer
+The Arcane Sniper, the Rifleman and the five enemies set the bar. The Warbringer
 now has all seven tiers built through `td_mesh` (no Blender needed for it). **The
-Siphon now has all eleven tiers built too**; seventeen of the twenty-one enemy
+Siphon now has all eleven tiers built too**; sixteen of the twenty-one enemy
 types are still untextured spheres, and so is the Tyrant — the wave-35 boss the whole
-campaign ends on. Every future enemy has the same problem to solve. This is the
-contract. A model that meets it needs no
+campaign ends on. Every future enemy has the same problem to solve.
+
+The fifth enemy mesh is the Aether Wisp (`enemy-flying`), and it is the one
+model here **not authored in this repo** — it is Morcoos's work, brought in on
+2026-08-12 from his own copy of the game. It is also the only one with no
+`tools/blender/*.py` script behind it: it came from a `.glb` through an importer
+of his rather than from a build script of ours. Read it as a worked example, not
+as something to regenerate from `tools/blender`, because nothing here can.
+(Verified 2026-08-12: `js/gl/models/` holds five `enemy-*.js`, and
+`tools/blender/` holds four `enemy_*.py` — `enemy_flying.py` is the one that
+does not exist.)
+
+This is the contract. A model that meets it needs no
 special-casing anywhere in the renderer; a model that skips a clause needs a
 patch in `js/gl/gl-parts.js`, which is a worse outcome for everyone.
 

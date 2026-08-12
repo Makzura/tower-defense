@@ -5196,17 +5196,24 @@ function drawMapThumbnail(map, box) {
 function enemyAt(x, y) {
   var best = null;
   var bestDistSq = Infinity;
+  // THE POINT BEING TESTED IS NOT THE SAME KIND OF POINT IN BOTH RENDERERS.
+  // In 2D it is a screen position under a flat camera, so the body's drawn
+  // lift is part of where the body IS. In 3D it is a ground-plane hit from
+  // screenToWorld, and the lift happens along an axis this point does not
+  // have. Decided once, here, and handed to every test below -- the same
+  // arrangement drawInspection uses for its own `flat`.
+  var flat = !(typeof World3D !== "undefined" && World3D.isEnabled());
 
   for (var i = 0; i < enemies.length; i++) {
     var e = enemies[i];
-    if (!e.containsPoint(x, y)) continue;
+    if (!e.containsPoint(x, y, flat)) continue;
 
     // Measured to the VISIBLE body, not the ground contact point. An enemy is
     // drawn lifted above where it stands in the three-quarter camera, so
     // picking the nearest by ground position would hand the cursor the wrong
     // body whenever two of them overlap.
     var dx = x - e.pos.x;
-    var dy = y - (e.visualBodyY ? e.visualBodyY() : e.pos.y);
+    var dy = y - ((flat && e.visualBodyY) ? e.visualBodyY() : e.pos.y);
     var distSq = dx * dx + dy * dy;
     if (distSq < bestDistSq) {
       bestDistSq = distSq;

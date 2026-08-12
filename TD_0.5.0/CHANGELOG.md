@@ -13,6 +13,153 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — the Aether Wisp's RUNTIME: it flies, its wings beat off a clock,
+its lantern lights, and it falls out of the sky when it dies. Ported by hand
+from Morcoos's copy into `gl-world.js` / `gl-renderer.js`; `enemy-wreck.js`
+taken whole.**
+
+**PORTED BY HAND, NOT COPIED.** His `gl-world.js` and `gl-renderer.js` predate
+`7506bf4` (the Siphon self-occlusion work) and the idle-filament deletion above,
+so copying either file over ours would have silently reverted a day of shipped
+work. Every hunk was applied individually and the result diffed back against his
+copy: **0 of his flier/wreck lines missing, and our `animFrame`, `summonerSeats`,
+`SiphonFXRitual` and `bodyTopOf`/`towerTop`/`enemyTop` all still present.**
+
+**THE WINGBEAT IS DRIVEN BY A CLOCK, AND THAT IS A DELIBERATE EXCEPTION TO THIS
+FILE'S OWN RULE.** Everything else in `gl-world.js` advances by distance covered,
+because a planted foot has to stay on one patch of road. A Wisp plants nothing:
+its wings must beat while it is slowed, while a Warbringer stun holds it still,
+and while it hovers in the sandbox with no path under it. `HOVER_HZ = 2.6` over a
+12-frame cycle carrying two beats is 5.2 wingbeats a second. His reasoning and
+his comment are kept verbatim; this is the one animation a clock may drive.
+
+**The lift is READ, never copied.** `flightLiftRadii()` reads
+`Enemy.FLIGHT_LIFT_RADII` with a fallback, so the constant can move without this
+file changing — which is the point, and it was exercised: the constant landed
+mid-port and no edit here was needed.
+
+**Evidence, all of it driving the real game and reading `#gl` with `readPixels`
+at the default camera** (1280x720, distance 2022, pitch 0.5945). Controls first:
+identical draws **0 px**, a known-good body (a `normal` enemy) **131 px** in a
+10x21 box, return-to-empty **0 px**.
+
+- **Lift.** A/B on `Enemy.FLIGHT_LIFT_RADII` alone: the body rises **16 screen
+  px**, 107 px change. Wisp silhouette 54 px in a 14x11 box.
+- **The wingbeat advances through the whole cycle, wrap included.** All 12
+  frames visited exactly once (7,8,9,10,11,0,...,6,7), consecutive deltas
+  **37-61 px, mean 49**, the wrap 11→0 among them.
+- **And those deltas are the WINGS, which is a separate claim and was tested
+  separately.** The raw sweep is not proof: the same clock also drives the bob
+  and the lantern, and sampling the *same* wing frame one cycle apart came out
+  **72 px — larger than the mean adjacent-frame delta**. With the lantern pinned
+  through `setGlow` and the bob cancelled through `FLIGHT_LIFT_RADII`, that
+  control falls to **exactly 0** and the adjacent deltas stand.
+- **The wings beat while the flier does not move.** Held by the game's own
+  `stunTimer`; `progress` was **exactly 700 at all 13 samples**. This is the case
+  distance-driving would silently fail.
+- **`setGlow` is put back.** A walker drawn after a lit Wisp: **0 of its 131
+  pixels changed**, max channel delta 0, with the flier's own 48 px provably
+  gone so the test is not vacuous.
+
+**The wreck (`js/gl/enemy-wreck.js`) is Morcoos's file, taken whole.** It reads
+three globals, all `typeof`-guarded and all present here — `paused` and
+`gameSpeed` to scale onto the simulation clock, and `ul()` for its gravity, so
+its `GRAVITY_UL` obeys this project's u.l. rule instead of being a pixel
+constant. Everything else arrives through `bind()`.
+
+**Sampled end to end rather than at one pose**, because a wreck frozen at its
+first frame photographs as a wreck: spawn at z **33.29** — matching the live
+`flightLift` of 33.41, i.e. the raised height, not the old 1.15 radii (10.75)
+and not the road — then fall, **bounce at 0.40 s**, **rest at 0.717 s**, **fade
+begins 2.233 s** (1.52 s of rest, against `REST_S` 1.5), gone at **3.25 s**,
+leaving 0 wrecks, 0 sparks and 0 watch records. Frame-to-frame deltas stay
+non-zero throughout the fall (58-77 px) and the fade (31-43 px); they reach 0
+only during deep rest, where the wreck is genuinely still and not yet fading.
+
+**`setFade` is the renderer's only blend, and it exists for this one case.**
+Depth WRITES go off while a wreck fades so it cannot carve a hole in the depth
+buffer; depth TESTING stays on so the world still occludes it.
+
+**One thing deliberately NOT lifted, and it looks like an oversight.**
+`enemyCrown` (the health bar) takes `flightLift`; `enemyTop` does not.
+`siphon-beam-draw.js` builds its occluder capsule from a base at ground level
+plus this height, so lifting `enemyTop` would not move the occluder — it would
+stretch it from the road to the flier's head and mask every cord crossing the
+empty air beneath a Wisp. Over-occlusion is the failure that photographs as
+success. Occluding a flier properly needs a lifted BASE, which is a change to
+that file's signature. Until then a cord shows through a Wisp, exactly as it did
+before fliers were raised. Both functions carry comments saying so.
+
+**A flier's drawn body cannot be clicked, and it could not before this change
+either.** Driving the real `screenToWorld` → `enemyAt` chain and asking, for
+every pixel the body covers, whether clicking there selects it:
+
+| case | body px | clickable | % |
+|---|---|---|---|
+| flier @ 3.45 | 58 | 0 | 0.0 |
+| flier @ 1.15 | 58 | 0 | 0.0 |
+| `normal`, ground | 130 | 16 | 12.3 |
+
+The pickable band is the same ~12 screen rows in all three cases, because
+`containsPoint(x, y, flat)` with `flat === false` tests `e.pos` — the ground
+contact — which does not move with the lift. A ground enemy gets away with it
+only because its body is tall enough to overlap its own ground patch. **So the
+raise did not break picking; it widened the gap between body and pick zone from
+4 px to 16 px.** Recorded here because it is a live usability question no suite
+covers, and because the honest answer to "did we break it" is no.
+
+**2026-08-12 — `js/gl/models/enemy-flying.js` added: the Aether Wisp gets a
+mesh. First model in the library that was NOT built by a `tools/blender/*.py`
+script, and the first authored by someone outside this repo.**
+
+**THE MODEL AND ITS ANIMATION ARE MORCOOS'S WORK, NOT OURS.** He built the
+Wisp — geometry, rig and all twelve frames — in his own copy of the game and
+handed the copy over by hand because he does not push yet. Everything below is
+a description of what we received and what we had to adapt to receive it. None
+of it is a claim of authorship, and nobody should read this entry later and
+conclude the mesh was made here.
+
+Authored outside this repo as `robotic-firefly.glb` and converted by his
+`tools/glb_to_model.py`, which is not in our tree. 5815 triangles, 6 colours,
+8 rigid groups, 12 frames, 443,732 bytes.
+
+**It satisfies the `GLModels.register` contract without a single concession
+asked of it, which was not assumed — it was run.** Our real `gl-parts.js` and
+`gl-models.js` were loaded in a VM and `GLModels.mesh()` driven with a stub
+renderer so `expand()` actually executed: `positions` 52335 = 5815x9,
+`normals` 17445, `colourIndex` 5815 all in range 0..5, palette 6 entries all
+4-component, no NaN anywhere in the expanded arrays. Group `first`/`count` are
+vertex indices summing to 17445 = 3x5815 and tiling the range exactly, with no
+gap, no overlap, and every bound a multiple of 3. `GLParts.split` returns 0 —
+`FIXED` is an exact key lookup over eight tower names and carries no
+`enemy-flying` — so none of it is pulled into the world pass.
+
+**The `null` first entry in each frame is our own convention, not his.**
+`drawActor` reads `pg ? multiply(instanceMat, pg) : instanceMat`, so a null
+pose draws that group with the bare instance matrix. Every `rifleman-*` and
+all eleven `siphon-*` models already ship `[null, ...]`. His group 0 is null in
+all twelve frames and its geometry was measured moving 0.00 px across the
+cycle.
+
+**`unitsToPx` is 31.8032, identical to every model we author, and that is
+deliberate on his side**: his importer hard-codes `20.0 * 1.529 * 1.04`, the
+same expression as `tools/blender/export_mesh.py`, with a comment saying an
+import must not arrive at its own scale. Posed through `GLMath` with
+`drawActor`'s own composition, over all 12 frames, the mesh spans
+**22.6 x 22.5 x 18.4 board px** at the Wisp's `sizeScale: 0.85`, and its
+minimum z is **+0.0005 u** — it rests on the road exactly like every model
+this project authors, and carries no hover of its own.
+
+**The rig is a 1x body bob carrying a 2x wingbeat.** Wing-tip height per frame
+is `14.73 8.36 8.36 14.73 18.42 18.42` repeated — frames 0–5 and 6–11 are
+identical for all four wing groups, two beats per cycle — while `abdomen` and
+`legs` oscillate once over the same twelve. The frame array cannot be halved.
+
+Stored CRLF like every other file in the working tree. With `core.autocrlf=true`
+and no `.gitattributes` the LF and CRLF forms clean to the identical blob, so
+the committed object is the same either way; CRLF only stops the next checkout
+rewriting the file on disk.
+
 **2026-08-12 — the Siphon's idle "seeking" filaments are deleted. A tower with
 nothing to drain now draws nothing.**
 

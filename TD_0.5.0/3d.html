@@ -78,6 +78,7 @@ var AUTHORED_AT_PX_PER_UL = UNIT_LENGTH;
 <script src="js/gl/models/enemy-swarm.js"></script>
 <script src="js/gl/models/enemy-brute.js"></script>
 <script src="js/gl/models/enemy-hive.js"></script>
+<script src="js/gl/models/enemy-flying.js"></script>
 
 <script>
 (function () {
@@ -256,7 +257,7 @@ var AUTHORED_AT_PX_PER_UL = UNIT_LENGTH;
       // Some traffic on the road itself, so the scale of a person against the
       // board is judgeable.
       var enemyModels = ["enemy-normal", "enemy-swarm", "enemy-brute",
-                         "enemy-hive"];
+                         "enemy-hive", "enemy-flying"];
       for (var e = 0; e < 8; e++) {
         var ed = p.length * (0.10 + e * 0.105);
         var ep = p.pointAt(ed), et = p.tangentAt(ed);

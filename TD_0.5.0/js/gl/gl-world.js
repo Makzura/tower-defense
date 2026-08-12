@@ -551,7 +551,7 @@ var World3D = (function () {
     return (name && GLModels.has(name)) ? name : null;
   }
 
-  // Only the four authored enemies have meshes. EVERY OTHER TYPE IS A SPHERE,
+  // Only the AUTHORED enemies have meshes. EVERY OTHER TYPE IS A SPHERE,
   // in its own colour at its own radius -- the exact 3D spelling of what the
   // 2D game drew for them, which was a circle. One mesh per type, built lazily
   // and cached; the per-frame scale handles fractal shrinkage.
@@ -561,6 +561,91 @@ var World3D = (function () {
     var id = enemy && enemy.typeId;
     if (GLModels.has("enemy-" + id)) return "enemy-" + id;
     return null;
+  }
+
+  // --- fliers ---------------------------------------------------------------
+  //
+  // HOW FAR OFF THE ROAD A FLIER RIDES.
+  //
+  // The 3D board used to lift a flying body by nothing -- every Aether Wisp
+  // walked the tarmac. For the sphere it merely looked odd; for a firefly with
+  // six legs it reads as a machine that has landed and is being dragged.
+  //
+  // THE HEIGHT IS `Enemy.FLIGHT_LIFT_RADII`, READ, NOT COPIED. `visualBodyY`,
+  // the hover test, the kill burst and this all have to agree about where a
+  // flier is, and a number retyped in four files is a number that will be
+  // raised in three of them. It went 1.15 -> 3.45 on 2026-08-12 at the owner's
+  // request and this file needed no edit for it, which is the point.
+  var FLIGHT_BOB = 0.16;                  // radii, peak above the rest height
+  var FLIGHT_BOB_HZ = 0.75;
+
+  function flightLiftRadii() {
+    return (typeof Enemy !== "undefined" && Enemy.FLIGHT_LIFT_RADII) || 3.45;
+  }
+
+  // AND THE ONE ANIMATION IN THIS FILE A CLOCK IS ALLOWED TO DRIVE.
+  //
+  // Everything else advances by DISTANCE COVERED, because a planted foot has
+  // to stay on one patch of road -- that rule is written three times in this
+  // file and once in MODEL_SKINS_GUIDE.md, and it is right every time. A Wisp
+  // plants nothing. Its wings have to beat while it is slowed, while a
+  // Warbringer stun holds it still, and while it hovers in the sandbox with no
+  // path under it at all, so distance is exactly the wrong input: a stopped
+  // flier would freeze mid-beat and hang in the air like a prop.
+  //
+  // The model carries TWO beats per cycle (see tools/glb_to_model.py), so this
+  // is 5.2 wingbeats a second at ~31 frame changes -- fast enough to flutter,
+  // slow enough not to alias against 60 Hz.
+  var HOVER_HZ = 2.6;
+
+  // The board's clock, latched at the top of each pass. The overlay layer draws
+  // a flier's health bar from `bar()`, which is handed an actor and no state,
+  // and a bar that ignored the bob would float free of the body under it.
+  var boardClock = 0;
+
+  function flightLift(enemy, radius) {
+    if (!enemy || !enemy.isFlying) return 0;
+    var bob = Math.sin(boardClock * FLIGHT_BOB_HZ * Math.PI * 2);
+    return radius * (flightLiftRadii() + FLIGHT_BOB * bob);
+  }
+
+  // A LANTERN THAT DOES NOT EMIT IS NOT A LANTERN.
+  //
+  // The Wisp's abdomen and eye lens are emissive materials, and until something
+  // drives `uGlow` an emissive material is only its own resting floor -- which
+  // on a 23 px body at the play camera is a pale dot on a dark shell. Two
+  // reasons to light it, one artistic and one that matters more: the Aether
+  // Wisp is the enemy no ground tower can touch, so "which of those specks do I
+  // need air reach for" has to be answerable at a glance, and it is answerable
+  // because the lit one is the flying one.
+  //
+  // THE COLOUR IS THE TYPE'S OWN, not a constant typed here. `Enemy.TYPES`
+  // already says what a Wisp looks like and the kill burst, the codex swatch
+  // and the hover card all read it; a seventh copy would be the one that goes
+  // stale. Converted to linear per type and cached, exactly as enemySphere
+  // does with the same field.
+  var LANTERN_BASE = 0.42;
+  var LANTERN_SWING = 0.22;
+  var LANTERN_HZ = 1.15;
+
+  // Reused, so a board full of wrecks allocates nothing per frame.
+  var wreckTilt = { rx: 0, ry: 0, pivotZ: 0 };
+
+  function lanternTint(enemy) {
+    var id = enemy.typeId || "unknown";
+    var hit = typePrims["glow:" + id];
+    if (hit) return hit;
+    var c = (enemy.type && enemy.type.color) || { r: 150, g: 200, b: 255 };
+    hit = [Math.pow(c.r / 255, 2.2), Math.pow(c.g / 255, 2.2),
+           Math.pow(c.b / 255, 2.2)];
+    typePrims["glow:" + id] = hit;
+    return hit;
+  }
+
+  function lanternGlow(enemy) {
+    // Off phase with the hover, so the two do not read as one pumping motion.
+    var t = boardClock * LANTERN_HZ * Math.PI * 2 + (enemy.progress || 0) * 0.03;
+    return LANTERN_BASE + LANTERN_SWING * Math.sin(t);
   }
 
   function enemySphere(enemy) {
@@ -833,6 +918,16 @@ var World3D = (function () {
         groundHeightAt: groundHeightAt
       });
     }
+    // The flier wreck. It is handed the four things it must not have its own
+    // copy of -- where a flier is drawn, which mesh it is, what colour it
+    // glows, and how high the ground is -- and nothing else.
+    if (typeof EnemyWreck !== "undefined") {
+      EnemyWreck.bind({
+        project: project, groundAt: groundHeightAt,
+        flightLift: flightLift, modelOf: enemyModel,
+        tintOf: lanternTint, unitsToPx: GLModels.unitsToPx
+      });
+    }
     return true;
   }
 
@@ -846,6 +941,7 @@ var World3D = (function () {
     if (typeof BlubFXSystems !== "undefined") BlubFXSystems.reset();
     if (typeof BlubFXShots !== "undefined") BlubFXShots.reset();
     if (typeof BlubFXCircles !== "undefined") BlubFXCircles.reset();
+    if (typeof EnemyWreck !== "undefined") EnemyWreck.reset();
     mapMesh = buildMapMesh(map, routePaths);
     camera.bounds = bounds;
     camera.fitBounds(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
@@ -878,6 +974,7 @@ var World3D = (function () {
   function drawWorld(ctx, state) {
     if (!enabled) return false;
     resize();
+    boardClock = state.now || 0;
     ensureMap(state.map, state.paths);
     camera.update(state.dt || 1 / 60);
     // ONE DIFF PASS, once per frame, before anything is drawn: which blubs are
@@ -885,6 +982,10 @@ var World3D = (function () {
     // on `state.now`, so it does not matter that drawOverlays also touches the
     // module later in the same frame.
     if (typeof BlubFXSystems !== "undefined") BlubFXSystems.update(state);
+    // Same diff, same reason, for the fliers: an enemy is spliced out of the
+    // array at the end of the update tick it dies in, so a death is only ever
+    // visible as an ABSENCE by the time anything draws.
+    if (typeof EnemyWreck !== "undefined") EnemyWreck.update(state);
 
     var vp = camera.viewProjection();
     renderer.begin(vp);
@@ -1165,23 +1266,56 @@ var World3D = (function () {
       var stride = radius * 2.6;
       var phase = (e.progress || 0) / stride * Math.PI * 2;
       var model = enemyModel(e);
+      // A flier rides above its own path point; a walker sits on it. Read once
+      // here so the mesh branch and the sphere branch cannot drift apart, and
+      // so the sphere types that are still fliers rise too.
+      var lift = groundHeightAt(e.pos.x, e.pos.y) + flightLift(e, radius);
       if (model) {
         // THE WALK, ADVANCED BY DISTANCE. One full cycle per stride, so a
         // planted foot stays on one patch of road, a slowed enemy's legs drag
         // and a stopped one stops mid-step -- all for free, and all wrong the
         // moment a clock drives it instead. Same rule the sprite pack used.
+        //
+        // A FLIER IS THE EXCEPTION, and the only one: see HOVER_HZ above for
+        // why a wingbeat is the one cycle distance cannot drive.
         var em = GLModels.get(renderer, model);
         var frames = em && em.frames.length ? em.frames.length : 1;
-        var walk = Math.floor((e.progress || 0) / stride * frames);
-        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11,
-          groundHeightAt(e.pos.x, e.pos.y), walk);
+        var walk = e.isFlying
+          ? Math.floor(boardClock * HOVER_HZ * frames)
+          : Math.floor((e.progress || 0) / stride * frames);
+        if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
+        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk);
+        // Put it back. setGlow is state, not an argument, so a flier that left
+        // it lit would hand its lantern to the next body drawn.
+        if (e.isFlying) renderer.setGlow(0, null);
       } else {
         // Sphere types ROLL their bounce instead: squash on the ground beat,
         // stretch at the top, which is the one animation a ball actually has.
-        var beat = Math.abs(Math.sin(phase));
+        // A flying one has no ground to beat against, and its hover is already
+        // in `lift`.
+        var beat = e.isFlying ? 0 : Math.abs(Math.sin(phase));
         renderer.draw(enemySphere(e).mesh, e.pos.x, e.pos.y,
-          groundHeightAt(e.pos.x, e.pos.y) + beat * radius * 0.22, yaw,
+          lift + beat * radius * 0.22, yaw,
           radius * (0.94 + beat * 0.10));
+      }
+    }
+    // THE WRECKS, drawn last of the bodies. They are the only translucent thing
+    // on the board, and a blended draw with depth writes off has to come after
+    // everything opaque or it composites against a half-built frame. Each one
+    // is the real mesh at a real transform -- see js/gl/enemy-wreck.js.
+    if (typeof EnemyWreck !== "undefined") {
+      var wrecks = EnemyWreck.bodies();
+      for (i = 0; i < wrecks.length; i++) {
+        var wr = wrecks[i];
+        wreckTilt.rx = wr.roll;
+        wreckTilt.ry = wr.pitch;
+        wreckTilt.pivotZ = wr.pivotZ;
+        if (wr.glow > 0) renderer.setGlow(wr.glow, wr.tint);
+        renderer.setFade(wr.fade);
+        drawActor(wr.model, wr.x, wr.y, wr.yaw, wr.scale, wr.ground + wr.z,
+          wr.frame, null, wreckTilt);
+        renderer.setFade(1);
+        if (wr.glow > 0) renderer.setGlow(0, null);
       }
     }
     // Projectiles are NOT drawn here. They were, as one grey cube each, until
@@ -1264,7 +1398,35 @@ var World3D = (function () {
   // with `instance * groupPose` needs no new concept.
   var overrideMat = new Float32Array(16);
 
-  function drawActor(model, x, y, yaw, scale, lift, frame, overrides) {
+  // A WHOLE-BODY TUMBLE, which is not the same thing as `overrides`.
+  //
+  // `overrides` is per GROUP and lands in each group's own local space, which is
+  // exactly right for a recoil and exactly wrong for a body falling out of the
+  // sky: every group would rotate about its own pivot and the wreck would come
+  // apart in mid-air. This composes into the INSTANCE matrix instead, so the
+  // whole model turns as one rigid thing, about a pivot given in model units --
+  // the Wisp rolls about the axis of its own body tube, because rolling about
+  // the model origin would swing it around the tips of its legs and drive it
+  // through the road.
+  var tiltMat = new Float32Array(16);
+  var tiltBase = new Float32Array(16);
+  var tiltPivot = [0, 0, 0];
+
+  // GLMath.multiply IS NOT ALIAS-SAFE, and the failure is silent. It reads `a`
+  // for all four columns while writing `out`, so `multiply(m, m, t)` corrupts
+  // the source after the first column and the result is a degenerate matrix --
+  // which does not draw a wrong picture, it draws nothing at all, or a
+  // one-pixel smear where a body should be. Costs one scratch matrix to avoid.
+  function instanceOf(out, x, y, lift, yaw, size, tilt) {
+    if (!tilt) return GLMath.modelYaw(out, x, y, lift || 0, yaw || 0, size);
+    GLMath.modelYaw(tiltBase, x, y, lift || 0, yaw || 0, size);
+    tiltPivot[2] = tilt.pivotZ || 0;
+    GLMath.localPose(tiltMat, tiltPivot, tilt.rx || 0, tilt.ry || 0, 0,
+      0, 0, 0);
+    return GLMath.multiply(out, tiltBase, tiltMat);
+  }
+
+  function drawActor(model, x, y, yaw, scale, lift, frame, overrides, tilt) {
     var m = model ? GLModels.get(renderer, model) : null;
     if (!m) {
       renderer.draw(prims.block, x, y, lift || 0, yaw || 0, 34);
@@ -1300,12 +1462,12 @@ var World3D = (function () {
     }
 
     if (!m.frames.length) {
-      GLMath.modelYaw(instanceMat, x, y, lift || 0, yaw || 0, size);
+      instanceOf(instanceMat, x, y, lift, yaw, size, tilt);
       if (!bound) renderer.bind(m.gpu);
       renderer.drawRange(instanceMat, fixed, m.gpu.count - fixed);
       return;
     }
-    GLMath.modelYaw(instanceMat, x, y, lift || 0, yaw || 0, size);
+    instanceOf(instanceMat, x, y, lift, yaw, size, tilt);
     var pose = m.frames[((frame | 0) % m.frames.length + m.frames.length) %
       m.frames.length];
     if (!bound) renderer.bind(m.gpu);
@@ -1578,6 +1740,7 @@ var World3D = (function () {
 
   function drawOverlays(ctx, state) {
     if (!enabled) return;
+    boardClock = state.now || 0;
     var i;
 
     // Range, for the tower being asked about -- same rule as 2D: only the one
@@ -2005,7 +2168,14 @@ var World3D = (function () {
     // A homing round is aimed at ONE body, so it eases from the height it left
     // to the height that body is standing on, by how far along it is. Straight
     // line, angled at the target.
-    var to = groundHeightAt(shot.target.pos.x, shot.target.pos.y);
+    //
+    // A BODY THAT IS NOT STANDING ON ANYTHING still has a height, and it is the
+    // one the model is drawn at. Aiming at the road under an Aether Wisp sent
+    // every anti-air round sailing beneath it -- visibly a miss, on the one
+    // enemy the game asks you to build a specific answer to.
+    var to = groundHeightAt(shot.target.pos.x, shot.target.pos.y) +
+      flightLift(shot.target, shot.target.radiusPx
+        ? shot.target.radiusPx() : 11);
     var gx = shot.x - shot._gx, gy = shot.y - shot._gy;
     var gone = Math.sqrt(gx * gx + gy * gy);
     var lx = shot.target.pos.x - shot.x, ly = shot.target.pos.y - shot.y;
@@ -2290,7 +2460,10 @@ var World3D = (function () {
       var t = 1 - a;
       // A real arc: up fast, down under gravity. The 2D pass faked altitude by
       // subtracting from y, which under a 3D camera slides along the ground.
-      var h = Math.max(0, 46 * t - 78 * t * t);
+      // `lift` is where the burst STARTED -- zero for anything thrown off the
+      // floor, a flier's body height for anything thrown off a flier.
+      var lift = p.lift || 0;
+      var h = lift + Math.max(0, 46 * t - 78 * t * t);
       var head = project(p.x, p.y, h);
       if (!head) continue;
       // The tail is where it was a moment ago, so the streak points along the
@@ -2298,7 +2471,7 @@ var World3D = (function () {
       var back = 0.055;
       var ht = Math.max(0, t - back);
       var tail = project(p.x - p.vx * back, p.y - p.vy * back,
-        Math.max(0, 46 * ht - 78 * ht * ht));
+        lift + Math.max(0, 46 * ht - 78 * ht * ht));
       var w = Math.max(0.6, p.size * (0.35 + a * 0.65) * head.scale);
       ctx.strokeStyle = "rgba(" + p.color + "," + (0.9 * a).toFixed(3) + ")";
       ctx.lineWidth = w;
@@ -2317,6 +2490,12 @@ var World3D = (function () {
     }
     ctx.lineCap = "butt";
 
+    // The flier wreck's own sparks. They keep their own arrays because they
+    // carry a real z velocity, which the shared particle record has no room
+    // for -- debris off a body that is itself falling cannot be expressed as a
+    // fixed arc off the floor.
+    if (typeof EnemyWreck !== "undefined") EnemyWreck.draw(ctx);
+
     // Popups are TEXT, so they stay at screen size whatever the zoom -- a
     // bounty you cannot read is a bounty that may as well not have printed.
     ctx.textAlign = "center";
@@ -2324,7 +2503,8 @@ var World3D = (function () {
     for (i = 0; i < s.popups.length; i++) {
       p = s.popups[i];
       var alpha = Math.min(1, p.life / (p.maxLife * 0.5));
-      var at = project(p.x, p.y, 30 + (1 - p.life / p.maxLife) * 22);
+      var at = project(p.x, p.y,
+        30 + (p.lift || 0) + (1 - p.life / p.maxLife) * 22);
       if (!at) continue;
       ctx.font = "600 14px system-ui, sans-serif";
       ctx.fillStyle = p.bad
@@ -3111,7 +3291,10 @@ var World3D = (function () {
 
   function enemyCrown(e) {
     var r = e.radiusPx ? e.radiusPx() : 11;
-    return crownOf(e, enemyModel(e), r, r / 11);
+    // crownOf measures the MODEL; `flightLift` is where that model currently
+    // is. Without the second term a Wisp's health bar hangs at road height,
+    // level with its own dangling legs, while the body floats above it.
+    return crownOf(e, enemyModel(e), r, r / 11) + flightLift(e, r);
   }
 
   // THE TOP OF THE BODY ITSELF, which is not the same number as its crown.
@@ -3135,6 +3318,15 @@ var World3D = (function () {
     return bodyTopOf(t, towerModel(t), t.footprintPx, 1);
   }
 
+  // DELIBERATELY NOT LIFTED, unlike enemyCrown above, and this is a known seam
+  // rather than an oversight. siphon-beam-draw builds its capsule from a BASE at
+  // `groundAt(actor)` plus this height, so adding flightLift here would not move
+  // the occluder up -- it would STRETCH it from the road to the flier's head and
+  // mask every cord crossing the empty air beneath a Wisp. Over-occlusion is the
+  // failure that photographs as success. Occluding a flier correctly needs a
+  // lifted BASE, which is a change to the occluder's signature in
+  // js/gl/siphon-beam-draw.js, not to this measurement. Until then a cord shows
+  // through a Wisp, which is what it did before fliers were raised at all.
   function enemyTop(e) {
     var r = e.radiusPx ? e.radiusPx() : 11;
     return bodyTopOf(e, enemyModel(e), r, r / 11);

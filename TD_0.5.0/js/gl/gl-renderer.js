@@ -71,6 +71,9 @@ function GLRenderer(canvas) {
     // the shader and the light lands on the geometry it belongs to.
     "uniform float uGlow;\n" +
     "uniform vec3 uGlowTint;\n" +
+    // How solid this instance is. 1 for everything on the board; only a body
+    // being cleared away ever asks for less. See setFade.
+    "uniform float uAlpha;\n" +
     "void main() {\n" +
     "  vec3 n = normalize(vNrm);\n" +
     "  float key = max(dot(n, uKeyDir), 0.0) * uKeyStrength;\n" +
@@ -93,7 +96,7 @@ function GLRenderer(canvas) {
     // converts once at the end, which is why its renders of these exact
     // colours are rich and this was not. Vertex colours arrive linear (see
     // GLModels.expand and GLGeometry.hex); this is the conversion back.
-    "  gl_FragColor = vec4(pow(max(lit, vec3(0.0)), vec3(1.0 / 2.2)), 1.0);\n" +
+    "  gl_FragColor = vec4(pow(max(lit, vec3(0.0)), vec3(1.0 / 2.2)), uAlpha);\n" +
     "}\n";
 
   this.program = this._link(vs, fs);
@@ -114,8 +117,12 @@ function GLRenderer(canvas) {
     fillColor: gl.getUniformLocation(this.program, "uFillColor"),
     keyStrength: gl.getUniformLocation(this.program, "uKeyStrength"),
     glow: gl.getUniformLocation(this.program, "uGlow"),
-    glowTint: gl.getUniformLocation(this.program, "uGlowTint")
+    glowTint: gl.getUniformLocation(this.program, "uGlowTint"),
+    alpha: gl.getUniformLocation(this.program, "uAlpha")
   };
+  // Solid until something asks otherwise, and `_faded` tracks the GL state so
+  // setFade can be called per body without touching BLEND on every one.
+  this._faded = false;
 
   // td_scene's lights, converted into this file's axes. The 2D board's light
   // comes from the upper LEFT of frame, which with +Y going into the board is
@@ -234,6 +241,7 @@ GLRenderer.prototype.begin = function (viewProj, clearColor) {
   gl.uniform3fv(this.uniform.fillColor, this.fillColor);
   gl.uniform1f(this.uniform.keyStrength, this.keyStrength);
   this.setGlow(0, null);
+  this.setFade(1);
   this.drawCalls = 0;
   this.triangles = 0;
 };
@@ -249,6 +257,43 @@ GLRenderer.prototype.setGlow = function (amount, tint) {
   gl.uniform1f(this.uniform.glow, amount || 0);
   var c = tint || GLRenderer.LEY;
   gl.uniform3f(this.uniform.glowTint, c[0], c[1], c[2]);
+};
+
+// HOW SOLID THE NEXT DRAWS ARE, and the only place this renderer blends.
+//
+// The board is opaque by design: one depth buffer, back faces culled, no sort.
+// Exactly one thing needs less -- a body being cleared away after it dies --
+// and that is worth the exception rather than the alternatives, which were a
+// corpse that pops out of existence or one that sinks through the road.
+//
+// DEPTH WRITES GO OFF while it fades, or the transparent body would carve a
+// hole in the depth buffer and hide whatever is behind it. Depth TESTING stays
+// on, so the wreck is still occluded by the world in front of it. The fading
+// object's own triangles then composite in buffer order rather than back to
+// front, which on a 23 px body over one second is not something a player can
+// see -- and a full depth sort for one corpse would be.
+//
+// State, not an argument, exactly like setGlow: a caller that fades a body must
+// put it back.
+GLRenderer.prototype.setFade = function (alpha) {
+  var gl = this.gl;
+  var a = (alpha === undefined || alpha === null) ? 1 : alpha;
+  if (a >= 1) {
+    if (this._faded) {
+      gl.disable(gl.BLEND);
+      gl.depthMask(true);
+      this._faded = false;
+    }
+    gl.uniform1f(this.uniform.alpha, 1);
+    return;
+  }
+  if (!this._faded) {
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    this._faded = true;
+  }
+  gl.uniform1f(this.uniform.alpha, Math.max(0, a));
 };
 
 // Bind a mesh's three buffers once, so a model with several animated groups

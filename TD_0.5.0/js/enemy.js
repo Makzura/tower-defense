@@ -2088,19 +2088,54 @@ Enemy.prototype.knockBack = function (distancePx) {
 // Hover hit test. Uses the same RADIUS_PX the body is drawn with, so the
 // target can never be somewhere other than what the player sees -- the same
 // arrangement as Tower.containsPoint and its footprint.
-Enemy.prototype.containsPoint = function (x, y) {
+//
+// `flat` is FALSE on the 3D board, and the distinction is not cosmetic. In 2D
+// the lift below is a SCREEN offset, so testing against it points at the body.
+// In 3D the caller's point is on the GROUND PLANE -- the lift happens along an
+// axis that point does not have -- so the same subtraction moves the target
+// away from the road the enemy is actually on. At the old 1.15 radii that was
+// a ten-pixel slip nobody reported; at a Wisp's 3.45 it is thirty, which is the
+// whole body. Decided by the caller, the same way drawInspection decides its
+// own `flat`, because this file must not know which renderer is running.
+//
+// Omitting the argument keeps the 2D reading, so every existing caller and
+// every fixture that passes two arguments behaves exactly as before.
+Enemy.prototype.containsPoint = function (x, y, flat) {
   var dx = x - this.pos.x;
-  var dy = y - this.visualBodyY();
+  var dy = y - (flat === false ? this.pos.y : this.visualBodyY());
   var r = this.radiusPx() + Enemy.HOVER_PAD_PX;
   return dx * dx + dy * dy <= r * r;
 };
 
-// Screen-space centre of the upright body. `pos` remains the point where the
-// enemy touches the path and where all gameplay distances are measured; only
-// picking and drawing use this lifted centre. Flying bodies sit higher still.
+// HOW FAR ABOVE ITS GROUND CONTACT THE BODY IS DRAWN, in pixels.
+//
+// `pos` remains the point where the enemy touches the path and where every
+// gameplay distance is measured; only picking and drawing use this lift.
+//
+// ONE NUMBER, FOUR READERS. The 2D body, the 3D body (gl-world's flightLift),
+// the death burst and the hover test all have to agree about where a flier is,
+// and they did not: 3D drew it on the tarmac while 2D lifted it by 1.15. A
+// number retyped in four files is a number that gets raised in three of them.
+//
+// 3.45 rather than 1.15 since 2026-08-12, at the owner's request, and it is the
+// height the Aether Wisp's own model was authored against. Measured on that
+// model: 18.4 board px tall at its drawn scale of 0.85, taking the largest
+// extent across all twelve animation frames rather than the rest pose, because
+// the wings are what move. A Wisp's radius is 9.35 board px, so 1.15 radii is
+// 10.7 px of clearance -- 0.58 body heights, a six-legged firefly skimming the
+// tarmac -- and 3.45 radii is 32.3 px, or 1.75 body heights, which is air.
+Enemy.FLIGHT_LIFT_RADII = 3.45;
+Enemy.GROUND_LIFT_RADII = 0.48;
+
+Enemy.prototype.visualBodyLift = function () {
+  return this.radiusPx() *
+    (this.isFlying ? Enemy.FLIGHT_LIFT_RADII : Enemy.GROUND_LIFT_RADII);
+};
+
+// Screen-space centre of the upright body, for the flat board. Flying bodies
+// sit higher still -- see visualBodyLift for the single number both boards read.
 Enemy.prototype.visualBodyY = function () {
-  var radius = this.radiusPx();
-  return this.pos.y - radius * (this.isFlying ? 1.15 : 0.48);
+  return this.pos.y - this.visualBodyLift();
 };
 
 Enemy.prototype.draw = function (ctx, options) {
