@@ -105,9 +105,13 @@ states. Every rendering claim in the change log below was settled that way, and
 several "obvious" visual tests turned out to prove nothing (see the map-fixed
 note in the 2026-08-09 entry). Do not accept a screenshot glance as proof.
 
-**Run the test suite:** all six, none of which import each other. These are the
-current measured results, taken on 2026-08-10 after the Summoner landed and
-confirmed on 2026-08-11 at commit `77a7865`:
+**Run the test suite:** all six, none of which import each other — **five unit
+suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
+Where this file says "the five unit suites" it means these six minus the smoke
+test, and that is a correct count, not a stale one. Name the set a count counts
+before repairing it. These are the current measured results, taken on
+2026-08-10 after the Summoner landed and confirmed on 2026-08-11 at commit
+`77a7865`:
 
 ```
 node tests/run.js                 105 pass / 3 fail   core game and difficulty
@@ -118,7 +122,7 @@ node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance li
 node tests/sandbox.smoke.js       2 failures          sandbox integration
 ```
 
-**The content line dipped to `181 / 31` for part of 2026-08-09 and is back.**
+**The content line dipped to `181 / 31` for part of 2026-08-09.**
 Adding the Summoner broke one codex test twice over, and both halves were real:
 its path B stopped at B3 (the cross-branch `needs A2` gate truncated the walk,
 so B4 and B5 were missing from the index), and the same test's *first*
@@ -129,14 +133,15 @@ are fixed. **Diff the failure NAMES rather than the totals** if these numbers
 ever look wrong: that is what found the second one, which no total could have
 shown.
 
-The failure groups are unchanged from the checkout baseline. The extra two
-core passes and four content passes cover B5's fourth-round impact, moving
-channel lock, resolution-frame aim freeze, adapter stun mirroring, Siphon's
+The failure groups are unchanged from the checkout baseline. The extra core and
+content passes cover B5's fourth-round impact, moving channel lock,
+resolution-frame aim freeze, adapter stun mirroring, Siphon's
 hidden beams while stunned, and live base/shield enemy-sheet selection with
-segmented field continuity. The three core failures, the Longshot
-failure, and both Sandbox failures are the same Arcane-Sniper B5 ability/effect
-timing drift already present in the checkout. The content suite includes that
-group plus older schedule, boss, price and test fixture drift. Known examples:
+segmented field continuity. The core, Longshot and Sandbox failures are the
+same Arcane-Sniper B5 ability/effect timing drift already present in the
+checkout — how many of each there are is in the table above, and deliberately
+not repeated here. The content suite includes that group plus older schedule,
+boss, price and test fixture drift. Known examples:
 
 - `content.test.js` — four boss/stun tests (`a stunned tower goes completely
   silent`, `the Tyrant's aimed shot…`, `the leap jumps 50 u.l.…`, `after the roar
@@ -272,6 +277,25 @@ Any future replay, fast-forward, or headless balancing work depends on it.
 ---
 
 ## Architecture
+
+**Where the repository starts, because it is not where you are standing.** The
+git root is **`TD_0.5.1/`**; the game is one level down in **`TD_0.5.0/`**, and
+every path in this file is relative to that game folder unless it says
+otherwise. A second tracked directory sits beside the game at the root:
+**`visual-pass/`** — the design corpus the models and effects were built
+against (`SIPHON-SOCLE.md`, `DIRECTION.md`, `CALIBRATION.md`, `HANDOFF.md`,
+per-lot review records), plus the `git-sync.sh` that the post-commit hook runs.
+
+**Source files cite those documents repo-root-relative**, so they are invisible
+from where you work. `js/gl/gl-world.js`, `js/gl/siphon-enemy-fx.js`,
+`js/gl/siphon-ground.js`, `tools/blender/siphon_beam.py` and
+`tools/blender/siphon_idol.py` all name `visual-pass/SIPHON-SOCLE.md`, and a
+`grep` or `ls` for it from inside `TD_0.5.0/` finds nothing — so the document
+looks deleted. **It is not.** On 2026-08-12 that cost two people a search and
+came within one step of a "reconstruction" of a file that was tracked, intact
+and unchanged the whole time, which would have produced a second copy of a live
+document. **Before concluding that any cited document is missing, run
+`git ls-files` from the repository root, not from the game folder.**
 
 ```
 index.html          loads the scripts in order; order matters. Since
@@ -566,7 +590,9 @@ first enemy spawns immediately; `interval` is the delay between later enemies
 in that wave. When a wave's last enemy spawns, the `WAVE_BREAK` countdown
 begins. The next wave starts when that countdown reaches zero.
 
-**The three campaign difficulties were added 2026-07-30:**
+**The three campaign difficulties were added 2026-07-30. TWO OF THE THREE ARE
+PLACEHOLDERS** — read the caveat under this table before quoting any figure
+from the Normal or Hard rows.
 
 | tier | waves | scheduled bodies | effective HP | authored pressure |
 |---|---:|---:|---:|---|
@@ -574,9 +600,43 @@ begins. The next wave starts when that countdown reaches zero.
 | Normal | 35 | 918 | 43 844 | 8% more bodies, 15% more health, 16% tighter intervals, five roster additions |
 | Hard | 35 | 1039 | 56 895 | 20% more bodies, 35% more health, 32% tighter intervals, repeated support threats |
 
+**EASY IS THE ONLY SOURCE OF TRUTH: 35 waves, Vanguard at wave 34.** Normal and
+Hard are placeholder modes a collaborator added in a few seconds; the owner had
+forgotten they existed until asked on 2026-08-12, and has since authorised
+deleting them. Whether they actually go is a conversation between him and their
+author and is tracked in `OPEN-ITEMS.md`. **Until then they ship, and they mean
+nothing.** Every claim that cites Normal or Hard carries this caveat — census
+counts, schedule totals, enemy coverage, balance comparisons, and the two rows
+above.
+
+**They do not look unfinished, and that is the danger.** They derive
+programmatically from `EASY_WAVES`, they appear in `DIFFICULTIES`, they produce
+complete 35-wave schedules, and they answer every query put to them with
+plausible numbers. So the failure mode is not that somebody notices they are
+broken. It is that **somebody cites them as corroboration** — three difficulties
+agreeing looks like triangulation and is not.
+
+The demonstration: `difficultyGroup` rebuilds each derived group through a field
+whitelist (`count`, `interval`, `health`, plus `type` and `lead` when present)
+and **`tier` is not on it.** Wave 25 authors a Fractal Slime at tier 3, which on
+Easy is one body of 64 HP; on Normal and Hard the tier is dropped and it arrives
+as two untiered bodies of 5 HP each. Harder is weaker. Nothing catches it,
+because the *declaration* is what is wrong — the schedule sums, the pinned
+totals, the in-game enemy guide and all six suites recompute from that same
+declaration and agree with each other perfectly. Measured across all three
+difficulties on 2026-08-12.
+
+**Do not "fix" this by adding `tier` to the whitelist.** `Enemy.healthOf` gives
+a fractal tier precedence over the `health` override and discards the override
+entirely, so carrying the field alone would flatten Normal and Hard onto Easy's
+exact numbers with `healthScale` silently ignored. The only other knob is the
+tier itself, which steps ×4. That is a real design decision, and not one worth
+making for modes that may be deleted.
+
 Normal and Hard are built from Easy's proven spine by
 `buildDifficultyWaves(tuning, additions)`. The transform is deterministic and
-authored, not simulated. Health/count increase the workload; interval/lead
+mechanical, not simulated — but it is **not "authored" in the sense Easy is**,
+per the caveat above. Health/count increase the workload; interval/lead
 compression and the supporters are the important difficulty levers because
 **they pay nothing at all.** A wave's `health` override still scales income —
 `Enemy.bountyOf` prices a body at `type.bounty × health / type.health`, so
@@ -591,6 +651,13 @@ each once; Hard repeats support enemies and brings Vanguard into the finale.
 Camo Heavy is added only to already-pure camo waves. That preserves the
 Warbringer collateral rule below.
 
+**All five are already in Easy** — this paragraph is about the *extra*
+appearances the derived modes add, not about where the types live. The types
+are shipping content; only the additions are placeholder scaffolding. (Verified
+across all three difficulties on 2026-08-12. The type ids do not match the
+display names: Vanguard is `boss_fast` and Aether Wisp is `flying`, so a grep
+for either name in the schedule finds nothing and proves nothing.)
+
 `selectedDifficultyId` and the active `WAVES` reference survive
 `restartGame()`: Restart means replay this route and difficulty. Choosing
 another difficulty through the run chooser calls `setDifficulty` before the
@@ -600,7 +667,9 @@ route starts. Difficulty is not saved to `MetaProgress`.
 wave a bit more chaotic, still deterministic but with more than 1 type"). In
 place of the flat fields a wave may carry `groups: [...]`, a list of groups
 each with its own `count`/`interval`/`type`/`health` and an optional `lead` —
-the pause before that group's first body, used instead of its `interval`. The
+the pause before that group's first body, used instead of its `interval` — plus
+an optional `tier` on a fractal type. **`tier` is the one group field the
+difficulty derivation drops**, which is the caveat above. The
 groups deploy in order, so a wave reads top to bottom as the thing the player
 watches arrive.
 
@@ -4092,10 +4161,16 @@ combination. It intentionally lives beside the gunner rather than inside it:
   "strongest enemy") a clearly-flagged placeholder heuristic in
   `js/systems/active-ability.js`. Do not fill any of these in without asking
   -- that is the same "do not invent" instruction the spec itself gave.
-- **Tests:** `node tests/long-range-dps.test.js` (58 tests, independent of
-  `tests/run.js` -- it requires the systems/config files directly rather than
+- **Tests:** `node tests/long-range-dps.test.js` -- independent of
+  `tests/run.js`: it requires the systems/config files directly rather than
   booting through `tests/harness.js`, since Longshot's systems have no DOM
-  dependency to stub). `node tests/long-range-dps-scene.smoke.js` boots the
+  dependency to stub. **Its pass/fail figures live in the suite table under
+  "How to run and test" and nowhere else.** This line used to carry its own
+  test count; it drifted, and it was removed rather than corrected, because a
+  count kept in two places diverges again. Do not recount the suite with
+  `grep -c '^test('` either -- it generates cases inside `forEach` loops over
+  the spec's own path tables, so a static count reads low. Only a real run is
+  authoritative. `node tests/long-range-dps-scene.smoke.js` boots the
   debug scene against a stubbed DOM to catch wiring mistakes the unit tests
   can't see (missing element ids, DOM calls leaking into `update()`).
 
@@ -4357,7 +4432,7 @@ no mechanic was moved to match the description.
 | Wave bonus timing | owed on deploy; paid on board-clear, on a skip, or when the next wave arrives | `pendingBounty`, `payWaveBounty` |
 | Tower stun | longest wins; no update, cooldown, aim tracking or live Siphon beam presentation while stunned | `TowerHealth.stun / isStunned / tickStun`, `BeamTower.visibleLocks` |
 | Waves 1-11 | the introduction, single-type, pinned exactly | `WAVES.slice(0, 11)` — deep-equal test in run.js |
-| Mixed waves | `groups: [...]`, each with its own count/interval/type/health/lead | `waveGroups`, `waveCount`, `waveGroupAt`, `waveSummary` |
+| Mixed waves | `groups: [...]`, each with its own count/interval/type/health/lead, plus `tier` on a fractal — and `tier` is the one field the difficulty derivation drops | `waveGroups`, `waveCount`, `waveGroupAt`, `waveSummary` |
 | Wave break | 90 s ceiling; 3 s once called in; 5 s once the board is cleared | `WAVE_BREAK`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave` in game.js |
 | Run opening | 10 s before wave 1, or the Start button; 0 with auto-send | `RUN_START_DELAY`, `beforeFirstWave`, `waveSkipButtonLabel` in game.js |
 | Wave call triggers | the Send button, an empty board, or the 90 s running out | `callNextWave` in game.js |

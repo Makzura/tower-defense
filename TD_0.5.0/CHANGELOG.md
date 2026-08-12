@@ -13,6 +13,131 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-12 — `AGENTS.md` said nothing about where the repository starts, and
+a tracked design document was nearly reconstructed because of it.**
+
+Documentation only. The git root is `TD_0.5.1/`; the game is one level down in
+`TD_0.5.0/`, and `visual-pass/` — the design corpus the models and effects were
+built against — sits beside the game at that root. Five source files
+(`js/gl/gl-world.js`, `js/gl/siphon-enemy-fx.js`, `js/gl/siphon-ground.js`,
+`tools/blender/siphon_beam.py`, `tools/blender/siphon_idol.py`) cite
+`visual-pass/SIPHON-SOCLE.md` **repo-root-relative**, so a `grep` or `ls` from
+inside the game folder finds nothing and the document reads as deleted.
+
+It is not deleted. `SIPHON-SOCLE.md` is tracked, 8 400 bytes, committed in
+`b30cdd1` on 2026-08-10 and unchanged since. On 2026-08-12 two people searched
+for it and it came within one step of being "reconstructed" from
+`siphon_idol.py`'s header — which would have produced a second copy of a live
+document, the exact failure that reduced `CLAUDE.md` to a pointer.
+
+`AGENTS.md` now opens its Architecture section with the layout and the check:
+**run `git ls-files` from the repository root, not from the game folder, before
+concluding that any cited document is missing.** The directory is named rather
+than counted, so the line does not rot when a document is added to it.
+
+Verified while writing this and deliberately NOT documented: the stale
+worktrees that used to hold complete copies of the game are gone. `git worktree
+list` shows only the live tree, both `.claude/worktrees` directories are empty,
+and `find -name AGENTS.md` from the root returns exactly one file. A hazard
+that no longer exists does not belong in a rules document either.
+
+**2026-08-12 — Normal and Hard are unfinished placeholder modes, and
+`AGENTS.md` was presenting them as authored content.**
+
+Ruled by the owner on 2026-08-12: **Easy is the only source of truth — 35
+waves, Vanguard at wave 34.** Normal and Hard were added by a collaborator in a
+few seconds and the owner had forgotten they existed. He has since authorised
+deleting them; whether they actually go is a conversation between him and their
+author, and is tracked in `OPEN-ITEMS.md`.
+
+The document said the opposite in four places and the caveat is now in all
+four: the difficulty table headed "authored pressure"; the paragraph calling
+the transform "authored, not simulated" (deterministic is true — *authored* was
+the contradiction); "All five formerly sandbox-only types appear in both Normal
+and Hard"; and both mixed-wave field lists, which enumerated exactly
+`difficultyGroup`'s whitelist and so read as though `tier` were not a group
+field.
+
+Measured across all three difficulties before writing, and again after
+`7c9ba58` landed, because that commit touched the function the claim rests on:
+wave 25 declares one Fractal Slime at tier 3 → **64 HP** on Easy, and two
+untiered bodies at **5 HP** each on Normal and Hard. `tierZeroHealth 1 ×
+healthMultiplier 4³ = 64`; the derived side is `4 × 1.15` and `4 × 1.35`, both
+rounding to 5, which is why Normal and Hard are identical rather than laddered.
+
+**One correction caught in the writing, recorded because it will catch the next
+person.** The first draft added "these are placeholder modes, so this describes
+scaffolding, not shipping content" to the five-types paragraph. That is false:
+all five are already scheduled on Easy — Aether Wisp 24/31/35, Shieldbearer
+27/29/30/34, Camo Heavy 28, Healer 32, Vanguard 34 — and only the *extra*
+appearances belong to the derived modes. The cause is that **type ids do not
+match display names**: Vanguard is `boss_fast`, Aether Wisp is `flying`,
+Bulwark is `shielded`. A search for `type === "vanguard"` returns an empty list
+and proves nothing, and it nearly produced a document contradicting the owner's
+own ruling. That note is now in `AGENTS.md` beside the paragraph it saved.
+
+`OPEN-ITEMS.md` keeps only the open half — whether the modes are deleted — and
+gained two rules. Every entry carries a **Lands in** list naming the sites its
+outcome obligates, cited by phrase rather than line number because line numbers
+move. And **a ruled entry moves in the same edit that records the ruling**: the
+instant a decision lands, that content stops being undecided and becomes a
+second copy of a live claim until it is moved. That is not hypothetical — it
+produced a live contradiction with the difficulty table within twenty minutes.
+
+**2026-08-12 — two design documents moved out of agent memory and into the
+repository.**
+
+`HOUSE-STANDARD.md` (what "good" means for a model at the size this game draws
+it) and `BRIEF-siphon-idol-gesture.md` (the A3–A5 channelling rework) now live
+in `tools/blender/`, beside `WARBRINGER_CONCEPT.md`. They were in an agent's
+memory directory, which is outside this repository entirely — so a standard
+governing every future brief had no version control and was invisible to every
+check this project runs.
+
+The rule applied, and it is the one to reuse: **memory holds what an author
+learned; the repository holds what other people build against.** The decisive
+test is not durability but discoverability — can the people who need it find it
+without knowing whose memory to look in? A durability failure eventually
+announces itself, because the file is gone. A discoverability failure never
+does; the reader simply builds against something else. `tools/blender/` was
+chosen over `visual-pass/` because that is where the builder works, and because
+a standing contract is a different kind of object from a per-session review
+record.
+
+Copied programmatically and diffed rather than retyped — these are dense with
+measured figures and a transcription slip fabricates a measurement. Every
+source line appears in the destination except the memory frontmatter, stripped
+to match `WARBRINGER_CONCEPT.md`'s plain-markdown convention. Pointers left in
+both directions.
+
+**2026-08-12 — a stale test count in the Longshot section, removed rather than
+corrected.**
+
+`AGENTS.md` described `tests/long-range-dps.test.js` as "58 tests". Measured by
+running it: **71**, confirmed two independent ways — the runner's own summary
+line and a count of its result lines. **The number was deleted, not updated.**
+The suite table under "How to run and test" already carried the figures, and a
+count kept in two places diverges again; that is precisely what had happened,
+and it is why `CLAUDE.md` is a pointer. The line now points at the table.
+
+The same pass removed three more copies of that table's fail counts, twenty
+lines below it — "the **three** core failures, the Longshot failure, and
+**both** Sandbox failures". They survived an earlier sweep because they are
+spelled as words, and a grep for digits cannot see them.
+
+**A static count of this suite is wrong**, which is worth stating because it is
+the obvious way to check the figure: `grep -c '^test('` reads 61 and
+`grep -c '\btest('` reads 63, against 71 actual, because the suite generates
+cases inside `forEach` loops over the spec's own path tables. Only a real run is
+authoritative, and `AGENTS.md` now says so in place.
+
+The measurement moved while it was being taken — 70 pass / 1 fail at 07:16:52Z,
+71 pass / 0 fail at 07:27:31Z, with the suite file written at 07:18:12Z in
+between. The suite *size* was 71 in both readings. A quantity that changes
+whenever anyone touches the code belongs in one recorded place that the rest of
+the file points at; a quantity that changes only when someone writes a test can
+be stated. That distinction is the whole reason this entry exists.
+
 **2026-08-12 — wave 25's Fractal Slime reached the board at T1, because
 `spawnScheduledEnemy` calls `spawnEnemy` with four arguments where it takes
 five, dropping the tier.**
