@@ -256,6 +256,42 @@ and put back to 0 it returns **bit-identical to the first capture**. No suite
 could have caught it — the harness has no WebGL, so every green result on this
 feature exercised the 2D fallback path.
 
+**2026-08-14 — The Vanguard verifies both legs, and "groups" gets pinned down.**
+
+`884f325`. `enemy_vanguard.py` ran `measure_plant("leg_l")` and nothing else, so
+a shipped boss verified its gait on **one leg of two**. Found by kaz applying
+the Tyrant job's own rule to the neighbouring body: **ask what case the check
+has never been given** — the answer was its own right leg.
+
+Measurement only, no geometry. The re-export is content-identical to the
+committed file (same 2,760 triangles, position multiset identical, `frames` and
+`groups` JSON identical), so the committed bytes were restored rather than
+taking a diff that is pure Blender face-order noise.
+
+    A (pre-export, posed)   leg_l 0.000000 u   leg_r 0.000000 u   delta 0
+
+Clear by construction now instead of by argument. It was very probably fine —
+two mirror legs on a half-cycle offset should agree — but **"fine by symmetry"
+is immunity by coincidence**, and it is the same assumption that let
+`gait_solve` steer on `groups[0][0]` and report SUCCESS on a body whose other
+two feet slid 19.3 and 14.3 board px. Four one-case instruments surfaced in two
+days; this one cost a line to close.
+
+**`AGENTS.md` gets the vocabulary trap, at the point of use.** *Mesh* groups are
+what the exporter emits, one per animated root, and what every tool prints;
+*gait* groups are evenly-phased leg phases, which is what the 3+-group rules are
+about. The Tyrant is **3 mesh groups and 2 gait groups**, and reporting the
+first into a conversation about the second read as an alarm on a shipped boss.
+Mesh count is always at least gait count + 1 — the body root is a mesh group and
+is not a leg.
+
+It also records **why both bosses are clear** of the `groups[0][0]` defect: not
+because `+N/2 ≡ −N/2 (mod N)` hides it at two groups — true, and it expires
+silently the day someone adds a third — but because **neither module calls the
+defective functions at all.** Prefer immunity by construction to immunity by
+arithmetic: the structural reason keeps holding when the leg count changes, and
+nothing announces when the arithmetic one stops.
+
 **2026-08-13 — The Tyrant gets a body, and it walks without sliding.**
 
 `enemy-boss` — the wave-35 boss the whole campaign ends on, and the last of the
@@ -485,6 +521,40 @@ nothing. It is the same failure as an untagged script file, one scope down.
 Suites: 107/0, 207/5, 72/0, 45/0, 53/0 and sandbox green — the same five
 failures, by name, as the recorded clean-extraction baseline. None of them is
 this change.
+
+**2026-08-14 — The manifest gate gets a third leg: the git index. Two commits
+on this branch cannot be booted by anyone who clones them.**
+
+`d828769` and `181119c` both tag `js/gl/models/enemy-boss.js` in `index.html`.
+The file was not committed until `de30b50`, two commits later. `tests/harness.js`
+`readFileSync`s every entry in the page's script list, so **at those two commits
+every suite dies in `boot()` before its first assertion** — run 1/106,
+content 0/212, blub 0/53. Found by simulation, the expensive way: seeded a
+gate run from inside that window and spent minutes believing a comment-only
+change had broken 371 tests.
+
+**Yesterday's version of this check could not see it, and the reason is the
+lesson.** It compared the page's tags against files **on disk**. The model was
+on disk the whole time — merely untracked. **The author's own working tree is
+always green**, so this class is invisible from the machine that creates it and
+breaks everybody else. That is the opposite blast radius from the unwired case,
+which only ever hurts the author's own feature, and it is why the untracked half
+was named in yesterday's diagnosis and still left uncovered by yesterday's fix.
+
+So the check now reconciles **three** sources of truth, not two: the page, the
+filesystem, and the git index. A tag whose target is untracked fails the build
+exactly as a tag whose target is missing does.
+
+**Where it deliberately does not fire:** run against an extraction or an archive
+there is no index to consult, so the git leg is skipped and the run says so in
+its output — two legs of three is not a clean gate, and a gate that quietly
+degrades to a subset of itself is the failure this whole file exists to prevent.
+
+**A gate is only as good as the tree you seeded it from.** Materialising a
+commit and running the suites there is the right technique and it inherits every
+defect of the commit you seeded from. Take a **control run before the treatment**:
+confirm the materialised tree boots at all before attributing any failure to
+your own change.
 
 **2026-08-13 — A manifest gate: every js file on disk must be loaded by a page,
 because no suite can tell you when one is not.**
