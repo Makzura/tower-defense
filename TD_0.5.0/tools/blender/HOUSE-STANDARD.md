@@ -83,6 +83,27 @@ reference viewport:
 | y, into the screen | 10.91 | 0.092 u |
 | z, up | 16.49 | 0.061 u |
 
+> **"THE DEFAULT CAMERA" IS A NUMBER PER VIEWPORT — QUOTE THE VIEWPORT BESIDE
+> THE DISTANCE.** `gl-world.js` fits the board with `camera.fitBounds()` on the
+> first draw, and `fitBounds` depends on **aspect**. Two rigs whose canvases
+> differed by two pixels produced **2021.3631 and 2021.237** — same target, same
+> yaw, same pitch. That gap is 0.006% and harmless numerically, but **unless the
+> viewport is stated the next two-rig disagreement gets read as a finding when it
+> is a window size**, and this project has already spent a day on one scale
+> disagreement that turned out to be a camera. Found by juno, 2026-08-13.
+>
+> The distance is also **not** `OrbitCamera`'s constructor default of 900 — read
+> the camera before anything draws and you get 900 with target [0,0,0], which is
+> 2.25x too close and centred off the board. That is the disagreement above.
+>
+> **AND A SINGLE FRAME IS WORTH ABOUT ±13% OF THE SILHOUETTE.** The Gleaner runs
+> **134 to 151 lit px across its eight walk frames** at one camera and one yaw.
+> So any figure taken from one frame carries that much noise before anything else
+> is measured, and **a question about a moving part wants a per-frame curve rather
+> than a number** — otto reached the same thing from the other direction, with
+> f0-vs-f3 at 224 px against f0-vs-f6 at 111 px on the Hedger's crank. This is
+> why *frame* is one of the terms every figure must name.
+
 **So any feature under about 0.05 u does not exist.** That one line rejects more
 bad detail than everything else here combined. Note also that x and z are nearly
 double y: a gesture aimed into the screen is worth half a gesture aimed across
