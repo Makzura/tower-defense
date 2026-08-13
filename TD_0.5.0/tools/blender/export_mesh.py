@@ -339,13 +339,34 @@ def _build_rifleman(group):
 
 
 def _build_enemy(module_name):
-    """Each enemy script returns a different tuple and switches its shield off
-    a different way, so the unshielded state is selected per module rather than
-    guessed from the shape of the return value."""
+    """Build one enemy into the current scene and return its frame count.
+
+    THE CONTRACT FOR EVERY MODULE WRITTEN FROM 2026-08-13 ON: expose
+
+        export_build() -> frame count
+
+    which builds, hides whatever must not ship, animates, and returns how many
+    frames it keyed. The exporter then needs to know NOTHING about the module's
+    internals, and a new enemy is one line in TARGETS and no line here.
+
+    THE SWITCH BELOW IS CLOSED. The four original enemies each return a
+    different tuple and switch their shield off a different way, so the
+    unshielded state had to be selected per module -- and the `else` branch
+    guesses that `result[2]` is the shield carrier. That guess is correct for
+    exactly the two modules that reach it. It is not a default, it is a
+    coincidence, and every module added to it makes the coincidence load
+    bearing for one more file. Nothing new goes in it: give the module an
+    `export_build` instead. The branches stay only because rewriting the four
+    would change their output, and their output is currently correct.
+    """
     def build():
         module = __import__(module_name)
         td.scene(ortho_scale=getattr(module, "ORTHO_SCALE", 1.5),
                  tile_w=64, tile_h=64)
+
+        if hasattr(module, "export_build"):
+            return module.export_build()
+
         result = module.build()
         if module_name == "enemy_swarm":
             module.set_rendered(result[3], False)
@@ -415,10 +436,28 @@ TARGETS = [
     ("enemy-swarm", "enemy-swarm.js", _build_enemy("enemy_swarm")),
     ("enemy-brute", "enemy-brute.js", _build_enemy("enemy_brute")),
     ("enemy-hive", "enemy-hive.js", _build_enemy("enemy_hive")),
+    # The five Easy bodies, built on tools/blender/enemy_chassis.py. Each
+    # implements `export_build()`, so none of them touches the closed switch in
+    # _build_enemy. THE FILE NAME IS THE TYPE ID: gl-world.js::enemyModel()
+    # looks up "enemy-" + enemy.typeId, so `camo_normal` keeps its underscore.
+    ("enemy-armored", "enemy-armored.js", _build_enemy("enemy_drudge")),
 ]
 
 
 def _requested():
+    """Targets named by `--only=a,b`. MATCHING IS BY PREFIX, NOT BY NAME.
+
+    That is deliberate -- `--only=sniper` builds the whole sniper family -- but
+    it means a partial name silently selects more than it looks like:
+    `--only=enemy-a` is armored AND angry. No full target name is a prefix of
+    another, so spelling one out in full always selects exactly one. Anything
+    shorter is a family selector whether or not you meant it that way.
+
+    Note there is no regex here and none should be added. Model ids may contain
+    underscores -- `enemy-camo_normal` is a real target -- and a character class
+    written as [a-z-] drops it silently. That has already cost this project two
+    wrong roster counts.
+    """
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     for arg in args:
         if arg.startswith("--only="):

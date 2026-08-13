@@ -13,6 +13,80 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — the Drudge (`enemy-armored`), the first of five Easy bodies, and
+the shared chassis they are all built on.**
+
+`tools/blender/enemy_chassis.py` is new: the stamped frame every Easy enemy is
+built from. Measured on the Gleaner, that shared frame is 3,568 of its 4,032
+triangles — 88.5% — so the five bodies describe it once rather than copying it
+five times. Roster Law 02 is "stamped, not born"; a faction stamped from one die
+is authored from one module. The coupling is deliberate and it is dangerous:
+an edit there rewrites five shipped files. `CHASSIS_VERSION` is written into
+every generated header so a mismatched set shows up in a diff, and any chassis
+change re-exports all five in one commit.
+
+The chassis was proved before anything was built on it: configured as the
+Gleaner it reproduces the committed `enemy-normal.js` exactly — identical
+triangle multiset, palette, groups and frames. `enemy_normal.py` is untouched
+and still owns `enemy-normal.js`.
+
+The Drudge is 3,520 triangles, 12.7% *cheaper* than the Gleaner, because the
+separator is a filling rather than a plating: one poured sheath from collar to
+knee swallows the two real concavities (the neck notch and the hip taper), and
+the torso, both bands, the hip brace, both knees, both upper arms and both
+shoulders stop being modelled. The card's stated tell — "pinched at the waist" —
+does not exist: 12 px of interior concavity across 96 samples, 0.125 px per
+sample. Gleaner = lollipop, Drudge = bollard.
+
+**NEW INVARIANT, AND THE `AGENTS.md` CLAUSE FOR IT IS OWED.** An animated
+group's positions are stored in that group's LOCAL space, and `model.top` is the
+max z over RAW positions — so a body root standing at z = 0.62 makes the model
+report itself 0.62 units short and `crownOf` draws the health bar inside the
+mesh. Measured on the shipped roster: `enemy-normal` 9.7 board px inside,
+`enemy-brute` 27.2, `enemy-hive` 25.1. `enemy-swarm` and `enemy-flying` pass
+only by luck — the 10 px crown pad happens to cover their error.
+
+> **The rule: the animated group root that owns the topmost geometry sits at
+> z = 0 with identity rotation at frame 1.** Its local space is then world
+> space and the raw max z is the true max z, so the defect cannot occur. Limb
+> roots stay at their joints — a limb hangs down and never owns the top. The
+> root position is not the guarantee, though: the root translates for the walk
+> bob, so quote the margin from `node tools/check-model-top.js`, which sweeps
+> every frame, and never the root's z.
+
+This belongs in `AGENTS.md` clause 6, which currently governs only the model
+origin and not the animated group root — a different rule, and its absence is
+why all four authored enemies shipped wrong. **It is not written there in this
+commit because `AGENTS.md` currently holds another division's uncommitted work,
+and adding our clause would sweep theirs in.** The clause is owed and routed to
+petra; it lands as its own commit once theirs does. Recorded here rather than
+omitted, because a visible debt is honest and a silent one is the drift the
+convention exists to prevent.
+
+Two new gates, both of which have been watched to fail before being trusted:
+
+- `tools/check-model-top.js` — posed top against the crown, across every frame,
+  for every model. Three of five enemies fail it today.
+- `tools/check-model-tags.js` — is every model actually loaded by the pages that
+  draw it? A missing `<script>` tag throws nothing: `enemyModel()` returns null,
+  the fallback sphere draws, and all six suites pass full green with the new
+  enemy as a coloured ball. No suite can see it. The rule is derived per family
+  rather than declared, because `3d.html` deliberately carries no towers. It
+  currently reports 10 pre-existing `blub-detail` models missing from
+  `sandbox.html`, which is a real finding and is left for their owner.
+
+`td_scene.ball` takes `segments`/`rings`, defaulting to the previous 16/8 so no
+existing model changes. New bodies pass 8/4: 48 triangles instead of 224 for a
+lens under 2 screen px at the default camera, and not 6/3 because the player's
+camera reaches 11.2x closer, where a 6-segment sphere reads as a hexagon.
+
+`export_mesh.py` gains the `export_build()` contract — a module builds, hides,
+animates and returns its own frame count, so the exporter needs to know nothing
+about its internals. The per-module `if` switch is now **closed**: its `else`
+branch guesses that `result[2]` is the shield carrier, which is a coincidence
+that happens to hold for two modules, and every module added would make that
+coincidence load-bearing for one more file.
+
 **2026-08-12 — the Aether Wisp's RUNTIME: it flies, its wings beat off a clock,
 its lantern lights, and it falls out of the sky when it dies. Ported by hand
 from Morcoos's copy into `gl-world.js` / `gl-renderer.js`; `enemy-wreck.js`

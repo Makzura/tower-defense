@@ -426,8 +426,37 @@ def cyl(name, radius, depth, location=(0, 0, 0), rotation=(0, 0, 0), mat=None,
     return _attach(obj, name, location, rotation, mat, parent)
 
 
-def ball(name, radius, location=(0, 0, 0), mat=None, parent=None):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8,
+def ball(name, radius, location=(0, 0, 0), mat=None, parent=None,
+         segments=16, rings=8):
+    """A UV sphere. Triangle cost is `segments * (2 * rings - 2)`.
+
+    THE DEFAULTS ARE 16/8 AND MUST STAY THAT WAY. Every model authored before
+    2026-08-13 called this with no resolution argument, so changing the default
+    silently rebuilds every head, eye, joint and glow orb in the project. New
+    models pass the resolution they actually need; old ones keep theirs by
+    getting it from here.
+
+    16/8 IS 224 TRIANGLES, WHICH IS THE WRONG PRICE FOR A SMALL PART. The
+    Gleaner's lens is r=0.048 -- about 1.9 screen px at the default camera --
+    and it spends 5.6% of that model's entire budget. Anything that multiplies
+    should pass segments=8, rings=4 (48 triangles). Do not drop to 6/3 for a
+    part the player can zoom in on: the camera reaches 180 against a 2022
+    default, 11.2x closer, and at that range a 6-segment sphere reads as a
+    hexagon. 8/4 survives it.
+
+    ONE PLACE WHERE THE FACE ORDER OF THIS PRIMITIVE IS VISIBLE. Blender emits
+    these faces in a version-dependent ORDER -- the geometry is identical, but
+    5.3 lists it differently, which is why a re-export of an unchanged model
+    differs in bytes while its triangle multiset does not. That is unobservable
+    on the opaque path, which is the whole board. It is NOT unobservable under
+    `GLRenderer.setFade`, which enables BLEND with depthMask(false) so a fading
+    body composites in buffer order rather than back to front. Today setFade
+    has exactly one caller -- the wreck fade in gl-world.js -- and wrecks are
+    flier-only, so nothing here reaches it. If wrecks are ever extended to
+    ground enemies, sphere face order becomes a visible property of these
+    models and re-exporting one becomes a visual change.
+    """
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings,
                                          radius=radius, location=(0, 0, 0))
     obj = bpy.context.active_object
     bpy.ops.object.shade_smooth()
