@@ -13,6 +13,60 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `visual-pass/probe/rank-page.js`: six defects in the rank solver,
+every one of which produced a CONFIDENT wrong answer.** The candidate A rank
+(five enemies, ascending height, gap = the narrower neighbour) now passes all
+seven asserts at Loader 651 px, top y 286, feet y 937, gaps +1/+0/+0/+2.
+
+**Five of the six were the same mistake in different clothes: a limit condition
+read as data.** The pan loop steered on the silhouette's TOP edge, and a body
+clipped at the top reports `box[1] = 0` whatever the camera does — so the
+finite-difference slope came out zero, the loop broke on iteration ZERO against
+its own "slope too small" guard, and the requested ground line was accepted,
+logged and never applied. The same clipped body reported 658 px of a taller
+body, which sat inside the requested 650-670 band, so the distance bisection
+"converged" on a subject larger than the frame: **a clipped height is a lower
+bound, not a height.** The clip test returned true for a NULL box, conflating
+NOT DRAWN with CLIPPED, so an invisible body scored as too tall, the solver
+moved to shrink it, and the distance walked to the floor with `tallest:0` on
+every step. Pan returned on a lost body while keeping whatever target the last
+overshoot had thrown it to, poisoning every later reading. And the solver itself
+was an alternating pan-then-bisect written **ten lines below the coupled 2x2
+whose comment explains that alternating does not work** — the camera target is a
+point on the GROUND, so sliding it vertically also changes the subject's depth
+and therefore its scale. Reading past that comment rebuilt the exact bug it was
+written about.
+
+The sixth is a real projection fact worth keeping: **one linear world-to-screen
+scale is exact only where it was measured.** It was measured at the rank centre,
+and a rank's whole purpose is to put bodies far off centre, where perspective
+both widens and shifts them — measured rank/solo width ratio 1.000 at the centre
+against 1.096 at the frame edge. Planning gaps from centre-measured widths left
+them short by 69, 44 and 21 px, worst at the edges and perfect in the middle;
+that signature is the tell. Both axes now take a per-body Newton correction
+against measured positions instead of a global constant.
+
+Also: `RankRig.audit(placed)` threw `Cannot read properties of undefined` deep
+inside on `placed.length` whenever the solve returned an error object carrying no
+placement, which hid the real reason for four consecutive runs. A failed stage
+must surface its own reason rather than throw downstream; there is now a guard
+that prints it. The rule this all reduces to is in `AGENTS.md` under "Testing
+anything VISUAL".
+
+**Separately — the shoot-from-committed-HEAD rigs now delete their own
+extraction.** `hero-rig.js`, `candidate-rig.js` and `rank-rig.js` each
+`git archive` the entire repo into `%TEMP%`, and none cleaned up. The directory
+is named for the sha, which moves every run, so re-running never reuses one — it
+adds one. Thirteen extractions took the system disk to 223 GB of 223 GB with
+**zero bytes free** and killed `tar` mid-extract. That is not a local failure: a
+full disk breaks every agent on the machine, and their failures look like bugs in
+their own tools. It is also the exact condition that writes a TRUNCATED FILE WITH
+A VALID HEADER — a PNG whose IHDR reads a perfect 1920x1080 and whose image data
+stops halfway, which every dimension check passes. The only proof of completeness
+is the IEND chunk, and its name sits at offset 4 of the last TWELVE bytes; read
+the last eight and the check lands on the CRC and condemns healthy files. Each
+rig now removes its extraction in the `finally` that already kills Chrome.
+
 **2026-08-13 — The Tender (`enemy-shieldbearer`): the first four-legged body in
 the game, and the first with no arms at all.** 6,452 triangles, 8 frames, on
 `enemy_chassis.py` at `CHASSIS_VERSION 1` with no change to the shared module —
@@ -150,6 +204,41 @@ framesDigest moved on **0 of 6**. `framesDigest` is the one that matters here,
 and multiset alone would have been negligent — **a gait change moves no
 triangles**, so a multiset check passes unchanged while the walk is visibly
 wrong.
+
+**2026-08-13 — `bands` reaches the runtime: the frame-layout contract, and the
+registry line that was silently dropping it (`3f5c77e`).** The rule itself is in
+`AGENTS.md` under "`bands` — which frames are the walk"; this is what happened.
+
+**The defect the reader exposed was in the REGISTRY, not the reader.**
+`GLModels.register` builds its model object from an explicit field list, and
+`bands` was not on it. So the field shipped on eight models while `m.bands` was
+`undefined` on every one of them. **A reader written only in `gl-world.js` would
+have taken the absent-fallback thirteen times, changed nothing, and passed a null
+control perfectly** — a green from a feature that never ran. Any new field on the
+model contract has to be added in two places or it is decoration.
+
+**Why a pair and not a length.** Two incompatible frame arithmetics already
+coexist in `gl-world.js` — enemies index frame 0 as a walk frame, blubs and
+summoners reserve it as a rest pose and count from `frames.length - 1`. A bare
+`cycle` integer cannot say which applies, and guessing wrong does not throw, it
+draws a plausible body on the wrong frame of the wrong band. `[[first, count]]`
+leaves the reader nothing to derive. A renderer-side constant was considered and
+killed on a census: `enemy-angry` and `enemy-flying` carry twelve frames where
+everything else carries eight, so one constant would have made the Hedger's crank
+and the Wisp's second wingbeat unreachable.
+
+**Accepted on two gates, because one was not enough.** Every band in the tree is
+currently `[[0, frames.length]]`, so the regression null — as-shipped versus
+stripped versus explicit whole-list, bit-identical across 12 bodies × 3 bearings
+at worst 0 px — would have passed a reader that ignored the field entirely. It
+proves nothing broke and nothing more. The **synthetic positive** is what
+exercises the feature: a band that is not the whole list, injected at runtime,
+identifying the state pose from its measured silhouette rather than from the
+index that set it, and going red on demand when the same band is declared as the
+whole list.
+
+**`bands[n][0]` still has no caller.** Nothing addresses a state band, so the path
+ships unexercised by real geometry until the first genuinely banded body lands.
 
 **2026-08-13 — The wave banner shrinks to fit instead of clipping, and the flat
 triangle ceiling is retired.** Two rendering fixes and one measurement guard;

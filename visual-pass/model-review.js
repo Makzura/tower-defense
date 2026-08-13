@@ -243,15 +243,31 @@ function review(name, model, scale) {
   // The old flag would have sent a smith to shave a model that costs nothing
   // and waved through the one type in the game that multiplies.
   //
-  // MAX_ON_ROAD is the largest simultaneous population, read off EASY_WAVES
-  // (js/game.js). It is a schedule fact, so it goes stale if the waves change
-  // -- an absent entry prints no peak rather than guessing one.
+  // MAX_ON_ROAD is the largest simultaneous population. A schedule fact, so it
+  // goes stale if the waves change -- an absent entry prints no peak rather
+  // than guessing one.
+  //
+  // IT IS NOT READ OFF EASY_WAVES ALONE, AND AN EARLIER VERSION OF THIS COMMENT
+  // SAID IT WAS. The Tyrant's roar at half health spawns a crowd from a `phases`
+  // block in js/enemy.js, not from the wave table: 6 normal, 4 angry, 2 flying,
+  // 2 hive, 3 shieldbearer, 3 healer, 2 colossus. Two rows are larger there than
+  // anywhere in EASY_WAVES, and the colossus is the sharp case -- the wave table
+  // spawns exactly ONE, so a table scoped to the waves reported half the real
+  // peak for the biggest body in the game. Caught by a smith who read this
+  // comment against the code instead of trusting it.
+  //
+  // So: the max over the wave table AND the roar crowd. Anything that spawns
+  // bodies outside `updateWaves` has to be counted here or this understates.
   var MAX_ON_ROAD = {
     "enemy-normal": 30, "enemy-swarm": 30, "enemy-fast": 18, "enemy-slow": 14,
     "enemy-armored": 10, "enemy-angry": 10, "enemy-flying": 8, "enemy-brute": 4,
     "enemy-hive": 3, "enemy-camo_normal": 10, "enemy-camo_fast": 12,
     "enemy-camo_heavy": 6, "enemy-shielded": 6, "enemy-revenant": 6,
-    "enemy-healer": 3, "enemy-shieldbearer": 2, "enemy-colossus": 1,
+    "enemy-healer": 3,
+    // 2 in the waves, 3 in the roar crowd.
+    "enemy-shieldbearer": 3,
+    // 1 in the waves, 2 in the roar crowd. The wave-only figure halved it.
+    "enemy-colossus": 2,
     // 1 T3 -> 4 T2 -> 16 T1 -> 64 T0. The only type that multiplies.
     "enemy-fractal_slime": 64
   };

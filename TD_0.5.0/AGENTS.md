@@ -105,6 +105,14 @@ states. Every rendering claim in the change log below was settled that way, and
 several "obvious" visual tests turned out to prove nothing (see the map-fixed
 note in the 2026-08-09 entry). Do not accept a screenshot glance as proof.
 
+**And when a solve reports a clean number while the picture is still wrong,
+suspect a LIMIT CONDITION IS BEING READ AS DATA.** Clipped, absent and
+out-of-frame all yield plausible numbers that are not measurements: a clipped
+height is a LOWER BOUND, not a height, and a body that drew nothing is not a
+body at an extreme. Distinguish "not drawn" from "clipped" explicitly — a
+measuring routine that conflates them will drive a solver confidently the wrong
+way and report success. See the 2026-08-13 rank-rig entry in the change log.
+
 **Run the test suite:** all six, none of which import each other — **five unit
 suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
 Where this file says "the five unit suites" it means these six minus the smoke
@@ -4506,6 +4514,50 @@ volumes are the wrong default for anything long and thin standing beside a body.
 
 **When a solid is borderline, let it TURN.** A detail that turns with the tower
 is a much smaller error than a prop split down the middle.
+
+---
+
+## `bands` — which frames are the walk, and which are a state pose
+
+A model may declare `bands: [[first, count], ...]`, one pair per band. **Band 0
+is the walk or default cycle**; any state bands follow it. The exporter emits it
+for **enemies and recruits**; it is deliberately absent on blubs, summoners and
+towers, whose layouts the exporter does not model.
+
+**ABSENT OR `null` MEANS "THE EXPORTER DID NOT DECLARE THIS MODEL'S LAYOUT",
+NOT "this model is unbanded", and the fallback is the whole frame list.** Those
+two readings are identical today and stop being identical the moment a family we
+do not emit for gets banded. Five of the twelve enemy and recruit models rely on
+the fallback right now — `enemy-normal`, `brute`, `flying`, `hive`, `swarm` —
+because they have not been re-exported since the field landed; the other seven
+declare an explicit `[[0, n]]` that means exactly the same thing.
+
+**A PAIR, NOT A LENGTH, and the reason is a defect this replaces.** Two
+incompatible arithmetics already coexist in `gl-world.js`: enemies index frame 0
+as a walk frame, while blubs and summoners reserve it as a rest pose and count
+from `frames.length - 1`. A bare cycle *length* cannot say which applies, and
+guessing wrong does not throw — it draws a plausible body on the wrong frame of
+the wrong band. A pair leaves the reader nothing to derive.
+
+**`GLModels.register` MUST COPY IT.** It builds its model object from an explicit
+field list, and when `bands` was missing from that list the field shipped on
+eight bodies while `m.bands` was `undefined` on every one of them. A reader
+written only in `gl-world.js` would have taken the absent-fallback thirteen
+times, changed nothing, and passed a null control perfectly. **Any new field on
+the model contract has to be added in two places or it is decoration.**
+
+**Acceptance for a change to the reader** is two gates, not one, because every
+band in the tree is currently `[[0, frames.length]]`: a **regression null**
+(as-shipped versus stripped versus explicit whole-list, bit-identical across
+every registered body — 12 × 3 bearings at worst 0 px) proves nothing broke, and
+a **synthetic positive** (a band that is not the whole list, injected at runtime,
+asserting the walk never presents the state pose) is the only thing that
+exercises the feature at all. The first alone passes a reader that ignores the
+field entirely.
+
+**`bands[n][0]` has no caller yet.** Nothing addresses a state band, so that path
+ships unexercised by real geometry until the first genuinely banded body lands.
+Do not expect a plant or a raise pose to animate on arrival.
 
 ---
 
