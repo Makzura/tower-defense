@@ -9,6 +9,22 @@
 # and I were describing one body and not two with identical measurements. Any
 # document about this body should carry all of the names it answers to.
 #
+# **AND A FIFTH NAME WAS A LIE FOR A DAY. `bill`/`bill_head` ARE NOW
+# `barrel`/`barrel_head`.** hugo's evidence, in his terms: **a billhook is a
+# curved hooked blade. This mesh is a straight square bar with a cube flush on
+# the end, carried horizontal.** The geometry never depicted the tool it was
+# named for, and the entire "clearing the verge" reading -- a maintenance
+# machine cutting back growth, which shaped the gesture, the palette argument
+# and two briefs -- lived in that name and in nothing else.
+#
+# **My own sentence, because it is the transferable half: three of us read a
+# part's NAME and believed we had read its GEOMETRY.** That is the reception
+# gate running in reverse. The gate asks whether a viewer can tell what a part
+# is FOR; here the authors could not, and were covered by a label that answered
+# for it. A part name is a claim about the mesh and it is never checked by
+# anything. When a reading of a body depends on one, go and look at the
+# vertices.
+#
 #   blender --background --factory-startup --python tools/blender/export_mesh.py \
 #           -- --only=enemy-angry
 #
@@ -80,7 +96,7 @@
 # 1. **AN UNKEYED GROUP ROOT IS NOT A GROUP.** `mast` is keyed to identity on
 #    every frame. That is not animation -- it is the only thing that MAKES it a
 #    group. `export_mesh._group_root` walks up to the nearest ancestor holding an
-#    ACTION, so an unkeyed empty is transparent to it: the drum, bill, head, core
+#    ACTION, so an unkeyed empty is transparent to it: the drum, barrel, head, core
 #    and hold would have exported inside `angry_body`, and the runtime would have
 #    had no `mast` group to override. The export succeeds, every count is
 #    correct, the walk is right, and the attack silently does nothing. The keys
@@ -177,7 +193,7 @@
 # so nothing in this pipeline looks at the pose the machine spends 0.4 s in
 # every 2.5 s. Measured by hand on the exported file, mast at 34 degrees:
 #
-#     bill tip                 rest x 0.524 z 0.783  ->  strike x 0.425 z 0.493
+#     barrel tip                 rest x 0.524 z 0.783  ->  strike x 0.425 z 0.493
 #     sign check               tip BELOW the drum centre line          OK
 #     rise over rest top       4.10 board px of the health bar's 10    (brief: 4.1)
 #     clearance under the bar  5.90 board px                           (brief: 5.9)
@@ -200,6 +216,49 @@
 # beside it, which is just the drum tipping. That is a geometric argument and
 # the honest instrument is a render. With juno; the standards question of
 # whether clause 8 reaches an unbaked pose is with rhea.
+#
+# **EVERY ANGLE AND DISTANCE BELOW IS A VERTEX TEST, WHICH MEANS THEY ARE ALL
+# THE OPTIMISTIC END. READ THIS BEFORE QUOTING ONE.** The sweep tests posed
+# VERTICES against the hub, not faces. Blender triangulates a cylinder cap from
+# its rim, so **the drum's bottom disc has no interior vertices at all** --
+# every one sits at r 0.2208, outside the hub's 0.1564 -- and a face sweeping
+# through the hub between them is invisible to the test.
+#
+# **The tell that proves the blind spot is the drum's own designed 0.005 u seat
+# on the hub: it does not fire at 0 degrees. Not because it is not there, but
+# because no vertex is.** A test that cannot see a contact you know exists has
+# a known blind spot in its clean results, and that is the state of every figure
+# in this block.
+#
+# So the true first contact is at or below each number here. Do not specify any
+# motion near one of them on this evidence: keep a margin, and prefer a route
+# whose margin is an order of magnitude rather than a degree. **The posed gate
+# this body is waiting on therefore has to be FACE-AWARE and not merely posed**,
+# which is a bigger job than "run the existing check with an override applied".
+#
+# **THE SURFACE IS NOT MONOTONIC. DO NOT INTERPOLATE BETWEEN THESE ROWS.**
+# Pitching the mast UP lifts the drum's rear underside out of the hub band, so
+# pitch BUYS the slide its travel instead of spending it:
+#
+#     pure slide, no pitch          first contact 0.055 u
+#     pitch 5 / 10 / 15 / 20 deg    free beyond 0.50 u
+#     pitch 25 deg                  blocked by the pitch alone
+#     upward rotation, no slide     first contact 23.5 deg
+#     downward rotation (the old stroke)  first contact 18.0 deg
+#
+# A proposed 6.5 deg was withdrawn for exactly this reason: it was the lowest
+# swept value plus a margin, and **a margin assumes monotonicity.** On this
+# surface it was simply an untested point that happened to sit above a tested
+# one. The shipped 10 deg is a row of the table, not a point between rows.
+#
+# **AND THE ERROR CLASS THAT NEARLY SHIPPED, WHICH IS THE MIRROR OF THE ABOVE
+# (mira's own naming of her own mistake, recorded because the next person will
+# make it in this file):** she measured that ROTATION dips the rim, and inferred
+# from that measurement that TRANSLATION was safe. **She treated the complement
+# of a measured constraint as though it were itself measured.** Nobody had swept
+# translation. A pure slide first-contacts at 0.055 u against a spec of 0.12 --
+# less than half. Measuring one direction tells you nothing whatsoever about the
+# other, and on a non-monotonic surface it does not even tell you the sign.
 #
 # SWEPT PER Z-SLICE AND PER PART, BECAUSE THE OBVIOUS FIXES ARE ALL WRONG:
 #
@@ -341,8 +400,8 @@ DRUM_Z = MAST_PIVOT_Z
 RIM_R, RIM_H = 0.255 * F, 0.054 * F
 
 # The tool.
-BILL_L, BILL_W, BILL_T = 0.350 * F, 0.076 * F, 0.065 * F
-BILL_TIP_X = 0.570 * F               # reach, from the machine's axis
+BARREL_L, BARREL_W, BARREL_T = 0.350 * F, 0.076 * F, 0.065 * F
+BARREL_TIP_X = 0.570 * F               # reach, from the machine's axis
 HEAD_L, HEAD_W, HEAD_T = 0.098 * F, 0.110 * F, 0.110 * F
 CORE_D, CORE_W, CORE_T = 0.054 * F, 0.098 * F, 0.098 * F
 
@@ -450,7 +509,7 @@ def build_drum(m, mast):
            mat=m["brass"], parent=mast, verts=16)
 
 
-def build_bill(m, mast):
+def build_barrel(m, mast):
     """The tool. It is what the frame was rebuilt around.
 
     FOR: below boss tier this is the only armed thing in the game, and this bar
@@ -462,13 +521,13 @@ def build_bill(m, mast):
 
     AND IT IS WHAT KEEPS THE TOOL'S LENGTH OUT OF THE HEALTH BAR. Carried
     horizontal at drum-centre height, the tip sits below the drum's top face --
-    so the DRUM sets `model.top` and the bill's length never enters the bar
+    so the DRUM sets `model.top` and the barrel's length never enters the bar
     height at all. The constraint that replaces the trade is one line, asserted
     below: the rest tip must stay at or below the drum's top face.
     """
-    inner_x = BILL_TIP_X - BILL_L
-    td.box("bill", (BILL_L, BILL_W, BILL_T),
-           location=(0.5 * (inner_x + BILL_TIP_X), 0.0, DRUM_Z),
+    inner_x = BARREL_TIP_X - BARREL_L
+    td.box("barrel", (BARREL_L, BARREL_W, BARREL_T),
+           location=(0.5 * (inner_x + BARREL_TIP_X), 0.0, DRUM_Z),
            mat=m["tin_dark"], parent=mast)
 
     # FOR: the working end -- the part that actually meets the growth.
@@ -478,8 +537,8 @@ def build_bill(m, mast):
     # figure. Same head, same read, and flush gives the approved plan back for
     # free. It is also the point the eye tracks through the whole stroke, and a
     # bar this thin without a lump on the end anti-aliases into a line.
-    td.box("bill_head", (HEAD_L, HEAD_W, HEAD_T),
-           location=(BILL_TIP_X - 0.5 * HEAD_L, 0.0, DRUM_Z),
+    td.box("barrel_head", (HEAD_L, HEAD_W, HEAD_T),
+           location=(BARREL_TIP_X - 0.5 * HEAD_L, 0.0, DRUM_Z),
            mat=m["tin"], parent=mast)
 
     # FOR: it is the battery -- the power the tool draws, mounted on the tool's
@@ -488,7 +547,7 @@ def build_bill(m, mast):
     # the tin it sits on, this is a reward for a player who zooms, not a read at
     # game scale. It is first on the drop list if anything ever has to go.
     td.box("core", (CORE_D, CORE_W, CORE_T),
-           location=(DRUM_R, 0.0, DRUM_Z - 0.5 * BILL_T - 0.5 * CORE_T),
+           location=(DRUM_R, 0.0, DRUM_Z - 0.5 * BARREL_T - 0.5 * CORE_T),
            mat=m["battery"], parent=mast)
 
 
@@ -667,8 +726,28 @@ def build():
 
     build_hub(m, body)
     build_drum(m, mast)
-    build_bill(m, mast)
-    build_hold(m, mast)
+    build_barrel(m, mast)
+    # THE HOLD IS NOT ON THE MAST, AND THAT IS A CLAUSE 8 CONSTRAINT ENFORCED BY
+    # STRUCTURE RATHER THAN BY AN ANGLE.
+    #
+    # It used to be `build_hold(m, mast)`. The strike is a live override on the
+    # `mast` group, so everything parented to the mast swings with the tool --
+    # and the hold swung into the legs. Measured on the composed pose:
+    # `hold`/`thigh_2` and `hold_plate_1`/`thigh_2` interpenetrate for real,
+    # from between 7 and 8 degrees of stroke upward, monotonically, with no
+    # clean angle above 7 degrees. No stroke angle fixed it because the moving
+    # part was the wrong part.
+    #
+    # Parented to `body` the hold joins the `angry_body` group: it still
+    # inherits bob and roll, and it CANNOT be rotated by the strike at any
+    # angle. The collision stops being small and becomes impossible.
+    #
+    # mira's call, and it is right independently of the collision: the hold is
+    # cargo, and cargo bolted to a chassis does not tilt when the tool strokes.
+    # Her own brief already records the hold as "inside the silhouette at every
+    # bearing... not counted as one of this body's reads", so removing its
+    # motion cannot cost a read it never had.
+    build_hold(m, body)
     legs = build_legs(m, body)
 
     # --- the checks that are cheap and would have cost an export ------------
@@ -681,7 +760,7 @@ def build():
         "the drum's top face is the figure's height by definition: %.6f vs %.6f"
         % (drum_top, F))
     assert DRUM_Z + 0.5 * HEAD_T <= drum_top + 1e-9, (
-        "the bill's rest tip must stay at or below the drum's top face, or the "
+        "the barrel's rest tip must stay at or below the drum's top face, or the "
         "TOOL sets model.top and its length starts moving the health bar")
     hold_top = HIP_Z - 0.5 * HUB_H
     assert hold_top <= HIP_Z - 0.5 * HUB_H + 1e-9, (
@@ -708,7 +787,7 @@ def animate_walk(body, mast, parts, frames=WALK_FRAMES):
 
     # `mast` IS KEYED TO IDENTITY, AND IT IS NOT ANIMATION. `_group_root` walks
     # up to the nearest ancestor holding an ACTION; an unkeyed empty is
-    # transparent to it, so without these keys the drum, bill and hold would be
+    # transparent to it, so without these keys the drum, barrel and hold would be
     # exported as part of `angry_body` and otto would have no group to override.
     # The keys are constant: the walk moves this group only through the body it
     # is parented to, which the exporter picks up because it writes each group's
