@@ -13,6 +13,46 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — CORRECTION: there was never a coverage gap in
+`check_group_gait.py`. "The boss shipped outside its own gate" was mine and it
+was wrong, and the error was `import` ⇒ `reaches`.**
+
+An entry below says the group-gait gate "did not cover the body we had just
+shipped", because `enemy_tyrant` was absent from its `BODIES` list. **The
+premise is false.** `enemy_tyrant` and `enemy_vanguard` import the chassis and
+**call neither** `animate_walk_grouped` nor the `animate_walk` wrapper that
+reaches it — each defines its own `animate_walk` and says so
+(`enemy_tyrant.py:971`, `enemy_vanguard.py:656`). Verified by counting the call
+sites: **eight callers**, `cooper`, `courier`, `dray`, `drudge`, `hedger`,
+`skimmer`, `tender`, `tun` — and **two importers that never call**, the two
+bosses. The original hand-maintained list had covered every real gait user all
+along.
+
+**The harness perturbs a line and propagates by CALL; the recipe in the comment
+selected by IMPORT.** Those are different properties, and I derived the wrong
+one while writing a change whose whole point was that a derivation beats a
+literal. The derivation was right as a principle and measured the wrong thing.
+
+**The error's direction is worth being exact about: it made the covered set too
+LARGE, never too small.** No body was ever hidden. What it did was manufacture
+two zeros that no code explained and then present them as coverage — which is
+worse than an obvious gap, because the file's own standard is that **every zero
+must be explained by code, not by story**, and unexplained zeros are what a
+blind harness looks like.
+
+**What stands from that commit** — the coverage line printed first and
+unconditionally on every run, and the anchor guard — is unaffected and still
+worth having: a gate that reports its scope only when it fails lets a shrinking
+scope pass as a clean run. **What does not stand is the justification.** The
+file has since been corrected in place and now records the import-versus-call
+mismatch directly; no further change is needed there.
+
+**And the same shape, one level up, in prose about the code rather than in the
+code**: a count of "three callers" of the shared gait was circulated and the
+real number is eight. The code was accurate throughout and the sentences about
+it were not — which is precisely the failure the original commit was correcting
+in a comment.
+
 **2026-08-14 — CORRECTION: 17° does not comply. It is a real, declared, open
 clause 8 violation, and the sentence saying otherwise was mine.**
 
