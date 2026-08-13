@@ -209,9 +209,35 @@
 #   half the hub's radius, and it then falls away from the leg hips at 0.1564 --
 #   so the legs would meet nothing. The cone seat is not the cheap lever it
 #   looks like.
-# - **THE ONLY CHEAP LEVER IS THE STROKE ANGLE.** First contact is at 18 deg, so
-#   anything at or under 17 is clean by construction. 34 is the measured knee and
-#   was kept; the cost of 20 is about a third of the read.
+# - **THE ONLY LEVER IS THE STROKE ANGLE, AND IT IS CHEAPER THAN THE BRIEF
+#   SAYS.** First contact is at 18 deg, so anything at or under 17 is clean by
+#   construction. The brief prices 20 deg at "about a third of the read" and
+#   declines it; that figure was taken before the excursion was known and never
+#   measured across bearings. Re-measured at the built +-0.1874, banded:
+#
+#       bearing  road%   34 deg   17 deg
+#          0     60.2%   7.41x    4.27x
+#         45     13.4%   5.77x    3.86x
+#         90      4.5%   4.24x    2.45x
+#        180      6.9%   7.13x    4.13x
+#        315     13.2%   2.70x    2.72x
+#        270      1.7%   0.96x    0.97x   <- fails at BOTH angles
+#
+#   **17 deg costs no bearing.** Every bearing carrying road still reads, at
+#   2.45x to 4.27x, and the road that fails is the same 1.7% that already fails
+#   at 34. What it costs is 42% of the silhouette change at the dominant bearing
+#   (71.7 px to 41.3) and half the tip drop (6.0 to 3.1 screen px).
+#
+#   Read that table DOWN a column, not ACROSS a row: the band is the mast's own
+#   projected rows, so a smaller stroke shrinks the denominator with it. 315
+#   appearing to improve at 17 deg is that artefact, not a gain.
+#
+# 34 IS KEPT. It is the measured knee, the intrusion does not start until 18 deg
+# -- the top 47% of a linear ramp on a gesture that is 2.4% of a body's life, so
+# roughly 1.1% of its time on screen -- and the defence of the overlap is that it
+# never reaches the outline. **If that defence fails, 17 deg is a real option and
+# not a mutilation**, and it is the one to take before redesigning the hub-drum
+# joint.
 
 import math
 import os
