@@ -482,11 +482,61 @@ highlights. I made that mistake first and the table below is the corrected one.
 calibration later. He re-derived the arithmetic independently and confirmed that
 contrast ratio, not luminance gap, is the right instrument.
 
+> **⚠ THESE BANDS ARE PROVISIONAL IN RENDERED UNITS. They were reasoned about
+> ALBEDO and they do not transfer.** mira's overrule of kaz, 2026-08-13, and her
+> own first rendered pair proves it: **`tin` bar on `tin` hip — identical
+> material, zero albedo difference — renders at 1.25–1.40.** The table then says
+> that pair "separates only across a long, roughly straight boundary", and a bar
+> lying across a hip **is** a long straight boundary — so the bands, applied to
+> rendered numbers, declare an identical-material pair legible. **That pair
+> merging is the defect the whole crank investigation started from.**
+>
+> This section's own header always said the bands were *"flagged for screen-pixel
+> calibration later"*. **That calibration was never done. Do not read
+> "compute on rendered pixels" and "use these thresholds" as compatible until it
+> is.**
+>
+> **One end of the calibration now exists: rendered 1.25–1.40 = identical
+> material = provably does not read.** The other end is owed — one pair the team
+> agrees DOES read, measured rendered. mira nominates the Siphon's
+> `cloth_worn → ochre_cloth` (palette 1.67), which section 5 already calls the
+> largest legible material change on path A.
+
 | CR between two adjacent parts | what happens at this size |
 |---|---|
 | **under 1.25** | they are the same value. They merge into one shape. |
 | **1.25 – 1.6** | separates only across a long, roughly straight boundary |
 | **over 2.0** | reads as two things anywhere, including across a jagged 3 px edge |
+
+> **RENDERED CR IS A RANGE, AND A MATERIAL IS JUDGED ON ITS WORST FRAME — NEVER
+> ITS MEDIAN.** `gl-renderer.js` sets `keyDir` once and uploads it as a
+> **world-space** uniform, so **the key does not rotate with the body.** As an
+> enemy yaws along its path and a part turns through its cycle, that part's
+> normals sweep under a stationary light: **rendered CR varies by frame and by
+> bearing by construction**, and the spread is the signal, not noise.
+>
+> **A part that separates on eight frames of twelve and merges on four
+> disappears twice a second, and a median hides exactly that.** Quote the range.
+>
+> Worked example: brass renders **1.30–1.88** against the hip, and **its low end
+> sits inside the identical-material range of 1.25–1.40** — so at its worst
+> frames the brass bar is as separated from the hip as the tin bar was, which is
+> to say not at all.
+
+> **AND DO NOT OVER-READ THE RETRACTION: ALBEDO IS STILL THE ONLY LEVER A BRIEF
+> HAS.** The tin-on-tin 1.25–1.40 is manufactured entirely by normals, and
+> **normals move.** Shading-derived contrast is not stable across frames or
+> bearings; **albedo-derived contrast is the only component present in every
+> frame at every bearing.** Nobody can brief a normal. So material choice matters
+> *more* than before, not less — it is the only part of the rendered ratio that
+> does not flicker. What changed is that the palette number no longer *predicts*
+> the rendered one: it shortlists, and never decides.
+>
+> **If a part still does not read, the fix is GEOMETRY before palette.** Reaching
+> for a brighter material picks a value on the broken instrument. Moving the part
+> so its neighbour is *road* rather than *body* gives it both a darker neighbour
+> and the unoccluded status section 3's gate requires. **Placement beats
+> palette** — the same conclusion the occlusion term reaches from the other side.
 
 > **THE TABLE IS EXACTLY RIGHT FOR ENEMIES AND UNDERSTATES CONTRAST ON TOWERS —
 > because EMISSION IS INERT ON EVERY GROUND ENEMY.** Verified in the shader
