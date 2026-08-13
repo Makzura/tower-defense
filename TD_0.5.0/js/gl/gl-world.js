@@ -1264,9 +1264,13 @@ var World3D = (function () {
           // Marching recruits walk; a holding one stands still and shoots,
           // which is the whole design of the unit.
           var rm = GLModels.get(renderer, recruitModel(rc));
-          var rFrames = rm && rm.frames.length ? rm.frames.length : 1;
-          var rFrame = rc.holding ? 0
-            : Math.floor((rc.progress || 0) / 26 * rFrames);
+          // Same band contract as the enemy walk below. A holding recruit
+          // stands on the FIRST frame of its walk band rather than on literal
+          // frame 0 -- identical while every band starts at 0, and correct if
+          // one ever does not.
+          var rBand = walkBand(rm);
+          var rFrame = rc.holding ? rBand[0]
+            : bandFrame(rBand, (rc.progress || 0) / 26);
           drawActor(recruitModel(rc), rc.x, rc.y, rc.facing, 1,
             groundHeightAt(rc.x, rc.y), rFrame, recruitPose(rc));
         }
@@ -1354,11 +1358,16 @@ var World3D = (function () {
         //
         // A FLIER IS THE EXCEPTION, and the only one: see HOVER_HZ above for
         // why a wingbeat is the one cycle distance cannot drive.
+        //
+        // WHICH frames are the walk comes from the model's `bands`, never from
+        // arithmetic on `frames.length` -- see walkBand. Frame counts are not
+        // uniform even inside the enemy family (8 on nine bodies, 12 on `angry`
+        // and `flying`), so any constant here would already be wrong twice.
         var em = GLModels.get(renderer, model);
-        var frames = em && em.frames.length ? em.frames.length : 1;
+        var eBand = walkBand(em);
         var walk = e.isFlying
-          ? Math.floor(boardClock * HOVER_HZ * frames)
-          : Math.floor((e.progress || 0) / stride * frames);
+          ? bandFrame(eBand, boardClock * HOVER_HZ)
+          : bandFrame(eBand, (e.progress || 0) / stride);
         if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
         drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk);
         // Put it back. setGlow is state, not an argument, so a flier that left
@@ -1511,6 +1520,49 @@ var World3D = (function () {
     GLMath.localPose(tiltMat, tiltPivot, tilt.rx || 0, tilt.ry || 0, 0,
       0, 0, 0);
     return GLMath.multiply(out, tiltBase, tiltMat);
+  }
+
+  // WHICH FRAMES ARE THE WALK, asked of the model rather than worked out.
+  //
+  // Returns `[first, count]` for band 0 -- the walk or default cycle. The whole
+  // point of the exported `bands` field is that a reader NEVER derives a band
+  // count: every off-by-one this replaces came from readers doing arithmetic on
+  // `frames.length`, and two incompatible conventions already live in this file
+  // (enemies treat frame 0 as a walk frame; blubs and summoners reserve it as a
+  // rest pose and count from `frames.length - 1`). If anything here ever starts
+  // dividing, the contract has been misread.
+  //
+  // ABSENT MEANS "THE EXPORTER DID NOT DECLARE THIS LAYOUT", NOT "unbanded".
+  // Identical today -- five bodies carry no `bands`, including `enemy-normal`
+  // and the flier, and on every one of them the whole list really is the walk.
+  // They stop being identical the moment a family the exporter does not emit
+  // for gets banded, which is why the fallback is written as a default rather
+  // than as a claim about the model.
+  // VALIDATED, NOT TRUSTED. A malformed `bands` falls back to the default, so a
+  // bad value is never worse than an omitted one -- which matters because the
+  // field is generated, and a generator that emits a wrong pair would otherwise
+  // index frames that do not exist and throw inside drawActor rather than draw
+  // the wrong pose. Every pair must lie inside the frame list.
+  function walkBand(m) {
+    var n = (m && m.frames.length) ? m.frames.length : 1;
+    var b = m && m.bands;
+    if (b && b.length && b[0] && b[0].length === 2) {
+      var first = b[0][0], count = b[0][1];
+      if (typeof first === "number" && typeof count === "number" &&
+          first >= 0 && count > 0 && first + count <= n) {
+        return b[0];
+      }
+    }
+    return [0, n];
+  }
+
+  // A drive value -- cycles completed -- reduced into a band. Non-negative by
+  // construction here (`progress` and `boardClock` never go below zero), so the
+  // single `%` is enough and matches what drawActor's own reduction did to the
+  // unbounded index this replaces. That is what makes the absent case
+  // bit-identical rather than merely equivalent.
+  function bandFrame(band, drive) {
+    return band[0] + (Math.floor(drive * band[1]) % band[1]);
   }
 
   function drawActor(model, x, y, yaw, scale, lift, frame, overrides, tilt) {

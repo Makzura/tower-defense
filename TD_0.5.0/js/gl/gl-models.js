@@ -40,6 +40,26 @@ var GLModels = (function () {
       // Rifleman's four-frame bolt cycle against 2 KB for this.
       groups: data.groups || [],
       frames: data.frames || [],
+      // WHICH FRAMES ARE WHICH, when the exporter has said so.
+      //
+      // `[[first, count], ...]`, one pair per band; band 0 is the walk or
+      // default cycle and any state bands follow it. A PAIR rather than a
+      // length, so a reader never derives anything -- the whole class of
+      // off-by-one this replaces came from readers computing band counts, and
+      // two incompatible arithmetics already coexist in gl-world.js (enemies
+      // index frame 0 as a walk frame; blubs and summoners reserve it as a rest
+      // pose and count from `frames.length - 1`).
+      //
+      // ABSENT MEANS "THE EXPORTER DID NOT DECLARE THIS MODEL'S LAYOUT", NOT
+      // "this model is unbanded". They are the same thing today and stop being
+      // the same the moment a family the exporter does not emit for gets
+      // banded. The documented fallback is the whole frame list.
+      //
+      // This line is load-bearing and was missing: the field shipped on eight
+      // models and `register` did not copy it, so `m.bands` was undefined
+      // everywhere and any reader would have silently taken the fallback on
+      // every body while appearing to work.
+      bands: data.bands || null,
       expanded: null,
       gpu: null
     };
