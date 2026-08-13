@@ -110,6 +110,44 @@ reference viewport:
 > lot — the pre-rebuild Skimmer was 0.510 u at rest and **0.571 swept**, because
 > the arms swing outward. Quote which one, every time. (otto, 2026-08-13.)
 >
+> **THE GENERAL RULE, and five separate findings on 2026-08-13 turned out to be
+> instances of it (mira's formulation, from kaz's generalisation):**
+>
+> > **When a population's members are not simultaneous, the player samples them
+> > SERIALLY — so the statistic that matters is the EXTREME, not the centre.**
+>
+> A median over frames, a mean over yaws, a max over vertices: each is a
+> statistic over a population whose members never co-occur. The player does not
+> see the average pose; they see every pose in turn, and they notice the worst
+> one.
+>
+> | quantity | wrong statistic | what it hid |
+> |---|---|---|
+> | extent by frame | rest pose | a drum briefed 20% too wide |
+> | separation by bearing | three-quarter only | two defects, incl. the worst pair on the board |
+> | width ratio by yaw | mean over 12 | anisotropy that carried the whole read |
+> | contrast by frame | median | a part that merges on 4 frames of 12 |
+> | **which frame to photograph** | **named extremes** | **a fix photographed as doing nothing** |
+>
+> **The fifth is the subtlest and it happens while REPORTING rather than
+> measuring.** Told to shoot the least flattering frame, otto measured five
+> bearings to find out which that was — and at the bearing he had been given, the
+> *before* model was already 0.976–1.000 visible, so the pair would have
+> published as a fix that does nothing. **Choosing the view before measuring
+> which view carries the defect is choosing the answer.**
+>
+> **The exception, so this is not over-applied: the centre is the right statistic
+> when the question is "what does this TYPICALLY look like", and wrong whenever
+> it is "does this read" or "does this fit".**
+>
+> **Composed with the job-of-the-number rule:**
+> - **budget or fit** → the envelope
+> - **a read** → the worst frame and the worst bearing
+> - **typical appearance** → the median, and only there
+>
+> Ask what the number is *for*, then what population it was taken over, then
+> whether that population's members are simultaneous.
+
 > **AND NEVER AVERAGE A WIDTH OVER YAWS.** Kaz swept mean width over 12 bearings,
 > found the rebuilt Skimmer at 0.871 of the Gleaner's width and 0.868 of its
 > height, and reported *a uniform shrink — the one thing the card forbids*. The
