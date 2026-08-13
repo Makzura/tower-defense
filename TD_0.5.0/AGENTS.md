@@ -544,6 +544,14 @@ tools/measure-starter-kit.js         does the STARTER kit still lose? Added
                                       first time, which is the premise the
                                       whole meta-progression loop rests on
                                       (not loaded by the game or the suite)
+                                      ** PROVENANCE VOID as of 2026-08-12:
+                                      lines 63-67 rebuild BUILD_SLOTS around
+                                      g.Tower, the gunner deleted 2026-07-30,
+                                      so it measures a roster that no longer
+                                      exists. Its output is not evidence about
+                                      the shipping game. NOT re-run and NOT
+                                      repaired here -- that is unauthorised
+                                      new work, with vera. **
 
 -- superseded, safe to delete (see the banner in the HTML):
 long-range-dps-debug.html            old static test bench, replaced by sandbox.html
@@ -1871,6 +1879,22 @@ Sniper has no detection and "corrects" a sentence that is right.
 answer is that **the loop survives, for a new reason**. Scripted play, starter
 bar only, best build order found by sweeping:
 
+> **PROVENANCE VOID, CONCLUSION INTACT (2026-08-12).** The tool that produced
+> the table below is pegged to the deleted gunner — `tools/measure-starter-kit.js`
+> lines 63-67 rebuild `BUILD_SLOTS` around `g.Tower`, removed 2026-07-30 — so
+> **the figures are no longer sourced to a live instrument.** What survives is
+> the *finding*: the starter bar loses on every route, and it loses for a
+> different reason than it used to. That conclusion is the load-bearing part
+> and nothing here contradicts it.
+>
+> **The wave number is genuinely unknown and is being left that way.** Three
+> sources disagree — `js/meta.js:283` says "somewhere around wave 17
+> (measured — see AGENTS.md)", the table below says w19-w20, and the dead tool
+> now reports 11. **Do not reconcile them by picking one.** 11 is the dead
+> tool's output; 17 traces to a single route (`null-meridian`) of the v0.4.5
+> table further down, which is superseded. Re-measuring is unauthorised new
+> work and sits with vera.
+
 | policy | rune-circuit | mana-coil | sigil-lattice | null-meridian |
 |---|---|---|---|---|
 | gunners + smashers (the old kit) | loss w19 | loss w20 | loss w19 | loss w19 |
@@ -2152,6 +2176,23 @@ on an Enemy is the same idea at the instance level.
    override but would not survive a retune of either field. Across the whole
    schedule the ratio is 0.905, and per type it runs 0.4545 (`colossus`) to
    1.5 (`fast`, `camo_fast`, `camo_heavy`).
+
+   **The denominator is EFFECTIVE HP — what you must actually remove — and
+   naming it is load-bearing.** 0.905 is `23 503 / 25 969`; against *declared*
+   health the same figure would be 0.9847, so the two readings are not
+   interchangeable. Every per-type number above is bounty over effective HP
+   too. Measured across all 21 types on 2026-08-12.
+
+   The trap this closes, because it has already been reported as a defect
+   once: **`shielded` reads 20/12 = 1.6667 against declared health and
+   20/36 = 0.5556 against effective**, because a Bulwark carries 24 shield on
+   12 health and the shield pays nothing. Under the declared reading it looks
+   like the top of the range; under the one this passage actually uses it is
+   near the bottom, and 1.6667 is a number no player can ever realise, since
+   the 12 cannot be removed without the 36. `revenant` splits the same way
+   (1.25 declared, 0.625 effective). Every other type is identical under both,
+   which is why the mismatch stayed invisible. **Do not "correct" the range to
+   1.6667** — that would contradict the 0.905 three lines above it.
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
    removes more health than the schedule names while earning exactly the
@@ -2840,6 +2881,31 @@ other at one body size. Both are now derived — `radiusPx() + 4` and
 original radius of 11 they are still exactly 15 and 20. Everything that needs
 the sprite's extent (body, rings, hit test, health bar, hover readout) reads
 `radiusPx()`.
+
+**But `radiusPx()` is the GAMEPLAY extent, and on the 3D board it is NOT the
+drawn body.** It is the hit test, the frost and camo rings (`radiusPx() + 4`),
+the hover ring (`radiusPx() + 9`), the health-bar fallback — and, on the 2D
+renderer, the body itself, which really is drawn `2 × radiusPx()` across
+(`ctx.ellipse(x, bodyY, radius, radius * 0.96)`). On the shipping GL renderer
+the body is a mesh: `drawActor` is handed `radiusPx() / 11` as its scale, so
+`radiusPx()` still *scales* the mesh, but the mesh's drawn extent is `its own
+extent in Blender units × unitsToPx × radiusPx() / 11`. **How much of its own
+circle a body fills is therefore authored into the model, not derived from the
+type** — measured across the shipped roster on 2026-08-13 it runs from 0.72
+(`enemy-normal` at rest, 0.86 at the stride extremes) to 1.57 (`enemy-brute`)
+and 2.14 (`enemy-hive`).
+
+Two ways this has already been got wrong, both on 2026-08-13, and both worth the
+warning:
+
+- **Do not quote it as a constant.** "An enemy is 22 px across" is the `normal`
+  value and every other type scales it; a per-type quantity written as a
+  constant is half of how nineteen design cards came to be sized against a body
+  twice the real width. Write `2 × radiusPx()`.
+- **Do not check anything against the bare circle.** A check built against
+  `radiusPx()` rather than the ring radii reported four of five meshed enemies
+  as overhanging their own rings; with the pads named, only two are. The
+  bare-circle reading produces a very convincing false alarm.
 
 A wave says how many and how often, **never how tough** — health comes from
 the type, unless the wave carries a `health` override (waves 17–31 do, bar the brutes at 18). An
@@ -3966,8 +4032,13 @@ It is a **90-coin purchase** in `js/meta.js`, not part of the opening kit. That
 was a decision, not an omission: `starter: true` would put a tower producing
 free damage forever into the starting hand, and *a fresh profile cannot win* is
 the premise the whole meta loop rests on — the one `tools/measure-starter-kit.js`
-exists to keep checking. If the owner wants it in the opening hand it is one
-field plus a re-run of that tool.
+exists to keep checking. **That tool's provenance is void** — it is pegged to
+the gunner deleted 2026-07-30; see the file map and the Balance math section —
+so right now **nothing live is checking this premise.** The premise stands as a
+design decision; what has lapsed is the instrument that verified it. If the
+owner wants it in the opening hand it is one field plus a re-run, and the
+re-run needs the tool repaired first — unauthorised work sitting with vera,
+not a step to take in passing.
 
 **It fills the fifth build slot**, which had been empty since the gunner was
 deleted. The bar is now genuinely full, and a sixth type needs a decision about
@@ -4222,6 +4293,79 @@ a frame is one 4×4 per group. Four frames of the Rifleman's bolt cycle is about
 up from each mesh to its nearest animated ancestor, so a rig that gains a moving
 part exports correctly with no table to update.
 
+**3b. The REST frame must be the model's tallest — or everything drawn ABOVE the
+model gets drawn INSIDE it.**
+
+Clause 3 stores each animated group's geometry in its group root's local space
+and poses it with a per-frame 4×4. `GLModels.expand` (`js/gl/gl-models.js`) sets
+`model.top` from the largest **raw** z in that stored geometry, *before* any
+frame transform is applied — despite the comment above it, which claims the
+model's real top. `crownOf` (`js/gl/gl-world.js`) then places the health bar,
+the hover readout and the occluder capsule at that height plus 10 board px. So a
+group root whose rest frame *lifts* its geometry makes the model under-report
+its own height by exactly that lift, and the readouts land inside the mesh.
+
+Clause 6 governs where the ORIGIN sits. This governs the animated group ROOT,
+which is a different node and a different failure: a model can satisfy 6
+perfectly — flush foundation, feet at z = 0 — and still bury its own health bar
+the moment it is rigged.
+
+**The condition**, for every animated group `g`, with `R` the model's rest
+frame:
+
+    (max z of frames[R][g] · v  −  model.top) × unitsToPx × scale  ≤  10
+
+`scale` is the actor's own — `radiusPx() / 11`, which is the type's `sizeScale`,
+for an enemy; 1 for a tower. Whatever the left-hand side exceeds 10 by is how
+many board pixels the health bar is drawn *inside* the body.
+
+**The gate is `tools/check-model-top.js`.** It reads the exported model data and
+needs no browser and no runtime. Run bare it covers the enemies, and three of the
+five fail it today. **Read `--all` with care: it sweeps EVERY frame, which is
+stricter than this clause**, so it reports nine — and four of those nine
+(`warbringer-a4`, `-a5`, `blub-superb`, `sniper-b3`) are clear at rest and are
+only over the line mid-swing, which this clause allows. The bare enemy run and
+the rest-frame condition happen to agree today because no enemy rises above its
+own rest pose.
+
+Three things about the condition, each of which has already caught someone:
+
+- **The REST frame, not the worst frame.** A Warbringer's A5 hammer stands 25
+  board px higher mid-swing than at rest; pinning the bar to the swing would
+  leave it hanging in empty air in the pose the tower holds most of the time.
+  The contract is about the pose the actor is usually in, and "the model's true
+  top" is ambiguous for anything that swings.
+- **The scale term.** The same rig passes on a small type and fails on a large
+  one, because the error is multiplied by `sizeScale` and the 10 px of headroom
+  is not.
+- **It is not an enemy problem.** Towers reach the same code through
+  `towerCrown` at scale 1 and are affected in exactly the same way.
+
+**How to meet it, and this is the form the five Easy bodies are built to:** the
+animated group root that owns the topmost geometry sits at **z = 0 with identity
+rotation at frame 1**. Its local space is then world space, the raw maximum z is
+the true maximum z, and the defect cannot occur — by construction rather than by
+margin, which is the difference between a rule and a tolerance. Limb roots stay
+at their joints; a limb hangs down and never owns the top.
+
+**The root's position is not the proof, though.** That root still translates for
+the walk bob, so quote the margin from `tools/check-model-top.js`, which sweeps
+every frame, and never from the root's own z.
+
+**The worked example, chosen because it has no hidden multiplier.**
+`enemy-normal` carries 0.620 u of group-root lift; × 31.8032 `unitsToPx` ×
+`sizeScale` 1 = 19.72 board px, against 10 px of headroom. Its health bar is
+therefore drawn 9.7 px inside its own body.
+
+**As of 2026-08-13 the runtime side is NOT repaired, and this clause is the
+model-side contract that holds until it is.** Teaching `model.top` to read
+rest-frame posed geometry belongs to the rendering division, is not authorised,
+and is gated on a measurement: `crownOf` also feeds `bodyTopOf` and the Siphon
+occluder capsules, so making a body taller makes its occluder taller, and
+over-occlusion photographs as success. The models that predate this clause, and
+by how much each misses, are listed in the CHANGELOG entries for 2026-08-13 —
+a dated reading, which is why it is recorded there and not here.
+
 **4. Every accent seat must be bit-identical across frames.**
 
 `make_preview.py --validate-riflemen` asserts it. If a hat, a badge or a muzzle
@@ -4261,8 +4405,11 @@ belongs OFF the centreline. On the model's own axis it will pass through the
 torso in some pose, whatever the numbers say.
 
 **Checks before calling a model done:** `--validate-riflemen` (or its
-equivalent) passes; `--frame-riflemen` reports the ortho actually used; the
-model loads in `index.html` with no console errors; and, for anything with a
+equivalent) passes; `--frame-riflemen` reports the ortho actually used;
+`tools/check-model-top.js` passes (clause 3b) and `tools/check-model-tags.js`
+passes — a model with no `<script>` tag throws nothing, draws as the fallback
+sphere and keeps all six suites green, so nothing else can see it; the model
+loads in `index.html` with no console errors; and, for anything with a
 foundation, BOTH halves of the map-fixed check below.
 
 **The map-fixed check has two halves, and one of them cannot be automated.**
@@ -4438,7 +4585,7 @@ no mechanic was moved to match the description.
 | Default enemy HP | 4 | `Enemy.BASE_HEALTH` |
 | Enemy speed | 50 u.l./s (~37 s crossing) | `Enemy.BASE_SPEED_ULPS` |
 | Enemy lane spread | ±7 u.l. off the centreline, deterministic hash | `Enemy.LANE_SPREAD_UL`, `Enemy.laneOffsetFor` |
-| Enemy sprite radius | 11 px × the type's `sizeScale` — swarm 0.55 is the smallest, boss 2.4 the largest, and a type that declares none counts as 1. A fractal split multiplies again by its own `fractalSizeScale` | `Enemy.RADIUS_PX`, `Enemy.prototype.radiusPx` |
+| Enemy gameplay radius | 11 px × the type's `sizeScale` — swarm 0.55 is the smallest, boss 2.4 the largest, and a type that declares none counts as 1. A fractal split multiplies again by its own `fractalSizeScale`. This is the hit test, the rings and the 2D body; on the 3D board it scales the mesh but is not the mesh's drawn extent — see the sprite-extent note in Enemies | `Enemy.RADIUS_PX`, `Enemy.prototype.radiusPx` |
 | Camo detection | Arcane Sniper **A1** (not B — see the naming section), Siphon B1, **Rifleman B3** — nothing else has it | `seesCamo` |
 | Flying eligibility | fail-closed: Arcane Sniper at base and Siphon A4 can target flyers; flat towers cannot unless `seesFlying` is explicit | `Targeting.sees`, `RangeFilter.canTarget` |
 | Defence pierce (flat) | Rifleman B4 only: 10 percentage points off `defense`, clamped at 0 so it is never a damage bonus. Nothing pierces flat armor | `Mitigation.mitigate`'s 4th argument |

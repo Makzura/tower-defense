@@ -13,6 +13,160 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — model contract clause 3b, the rest-frame rule, written into
+`AGENTS.md`. The `radiusPx()` extent distinction. And the three passages held
+uncommitted since 2026-08-12, finally landed.**
+
+**The owed clause is paid.** The entry below records the group-root invariant
+and states, correctly, that the `AGENTS.md` clause for it was owed and could not
+be written because the file held another division's uncommitted work. That
+blocker was mine and it is cleared in this commit — see the third section. The
+clause is now **3b**, placed immediately after clause 3 rather than inside
+clause 6: clause 3 is what introduces the group root, and clause 6 governs the
+model ORIGIN, which is a different node. A model can satisfy 6 perfectly — flush
+foundation, feet at z = 0 — and still bury its own health bar the moment it is
+rigged. The clause carries the constructive rule (topmost group root at z = 0,
+identity rotation at frame 1), the inequality a model must satisfy, the gate
+that checks it, and the caution that the root's own z is not the proof because
+it translates for the walk bob.
+
+**THE DEFECT IS NOT ENEMY-ONLY, AND A CLAUSE THAT SAID SO WOULD HAVE BEEN TRUE
+AND STILL MISLEADING.** Towers reach the same code through `towerCrown` at scale
+1. Swept across all 101 registered models, mirroring `drawActor` including the
+two ranges it draws with `fixedMat` and no pose: **33 under-report by ≥ 0.5
+board px**, and `recruit-b4` *over*-reports by 0.19. Under the rest-frame rule
+exactly **five** models are over the line today — `enemy-brute` 27.2 px inside,
+`enemy-hive` 25.1, `enemy-normal` 9.7, `warbringer-a3` 2.5, `warbringer-base`
+0.8. Everything else clears at rest, `enemy-swarm` by 3.5 and `enemy-flying` by
+4.9 (2.3 at its tallest frame, and the flier's bob cancels exactly rather than
+approximately, because `enemyCrown` and `drawEnemies` call the same
+`flightLift(e, radius)` inside one `draw()`).
+
+**Why REST frame and not worst frame, which is the whole substance of the
+decision.** `warbringer-a5` and `-a4` are 25.3 and 24.1 board px under at their
+worst frame and **0 at rest** — that height is the hammer mid-swing. A
+max-over-frames rule would anchor the A5's health bar 25 px into empty air in
+the pose the tower holds most of the time. "The model's true top" is ambiguous
+for anything that swings, and the clause says *rest frame* in those words for
+that reason.
+
+**Which makes `tools/check-model-top.js --all` stricter than the clause it
+gates, and the clause now says so.** It sweeps every frame, so it reports nine
+models rather than five; the four extra — `warbringer-a4`, `-a5`, `blub-superb`,
+`sniper-b3` — are clear at rest and over the line only mid-swing. Run bare, on
+the enemies, it agrees with the clause exactly, because no enemy rises above its
+own rest pose. Reported to the tool's owner rather than changed here; a gate that
+is too strict in a mode nobody runs by default is a footnote, not a defect, but
+it would have produced four confident false failures the first time someone
+audited the towers.
+
+**A correction to the figures on record, and the cause is worth more than the
+numbers.** The depth-inside figures carried since 2026-08-12 were `enemy-brute`
+29.7 and `enemy-hive` 36.1. They are wrong. 29.7 is `24.81 × 1.6` and 36.1 is
+`21.94 × 2.1` — brute scaled by hive's `sizeScale` and hive by the colossus's,
+one row out in the `sizeScale` column. The models had not moved (`enemy-brute.js`
+and `enemy-hive.js` last changed in `e3bd3f4`, and `git log -S'sizeScale: 1.5'`
+on `js/enemy.js` returns only `e3bd3f4`), so this was never a measurement error.
+`enemy-normal` 9.7 and `enemy-swarm` 3.5 reproduced exactly from the same
+derivation, which is what proved the model of `crownOf` right and localised the
+fault to those two rows. Four independent routes now agree on the corrected set:
+a posed sweep of the runtime data, vertex geometry, the Blender rig's body-root
+heights, and `crownOf` re-derived from source.
+
+**The runtime is NOT repaired and the clause does not claim it is.** Teaching
+`model.top` to read rest-frame posed geometry is gated on an occlusion
+measurement: `crownOf` also feeds `bodyTopOf` and the Siphon occluder capsules,
+so making a body taller makes its occluder taller, and over-occlusion
+photographs as success. It lands as its own commit after the five new models.
+
+---
+
+**`radiusPx()` IS THE GAMEPLAY EXTENT, AND ON THE 3D BOARD IT IS NOT THE DRAWN
+BODY.** The sprite-extent paragraph in Enemies now says so, and the current
+values row is renamed from "Enemy sprite radius" to "Enemy gameplay radius".
+Same conflation, same day, as the one that sized nineteen design cards against a
+body twice the real width.
+
+What is true, and it is a proportion rather than an absence of relation:
+`radiusPx()` **does** scale the mesh — `drawActor` is handed `radiusPx() / 11` —
+but the mesh's drawn extent is `its own extent in Blender units × unitsToPx ×
+radiusPx() / 11`. **How much of its own circle a body fills is authored into the
+model, not derived from the type**, and across the shipped roster it runs 0.72
+(`enemy-normal` at rest, 0.86 at the stride extremes) to 1.57 (`enemy-brute`) to
+2.14 (`enemy-hive`). Writing that the two are *unrelated* would have been the
+opposite error and was rejected: a reader would conclude they can be reasoned
+about separately, and they cannot.
+
+**What was NOT changed, because it is right.** On the 2D renderer the body
+really is drawn `2 × radiusPx()` across — `ctx.ellipse(x, bodyY, radius, radius
+* 0.96)` — so "an enemy is 22 px across" was true when it was written and is
+still true there. `js/bullet.js:258` ("the shot teleported clean over 22 px-wide
+bodies") is about collision, which tests the gameplay circle, and is correct as
+written. The sprite-versus-road passage in Enemies is also correct: `ROAD_WIDTH_UL`
+21.875 × `UNIT_LENGTH` 1.04 = 22.75 px, and the overhang conclusion survives at
+the real drawn widths. Two things are wrong about the phrasing rather than the
+number — it is quoted as a **constant** when 22 is only the `normal` value and
+every other type scales it, and it is quoted without saying which renderer.
+
+**A second false alarm the clause now warns about.** A check built against the
+bare `radiusPx()` circle rather than the ring radii reported four of five meshed
+enemies as overhanging their own rings. With the pads named — hover at
+`radiusPx() + 9`, frost and camo at `radiusPx() + 4` — only two are.
+
+**ROUTED, NOT FIXED — three source comments carry the same conflation and are
+not this file's to repair.** All three verified at source on 2026-08-13:
+
+- `js/enemy.js:1097` ("An enemy is 22 px across and crosses the screen at ~78
+  px/s, so hit-testing the body exactly…") — the hit test really is the 22 px
+  circle, so the mechanism is right; what misleads is calling it *the body*
+  without a renderer, and quoting a per-type value as a constant.
+- `js/enemy.js:1015` — the same sentence in the lane-spread note. Conclusion
+  intact, phrasing identical.
+- `tools/blender/enemy_normal.py:24` ("`Enemy.RADIUS_PX` is 11, so this is
+  roughly 22 px across in play") — **this is the load-bearing one.** It is the
+  premise under WHY EVERYTHING IS BOXES, in the build script that every later
+  body was measured against. Its conclusion does not just survive at the real
+  size, it gets stronger: the Gleaner draws ~148 lit pixels in a 10 × 20 screen
+  box, so there is even less to resolve than the comment claims.
+
+`js/enemy.js` belongs to the simulation division and `enemy_normal.py` to
+rendering; neither is documentation, and the archivist does not edit game code.
+
+---
+
+**THE 48 HELD LINES, WRITTEN 2026-08-12 AND LANDED TODAY — and they were never
+another division's.** `tools/check-model-top.js`'s owner was told, correctly for
+what could be known at the time, that `AGENTS.md` held "48 uncommitted lines from
+another division", and gated a clause on it. Attribution says otherwise: the last
+five writes to the file are a previous archivist instance at 2026-08-12
+13:03:43–13:05:10Z, writing to a ruling made two minutes earlier. The rendering
+division's own write that day (12:43:19Z) had already landed in `e88c6b3`. The
+warning against `git commit -a` was right; the ownership was not, and the debt it
+created is cleared here rather than handed on.
+
+The held text itself is unchanged from 2026-08-12 and every figure in it was
+re-verified at runtime before committing:
+
+- **`tools/measure-starter-kit.js` is marked PROVENANCE VOID in all three places
+  `AGENTS.md` cites it** — the file map, the starter-kit table, and the Summoner
+  section that calls it "the premise the whole meta loop rests on". It is pegged
+  to the gunner deleted 2026-07-30, so nothing live is checking that premise.
+  The conclusions are KEPT and no replacement number is invented: the starter bar
+  still loses on every route, and the first-run death wave is left explicitly
+  unknown, with all three disagreeing sources named (`js/meta.js:283` says 17,
+  the table says 19–20, the dead tool reports 11). Writing 11 would be worse than
+  leaving it, because 11 is the dead tool's output. Re-measuring is unauthorised
+  new work.
+- **The bounty-to-health ratio's denominator is named as EFFECTIVE HP**, which
+  is load-bearing: 0.905 is `23 503 / 25 969`, and against *declared* health the
+  same figure is 0.9847. The `shielded` trap is stated in full — 20/12 = 1.6667
+  declared against 20/36 = 0.5556 effective, because a Bulwark carries 24 shield
+  on 12 health and the shield pays nothing, so the same type reads as the top of
+  the range under one denominator and near the bottom under the other. It has
+  already been reported as a defect once. `revenant` splits the same way (1.25
+  against 0.625); every other type of the 21 is identical under both, which is
+  why the mismatch stayed invisible.
+
 **2026-08-13 — the Drudge (`enemy-armored`), the first of five Easy bodies, and
 the shared chassis they are all built on.**
 
