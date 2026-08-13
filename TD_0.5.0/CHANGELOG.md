@@ -13,6 +13,29 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — `World3D.animHz` closes the flier-cadence seam: a preview can ask
+what drives a body instead of re-deriving it.**
+
+The board drives a walk by DISTANCE COVERED and a flier's wingbeat by a CLOCK
+(`HOVER_HZ = 2.6`) — the one exception, and it is the one a viewer standing a
+body still cannot see. The codex's enemy viewer had to invent a rate, derived
+`ul(speed) / (radiusPx * 2.6)` for everything, and gave the Aether Wisp
+**2.5668 against the authored 2.6**: close by luck, not by construction, and the
+next flier would land wherever its own numbers put it.
+
+Exported beside `walkBand`/`bandFrame`, which already exist so a preview does
+not own a second copy of a rule. **A function, not the constant**: copying `2.6`
+into `js/codex.js` puts a second copy of a number in the file that will never be
+the one retuned, and that failure is silent — the viewer beats the old rate
+forever and nothing renders wrong enough to notice.
+
+It returns **null for every distance-driven body**, and that null is the useful
+half: it says this body has no authored rate at all, so a caller standing it
+still must invent one, which is the caller's business and not this file's.
+Asserted in both directions through the real page — flier 2.6, Normal null,
+Brute null, and null for a missing argument. The predicate is `enemy.isFlying`,
+the same field `drawActor` branches on.
+
 **2026-08-14 — Opaque is now the renderer's default rather than a promise each
 caller makes, and the enemy viewer's four claims are settled in pixels.**
 
