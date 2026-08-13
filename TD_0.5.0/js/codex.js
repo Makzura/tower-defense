@@ -992,10 +992,19 @@ var Codex = (function () {
   // thing a field guide must not do. The mesh comes first now and the skin is
   // what runs when there is no WebGL, or no mesh for that type.
   //
-  // EIGHT OF THE TWENTY-ONE TYPES HAVE NO MESH and reach the skin path here on
-  // every load. That is not a bug in this function; the board draws those as a
-  // coloured sphere. Both are placeholders and neither is what the type will
-  // eventually look like.
+  // SOME TYPES HAVE NO MESH and reach the skin path here on every load. That is
+  // not a bug in this function; the board draws those as a coloured sphere.
+  // Both are placeholders and neither is what the type will eventually look
+  // like.
+  //
+  // THE COUNT IS DELIBERATELY NOT WRITTEN DOWN HERE. It moves every time a
+  // model lands, and a stale one in a comment is worse than none — the first
+  // draft of this block said EIGHT and was wrong within the day. Ask the tree
+  // instead: the types with no mesh are the ones `World3D.enemyModelFor`
+  // answers null for, and `Codex.models().enemies` carries the resolved `mesh`
+  // per row. Note when you count that an UNCOMMITTED model file in someone
+  // else's working tree counts as present — a figure taken on a shared tree is
+  // a figure about that tree, not about a clean checkout.
   //
   // `opts.live` is the caller's call, not this function's, and getting it
   // wrong costs frame time rather than correctness: a list of ten rows must be
