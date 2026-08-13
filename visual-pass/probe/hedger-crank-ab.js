@@ -200,6 +200,10 @@ async function main() {
     var roi = [bb[0] - m, (H - (bb[1] + bb[3])) - m, bb[2] + m * 2, bb[3] + m * 2];
     out.roi = roi;
 
+    var bF = per.before.map(function (r) { return r.fraction; });
+    var aF = per.after.map(function (r) { return r.fraction; });
+    var bMin = Math.min.apply(null, bF), bMax = Math.max.apply(null, bF);
+    var aMin = Math.min.apply(null, aF), aMax = Math.max.apply(null, aF);
     for (var q = 0; q < shots.length; q++) {
       var K = shots[q];
       var keys = [];
@@ -230,9 +234,24 @@ async function main() {
             "   after " + SIDES[1].commit + " md5 " + SIDES[1].md5crlf.slice(0, 8) +
             "   (md5 of the checked-out CRLF file; git show gives " +
             SIDES[0].md5lf.slice(0, 8) + " / " + SIDES[1].md5lf.slice(0, 8) + ")",
-          "MEASURED: occlusion eliminated -- crank front-most fraction 1.00 at all 12 frames, was 0.08-0.86.",
-          "Share registering when removed 48% -> 86%. STILL UNDER THE STANDARD: median 1.3-1.9, most pixels under 2.0.",
-          "NOT COVERED HERE: file://, the seven other bearings for the after, and the collar interpenetration."
+          // THIS IMAGE'S OWN NUMBERS FIRST, at this bearing, this metric, this
+          // frame. juno's figures follow and are ATTRIBUTED, because they were
+          // taken with a depth-based front-most metric at her bearing, not with
+          // this contribution-over-solo metric at camYaw -45. Presenting them as
+          // if they described this view is the same category error the last line
+          // warns about, one level down.
+          "THIS IMAGE (contribution/solo at " + best.tag + "): crank visible " +
+            per.before[K].fraction.toFixed(3) + " -> " + per.after[K].fraction.toFixed(3) +
+            " at this frame; across 12 frames before " + bMin.toFixed(2) + "-" + bMax.toFixed(2) +
+            ", after " + aMin.toFixed(2) + "-" + aMax.toFixed(2) + ".",
+          "OCCLUSION ELIMINATED (juno, depth front-most metric, her bearing): 1.00 at all 12 " +
+            "frames, was 0.08-0.86. Share registering when removed 48% -> 86%.",
+          "CONTRAST (juno): rendered CR 1.30-1.88 against the hip, worst frame 1.30. NOT COMPARABLE " +
+            "to the standard's 2.0 bar -- that threshold was reasoned in PALETTE space, and rendered " +
+            "CR reaches only 2.63 even for white on tin at this size and camera.",
+          "WHETHER THIS READS IS A JUDGEMENT, NOT A MEASUREMENT.",
+          "NOT COVERED: file://, the seven other bearings for the after, the collar interpenetration; " +
+            "and juno's figures above are at her bearing and metric, not this image's."
         ];
         var url = await S.evaluate(
           "TDProbe.stripFrom(" + JSON.stringify(keys) + "," +
