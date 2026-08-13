@@ -13,6 +13,78 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `f90819e` retires the three-difficulty claims from the roster
+comments, and `AGENTS.md` stops counting the model roster it cannot keep up
+with. Plus the one-line incantation for auditing the schedule, and why a
+hand-rolled version of it silently drops a quarter of the waves.**
+
+**`f90819e` — `js/enemy.js`, comments only.** Two roster comments still described
+a campaign with Easy, Normal and Hard. Those derivations were deleted on
+2026-08-12 (`js/game.js:663-667` records it) and `WAVES = EASY_WAVES` is the only
+schedule. The midboss block also restated the wave-11 health override, and the
+v0.4.9 block listed one wave per type — **already wrong by omission**, because
+the Shieldbearer appears in **four** waves and the others in one. Verified at
+runtime: `shieldbearer` at 27, 29, 30 and 34; `midboss` at 11; `healer` at 32.
+
+> **THE DURABLE HALF, and it generalises well past those two paragraphs: a
+> schedule number restated in `js/enemy.js` is a FOSSIL-IN-WAITING WHATEVER ITS
+> VALUE**, because the schedule moves independently of the type row the comment
+> sits above. **So the repair was deletion, not correction** — both comments now
+> point at `EASY_WAVES` and quote nothing. Correcting the number would only have
+> reset the clock, and it would have pinned prose in a file that does not own the
+> schedule, blocking a retune of the wave-11 override that is live elsewhere.
+> Same shape as the pixel-fossil classes above: **the repair for a restated
+> derived value is to delete it and point at the source, not to refresh it.**
+
+**AND A MEASURING TRAP UNDER IT, WHICH IS WORTH MORE THAN EITHER COMMENT.**
+`EASY_WAVES` is **mixed-shape**. Measured at runtime on 2026-08-13: **19 of the
+35 waves are bare group objects and only 16 carry `groups: [...]`**, so a
+hand-rolled walk over `wave.groups` sees **58 groups against the true 77** and
+drops a quarter of the schedule, front-loaded. **The failure does not look like
+one** — it reported "midboss: NOWHERE" for a type scheduled at wave 11 in plain
+sight, which reads as a finding rather than as a broken query, and was nearly
+used to contradict a correct handoff. Same family as *"Not found" is not "not
+running"*: an instrument whose scope excludes the thing it exists to see.
+
+**The normalizer is one line — `function waveGroups(wave) { return wave.groups ||
+[wave]; }` at `js/game.js:509` — and the `|| [wave]` fallback IS the function.**
+`AGENTS.md` already named `waveGroups` as the one place the two forms are
+reconciled; it now also says what walking the schedule by hand costs, because
+naming the right function did not stop a reimplementation that omits the fallback
+and still runs.
+
+**`AGENTS.md` STOPS COUNTING THE MODEL ROSTER.** The model-contract section said
+*"sixteen of the twenty-one enemy types are still untextured spheres"* and
+*"`js/gl/models/` holds five `enemy-*.js`, `tools/blender/` holds four
+`enemy_*.py`"*. Today it is **ten and ten** — nine body modules plus
+`enemy_chassis.py`. **The roster moved by five in one day, so no written figure
+survives a commit**, and the numbers are replaced with the derivation:
+`enemyModel()` in `js/gl/gl-world.js` asks `GLModels.has("enemy-" + id)` and
+falls back to the sphere, so `ls js/gl/models/enemy-*.js` against `Enemy.TYPES`
+is the answer and is always current. The load-bearing half — `enemy_flying.py`
+does not exist while `enemy-flying.js` does — is unchanged and still true.
+
+> **AND A TRAP RECORDED SO NOBODY RE-DERIVES IT BY MATCHING THE TWO DIRECTORY
+> LISTINGS:** the four original bodies are named for their **typeId**
+> (`enemy_brute`, `enemy_hive`, `enemy_normal`, `enemy_swarm`) and the five added
+> 2026-08-13 for their **lore name** — `enemy_skimmer` → `enemy-fast`,
+> `enemy_tun` → `enemy-slow`, `enemy_drudge` → `enemy-armored`, `enemy_hedger` →
+> `enemy-angry`, `enemy_cooper` → `enemy-camo_normal`. A name-match across the
+> two lists reports mismatches that are not real.
+
+**ROUTED, NOT FIXED — a wrong triangle count in a docstring people price off.**
+`tools/blender/enemy_chassis.py::shield_projectors()` says *"732 triangles at
+16/8, 204 at 8/4"*. The function builds **5 boxes and 3 balls**; a beveled
+`td.box` is 108 triangles and `td.ball(s, r)` is `s(2r-2)`, so the real figures
+are **1,212 and 684**. **Only the box baseline is wrong** — the 528 delta between
+the two numbers is exactly right, since that is the three balls. The cause is
+pinnable: `732 − 672 = 60` and `204 − 144 = 60`, i.e. **5 × 12**, so the
+docstring priced the boxes as *unbeveled* cubes; all five calls take
+`round_edges` at its default of `True`. It matters because the other five
+sub-assembly docstrings in that file are exact to the digit (`torso_frame` 540,
+`legs` 692, `arms` 736, `head` 288/464, `cargo_cage` 1,600), so a reader has
+every reason to trust this one. Pipeline source, so not this file's to edit.
+
 **2026-08-13 — the source comments that carried the 22 px conflation are fixed
 (`217d40a`), the Siphon A2 row is no longer readable as a hollow tier
 (`fb9ab97`), and a dating tool for pixel fossils.** Entries written by the

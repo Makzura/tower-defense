@@ -664,6 +664,18 @@ nothing else in the game reads `wave.count` or `wave.type` directly.
 `waveCount`, `waveGroupAt` and `waveSummary` are built on it, and so is the
 index screen's per-type "appears in waves N, M" list.
 
+**IF YOU ARE AUDITING THE SCHEDULE, CALL IT — NEVER WALK `wave.groups`
+YOURSELF.** The shape is mixed: measured at runtime 2026-08-13, **19 of the 35
+Easy waves are bare group objects and only 16 carry `groups: [...]`**, so a
+hand-rolled walk over `wave.groups` sees **58 groups against the true 77** and
+silently drops a quarter of the schedule — front-loaded, because the bare form
+clusters early. The failure does not look like a failure: it reports a type as
+appearing *nowhere* when it is scheduled in plain sight (the midboss, wave 11),
+which reads as a finding rather than as a broken query. **The whole normalizer is
+`function waveGroups(wave) { return wave.groups || [wave]; }` at
+`js/game.js:509` — the `|| [wave]` fallback IS the function.** Reimplementing it
+means re-deriving that fallback, and the version that omits it still runs.
+
 **CAMO WAVES ARE NEVER MIXED, and that is a rule about the Smasher.** Its swing
 damages whatever it physically reaches, camo included; it simply will not
 *turn* towards something it cannot see (see the camo table under Content). With
@@ -4225,21 +4237,34 @@ combination. It intentionally lives beside the gunner rather than inside it:
 
 ## Building a model that looks like the ones that already work
 
-The Arcane Sniper, the Rifleman and the five enemies set the bar. The Warbringer
+The Arcane Sniper, the Rifleman and the meshed enemies set the bar. The Warbringer
 now has all seven tiers built through `td_mesh` (no Blender needed for it). **The
-Siphon now has all eleven tiers built too**; sixteen of the twenty-one enemy
-types are still untextured spheres, and so is the Tyrant — the wave-35 boss the whole
-campaign ends on. Every future enemy has the same problem to solve.
+Siphon now has all eleven tiers built too**; **every enemy type with no
+`js/gl/models/enemy-<typeId>.js` still draws as an untextured sphere**, and the
+Tyrant — the wave-35 boss the whole campaign ends on — is one of them. Every
+future enemy has the same problem to solve.
 
-The fifth enemy mesh is the Aether Wisp (`enemy-flying`), and it is the one
-model here **not authored in this repo** — it is Morcoos's work, brought in on
-2026-08-12 from his own copy of the game. It is also the only one with no
-`tools/blender/*.py` script behind it: it came from a `.glb` through an importer
-of his rather than from a build script of ours. Read it as a worked example, not
-as something to regenerate from `tools/blender`, because nothing here can.
-(Verified 2026-08-12: `js/gl/models/` holds five `enemy-*.js`, and
-`tools/blender/` holds four `enemy_*.py` — `enemy_flying.py` is the one that
-does not exist.)
+**The roster is deliberately not counted here.** It moved by five in a single day
+on 2026-08-13 and any figure written down is wrong by the next commit;
+`enemyModel()` in `js/gl/gl-world.js` derives it — `GLModels.has("enemy-" + id)`,
+falling back to the sphere — so `ls js/gl/models/enemy-*.js` against
+`Enemy.TYPES` is the answer, and it is always current.
+
+The Aether Wisp (`enemy-flying`) is the one model here **not authored in this
+repo** — it is Morcoos's work, brought in on 2026-08-12 from his own copy of the
+game. It is also the only one with no `tools/blender/*.py` script behind it: it
+came from a `.glb` through an importer of his rather than from a build script of
+ours. Read it as a worked example, not as something to regenerate from
+`tools/blender`, because nothing here can. (**The load-bearing half is that
+`enemy_flying.py` does not exist while `enemy-flying.js` does** — still true on
+2026-08-13. Do not re-derive that by matching the two directory listings:
+**the four original bodies are named for their typeId (`enemy_brute`,
+`enemy_hive`, `enemy_normal`, `enemy_swarm`) and the five added 2026-08-13 are
+named for their LORE name** — `enemy_skimmer` → `enemy-fast`, `enemy_tun` →
+`enemy-slow`, `enemy_drudge` → `enemy-armored`, `enemy_hedger` → `enemy-angry`,
+`enemy_cooper` → `enemy-camo_normal`. A name-match across the two lists reports
+mismatches that are not real. `enemy_chassis.py` is the shared frame, not a
+body.)
 
 This is the contract. A model that meets it needs no
 special-casing anywhere in the renderer; a model that skips a clause needs a
@@ -4400,6 +4425,18 @@ because the ground slab is thick. New models should not repeat it.
 The first Rifleman palette had five colours inside ~8% luminance and rendered as
 one dark blob. Separate by VALUE first, hue second. The largest surface takes
 the darkest value, or it pulls the eye off the character.
+
+**AND THE HARDER CONSTRAINT NOBODY HAD WRITTEN DOWN: COLOUR IS PER-FACE, AND
+NOTHING CAN BE DRAWN *ON* A FACE.** There is no texture path in this pipeline at
+all — `td_scene.material()` takes a colour key, emission, roughness and metallic,
+and there is no UV unwrap, no image texture and no decal route anywhere in
+`tools/blender`. Every surface is a flat palette colour, and the mesh export
+carries rgb plus emission per vertex and nothing else. **So a marking is
+GEOMETRY or it does not exist**: a hull number, a stencil, lettering, wear, a
+painted-over patch are all unbuildable as described, and at enemy scale they are
+unresolvable as geometry too. Brief the shape, never the paint. (Verified
+2026-08-13. Note `roughness` and `metallic` reach the *sprite-render* path only —
+the runtime shader has no input for either.)
 
 **How to check it is section 4 of `tools/blender/HOUSE-STANDARD.md`**, which
 carries the instrument, the thresholds and the worked palettes. It is deliberately
