@@ -92,6 +92,16 @@ reference viewport:
 > is a window size**, and this project has already spent a day on one scale
 > disagreement that turned out to be a camera. Found by juno, 2026-08-13.
 >
+> **AND NAME THE COMMIT THE MEASUREMENT WAS TAKEN AT.** Same reason, one axis
+> over: a figure quoted to direct someone else's work is about a tree, and the
+> tree moves under you. `ddef990` → `1769dcf` is the case — three of us published
+> per-axis extent tables measured at `ddef990` while `1769dcf`, the narrowed
+> Skimmer, was already on disk, and one was a step from sending a correction to
+> the builder for a model that no longer existed. **This is a company-wide
+> reporting rule and its home is `.claude/org/PROTOCOL.md`, not this file**; it is
+> named here because this is where model measurements actually get quoted.
+> A measurement without a commit and a viewport is a reading, not a fact.
+>
 > The distance is also **not** `OrbitCamera`'s constructor default of 900 — read
 > the camera before anything draws and you get 900 with target [0,0,0], which is
 > 2.25x too close and centred off the board. That is the disagreement above.
@@ -732,17 +742,27 @@ contrast ratio, not luminance gap, is the right instrument.
 > **So "a pair that fails on paper cannot be rescued by lighting" is false.** Tin
 > on tin is CR 1.00 on paper and renders at 1.25–1.40 from geometry alone.
 >
-> **What survives is most of the section: contrast ratio is still the right
-> instrument and the thresholds below still stand.** What changes is the input.
+> **What survives is the INSTRUMENT: contrast ratio is still the right measure.**
+> ~~and the thresholds below still stand~~ — **that half was itself overruled
+> within the hour**, first by mira (the bands were reasoned about albedo and do
+> not transfer) and then by kaz's ruling that they are **palette-space bands** and
+> a rendered CR must never be compared against them. Both are above. A reader
+> arriving at this box should not take "the thresholds still stand" from it.
 > **Measure the candidate material on RENDERED PIXELS before it is exported** —
 > juno can run a candidate in one pass, which catches this before a build instead
 > of after one.
 >
 > **This invalidates a METHOD, not a value.** The Hedger's crank was chosen brass
 > over tin on palette arithmetic — a method now known to carry error larger than
-> some of the margins it was deciding between. Brass still came out better than
-> tin when rendered, but that was **luck rather than knowledge**, and the table it
-> was chosen from cannot be trusted for the next call.
+> some of the margins it was deciding between, and the table it was chosen from
+> cannot be trusted for the next call. ~~Brass still came out better than tin when
+> rendered, but that was luck rather than knowledge.~~ **That "luck" line is
+> superseded and the correction is worth having**: the eleven-pair sweep measures
+> `brass` 1.41 against `tin_dark` 1.28 rendered, the same order the palette gave,
+> so the choice **against that neighbour** is now knowledge. The luck was never in
+> the ranking; it was in nobody having checked. **What is still unchecked is brass
+> against the ROAD** — the second neighbour, and the one that actually decided the
+> material.
 
 **~~Every figure in the table below is a CEILING, never an underestimate.~~
 RETRACTED — see the box above.** The reasoning was kaz's: the shader lights
@@ -814,14 +834,31 @@ that arc is worth on screen:
 **On the shadow side the mineralisation is literally invisible — CR 1.02.** On
 the lit side it is CR 1.30, on parts a few pixels across.
 
-**Kaz's lighting proof makes this absolute rather than merely severe:
-`skin_dark → gold_dark` cannot exceed CR 1.025 under any lighting whatsoever.**
-Not hard to separate — *incapable* of separating. No modelling change and no
-lighting change reaches it.
+**~~Kaz's lighting proof makes this absolute rather than merely severe:
+`skin_dark → gold_dark` cannot exceed CR 1.025 under any lighting whatsoever.
+Not hard to separate — incapable of separating.~~ RETRACTED 2026-08-13 with the
+ceiling claim it was built on.** It is the sharpest casualty of that retraction
+because it is exactly the form now known to be unsupportable: **no claim of the
+shape "no lighting can reach this" survives in this renderer.** The measured
+crossover runs the wrong way for it, too — below palette CR ≈ 1.2 the render
+*adds* contrast, and 1.02 is below 1.2.
 
-**Consequence: A1 and A2 cannot be legible tier purchases at game scale.** They
-are hue changes at constant value on small parts. Anyone briefing a tier ladder
-should plan around that rather than discover it after a build. See section 5.
+**The conclusion is kept as a PREDICTION, and it is probably still right.** 1.02
+albedo, even carrying the sweep's largest upward correction, does not plausibly
+become a read at these part sizes. But it is no longer *proved*, and the
+difference is load-bearing rather than pedantic:
+
+> **TWO LIVE DECISIONS REST ON THE RETIRED PROOF, and neither owner has been
+> told by the proof itself.** The **A1/A2 tier-legibility call** below, and the
+> **design question routed to vera and Diego** about whether a $600 tier may be a
+> reward rather than a read. Both were reached when this was a proof. Neither is
+> withdrawn — but anyone re-opening either should know the floor under it moved.
+> **A rendered re-measure of `skin_dark → gold_dark` is OWED, against juno.**
+
+**Consequence, now a prediction rather than a proof: A1 and A2 are unlikely to be
+legible tier purchases at game scale.** They are hue changes at constant value on
+small parts. Anyone briefing a tier ladder should plan around that rather than
+discover it after a build. See section 5.
 
 **Measured 2026-08-12, and the honest result is softer than the prediction.**
 Through the game's real `drawActor` path, `siphon-base` and `siphon-a1` differ by

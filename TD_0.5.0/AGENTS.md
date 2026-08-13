@@ -455,6 +455,14 @@ tools/blender/make_preview.py regenerates review sheets and inspectable .blend
                      files under tools/blender/preview/
 tools/blender/WARBRINGER_CONCEPT.md the design the Warbringer will be built
                      from, plus the shortlist of the next five enemies
+tools/blender/HOUSE-STANDARD.md what a model must be AT THE SIZE THIS GAME
+                     DRAWS IT -- the resolvable ceiling, the feature-size
+                     floor, value and contrast, how a tier is signalled, and
+                     what a read may and may not be approved from. It
+                     elaborates the model contract below; the contract is the
+                     rule and this is the measurement behind it
+tools/blender/BRIEF-siphon-idol-gesture.md the worked brief the Siphon idol was
+                     built from -- the example of what a brief looks like here
 tools/torn.js       `node tools/torn.js` -- flags any ground prop that is
                      frozen by HALVES. Run it after touching gl-parts.js
 tools/fixed-list.js `node tools/fixed-list.js <model>` -- lists the solids a
@@ -4389,6 +4397,13 @@ because the ground slab is thick. New models should not repeat it.
 The first Rifleman palette had five colours inside ~8% luminance and rendered as
 one dark blob. Separate by VALUE first, hue second. The largest surface takes
 the darkest value, or it pulls the eye off the character.
+
+**How to check it is section 4 of `tools/blender/HOUSE-STANDARD.md`**, which
+carries the instrument, the thresholds and the worked palettes. It is deliberately
+not repeated here: that measurement has been retracted and re-ruled repeatedly
+while this clause has not moved once, so a copy here would be the drifting one.
+Note in particular that the CR bands there are **palette-space** bands. That
+document cites this clause back.
 
 **8. A weapon must not be inside the body, and PROVE it with solids.**
 

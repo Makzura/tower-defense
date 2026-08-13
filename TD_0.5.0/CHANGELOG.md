@@ -13,6 +13,135 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — contrast ratio is computed on RENDERED PIXELS, never on palette
+values. The palette-CR method is retired, the bands it fed are palette-space
+only, and `AGENTS.md` finally points at the standard that carries them.**
+
+**RECONSTRUCTED AFTER THE FACT, and the gap is the first finding.** The house
+standard changed in **seven commits** across 2026-08-13 — `c4a5ce3`, `7b05841`,
+`e5fb26e`, `080c6e8`, `4878259`, `80475da`, `4a18cc0` — and **not one of them
+carried a CHANGELOG entry**, though this file's own preamble requires one for
+every change. This entry is written from the git history and the documents
+rather than from the work as it happened; the six commits it does not narrate
+are listed here so the debt is visible rather than merely counted. Part of the
+section 4 text described below also landed inside `4a18cc0`, which was another
+agent's commit picking up my uncommitted working-tree edits — nothing was lost
+and nothing was overwritten, but the attribution in git does not match the
+authorship, and that is worth knowing before anyone reads `git blame` on that
+section.
+
+**THE METHOD THAT WAS RETIRED.** Section 4 said a material's contrast ratio
+could be computed from palette values, and that the palette figure was a
+**ceiling** — so a pair that failed on paper could not be rescued by lighting,
+which made the table usable to *reject* a palette before anything was built.
+kaz ratified that on 2026-08-12. It is false. **The palette number is albedo: an
+input to the render, not a prediction of it.**
+
+**The sequence matters, because three people overturned each other in about an
+hour and each step was right.** juno measured two pairs and the ceiling failed in
+both directions; kaz retracted his own claim (`4878259`) keeping "the thresholds
+still stand"; mira overruled that half (`80475da`) — the bands were reasoned
+about albedo, and applied to rendered numbers they declare an
+identical-material pair legible, which is the exact defect the crank
+investigation started from; **juno then withdrew her own error figure** and
+replaced it with an eleven-pair population; kaz ruled on that sweep (`4a18cc0`)
+that the bands are **palette-space bands** and a rendered CR must never be
+compared against them.
+
+**THE SELF-CORRECTION IS THE MOST REUSABLE PART.** "Roughly 0.3–0.7 CR of error
+with no reliable sign" had already been written into the standard when it was
+questioned — not for being wrong, but for not naming its population. It was an
+impression from two pairs. Asked what the number was measured over, its author
+ran eleven and **retracted it herself**: the real error is **+0.17 to −3.66**,
+understated roughly fivefold at the top of the range, and the sign is not random
+at all. **A figure whose population cannot be stated is not yet a
+measurement** — and the cost of asking was one run, against a wrong number that
+was already in a standard other people build against.
+
+**What the sweep actually shows.** A clean **monotone compression** with a
+crossover at palette CR ≈ 1.2: below it the render *adds* contrast, above it the
+render *removes* it, and the deficit grows with the palette figure. A palette
+span of 1.00–6.30 arrives on screen as **1.17–2.63**. Two consequences the
+two-pair version could not reach:
+
+- **the ceiling claim fails for EVERY pair, not only the identical one** — at the
+  90th percentile of the part's own pixels the rendered CR *exceeds* the palette
+  figure in all eleven cases (tin 1.00 → 1.97, white 6.30 → 8.62), so some of a
+  part's pixels always beat the albedo ratio;
+- **the "over 2.0" band is close to unreachable in rendered units**, which is
+  what makes the bands palette-space rather than merely miscalibrated.
+
+**But the palette table still RANKS.** The rendered median is monotone
+non-decreasing in the palette figure across the sweep, with one tie. So order is
+preserved and magnitude is not: shortlist and rank with it, never reject or
+threshold with it. The first retraction's "cannot settle two candidates within
+0.7 CR" rested on the withdrawn figure and does not survive it. **Read narrowly —
+one part, one bearing, two frames.** The compression curve is that crank's
+geometry, not a transfer function.
+
+**THE MECHANISM IS THREE TERMS, NOT ONE, and getting the set right matters
+because two of them are levers someone might reach for.** Per-face illumination
+under the directional key; **chromatic ambient and fill** (`uAmbient`
+[0.125, 0.142, 0.180] and `uFillColor` [0.075, 0.110, 0.155] are both
+blue-weighted, so identical albedo at different normals diverges on *hue*, not
+only on level); and a height-driven lift, `lit *= 1.0 + clamp(vDepth * 0.0016,
+0.0, 0.14)`. **The height term is real and small — do not reach for height as a
+contrast lever.** Its 0.14 cap needs `world.z` = 87.5 and a Hedger stands 47, so
+across the crank against the body it is worth about 1.03 CR, a second-order
+contributor rather than the explanation. A first reading of this file called it
+"the one that most directly explains a bar-against-hip pair"; that was wrong and
+was measured down before it was written. **Naming trap: `vDepth` is `world.z`, a
+HEIGHT, not camera depth** — read in the fragment shader alone it looks like a
+distance fade.
+
+**LIVE CONSEQUENCES, none of them cosmetic.**
+
+- **The Hedger's crank does not clear section 3 as measured, and the standard now
+  says so plainly**: contrast 1.30–1.88 against the 2.0 gate, and the area route
+  marginal at ~9–13% against an ~11% floor. The honest sentence is *occlusion
+  eliminated outright, contrast improved, threshold not met* — which is why a
+  before/after at the least flattering frame goes to the owner to judge by eye.
+- **Brass over `tin_dark` is now MEASURED rather than lucky** — 1.41 against 1.28
+  rendered, the same order the palette gave. **Brass against the ROAD, the second
+  neighbour and the one that actually decided the material, has never been
+  measured on pixels. Owed.**
+- **`skin_dark → gold_dark` "cannot exceed CR 1.025 under any lighting
+  whatsoever" is retracted** — the sharpest casualty, because no claim of the
+  shape *no lighting can reach this* survives in this renderer. The conclusion is
+  kept as a **prediction**, and the standard now names the two live decisions
+  that rest on the retired proof: the A1/A2 tier-legibility call, and the design
+  question already routed to vera and Diego about whether a $600 tier may be a
+  reward rather than a read. Neither is withdrawn; both should know the floor
+  moved. A rendered re-measure is owed.
+
+**TWO REPAIRS THAT WERE ARTEFACTS OF THREE PEOPLE EDITING ONE SECTION AT ONCE.**
+The eleven-pair mapping had been written **twice, about 140 lines apart, inside
+one hour**, by two people who could not see each other's drafts — merged to one
+copy beside the bands it governs, with the candidate names kept at the other
+site. And two sentences inside the retraction box still asserted what had been
+overruled after them: *"the thresholds below still stand"*, and *brass beating
+tin was "luck rather than knowledge"*. Both now carry their supersession rather
+than being deleted, so the reversal is legible instead of silent.
+
+**`AGENTS.md` NOW POINTS AT THE STANDARD, WHICH IT NEVER DID.** The file map
+listed `WARBRINGER_CONCEPT.md` but not `HOUSE-STANDARD.md` — 982 lines, the
+operative standard every model this week was built to, and invisible from the
+source of truth. Both it and `BRIEF-siphon-idol-gesture.md` are now in the map,
+and clause 7 (*keep the palette a value ladder*) points at section 4 for the
+instrument. **Deliberately a pointer and not a copy**, and the entry above is the
+argument for it: that measurement has now been revised three times in two days
+while clause 7 has not moved once, so a copy would be the drifting one.
+
+**One convention added, one routed away.** *Name the commit a measurement was
+taken at* — `ddef990` → `1769dcf` is the case, where three people published
+extent tables measured at `ddef990` while the narrowed Skimmer was already on
+disk, and one was a step from correcting a builder about a model that no longer
+existed. It is a company-wide reporting rule, so its home is
+`.claude/org/PROTOCOL.md` and it is only pointed at from the standard, where
+model measurements actually get quoted. The sibling convention — *quote the
+viewport beside the camera distance* — was already landed in `c4a5ce3` and is
+**not** repeated.
+
 **2026-08-13 — the Tun is SHORTER. 19.62 → 16.14 screen rows against the
 Gleaner's 20, on the two clauses of its own card that were never built. And the
 floor turned out to be the model's own boot, not the ground.**
