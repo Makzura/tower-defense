@@ -1,0 +1,658 @@
+{
+ "rows": [
+  {
+   "name": "blub-blub1",
+   "frames": 9,
+   "groups": 1
+  },
+  {
+   "name": "blub-blub2",
+   "frames": 9,
+   "groups": 1
+  },
+  {
+   "name": "blub-blub3",
+   "frames": 9,
+   "groups": 1
+  },
+  {
+   "name": "blub-cyber",
+   "frames": 9,
+   "groups": 2
+  },
+  {
+   "name": "blub-detail-blub1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-blub2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-blub3",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-cyber",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-hungry",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-mecha",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-mecha2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-mini1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-mini2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-detail-superb",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-hungry",
+   "frames": 9,
+   "groups": 3
+  },
+  {
+   "name": "blub-mark-a1-cyber",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a1-mecha",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a1-mecha2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a1-superb",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a2-cyber",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a2-mecha",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a2-mecha2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-a2-superb",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b1-blub1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b1-blub2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b1-blub3",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b1-hungry",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b1-mini1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b1-mini2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b2-blub1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b2-blub2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b2-blub3",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b2-hungry",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b2-mini1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mark-b2-mini2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-mecha",
+   "frames": 9,
+   "groups": 2
+  },
+  {
+   "name": "blub-mecha2",
+   "frames": 9,
+   "groups": 3
+  },
+  {
+   "name": "blub-mini1",
+   "frames": 9,
+   "groups": 1
+  },
+  {
+   "name": "blub-mini2",
+   "frames": 9,
+   "groups": 1
+  },
+  {
+   "name": "blub-monster-t0",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-monster-t1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-monster-t2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-monster-t3",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-monster-t4",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "blub-superb",
+   "frames": 17,
+   "groups": 3
+  },
+  {
+   "name": "enemy-angry",
+   "frames": 12,
+   "groups": 6
+  },
+  {
+   "name": "enemy-armored",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "enemy-brute",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "enemy-camo_normal",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "enemy-fast",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "enemy-flying",
+   "frames": 12,
+   "groups": 8
+  },
+  {
+   "name": "enemy-hive",
+   "frames": 8,
+   "groups": 7
+  },
+  {
+   "name": "enemy-normal",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "enemy-slow",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "enemy-swarm",
+   "frames": 8,
+   "groups": 7
+  },
+  {
+   "name": "recruit-b4",
+   "frames": 8,
+   "groups": 6
+  },
+  {
+   "name": "recruit-b5",
+   "frames": 8,
+   "groups": 6
+  },
+  {
+   "name": "rifleman-a3",
+   "frames": 4,
+   "groups": 5
+  },
+  {
+   "name": "rifleman-a5",
+   "frames": 4,
+   "groups": 4
+  },
+  {
+   "name": "rifleman-b3",
+   "frames": 4,
+   "groups": 4
+  },
+  {
+   "name": "rifleman-b5",
+   "frames": 4,
+   "groups": 3
+  },
+  {
+   "name": "rifleman-base",
+   "frames": 4,
+   "groups": 4
+  },
+  {
+   "name": "siphon-a1",
+   "frames": 25,
+   "groups": 7
+  },
+  {
+   "name": "siphon-a2",
+   "frames": 25,
+   "groups": 7
+  },
+  {
+   "name": "siphon-a3",
+   "frames": 25,
+   "groups": 7
+  },
+  {
+   "name": "siphon-a4",
+   "frames": 25,
+   "groups": 8
+  },
+  {
+   "name": "siphon-a5",
+   "frames": 25,
+   "groups": 8
+  },
+  {
+   "name": "siphon-b1",
+   "frames": 4,
+   "groups": 2
+  },
+  {
+   "name": "siphon-b2",
+   "frames": 4,
+   "groups": 2
+  },
+  {
+   "name": "siphon-b3",
+   "frames": 4,
+   "groups": 3
+  },
+  {
+   "name": "siphon-b4",
+   "frames": 4,
+   "groups": 7
+  },
+  {
+   "name": "siphon-b5",
+   "frames": 4,
+   "groups": 6
+  },
+  {
+   "name": "siphon-base",
+   "frames": 25,
+   "groups": 7
+  },
+  {
+   "name": "siphon-beam-chain",
+   "frames": 8,
+   "groups": 4
+  },
+  {
+   "name": "siphon-beam-column",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "siphon-beam-gold",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "siphon-beam-ramp",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "siphon-beam-saturated",
+   "frames": 8,
+   "groups": 2
+  },
+  {
+   "name": "siphon-beam-seeking",
+   "frames": 8,
+   "groups": 4
+  },
+  {
+   "name": "siphon-beam-tendon",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "siphon-beam-thread",
+   "frames": 8,
+   "groups": 5
+  },
+  {
+   "name": "sniper-a3",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "sniper-a4",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "sniper-a5",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "sniper-b3",
+   "frames": 4,
+   "groups": 5
+  },
+  {
+   "name": "sniper-b4",
+   "frames": 4,
+   "groups": 6
+  },
+  {
+   "name": "sniper-b5",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "sniper-base",
+   "frames": 4,
+   "groups": 3
+  },
+  {
+   "name": "summoner-a3",
+   "frames": 61,
+   "groups": 4
+  },
+  {
+   "name": "summoner-a4",
+   "frames": 61,
+   "groups": 3
+  },
+  {
+   "name": "summoner-a5",
+   "frames": 61,
+   "groups": 3
+  },
+  {
+   "name": "summoner-b3",
+   "frames": 61,
+   "groups": 3
+  },
+  {
+   "name": "summoner-b4",
+   "frames": 61,
+   "groups": 3
+  },
+  {
+   "name": "summoner-b5",
+   "frames": 61,
+   "groups": 3
+  },
+  {
+   "name": "summoner-base",
+   "frames": 76,
+   "groups": 2
+  },
+  {
+   "name": "summoner-mark-a1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "summoner-mark-a2",
+   "frames": 61,
+   "groups": 2
+  },
+  {
+   "name": "summoner-mark-b1",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "summoner-mark-b2",
+   "frames": 0,
+   "groups": 1
+  },
+  {
+   "name": "warbringer-a3",
+   "frames": 8,
+   "groups": 2
+  },
+  {
+   "name": "warbringer-a4",
+   "frames": 8,
+   "groups": 2
+  },
+  {
+   "name": "warbringer-a5",
+   "frames": 8,
+   "groups": 2
+  },
+  {
+   "name": "warbringer-b3",
+   "frames": 8,
+   "groups": 3
+  },
+  {
+   "name": "warbringer-b4",
+   "frames": 8,
+   "groups": 3
+  },
+  {
+   "name": "warbringer-b5",
+   "frames": 8,
+   "groups": 3
+  },
+  {
+   "name": "warbringer-base",
+   "frames": 8,
+   "groups": 2
+  }
+ ],
+ "byPrefix": {
+  "blub": [
+   9,
+   9,
+   9,
+   9,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   9,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   9,
+   9,
+   9,
+   9,
+   0,
+   0,
+   0,
+   0,
+   0,
+   17
+  ],
+  "enemy": [
+   12,
+   8,
+   8,
+   8,
+   8,
+   12,
+   8,
+   8,
+   8,
+   8
+  ],
+  "recruit": [
+   8,
+   8
+  ],
+  "rifleman": [
+   4,
+   4,
+   4,
+   4,
+   4
+  ],
+  "siphon": [
+   25,
+   25,
+   25,
+   25,
+   25,
+   4,
+   4,
+   4,
+   4,
+   4,
+   25,
+   8,
+   8,
+   8,
+   8,
+   8,
+   8,
+   8,
+   8
+  ],
+  "sniper": [
+   0,
+   0,
+   0,
+   4,
+   4,
+   0,
+   4
+  ],
+  "summoner": [
+   61,
+   61,
+   61,
+   61,
+   61,
+   61,
+   76,
+   0,
+   61,
+   0,
+   0
+  ],
+  "warbringer": [
+   8,
+   8,
+   8,
+   8,
+   8,
+   8,
+   8
+  ]
+ }
+}

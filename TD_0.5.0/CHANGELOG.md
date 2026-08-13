@@ -13,6 +13,56 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — Camouflaged enemies finally have a visual cue on the 3D board:
+translucent bodies drawn last, plus the 2D pack's dashed ring ported into the
+overlay pass.** The owner's ruling was *"do the camos like the others, just make
+them a bit translucent or sum"*. Until now `isCamo` appeared **nowhere** under
+`js/gl/` — measured 0 changed pixels on both the mesh and the sphere path with
+the flag flipped on the same body, against 328 px on the 2D fallback. Wave 14 is
+the game's pure camo teaching wave, so the shipping renderer was teaching a
+mechanic with no on-screen signal for it at all.
+
+Reuses `GLRenderer.setFade`, which already existed for the wreck fade; no second
+blending path was written. Fade is STATE, so it is set once per pass and put
+back, exactly as `setGlow` is.
+
+**Camo bodies are drawn in a second pass, after every opaque one.** `setFade`
+turns depth writes off, so a translucent body lays down no depth; drawn in array
+order, an early camo enemy lets opaque bodies *behind* it composite over the top
+of it. Camo-vs-camo overlap is still array-ordered — measured at 29 px on two
+deliberately overlapping bodies, and sorting that pass is the obvious next step
+if it ever matters.
+
+**`CAMO_ALPHA = 0.62`, and the usual instrument could not have chosen it.**
+Across alpha 0.85 → 0.40 the changed-pixel count is 97–100 px and the silhouette
+change is **exactly zero at every step**: alpha does not move the outline by one
+pixel, so a count is flat across the entire range it is meant to choose within.
+Chosen on values instead — at one body pixel, board (21,45,60) and opaque
+(90,100,118), 0.62 renders (64,79,96). Below ~0.5 the body converges on the
+ground it stands on.
+
+**The ring is kept, and it is the half that teaches.** Alpha is a *subtractive*
+cue: it makes the body harder to see, which is right as fiction and wrong as
+instruction — it answers "which of these needs detection" by making that one
+less distinct. The ring is *additive*: measured on the overlay, 59 px **gained**,
+0 vacated, 0 recoloured — pure new outline where the alpha contributes none. It
+reuses `drawGroundRing`/`ringPath`, so it sits on the ground in perspective, and
+its colour, dash and `+4` radius are lifted verbatim from `js/enemy.js` so both
+renderers teach the same mark.
+
+`Effects.drawScreen` was considered as a shared seam and rejected: it does run
+in both renderers, but it is screen-space and enemy-agnostic — no projector, no
+enemy list. The two rings are two projections of one cue, not two implementations.
+
+Verified with `visual-pass/probe/camo-fade-probe.js`. The control is **the same
+body with alpha on versus off**, never camo-versus-ordinary — those differ by
+type colour and would show a difference even if the fade did nothing. With the
+fade forced inert the new build is **bit-identical** to the pre-change build, so
+the two-pass split costs nothing on a board with no camo on it. Buffer-order
+compositing under fade was tested directly with suki's two re-exports of
+`enemy-normal`, which differ only in triangle order: **0 px faded**, so it is not
+observable at this size and alpha.
+
 **2026-08-13 — `f90819e` retires the three-difficulty claims from the roster
 comments, and `AGENTS.md` stops counting the model roster it cannot keep up
 with. Plus the one-line incantation for auditing the schedule, and why a

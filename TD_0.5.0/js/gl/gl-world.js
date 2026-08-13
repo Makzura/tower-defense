@@ -579,6 +579,41 @@ var World3D = (function () {
   var FLIGHT_BOB = 0.16;                  // radii, peak above the rest height
   var FLIGHT_BOB_HZ = 0.75;
 
+  // HOW SOLID A CAMOUFLAGED BODY IS. The owner asked for "a bit translucent".
+  //
+  // CHOSEN ON PIXEL VALUES, BECAUSE A CHANGED-PIXEL COUNT CANNOT TUNE THIS AT
+  // ALL. Measured over alpha 0.85 down to 0.40, the count is 97-100 px at every
+  // step and the silhouette change is EXACTLY ZERO at every step -- alpha does
+  // not move the outline by one pixel, so the usual instrument is flat across
+  // the whole range it is supposed to choose within. What varies is value. At
+  // one body pixel, board (21,45,60) and opaque (90,100,118):
+  //
+  //     alpha 0.62 -> (64,79,96)   0.50 -> (55,72,89)   0.40 -> (48,67,83)
+  //
+  // 0.62 sits the body a little over halfway back from the board, which reads
+  // as washed out while still clearly a body. Below ~0.5 it starts converging
+  // on the ground it is standing on, and the thing a player must find becomes
+  // the thing that is hardest to see -- fine as fiction, bad as teaching.
+  //
+  // NOT the 2D pack's 0.5: that was chosen for a flat sprite on a flat board,
+  // where nothing else marks the enemy out. Here the RING below carries the
+  // teaching and the alpha only has to say "not solid", so it can afford to be
+  // gentler. The two paths differ on purpose and agree on the cue that matters.
+  //
+  // Self-transparency is small because the renderer culls back faces
+  // (gl-renderer.js enables CULL_FACE / BACK), so a translucent body shows its
+  // own overlapping FRONT faces in buffer order and never its interior.
+  // Measured, not assumed: suki's two re-exports of enemy-normal differ only in
+  // triangle order, and rendered faded they are still pixel-identical -- so
+  // buffer order is not observable on a body this size at this alpha.
+  var CAMO_ALPHA = 0.62;
+
+  // The camo ring's colour, dash and radius are lifted verbatim from the 2D
+  // pack (js/enemy.js) so a player who learns the cue on one path reads it
+  // unchanged on the other. Only the projection differs.
+  var CAMO_RING_RGBA = "rgba(190,255,205,0.75)";
+  var CAMO_RING_PAD = 4;                  // px beyond radiusPx(), as in 2D
+
   function flightLiftRadii() {
     return (typeof Enemy !== "undefined" && Enemy.FLIGHT_LIFT_RADII) || 3.45;
   }
@@ -1254,8 +1289,31 @@ var World3D = (function () {
         renderer.setGlow(0, null);
       }
     }
+    // CAMO BODIES ARE DRAWN TRANSLUCENT, AND THEY ARE DRAWN LAST.
+    //
+    // `setFade` turns on blending and turns OFF depth writes, so a translucent
+    // body lays down no depth. Drawn in array order a camo enemy that happened
+    // to be early would let every opaque body behind it composite over the top
+    // of it, which reads as a solid enemy standing in front of a ghost that is
+    // actually nearer the camera. Two passes fixes that for opaque-vs-camo, and
+    // costs one extra walk of a list that is at most a few dozen long.
+    //
+    // Camo-vs-camo overlap is still resolved in array order rather than by
+    // depth. That is deliberate and measured rather than assumed -- see the
+    // note on CAMO_ALPHA. Sorting the second pass would fix it and is the
+    // obvious next step if the board ever runs many overlapping camo bodies.
+    var camoCount = 0;
+    for (i = 0; i < state.enemies.length; i++) {
+      if (state.enemies[i].isCamo) camoCount++;
+    }
+    for (var pass = 0; pass < (camoCount ? 2 : 1); pass++) {
+      var wantCamo = (pass === 1);
+      // Set once per pass, not once per body: `setFade` toggles BLEND and the
+      // depth mask, and there is no reason to do that per enemy.
+      if (wantCamo) renderer.setFade(CAMO_ALPHA);
     for (i = 0; i < state.enemies.length; i++) {
       var e = state.enemies[i];
+      if (!!e.isCamo !== wantCamo) continue;
       var heading = e.path && e.path.tangentAt
         ? e.path.tangentAt(e.progress) : null;
       var yaw = heading ? Math.atan2(heading.y, heading.x) : 0;
@@ -1299,10 +1357,16 @@ var World3D = (function () {
           radius * (0.94 + beat * 0.10));
       }
     }
-    // THE WRECKS, drawn last of the bodies. They are the only translucent thing
-    // on the board, and a blended draw with depth writes off has to come after
-    // everything opaque or it composites against a half-built frame. Each one
-    // is the real mesh at a real transform -- see js/gl/enemy-wreck.js.
+      // Put it back, for the same reason setGlow is put back: fade is STATE,
+      // and a pass that left it on would hand its translucency to the wrecks
+      // and to every later frame's first body.
+      if (wantCamo) renderer.setFade(1);
+    }
+    // THE WRECKS, drawn last of the bodies. They were the only translucent
+    // thing on the board until camo enemies joined them, and a blended draw
+    // with depth writes off has to come after everything opaque or it
+    // composites against a half-built frame. Each one is the real mesh at a
+    // real transform -- see js/gl/enemy-wreck.js.
     if (typeof EnemyWreck !== "undefined") {
       var wrecks = EnemyWreck.bodies();
       for (i = 0; i < wrecks.length; i++) {
@@ -1917,6 +1981,32 @@ var World3D = (function () {
       for (var k = 0; rec && k < rec.length; k++) {
         if (!rec[k].dead) bar(ctx, rec[k], "recruit");
       }
+    }
+    // THE CAMO RING, and it is drawn as well as the translucency rather than
+    // instead of it.
+    //
+    // Alpha alone is a SUBTRACTIVE cue: it makes the body harder to see, which
+    // is the right fiction and the wrong teaching. Wave 14 is the game's pure
+    // camo wave -- the one where a player is meant to work out that some things
+    // need detection -- and answering "why can nothing shoot that" with a body
+    // that is merely fainter asks them to notice an absence. The ring is
+    // ADDITIVE: something is there that is not on any other enemy. The 2D pack
+    // pairs the two for exactly this reason and its comment says so; dropping
+    // the ring here would have made the 3D board a weaker teacher than the
+    // fallback it replaced.
+    //
+    // Full opacity on purpose, again as in 2D, so the marker survives on a body
+    // that is deliberately washed out. Projected with the same ringPath the
+    // range and hover rings use, so it sits on the ground in perspective rather
+    // than as a screen-space circle pasted over a 3D board.
+    for (i = 0; i < state.enemies.length; i++) {
+      var ce = state.enemies[i];
+      if (!ce.isCamo) continue;
+      var cr = (ce.radiusPx ? ce.radiusPx() : 11) + CAMO_RING_PAD;
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      drawGroundRing(ctx, ce.pos.x, ce.pos.y, cr, CAMO_RING_RGBA, null, 1.5);
+      ctx.restore();
     }
     for (i = 0; i < state.enemies.length; i++) bar(ctx, state.enemies[i], "enemy");
 

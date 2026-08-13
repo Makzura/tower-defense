@@ -1,0 +1,3547 @@
+{
+ "bearings": {
+  "front": {
+   "yaw": -1.5707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -1.5707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 200,
+   "spotScore": 0.947,
+   "guard": {
+    "angry": {
+     "atSpot": 217,
+     "ownBest": 228,
+     "ratio": 0.952,
+     "fill": 0.646
+    },
+    "armored": {
+     "atSpot": 145,
+     "ownBest": 145,
+     "ratio": 1,
+     "fill": 0.628
+    },
+    "brute": {
+     "atSpot": 1143,
+     "ownBest": 1207,
+     "ratio": 0.947,
+     "fill": 0.731
+    },
+    "camo_normal": {
+     "atSpot": 124,
+     "ownBest": 124,
+     "ratio": 1,
+     "fill": 0.62
+    },
+    "fast": {
+     "atSpot": 108,
+     "ownBest": 108,
+     "ratio": 1,
+     "fill": 0.667
+    },
+    "flying": {
+     "atSpot": 62,
+     "ownBest": 62,
+     "ratio": 1,
+     "fill": 0.397
+    },
+    "hive": {
+     "atSpot": 1347,
+     "ownBest": 1347,
+     "ratio": 1,
+     "fill": 0.597
+    },
+    "normal": {
+     "atSpot": 124,
+     "ownBest": 124,
+     "ratio": 1,
+     "fill": 0.62
+    },
+    "slow": {
+     "atSpot": 186,
+     "ownBest": 186,
+     "ratio": 1,
+     "fill": 0.729
+    },
+    "swarm": {
+     "atSpot": 48,
+     "ownBest": 48,
+     "ratio": 1,
+     "fill": 0.667
+    }
+   },
+   "sameYaw": true,
+   "yaws": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "inRunNull": 0,
+   "place": {
+    "angry": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 13.75,
+     "yaw": 0,
+     "walk": 72,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 217,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "isFlying": false
+    },
+    "armored": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11.55,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 145,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "isFlying": false
+    },
+    "brute": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 16.5,
+     "yaw": 0,
+     "walk": 40,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1143,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "isFlying": false
+    },
+    "camo_normal": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 124,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "isFlying": false
+    },
+    "fast": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 108,
+     "bboxGL": [
+      255,
+      249,
+      9,
+      18
+     ],
+     "isFlying": false
+    },
+    "flying": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 9.35,
+     "yaw": 0,
+     "walk": 66,
+     "bucket": 6,
+     "frames": 12,
+     "silhouette": 62,
+     "bboxGL": [
+      251,
+      264,
+      13,
+      12
+     ],
+     "isFlying": true
+    },
+    "hive": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 17.6,
+     "yaw": 0,
+     "walk": 32,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1347,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "isFlying": false
+    },
+    "normal": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 124,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "isFlying": false
+    },
+    "slow": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 186,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      17
+     ],
+     "isFlying": false
+    },
+    "swarm": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 6.050000000000001,
+     "yaw": 0,
+     "walk": 104,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 48,
+     "bboxGL": [
+      257,
+      249,
+      9,
+      8
+     ],
+     "isFlying": false
+    }
+   },
+   "pairs": {
+    "angry|armored": {
+     "changed": 232,
+     "soloA": 217,
+     "soloB": 145,
+     "ratio": 1.282,
+     "bboxGL": [
+      253,
+      245,
+      13,
+      28
+     ],
+     "intersection": 130,
+     "interiorPx": 130,
+     "rimPx": 102,
+     "interiorShare": 0.5603,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 102,
+     "ratioSymmetricDifference": 0.564
+    },
+    "angry|brute": {
+     "changed": 1143,
+     "soloA": 217,
+     "soloB": 1143,
+     "ratio": 1.681,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 217,
+     "interiorPx": 217,
+     "rimPx": 926,
+     "interiorShare": 0.1899,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 926,
+     "ratioSymmetricDifference": 1.362
+    },
+    "angry|camo_normal": {
+     "changed": 223,
+     "soloA": 217,
+     "soloB": 124,
+     "ratio": 1.308,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "intersection": 118,
+     "interiorPx": 118,
+     "rimPx": 105,
+     "interiorShare": 0.5291,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 105,
+     "ratioSymmetricDifference": 0.616
+    },
+    "angry|fast": {
+     "changed": 218,
+     "soloA": 217,
+     "soloB": 108,
+     "ratio": 1.342,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "intersection": 106,
+     "interiorPx": 105,
+     "rimPx": 113,
+     "interiorShare": 0.4817,
+     "intersectionRepainted": 0.9906,
+     "symmetricDifference": 113,
+     "ratioSymmetricDifference": 0.695
+    },
+    "angry|flying": {
+     "changed": 246,
+     "soloA": 217,
+     "soloB": 62,
+     "ratio": 1.763,
+     "bboxGL": [
+      251,
+      245,
+      14,
+      31
+     ],
+     "intersection": 33,
+     "interiorPx": 33,
+     "rimPx": 213,
+     "interiorShare": 0.1341,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 213,
+     "ratioSymmetricDifference": 1.527
+    },
+    "angry|hive": {
+     "changed": 1401,
+     "soloA": 217,
+     "soloB": 1347,
+     "ratio": 1.792,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 163,
+     "interiorPx": 163,
+     "rimPx": 1238,
+     "interiorShare": 0.1163,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1238,
+     "ratioSymmetricDifference": 1.583
+    },
+    "angry|normal": {
+     "changed": 221,
+     "soloA": 217,
+     "soloB": 124,
+     "ratio": 1.296,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "intersection": 118,
+     "interiorPx": 116,
+     "rimPx": 105,
+     "interiorShare": 0.5249,
+     "intersectionRepainted": 0.9831,
+     "symmetricDifference": 105,
+     "ratioSymmetricDifference": 0.616
+    },
+    "angry|slow": {
+     "changed": 263,
+     "soloA": 217,
+     "soloB": 186,
+     "ratio": 1.305,
+     "bboxGL": [
+      253,
+      245,
+      15,
+      28
+     ],
+     "intersection": 139,
+     "interiorPx": 138,
+     "rimPx": 125,
+     "interiorShare": 0.5247,
+     "intersectionRepainted": 0.9928,
+     "symmetricDifference": 125,
+     "ratioSymmetricDifference": 0.62
+    },
+    "angry|swarm": {
+     "changed": 224,
+     "soloA": 217,
+     "soloB": 48,
+     "ratio": 1.691,
+     "bboxGL": [
+      253,
+      245,
+      13,
+      28
+     ],
+     "intersection": 41,
+     "interiorPx": 41,
+     "rimPx": 183,
+     "interiorShare": 0.183,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 183,
+     "ratioSymmetricDifference": 1.381
+    },
+    "armored|brute": {
+     "changed": 1143,
+     "soloA": 145,
+     "soloB": 1143,
+     "ratio": 1.775,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 145,
+     "interiorPx": 145,
+     "rimPx": 998,
+     "interiorShare": 0.1269,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 998,
+     "ratioSymmetricDifference": 1.55
+    },
+    "armored|camo_normal": {
+     "changed": 145,
+     "soloA": 145,
+     "soloB": 124,
+     "ratio": 1.078,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 124,
+     "interiorPx": 124,
+     "rimPx": 21,
+     "interiorShare": 0.8552,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 21,
+     "ratioSymmetricDifference": 0.156
+    },
+    "armored|fast": {
+     "changed": 136,
+     "soloA": 145,
+     "soloB": 108,
+     "ratio": 1.075,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 107,
+     "interiorPx": 97,
+     "rimPx": 39,
+     "interiorShare": 0.7132,
+     "intersectionRepainted": 0.9065,
+     "symmetricDifference": 39,
+     "ratioSymmetricDifference": 0.308
+    },
+    "armored|flying": {
+     "changed": 193,
+     "soloA": 145,
+     "soloB": 62,
+     "ratio": 1.865,
+     "bboxGL": [
+      251,
+      249,
+      15,
+      27
+     ],
+     "intersection": 14,
+     "interiorPx": 14,
+     "rimPx": 179,
+     "interiorShare": 0.0725,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 179,
+     "ratioSymmetricDifference": 1.729
+    },
+    "armored|hive": {
+     "changed": 1386,
+     "soloA": 145,
+     "soloB": 1347,
+     "ratio": 1.858,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 105,
+     "interiorPx": 104,
+     "rimPx": 1282,
+     "interiorShare": 0.075,
+     "intersectionRepainted": 0.9905,
+     "symmetricDifference": 1282,
+     "ratioSymmetricDifference": 1.718
+    },
+    "armored|normal": {
+     "changed": 133,
+     "soloA": 145,
+     "soloB": 124,
+     "ratio": 0.989,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 124,
+     "interiorPx": 112,
+     "rimPx": 21,
+     "interiorShare": 0.8421,
+     "intersectionRepainted": 0.9032,
+     "symmetricDifference": 21,
+     "ratioSymmetricDifference": 0.156
+    },
+    "armored|slow": {
+     "changed": 196,
+     "soloA": 145,
+     "soloB": 186,
+     "ratio": 1.184,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      21
+     ],
+     "intersection": 129,
+     "interiorPx": 123,
+     "rimPx": 73,
+     "interiorShare": 0.6276,
+     "intersectionRepainted": 0.9535,
+     "symmetricDifference": 73,
+     "ratioSymmetricDifference": 0.441
+    },
+    "armored|swarm": {
+     "changed": 161,
+     "soloA": 145,
+     "soloB": 48,
+     "ratio": 1.668,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 32,
+     "interiorPx": 32,
+     "rimPx": 129,
+     "interiorShare": 0.1988,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 129,
+     "ratioSymmetricDifference": 1.337
+    },
+    "brute|camo_normal": {
+     "changed": 1142,
+     "soloA": 1143,
+     "soloB": 124,
+     "ratio": 1.803,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 124,
+     "interiorPx": 123,
+     "rimPx": 1019,
+     "interiorShare": 0.1077,
+     "intersectionRepainted": 0.9919,
+     "symmetricDifference": 1019,
+     "ratioSymmetricDifference": 1.609
+    },
+    "brute|fast": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 108,
+     "ratio": 1.827,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 108,
+     "interiorPx": 108,
+     "rimPx": 1035,
+     "interiorShare": 0.0945,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1035,
+     "ratioSymmetricDifference": 1.655
+    },
+    "brute|flying": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 62,
+     "ratio": 1.897,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 62,
+     "interiorPx": 62,
+     "rimPx": 1081,
+     "interiorShare": 0.0542,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1081,
+     "ratioSymmetricDifference": 1.794
+    },
+    "brute|hive": {
+     "changed": 1503,
+     "soloA": 1143,
+     "soloB": 1347,
+     "ratio": 1.207,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 971,
+     "interiorPx": 955,
+     "rimPx": 548,
+     "interiorShare": 0.6354,
+     "intersectionRepainted": 0.9835,
+     "symmetricDifference": 548,
+     "ratioSymmetricDifference": 0.44
+    },
+    "brute|normal": {
+     "changed": 1142,
+     "soloA": 1143,
+     "soloB": 124,
+     "ratio": 1.803,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 124,
+     "interiorPx": 123,
+     "rimPx": 1019,
+     "interiorShare": 0.1077,
+     "intersectionRepainted": 0.9919,
+     "symmetricDifference": 1019,
+     "ratioSymmetricDifference": 1.609
+    },
+    "brute|slow": {
+     "changed": 1139,
+     "soloA": 1143,
+     "soloB": 186,
+     "ratio": 1.714,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 186,
+     "interiorPx": 182,
+     "rimPx": 957,
+     "interiorShare": 0.1598,
+     "intersectionRepainted": 0.9785,
+     "symmetricDifference": 957,
+     "ratioSymmetricDifference": 1.44
+    },
+    "brute|swarm": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 48,
+     "ratio": 1.919,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 48,
+     "interiorPx": 48,
+     "rimPx": 1095,
+     "interiorShare": 0.042,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1095,
+     "ratioSymmetricDifference": 1.839
+    },
+    "camo_normal|fast": {
+     "changed": 125,
+     "soloA": 124,
+     "soloB": 108,
+     "ratio": 1.078,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "intersection": 107,
+     "interiorPx": 107,
+     "rimPx": 18,
+     "interiorShare": 0.856,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 18,
+     "ratioSymmetricDifference": 0.155
+    },
+    "camo_normal|flying": {
+     "changed": 178,
+     "soloA": 124,
+     "soloB": 62,
+     "ratio": 1.914,
+     "bboxGL": [
+      251,
+      249,
+      14,
+      27
+     ],
+     "intersection": 8,
+     "interiorPx": 8,
+     "rimPx": 170,
+     "interiorShare": 0.0449,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 170,
+     "ratioSymmetricDifference": 1.828
+    },
+    "camo_normal|hive": {
+     "changed": 1385,
+     "soloA": 124,
+     "soloB": 1347,
+     "ratio": 1.883,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 86,
+     "interiorPx": 86,
+     "rimPx": 1299,
+     "interiorShare": 0.0621,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1299,
+     "ratioSymmetricDifference": 1.766
+    },
+    "camo_normal|normal": {
+     "changed": 124,
+     "soloA": 124,
+     "soloB": 124,
+     "ratio": 1,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "intersection": 124,
+     "interiorPx": 124,
+     "rimPx": 0,
+     "interiorShare": 1,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 0,
+     "ratioSymmetricDifference": 0
+    },
+    "camo_normal|slow": {
+     "changed": 194,
+     "soloA": 124,
+     "soloB": 186,
+     "ratio": 1.252,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      20
+     ],
+     "intersection": 116,
+     "interiorPx": 116,
+     "rimPx": 78,
+     "interiorShare": 0.5979,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 0.503
+    },
+    "camo_normal|swarm": {
+     "changed": 143,
+     "soloA": 124,
+     "soloB": 48,
+     "ratio": 1.663,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      20
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 114,
+     "interiorShare": 0.2028,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 114,
+     "ratioSymmetricDifference": 1.326
+    },
+    "fast|flying": {
+     "changed": 165,
+     "soloA": 108,
+     "soloB": 62,
+     "ratio": 1.941,
+     "bboxGL": [
+      251,
+      249,
+      13,
+      27
+     ],
+     "intersection": 5,
+     "interiorPx": 5,
+     "rimPx": 160,
+     "interiorShare": 0.0303,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 160,
+     "ratioSymmetricDifference": 1.882
+    },
+    "fast|hive": {
+     "changed": 1383,
+     "soloA": 108,
+     "soloB": 1347,
+     "ratio": 1.901,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 72,
+     "interiorPx": 72,
+     "rimPx": 1311,
+     "interiorShare": 0.0521,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1311,
+     "ratioSymmetricDifference": 1.802
+    },
+    "fast|normal": {
+     "changed": 79,
+     "soloA": 108,
+     "soloB": 124,
+     "ratio": 0.681,
+     "bboxGL": [
+      255,
+      252,
+      10,
+      17
+     ],
+     "intersection": 107,
+     "interiorPx": 61,
+     "rimPx": 18,
+     "interiorShare": 0.7722,
+     "intersectionRepainted": 0.5701,
+     "symmetricDifference": 18,
+     "ratioSymmetricDifference": 0.155
+    },
+    "fast|slow": {
+     "changed": 178,
+     "soloA": 108,
+     "soloB": 186,
+     "ratio": 1.211,
+     "bboxGL": [
+      253,
+      251,
+      15,
+      16
+     ],
+     "intersection": 104,
+     "interiorPx": 92,
+     "rimPx": 86,
+     "interiorShare": 0.5169,
+     "intersectionRepainted": 0.8846,
+     "symmetricDifference": 86,
+     "ratioSymmetricDifference": 0.585
+    },
+    "fast|swarm": {
+     "changed": 127,
+     "soloA": 108,
+     "soloB": 48,
+     "ratio": 1.628,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      18
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 98,
+     "interiorShare": 0.2283,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 98,
+     "ratioSymmetricDifference": 1.256
+    },
+    "flying|hive": {
+     "changed": 1347,
+     "soloA": 62,
+     "soloB": 1347,
+     "ratio": 1.912,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 62,
+     "interiorPx": 62,
+     "rimPx": 1285,
+     "interiorShare": 0.046,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1285,
+     "ratioSymmetricDifference": 1.824
+    },
+    "flying|normal": {
+     "changed": 178,
+     "soloA": 62,
+     "soloB": 124,
+     "ratio": 1.914,
+     "bboxGL": [
+      251,
+      249,
+      14,
+      27
+     ],
+     "intersection": 8,
+     "interiorPx": 8,
+     "rimPx": 170,
+     "interiorShare": 0.0449,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 170,
+     "ratioSymmetricDifference": 1.828
+    },
+    "flying|slow": {
+     "changed": 246,
+     "soloA": 62,
+     "soloB": 186,
+     "ratio": 1.984,
+     "bboxGL": [
+      251,
+      249,
+      17,
+      27
+     ],
+     "intersection": 2,
+     "interiorPx": 2,
+     "rimPx": 244,
+     "interiorShare": 0.0081,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 244,
+     "ratioSymmetricDifference": 1.968
+    },
+    "flying|swarm": {
+     "changed": 110,
+     "soloA": 62,
+     "soloB": 48,
+     "ratio": 2,
+     "bboxGL": [
+      251,
+      249,
+      15,
+      27
+     ],
+     "intersection": 0,
+     "interiorPx": 0,
+     "rimPx": 110,
+     "interiorShare": 0,
+     "intersectionRepainted": 0,
+     "symmetricDifference": 110,
+     "ratioSymmetricDifference": 2
+    },
+    "hive|normal": {
+     "changed": 1385,
+     "soloA": 1347,
+     "soloB": 124,
+     "ratio": 1.883,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 86,
+     "interiorPx": 86,
+     "rimPx": 1299,
+     "interiorShare": 0.0621,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1299,
+     "ratioSymmetricDifference": 1.766
+    },
+    "hive|slow": {
+     "changed": 1393,
+     "soloA": 1347,
+     "soloB": 186,
+     "ratio": 1.817,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 140,
+     "interiorPx": 140,
+     "rimPx": 1253,
+     "interiorShare": 0.1005,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1253,
+     "ratioSymmetricDifference": 1.635
+    },
+    "hive|swarm": {
+     "changed": 1380,
+     "soloA": 1347,
+     "soloB": 48,
+     "ratio": 1.978,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 15,
+     "interiorPx": 15,
+     "rimPx": 1365,
+     "interiorShare": 0.0109,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1365,
+     "ratioSymmetricDifference": 1.957
+    },
+    "normal|slow": {
+     "changed": 184,
+     "soloA": 124,
+     "soloB": 186,
+     "ratio": 1.187,
+     "bboxGL": [
+      253,
+      251,
+      15,
+      18
+     ],
+     "intersection": 116,
+     "interiorPx": 106,
+     "rimPx": 78,
+     "interiorShare": 0.5761,
+     "intersectionRepainted": 0.9138,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 0.503
+    },
+    "normal|swarm": {
+     "changed": 143,
+     "soloA": 124,
+     "soloB": 48,
+     "ratio": 1.663,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      20
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 114,
+     "interiorShare": 0.2028,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 114,
+     "ratioSymmetricDifference": 1.326
+    },
+    "slow|swarm": {
+     "changed": 186,
+     "soloA": 186,
+     "soloB": 48,
+     "ratio": 1.59,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      17
+     ],
+     "intersection": 48,
+     "interiorPx": 48,
+     "rimPx": 138,
+     "interiorShare": 0.2581,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 138,
+     "ratioSymmetricDifference": 1.179
+    }
+   },
+   "pairCount": 45,
+   "seconds": 12.6
+  },
+  "three-quarter": {
+   "yaw": -0.8707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -0.8707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 1450,
+   "spotScore": 1,
+   "guard": {
+    "angry": {
+     "atSpot": 236,
+     "ownBest": 236,
+     "ratio": 1,
+     "fill": 0.581
+    },
+    "armored": {
+     "atSpot": 147,
+     "ownBest": 147,
+     "ratio": 1,
+     "fill": 0.607
+    },
+    "brute": {
+     "atSpot": 1293,
+     "ownBest": 1293,
+     "ratio": 1,
+     "fill": 0.699
+    },
+    "camo_normal": {
+     "atSpot": 128,
+     "ownBest": 128,
+     "ratio": 1,
+     "fill": 0.61
+    },
+    "fast": {
+     "atSpot": 110,
+     "ownBest": 110,
+     "ratio": 1,
+     "fill": 0.724
+    },
+    "flying": {
+     "atSpot": 60,
+     "ownBest": 60,
+     "ratio": 1,
+     "fill": 0.496
+    },
+    "hive": {
+     "atSpot": 1332,
+     "ownBest": 1332,
+     "ratio": 1,
+     "fill": 0.602
+    },
+    "normal": {
+     "atSpot": 127,
+     "ownBest": 127,
+     "ratio": 1,
+     "fill": 0.672
+    },
+    "slow": {
+     "atSpot": 170,
+     "ownBest": 170,
+     "ratio": 1,
+     "fill": 0.63
+    },
+    "swarm": {
+     "atSpot": 46,
+     "ownBest": 46,
+     "ratio": 1,
+     "fill": 0.575
+    }
+   },
+   "sameYaw": true,
+   "yaws": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "inRunNull": 0,
+   "place": {
+    "angry": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 13.75,
+     "yaw": 0,
+     "walk": 492,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 236,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "isFlying": false
+    },
+    "armored": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11.55,
+     "yaw": 0,
+     "walk": 384,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 147,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      22
+     ],
+     "isFlying": false
+    },
+    "brute": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 16.5,
+     "yaw": 0,
+     "walk": 272,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1293,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "isFlying": false
+    },
+    "camo_normal": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 128,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      21
+     ],
+     "isFlying": false
+    },
+    "fast": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 110,
+     "bboxGL": [
+      594,
+      233,
+      8,
+      19
+     ],
+     "isFlying": false
+    },
+    "flying": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 9.35,
+     "yaw": 0,
+     "walk": 66,
+     "bucket": 6,
+     "frames": 12,
+     "silhouette": 60,
+     "bboxGL": [
+      593,
+      248,
+      11,
+      11
+     ],
+     "isFlying": true
+    },
+    "hive": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 17.6,
+     "yaw": 0,
+     "walk": 256,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1332,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "isFlying": false
+    },
+    "normal": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 127,
+     "bboxGL": [
+      594,
+      233,
+      9,
+      21
+     ],
+     "isFlying": false
+    },
+    "slow": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 170,
+     "bboxGL": [
+      591,
+      233,
+      15,
+      18
+     ],
+     "isFlying": false
+    },
+    "swarm": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 6.050000000000001,
+     "yaw": 0,
+     "walk": 736,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 46,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      8
+     ],
+     "isFlying": false
+    }
+   },
+   "pairs": {
+    "angry|armored": {
+     "changed": 245,
+     "soloA": 236,
+     "soloB": 147,
+     "ratio": 1.279,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "intersection": 137,
+     "interiorPx": 136,
+     "rimPx": 109,
+     "interiorShare": 0.5551,
+     "intersectionRepainted": 0.9927,
+     "symmetricDifference": 109,
+     "ratioSymmetricDifference": 0.569
+    },
+    "angry|brute": {
+     "changed": 1293,
+     "soloA": 236,
+     "soloB": 1293,
+     "ratio": 1.691,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 236,
+     "interiorPx": 236,
+     "rimPx": 1057,
+     "interiorShare": 0.1825,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1057,
+     "ratioSymmetricDifference": 1.383
+    },
+    "angry|camo_normal": {
+     "changed": 240,
+     "soloA": 236,
+     "soloB": 128,
+     "ratio": 1.319,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "intersection": 124,
+     "interiorPx": 124,
+     "rimPx": 116,
+     "interiorShare": 0.5167,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 116,
+     "ratioSymmetricDifference": 0.637
+    },
+    "angry|fast": {
+     "changed": 234,
+     "soloA": 236,
+     "soloB": 110,
+     "ratio": 1.353,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "intersection": 110,
+     "interiorPx": 108,
+     "rimPx": 126,
+     "interiorShare": 0.4615,
+     "intersectionRepainted": 0.9818,
+     "symmetricDifference": 126,
+     "ratioSymmetricDifference": 0.728
+    },
+    "angry|flying": {
+     "changed": 260,
+     "soloA": 236,
+     "soloB": 60,
+     "ratio": 1.757,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "intersection": 36,
+     "interiorPx": 36,
+     "rimPx": 224,
+     "interiorShare": 0.1385,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 224,
+     "ratioSymmetricDifference": 1.514
+    },
+    "angry|hive": {
+     "changed": 1388,
+     "soloA": 236,
+     "soloB": 1332,
+     "ratio": 1.77,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 180,
+     "interiorPx": 180,
+     "rimPx": 1208,
+     "interiorShare": 0.1297,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1208,
+     "ratioSymmetricDifference": 1.541
+    },
+    "angry|normal": {
+     "changed": 239,
+     "soloA": 236,
+     "soloB": 127,
+     "ratio": 1.317,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "intersection": 123,
+     "interiorPx": 122,
+     "rimPx": 117,
+     "interiorShare": 0.5105,
+     "intersectionRepainted": 0.9919,
+     "symmetricDifference": 117,
+     "ratioSymmetricDifference": 0.645
+    },
+    "angry|slow": {
+     "changed": 266,
+     "soloA": 236,
+     "soloB": 170,
+     "ratio": 1.31,
+     "bboxGL": [
+      590,
+      230,
+      16,
+      29
+     ],
+     "intersection": 137,
+     "interiorPx": 134,
+     "rimPx": 132,
+     "interiorShare": 0.5038,
+     "intersectionRepainted": 0.9781,
+     "symmetricDifference": 132,
+     "ratioSymmetricDifference": 0.65
+    },
+    "angry|swarm": {
+     "changed": 240,
+     "soloA": 236,
+     "soloB": 46,
+     "ratio": 1.702,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "intersection": 42,
+     "interiorPx": 42,
+     "rimPx": 198,
+     "interiorShare": 0.175,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 198,
+     "ratioSymmetricDifference": 1.404
+    },
+    "armored|brute": {
+     "changed": 1292,
+     "soloA": 147,
+     "soloB": 1293,
+     "ratio": 1.794,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 147,
+     "interiorPx": 146,
+     "rimPx": 1146,
+     "interiorShare": 0.113,
+     "intersectionRepainted": 0.9932,
+     "symmetricDifference": 1146,
+     "ratioSymmetricDifference": 1.592
+    },
+    "armored|camo_normal": {
+     "changed": 150,
+     "soloA": 147,
+     "soloB": 128,
+     "ratio": 1.091,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      22
+     ],
+     "intersection": 125,
+     "interiorPx": 125,
+     "rimPx": 25,
+     "interiorShare": 0.8333,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 25,
+     "ratioSymmetricDifference": 0.182
+    },
+    "armored|fast": {
+     "changed": 138,
+     "soloA": 147,
+     "soloB": 110,
+     "ratio": 1.074,
+     "bboxGL": [
+      593,
+      234,
+      11,
+      21
+     ],
+     "intersection": 108,
+     "interiorPx": 97,
+     "rimPx": 41,
+     "interiorShare": 0.7029,
+     "intersectionRepainted": 0.8981,
+     "symmetricDifference": 41,
+     "ratioSymmetricDifference": 0.319
+    },
+    "armored|flying": {
+     "changed": 190,
+     "soloA": 147,
+     "soloB": 60,
+     "ratio": 1.836,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      26
+     ],
+     "intersection": 17,
+     "interiorPx": 17,
+     "rimPx": 173,
+     "interiorShare": 0.0895,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 173,
+     "ratioSymmetricDifference": 1.671
+    },
+    "armored|hive": {
+     "changed": 1357,
+     "soloA": 147,
+     "soloB": 1332,
+     "ratio": 1.835,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 122,
+     "interiorPx": 122,
+     "rimPx": 1235,
+     "interiorShare": 0.0899,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1235,
+     "ratioSymmetricDifference": 1.67
+    },
+    "armored|normal": {
+     "changed": 136,
+     "soloA": 147,
+     "soloB": 127,
+     "ratio": 0.993,
+     "bboxGL": [
+      593,
+      234,
+      11,
+      21
+     ],
+     "intersection": 124,
+     "interiorPx": 110,
+     "rimPx": 26,
+     "interiorShare": 0.8088,
+     "intersectionRepainted": 0.8871,
+     "symmetricDifference": 26,
+     "ratioSymmetricDifference": 0.19
+    },
+    "armored|slow": {
+     "changed": 178,
+     "soloA": 147,
+     "soloB": 170,
+     "ratio": 1.123,
+     "bboxGL": [
+      591,
+      234,
+      15,
+      21
+     ],
+     "intersection": 132,
+     "interiorPx": 125,
+     "rimPx": 53,
+     "interiorShare": 0.7022,
+     "intersectionRepainted": 0.947,
+     "symmetricDifference": 53,
+     "ratioSymmetricDifference": 0.334
+    },
+    "armored|swarm": {
+     "changed": 152,
+     "soloA": 147,
+     "soloB": 46,
+     "ratio": 1.575,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      22
+     ],
+     "intersection": 41,
+     "interiorPx": 41,
+     "rimPx": 111,
+     "interiorShare": 0.2697,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 111,
+     "ratioSymmetricDifference": 1.15
+    },
+    "brute|camo_normal": {
+     "changed": 1293,
+     "soloA": 1293,
+     "soloB": 128,
+     "ratio": 1.82,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 128,
+     "interiorPx": 128,
+     "rimPx": 1165,
+     "interiorShare": 0.099,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1165,
+     "ratioSymmetricDifference": 1.64
+    },
+    "brute|fast": {
+     "changed": 1293,
+     "soloA": 1293,
+     "soloB": 110,
+     "ratio": 1.843,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 110,
+     "interiorPx": 110,
+     "rimPx": 1183,
+     "interiorShare": 0.0851,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1183,
+     "ratioSymmetricDifference": 1.686
+    },
+    "brute|flying": {
+     "changed": 1293,
+     "soloA": 1293,
+     "soloB": 60,
+     "ratio": 1.911,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 60,
+     "interiorPx": 60,
+     "rimPx": 1233,
+     "interiorShare": 0.0464,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1233,
+     "ratioSymmetricDifference": 1.823
+    },
+    "brute|hive": {
+     "changed": 1567,
+     "soloA": 1293,
+     "soloB": 1332,
+     "ratio": 1.194,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 1049,
+     "interiorPx": 1040,
+     "rimPx": 527,
+     "interiorShare": 0.6637,
+     "intersectionRepainted": 0.9914,
+     "symmetricDifference": 527,
+     "ratioSymmetricDifference": 0.402
+    },
+    "brute|normal": {
+     "changed": 1293,
+     "soloA": 1293,
+     "soloB": 127,
+     "ratio": 1.821,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 127,
+     "interiorPx": 127,
+     "rimPx": 1166,
+     "interiorShare": 0.0982,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1166,
+     "ratioSymmetricDifference": 1.642
+    },
+    "brute|slow": {
+     "changed": 1293,
+     "soloA": 1293,
+     "soloB": 170,
+     "ratio": 1.768,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 170,
+     "interiorPx": 170,
+     "rimPx": 1123,
+     "interiorShare": 0.1315,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1123,
+     "ratioSymmetricDifference": 1.535
+    },
+    "brute|swarm": {
+     "changed": 1293,
+     "soloA": 1293,
+     "soloB": 46,
+     "ratio": 1.931,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "intersection": 46,
+     "interiorPx": 46,
+     "rimPx": 1247,
+     "interiorShare": 0.0356,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1247,
+     "ratioSymmetricDifference": 1.863
+    },
+    "camo_normal|fast": {
+     "changed": 129,
+     "soloA": 128,
+     "soloB": 110,
+     "ratio": 1.084,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      21
+     ],
+     "intersection": 109,
+     "interiorPx": 109,
+     "rimPx": 20,
+     "interiorShare": 0.845,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 20,
+     "ratioSymmetricDifference": 0.168
+    },
+    "camo_normal|flying": {
+     "changed": 176,
+     "soloA": 128,
+     "soloB": 60,
+     "ratio": 1.872,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      26
+     ],
+     "intersection": 12,
+     "interiorPx": 12,
+     "rimPx": 164,
+     "interiorShare": 0.0682,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 164,
+     "ratioSymmetricDifference": 1.745
+    },
+    "camo_normal|hive": {
+     "changed": 1354,
+     "soloA": 128,
+     "soloB": 1332,
+     "ratio": 1.855,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 106,
+     "interiorPx": 106,
+     "rimPx": 1248,
+     "interiorShare": 0.0783,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1248,
+     "ratioSymmetricDifference": 1.71
+    },
+    "camo_normal|normal": {
+     "changed": 128,
+     "soloA": 128,
+     "soloB": 127,
+     "ratio": 1.004,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      21
+     ],
+     "intersection": 127,
+     "interiorPx": 127,
+     "rimPx": 1,
+     "interiorShare": 0.9922,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1,
+     "ratioSymmetricDifference": 0.008
+    },
+    "camo_normal|slow": {
+     "changed": 182,
+     "soloA": 128,
+     "soloB": 170,
+     "ratio": 1.221,
+     "bboxGL": [
+      591,
+      233,
+      15,
+      21
+     ],
+     "intersection": 116,
+     "interiorPx": 116,
+     "rimPx": 66,
+     "interiorShare": 0.6374,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 66,
+     "ratioSymmetricDifference": 0.443
+    },
+    "camo_normal|swarm": {
+     "changed": 138,
+     "soloA": 128,
+     "soloB": 46,
+     "ratio": 1.586,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      21
+     ],
+     "intersection": 36,
+     "interiorPx": 36,
+     "rimPx": 102,
+     "interiorShare": 0.2609,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 102,
+     "ratioSymmetricDifference": 1.172
+    },
+    "fast|flying": {
+     "changed": 163,
+     "soloA": 110,
+     "soloB": 60,
+     "ratio": 1.918,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      26
+     ],
+     "intersection": 7,
+     "interiorPx": 7,
+     "rimPx": 156,
+     "interiorShare": 0.0429,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 156,
+     "ratioSymmetricDifference": 1.835
+    },
+    "fast|hive": {
+     "changed": 1353,
+     "soloA": 110,
+     "soloB": 1332,
+     "ratio": 1.877,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 89,
+     "interiorPx": 89,
+     "rimPx": 1264,
+     "interiorShare": 0.0658,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1264,
+     "ratioSymmetricDifference": 1.753
+    },
+    "fast|normal": {
+     "changed": 83,
+     "soloA": 110,
+     "soloB": 127,
+     "ratio": 0.7,
+     "bboxGL": [
+      594,
+      237,
+      9,
+      17
+     ],
+     "intersection": 109,
+     "interiorPx": 64,
+     "rimPx": 19,
+     "interiorShare": 0.7711,
+     "intersectionRepainted": 0.5872,
+     "symmetricDifference": 19,
+     "ratioSymmetricDifference": 0.16
+    },
+    "fast|slow": {
+     "changed": 163,
+     "soloA": 110,
+     "soloB": 170,
+     "ratio": 1.164,
+     "bboxGL": [
+      591,
+      235,
+      15,
+      17
+     ],
+     "intersection": 104,
+     "interiorPx": 91,
+     "rimPx": 72,
+     "interiorShare": 0.5583,
+     "intersectionRepainted": 0.875,
+     "symmetricDifference": 72,
+     "ratioSymmetricDifference": 0.514
+    },
+    "fast|swarm": {
+     "changed": 121,
+     "soloA": 110,
+     "soloB": 46,
+     "ratio": 1.551,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      19
+     ],
+     "intersection": 35,
+     "interiorPx": 35,
+     "rimPx": 86,
+     "interiorShare": 0.2893,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 86,
+     "ratioSymmetricDifference": 1.103
+    },
+    "flying|hive": {
+     "changed": 1332,
+     "soloA": 60,
+     "soloB": 1332,
+     "ratio": 1.914,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 60,
+     "interiorPx": 60,
+     "rimPx": 1272,
+     "interiorShare": 0.045,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1272,
+     "ratioSymmetricDifference": 1.828
+    },
+    "flying|normal": {
+     "changed": 175,
+     "soloA": 60,
+     "soloB": 127,
+     "ratio": 1.872,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      26
+     ],
+     "intersection": 12,
+     "interiorPx": 12,
+     "rimPx": 163,
+     "interiorShare": 0.0686,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 163,
+     "ratioSymmetricDifference": 1.743
+    },
+    "flying|slow": {
+     "changed": 226,
+     "soloA": 60,
+     "soloB": 170,
+     "ratio": 1.965,
+     "bboxGL": [
+      591,
+      233,
+      15,
+      26
+     ],
+     "intersection": 4,
+     "interiorPx": 4,
+     "rimPx": 222,
+     "interiorShare": 0.0177,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 222,
+     "ratioSymmetricDifference": 1.93
+    },
+    "flying|swarm": {
+     "changed": 106,
+     "soloA": 60,
+     "soloB": 46,
+     "ratio": 2,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      26
+     ],
+     "intersection": 0,
+     "interiorPx": 0,
+     "rimPx": 106,
+     "interiorShare": 0,
+     "intersectionRepainted": 0,
+     "symmetricDifference": 106,
+     "ratioSymmetricDifference": 2
+    },
+    "hive|normal": {
+     "changed": 1353,
+     "soloA": 1332,
+     "soloB": 127,
+     "ratio": 1.855,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 105,
+     "interiorPx": 104,
+     "rimPx": 1249,
+     "interiorShare": 0.0769,
+     "intersectionRepainted": 0.9905,
+     "symmetricDifference": 1249,
+     "ratioSymmetricDifference": 1.712
+    },
+    "hive|slow": {
+     "changed": 1367,
+     "soloA": 1332,
+     "soloB": 170,
+     "ratio": 1.82,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 134,
+     "interiorPx": 133,
+     "rimPx": 1234,
+     "interiorShare": 0.0973,
+     "intersectionRepainted": 0.9925,
+     "symmetricDifference": 1234,
+     "ratioSymmetricDifference": 1.643
+    },
+    "hive|swarm": {
+     "changed": 1354,
+     "soloA": 1332,
+     "soloB": 46,
+     "ratio": 1.965,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "intersection": 24,
+     "interiorPx": 24,
+     "rimPx": 1330,
+     "interiorShare": 0.0177,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1330,
+     "ratioSymmetricDifference": 1.93
+    },
+    "normal|slow": {
+     "changed": 171,
+     "soloA": 127,
+     "soloB": 170,
+     "ratio": 1.152,
+     "bboxGL": [
+      591,
+      235,
+      15,
+      19
+     ],
+     "intersection": 115,
+     "interiorPx": 104,
+     "rimPx": 67,
+     "interiorShare": 0.6082,
+     "intersectionRepainted": 0.9043,
+     "symmetricDifference": 67,
+     "ratioSymmetricDifference": 0.451
+    },
+    "normal|swarm": {
+     "changed": 137,
+     "soloA": 127,
+     "soloB": 46,
+     "ratio": 1.584,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      21
+     ],
+     "intersection": 36,
+     "interiorPx": 36,
+     "rimPx": 101,
+     "interiorShare": 0.2628,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 101,
+     "ratioSymmetricDifference": 1.168
+    },
+    "slow|swarm": {
+     "changed": 170,
+     "soloA": 170,
+     "soloB": 46,
+     "ratio": 1.574,
+     "bboxGL": [
+      591,
+      233,
+      15,
+      18
+     ],
+     "intersection": 46,
+     "interiorPx": 46,
+     "rimPx": 124,
+     "interiorShare": 0.2706,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 124,
+     "ratioSymmetricDifference": 1.148
+    }
+   },
+   "pairCount": 45,
+   "seconds": 12.6
+  },
+  "broadside": {
+   "yaw": 0,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": 0,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 1450,
+   "spotScore": 0.825,
+   "guard": {
+    "angry": {
+     "atSpot": 253,
+     "ownBest": 253,
+     "ratio": 1,
+     "fill": 0.586
+    },
+    "armored": {
+     "atSpot": 150,
+     "ownBest": 150,
+     "ratio": 1,
+     "fill": 0.62
+    },
+    "brute": {
+     "atSpot": 1467,
+     "ownBest": 1467,
+     "ratio": 1,
+     "fill": 0.743
+    },
+    "camo_normal": {
+     "atSpot": 140,
+     "ownBest": 140,
+     "ratio": 1,
+     "fill": 0.667
+    },
+    "fast": {
+     "atSpot": 101,
+     "ownBest": 101,
+     "ratio": 1,
+     "fill": 0.802
+    },
+    "flying": {
+     "atSpot": 54,
+     "ownBest": 54,
+     "ratio": 1,
+     "fill": 0.415
+    },
+    "hive": {
+     "atSpot": 1128,
+     "ownBest": 1213,
+     "ratio": 0.93,
+     "fill": 0.684
+    },
+    "normal": {
+     "atSpot": 140,
+     "ownBest": 140,
+     "ratio": 1,
+     "fill": 0.667
+    },
+    "slow": {
+     "atSpot": 141,
+     "ownBest": 163,
+     "ratio": 0.865,
+     "fill": 0.675
+    },
+    "swarm": {
+     "atSpot": 33,
+     "ownBest": 40,
+     "ratio": 0.825,
+     "fill": 0.786
+    }
+   },
+   "sameYaw": true,
+   "yaws": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "inRunNull": 0,
+   "place": {
+    "angry": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 13.75,
+     "yaw": 0,
+     "walk": 492,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 253,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "isFlying": false
+    },
+    "armored": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11.55,
+     "yaw": 0,
+     "walk": 384,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 150,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "isFlying": false
+    },
+    "brute": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 16.5,
+     "yaw": 0,
+     "walk": 272,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1467,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "isFlying": false
+    },
+    "camo_normal": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 140,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "isFlying": false
+    },
+    "fast": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 101,
+     "bboxGL": [
+      469,
+      245,
+      7,
+      18
+     ],
+     "isFlying": false
+    },
+    "flying": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 9.35,
+     "yaw": 0,
+     "walk": 66,
+     "bucket": 6,
+     "frames": 12,
+     "silhouette": 54,
+     "bboxGL": [
+      465,
+      260,
+      13,
+      10
+     ],
+     "isFlying": true
+    },
+    "hive": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 17.6,
+     "yaw": 0,
+     "walk": 256,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1128,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "isFlying": false
+    },
+    "normal": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 140,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "isFlying": false
+    },
+    "slow": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 408,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 141,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      19
+     ],
+     "isFlying": false
+    },
+    "swarm": {
+     "pos": [
+      850,
+      220
+     ],
+     "radius": 6.050000000000001,
+     "yaw": 0,
+     "walk": 736,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 33,
+     "bboxGL": [
+      469,
+      246,
+      6,
+      7
+     ],
+     "isFlying": false
+    }
+   },
+   "pairs": {
+    "angry|armored": {
+     "changed": 262,
+     "soloA": 253,
+     "soloB": 150,
+     "ratio": 1.3,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 135,
+     "interiorPx": 129,
+     "rimPx": 133,
+     "interiorShare": 0.4924,
+     "intersectionRepainted": 0.9556,
+     "symmetricDifference": 133,
+     "ratioSymmetricDifference": 0.66
+    },
+    "angry|brute": {
+     "changed": 1483,
+     "soloA": 253,
+     "soloB": 1467,
+     "ratio": 1.724,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 237,
+     "interiorPx": 237,
+     "rimPx": 1246,
+     "interiorShare": 0.1598,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1246,
+     "ratioSymmetricDifference": 1.449
+    },
+    "angry|camo_normal": {
+     "changed": 267,
+     "soloA": 253,
+     "soloB": 140,
+     "ratio": 1.359,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 126,
+     "interiorPx": 126,
+     "rimPx": 141,
+     "interiorShare": 0.4719,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 141,
+     "ratioSymmetricDifference": 0.718
+    },
+    "angry|fast": {
+     "changed": 260,
+     "soloA": 253,
+     "soloB": 101,
+     "ratio": 1.469,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 90,
+     "interiorPx": 86,
+     "rimPx": 174,
+     "interiorShare": 0.3308,
+     "intersectionRepainted": 0.9556,
+     "symmetricDifference": 174,
+     "ratioSymmetricDifference": 0.983
+    },
+    "angry|flying": {
+     "changed": 273,
+     "soloA": 253,
+     "soloB": 54,
+     "ratio": 1.779,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 34,
+     "interiorPx": 34,
+     "rimPx": 239,
+     "interiorShare": 0.1245,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 239,
+     "ratioSymmetricDifference": 1.557
+    },
+    "angry|hive": {
+     "changed": 1195,
+     "soloA": 253,
+     "soloB": 1128,
+     "ratio": 1.731,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 186,
+     "interiorPx": 186,
+     "rimPx": 1009,
+     "interiorShare": 0.1556,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1009,
+     "ratioSymmetricDifference": 1.461
+    },
+    "angry|normal": {
+     "changed": 263,
+     "soloA": 253,
+     "soloB": 140,
+     "ratio": 1.338,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 126,
+     "interiorPx": 122,
+     "rimPx": 141,
+     "interiorShare": 0.4639,
+     "intersectionRepainted": 0.9683,
+     "symmetricDifference": 141,
+     "ratioSymmetricDifference": 0.718
+    },
+    "angry|slow": {
+     "changed": 272,
+     "soloA": 253,
+     "soloB": 141,
+     "ratio": 1.381,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 119,
+     "interiorPx": 116,
+     "rimPx": 156,
+     "interiorShare": 0.4265,
+     "intersectionRepainted": 0.9748,
+     "symmetricDifference": 156,
+     "ratioSymmetricDifference": 0.792
+    },
+    "angry|swarm": {
+     "changed": 269,
+     "soloA": 253,
+     "soloB": 33,
+     "ratio": 1.881,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "intersection": 17,
+     "interiorPx": 17,
+     "rimPx": 252,
+     "interiorShare": 0.0632,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 252,
+     "ratioSymmetricDifference": 1.762
+    },
+    "armored|brute": {
+     "changed": 1486,
+     "soloA": 150,
+     "soloB": 1467,
+     "ratio": 1.838,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 131,
+     "interiorPx": 131,
+     "rimPx": 1355,
+     "interiorShare": 0.0882,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1355,
+     "ratioSymmetricDifference": 1.676
+    },
+    "armored|camo_normal": {
+     "changed": 153,
+     "soloA": 150,
+     "soloB": 140,
+     "ratio": 1.055,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "intersection": 137,
+     "interiorPx": 137,
+     "rimPx": 16,
+     "interiorShare": 0.8954,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 16,
+     "ratioSymmetricDifference": 0.11
+    },
+    "armored|fast": {
+     "changed": 139,
+     "soloA": 150,
+     "soloB": 101,
+     "ratio": 1.108,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "intersection": 101,
+     "interiorPx": 90,
+     "rimPx": 49,
+     "interiorShare": 0.6475,
+     "intersectionRepainted": 0.8911,
+     "symmetricDifference": 49,
+     "ratioSymmetricDifference": 0.39
+    },
+    "armored|flying": {
+     "changed": 187,
+     "soloA": 150,
+     "soloB": 54,
+     "ratio": 1.833,
+     "bboxGL": [
+      465,
+      245,
+      13,
+      25
+     ],
+     "intersection": 17,
+     "interiorPx": 17,
+     "rimPx": 170,
+     "interiorShare": 0.0909,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 170,
+     "ratioSymmetricDifference": 1.667
+    },
+    "armored|hive": {
+     "changed": 1170,
+     "soloA": 150,
+     "soloB": 1128,
+     "ratio": 1.831,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 108,
+     "interiorPx": 108,
+     "rimPx": 1062,
+     "interiorShare": 0.0923,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1062,
+     "ratioSymmetricDifference": 1.662
+    },
+    "armored|normal": {
+     "changed": 137,
+     "soloA": 150,
+     "soloB": 140,
+     "ratio": 0.945,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "intersection": 137,
+     "interiorPx": 121,
+     "rimPx": 16,
+     "interiorShare": 0.8832,
+     "intersectionRepainted": 0.8832,
+     "symmetricDifference": 16,
+     "ratioSymmetricDifference": 0.11
+    },
+    "armored|slow": {
+     "changed": 151,
+     "soloA": 150,
+     "soloB": 141,
+     "ratio": 1.038,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "intersection": 133,
+     "interiorPx": 126,
+     "rimPx": 25,
+     "interiorShare": 0.8344,
+     "intersectionRepainted": 0.9474,
+     "symmetricDifference": 25,
+     "ratioSymmetricDifference": 0.172
+    },
+    "armored|swarm": {
+     "changed": 154,
+     "soloA": 150,
+     "soloB": 33,
+     "ratio": 1.683,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 125,
+     "interiorShare": 0.1883,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 125,
+     "ratioSymmetricDifference": 1.366
+    },
+    "brute|camo_normal": {
+     "changed": 1486,
+     "soloA": 1467,
+     "soloB": 140,
+     "ratio": 1.849,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 121,
+     "interiorPx": 121,
+     "rimPx": 1365,
+     "interiorShare": 0.0814,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1365,
+     "ratioSymmetricDifference": 1.699
+    },
+    "brute|fast": {
+     "changed": 1486,
+     "soloA": 1467,
+     "soloB": 101,
+     "ratio": 1.895,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 82,
+     "interiorPx": 82,
+     "rimPx": 1404,
+     "interiorShare": 0.0552,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1404,
+     "ratioSymmetricDifference": 1.791
+    },
+    "brute|flying": {
+     "changed": 1467,
+     "soloA": 1467,
+     "soloB": 54,
+     "ratio": 1.929,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 54,
+     "interiorPx": 54,
+     "rimPx": 1413,
+     "interiorShare": 0.0368,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1413,
+     "ratioSymmetricDifference": 1.858
+    },
+    "brute|hive": {
+     "changed": 1629,
+     "soloA": 1467,
+     "soloB": 1128,
+     "ratio": 1.255,
+     "bboxGL": [
+      451,
+      237,
+      42,
+      50
+     ],
+     "intersection": 963,
+     "interiorPx": 960,
+     "rimPx": 669,
+     "interiorShare": 0.5893,
+     "intersectionRepainted": 0.9969,
+     "symmetricDifference": 669,
+     "ratioSymmetricDifference": 0.516
+    },
+    "brute|normal": {
+     "changed": 1486,
+     "soloA": 1467,
+     "soloB": 140,
+     "ratio": 1.849,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 121,
+     "interiorPx": 121,
+     "rimPx": 1365,
+     "interiorShare": 0.0814,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1365,
+     "ratioSymmetricDifference": 1.699
+    },
+    "brute|slow": {
+     "changed": 1489,
+     "soloA": 1467,
+     "soloB": 141,
+     "ratio": 1.852,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 119,
+     "interiorPx": 119,
+     "rimPx": 1370,
+     "interiorShare": 0.0799,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1370,
+     "ratioSymmetricDifference": 1.704
+    },
+    "brute|swarm": {
+     "changed": 1486,
+     "soloA": 1467,
+     "soloB": 33,
+     "ratio": 1.981,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "intersection": 14,
+     "interiorPx": 14,
+     "rimPx": 1472,
+     "interiorShare": 0.0094,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1472,
+     "ratioSymmetricDifference": 1.963
+    },
+    "camo_normal|fast": {
+     "changed": 140,
+     "soloA": 140,
+     "soloB": 101,
+     "ratio": 1.162,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "intersection": 101,
+     "interiorPx": 101,
+     "rimPx": 39,
+     "interiorShare": 0.7214,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 39,
+     "ratioSymmetricDifference": 0.324
+    },
+    "camo_normal|flying": {
+     "changed": 181,
+     "soloA": 140,
+     "soloB": 54,
+     "ratio": 1.866,
+     "bboxGL": [
+      465,
+      245,
+      13,
+      25
+     ],
+     "intersection": 13,
+     "interiorPx": 13,
+     "rimPx": 168,
+     "interiorShare": 0.0718,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 168,
+     "ratioSymmetricDifference": 1.732
+    },
+    "camo_normal|hive": {
+     "changed": 1168,
+     "soloA": 140,
+     "soloB": 1128,
+     "ratio": 1.842,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 100,
+     "interiorPx": 100,
+     "rimPx": 1068,
+     "interiorShare": 0.0856,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1068,
+     "ratioSymmetricDifference": 1.685
+    },
+    "camo_normal|normal": {
+     "changed": 140,
+     "soloA": 140,
+     "soloB": 140,
+     "ratio": 1,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "intersection": 140,
+     "interiorPx": 140,
+     "rimPx": 0,
+     "interiorShare": 1,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 0,
+     "ratioSymmetricDifference": 0
+    },
+    "camo_normal|slow": {
+     "changed": 150,
+     "soloA": 140,
+     "soloB": 141,
+     "ratio": 1.068,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      21
+     ],
+     "intersection": 131,
+     "interiorPx": 131,
+     "rimPx": 19,
+     "interiorShare": 0.8733,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 19,
+     "ratioSymmetricDifference": 0.135
+    },
+    "camo_normal|swarm": {
+     "changed": 145,
+     "soloA": 140,
+     "soloB": 33,
+     "ratio": 1.676,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "intersection": 28,
+     "interiorPx": 28,
+     "rimPx": 117,
+     "interiorShare": 0.1931,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 117,
+     "ratioSymmetricDifference": 1.353
+    },
+    "fast|flying": {
+     "changed": 147,
+     "soloA": 101,
+     "soloB": 54,
+     "ratio": 1.897,
+     "bboxGL": [
+      465,
+      245,
+      13,
+      25
+     ],
+     "intersection": 8,
+     "interiorPx": 8,
+     "rimPx": 139,
+     "interiorShare": 0.0544,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 139,
+     "ratioSymmetricDifference": 1.794
+    },
+    "fast|hive": {
+     "changed": 1164,
+     "soloA": 101,
+     "soloB": 1128,
+     "ratio": 1.894,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 65,
+     "interiorPx": 65,
+     "rimPx": 1099,
+     "interiorShare": 0.0558,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1099,
+     "ratioSymmetricDifference": 1.788
+    },
+    "fast|normal": {
+     "changed": 94,
+     "soloA": 101,
+     "soloB": 140,
+     "ratio": 0.78,
+     "bboxGL": [
+      467,
+      250,
+      10,
+      16
+     ],
+     "intersection": 101,
+     "interiorPx": 55,
+     "rimPx": 39,
+     "interiorShare": 0.5851,
+     "intersectionRepainted": 0.5446,
+     "symmetricDifference": 39,
+     "ratioSymmetricDifference": 0.324
+    },
+    "fast|slow": {
+     "changed": 130,
+     "soloA": 101,
+     "soloB": 141,
+     "ratio": 1.074,
+     "bboxGL": [
+      467,
+      247,
+      11,
+      17
+     ],
+     "intersection": 99,
+     "interiorPx": 86,
+     "rimPx": 44,
+     "interiorShare": 0.6615,
+     "intersectionRepainted": 0.8687,
+     "symmetricDifference": 44,
+     "ratioSymmetricDifference": 0.364
+    },
+    "fast|swarm": {
+     "changed": 106,
+     "soloA": 101,
+     "soloB": 33,
+     "ratio": 1.582,
+     "bboxGL": [
+      469,
+      245,
+      7,
+      18
+     ],
+     "intersection": 28,
+     "interiorPx": 28,
+     "rimPx": 78,
+     "interiorShare": 0.2642,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 1.164
+    },
+    "flying|hive": {
+     "changed": 1128,
+     "soloA": 54,
+     "soloB": 1128,
+     "ratio": 1.909,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 54,
+     "interiorPx": 54,
+     "rimPx": 1074,
+     "interiorShare": 0.0479,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1074,
+     "ratioSymmetricDifference": 1.817
+    },
+    "flying|normal": {
+     "changed": 181,
+     "soloA": 54,
+     "soloB": 140,
+     "ratio": 1.866,
+     "bboxGL": [
+      465,
+      245,
+      13,
+      25
+     ],
+     "intersection": 13,
+     "interiorPx": 13,
+     "rimPx": 168,
+     "interiorShare": 0.0718,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 168,
+     "ratioSymmetricDifference": 1.732
+    },
+    "flying|slow": {
+     "changed": 188,
+     "soloA": 54,
+     "soloB": 141,
+     "ratio": 1.928,
+     "bboxGL": [
+      465,
+      245,
+      13,
+      25
+     ],
+     "intersection": 7,
+     "interiorPx": 7,
+     "rimPx": 181,
+     "interiorShare": 0.0372,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 181,
+     "ratioSymmetricDifference": 1.856
+    },
+    "flying|swarm": {
+     "changed": 87,
+     "soloA": 54,
+     "soloB": 33,
+     "ratio": 2,
+     "bboxGL": [
+      465,
+      246,
+      13,
+      24
+     ],
+     "intersection": 0,
+     "interiorPx": 0,
+     "rimPx": 87,
+     "interiorShare": 0,
+     "intersectionRepainted": 0,
+     "symmetricDifference": 87,
+     "ratioSymmetricDifference": 2
+    },
+    "hive|normal": {
+     "changed": 1168,
+     "soloA": 1128,
+     "soloB": 140,
+     "ratio": 1.842,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 100,
+     "interiorPx": 100,
+     "rimPx": 1068,
+     "interiorShare": 0.0856,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1068,
+     "ratioSymmetricDifference": 1.685
+    },
+    "hive|slow": {
+     "changed": 1176,
+     "soloA": 1128,
+     "soloB": 141,
+     "ratio": 1.853,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 93,
+     "interiorPx": 93,
+     "rimPx": 1083,
+     "interiorShare": 0.0791,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1083,
+     "ratioSymmetricDifference": 1.707
+    },
+    "hive|swarm": {
+     "changed": 1152,
+     "soloA": 1128,
+     "soloB": 33,
+     "ratio": 1.984,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "intersection": 9,
+     "interiorPx": 9,
+     "rimPx": 1143,
+     "interiorShare": 0.0078,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1143,
+     "ratioSymmetricDifference": 1.969
+    },
+    "normal|slow": {
+     "changed": 135,
+     "soloA": 140,
+     "soloB": 141,
+     "ratio": 0.961,
+     "bboxGL": [
+      467,
+      247,
+      11,
+      19
+     ],
+     "intersection": 131,
+     "interiorPx": 116,
+     "rimPx": 19,
+     "interiorShare": 0.8593,
+     "intersectionRepainted": 0.8855,
+     "symmetricDifference": 19,
+     "ratioSymmetricDifference": 0.135
+    },
+    "normal|swarm": {
+     "changed": 145,
+     "soloA": 140,
+     "soloB": 33,
+     "ratio": 1.676,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "intersection": 28,
+     "interiorPx": 28,
+     "rimPx": 117,
+     "interiorShare": 0.1931,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 117,
+     "ratioSymmetricDifference": 1.353
+    },
+    "slow|swarm": {
+     "changed": 142,
+     "soloA": 141,
+     "soloB": 33,
+     "ratio": 1.632,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      19
+     ],
+     "intersection": 32,
+     "interiorPx": 32,
+     "rimPx": 110,
+     "interiorShare": 0.2254,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 110,
+     "ratioSymmetricDifference": 1.264
+    }
+   },
+   "pairCount": 45,
+   "seconds": 11.9
+  }
+ },
+ "timing": {
+  "front": 12.6,
+  "three-quarter": 12.6,
+  "broadside": 11.9,
+  "totalSeconds": 41.7,
+  "bodiesMeasured": 10,
+  "pairsPerBearing": 45
+ },
+ "guard": {
+  "threshold": 0.8,
+  "rejected": []
+ },
+ "setup": {
+  "map": "rune-circuit",
+  "gl": [
+   1111,
+   625
+  ],
+  "fittedCamera": {
+   "target": [
+    640,
+    360,
+    0
+   ],
+   "distance": 2021.2373649696563,
+   "pitch": 0.5944591432292686,
+   "yaw": -1.5707963267948966
+  },
+  "orbitConstructorDefault": 900,
+  "ui": [
+   1280,
+   720
+  ],
+  "dpr": 1,
+  "visibility": "visible",
+  "notes": [
+   "rAF stubbed"
+  ]
+ },
+ "camera": {
+  "target": [
+   640,
+   360,
+   0
+  ],
+  "distance": 2021.2373649696563,
+  "pitch": 0.5944591432292686,
+  "yaw": -1.5707963267948966,
+  "viewport": [
+   1111,
+   625
+  ]
+ },
+ "discovery": {
+  "registered": [
+   "enemy-normal",
+   "enemy-swarm",
+   "enemy-brute",
+   "enemy-hive",
+   "enemy-flying",
+   "enemy-armored",
+   "enemy-fast",
+   "enemy-slow",
+   "enemy-angry",
+   "enemy-camo_normal"
+  ],
+  "usable": [
+   "angry",
+   "armored",
+   "brute",
+   "camo_normal",
+   "fast",
+   "flying",
+   "hive",
+   "normal",
+   "slow",
+   "swarm"
+  ],
+  "registeredWithoutType": [],
+  "typesWithoutModel": [
+   "fractal_slime",
+   "colossus",
+   "camo_fast",
+   "midboss",
+   "shielded",
+   "revenant",
+   "boss",
+   "shieldbearer",
+   "healer",
+   "boss_fast",
+   "camo_heavy"
+  ]
+ },
+ "bodies": [
+  "angry",
+  "armored",
+  "brute",
+  "camo_normal",
+  "fast",
+  "flying",
+  "hive",
+  "normal",
+  "slow",
+  "swarm"
+ ]
+}
