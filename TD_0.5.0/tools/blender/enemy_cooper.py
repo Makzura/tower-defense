@@ -17,10 +17,32 @@
 # ORDINARY body and the identifying cue is the RENDERER's -- translucency in the
 # GL path. The mesh is not asked to carry the read.
 #
-# **"It does not separate from the Gleaner" is this model working.** Anyone
-# running a pairwise separation sweep will find Cooper-vs-Gleaner at or near the
-# bottom of the board; that is the intended result and not a defect to fix. This
-# paragraph exists because that number looks exactly like a failure.
+# **"It does not separate from the Gleaner" is this model working** -- but only
+# as a statement about the MESH, and the rendered pair needs its metric named or
+# the sentence is worse than useless.
+#
+# The two meshes are near-identical by design, so a sweep run on GEOMETRY puts
+# this pair at the bottom of the board and that is the intended result.
+#
+# THE RENDERED PAIR IS A DIFFERENT QUESTION AND IT ANSWERS BOTH WAYS. juno
+# measured otto's cue in isolation -- `CAMO_ALPHA = 0.62`, forced on a real body
+# against the identical body opaque, default camera, on the road, 8 frames:
+#
+#     body pixels                402 - 465
+#     pixels that CHANGE         400 - 464   = 99.5% of the body
+#     mean magnitude of change   24.8 - 26.9 of 255  = ~10% of range
+#
+# So a Cooper/Gleaner separation figure reads as **~100% different by
+# changed-pixel count and ~10% different by magnitude, from the same two
+# frames**, and both numbers are true. Either "maximally separated" or "barely
+# separated" can be reported honestly. **A separation figure for this pair is
+# meaningless without naming which metric produced it** -- the same failure as
+# quoting a count without its threshold, arriving on a different axis.
+#
+# One consequence worth carrying: the cue is a REDUCTION, not a mark. Contrast
+# against the ground goes 1.21 -> 1.17, so translucency makes a camo body very
+# slightly harder to pick off the road while making it different from an opaque
+# sibling. Thematically right; it adds contrast nowhere.
 #
 # WHAT IT IS. A cooper is a barrel-maker, and this one has closed its hold. The
 # Gleaner's cargo weeps -- lit panes, a glowing core behind bars. The Cooper's
