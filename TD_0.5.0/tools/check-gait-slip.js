@@ -90,8 +90,25 @@ var SOLE_BAND = 0.02;
 // swinging leg ever carries is 0.012, so anything at or below that is contact.
 // 0.015 recovers exactly the support windows support_left_frames() authors.
 var PLANT_BAND = 0.015;
-// A group is weight-bearing only if its sole actually reaches the ground.
-var GROUND_BAND = 0.05;
+// A GROUP IS WEIGHT-BEARING ONLY IF IT REACHES THE GROUND PLANE ITSELF.
+//
+// Tested against z = 0 ABSOLUTELY, not against the lowest group on the body.
+// A relative test cannot work: enemy-hive's six feet sit between -0.0057 and
+// -0.0000, so any band tight enough to reject a non-contact part would reject
+// four of hive's real feet by measuring them against each other.
+//
+// WHAT THIS EXISTS TO REJECT. enemy-angry's `crank` is a wheel that hangs at
+// z = 0.0180 and NEVER touches the road. It was being counted as a foot, which
+// made a biped report `feet 3`, and -- far worse -- promoted it to `worst foot`
+// with 8.622 px in the summary A column, where its legs read 3.164. **A gate
+// reads the summary**, so the Hedger would have failed on a part with no ground
+// contact and sent the next reader hunting a gait defect that does not exist.
+//
+// Excluded groups are REPORTED BY NAME with their height, never dropped
+// quietly -- modelled on how enemy-flying is annotated rather than hidden. A
+// foot that has genuinely gone missing must not be able to hide inside this
+// filter.
+var GROUND_TOL = 0.005;
 
 // The drawn size of each enemy type, from `sizeScale` in js/enemy.js. Slip in
 // board px scales with it, so quoting a body at 1 understates every big one --
@@ -172,6 +189,7 @@ function analyse(name, data, opts) {
     bands: data.bands || null,
     axis: "model local +X (heading)",
     feet: [],
+    excluded: [],
     notes: []
   };
   if (HOVERS[name]) {
@@ -317,9 +335,12 @@ function analyse(name, data, opts) {
 
   for (c = 0; c < candidates.length; c++) {
     var cd = candidates[c];
-    // Weight-bearing? Its sole must actually reach the lowest point any part
-    // of the body reaches. An arm that swings low is not a foot.
-    if (cd.minZ > groundZ + GROUND_BAND) continue;
+    // Weight-bearing? Its sole must reach the GROUND PLANE, absolutely.
+    if (cd.minZ > GROUND_TOL) {
+      out.excluded.push({ group: cd.name, minContactZ: cd.minZ,
+        reason: "never reaches the ground plane (z > " + GROUND_TOL + ")" });
+      continue;
+    }
 
     // Planted frames: sole within PLANT_BAND of this foot's own low point.
     var planted = [];

@@ -629,9 +629,28 @@ def build():
 
 def animate_walk(body, parts, frames=WALK_FRAMES):
     """An alternating tripod, and no arms to counter it."""
+    # HELD OUT OF THE SOLVED GAIT, DELIBERATELY, AND THIS LINE IS THE HOLD.
+    #
+    # `animate_walk_grouped` now solves its swing angle against the stride by
+    # default, which fixes the seven other chassis bodies. **The Dray cannot be
+    # fixed that way and the solver would raise rather than lie about it.** Its
+    # hip sits 0.120 u above the sole and one plant needs 0.3372 u of backward
+    # travel; the most a 0.120 u pendulum can deliver is 2L = 0.240 u, so the
+    # required sweep is 1.405x what ANY angle can produce. `span / 2L > 1` is
+    # not a tuning problem, it is a geometry problem.
+    #
+    # The fix is mira's (c'): drop the carapace underside from z = 0.100 to
+    # z = 0.012, closing the 0.088 u of open daylight between the shell and the
+    # leg tops -- which also moves the silhouette lower and heavier, the way the
+    # card already wants it. Until that lands the Dray keeps its hand-tuned 14
+    # degrees and its measured 19.867 board px of slip, knowingly.
+    #
+    # DO NOT "FIX" THIS BY REMOVING THE FLAG. It will raise, and the raise is
+    # correct.
     chassis.animate_walk_grouped(body, parts, GAIT_GROUPS, frames=frames,
                                  swing_deg=SWING_DEG, bob=BOB,
-                                 roll_deg=ROLL_DEG, arms=())
+                                 roll_deg=ROLL_DEG, arms=(),
+                                 solve_swing=False)
 
 
 def export_build():

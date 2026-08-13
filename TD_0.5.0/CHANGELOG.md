@@ -137,6 +137,95 @@ metrics reported it and both read as "the towers are not firing"; one of them,
 shipped tower, so it could not have been non-zero. Found independently and
 concurrently by a second engineer on the same harness.
 
+**2026-08-13 — The seven chassis bodies now SOLVE their swing angle against the
+stride. A falls from up to 5.098 board px to 0.294–0.385, and not one triangle
+moved.**
+
+**CORRECTION TO THE 39f1f5c ENTRY, WHICH WAS WRONG.** That entry said the roster
+shared one stale `swing_deg = 28.0`. It does not. 28.0 is only the chassis
+DEFAULT; seven of the eight callers override it and they span **14 to 34
+degrees**: Drudge 18, Skimmer 34, Tun 20, Hedger 22, Cooper 28, Courier 26,
+Tender 18, Dray 14. I read the default and never counted the call sites.
+
+**The finding underneath is stronger than the version it replaces.** These
+angles were hand-tuned per body, by eye, and every one of them misses. So the
+defect is not one stale constant copied around — it is that **the angle was
+never once compared to the distance the body travels**, and eight independent
+tunings all missed a target none of them could see. That is unobservability, not
+carelessness, and the next person would have missed it too.
+
+**THE MECHANISM.** `animate_walk_grouped` takes `solve_swing=True` by default.
+The passed `SWING_DEG` becomes a bracket seed, and the function bisects the
+angle on EVALUATED geometry until the planted sole's backward sweep matches
+`(P-1)/frames` of a cycle — **transitions, not samples**: P planted frames give
+P−1 transitions, and off-by-one here is a whole frame-step. Bisection lays the
+full cycle per candidate rather than assuming `L·sin θ`, because
+`_set_sole_height` translates the leg after the rotation and the body rolls.
+
+One shared edit plus one hold-out line, so no hand-tuned angle survives by
+accident.
+
+| model | tri | multiset | A px before → after | B px | plan/ring |
+|---|---|---|---|---|---|
+| `enemy-armored` | 3520 | identical | 3.965 → **0.294** | 3.754 | 70% → 80% |
+| `enemy-fast` | 3508 | identical | 1.901 → **0.280** | 3.575 | 85% → 79% |
+| `enemy-slow` | 2584 | identical | 3.935 → **0.358** | 3.575 | 89% → 89% |
+| `enemy-angry` | 4072 | identical | 3.164 → **0.385** | 2.979 | 162% → 162% |
+| `enemy-camo_normal` | 3928 | identical | 0.277 → **0.280** | 3.575 | 79% → 79% |
+| `enemy-shielded` | 4552 | identical | 0.985 → **0.322** | 4.111 | 85% → 85% |
+| `enemy-shieldbearer` | 6452 | identical | 5.098 → **0.378** | 4.826 | 89% → **103%** |
+| `enemy-colossus` | 3672 | identical | 19.867 → 19.867 | 7.508 | 105% | *held* |
+| `enemy-normal` | — | not re-exported | 0.277 | 3.575 | 76% | *control* |
+
+**EVERY TRIANGLE MULTISET IS IDENTICAL**, compared per body as a sorted multiset
+of vertex-sorted triangles at export precision — not by count and not by hash,
+since re-exports are not byte-stable on this pipeline. Only frame matrices moved.
+
+**B IS UNCHANGED ON EVERY BODY AND THAT IS NOT A DISAPPOINTMENT, IT IS THE
+POINT.** A and B have different fixes. This commit touches A only; B is set by
+pose-hold time and its lever is the frame count, which is the separate frame
+raise. **The Dray still slides visibly** — its 19.867 px of A is untouched by
+design and its 7.508 px of B is the largest on the board.
+
+**`enemy-shieldbearer` HAS CROSSED ITS RING, 89% → 103%, AND THIS IS THE
+PREDICTED COST.** A foot planted for duty `d` must travel back `d × 0.899281` u;
+a sliding gait is *cheaper in plan* than a correct one, so removing slip
+necessarily spends extent. **No frame count changed in this commit, so none of
+these plan movements are a sampling artefact** — they are the real new gait.
+`enemy-armored` also rose, 70% → 80%, and stayed inside. Only the Tender
+crossed, and it now draws its frost and hover rings inside its own silhouette.
+That is a genuine regression traded for a genuine fix and it needs an art call,
+not a threshold change.
+
+**THE RESIDUAL IS ~0.3 px AND IS STRUCTURAL.** `walk_phases` says it is a
+triangle and not a sine so that "the planted foot must sweep backwards in EQUAL
+INCREMENTS". That intent is not delivered: the phase is linear in the frame but
+the contact goes as `L·sin(swing × phase)`, so increments bunch toward the ends
+of the plant — the exact fault the docstring attributes to a sine. The amplitude
+solve pins the first and last planted frames; the curvature between them is what
+remains. It is bounded by the curvature of a sine over one plant and **does not
+grow with body size**.
+
+A per-frame angle solve was attempted and **made it worse — 0.294 → 3.028 px on
+the Drudge**, with interior frames landing ~0.085 u the wrong side of targets
+whose arithmetic was verified correct by hand. It is reverted, and the failure
+is recorded in place so nobody re-attempts it without an instrument on the
+intermediate state.
+
+**Also in this commit: `check-gait-slip.js` no longer counts `crank` as a
+foot.** `enemy-angry`'s crank is a wheel hanging at z = 0.0180 that never
+touches the road. It was being promoted to `worst foot` with 8.622 px in the
+summary A column where the Hedger's legs read 3.164, and **a gate reads the
+summary** — so the Hedger would have failed on a part with no ground contact.
+Contact groups are now tested against the ground plane ABSOLUTELY (z ≤ 0.005),
+not relative to the lowest group on the body: `enemy-hive`'s six feet sit
+between −0.0057 and −0.0000, so a relative band tight enough to reject the crank
+rejects four real feet. Excluded groups are **reported by name with their
+height**, never dropped silently, so a genuinely missing foot cannot hide inside
+the filter. Proved in both directions: the Hedger now passes on its legs at
+3.164 and the tool still fails `enemy-hive` at 12.881 and `enemy-colossus` at
+19.867.
+
 **2026-08-13 — `gait_solve.contact_x` had the material-point bug it was written
 to avoid. Found by the Vanguard build, in my own module, one commit after the
 rule was written down.**

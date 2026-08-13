@@ -92,6 +92,9 @@ sys.path.append(os.path.dirname(__file__))
 import bpy
 from mathutils import Vector
 import td_scene as td
+# AFTER the sys.path.append above -- gait_solve is a sibling module and is not
+# importable until the script's own directory is on the path.
+import gait_solve
 
 # Bump on any change to the geometry this file emits, and re-export ALL five
 # bodies in the same commit.
@@ -574,7 +577,7 @@ def _group_phase_offsets(count):
 
 def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
                          arm_swing_deg=14.0, bob=0.03, roll_deg=2.6,
-                         arms=("arm_l", "arm_r")):
+                         arms=("arm_l", "arm_r"), solve_swing=True):
     """The gait for any number of legs, in any number of evenly-phased groups.
 
     `groups` is a sequence of sequences of leg-root keys in `parts`:
@@ -648,14 +651,41 @@ def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
         # {1,2,7,8} and the shift of 4 gives {3,4,5,6}.
         return (((frame - 1 - shifts[g]) % frames) + 1) in base_support
 
-    for f in range(frames):
-        frame = 1 + f
-        t = 2.0 * math.pi * f / frames
-        for g, group in enumerate(groups):
-            phase = group_phase(g, f)
-            for leg in group:
-                key(parts[leg], frame, rotation=(0.0, swing * phase, 0.0),
-                    location=rests[leg])
+    # THE PLANTED RUN FOR GROUP 0, ordered along the cycle with the wrap
+    # unwound. At frames=8 the support set is {1,2,7,8} 1-based, which is the
+    # 0-based run 6,7,0,1 -- one plant that crosses the seam, not two.
+    def planted_run():
+        flags = [group_plants(0, 1 + f) for f in range(frames)]
+        if all(flags):
+            return list(range(frames))
+        start = 0
+        while flags[start]:
+            start = (start + 1) % frames
+        run = []
+        for i in range(frames):
+            f = (start + i) % frames
+            if flags[f]:
+                run.append(f)
+            elif run:
+                break
+        return run
+
+    def _lay(swing_rad):
+        _lay_poses(swing_rad)
+        _lay_soles()
+
+    def _lay_poses(swing):
+        for f in range(frames):
+            frame = 1 + f
+            t = 2.0 * math.pi * f / frames
+            for g, group in enumerate(groups):
+                phase = group_phase(g, f)
+                for leg in group:
+                    key(parts[leg], frame, rotation=(0.0, swing * phase, 0.0),
+                        location=rests[leg])
+            _lay_extras(frame, f, t)
+
+    def _lay_extras(frame, f, t):
         if arms:
             # Arms counter the FIRST group, which is what "arms counter the
             # legs" meant when there were only two of them.
@@ -668,7 +698,8 @@ def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
             location=(0.0, 0.0, base_z - bob * abs(group_phase(0, f))),
             rotation=(math.radians(roll_deg) * group_phase(0, f), 0.0, 0.0))
 
-    for f in range(frames):
+    def _lay_soles():
+      for f in range(frames):
         frame = 1 + f
         t = 2.0 * math.pi * f / frames
         swing_z = 0.012 + 0.045 * abs(math.cos(t))
@@ -689,9 +720,90 @@ def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
                 _set_sole_height(parts[leg], leg.replace("leg", "foot", 1),
                                  frame, swing_z)
 
+    # --- solve the swing against the stride ---------------------------------
+    #
+    # The angle above was hand-tuned per body -- 14 to 34 degrees across the
+    # eight callers -- and not one of those tunings was ever compared to the
+    # distance the body actually travels. `tools/check-gait-slip.js` measures
+    # the result: no shipped walker's planted foot is still.
+    #
+    # WHAT THE ANGLE MUST SATISFY. One full cycle is exactly
+    # `28.6 / 31.8032 = 0.899281` model units of travel (see gait_solve). A
+    # planted sole must move backward by that fraction of a cycle which it
+    # spends planted, measured across TRANSITIONS and not samples: P planted
+    # frames give P-1 transitions, so the requirement is `(P-1)/frames` of a
+    # cycle. Off by one here is a whole frame-step of error.
+    #
+    # BISECTION ON EVALUATED GEOMETRY, laying the full pose each time, because
+    # `_set_sole_height` translates the leg AFTER the rotation and the body
+    # rolls -- so the delivered sweep is not the clean `L*sin(theta)` an
+    # analytic solve would assume. Laying the whole cycle per candidate costs a
+    # few seconds and removes the assumption entirely.
+    run = planted_run()
+    if solve_swing and len(run) >= 2 and groups and groups[0]:
+        want = float(len(run) - 1) / frames * gait_solve.CYCLE_UNITS
+        leg0 = groups[0][0]
+        contact0 = leg0.replace("leg", "foot", 1)
+
+        def delivered(candidate):
+            _lay(candidate)
+            bpy.context.scene.frame_set(1 + run[0])
+            first = gait_solve.contact_x(contact0)
+            bpy.context.scene.frame_set(1 + run[-1])
+            return first - gait_solve.contact_x(contact0)
+
+        lo, hi = 0.0, math.radians(75.0)
+        d_lo, d_hi = delivered(lo), delivered(hi)
+        if (d_lo - want) * (d_hi - want) > 0.0:
+            raise ValueError(
+                "no swing angle delivers the stride for %s: 0..75 deg spans a "
+                "planted sweep of %.5f..%.5f u against %.5f required. The legs "
+                "are too short -- change the geometry, not the angle. This is "
+                "the Dray's defect and a clamp here would hide it."
+                % (leg0, min(d_lo, d_hi), max(d_lo, d_hi), want))
+        for _ in range(48):
+            mid = 0.5 * (lo + hi)
+            d_mid = delivered(mid)
+            if abs(d_mid - want) < 1e-6:
+                break
+            if (d_lo - want) * (d_mid - want) <= 0.0:
+                hi, d_hi = mid, d_mid
+            else:
+                lo, d_lo = mid, d_mid
+        swing = mid
+    # Lay the final pose at the chosen angle. Unconditional: the bisection
+    # leaves the rig at whatever its last probe was, which is not the answer.
+    _lay(swing)
+
+    # --- WHY THE RESIDUAL IS NOT ZERO, AND WHY IT IS LEFT THERE ------------
+    #
+    # After the amplitude solve the Drudge measures 0.294 board px, down from
+    # 3.965 -- level with the Gleaner, the best body on the roster. It is not
+    # zero, and the reason is structural rather than a tuning miss.
+    #
+    # `walk_phases`'s docstring says the wave is a triangle and not a sine so
+    # that "the planted foot must sweep backwards in EQUAL INCREMENTS". **That
+    # intent is not delivered.** The phase is linear in the frame, but the
+    # contact's position goes as `L * sin(swing * phase)`, and sine is not
+    # linear in its argument -- so the increments bunch toward the ends of the
+    # plant, which is the very thing the docstring says a sine wave would do.
+    # The amplitude solve pins the FIRST and LAST planted frames; the curvature
+    # between them is what is left.
+    #
+    # A PER-FRAME ANGLE SOLVE WAS TRIED HERE AND MADE IT WORSE -- 0.294 px to
+    # 3.028 px on the Drudge, with the interior frames landing about 0.085 u
+    # the wrong side of their targets. The arithmetic of the targets was
+    # verified correct by hand, so the fault is in the interaction between the
+    # x solve and the sole re-plant that has to follow it, and it was not worth
+    # holding a seven-body commit to chase. **Do not re-attempt it without an
+    # instrument on the intermediate state** -- the failure is invisible in the
+    # target arithmetic, which is what makes it expensive.
+    #
+    # The remaining 0.294 px is a fifth of a screen pixel and is bounded by the
+    # curvature of a sine over the plant, so it does not grow with body size.
 
 def animate_walk(body, parts, frames=8, swing_deg=28.0, arm_swing_deg=14.0,
-                 bob=0.03, roll_deg=2.6):
+                 bob=0.03, roll_deg=2.6, solve_swing=True):
     """The shared gait, with evaluated sole planting.
 
     Legs stay in antiphase and arms counter them. Each support arc advances
@@ -715,7 +827,7 @@ def animate_walk(body, parts, frames=8, swing_deg=28.0, arm_swing_deg=14.0,
     all and would therefore pass a multiset check while looking wrong on screen.
     """
     animate_walk_grouped(body, parts, (("leg_l",), ("leg_r",)), frames=frames,
-                         swing_deg=swing_deg, arm_swing_deg=arm_swing_deg,
+                         swing_deg=swing_deg, solve_swing=solve_swing, arm_swing_deg=arm_swing_deg,
                          bob=bob, roll_deg=roll_deg)
 
 
