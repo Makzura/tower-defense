@@ -5031,24 +5031,29 @@ function drawMenu() {
 
   // Shadow, edge and face make the title feel stamped into the command
   // terminal instead of floating over it.
+  //
+  // THE BLOCK SITS 23 px LOWER THAN IT DID, and that is the deletion of the
+  // strap line showing up in the layout rather than a nudge for its own sake.
+  // A line reading "35 waves. 6 ley-lines. N towers. Hold the base." used to
+  // run under the rule; it was removed 2026-08-13 at the owner's request --
+  // he did not want it corrected, he wanted it gone. Removing it alone would
+  // have left 103 px of nothing between the rule and PLAY where the strap's
+  // own line box had kept that gap at 80. Moving the whole block down by that
+  // line box restores the gap exactly and changes no other relationship: the
+  // title, its rule and the four controls stand as they always did, one
+  // element shorter. Every offset below is expressed against `titleY` so the
+  // block can be moved again as one thing.
+  var titleY = 199;
   ctx.font = "700 74px system-ui, sans-serif";
   ctx.fillStyle = "rgba(0,0,0,0.6)";
-  ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2 + 5, 181);
+  ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2 + 5, titleY + 5);
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(67,205,244,0.62)";
-  ctx.strokeText("TOWER DEFENSE", VIEW_WIDTH / 2, 176);
+  ctx.strokeText("TOWER DEFENSE", VIEW_WIDTH / 2, titleY);
   ctx.fillStyle = "#d9f7ff";
-  ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2, 176);
+  ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2, titleY);
   ctx.fillStyle = "rgba(74,218,255,0.78)";
-  ctx.fillRect(VIEW_WIDTH / 2 - 128, 215, 256, 2);
-
-  // Counted, never typed: the strap line said "Ten waves" for exactly as long
-  // as it took to add ten more.
-  var towerCount = BUILD_SLOTS.filter(function (t) { return t !== null; }).length;
-  ctx.fillStyle = "rgba(199,209,224,0.55)";
-  ctx.font = "17px system-ui, sans-serif";
-  ctx.fillText(WAVES.length + " waves.  " + Maps.LIST.length + " ley-lines.  " +
-    towerCount + " towers.  Hold the base.", VIEW_WIDTH / 2, 232);
+  ctx.fillRect(VIEW_WIDTH / 2 - 128, titleY + 39, 256, 2);
 
   drawMenuButton(playButtonRect(), "PLAY", "1", "74,218,255", true);
   drawMenuButton(storeButtonRect(), "ARMOURY  //  STORE & INVENTORY",
