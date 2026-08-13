@@ -511,6 +511,57 @@ gesture, with the life taken out of it.
 > build script before anything is exported**, which is the property a floor most
 > wants.
 >
+> ### OCCLUSION IS NOT THE SAME AS WHAT A PART SITS AGAINST
+>
+> mira, 2026-08-13. Two different relationships, and conflating them is the
+> mistake this section used to invite:
+>
+> - **Occluded** — something is drawn **in front of** the part. This is the gate.
+>   A part with the model's own geometry crossing it fails the contrast route
+>   however good its material is.
+> - **Backdropped** — what sits **behind** the part. This is not occlusion and it
+>   is not a failure. It decides how **stable** the part's contrast is, frame to
+>   frame.
+>
+> **On the backdrop, prefer a neighbour that shades WITH the part.** `keyDir` is
+> a world-space uniform — computed into the shading at `gl-renderer.js:81` and
+> uploaded once at `:238` — and it does not rotate with anything. So two parts of
+> one model share its yaw and tilt: their normals move together and their ratio
+> is buffered. The ground is a horizontal plane whose normal is constant and
+> shares nothing, so a part measured against it is driven by its own swing alone,
+> undamped.
+>
+> Measured on the Hedger's crank, rendered, twelve frames: against the **body**
+> brass holds **1.44–2.15 and wins on 12 of 12**; against the **road** it runs
+> **1.09–2.25 and loses on 3 of 12** to materials it beats everywhere else. At
+> frame 0 brass against road is **1.09** while `tin_dark` is **1.66**. The road
+> supplies both the best number and the worst.
+>
+> > **Placement beats palette — but the axis is "toward a neighbour that shades
+> > WITH the part", not "toward a dark one". Darkness of a neighbour is a palette
+> > property; co-shading is a geometric one. Only the second gives a ratio you
+> > can rely on frame to frame, and a read is judged on the worst frame.**
+>
+> **A volatile neighbour is worse than a stable one even when its mean and its
+> best are better.**
+>
+> **The worked example, and it is the configuration to copy:** the Hedger's crank
+> is front-most at 1.00 on all twelve frames with the body as its backdrop —
+> **unoccluded and co-shaded at once**. That is the target. Moving it outboard
+> would have traded a satisfied gate for a volatile neighbour, which is the error
+> this clause exists to prevent, and it was mira's own recommendation before she
+> withdrew it.
+>
+> **When neither material nor placement can help.** At each material's own worst
+> frame-and-neighbour the Hedger's three candidates measure **1.09, 1.07 and
+> 1.05** — indistinguishable, and all three invisible. The failure occupies a
+> **contiguous arc** of the cycle, which makes it **a function of phase: an
+> animation fact, not a material or placement one.** The lever there is angular
+> range or phase, and motion costs zero triangles.
+>
+> **Whenever the worst-frame numbers for every candidate converge, the variable
+> is not the one being varied.**
+>
 > **Every figure here is at the fitted default (~2021).** At distance 900 those
 > same invisible windows are 4–27 px and clearly visible — which is section 2's
 > point arriving inside section 3, and the reason the proportional form is the
