@@ -110,6 +110,21 @@ reference viewport:
 > lot — the pre-rebuild Skimmer was 0.510 u at rest and **0.571 swept**, because
 > the arms swing outward. Quote which one, every time. (otto, 2026-08-13.)
 >
+> **A BEARING IS A CAMERA YAW UNLESS IT SAYS OTHERWISE — and any figure that
+> travels between rigs carries its METRIC, its BEARING and its VIEWPORT.**
+> otto's rule, 2026-08-13, after the convention gap cost three people time.
+> "Yaw 0" is exact in the *path-direction* convention (25 of 42 road segments)
+> and means something entirely different as a camera yaw; read the second way it
+> pointed at the one bearing where the defect being fixed did not exist, and a
+> capture there would have published a fix as doing nothing.
+>
+> **Two metrics can also disagree while both are right.** On the same model,
+> juno's depth front-most metric reads 1.00 at all twelve frames where otto's
+> contribution-over-solo reads 0.98 at two of them. Printed unattributed as one
+> number the gap is averaged away and the next person to re-measure finds a
+> discrepancy with nothing to explain it. **Attribution is not pedantry; it is
+> what makes a later disagreement diagnosable.**
+
 > **THE GENERAL RULE, and five separate findings on 2026-08-13 turned out to be
 > instances of it (mira's formulation, from kaz's generalisation):**
 >
@@ -662,28 +677,11 @@ contrast ratio, not luminance gap, is the right instrument.
 > and **the sign is not random at all.**
 >
 > **THE ERROR IS A MONOTONE COMPRESSION, AND THAT IS FAR MORE USEFUL THAN
-> "UNPREDICTABLE".** Sweeping the crank's albedo across eleven candidates, with
-> the entire body repainted to `tin` so every neighbour is one unmixed material:
->
-> | candidate | palette CR | rendered median | error |
-> |---|---|---|---|
-> | tin | 1.00 | 1.17 | **+0.17** |
-> | grey35 | 1.04 | 1.19 | **+0.15** |
-> | olive | 1.31 | 1.19 | −0.12 |
-> | core_red | 1.72 | 1.27 | −0.45 |
-> | tin_dark | 1.91 | 1.28 | −0.62 |
-> | grey55 | 2.01 | 1.39 | −0.62 |
-> | brass | 2.16 | 1.41 | −0.76 |
-> | black | 2.89 | 1.48 | −1.41 |
-> | grey75 | 3.67 | 1.85 | −1.82 |
-> | teal | 4.24 | 2.03 | −2.21 |
-> | white | 6.30 | 2.63 | **−3.66** |
->
-> **The sign flips at a palette CR of about 1.2**: below it the render *adds*
-> contrast, above it the render *removes* it, and the deficit grows monotonically
-> with the palette figure. A palette span of 1.00 → 6.30 arrives on screen as
-> **1.17 → 2.63**. So palette arithmetic is not a bound in either direction, but
-> it is **predictably** not a bound.
+> "UNPREDICTABLE".** The mapping itself is **not repeated here** — it is stated
+> once, beside the bands it governs, in the palette-space ruling above. The
+> candidate names, for reading that row of numbers back: `tin`, `grey35`, `olive`,
+> `core_red`, `tin_dark`, `grey55`, `brass`, `black`, `grey75`, `teal`, `white`,
+> in the order the mapping lists them.
 >
 > **AND THE CEILING CLAIM FAILS FOR EVERY PAIR, NOT ONLY THE IDENTICAL ONE. This
 > is the cleanest form of the refutation** and it is stronger than the two-pair
