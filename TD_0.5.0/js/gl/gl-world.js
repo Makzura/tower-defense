@@ -3650,6 +3650,23 @@ var World3D = (function () {
     drawWorld: drawWorld,
     drawOverlays: drawOverlays,
     screenToWorld: screenToWorld,
+    // WHICH BODY AN ACTOR IS WEARING, published rather than re-derived.
+    //
+    // js/gl/tower-preview.js has asked for `modelFor` since it was written --
+    // its own comment says the per-tier rule "is not duplicated here, because a
+    // second copy of a tiering rule is a second copy that drifts" -- and it was
+    // never exported, so `World3D.modelFor` was permanently undefined and EVERY
+    // preview in the interface fell through to the base body regardless of tier.
+    // The build bar and the store cards are drawing a TYPE, which has no tiers,
+    // so they were right by accident; anything showing a LIVE tower was not.
+    //
+    // The two resolvers below and the two band helpers are the whole contract a
+    // preview needs. Exporting them is what keeps js/gl/model-viewer.js from
+    // owning a second copy of five tier selectors and a band validator.
+    modelFor: towerModel,
+    enemyModelFor: enemyModel,
+    walkBand: walkBand,
+    bandFrame: bandFrame,
     // The board's height under a point, and whether a footprint sits on ONE
     // level. Presentation-derived, but the placement rule reads the second one:
     // a tower bridging a deck edge is half planted and half in mid-air, and
