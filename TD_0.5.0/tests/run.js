@@ -225,8 +225,11 @@ test("the schedule totals about 26 000 authored effective HP", function (t) {
   var total = 0;
   h.game.WAVES.forEach(function (wave) { total += h.game.waveEffectiveHealth(wave); });
 
-  t.ok(Math.abs(total - 25799) < 100,
-    "25 799 authored effective HP across the schedule (" + total + ")");
+  // 25 799 until the 2026-08-13 curve retune, which raised waves 12, 13 and 16
+  // by 25% each. The whole-schedule effect is small BECAUSE the retune landed
+  // on three waves out of twelve proposed -- the other nine are held.
+  t.ok(Math.abs(total - 25898) < 100,
+    "25 898 authored effective HP across the schedule (" + total + ")");
 
   // THE CURVE, not just the total. Wave 35 alone is more than the first
   // twenty-one put together, and the last third is where the growth lives --
@@ -517,31 +520,37 @@ test("every enemy type is scheduled, and every scheduled type exists", function 
 
 // A mixed wave deploys its groups IN ORDER, each at its own spacing, with a
 // `lead` in place of that spacing before the group's first body. Wave 12 is
-// the first one: eighteen 5 HP Fast at 0.35, a two-second gap, sixteen 2 HP
-// Swarm at 0.22, another gap, twelve 10 HP normals at 0.8.
+// the first one: eighteen 5 HP Fast at 0.35, a two-second gap, forty 1 HP
+// Swarm at 0.22, another gap, thirty 5 HP normals at 0.8.
 //
 // The counts moved on 2026-07-30 with the rest of the schedule (this used to
 // read 36 bodies in groups of 18/12/6, which had ALREADY drifted from the
-// wave it describes -- it was 44 in three groups when the suite was last run).
-// The shape it is testing is the same one.
+// wave it describes -- it was 44 in three groups when the suite was last run),
+// and again on 2026-08-13 with the curve retune, which took the Swarm group
+// 16 -> 40 and the normals 12 -> 30 while halving both healths. THE FAST GROUP
+// DID NOT MOVE: 5 is odd, so the retune's `health / 2` is not exact and the
+// rule skipped it. That is why the first two cursor assertions below are
+// unchanged and the last three are not.
+//
+// The shape it is testing is the same one it has always tested.
 test("a mixed wave deploys its groups in order, each at its own spacing", function (t) {
   var h = harness.boot();
   var wave = h.game.WAVES[11];
 
-  t.eq(h.game.waveCount(wave), 46, "forty-six bodies across three groups");
+  t.eq(h.game.waveCount(wave), 88, "eighty-eight bodies across three groups");
   t.eq(h.game.waveGroups(wave).length, 3, "three groups");
   t.eq(h.game.waveGroupAt(wave, 0).group.type, "fast", "the first body is a Fast");
   t.eq(h.game.waveGroupAt(wave, 17).group.type, "fast", "and so is the eighteenth");
   t.eq(h.game.waveGroupAt(wave, 18).group.type, "swarm", "the nineteenth opens the Swarm group");
   t.ok(h.game.waveGroupAt(wave, 18).opensGroup, "and is flagged as opening it, so its lead applies");
   t.notOk(h.game.waveGroupAt(wave, 19).opensGroup, "the twentieth is not");
-  t.ok(h.game.waveGroupAt(wave, 34).opensGroup, "the thirty-fifth opens the last group");
-  t.eq(h.game.waveGroupAt(wave, 34).group.health, 10, "the last group is the scaled normals");
-  t.eq(h.game.waveGroupAt(wave, 46), null, "and there is no forty-seventh");
+  t.ok(h.game.waveGroupAt(wave, 58).opensGroup, "the fifty-ninth opens the last group");
+  t.eq(h.game.waveGroupAt(wave, 58).group.health, 5, "the last group is the scaled normals");
+  t.eq(h.game.waveGroupAt(wave, 88), null, "and there is no eighty-ninth");
 
   // The banner names every group, so a player looking up sees what is actually
   // coming rather than only the first thing in it.
-  t.eq(h.game.waveSummary(wave), "18 × Fast  +  16 × Swarm  +  12 × Normal",
+  t.eq(h.game.waveSummary(wave), "18 × Fast  +  40 × Swarm  +  30 × Normal",
     "the banner lists all three");
 
   // The flat form is the SINGLE-GROUP case, not a legacy path.
@@ -2098,8 +2107,9 @@ test("wave arithmetic records the incoming burst and total health", function (t)
 
   t.near(waveOneBurst, 5, 0.001, "wave 1 burst HP/s");
   t.near(waveTwoBurst, 4, 0.001, "wave 2 burst HP/s");
-  t.eq(scheduled, 23697, "scheduled health across the full schedule");
-  t.eq(effective, 25799, "and what it actually takes to clear it");
+  // 23 697 / 25 799 until the 2026-08-13 curve retune landed waves 12, 13, 16.
+  t.eq(scheduled, 23796, "scheduled health across the full schedule");
+  t.eq(effective, 25898, "and what it actually takes to clear it");
   t.ok(unpaid > 0 && unpaid < effective * 0.25,
     "shields remain a real part of the work (" + unpaid + " of " + effective + ")");
   t.ok(supplied < waveOneBurst, "one gunner is below the wave 1 burst");
@@ -2138,7 +2148,9 @@ test("wave arithmetic records the incoming burst and total health", function (t)
     killIncome += h.game.waveKillBounty(wave);
     clearIncome += h.game.waveBounty(wave);
   });
-  t.eq(killIncome, 23333, "scheduled kill bounties");
+  // $23 333 until the 2026-08-13 curve retune. The rise is the HP inflation
+  // paying for itself, NOT a bounty change -- `b = 1.00`, no bounty was touched.
+  t.eq(killIncome, 23438, "scheduled kill bounties");
   var progressionIncome = 0;
   var escalatingIncome = 0;
   for (var waveNumber = 1; waveNumber <= h.game.WAVES.length; waveNumber++) {
@@ -2147,7 +2159,11 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   }
   var purse = killIncome + clearIncome + progressionIncome + escalatingIncome +
     h.game.STARTING_CASH;
-  t.eq(purse, 36017, "authored run purse before conditional rewards");
+  // $36 017 until the 2026-08-13 curve retune. Note it rose 0.32% while
+  // effective HP rose 0.38%: the $9 505 of progression and escalating rewards
+  // is schedule-blind, so inflating health dilutes spending power on its own
+  // and no bounty has to be touched to make that happen.
+  t.eq(purse, 36133, "authored run purse before conditional rewards");
   var dearest = h.game.BUILD_SLOTS.reduce(function (max, type) {
     return type && type.COST > max ? type.COST : max;
   }, 0);

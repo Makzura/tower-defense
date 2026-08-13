@@ -288,18 +288,109 @@ var EASY_WAVES = [
   // it kills a competent 30-tower board on null-meridian outright. It is back
   // at 20, and the three new types are fitted around that order rather than
   // through it.
-  { groups: [                                                     // 242 HP  old 9 + company
+  // --- THE CURVE RETUNE (2026-08-13). THREE WAVES: 12, 13 and 16.
+  //
+  // It was designed for twelve and it landed on three. The other nine are
+  // named below with the reason each is held, because a comment describing a
+  // change bigger than the diff is how this file has misled people before.
+  //
+  // The three rows marked RETUNED were rewritten by one rule, per GROUP:
+  // `health -> health / 2`, `count -> round(count x 2 x 1.25)`.
+  //
+  // It is two operations with two different jobs, and they are separable:
+  //
+  //   THE SWAP (k = 2) is `health / 2, count x 2` and is EXACTLY income
+  //   neutral. `Enemy.bountyOf` is `round(type.bounty x health / type.health)`
+  //   and a group pays `count x` that, so `count x health` is the invariant --
+  //   halving one while doubling the other holds total HP, and therefore kill
+  //   income, fixed by construction. It buys TEXTURE and nothing else: more,
+  //   smaller bodies for the same work and the same money.
+  //
+  //   THE INFLATION (m = 1.25) is the extra `x 1.25` on the count, and it is
+  //   the only part that moves anything. It raises these three waves' health
+  //   25% -- and the schedule's by 0.38%, which is the honest size of a
+  //   three-wave change: 25 799 -> 25 898 effective, 797 -> 866 bodies.
+  //
+  // NO BOUNTY HAIRCUT (b = 1.00), deliberately, because the inflation IS the
+  // cash cut and a second site would double-count it. The purse is
+  // `600 + kill + waveBonus + 9505 fixed`, and that fixed 26% knows nothing
+  // about the schedule -- so inflating HP raises the purse by less, and money
+  // density (purse / effective HP) falls on its own. AT THIS SCOPE THAT IS
+  // ALMOST NOTHING: 36 017 / 25 799 = 1.3961 becomes 36 133 / 25 898 =
+  // 1.3952, -0.07%. Do not quote this patch as having moved the difficulty
+  // curve. It moved three waves; the curve is still the one measured before.
+  //
+  // WHICH GROUPS MOVE. Only where `Enemy.healthOf` resolves EVEN (so `/2` is
+  // exact and no HP is invented by rounding), `count > 1`, and the type is not
+  // a single-purpose body. Halving a Hive, Shieldbearer, Healer, Colossus,
+  // Fractal Slime or boss into two is a design change, not a texture change:
+  // they carry a mechanism per body, so doubling the body doubles the
+  // mechanism.
+  //
+  // WHY THESE THREE AND NOT THE OTHERS -- land what a player can reach, hold
+  // what is past the wall. The upgrading policy that plays this schedule today
+  // reaches wave 20 and dies to the Brute. Waves 12, 13 and 16 are inside what
+  // a run actually sees, so a change to them is a change someone can report
+  // on; 19 onward is past that point and would be tuned blind.
+  //
+  // HELD, NOT REJECTED -- 19, 21, 22, 23, 27, 31, 32 and 33. Two independent
+  // grounds, either of which is sufficient:
+  //
+  //   1. MEASURED PEAK LOAD FALLS. `interval` is untouched, so a retuned group
+  //      puts 2.5x the bodies out at the old spacing with half the health
+  //      each. Simulated one wave per boot with no towers, peak effective HP
+  //      on the road across the twelve went 10 070 -> 8 482, **-15.8% while
+  //      authored HP rose 25%**, and the waves ran 3.9 minutes longer. Eight
+  //      of twelve got LIGHTER at their peak moment. Wave 31: 1510 -> 1085.
+  //      An analytic model predicted +18% and was wrong, because a wave that
+  //      deploys over 87 s instead of 45 s no longer overlaps itself.
+  //      The derived correction is dividing each retuned group's `interval`
+  //      by 2.5, which restores the window and turns -16% into +25%. It is not
+  //      in this patch. DO NOT WIDEN THE SCOPE WITHOUT IT.
+  //
+  //   2. THE v0.4.4 SPINE. tests/run.js:432 pins each of the twenty original
+  //      waves to the exact count, interval and type of the group that OPENS
+  //      its wave. Seven of the held eight are old-wave openers, and the
+  //      retune changes their counts. That table is the only surviving record
+  //      of a curve someone measured and it cannot be re-derived, so it is
+  //      held rather than re-pinned. Waves 12, 13 and 16 open with groups the
+  //      rule does not touch, which is why these three land free of it.
+  //
+  //      And do not "fix" the guard by re-keying it on interval + type: that
+  //      key is NOT UNIQUE -- old 6 and old 12 are both fast@0.4, and waves 14
+  //      and 28 both open camo_normal@0.9. Only the ordered walk hides it, so
+  //      the ambiguity would appear the first time an opening moved, which is
+  //      the one moment the guard exists for.
+  //
+  // WAVE 21 IS HELD EVEN THOUGH THE SPINE PERMITS IT. 6 -> 15 Revenants is
+  // 2.5x the revive events in one wave, and it sits past the wall where
+  // nothing can measure what that does.
+  //
+  // ALSO EXCLUDED, by design rather than by caution -- 1-10 (the tutorial, the
+  // shape the opening purchase is measured against), 11 (the midboss, one
+  // authored body), 14/15/18/20/24 (pure counter waves: they ask for a
+  // PURCHASE, not for damage, and all five resolve ODD so the rule is a no-op
+  // on them anyway), 17 (in the original twelve, and a no-op for the same
+  // reason -- its groups are 3, 13 and 7), 25 (the Fractal Slime cascade),
+  // 26 and 30 (spawners: a brood is unscheduled and pays nothing), 28 (the
+  // camo blackout), 29 (the Colossus spike), 34 and 35 (the boss waves).
+  //
+  // WAVE 12 CARRIES THE SAME REGRESSION AT A SIZE WORTH ACCEPTING: measured
+  // peak load 222 -> 164, and it now deploys over 90 s instead of 70. It is
+  // the one landed wave where the interval correction would show, and it is
+  // early enough that a player reports it rather than a simulator inferring it.
+  { groups: [                                                     // 280 HP  old 9 + company -- RETUNED
     { count: 18, interval: 0.35, type: "fast", health: 5 },
-    { count: 16, interval: 0.22, type: "swarm", health: 2, lead: 2 },
-    { count: 12, interval: 0.8,  health: 10, lead: 2.5 }
+    { count: 40, interval: 0.22, type: "swarm", health: 1, lead: 2 },
+    { count: 30, interval: 0.8,  health: 5, lead: 2.5 }
   ] },
-  { count: 8,  interval: 1.5,  type: "angry", health: 18 },       // 144 HP  first attacker -- PURE
+  { count: 20, interval: 1.5,  type: "angry", health: 9 },        // 180 HP  first attacker -- PURE, RETUNED
   { count: 10, interval: 0.9,  type: "camo_normal", health: 7 },  //  70 HP  first camo -- PURE
   { count: 5,  interval: 2.2,  type: "shielded", health: 15 },    // 225 HP  first shield -- PURE
-  { groups: [                                                     // 382 HP  old 10 + company
+  { groups: [                                                     // 407 HP  old 10 + company -- RETUNED
     { count: 14, interval: 0.8,  type: "slow", health: 15 },
     { count: 24, interval: 0.18, type: "swarm", health: 3, lead: 2 },
-    { count: 10, interval: 0.9,  type: "armored", health: 10, lead: 2 }
+    { count: 25, interval: 0.9,  type: "armored", health: 5, lead: 2 }
   ] },
   { groups: [                                                     // 384 HP
     { count: 30, interval: 0.18, type: "swarm", health: 3 },
@@ -318,10 +409,18 @@ var EASY_WAVES = [
   // --- 22-34: the back half. Three or four types a wave, every wave.
   //
   // The `health` overrides climb steeply from here — that is where the bulk of
-  // the 13 500 lives. They scale a type without inventing a tougher one, and
-  // they never touch defences: a 70 HP Brute still carries its 5 flat armor, a
-  // scaled Bulwark still gets twice its (new) health in shield and still
-  // doubles its speed when that breaks.
+  // the schedule's HP lives: 23 796 scheduled points across 35 waves after the
+  // retune above (23 697 before it), of which waves 22-34 hold 13 900 -- and
+  // that back-half figure is UNCHANGED, because the retune landed on three
+  // early waves only. They scale a type without inventing a tougher one, and
+  // they never touch
+  // defences: a 70 HP Brute still carries its 5 flat armor, a scaled Bulwark
+  // still gets twice its (new) health in shield and still doubles its speed
+  // when that breaks.
+  //
+  // The "13 500" this comment used to quote was a fossil of a schedule two
+  // rescales ago; it is also still in js/towers/long-range-dps.config.js and
+  // in old CHANGELOG entries, where it is history and should stay.
   { groups: [                                                     // 652 HP  old 12 + company
     { count: 12, interval: 0.4,  type: "fast", health: 18 },
     { count: 4,  interval: 2.2,  type: "brute", health: 85, lead: 2 },
@@ -362,6 +461,14 @@ var EASY_WAVES = [
   // cascade conserves health -- four bodies at a quarter each, so never more
   // than the root's 64 points are in flight -- and measured peak concurrency
   // does not rise.
+  //
+  // DO NOT GIVE THE FRACTAL SLIME A `health` OVERRIDE, here or in any later
+  // retune. `fractal_slime` DISCARDS one at every value: `fractalTierOf`
+  // resolves undefined to the default tier, so the constructor always holds a
+  // tier and `Enemy.healthOf` takes the tier branch. Writing `health` here
+  // would be a no-op on the body and NOT a no-op on the accounting --
+  // `waveKillBounty` would declare income for a body that never got tougher.
+  // Scale the tier, or scale the type row in js/enemy.js; not this.
   { groups: [                                                     // 984 effective HP + split generations
     { count: 20, interval: 0.45, health: 22 },
     { count: 5,  interval: 1.8,  type: "shielded", health: 20, lead: 2 },
