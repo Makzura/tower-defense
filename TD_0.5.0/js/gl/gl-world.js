@@ -1673,11 +1673,30 @@ var World3D = (function () {
     // is the first thing that breaks and it will break silently, because the
     // baked-frame gate cannot see this pose at all.
     //
-    // tipCheck moves with the angle: the tip sits 0.520 u out along +x from the
-    // pivot, so its world z is `0.8004 - 0.520 * sin(swing)` -- 0.5096 at 34
-    // degrees, which is mira's authored 0.509, and 0.6484 here.
+    // tipCheck MOVES WITH THE ANGLE, AND IT IS DERIVED FROM THE MESH RATHER
+    // THAN FROM THE BRIEF'S IDEALISATION -- WHICH MATTERS MORE AT 17 THAN IT
+    // DID AT 34.
+    //
+    // The brief's form is `0.8004 - 0.520 * sin(swing)`, from a tool tip 0.520 u
+    // out along +x at exactly the pivot's height. Measured on the built mesh,
+    // the centroid of the bill's end face is 0.5188 u out and sits 0.0050 u
+    // ABOVE the pivot, so the true arrival is
+    //
+    //     atan2(0.0050, 0.51882) - swing, at radius 0.51882
+    //
+    // giving 0.5144 at 34 degrees and 0.6535 here. That reproduces what the
+    // rig reads through the renderer's own matrix to four decimals at both
+    // angles, and it is 0.005 u away from the brief's form at both.
+    //
+    // 0.005 u is FIXED while the tip travel halves with the angle, so the same
+    // error is 1.7% of travel at 34 degrees and 3.4% here -- it grows as the
+    // stroke shrinks. This field's entire job is to catch a silent pivot error,
+    // and spending half its tolerance on a known systematic offset is how a
+    // gate quietly stops being able to fail. mira's 0.509 remains the authored
+    // INTENT; the 0.005 is the built mesh against that intent, not the
+    // renderer against either.
     "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004], swing: 0.2967060,
-                     tipCheck: 0.648 }
+                     tipCheck: 0.6535 }
   };
 
   // ONE SCRATCH MATRIX AND ONE SCRATCH OBJECT, allocation-free per frame. Both
