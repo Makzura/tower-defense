@@ -109,16 +109,29 @@
 # carried by the group ORDER below, not by the leg positions. Liftoff frames are
 # 4, 8, 12 for groups 0, 1, 2.
 #
-# **THE BRIEF'S STATED CONSEQUENCE OF THAT ORDERING DOES NOT HOLD, AND NO
-# ORDERING CAN MAKE IT HOLD.** It says the trailing leg "should only ever be off
-# the ground while both leading legs are planted". The shared support window is
-# duty 0.5 -- six planted frames of twelve -- so the body has exactly one foot
-# down on six frames of the cycle. The trailing leg is airborne on frames
-# 12, 1, 2, 3, 4, 5, and on four of those only ONE leading leg is planted. Every
-# ordering is a rotation of the same cycle, so this is a DUTY question and not an
-# ordering question: it needs duty 2/3, which is a second change to
-# `support_left_frames` and reaches nine shipped bodies. Flagged to kaz and mira,
-# NOT taken unilaterally. The ordering itself is honoured exactly as specified.
+# **THE ORDERING IS ARBITRARY, PINNED AND DOCUMENTED -- IT IS NOT JUSTIFIED, AND
+# THAT IS THE ACCURATE DESCRIPTION RATHER THAN A GAP.** The brief originally gave
+# a reason: the trailing leg "should only ever be off the ground while both
+# leading legs are planted", the prop never leaving the ground between the two
+# placements it braces. That is false here and no ordering can make it true. The
+# shared support window is duty 0.5 -- six planted frames of twelve -- so the
+# body has exactly one foot down on six frames; the trailing leg is airborne on
+# frames 12, 1, 2, 3, 4, 5 and on four of those only ONE leading leg is planted.
+# Every ordering is a rotation of the same cycle, so it was never an ordering
+# question. mira withdrew the justification rather than replace it, on the
+# grounds that a reason invented after the fact is worse than an admitted
+# arbitrary choice because the next reader treats it as load bearing. **So the
+# only real reason this ordering matters is the renumbering trap below.**
+#
+# AND DUTY 2/3 IS CLOSED, NOT PENDING. It was the one change that would have made
+# the withdrawn sentence true, and it is refused on evidence order (kaz: a read
+# requirement is settled by looking, and nobody had looked) and on merit (mira:
+# duty 0.5 is what produces the +-0.1874 excursion, and her re-run puts the
+# gesture at 7.58x at the dominant bearing against 4.21x at the duty-2/3
+# excursion of 0.30). **Duty 0.5 makes the attack read BETTER.** A tripod is
+# dynamically balanced at every duty in any case -- two feet is a line, not a
+# support polygon -- so this was never a physics requirement. Do not reopen it
+# without a capture showing the walk staggering.
 #
 # FOOT EXCURSION IS +-0.1874 u, and it is derived rather than chosen: one cycle
 # is 0.899281 u of travel, a plant is 6 of 12 frames, so the planted sweep is
@@ -174,13 +187,31 @@
 # 0.06 u is hit by any drum rotated this far about its own centre.
 #
 # **I believe it is interior and I am not treating that as settled.** The
-# dipping edge reaches radius 0.116 against a hub surface at 0.156, so the
-# intersection is buried inside the hub's own cylinder rather than breaking its
+# dipping edge stays inside the hub's own cylinder rather than breaking its
 # silhouette; the part of the drum's rim that descends OUTSIDE the hub passes
 # beside it, which is just the drum tipping. That is a geometric argument and
-# the honest instrument is a render. Flagged to kaz and mira for juno, with the
-# cheap lever named: shortening the hub is the fix, and it costs the hub's read
-# as a shared member.
+# the honest instrument is a render. With juno; the standards question of
+# whether clause 8 reaches an unbaked pose is with rhea.
+#
+# SWEPT PER Z-SLICE AND PER PART, BECAUSE THE OBVIOUS FIXES ARE ALL WRONG:
+#
+#     part            depth     reaches r    at z      first contact
+#     drum rim        0.0523    0.1041       0.5951    18 deg of stroke
+#     hold            (abuts)   0.1282       0.5478    at rest, by design
+#
+# - **IT IS THE DRUM, NOT THE HOLD.** The hold's figure is its designed abutment
+#   against the hub's underside, measured radially; it is not an intrusion.
+# - **THE TIGHT POINT IS MID-HUB (z 0.595), NOT THE TOP**, because the rim
+#   sweeps into the hub's SIDE on its way down rather than over its top face. So
+#   tapering the hub's top does not reach the constraint at all -- the top slice
+#   already clears at 0.1613 against a hub surface of 0.1564.
+# - **A CONE THAT CLEARS HAS TO NARROW DOWNWARD TO ABOUT r 0.069**, less than
+#   half the hub's radius, and it then falls away from the leg hips at 0.1564 --
+#   so the legs would meet nothing. The cone seat is not the cheap lever it
+#   looks like.
+# - **THE ONLY CHEAP LEVER IS THE STROKE ANGLE.** First contact is at 18 deg, so
+#   anything at or under 17 is clean by construction. 34 is the measured knee and
+#   was kept; the cost of 20 is about a third of the read.
 
 import math
 import os
