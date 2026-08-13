@@ -858,21 +858,100 @@ of the table is the range almost nobody needs.
 > deliberately: a document that records its own rule being violated inside itself
 > is worth more than one that quietly reads correct.
 
-**AND THE SAME SLICE DEMOTES A LIVE CLAIM ABOUT A SHIPPED MODEL.** `brass` 1.41
-against `tin_dark` 1.28 — the figure that made the Hedger's material choice look
-"measured rather than lucky" — **is also frame 6 only**, and `tin`/`tin_dark`
-reverses on half the cycle at a wider palette gap than brass enjoys. **Brass over
-`tin_dark` is NOT established across the crank cycle. Owed: that pair over all
-twelve frames — and brass against the ROAD**, the second neighbour and the one
-that actually decided the material, which has never been measured on pixels at
-all.
+**THE HEDGER'S CRANK: WHAT THE PIXELS ACTUALLY SETTLE, AND WHAT THEY DO NOT.**
+The material was chosen on palette arithmetic and the claim has since been
+measured three times, each time over a wider population, each time narrowing:
 
-**THE SURVIVING HALF IS ITSELF PROVISIONAL. Everything here is one part, one
-bearing.** A second geometry — commissioned by kaz from juno — decides whether
-*"above 3.5 separates"* is a property of the engine or of this crank. **If it is
-this crank's, a palette table has no remaining job at all, and this section
-should then say exactly that** rather than leave standing a rule nobody can act
-on. Do not treat the gross-tier claim as settled in the meantime.
+**Against the Hedger's own body — SOLID.** Brass beats both alternatives on
+**12 of 12 frames**, 1.44 to 2.15, in the controlled condition (body repainted to
+one material) and in the authored neighbourhood alike.
+
+**Against the ROAD — it comes apart, and the road is the neighbour that actually
+decided the material.** The bar overhangs the road; that overhang is the whole
+point of the low placement, and it is what rejected `tin_dark` on paper.
+
+    frame        0     1    ...    6    ...   10    11
+    brass      1.09  1.22        2.25        1.55  1.20
+    tin        1.36  1.25        1.51        1.19  1.24
+    tin_dark   1.66  1.56        1.12        1.13  1.45
+               LOSE  LOSE         win         win  LOSE
+
+**Brass wins on 9 of 12 and is the WORST of the three on the other 3** — and
+frames 11, 0 and 1 are **contiguous**, a sustained quarter of the cycle wrapping
+through the start rather than one sampled instant. **At frame 0 brass is 1.09
+where `tin_dark`, the material the palette table rejected, is 1.66.**
+
+**AND AT THE WORST FRAME — WHICH IS WHERE THIS STANDARD SAYS TO SETTLE A READ —
+THE THREE ARE INDISTINGUISHABLE:** brass **1.09**, tin **1.07**, `tin_dark`
+**1.05**, each at its own worst frame-and-neighbour. All three are effectively
+invisible at their worst.
+
+**So: brass was a better choice than tin overall and the pixels support that. But
+"never negative" is false, and the material question is NOT settled at the worst
+frame.** What is unsupported is *"a measured choice rather than a lucky one"*
+standing **without qualification** — not the choice itself. The crank did **not**
+ship on a lucky ordering: brass is genuinely better overall and clearly better
+against the body.
+
+**The sharpest thing in it: the palette table did not merely fail to predict the
+road, it inverted there.** `tin_dark` was rejected because darkening a part that
+overhangs a dark background is backwards — sound reasoning, and on pixels
+`tin_dark` is the **best** of the three against the road at exactly the frames
+where brass is worst. This is the concrete form of *worst exactly where it is
+most often used*.
+
+**STILL OWED, AND KEPT OPEN RATHER THAN CLOSED: the road is not uniform.** The
+crank may overhang road, road edge and whatever borders them, and those have not
+been separated. The figure above is itself an aggregate over a population nobody
+has split yet.
+
+> **THE POPULATION LESSON, FOURTH INSTANCE IN ONE SECTION IN ONE DAY, AND ALWAYS
+> THE SAME SHAPE: a statistic quoted over a population that was never split.**
+> Two pairs quoted as a spread; one frame quoted as an ordering; **one median
+> quoted over two different neighbours**; and now a road that is not one surface.
+> Each was caught by asking *what is this a statistic of* — never by re-checking
+> the arithmetic, which was correct every time.
+>
+> **The operational form: when a part touches more than one thing, its contrast
+> is not one number.** Split by what is actually behind each pixel before quoting
+> a figure, and say which neighbours the split covers. A controlled measurement
+> isolates the mechanism; the authored condition settles the choice; **and
+> neither is worth anything until the population behind the median is named.**
+
+**THE SURVIVING HALF IS NO LONGER PROVISIONAL — IT TRANSFERS.** A second geometry
+sharing nothing with the crank but a renderer (`warbringer-a5` / `haft`, 976
+triangles, a hammer head on a shaft against a body) reproduces it exactly: the
+three candidates above palette 3.5 stayed clear of and above all eight below, **on
+all eight frames.** So the one job a palette table has now holds on two unrelated
+shapes.
+
+**AND THE FAILURE TRANSFERS TOO — WORSE.** Within-band scrambling on the haft
+runs **11–12 inversions per frame** against the crank's 1–8, with `tin` at palette
+1.00 beating `black` at 2.89 **on every frame** — a reversed gap of **1.89**. The
+mechanism is visible in the numbers rather than inferred: `black` renders
+1.04–1.27, *below* a same-material pair, because **a dark albedo on a large flat
+face goes dark and matches the shadowed body whatever its paper ratio says.** Area
+and orientation beat albedo, and the paper figure cannot see either.
+
+> **Carry this sentence, which is juno's:** *a palette table can tell you a pair
+> is obviously different; it cannot tell you anything else, and it is worst
+> exactly where it is most often used.*
+
+**TWO LIMITS BELONG BESIDE THE CLAIM, NOT UNDER IT.** kaz declined the pass that
+would close them, on the grounds that it buys attribution rather than confidence:
+
+1. **Two things varied at once.** The haft was measured off-board against a
+   uniform background, the crank on the road. **So the inversion-count difference
+   — 11–12 against 1–8 — cannot be attributed to shape alone.** What transfers is
+   the *direction*: both scramble, both preserve the gross tier. The size of the
+   gap between them is not yet anyone's to explain.
+2. **One bearing on both parts**, and yaw is not free on this project — an
+   enemy's yaw is its heading, so it shows the player every bearing during a run.
+
+**The controls are worth naming, because the whole sweep rests on them.** null 0,
+revert 0, **all-groups-suppressed against a bare plate 0**, and a planted
+violation caught at 482 px. The third is the load-bearing one: it proves group
+suppression removes exactly the model and nothing else.
 
 ### The Siphon palette, measured
 

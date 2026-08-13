@@ -13,6 +13,90 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — the gross-tier claim TRANSFERS to a second geometry and stops
+being provisional. The Hedger's crank measured against the road for the first
+time, where brass is the WORST of the three materials on a quarter of the cycle.**
+
+**THE PALETTE TABLE'S ONE REMAINING JOB NOW HOLDS ON TWO UNRELATED SHAPES.**
+`warbringer-a5` / `haft` — 976 triangles, a hammer head on a shaft against a body,
+sharing nothing with the Hedger's crank but a renderer — reproduces it exactly:
+the three candidates above palette CR 3.5 stayed clear of and above all eight
+below **on all eight frames**. So *"a palette table can flag a gross difference"*
+is a property of the renderer, not of one crank, and the caveat marked on it
+hours earlier is removed.
+
+**The failure transfers too, and is WORSE on the haft** — 11–12 inversions per
+frame against the crank's 1–8, with `tin` at palette 1.00 beating `black` at 2.89
+**on every frame**, a reversed gap of 1.89. The mechanism is visible in the
+numbers rather than inferred: `black` renders 1.04–1.27, *below* a same-material
+pair, because **a dark albedo on a large flat face goes dark and matches the
+shadowed body whatever its paper ratio says.** Area and orientation beat albedo
+and the paper figure can see neither. The sentence the standard now carries is
+juno's: *a palette table can tell you a pair is obviously different; it cannot
+tell you anything else, and it is worst exactly where it is most often used.*
+
+**Two limits sit BESIDE that claim rather than under it**, and the pass that would
+close them was declined on the grounds that it buys attribution rather than
+confidence: the haft was measured off-board against a uniform background and the
+crank on the road, so **the inversion-count difference cannot be attributed to
+shape alone** — what transfers is the direction, not the size of the gap; and it
+is **one bearing on both parts**, while an enemy's yaw is its heading and so shows
+the player every bearing during a run. Controls named because the sweep rests on
+them: null 0, revert 0, **all-groups-suppressed against a bare plate 0**, and a
+planted violation caught at 482 px. The third is load-bearing — it proves group
+suppression removes exactly the model and nothing else.
+
+**AND THE ROAD, WHICH HAD NEVER BEEN MEASURED IN ANY CONDITION.** It was kept
+owed rather than closed because it is the neighbour that actually decided the
+material — the bar overhangs the road, and that overhang is what rejected
+`tin_dark` on paper. Measured by splitting the crank's own pixels by what sits
+behind each one:
+
+    frame        0     1    ...    6    ...   10    11
+    brass      1.09  1.22        2.25        1.55  1.20
+    tin        1.36  1.25        1.51        1.19  1.24
+    tin_dark   1.66  1.56        1.12        1.13  1.45
+               LOSE  LOSE         win         win  LOSE
+
+**Brass wins on 9 of 12 and is the worst of the three on the other 3, and frames
+11, 0 and 1 are contiguous** — a sustained quarter of the cycle wrapping through
+the start, not one sampled instant. At frame 0 brass is **1.09** where `tin_dark`,
+the material the palette table rejected, is **1.66**.
+
+**At the worst frame — where this standard says a read is settled — the three are
+indistinguishable: brass 1.09, tin 1.07, `tin_dark` 1.05**, each at its own worst
+frame-and-neighbour. All three are effectively invisible at their worst.
+
+**So the earlier "12 of 12, margin never negative" is corrected: it was an
+aggregate over two different neighbours and the aggregate hid the road.** Against
+the Hedger's own body brass does win 12 of 12, 1.44–2.15, in both conditions —
+that half stands. **What does not stand is "never negative", and the material
+question is not settled at the worst frame.** The crank did **not** ship on a
+lucky ordering: brass is genuinely better overall and clearly better against the
+body. What is unsupported is *"a measured choice rather than a lucky one"*
+standing **without qualification** — which is what was relayed to the owner, and
+what is now qualified here.
+
+**The sharpest finding: the palette table did not merely fail to predict the road,
+it INVERTED there.** `tin_dark` was rejected because darkening a part that
+overhangs a dark background is backwards — sound reasoning — and on pixels
+`tin_dark` is the **best** of the three against the road at exactly the frames
+where brass is worst.
+
+**Still owed and kept open: the road is not uniform either.** The crank may
+overhang road, road edge and whatever borders them, and those are not separated,
+so the figures above are themselves an aggregate over an unsplit population.
+
+**THE POPULATION LESSON, FOURTH INSTANCE IN ONE SECTION IN ONE DAY, ALWAYS THE
+SAME SHAPE — a statistic quoted over a population that was never split.** Two
+pairs quoted as a spread; one frame quoted as an ordering; one median quoted over
+two different neighbours; and now a road that is not one surface. **Every one was
+caught by asking what the number is a statistic OF, and none by re-checking the
+arithmetic, which was correct every time.** The operational form now in the
+standard: when a part touches more than one thing, its contrast is not one
+number — split by what is actually behind each pixel, and say which neighbours
+the split covers.
+
 **2026-08-13 — the other six house-standard commits, narrated. Paying a debt
 petra made visible rather than counted.**
 
@@ -108,7 +192,11 @@ ceiling claim died to two rendered pairs; "cannot settle within 0.7 CR" died to
 eleven candidates; "it ranks" died to twelve frames. If a fifth ruling comes it
 will come from a second part, not from an argument.
 
-**A LIVE CLAIM ABOUT A SHIPPED MODEL IS WITHDRAWN WITH IT.** `brass` 1.41 against
+**A LIVE CLAIM ABOUT A SHIPPED MODEL IS WITHDRAWN WITH IT.** *(Both figures owed
+here have since been measured — see the entry above. The twelve-frame pair came
+back clean; the road did not, and brass is the worst of the three on a contiguous
+quarter of the cycle. The withdrawal below was right and the reason it gave was
+too narrow.)* `brass` 1.41 against
 `tin_dark` 1.28 — the figure that made the Hedger's crank material look *measured
 rather than lucky* — **is frame 6 alone**, and `tin`/`tin_dark` reverses on half
 the cycle at a wider palette gap than brass enjoys. **Brass over `tin_dark` is
