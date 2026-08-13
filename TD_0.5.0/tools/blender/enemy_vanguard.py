@@ -765,7 +765,20 @@ def export_build():
     """The exporter contract: build, animate, return the frame count."""
     _root, body, parts, hip_z, band = build()
     report = animate_walk(body, parts, hip_z, WALK_FRAMES, band)
-    peak, track = measure_plant("leg_l", WALK_FRAMES)
+    # BOTH LEGS, NOT ONE. This body verified its gait on `leg_l` alone until
+    # 2026-08-14. It was almost certainly fine -- two mirror legs on a
+    # half-cycle offset should agree -- but "fine by symmetry" is immunity by
+    # COINCIDENCE, and the same shape of assumption is what let
+    # `gait_solve.solve_contact_x` steer on `groups[0][0]` and report SUCCESS
+    # on a body whose other two feet slid 19.3 and 14.3 board px.
+    #
+    # kaz's rule, and this line is the whole cost of obeying it: AN INSTRUMENT
+    # THAT HAS ONLY EVER RETURNED ONE ANSWER HAS NOT BEEN TESTED, WHICHEVER
+    # ANSWER IT IS. The useful question is what the check has never been GIVEN;
+    # here the answer was its own right leg.
+    peak_l, track = measure_plant("leg_l", WALK_FRAMES)
+    peak_r, _track_r = measure_plant("leg_r", WALK_FRAMES)
+    peak = max(peak_l, peak_r)
     px = gait_solve.UNITS_TO_PX * 1.9
     print("  vanguard: F=%d  P=%d  theta_m=%.4f deg (VERIFIED, not re-solved)"
           % (WALK_FRAMES, PLANT_FRAMES, report["theta_m_deg"]))
@@ -778,8 +791,10 @@ def export_build():
              report["pitch_units"] * px))
     print("  vanguard: float frames %s   worst swing lift %.5f u (rail %.3f)"
           % (report["float_frames"], report["worst_swing_lift"], RAIL_H))
-    print("  vanguard: A (pre-export, posed) %.6f u = %.4f board px at 1.9"
-          % (peak, peak * px))
+    print("  vanguard: A (pre-export, posed) leg_l %.6f u   leg_r %.6f u   "
+          "delta %+.2e u" % (peak_l, peak_r, peak_r - peak_l))
+    print("  vanguard: A (pre-export, posed) %.6f u = %.4f board px at 1.9  "
+          "(worst of the two legs)" % (peak, peak * px))
     print("  vanguard: B (sawtooth) %.6f u = %.4f board px at 1.9"
           % (gait_solve.travel_per_frame(WALK_FRAMES),
              gait_solve.travel_per_frame(WALK_FRAMES) * px))

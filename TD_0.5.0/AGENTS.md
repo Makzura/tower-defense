@@ -216,6 +216,20 @@ Things to know if a test misleads you:
   points at a file that exists. Deliberate exceptions are listed in that file
   with their reasons, and pre-existing unwired files sit in a dated ledger that
   prints every run without failing the build. `tools/ci-check.js` runs it.
+- **The mirror image breaks other people rather than you: a tag whose file you
+  have but have not COMMITTED.** The harness `readFileSync`s every entry in the
+  script list, so a clone at such a commit cannot run a single suite — it dies
+  in `boot()` before the first assertion. `d828769` and `181119c` are both in
+  that state on this branch, tagging `js/gl/models/enemy-boss.js` two commits
+  before it was committed; measured there, run is 1/106, content 0/212 and blub
+  0/53. **Your own working tree is always green**, which is exactly why this one
+  escapes. The manifest check's third leg compares the tags against
+  `git ls-files`. It is skipped, and says so in its output, when run against an
+  extraction that has no git index.
+- **Seed a gate run from a commit and you inherit that commit's defects.** When
+  you materialise a commit to measure it, take a CONTROL run before the
+  treatment: confirm the materialised tree boots at all before attributing any
+  failure to your own change.
 - A hidden browser tab pauses `requestAnimationFrame` entirely, so the canvas
   freezes and nothing simulates. That has fooled a debugging session before —
   if the game looks dead in a background tab, it is not a bug.
@@ -4385,6 +4399,39 @@ group count gives two body dips per cycle against N footfalls. And remember a
 roll on this chassis *adds* to the plan extent rather than shrinking it, because
 clause 3b puts the animated root on the ground — so trimming those two buys
 plan margin as well as rhythm.
+
+**"GROUPS" MEANS TWO DIFFERENT THINGS AND THE RULE ABOVE IS ABOUT ONLY ONE OF
+THEM.** Say which every time, because the two counts differ on every walking
+body in the library:
+
+- **Mesh groups** — what the exporter emits and what `groups[]` holds in the
+  generated JS, one per animated root. This is the number in an export line
+  (`3 moving group(s)`) and in `check-model-top` / `check-gait-slip` output.
+- **Gait groups** — how many *evenly-phased leg phases* the walk has. This is
+  the number the two rules above are about.
+
+The Tyrant is **3 mesh groups** (`boss_body`, `leg_l`, `leg_r`) and **2 gait
+groups**. Reporting the first into a conversation about the second read as an
+alarm on a shipped boss for several minutes and cost a rendering lead a
+re-check. The mesh count is always at least gait count + 1, because the body
+root is a mesh group and is not a leg.
+
+**And prefer immunity by CONSTRUCTION to immunity by arithmetic when you clear a
+body of a defect.** Both bosses are clear of the `groups[0][0]` steering defect
+— but not because `+N/2 ≡ −N/2 (mod N)` makes it invisible at two groups, which
+is true and expires silently the day someone adds a third. They are clear
+because **neither module calls the defective functions at all**: no
+`gait_solve.solve_contact_x`, no `verify_plant`, no `gait_solve.contact_x`, no
+`chassis.animate_walk_grouped`. That reason keeps holding when the leg count
+changes; the arithmetic one does not, and nothing announces when it stops.
+
+**Verify every leg, not the first one.** Both boss modules re-measure their
+plant from posed geometry per leg (`measure_plant("leg_l")` *and*
+`("leg_r")`) — the Vanguard did only `leg_l` until 2026-08-14, and "fine by
+symmetry" is the same assumption that let the solver report success on feet
+sliding 19.3 board px. The fix was one line and both legs read 0.000000 u.
+**An instrument that has only ever returned one answer has not been tested,
+whichever answer it is** — so ask what case your check has never been *given*.
 
 **The roster is deliberately not counted here.** It moved by five in a single day
 on 2026-08-13 and any figure written down is wrong by the next commit;
