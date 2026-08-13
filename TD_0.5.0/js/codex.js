@@ -269,6 +269,20 @@ var Codex = (function () {
       // somewhere; taking it from the enemy's OWN speed keeps the one property
       // that made the board's walk worth having. A Sprinter scurries here and a
       // Colossus plods, for the same reason and by the same arithmetic.
+      // A FLIER IS THE BOARD'S ONE EXCEPTION TO THIS RULE AND IT IS NOT
+      // REPRODUCED HERE. `gl-world` drives a wingbeat from `boardClock *
+      // HOVER_HZ` (2.6) rather than from distance, because a stopped flier
+      // would otherwise freeze mid-beat. The derivation below happens to give
+      // the Aether Wisp 2.567 -- within 1.3% of the board, which is why nothing
+      // looks wrong today. **That is luck, not construction.** It falls out of
+      // that one body's speed and radius, and the next flier will land wherever
+      // its own numbers put it.
+      //
+      // NOT FIXED HERE ON PURPOSE: the honest fix is to ask the renderer for
+      // the rule rather than to copy 2.6 into this file, and `HOVER_HZ` is
+      // private to gl-world. A second copy of a constant that only one of the
+      // two sites will ever be retuned is worse than a documented seam. Owner:
+      // rendering (otto) -- export it beside `walkBand` and read it here.
       var strideP = Math.max(1, sprite.radiusPx() * 2.6);
       var walkHz = (typeof ul === "function" ? ul(speed) : speed) / strideP;
 
@@ -376,6 +390,13 @@ var Codex = (function () {
     enemyIndex = 0;
     enemyScroll = 0;
     pick = null;
+    // THE MODAL DIES WITH THE SCREEN. Every other piece of state here is reset
+    // on entry and the viewer was not, so leaving the index with one open and
+    // coming back put a stale modal on top of a freshly reset index -- the
+    // modal still showing the enemy you left on, the list underneath showing
+    // enemy 0. Two states disagreeing about what the player is looking at, and
+    // the wheel dead because the viewer swallows it.
+    viewer = null;
     screen = "index";
   }
 
@@ -1202,8 +1223,12 @@ var Codex = (function () {
     // THE MOTION. Elapsed time drives both the turn and the walk, and they are
     // deliberately not locked to each other: a body whose stride completed once
     // per revolution would look like a wind-up toy.
+    // STARTS WHERE THE PICTURE THE PLAYER CLICKED WAS POINTING. Every static
+    // preview on this screen sits at LIST_YAW; the modal used to start at 0,
+    // so the body visibly snapped through 30 degrees at the exact moment the
+    // player was comparing the two. The turn is continuous from there.
     var t = (nowMs() - viewer.t0) / 1000;
-    var yaw = (t / ROT_SECONDS) * Math.PI * 2;
+    var yaw = LIST_YAW + (t / ROT_SECONDS) * Math.PI * 2;
 
     var drew = false;
     if (item.enemy) {
@@ -1633,7 +1658,13 @@ var Codex = (function () {
 
   function draw(ctx) {
     drawSelectBackdrop();
-    drawBackButton();
+    // NOT DRAWN UNDER THE MODAL, and this is not cosmetic. The viewer's
+    // backdrop is 93% opaque, which leaves the Back button faintly visible --
+    // measured at 141 ink px in its 96x34 box -- while game.js still tested its
+    // rectangle first and would have taken the click. All but invisible and
+    // fully live is the worst of both; now it is neither. `Codex.modalUp` is
+    // what stops the click, this only stops the ghost.
+    if (!viewer) drawBackButton();
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -1687,6 +1718,10 @@ var Codex = (function () {
     onClick: onClick,
     onWheel: onWheel,
     onKey: onKey,
+    // Whether the model viewer is up. game.js asks so its Back button cannot
+    // take a click that belongs to the modal on top of it -- the same rule the
+    // pause menu follows against the board.
+    modalUp: function () { return !!viewer; },
     draw: draw,
     // Read-only views for the tests, plus the geometry they click through --
     // the same rectangles the screen draws, so a test clicks what a player

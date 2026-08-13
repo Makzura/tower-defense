@@ -336,6 +336,49 @@ does rewrite `positions`/`normals` line ordering, but that is pre-existing
 export nondeterminism — two consecutive exports with no edit between them
 differ the same way, and the sorted triangle multiset is identical.)
 
+**2026-08-14 — Three things the capture found once the viewer could be seen.**
+
+Driving the real modal turned up two input defects and one that is a design
+question rather than a bug.
+
+**The Back button was live and all but invisible under the modal.** The viewer's
+backdrop is 93% opaque, which leaves the button showing at a measured **141 ink
+px in its 96x34 box** — and `js/game.js` still tested its rectangle *before*
+handing the click to `Codex.onClick`, so it took the click anyway. All but
+invisible and fully clickable is the worst of both. Worse, `Codex.open()` reset
+`enemyIndex`, `enemyScroll` and `pick` but never cleared `viewer`, so leaving
+that way and coming back put a **stale modal showing one enemy on top of an
+index reset to another** — two states disagreeing about what the player is
+looking at, with the wheel dead underneath because the viewer swallows it.
+
+Fixed at both ends: the modal now outranks the button (`Codex.modalUp`), and the
+button is not drawn under it either. This is the input-priority rule `AGENTS.md`
+already states, applied one level in — anything drawn on top consumes clicks
+before what is under it. **The control that matters is that Back still works
+when no modal is up**; a fix that merely disabled the button would pass every
+other check.
+
+**The viewer opened at a different yaw from the picture that was clicked.** Every
+static preview on the screen sits at `LIST_YAW` (−30°) and the modal started at
+0, so the body visibly snapped through 30 degrees at the exact moment the player
+was comparing the two. It now starts at `LIST_YAW` and turns continuously.
+
+**And one that is NOT fixed, because it is a design question: the per-body fit
+destroys relative size.** Every body is fitted to the same box, so the
+**Colossus renders 231–277 px tall against the Normal's 307–333** — the game's
+heaviest enemy shown *shorter* than its weakest, backwards from the board by a
+wide margin. A shared scale would waste most of the frame on the small bodies,
+so there is no free fix. Recorded rather than papered over: a field guide that
+answers "how big is this" wrongly is worse than one that does not answer it.
+
+Also recorded and deliberately not fixed: the codex derives every walk rate from
+speed over stride, while the board drives a **flier** from a clock at
+`HOVER_HZ`. That happens to give the Aether Wisp 2.567 against the board's 2.6 —
+within 1.3%, which is why nothing looks wrong today. It is luck, not
+construction, and the next flier will land wherever its own numbers put it. The
+honest fix is to export the rule from `gl-world` rather than copy the constant,
+so the seam is documented at the derivation instead.
+
 **2026-08-14 — Every 3D preview on a cold page was rendering fully transparent,
 and reporting success.**
 
@@ -676,6 +719,38 @@ exactly as a tag whose target is missing does.
 there is no index to consult, so the git leg is skipped and the run says so in
 its output — two legs of three is not a clean gate, and a gate that quietly
 degrades to a subset of itself is the failure this whole file exists to prevent.
+
+**`--rev <sha>` answers the other question, and they are not the same gate.**
+The default is *prospective* — "is what I am about to commit self-consistent?"
+— and it is the one worth having, because catching the mistake before it lands
+beats proving it afterwards. `--rev` is *retrospective*: "was the branch
+bootable at that point?" It reads the page and the file list straight out of
+git objects with `git show` and `git ls-tree`, so it needs **no checkout and no
+extraction** — which matters on this machine, where a rig filled the disk to
+zero free earlier in the week by extracting the repo once per run. At a commit
+"present" and "tracked" are the same thing, so the retrospective form needs
+only two legs where the prospective one needs three.
+
+**The reason it exists is a blind spot in how the first version was tested.**
+That version was self-tested against a throwaway repo built for the purpose,
+and material you build yourself is shaped by the same assumptions as the code
+it is meant to test. This branch already contained a real known-bad and a real
+known-good, for free: **`d828769` and `181119c` must fail, `de30b50` must
+pass.** They do. That is a control on real geometry rather than on a fixture,
+and it is the difference between "my check works on my example" and "my check
+works". Kaz's call, and he was right to insist.
+
+Two path conventions bit once and are now commented in the source: `git show
+rev:path` resolves **repo-root-relative** and fails without the `TD_0.5.0/`
+prefix, while `git ls-tree` takes its pathspec **relative to the current
+directory** and prints matches the same way. Prefix one, not the other. The
+plausibility guard caught the mistake — it refused to run rather than reporting
+a clean sweep off an empty file list, which is exactly what it is for.
+
+**Swept the last 120 commits: exactly two are un-bootable, and they are the two
+already known.** The branch is otherwise sound at every point in that window.
+Both broke `sandbox.html` as well as `index.html`, so no suite and no sandbox
+could run there.
 
 **A gate is only as good as the tree you seeded it from.** Materialising a
 commit and running the suites there is the right technique and it inherits every

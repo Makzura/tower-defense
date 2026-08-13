@@ -1678,7 +1678,14 @@ function onClick(event) {
   // here, like the chooser's, so the two screens cannot disagree about how
   // leaving works; everything else on the screen is the codex's own.
   if (screen === "index") {
-    if (pointInRect(p.x, p.y, backButtonRect())) openMenu();
+    // THE MODEL VIEWER OUTRANKS THE BACK BUTTON WHILE IT IS UP. This is the
+    // input-priority rule stated above, applied one level in: anything drawn on
+    // top must consume clicks before what is under it. The viewer's backdrop is
+    // 93% opaque, so the button was all but invisible and still took the click
+    // -- and because `Codex.open` resets the index but the modal is not part of
+    // `screen`, leaving that way stranded a viewer showing one enemy over a
+    // list reset to another.
+    if (!Codex.modalUp() && pointInRect(p.x, p.y, backButtonRect())) openMenu();
     else Codex.onClick(p.x, p.y);
     return;
   }
