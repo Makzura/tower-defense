@@ -1643,8 +1643,41 @@ var World3D = (function () {
   // written down purely so that if the figure height ever moves, the pivot
   // moves with it instead of staying at a literal that used to be right.
   var STRIKE_BY_MODEL = {
-    "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004], swing: 0.5934119,
-                     tipCheck: 0.509 }
+    // 17 DEGREES, NOT 34, AND THIS IS A CLAUSE 8 COMPLIANCE CHANGE.
+    //
+    // At 34 degrees the drum's rim reaches 0.0523 u into the hub at z 0.595 for
+    // about 53% of each gesture window. `check_penetration.py` walks the BAKED
+    // frames and reports clean, correctly -- nothing exports this pose, because
+    // it is composed here at draw time from `attackFlash`. The instrument
+    // narrowed; the rule did not.
+    //
+    // rhea ruled clause 8 has NO WAIVER: remove the overlap, or declare the
+    // parts as meant to touch. Magnitude and frequency are a waiver argument
+    // and fit through neither door. The exclusion door is closed by the
+    // measurement itself -- first contact is at 18 degrees of a 34 degree
+    // stroke, so the parts meet only because the stroke travels PAST the point
+    // where they meet. That is an overshoot, not an abutment, and signing "these
+    // are meant to meet" would be untrue.
+    //
+    // 17 holds every bearing 34 held, at 42% of the silhouette change at the
+    // dominant one. Bearing 270 fails at BOTH angles (0.96x at 34, 0.97x at 17),
+    // so that 1.7% of road is a pre-existing Hedger gap and NOT a cost of this
+    // change -- do not report it as one.
+    //
+    // **THE MARGIN IS THIN AND IS STATED AS A NUMBER RATHER THAN A SIGN.**
+    // First contact is at 18 degrees; this sits 1 degree below it. Taking the
+    // intrusion as locally linear (0.0523 u over the 16 degrees from 18 to 34,
+    // so ~0.0033 u/deg) the clearance here is of order 0.003 u -- about 0.13
+    // board px at this body's sizeScale of 1.25. That COMPLIES, and it complies
+    // by less than a pixel. If the drum, the hub or the pivot ever move, this
+    // is the first thing that breaks and it will break silently, because the
+    // baked-frame gate cannot see this pose at all.
+    //
+    // tipCheck moves with the angle: the tip sits 0.520 u out along +x from the
+    // pivot, so its world z is `0.8004 - 0.520 * sin(swing)` -- 0.5096 at 34
+    // degrees, which is mira's authored 0.509, and 0.6484 here.
+    "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004], swing: 0.2967060,
+                     tipCheck: 0.648 }
   };
 
   // ONE SCRATCH MATRIX AND ONE SCRATCH OBJECT, allocation-free per frame. Both

@@ -33,11 +33,19 @@
 #
 # So: **perturb a line that is unconditionally executed, ideally the exact line
 # under test.** Re-armed as `phases[(f + shifts[g] + 1) % frames]` the control
-# lights 26,276 floats across 8 of the 10 bodies. The 2 that stay at zero are
-# `enemy_normal` (its own `animate_walk`, :342) and `enemy_vanguard` (its own,
-# and its header says so), which never reach the shared gait -- **every zero is
-# explained by code, not by story**, which is the bar. A partial control result
-# is only trustworthy once you can name why each zero is a zero.
+# lights 26,276 floats across 8 of the 10 bodies. **ONE** body stays at zero:
+# `enemy_normal`, which authors its own `animate_walk` (:342) and never reaches
+# the shared gait -- **every zero is explained by code, not by story**, which is
+# the bar. A partial control result is only trustworthy once you can name why
+# each zero is a zero.
+#
+# CORRECTION, 2026-08-14. This paragraph used to name `enemy_vanguard` as a
+# second zero "with its own walk, and its header says so". **That is false --
+# `enemy_vanguard.py:152` is `import enemy_chassis as chassis`.** It reaches the
+# shared gait like any other chassis body and it is not a negative control. The
+# claim was believed because it travelled beside a true one about `enemy_normal`.
+# A comment that misdescribes WHY a control is a control is worse than no
+# comment: the next person preserves it for the stated reason.
 #
 # THIS IS NOT THE WHOLE GATE. It compares rigs before export. Finish with
 # `framesDigest` on the exported file -- that is the end-to-end confirmation on
@@ -49,14 +57,45 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Every body that imports the chassis. Derive it rather than trusting this list:
-#     grep -l "import enemy_chassis" tools/blender/enemy_*.py | grep -v chassis
-# `enemy_normal` and `enemy_vanguard` are here DELIBERATELY even though they
-# author their own walks -- they are the negative-control anchors above, and
-# dropping them removes the evidence that the zeros mean something.
-BODIES = ("enemy_normal", "enemy_hedger", "enemy_tender", "enemy_dray",
-          "enemy_drudge", "enemy_skimmer", "enemy_tun", "enemy_cooper",
-          "enemy_courier", "enemy_vanguard")
+# WHICH BODIES THIS GATE COVERS -- DERIVED, NOT LISTED.
+#
+# The comment here used to give the derivation and then hand-maintain a literal
+# beside it. That is the shape that fails silently: `enemy_tyrant` landed, was
+# never added, and **the body we had just shipped sat outside its own gate.** A
+# list that must be edited when a body is added will eventually not be.
+#
+# THE DERIVATION IS RUN, AND ITS RESULT IS PRINTED ON EVERY RUN. That is the
+# whole point and it is not decoration -- swapping a literal for a comprehension
+# nobody reads changes only where the omission hides. A derivation you have
+# never watched produce a DIFFERENT answer is a literal with extra steps, so the
+# coverage line is printed before any comparison runs, whether or not the gate
+# passes.
+def derive_bodies():
+    """Every enemy build script that imports the chassis, by reading them."""
+    blender = os.path.join(REPO, "tools", "blender")
+    found = []
+    for name in sorted(os.listdir(blender)):
+        if not name.startswith("enemy_") or not name.endswith(".py"):
+            continue
+        if name == "enemy_chassis.py":
+            continue
+        with open(os.path.join(blender, name), encoding="utf-8") as handle:
+            if "import enemy_chassis" in handle.read():
+                found.append(name[:-3])
+    return tuple(found)
+
+
+# NEGATIVE-CONTROL ANCHORS: bodies that do NOT import the chassis and are
+# covered anyway, so that a control run has a case which MUST stay at zero.
+# Without one, "no differences" cannot be distinguished from "harness blind".
+#
+# `enemy_normal` only. It authors its own `animate_walk` at :342 and never
+# reaches the shared gait. `enemy_vanguard` was listed here too and does not
+# belong -- it imports the chassis (:152), so it is an ordinary covered body and
+# its zero would have meant the harness was broken, not that the control worked.
+ANCHORS = ("enemy_normal",)
+
+BODIES = tuple(sorted(set(derive_bodies()) | set(ANCHORS)))
 
 TOL = 1e-9
 
@@ -134,8 +173,30 @@ def dump(out_path):
     print("wrote %s" % out_path)
 
 
+def print_coverage():
+    """What this gate covers, derived and printed, before it does anything.
+
+    UNCONDITIONAL AND FIRST. A gate that only tells you its scope when it fails
+    lets a shrinking scope pass as a clean run -- which is exactly how
+    `enemy_tyrant` shipped uncovered. Read this line before believing a pass:
+    a zero from a gate covering nothing is still a zero.
+    """
+    derived = derive_bodies()
+    print("coverage: %d bodies (%d derived + %d anchor)"
+          % (len(BODIES), len(derived), len(ANCHORS)))
+    print("  derived (import enemy_chassis): %s" % ", ".join(derived))
+    print("  negative-control anchors:       %s" % ", ".join(ANCHORS))
+    missing = [b for b in ANCHORS if b in derived]
+    if missing:
+        print("  *** ANCHOR IS NOT A CONTROL: %s imports the chassis, so its"
+              " zero would mean the harness is blind, not that the control"
+              " held. Remove it from ANCHORS or stop calling it a control."
+              % ", ".join(missing))
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
+    print_coverage()
     if argv and argv[0] == "--compare":
         sys.exit(compare(argv[1], argv[2]))
     dump(argv[0])

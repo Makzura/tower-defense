@@ -13,6 +13,83 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — The group-gait gate did not cover the body we had just shipped.
+Its body list is now derived and PRINTED; and the Hedger's crank goes to 17°.**
+
+**`check_group_gait.py` carried a hand-maintained `BODIES` literal with the
+derivation written in the comment directly above it.** `enemy_tyrant` landed,
+was never added, and **the boss shipped outside its own gate.** A list that must
+be edited when a body is added will eventually not be.
+
+**Derived now — and the derivation is printed on every run, first, before any
+comparison.** That distinction is the fix. Swapping a literal for a
+comprehension nobody reads only moves where the omission hides: *a derivation
+you have never watched produce a different answer is a literal with extra
+steps.* Shown changing:
+
+    BEFORE (hand-maintained literal): 10 bodies
+    AFTER  (derived + anchor):        11 bodies
+    ADDED  : enemy_tyrant
+    REMOVED: (none)
+
+and the run now opens with
+
+    coverage: 11 bodies (10 derived + 1 anchor)
+      derived (import enemy_chassis): enemy_cooper, enemy_courier, enemy_dray,
+        enemy_drudge, enemy_hedger, enemy_skimmer, enemy_tender, enemy_tun,
+        enemy_tyrant, enemy_vanguard
+      negative-control anchors:       enemy_normal
+
+A gate that only reports its scope when it fails lets a *shrinking* scope pass
+as a clean run. A zero from a gate covering nothing is still a zero.
+
+**A FALSE COMMENT ABOUT WHY A CONTROL IS A CONTROL, CORRECTED.** The header
+named `enemy_normal` **and** `enemy_vanguard` as negative-control anchors "even
+though they author their own walks". `enemy_vanguard.py:152` is `import
+enemy_chassis as chassis` — it reaches the shared gait like any other chassis
+body, so its zero would have meant **the harness was blind**, not that the
+control held. The claim was believed because it travelled beside a true one
+about `enemy_normal`. `ANCHORS` is now `enemy_normal` alone, and a guard prints
+a loud line if any anchor is found in the derived set. Verified in both
+directions: clean for `("enemy_normal",)`, fires for
+`("enemy_normal", "enemy_vanguard")`.
+
+**THE HEDGER'S CRANK: 34° → 17°, AND NO EXCLUSION IS DECLARED.** At 34° the
+drum's rim reaches 0.0523 u into the hub at z 0.595 for ~53% of each gesture
+window. `check_penetration.py` walks the BAKED frames and reports clean,
+correctly — nothing exports this pose; it is composed at draw time from
+`attackFlash`. The instrument narrowed; the rule did not.
+
+Clause 8 has no waiver: remove the overlap, or declare the parts as meant to
+touch. Magnitude and frequency fit through neither door. **The exclusion door is
+closed by the measurement itself: first contact is at 18° of a 34° stroke, so
+the parts meet only because the stroke travels PAST the point where they meet.**
+That is an overshoot, not an abutment, and signing "these are meant to meet"
+would be untrue.
+
+17° holds every bearing 34° held, at 42% of the silhouette change at the
+dominant one. **Bearing 270 fails at BOTH angles** (0.96x at 34°, 0.97x at 17°),
+so that 1.7% of road is a pre-existing Hedger gap and **not a cost of this
+change.**
+
+**THE MARGIN IS THIN AND IS RECORDED AS A NUMBER, NOT A SIGN.** First contact is
+at 18°; this sits 1° below it. Taking the intrusion as locally linear —
+0.0523 u over the 16° from 18° to 34°, so ~0.0033 u/deg — the clearance is of
+order **0.003 u, about 0.13 board px** at this body's `sizeScale` of 1.25. It
+complies, and it complies by less than a pixel. If the drum, hub or pivot ever
+move this breaks first, and it breaks **silently**, because the baked-frame gate
+cannot see this pose at all.
+
+`tipCheck` moves with the angle and is not a literal to tidy: the tip sits
+0.520 u out along +x of the pivot, so its world z is `0.8004 - 0.520·sin(swing)`
+— 0.5096 at 34°, which reproduces mira's authored 0.509, and 0.648 here.
+
+**One methodological rule, into the tool headers: compare ABSOLUTE px across
+angles, RATIOS within an angle.** The silhouette band is the mast's projected
+rows, so a smaller stroke shrinks the denominator with it — bearings appearing
+to "improve" at 17° is the denominator moving, not a gain. An instrument whose
+scale tracks its subject produces numbers that look comparable and are not.
+
 **2026-08-14 — `World3D.animHz` closes the flier-cadence seam: a preview can ask
 what drives a body instead of re-deriving it.**
 
