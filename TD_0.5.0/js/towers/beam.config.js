@@ -80,6 +80,14 @@ TowerConfigs.beam = {
         tier: 2,
         cost: 900,
         statDeltas: { ad: 1, range: 25, hp: 200 },
+        // NOT an empty tier. `mechanics: []` means only that this row adds no
+        // NAMED mechanic; its entire payload is the statDeltas above, and what
+        // those are worth can be read ONLY against the base in section 1. An
+        // `ad` delta of +1 is a doubling or a rounding error depending
+        // entirely on that base, so go and size it there before calling this
+        // row hollow -- the base is not repeated here, because a number kept
+        // in two places drifts. Anyone grepping `mechanics` to argue the tier
+        // ladder misreads exactly this row.
         mechanics: []
       },
       { // A3
