@@ -35,6 +35,40 @@
 // exactly 3x the triangle count of the slice. Reading them as triangles lands
 // every group matrix on the wrong third of its own mesh and produces a table
 // that looks plausible and is wrong throughout.
+//
+// ---------------------------------------------------------------------------
+// WHAT THIS CHECKS, WHAT IT DOES NOT, AND WHERE IT DISAGREES WITH THE RULE
+// ---------------------------------------------------------------------------
+//
+// A tool that does not say what it fails to check invites the misreading that
+// lets defects ship. The Hedger passed a four-gate instrument for hours while
+// its crank passed through its own arm, not because a test was broken but
+// because GREEN WAS READ AS "SOUND" when it meant "the things this looks at are
+// fine". So, plainly:
+//
+// IT CHECKS exactly one thing: that `model.top * unitsToPx * sizeScale + 10`
+// covers the model's posed geometry, per model, over every frame.
+//
+// IT DOES NOT CHECK anything else about the model. Not interpenetration -- a
+// part inside another part is invisible here (see AGENTS.md clause 8, and note
+// that a whole-GROUP AABB test is NOT the fix: it reports overlap on every
+// frame of a correct model, which is the same as reporting nothing. The test
+// has to be per SOLID). Not silhouette, contrast or whether anything reads.
+// Not triangle budget. Not whether a group root sits at z=0 -- that is the
+// usual CAUSE of a failure here, but a model can pass with roots anywhere.
+// Not whether the model is registered or loaded by any page: that is
+// `check-model-tags.js`, and a model can pass every check in this file and
+// still draw as an untextured sphere.
+//
+// IT IS STRICTER THAN THE CLAUSE IT ENFORCES, and this is the important one.
+// AGENTS.md 3b requires the REST frame to be the model's tallest. This sweeps
+// EVERY frame, so a model that rises above its rest pose only mid-animation is
+// reported here and is legal under the clause. On the enemies the two agree
+// exactly, because no enemy rises above its rest pose. On towers they do not:
+// `warbringer-a4`, `-a5`, `blub-superb` and `sniper-b3` are clear at rest and
+// over the line only mid-swing. THEY ARE NOT FAILURES. Run bare (enemies only)
+// to match the clause; `--all` is the stricter sweep and its extra hits want
+// reading against the rest-frame rule before anyone acts on them.
 // ---------------------------------------------------------------------------
 
 var fs = require("fs");

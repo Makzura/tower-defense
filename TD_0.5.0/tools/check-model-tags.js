@@ -31,6 +31,37 @@
 // themselves: IF a page loads any model of a family, it must load ALL of them.
 // A page that carries four enemies and not the fifth is the bug; a page that
 // carries no snipers at all is a decision.
+//
+// ---------------------------------------------------------------------------
+// WHAT THIS CHECKS AND WHAT IT DOES NOT
+// ---------------------------------------------------------------------------
+//
+// Stated because a tool that does not say what it fails to check invites the
+// reading that a green run means the model is fine. It does not. It means the
+// tag is present.
+//
+// IT CHECKS that a `<script>` tag exists, in both directions: a model file with
+// no tag on a page that carries its family, and a tag pointing at a file that
+// is not there.
+//
+// IT DOES NOT CHECK that the tag WORKS. It never loads a page or executes a
+// model file, so it cannot see: a tag in the wrong ORDER (a model file that
+// runs before `gl-models.js` throws `GLModels is not defined` and the model is
+// absent at runtime with the tag present and correct); a syntax error inside a
+// generated file; a model that registers under a name nothing looks up -- the
+// registered name comes from the exporter's TARGETS entry and is NOT derived
+// from the filename, so `enemy-camo_normal.js` registering itself as
+// `enemy-camo-normal` would pass here and still draw a sphere.
+//
+// IT ALSO DOES NOT CHECK the derived family rule against intent. The rule is
+// read off the pages, so if a page is missing an ENTIRE family the omission is
+// silently treated as deliberate. `3d.html` carrying no towers is a decision;
+// a page that lost every one of its siphon tags in one bad edit would look
+// exactly the same to this file.
+//
+// The genuine end-to-end check is loading the page and asserting
+// `GLModels.has(name)` for each expected model. That needs a browser and does
+// not exist yet.
 // ---------------------------------------------------------------------------
 
 var fs = require("fs");
