@@ -162,6 +162,85 @@ first time.
 No test suite loads `js/gl/gl-world.js`, so the six suites are not evidence
 about this change in either direction; the pixel work is.
 
+**2026-08-14 — The Hedger is rebuilt as the Tripod: three legs, a drum, and one
+working bill. `enemy-angry`, 4072 → 1800 triangles.**
+
+Diego approved mira's candidate B. Built to her two briefs (part inventory and
+attack gesture); the old body's geometry and its header are both gone.
+
+**The gates, with numbers rather than assurances.**
+
+| | |
+|---|---|
+| triangles | **1800**, from 4072 |
+| `check-model-top` | raw 0.9200 = posed 0.9200, pad **10.0** board px, ok |
+| `check-gait-slip` | A **0.258** board px, B 2.979, worst foot `leg_1` |
+| `check_penetration` | **CLEAN**, 12 declared contacts |
+| plan radius, envelope over all 12 frames | **0.5331 u**, from the shipped body's 0.7253 |
+
+**A is authored slip and is now near zero on all three legs** — level with the
+best on the roster. B is the quantisation sawtooth at 12 frames and no rig can
+touch it. Foot excursion is ±0.1874 u, derived from the stride rather than
+chosen: a plant is 6 of 12 frames, so the planted sweep is (6−1)/12 of a cycle.
+
+**THE `mast` GROUP ROOT IS AT z = 0, WHICH IS A CORRECTION TO THE BRIEF.** The
+inventory asks for it at the drum's centre (0, 0, 0.80) so the strike needs no
+pivot arithmetic. It cannot go there: `export_mesh.py:199-204` stores geometry in
+the **group root's local space** and `gl-models.js:120-124` takes `model.top` as
+max z over the raw `positions`, so an elevated root's height never enters
+`positions` at all. Verified on the body being replaced — its `crank` root sat at
+z 0.600 and its stored geometry ran z [−0.582, 0.000], top reading **zero**. This
+body's tallest geometry is the drum and the drum is in `mast`, so the bar would
+have been painted through the machine at every frame, permanently. **The rule in
+its sharp form: the group holding the model's tallest geometry must have its root
+at z = 0.** Leaf roots still belong at their own pivots. otto takes the pivot back
+as a `localPose` argument and nothing else in the gesture changes.
+
+**`mast` is keyed to identity on all 12 frames, and that is not animation.**
+`_group_root` walks up to the nearest ancestor holding an *action*, so an unkeyed
+empty is transparent to it and the drum would have exported as part of the body,
+leaving otto no group to override. One walk band; the strike is live.
+
+**Two things measured that neither brief predicted.**
+
+1. **The drum ploughs into the hub at full stroke — 0.0477 u, 1.9 board px.**
+   Rotating a 0.221 u drum about its own centre swings its rim down by
+   `R sin 34° = 0.123 u` and the hub is directly beneath it, so any hub taller
+   than ~0.06 u is hit. Structural, not a sizing miss. The dipping edge reaches
+   radius 0.116 against a hub surface at 0.156, so the intersection is buried
+   inside the hub's own cylinder rather than breaking its silhouette — **a
+   geometric argument, flagged for a render rather than closed.** `check_
+   penetration.py` cannot see this at all: it walks the baked frames and the
+   strike is not baked.
+2. **The brief's plan margin compares a radius against a diameter.** It reads
+   "plan radius 0.5212 u against the frost-ring budget of 0.8930 u, margin
+   0.371". 0.8930 is the ring **diameter**; the ring **radius** at this sizeScale
+   is 0.4465 u, which is what a plan radius has to be measured against. The built
+   body is 0.5331 u = **119% of the ring radius** — and the body it replaces was
+   0.7253 u = 162%, so this is a large improvement and not a regression. The
+   inventory's geometry is right to within 2 points; only the margin sentence is
+   wrong.
+
+**One line of the inventory cannot be met and no ordering can meet it.** It says
+the trailing leg "should only ever be off the ground while both leading legs are
+planted". The shared support window is duty 0.5, so the body has exactly one foot
+down on six frames of twelve; the trailing leg is airborne on frames 12, 1, 2, 3,
+4, 5 and on four of those only one leading leg is planted. Every ordering is a
+rotation of the same cycle, so this needs **duty 2/3** — a second change to
+`support_left_frames`, reaching nine shipped bodies. Not taken unilaterally. The
+footfall ordering itself (lead → other lead → trailing) is carried exactly, by
+the group order.
+
+Predictions from the gesture brief that the built geometry confirms: rise over
+rest **4.10** board px against a predicted 4.1, clearance under the bar **5.90**
+against 5.9, the sign check passes (tip below the drum's centre line at
+`attackFlash == 1`), and the stroke pulls the tool inward — mast plan radius
+0.4595 u struck against 0.5253 at rest — so the strike cannot break the plan
+budget.
+
+`core_red` is named **battery** throughout, per Diego. The 1.25 `sizeScale` is
+not baked.
+
 **2026-08-14 — The shared grouped gait was wrong above two leg groups: the
 swing phase and the support window rotated in opposite directions.**
 
