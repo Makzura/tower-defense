@@ -87,15 +87,27 @@ async function main() {
     out.glCanvas = setup.gl;
 
     var stamp = "commits " + prov.map(function (p) { return p.name + " " + p.commit; }).join("  ");
+    // THE VIEWPORT TRAVELS WITH THE DISTANCE. fitBounds solves against the
+    // canvas aspect, so the fitted distance is a property of the window, not
+    // the map -- juno reads 2021.3631 at 1278x719 where this rig reads
+    // 2021.2374 at 1111x625, same board, same method. A caption quoting the
+    // distance alone lets a future disagreement between two rigs read as a
+    // finding when it is a window size.
     var camLine = "game camera, fitted: distance " + out.camera.distance.toFixed(3) +
-      "  target [" + out.camera.target.join(",") + "]  pitch " + out.camera.pitch.toFixed(4);
+      "  target [" + out.camera.target.join(",") + "]  pitch " + out.camera.pitch.toFixed(4) +
+      "  viewport " + out.camera.viewport[0] + "x" + out.camera.viewport[1];
 
     // ---- TWO YAWS. The Drudge's separator is a profile change and the
     // Hedger's arm is a broken-symmetry read; a single head-on view would
     // understate both, and choosing the flattering one is not my call.
     var YAWS = [
       { tag: "front", yaw: -Math.PI / 2, label: "yaw -90deg (the board default)" },
-      { tag: "three-quarter", yaw: -Math.PI / 2 + 0.7, label: "yaw -50deg (three-quarter)" }
+      { tag: "three-quarter", yaw: -Math.PI / 2 + 0.7, label: "yaw -50deg (three-quarter)" },
+      // BROADSIDE. mira: the fore/aft narrowing pays 10-12% at the two
+      // bearings above and 35% here, and a body yaws with the path so it
+      // presents every bearing during a run. Shooting only the standard views
+      // measures the separator where it is worth least.
+      { tag: "broadside", yaw: 0, label: "yaw 0deg (broadside, +90 from front)" }
     ];
 
     // PLACE THEM ON THE ROAD, NOT ON A RULER.
@@ -141,7 +153,7 @@ async function main() {
     // These are both the separation baseline and the yardstick the lineup's
     // occlusion check is measured against, so they have to exist before any
     // group shot is trusted.
-    var soloPx = {};
+    var soloPx = {}, soloBox = {};
     for (var pi = 0; pi < YAWS.length; pi++) {
       await S.evaluate("TDProbe.cam({yaw:" + YAWS[pi].yaw + "})");
       soloPx[YAWS[pi].tag] = {};
@@ -154,13 +166,17 @@ async function main() {
       await S.evaluate("enemies.length = 0");
       await S.evaluate("TDProbe.warm(2)");
       await S.evaluate("TDProbe.cap('p_" + YAWS[pi].tag + "_empty')");
+      soloBox[YAWS[pi].tag] = {};
       for (var bi1 = 0; bi1 < BODIES.length; bi1++) {
-        soloPx[YAWS[pi].tag][BODIES[bi1].typeId] = JSON.parse(await S.evaluate(
+        var sd = JSON.parse(await S.evaluate(
           "JSON.stringify(TDProbe.diff('p_" + YAWS[pi].tag + "_" + BODIES[bi1].typeId +
-          "','p_" + YAWS[pi].tag + "_empty',0))")).changed;
+          "','p_" + YAWS[pi].tag + "_empty',0))"));
+        soloPx[YAWS[pi].tag][BODIES[bi1].typeId] = sd.changed;
+        soloBox[YAWS[pi].tag][BODIES[bi1].typeId] = sd.bboxGL;
       }
     }
     out.measurements.soloSilhouettePx = soloPx;
+    out.measurements.soloBboxGL = soloBox;
 
     for (var yi = 0; yi < YAWS.length; yi++) {
       var Y = YAWS[yi];
@@ -187,10 +203,19 @@ async function main() {
       });
       out.measurements[Y.tag].allBodiesClear = hidden.length === 0;
       if (hidden.length) {
-        throw new Error("occluded in lineup at yaw " + Y.tag + ": " +
-          hidden.map(function (b) {
-            return b.typeId + " " + b.changed + "/" + b.soloPx + " px";
-          }).join(", ") + " -- refusing to publish a picture that hides a body");
+        // SKIP THE BOARD SHOT AT THIS YAW, DO NOT ABORT THE RUN.
+        //
+        // The board shot is context; the STRIP and the separation table are
+        // built from solo captures at one fixed clear spot and do not depend on
+        // this layout at all. Aborting would have cost the broadside separation
+        // numbers -- the whole reason for this pass -- because a decorative
+        // image could not be laid out. Record which yaw could not be laid out
+        // and why, so the missing picture is a stated fact rather than a gap.
+        out.measurements[Y.tag].boardShotSkipped = hidden.map(function (b) {
+          return b.typeId + " " + b.changed + "/" + b.soloPx + " px (" +
+            b.visibleFraction + " of clear)";
+        });
+        continue;
       }
       // Same frame index and same yaw across all five, asserted not assumed.
       var walks = line.map(function (l) { return l.walk; });

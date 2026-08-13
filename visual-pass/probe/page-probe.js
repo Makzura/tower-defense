@@ -157,10 +157,18 @@
                            pitch: 0.5944591432292686, yaw: -1.5707963267948966 });
     },
 
+    // THE FITTED DISTANCE IS A PROPERTY OF THE VIEWPORT, NOT OF THE MAP.
+    // fitBounds solves against the canvas aspect, so two rigs at different
+    // window sizes fit different distances on the same board -- juno measures
+    // 2021.3631 at 1278x719 where this rig measures 2021.2374 at 1111x625.
+    // Both are correct and neither is quotable without its viewport, or a
+    // future disagreement between two rigs reads as a finding when it is a
+    // window size. So the canvas travels with the camera, always.
     camState: function () {
       var c = World3D.camera();
+      var g = glCanvas();
       return { target: c.target.slice(), distance: c.distance,
-               pitch: c.pitch, yaw: c.yaw };
+               pitch: c.pitch, yaw: c.yaw, viewport: [g.width, g.height] };
     },
 
     // Discard N rendered frames. THE FIRST RENDER AFTER ANY SCENE CHANGE

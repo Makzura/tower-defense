@@ -198,7 +198,20 @@
     var capH = lines.length ? lines.length * lineH + pad * 2 : 0;
 
     var out = document.createElement("canvas");
-    out.width = keys.length * (tw * k) + (keys.length + 1) * g0;
+    // SAME CAPTION-CLIPPING FIX AS pngFrom, and it was missing here. At 4x the
+    // strip is narrower than its own provenance line, so the yaw label and the
+    // commit hashes were cut off mid-string -- the exact information the
+    // caption exists to carry. Fixing it in one place and not the other is how
+    // a repaired defect comes back on the path nobody re-checked.
+    var meas2 = document.createElement("canvas").getContext("2d");
+    meas2.font = "12px Consolas, monospace";
+    var textW2 = 0;
+    for (var mj = 0; mj < lines.length; mj++) {
+      var w2 = meas2.measureText(lines[mj]).width;
+      if (w2 > textW2) textW2 = w2;
+    }
+    out.width = Math.max(keys.length * (tw * k) + (keys.length + 1) * g0,
+                         Math.ceil(textW2) + pad * 2);
     out.height = th * k + labH + capH + g0 * 2;
     var g = out.getContext("2d");
     g.fillStyle = "#0b0c11";
