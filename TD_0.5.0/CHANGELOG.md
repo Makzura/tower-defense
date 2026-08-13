@@ -13,6 +13,91 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — the Tun is SHORTER. 19.62 → 16.14 screen rows against the
+Gleaner's 20, on the two clauses of its own card that were never built. And the
+floor turned out to be the model's own boot, not the ground.**
+
+Measured in the running game, the Gleaner/Tun pair separated at **0.57 at
+broadside — the worst pair on the board** — while scoring 0.80–0.89 at the two
+standard views, which is why it passed review: nobody had shot broadside. Off
+both model files the cause was exact:
+
+| axis | Gleaner | Tun |
+|---|---|---|
+| y (across) | 0.510 | 0.510 — identical to the digit |
+| z (height) | 1.190 | 1.190 — identical to the digit |
+| x (fore/aft) | 0.498 | 0.699 — +40%, the entire separator |
+
+**Height is the only bearing-invariant dimension.** A body yaws with the path,
+so a width separator is a coin flip on where the player is looking; a shorter
+body reads at broadside, three-quarter and head-on alike. Two clauses of the
+Tun's card were unbuilt and both were height — *"the Gleaner's legs shortened"*
+(the legs were byte-identical to the Gleaner's) and *"the torso is mostly
+deleted"* (the body still reached the Gleaner's full 1.190). The card's other
+half, *"and doubled to four"*, stays unbuilt on mira's ruling that leg **count**
+is not countable at 10 px.
+
+**Two levers, in `tools/blender/enemy_tun.py`.** The antenna owned the crown at
+1.190 while the head topped out at 1.034, so it was spending 0.156 u by itself:
+it is now **raked back over the cask rather than deleted** — same cylinder, same
+radius, same length, because the chassis calls it load-bearing against the
+silhouette reading as a person, and swept back it stays inside the cask's
+existing x envelope so fore/aft does not grow. The other 0.055 is the shin,
+0.380 → 0.325, with the whole body descending with the hips, cask included. The
+drop comes out of `lift`, **not** out of `body_z`, so the body root stays at
+z = 0 and model contract clause 3b holds by construction — `check-model-top.js`
+reports enemy-slow top 0.979, posed 0.979, **margin +10.0 px, the full crown pad
+intact**. x 0.699 and y 0.510 are unchanged to the digit: drum width and leg
+tuck were measured correct and were not in question.
+
+**THE FLOOR IS THE BOOT, NOT THE GROUND, AND IT HAD TO BE MEASURED PER FRAME.**
+The bob puts the cask lowest at |phase| = 1 while the swing foot peaks near
+phase 0 — close to antiphase — so a min-against-max read over the walk cycle
+understates the gap and would have licensed a drop that clips. Two extremes that
+never co-occur is the shape that produces a confident wrong clearance. Per
+frame:
+
+| hip drop | rows | cask→boot | cask→ground |
+|---|---|---|---|
+| 0.000 | 17.05 | 0.084 | 0.181 |
+| **0.055** | **16.14** | **0.029** | **0.126** ← shipped |
+| 0.084 | 15.66 | 0.000 | 0.097 — boot touches the cask |
+| 0.124 | 15.00 | −0.040 | 0.057 — boot passes **through** it |
+
+So **15 rows is not available** while the drum keeps its width and its belly
+placement: the cask reaches the boot at 15.66 rows with 1.6 rows of ground still
+under it. 16.14 keeps a third of the original boot clearance.
+
+**Declined, both after measuring.** Lowering the head, or raising the cask
+inside the body — the head is already sunk into the cask and the lens sits only
+~0.02 u proud of it in its own column, so either move buries the identity slot.
+The head/cask relationship is frozen and the whole assembly descends together.
+
+**`enemy_chassis.py` was NOT touched, and that is why two parts are forked.**
+`chassis.legs()` takes no length and `chassis.head()`'s antenna is a flag rather
+than a pose; editing the shared module would rewrite five shipped bodies, and a
+second build was in flight on it at the time. So `build_short_legs` and
+`build_raked_antenna` live in `enemy_tun.py`, declared in its header the way the
+drum already is, forked from `CHASSIS_VERSION 1` with knee, stance, repair cuff,
+foot, and the antenna's radius and length carried across to the digit. **A later
+chassis change to a leg or an antenna will not reach this body** and must be
+re-forked by hand.
+
+**This is a re-pose, not a removal, so it is not cheaper: 2,584 triangles out,
+2,584 back.** An earlier framing called it free because it was a deletion; it is
+not one, and height being bearing-invariant was always the whole argument.
+**Recorded as a candidate and deliberately not acted on:** the torso box's
+bounding box sits inside the cask's, suggesting ~540 dead triangles — but that
+is a bounding-box argument, and two boxes nesting says nothing about two solids.
+The cask is a cylinder and a rectangular torso can push its corners through a
+curved wall. It needs a per-part occlusion test before anyone deletes anything,
+and it needs a flag on `chassis.torso_frame`, which is not a one-body decision.
+
+`assets/preview/easy_tun.png` re-rendered from the new geometry. Rendered alone
+rather than through `--easy-five`, because that sheet also re-renders the Hedger
+and another build was rebuilding it — a picture of a superseded file is the
+failure this job kept hitting.
+
 **2026-08-13 — model contract clause 3b, the rest-frame rule, written into
 `AGENTS.md`. The `radiusPx()` extent distinction. And the three passages held
 uncommitted since 2026-08-12, finally landed.**
