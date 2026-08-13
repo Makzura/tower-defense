@@ -482,8 +482,48 @@ highlights. I made that mistake first and the table below is the corrected one.
 calibration later. He re-derived the arithmetic independently and confirmed that
 contrast ratio, not luminance gap, is the right instrument.
 
-> **⚠ THESE BANDS ARE PROVISIONAL IN RENDERED UNITS. They were reasoned about
-> ALBEDO and they do not transfer.** mira's overrule of kaz, 2026-08-13, and her
+> **⚠ THE BANDS BELOW ARE PALETTE-SPACE BANDS. DO NOT COMPARE A RENDERED CR
+> AGAINST THEM.** Ruling by kaz 2026-08-13 on juno's eleven-pair sweep. The 2.0
+> row is very close to unreachable in rendered units, so *"this part is under
+> 2.0"* measured on pixels is a statement about **the standard**, not about the
+> part.
+>
+> **The mapping, measured — a body repainted to one material so every neighbour
+> is identical, then the part's albedo swept. Exact by construction:**
+>
+>     palette   1.00  1.04  1.31  1.72  1.91  2.01  2.16  2.89  3.67  4.24  6.30
+>     rendered  1.17  1.19  1.19  1.27  1.28  1.39  1.41  1.48  1.85  2.03  2.63
+>     error    +0.17 +0.15 -0.12 -0.45 -0.62 -0.62 -0.76 -1.41 -1.82 -2.21 -3.66
+>
+> **Palette spans 1.00–6.30; rendered spans only 1.17–2.63.** It is a clean
+> **monotone compression with a crossover at palette CR ≈ 1.2** — below it the
+> render *adds* contrast, above it the render *removes* it, and the deficit grows
+> with the palette figure. **So palette arithmetic is not a bound in either
+> direction, but it is PREDICTABLY not a bound**, which is far better than
+> "unpredictable": a material call can be *corrected* rather than merely
+> distrusted. **Rendered median tops out at 2.63 for WHITE ON TIN, and three of
+> eleven candidates clear 2.0 at all.**
+>
+> **This also kills the retracted ceiling claim more thoroughly than the
+> same-material case did: at the 90th percentile of a part's own pixels the
+> rendered CR exceeds the palette figure in ALL eleven pairs** — tin 1.00 → 1.97,
+> brass 2.16 → 3.27, white 6.30 → 8.62. **Some of a part's pixels always beat the
+> albedo ratio.**
+>
+> **I am NOT writing rendered bands from this.** It is **one part, one bearing,
+> two frames, one camera, one viewport** — the direction and the mechanism
+> generalise, the numbers do not. A second part of a different shape is owed
+> before any clause claims generality. Until then: **use the mapping to convert,
+> judge on the worst frame, and accept that whether a rendered 1.88 reads is
+> currently a question for a person and not for a table.**
+>
+> Second-order term found by petra and missed by juno: the shader's height-driven
+> lift `1 + clamp(vDepth * 0.0016, 0, 0.14)` separates surfaces of **identical
+> normals**, measured at about 1.03 CR here — real, not the explanation, and it
+> would matter far more on a tall tower whose parts sit 60 board units apart.
+>
+> **THE BANDS ARE ALSO PROVISIONAL IN RENDERED UNITS FOR AN INDEPENDENT REASON.
+> They were reasoned about ALBEDO and they do not transfer.** mira's overrule of kaz, 2026-08-13, and her
 > own first rendered pair proves it: **`tin` bar on `tin` hip — identical
 > material, zero albedo difference — renders at 1.25–1.40.** The table then says
 > that pair "separates only across a long, roughly straight boundary", and a bar
@@ -577,18 +617,81 @@ contrast ratio, not luminance gap, is the right instrument.
 > | tin bar on tin hip | **1.00** | **1.25 – 1.40** |
 > | brass bar on tin hip | **2.17** | **1.30 – 1.88** |
 >
-> **Roughly 0.3–0.7 CR of error with no reliable sign**, so the palette figure is
-> not usable even as a conservative bound. Shading *manufactures* contrast where
-> two materials are identical and *eats* it where they differ.
+> **~~Roughly 0.3–0.7 CR of error with no reliable sign.~~ WITHDRAWN BY ITS OWN
+> AUTHOR THE SAME DAY — it was an impression from those two pairs, and juno
+> replaced it with a measured population rather than defend it.** The real error
+> is **+0.17 to −3.66**, understated roughly fivefold at the top of the range,
+> and **the sign is not random at all.**
+>
+> **THE ERROR IS A MONOTONE COMPRESSION, AND THAT IS FAR MORE USEFUL THAN
+> "UNPREDICTABLE".** Sweeping the crank's albedo across eleven candidates, with
+> the entire body repainted to `tin` so every neighbour is one unmixed material:
+>
+> | candidate | palette CR | rendered median | error |
+> |---|---|---|---|
+> | tin | 1.00 | 1.17 | **+0.17** |
+> | grey35 | 1.04 | 1.19 | **+0.15** |
+> | olive | 1.31 | 1.19 | −0.12 |
+> | core_red | 1.72 | 1.27 | −0.45 |
+> | tin_dark | 1.91 | 1.28 | −0.62 |
+> | grey55 | 2.01 | 1.39 | −0.62 |
+> | brass | 2.16 | 1.41 | −0.76 |
+> | black | 2.89 | 1.48 | −1.41 |
+> | grey75 | 3.67 | 1.85 | −1.82 |
+> | teal | 4.24 | 2.03 | −2.21 |
+> | white | 6.30 | 2.63 | **−3.66** |
+>
+> **The sign flips at a palette CR of about 1.2**: below it the render *adds*
+> contrast, above it the render *removes* it, and the deficit grows monotonically
+> with the palette figure. A palette span of 1.00 → 6.30 arrives on screen as
+> **1.17 → 2.63**. So palette arithmetic is not a bound in either direction, but
+> it is **predictably** not a bound.
+>
+> **AND THE CEILING CLAIM FAILS FOR EVERY PAIR, NOT ONLY THE IDENTICAL ONE. This
+> is the cleanest form of the refutation** and it is stronger than the two-pair
+> version that prompted it. At the **90th percentile of the part's own pixels**
+> the rendered CR *exceeds* the palette figure in all eleven cases — tin
+> 1.00 → 1.97, brass 2.16 → 3.27, grey75 3.67 → 5.57, white 6.30 → 8.62. **Some
+> of the part's pixels always beat the albedo ratio.** The claim was not an edge
+> case about same-material boundaries; it is wrong everywhere.
+>
+> **PROVENANCE, and read the population before reusing the table.** juno, in
+> browser through the game's own `drawActor` path, `gl.readPixels` off `#gl`.
+> **Eleven pairs, ONE part, ONE bearing (yaw 0), TWO frames (6 and 3), 48 crank
+> pixels per sample, commit `22a8091`, viewport 1264x711, fitted camera
+> 2021.0670.** It is one part's geometry, so **the compression curve is this
+> crank's and not a transfer function.** What generalises is the direction and
+> the mechanism; the numbers do not. The two rows in the table above are a
+> different and earlier population — the *shipped* model, medians across all
+> twelve frames, `e015ef5` and `22a8091` at viewport 1278x719 and camera
+> 2021.3631 — so do not read the two sets as one series.
 >
 > **The error was a hidden assumption, not arithmetic.** The proof ran: shading
 > multiplies both colours, so their ratio moves toward 1.0. That holds only if
-> **both surfaces receive the same illumination** — and two parts at different
-> angles under one directional key do not. A bar lying across a hip has different
-> normals from the hip, so the two take different multipliers and the ratio can
-> move either way. The shader also lights in linear and converts to sRGB once at
-> the end. **The palette number is ALBEDO: an input to the render, not a
+> **both surfaces receive the same illumination**, and two parts at different
+> angles do not. **The palette number is ALBEDO: an input to the render, not a
 > prediction of it.**
+>
+> **THE PALETTE FIGURE IGNORES THREE TERMS, NOT ONE** — the first retraction
+> named only the key light, and getting the set right matters because two of the
+> three are levers a brief-writer might reach for:
+>
+> 1. **Per-face illumination under a directional key.** The dominant term.
+> 2. **Chromatic ambient and fill.** `gl-renderer.js` — `uAmbient`
+>    [0.125, 0.142, 0.180] and `uFillColor` [0.075, 0.110, 0.155] are both
+>    blue-weighted, so identical albedo at different normals diverges **on hue,
+>    not only on level.** With the key, this carries most of the effect.
+> 3. **A height-driven lift**, `lit *= 1.0 + clamp(vDepth * 0.0016, 0.0, 0.14)`.
+>    **Real, and small on a body — do not reach for height as a contrast lever.**
+>    The 0.14 cap needs `world.z` = 87.5 and a Hedger stands 47, so across the
+>    crank (23.9–47.0) against the body (16.5–47.3) the multiplier runs 1.026 to
+>    1.076 — about **4.9% of luminance, roughly 1.03 CR**, a second-order
+>    contributor rather than the explanation. On a tall tower whose parts really
+>    are ~60 board units apart it could reach ~1.10 CR; **that is arithmetic, not
+>    a measurement, and must not be quoted as one.**
+>
+> **Naming trap in that third term: `vDepth` is `world.z` — a HEIGHT, not camera
+> depth.** Read in the fragment shader alone it looks like a distance fade.
 >
 > **So "a pair that fails on paper cannot be rescued by lighting" is false.** Tin
 > on tin is CR 1.00 on paper and renders at 1.25–1.40 from geometry alone.
@@ -614,8 +717,28 @@ is precisely what two parts at different angles do not have.
 
 **~~Consequence: a pair that fails on paper cannot be rescued by lighting.~~
 ALSO RETRACTED.** The table can still **shortlist** a palette before anything is
-lit. It cannot **reject** one, and it cannot settle a choice between two
-candidates whose paper figures differ by less than about 0.7 CR.
+lit. It cannot **reject** one, and it cannot be compared against a threshold.
+
+**But it RANKS, and that is worth more than the first retraction allowed.** The
+first form of this consequence said the table "cannot settle a choice between two
+candidates whose paper figures differ by less than about 0.7 CR" — that rested on
+the withdrawn error figure and does not survive it. Across juno's eleven
+candidates the rendered median is **monotone non-decreasing** in the palette
+figure, with one tie (`grey35` 1.04 and `olive` 1.31 both land at 1.19). So
+**order is preserved and magnitude is not.** Use the palette table to rank
+candidates and to shortlist; never to reject one, and never against the bands
+below.
+
+**The live consequence: brass over `tin_dark` for the Hedger's crank is now
+MEASURED rather than lucky** — 1.41 against 1.28 rendered, the same order the
+palette gave. That is one neighbour only. **Brass against the ROAD — the second
+neighbour, and the one that actually decided the material — has never been
+measured on pixels, and is owed.**
+
+**Read "monotone" as narrowly as it was measured.** One part, one bearing, two
+frames. What is established is that the compression did not reorder *this*
+sweep; a second part of a different shape would earn the general claim, and until
+someone runs one, "the palette ranks" is a working assumption and not a result.
 
 ### The Siphon palette, measured
 
