@@ -4365,6 +4365,27 @@ contact measure of your own** — it records why a fixed-sole-centroid measure,
 which is the correct choice on every other body here, scores a *correct*
 flat-soled rocking foot at 0.55 of requirement.
 
+**A GAIT WITH MORE THAN TWO LEG GROUPS HAS TWO RULES OF ITS OWN, AND THE SOLVER
+ENFORCES NEITHER.** `enemy_chassis.animate_walk_grouped` takes any number of
+evenly-phased groups, but every body shipped before 2026-08-14 passed exactly
+two, and two is the count at which both of these are free:
+
+- **The frame count must divide by the group count.** `shifts` are whole
+  frames, so three groups at `frames` 8, 10 or 16 gives gaps of 3/2/3, 3/4/3 and
+  5/6/5 — a body whose legs are unevenly phased, silently. The function now
+  raises on this; the multiples for three groups are 6, 9, 12, 15, 18, 21, 24.
+- **A clean `gait_solve` is not a clean gait.** The solver steers on
+  `groups[0][0]` and measures no other foot, so it converges and reports success
+  while the other groups slide. `tools/check-gait-slip.js` is the instrument
+  that answers this — it iterates every foot and reports a worst foot. **Run the
+  gate, not the solver's own convergence**, on anything above two groups.
+
+Also expect the body's `bob` and `roll_deg` to stay wired to group 0, so an odd
+group count gives two body dips per cycle against N footfalls. And remember a
+roll on this chassis *adds* to the plan extent rather than shrinking it, because
+clause 3b puts the animated root on the ground — so trimming those two buys
+plan margin as well as rhythm.
+
 **The roster is deliberately not counted here.** It moved by five in a single day
 on 2026-08-13 and any figure written down is wrong by the next commit;
 `enemyModel()` in `js/gl/gl-world.js` derives it — `GLModels.has("enemy-" + id)`,

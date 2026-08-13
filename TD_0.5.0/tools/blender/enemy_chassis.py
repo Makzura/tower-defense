@@ -627,7 +627,54 @@ def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
     by nine shipped bodies -- not a caller-side fix.** Verified at 2, 4 and 6
     groups: minimum support 1, 2 and 3 groups per frame respectively, never
     zero.
+
+    THE PHASE AND THE SUPPORT WINDOW MUST ROTATE THE SAME WAY, AND UNTIL
+    2026-08-14 THEY DID NOT. `group_phase` read `phases[(f + shifts[g])]` while
+    `group_plants` read `((frame - 1 - shifts[g]))`: the phase LED by the shift
+    and the plant LAGGED by it. A shifted group was therefore planted during the
+    wrong part of its own swing -- at three groups over twelve frames, group 1's
+    planted phases ran `+1/3, 0, -1/3, -2/3, -1, -2/3`, so the sole REVERSED
+    DIRECTION half way through its own plant instead of sweeping monotonically
+    the way group 0's `-1 .. +2/3` does.
+
+    **It is invisible at two groups because the shift is `frames/2` and
+    `+N/2 == -N/2 (mod N)`** -- which is why nine shipped bodies were correct and
+    why the "verified at 2, 4 and 6 groups" line above never caught it: those
+    runs checked SUPPORT COUNTS, not planted travel. Measured on a three-legged
+    stub at `frames=12`, hip 0.480: foot_0 0.2421 board px, foot_1 **19.3088**,
+    foot_2 **14.3321**. After the sign fix all three read 0.2421 -- identical to
+    each other and to the irreducible sine-curvature residual the Gleaner
+    (0.277) and the Drudge (0.294) already carry.
+
+    **AND THE SOLVER CANNOT SEE IT.** `gait_solve` steers on `groups[0][0]` and
+    nothing else, so it converged and reported success on all three of those
+    numbers. **A clean solve is not a clean gait above two groups.** The shipped
+    gate `tools/check-gait-slip.js` DOES iterate every foot and report a worst
+    foot, so it would have caught this the first time a three-group body ran --
+    the defect was undetected because no such body existed, not undetectable.
+
+    The regression harness is `check_group_gait.py`, beside this file.
     """
+    # THE SPACING GATE. `shifts` below is whole frames, so unless the frame
+    # count divides by the group count the groups are not evenly spaced and the
+    # body walks with unevenly phased legs -- silently, because every other
+    # property still holds. Three groups at frames=8, 10 or 16 gives gaps of
+    # 3/2/3, 3/4/3 and 5/6/5 respectively.
+    #
+    # This passes every shipped body by construction (two groups, even frame
+    # counts: 8 on eleven bodies, 12 on the Hedger, 36 Vanguard, 128 Tyrant) and
+    # fails exactly the cases above, which is the pass-known-good/fail-known-bad
+    # property a gate needs before it gates anything.
+    if frames % len(groups) != 0:
+        raise ValueError(
+            "frames=%d does not divide by %d leg groups: the whole-frame shifts "
+            "%s are not evenly spaced, so the legs are unevenly phased. Choose a "
+            "frame count that is a multiple of the group count -- for three "
+            "groups that is 6, 9, 12, 15, 18, 21 or 24, and 12 is what the "
+            "Hedger ships." % (
+                frames, len(groups),
+                [int(round(o * frames))
+                 for o in _group_phase_offsets(len(groups))]))
     base_z = body.location[2]
     swing = math.radians(swing_deg)
     arm_swing = math.radians(arm_swing_deg)
@@ -642,13 +689,18 @@ def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
                  for group in groups for leg in group)
 
     def group_phase(g, f):
-        return phases[(f + shifts[g]) % frames]
+        # MINUS, matching `group_plants` below. See the docstring: a plus here
+        # makes the phase lead while the plant lags, and a shifted group is then
+        # planted through the wrong part of its swing. Two groups cannot show it
+        # (`+frames/2 == -frames/2`), so this line was wrong under nine shipped
+        # bodies without moving one of them.
+        return phases[(f - shifts[g]) % frames]
 
     def group_plants(g, frame):
         # The support window, rotated by the same whole-frame shift as the
-        # phase. For two groups this is the original set and its exact
-        # complement -- verified, not assumed: at frames=8 the base is
-        # {1,2,7,8} and the shift of 4 gives {3,4,5,6}.
+        # phase, IN THE SAME DIRECTION. For two groups this is the original set
+        # and its exact complement -- verified, not assumed: at frames=8 the
+        # base is {1,2,7,8} and the shift of 4 gives {3,4,5,6}.
         return (((frame - 1 - shifts[g]) % frames) + 1) in base_support
 
     # THE PLANTED RUN FOR GROUP 0, ordered along the cycle with the wrap

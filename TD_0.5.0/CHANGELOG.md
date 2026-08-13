@@ -13,6 +13,83 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — The shared grouped gait was wrong above two leg groups: the
+swing phase and the support window rotated in opposite directions.**
+
+Found while proving the Tripod (the Hedger's replacement) could use the shared
+gait at all — the first caller ever to pass three groups. Inside
+`enemy_chassis.animate_walk_grouped`:
+
+    group_phase(g, f)       phases[(f + shifts[g]) % frames]     LED  by shift
+    group_plants(g, frame)  ((frame - 1 - shifts[g]) % frames)   LAGGED by shift
+
+so a shifted group was planted through the wrong part of its own swing. Group 0
+sweeps monotonically (`-1, -2/3, -1/3, 0, +1/3, +2/3`); group 1 ran
+`+1/3, 0, -1/3, -2/3, -1, -2/3` and **reversed direction half way through its own
+plant**. Measured on a three-legged stub at `frames=12`, hip 0.480:
+
+    foot_0   0.2421 board px      <- the only leg the solver measures
+    foot_1  19.3088 board px
+    foot_2  14.3321 board px
+
+The fix is one character — `phases[(f - shifts[g]) % frames]`. All three feet
+then read **0.2421**, identical to each other and to the irreducible
+sine-curvature residual the Gleaner (0.277) and the Drudge (0.294) already
+carry.
+
+**Why nine shipped bodies never showed it: at two groups the shift is
+`frames/2`, and `+N/2 == -N/2 (mod N)`.** The function's own "verified at 2, 4
+and 6 groups" line is not wrong, it is about something else — those runs checked
+*support counts*, never planted travel.
+
+**And the solver could not have caught it.** `gait_solve` steers on
+`groups[0][0]` and measures no other foot, so it converged and reported success
+on all three numbers above. **A clean solve is not a clean gait.** But
+`tools/check-gait-slip.js` iterates every foot and reports a worst foot, so the
+shipped gate would have caught this the first time a three-group body ran — the
+defect was undetected because no such body existed, **not undetectable**.
+
+**Proven inert on every shipped body, twice, at two different levels.** New
+harness `tools/blender/check_group_gait.py` dumps every object's world matrix at
+every frame for the ten bodies that import the chassis, built through
+`export_mesh._build_enemy` so it exercises the shipping path: **0 differing
+floats of 96,704**, before against after. Then end-to-end on the artifact,
+because a rig dump is still upstream of the file: `framesDigest` on re-export is
+**unchanged on the Dray `a3a9e9eb…`, the Tender `7b346e4d…` and the Hedger
+`4a6288954…`** — the two multi-group shipped bodies and the one this work is
+for.
+
+**The first negative control on that harness was blind, and that is the part
+worth keeping.** Perturbing `animate_walk_grouped`'s `bob=0.03` default to 0.031
+also reported 0 differences — because `chassis.animate_walk` declares its own
+`bob=0.03` and forwards `bob=bob`, and the two multi-leg bodies pass `bob=BOB`,
+so the grouped default is shadowed on every path. **A control on a default
+argument proves nothing.** Re-armed on the exact line under test
+(`phases[(f + shifts[g] + 1)]`) it lights 26,276 floats across 8 of 10 bodies;
+the 2 zeros are `enemy_normal` (own `animate_walk`, :342) and `enemy_vanguard`
+(own, and its header says so), which never reach the shared gait. Every zero
+explained by code, not by story.
+
+**New gate in the same function: `frames % len(groups) != 0` now raises.** The
+shifts are whole frames, so three groups at `frames` 8, 10 or 16 gives gaps of
+3/2/3, 3/4/3 and 5/6/5 — legs unevenly phased, silently, and a second defect
+independent of the sign. It passes all four shipped configurations by
+construction (2 groups at 8, 12, 36, 128) and fails exactly those three, tested
+both ways.
+
+**Scope the odd-N caveat carefully, because it is easy to blur.** Odd `frames`
+at two groups is broken *today* and this fix makes it **correct**; what is not
+free there is the **inertness**, since `int(round(N/2))` is banker's-rounded and
+`+s != -s`. Correctness and inertness are different claims. Every current frame
+count is even (8 on eleven bodies, 12 Hedger, 36 Vanguard, 128 Tyrant), which is
+why the harness reads zero.
+
+Rule written into `AGENTS.md` under "Building a model that looks like the ones
+that already work". No model file changed. (Re-exporting to check the digests
+does rewrite `positions`/`normals` line ordering, but that is pre-existing
+export nondeterminism — two consecutive exports with no edit between them
+differ the same way, and the sorted triangle multiset is identical.)
+
 **2026-08-14 — Every 3D preview on a cold page was rendering fully transparent,
 and reporting success.**
 
