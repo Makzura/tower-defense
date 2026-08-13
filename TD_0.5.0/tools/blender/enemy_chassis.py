@@ -27,18 +27,31 @@
 # Read the `enemy_*` glob rather than the directory: `make_preview.py` imports
 # the chassis too and ships no model.
 #
-# **NOTHING WARNS YOU.** An earlier version of this header claimed
-# CHASSIS_VERSION was stamped into every generated file so a mismatched set
-# would show up in a diff. IT IS NOT, AND IT NEVER WAS -- the constant is
-# defined below and read by nothing. The claim was written when the plumbing was
-# proposed and the plumbing was never built. It is corrected here rather than
-# quietly deleted because a header that overstates its own safety is worse than
-# one that admits the hazard: a reader who believed that sentence would conclude
-# the coupling announces itself, and it does not.
+# **WHAT WARNS YOU, AND HOW TO CHECK IT RATHER THAN BELIEVE IT.**
+# `export_mesh.py` now stamps `CHASSIS_VERSION` into every model it builds
+# through this module -- once in the file's comment header and once as a
+# `chassisVersion` field. So:
 #
-# SO THE DISCIPLINE IS MANUAL AND IT IS ON YOU:
+#     grep -l chassisVersion js/gl/models/enemy-*.js
 #
-#   * change this file  ->  re-export ALL FIVE bodies, by hand, in ONE commit
+# lists every chassis-built model that has been exported SINCE the stamp
+# landed, and its absence from a file means that file predates the stamp -- NOT
+# that the model is unversioned, and never "version 0". Non-chassis bodies
+# (`enemy-brute`, `-swarm`, `-hive`, and the imported `-flying`) carry no stamp
+# at all and must never read as a stale chassis.
+#
+# **THIS SENTENCE HAS BEEN WRONG IN BOTH DIRECTIONS IN ONE DAY.** It first
+# claimed a stamp that had never been built; that was corrected to say no stamp
+# existed; and the stamp then landed, making the correction false in turn. That
+# is why it is now written as a COMMAND rather than a claim -- a reader can
+# falsify the line above in one second, and a command cannot rot the way a
+# description does. Write it that way if you change it again.
+#
+# **THE STAMP IS A DETECTOR, NOT A SAFEGUARD.** It tells you afterwards that a
+# set is mismatched. It cannot stop you shipping one, and it says nothing about
+# a body re-exported for an unrelated reason. The discipline is still manual:
+#
+#   * change this file  ->  re-export EVERY chassis body, by hand, in ONE commit
 #     that says a chassis change is what it is;
 #   * never re-export a single body after touching the chassis -- that is
 #     exactly how the five stop matching each other, silently;
