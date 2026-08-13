@@ -2135,8 +2135,10 @@ test("wave arithmetic records the incoming burst and total health", function (t)
 
   // The old two-wave schedule totalled 52 HP -- it could never destroy the
   // 100 HP base, so the loss screen was unreachable in real play. The full
-  // schedule can, and tools/simulate-campaign.js shows it does (an
-  // undefended base falls during the mid-game on every route).
+  // schedule can, and THE_COMPANY/tools/balance/simulate-campaign.js shows it
+  // does (that tool lives outside this repository, so it is not reachable
+  // from a clone of it; an undefended base falls during the mid-game on
+  // every route).
   t.ok(totalHealth > h.game.BASE_MAX_HP, "the schedule can now destroy an undefended base");
 
   // The authored purse is the sum of kill bounties, wave-clear bonuses and
@@ -2173,9 +2175,11 @@ test("wave arithmetic records the incoming burst and total health", function (t)
 
 test("additional gunners reduce the HP that reaches the base", function (t) {
   // Measured against the original two-wave opening as a combat regression.
-  // The full schedule's
-  // whole-run behaviour is tools/simulate-campaign.js's job; over 120 s of
-  // mid-campaign one or two gunners are simply dead, and rightly so.
+  // The full schedule's whole-run behaviour is
+  // THE_COMPANY/tools/balance/simulate-campaign.js's job (that tool lives
+  // outside this repository, so it is not reachable from a clone of it);
+  // over 120 s of mid-campaign one or two Riflemen are simply dead, and
+  // rightly so.
   var one = harness.boot();
   one.pinWaveBreak(5);
   one.run("WAVES = WAVES.slice(0, 2); restartGame()");

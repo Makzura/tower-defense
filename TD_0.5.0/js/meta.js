@@ -96,10 +96,12 @@ var MetaProgress = (function () {
     // A COIN PURCHASE, NOT A STARTER, and that was a decision rather than an
     // omission. `starter: true` would put a tower that produces free damage
     // forever into the opening kit, and the premise the whole meta loop rests
-    // on -- a fresh profile CANNOT win, which tools/measure-starter-kit.js
-    // exists to keep checking -- is measured against the kit as it stands. If
-    // the owner wants this in the opening hand it is one field, plus a re-run
-    // of that tool.
+    // on -- a fresh profile CANNOT win, which
+    // THE_COMPANY/tools/balance/measure-starter-kit.js exists to keep
+    // checking (that tool lives outside this repository, so it is not
+    // reachable from a clone of it) -- is measured against the kit as it
+    // stands. If the owner wants this in the opening hand it is one field,
+    // plus a re-run of that tool.
     //
     // Priced between the Arcane Sniper (40) and the Siphon (150): it is more
     // than a first unlock and less than the run-defining one.

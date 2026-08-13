@@ -8,10 +8,11 @@
 //
 // What actually makes a map hard, in this game specifically:
 //
-//   A gunner's reach (100 u.l.) and the closest it may legally stand to the
-//   road (22.1875 u.l.) are both fixed. So "how much road one tower can shoot"
-//   is a property of the map alone. On a plain straight road it is
-//   2 * sqrt(range^2 - clearance^2) = 195 u.l., whatever else is going on.
+//   The reference tower's reach (100 u.l.) and the closest it may legally
+//   stand to the road (22.1875 u.l.) are both fixed. So "how much road one
+//   tower can shoot" is a property of the map alone. On a plain straight
+//   road it is 2 * sqrt(range^2 - clearance^2) = 195 u.l., whatever else is
+//   going on.
 //
 //   A route that folds back on itself puts SEVERAL lanes of road inside one
 //   tower's circle, and that tower's output multiplies. This is why loops make
@@ -119,8 +120,10 @@ Maps.LIST = [
       { kind: "obelisk", x: 1010, y: 360, size: 29, color: "117,197,170" },
       { kind: "sigil", x: 1180, y: 95, size: 23, color: "120,208,179" }
     ],
-    // Deliberately set 13.6 m apart at the closest -- wider than a gunner's
-    // 8 m reach, so the switchbacks give you their corners and nothing more.
+    // Deliberately kept far enough apart at the closest that
+    // Maps.foldsBack() reads false for this route -- unlike Mana Coil, where
+    // it reads true -- so the switchbacks give you their corners and nothing
+    // more, never one tower covering two lanes.
     // Pull them together and this becomes a second Mana Coil.
     points: [
       { x: -60,  y: 165 },
@@ -1120,7 +1123,7 @@ Maps.GOOD_FRACTION = 0.10;
 // it the road reads as straight to the eye and to a tower's circle alike.
 Maps.TURN_THRESHOLD_DEG = 12;
 
-// The fold detector, in multiples of a gunner's range.
+// The fold detector, in multiples of the reference tower's range.
 //
 // Two bits of road only count as a fold if they are far apart ALONG the route:
 // four ranges, which is far enough that ordinary curvature cannot bring them
@@ -1155,7 +1158,7 @@ Maps.straightCoverageUl = function () {
   return 2 * Math.sqrt(rangeUl * rangeUl - clearanceUl * clearanceUl);
 };
 
-// Is (x, y) somewhere a gunner could actually be placed on an empty board?
+// Is (x, y) somewhere a tower could actually be placed on an empty board?
 // Uses the game's own clearance rule and its own interface geometry, so the
 // measurement can never count a spot the player is not allowed to use.
 Maps.buildableSpot = function (gamePaths, x, y, clearancePx) {
@@ -1288,7 +1291,7 @@ Maps.analyse = function (map) {
   return map.analysis;
 };
 
-// u.l. of road within a gunner's reach of (x, y).
+// u.l. of road within rangePx of (x, y).
 Maps.coverageAt = function (samples, x, y, rangePx) {
   var rangeSq = rangePx * rangePx;
   var hits = 0;

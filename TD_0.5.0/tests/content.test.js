@@ -3528,10 +3528,11 @@ group("maps: the routes and the chooser");
 // Returns the base HP left.
 //
 // Sliced to two waves deliberately: this test is about ROUTE difficulty, and
-// the opening is the stretch where a fixed two-gunner budget discriminates
-// between routes. Against the full ten-wave campaign two gunners lose
-// everywhere (see tools/simulate-campaign.js), which would collapse every
-// route to zero and tell us nothing.
+// the opening is the stretch where a fixed two-Rifleman budget discriminates
+// between routes. Against the full ten-wave campaign two Riflemen lose
+// everywhere (see THE_COMPANY/tools/balance/simulate-campaign.js, which
+// lives outside this repository and is not reachable from a clone of it),
+// which would collapse every route to zero and tell us nothing.
 //
 // 70 s is past the opening's last leak on every route: its last enemy spawns
 // at 15.2 s and the longest walk is 47 s.
