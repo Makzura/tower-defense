@@ -77,11 +77,35 @@ body. What is unsupported is *"a measured choice rather than a lucky one"*
 standing **without qualification** — which is what was relayed to the owner, and
 what is now qualified here.
 
-**The sharpest finding: the palette table did not merely fail to predict the road,
-it INVERTED there.** `tin_dark` was rejected because darkening a part that
-overhangs a dark background is backwards — sound reasoning — and on pixels
-`tin_dark` is the **best** of the three against the road at exactly the frames
-where brass is worst.
+**The sharpest finding: in a three-frame window the palette table did not merely
+miss the road — it predicted the EXACT REVERSE, in full order, on the one
+comparison it was used to decide.**
+
+    PALETTE   vs roadTop #274553  vs roadSide #0a1922
+    brass          3.28                 5.75
+    tin            1.51                 2.66
+    tin_dark       1.26                 1.39
+
+    RENDERED  frame 11  frame 0  frame 1
+    brass       1.20     1.09     1.22     <- palette's first
+    tin         1.24     1.36     1.25
+    tin_dark    1.45     1.66     1.56     <- palette's last
+
+`roadTop` 3.28 was **the deciding number** that carried brass over `tin_dark`,
+and the table ranks brass first against **both** road surfaces by 2.6x–4.1x, so
+the prediction does not depend on which one the bar overhangs. Road colours read
+from `js/gl/gl-world.js:207-208`.
+
+**The qualifier matters as much as the finding, and it is the same discipline
+that caught everything else today: "against the road" unqualified is too broad.**
+Brass is correctly ranked first on **9 of 12** frames; the full three-way ordering
+is correct on **7 of 12** (frames 8 and 9 swap `tin` and `tin_dark` while brass
+stays top); the ordering is completely reversed on **3 of 12**, contiguous. **So
+the table is not noisy — it is confidently wrong in a specific window**, which is
+the worse failure: a brief-writer consulting it would have come away reassured
+rather than uncertain. And it is not a usable inverse instrument either; right
+three quarters of the time and exactly backwards for a contiguous quarter is the
+absence of an instrument, not a negative one.
 
 **Still owed and kept open: the road is not uniform either.** The crank may
 overhang road, road edge and whatever borders them, and those are not separated,

@@ -944,17 +944,64 @@ standing **without qualification** — not the choice itself. The crank did **no
 ship on a lucky ordering: brass is genuinely better overall and clearly better
 against the body.
 
-**The sharpest thing in it: the palette table did not merely fail to predict the
-road, it inverted there.** `tin_dark` was rejected because darkening a part that
-overhangs a dark background is backwards — sound reasoning, and on pixels
-`tin_dark` is the **best** of the three against the road at exactly the frames
-where brass is worst. This is the concrete form of *worst exactly where it is
-most often used*.
+**THE SHARPEST THING IN IT: IN A THREE-FRAME WINDOW THE PALETTE TABLE DID NOT
+MERELY MISS THE ROAD — IT PREDICTED THE EXACT REVERSE, IN FULL ORDER, ON THE ONE
+COMPARISON IT WAS USED TO DECIDE.** Not one pair swapping. All three positions:
 
-**STILL OWED, AND KEPT OPEN RATHER THAN CLOSED: the road is not uniform.** The
-crank may overhang road, road edge and whatever borders them, and those have not
-been separated. The figure above is itself an aggregate over a population nobody
-has split yet.
+    PALETTE   vs roadTop #274553   vs roadSide #0a1922
+    brass          **3.28**              **5.75**
+    tin              1.51                  2.66
+    tin_dark         1.26                  1.39
+
+    RENDERED  frame 11   frame 0   frame 1
+    brass        1.20      1.09      1.22      <- palette's first
+    tin          1.24      1.36      1.25
+    tin_dark   **1.45**  **1.66**  **1.56**    <- palette's last
+
+**The palette's first is the pixels' last and its last is the pixels' first**, on
+each of the three frames, consistently. The prediction does not depend on which
+road surface the bar overhangs — the table ranks brass first against **both**, by
+2.6x to 4.1x `tin_dark`'s figure. And `roadTop` 3.28 was **the deciding number**,
+the single figure that carried brass over `tin_dark`. (Road colours read from
+`js/gl/gl-world.js:207-208`.)
+
+**THE QUALIFIER MATTERS AS MUCH AS THE FINDING — "against the road" unqualified
+is too broad.** Across the full cycle:
+
+- brass is **correctly ranked first on 9 of 12 frames**;
+- the **full three-way ordering is correct on 7 of 12** — on frames 8 and 9 `tin`
+  and `tin_dark` swap while brass stays top;
+- the ordering is **completely reversed on 3 of 12** — frames 11, 0, 1,
+  contiguous.
+
+**So the table is not noisy. It is CONFIDENTLY WRONG IN A SPECIFIC WINDOW**, and
+that is the worse failure: a brief-writer consulting it would have come away
+*reassured*, not uncertain. Nor is it a usable inverse instrument — right about
+the winner three quarters of the time and exactly backwards for a contiguous
+quarter is the absence of an instrument, not a negative one.
+
+**One bearing, and the "road" mask itself mixes two surfaces 1.5 CR apart in the
+palette** — which is what makes the sub-neighbour split below more than
+housekeeping.
+
+This is the concrete form of *worst exactly where it is most often used*.
+
+**STILL OWED, AND KEPT OPEN RATHER THAN CLOSED: the road is not uniform, and the
+"road" mask above mixes its surfaces.** `roadTop` and `roadSide` differ by **1.5
+CR in the palette** (3.28 against 5.75 for brass), so the figures above are an
+aggregate over a population nobody has split. **Deliberately not run** — nothing
+turns on it while the crank ships as authored. **But it stops being optional the
+moment anyone executes the ruling to move the part off the hip**, because the
+part would then lie against the neighbour whose behaviour is understood least.
+
+> **The habit this one is really about is narrower than splitting a population:
+> nobody ENUMERATED what the crank lies against.** The road went unmeasured
+> through an entire before-and-after review, not because the split was done
+> wrongly but because the neighbour was never listed. **Naming the members of a
+> set is a different discipline from splitting a statistic over it**, and it is
+> the one that failed first here — the deciding neighbour was named in the
+> original commit message and then never measured by anyone, including its
+> author.
 
 > **THE POPULATION LESSON, FOURTH INSTANCE IN ONE SECTION IN ONE DAY, AND ALWAYS
 > THE SAME SHAPE: a statistic quoted over a population that was never split.**
