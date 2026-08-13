@@ -2531,13 +2531,25 @@ Four rules, each of which has already cost something:
   does not stop to swing (`currentSpeedUlps` returns 0 only for `rooted`,
   `stunTimer` and `windUpTimer`). A second animation BAND would stop the legs
   dead in the road; an override leaves the gait running underneath.
-- **The pivot is the group's own root, and it is not one answer per model.** A
-  top-level body group is authored in model space with its root at z = 0 — that
-  is what makes `model.top` equal the posed top so the health bar cannot bury
-  itself. Leaf groups are authored about their own pivots. On `enemy-angry`,
-  `[0,0,0]` on `crank` is the axle at hip height and the same constant on
-  `angry_body` would be the road. **Read the root out of the file; do not take
-  it from a brief.**
+- **The pivot is NOT reliably the group's root, and the group and the pivot must
+  live in one record.** `export_mesh.py` stores each group's geometry in that
+  group's own local space, and `model.top` is max z over the raw `positions`
+  array — so **the height of a group whose root is elevated never appears in
+  `positions` at all**. The group carrying the model's TALLEST geometry
+  therefore has to be rooted at z = 0 or the health bar is painted through the
+  machine permanently. On the Hedger's Tripod that group is `mast`: its root is
+  at the road and its axle is the drum's centre, 0.8004 u up, supplied by the
+  renderer. Other leaf groups are still authored about their own pivots. **Read
+  both out of the model and the build script; take neither from a brief, and
+  keep them in one object** — a wrong group name fails LOUDLY (nothing draws, a
+  warning, a published list) while a wrong pivot fails SILENTLY, swinging the
+  machine about the road at the right moment in the right place.
+- **A silent pivot needs an authored arrival point.** The art brief states where
+  the tool's tip must end up (`0.509 u`, below the drum's centre line), which
+  makes the sign check a pivot check as well: a wrong pivot puts the tip
+  somewhere else entirely — measured, substituting the group root moves it
+  0.468 u = 18.6 board px. Check it through the matrix the renderer actually
+  built, never a re-derivation from the same constants.
 - **Drive it off a signal that only exists when the thing happened.**
   `attackFlash` is set when an attack RESOLVES. `attackTimer` counts down
   whether or not anything is in reach, so a pose driven off it telegraphs at

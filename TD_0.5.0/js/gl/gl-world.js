@@ -1338,7 +1338,7 @@ var World3D = (function () {
       // costs nothing would leave the guarantee untested in the shipped path.
       // The object it returns is shared scratch, consumed synchronously by the
       // drawActor call below before any other body reaches this line.
-      var strike = strikeOf(e, model, yaw);
+      var strike = strikeOf(e, model);
       // A CAMO BODY IS DRAWN TWICE: depth first, then colour.
       //
       // With depth writes off, EVERY front-facing surface of a translucent body
@@ -1580,12 +1580,15 @@ var World3D = (function () {
   // patch of road -- and a band would REPLACE that cycle, stopping the legs
   // dead in the road every time the body swung. An `overrides` matrix composes
   // with the baked frame instead (see overrideMat above), so the gait carries
-  // on underneath and the strike cannot fight it by construction. That is the
-  // whole reason this seam was built rather than a second animation band.
+  // on underneath and the strike cannot fight it by construction.
+  //
+  // AND THE BODY DOES NOT STOP TO SWING. `currentSpeedUlps` returns 0 only for
+  // `rooted`, `stunTimer` and `windUpTimer`, and `angry` carries no wind-up, so
+  // it walks straight through its own 0.4 s window. A band was never viable.
   //
   // DRIVEN BY `attackFlash`. Set to 1 in Enemy.prototype.resolveAttack -- when
-  // an attack ACTUALLY RESOLVES, wind-up already served -- and decayed at
-  // dt * 2.5 to a floor of 0: one 0.4 s monotonic ramp per landed blow.
+  // an attack ACTUALLY RESOLVES -- and decayed at dt * 2.5: one linear 0.4 s
+  // ramp per landed blow, and nothing else in the renderer reads it.
   //
   // NOT `attackTimer`, and the difference is the whole design. That counts down
   // every 2.5 s whether or not anything is in reach: `attackTowers` returns
@@ -1595,145 +1598,124 @@ var World3D = (function () {
   //
   // THE GATE IS A CROSSING, NEVER AN EQUALITY. `attackFlash` is decayed by dt,
   // so no sampled frame sees exactly 1; at a fixed 60 Hz it does not land
-  // exactly on 0 either (measured: 3.75e-16 after 24 steps, which is still
-  // strictly greater than zero). `f > 0` opens the window and the shape
-  // function takes any such residue to a rest pose regardless.
-  var STRIKE_GROUP = "crank";
+  // exactly on 0 either (measured: 3.75e-16 at step 24, a true 0 at step 25).
+  // `f > 0` opens the window and the curve takes any such residue to rest.
 
-  // THE PIVOT, READ OUT OF THE MODEL RATHER THAN ASSUMED -- INCLUDING FROM A
-  // BRIEF. `overrides` lands in the group's LOCAL space, so the pivot is
-  // wherever the exporter put that group's root, and that is NOT one answer for
-  // the whole model. Measured on the shipped enemy-angry: the top-level group
-  // `angry_body` is authored in model space with its root at z = 0, because it
-  // carries `model.top` and therefore the health bar; every LEAF group is
-  // authored about its own root, `crank` spanning local z [-0.582, 0] and put
-  // at model (-0.020, -0.325, 0.600) by the frame pose. So [0, 0, 0] on `crank`
-  // is the axle at hip height, and the identical constant on `angry_body` would
-  // be the road. Re-derive per group when a model changes; never carry it over.
-  var STRIKE_PIVOT = [0, 0, 0];
+  // ONE RECORD PER MODEL, BECAUSE THE GROUP AND THE PIVOT CANNOT BE UPDATED BY
+  // HALVES -- AND BECAUSE THEY FAIL IN OPPOSITE WAYS.
+  //
+  // A wrong GROUP NAME fails loudly: the lookup misses, `missingGroupOn` fires,
+  // and nothing draws. A wrong PIVOT fails SILENTLY -- right group, right
+  // moment, right place, and the machine swings about the road instead of about
+  // its own axle. That is a plausible picture with the wrong mechanism under it,
+  // and no still frame shows it. Keeping the pair in one object is what makes
+  // "rename the group and forget the pivot" impossible rather than merely
+  // discouraged. `tipCheck` is the instrument that makes the pivot loud: mira's
+  // brief states where the tool's tip must ARRIVE, and a wrong pivot puts it
+  // somewhere else entirely, so her sign check doubles as a pivot check.
+  //
+  // THE VALUES ARE mira's, FROZEN, from tools/blender/BRIEF-hedger-tripod-
+  // gesture.md section 2 (committed at d2c567f). Not derived here, not tuned
+  // here, and not to be adjusted here.
+  //
+  // THE PIVOT IS NOT THE GROUP ROOT ON THIS BODY, and that is the whole reason
+  // this field exists. `mast` carries the drum, which is the model's TALLEST
+  // geometry, so its root has to sit at z = 0 or `model.top` -- max z over the
+  // RAW positions array -- would not see it and the health bar would be painted
+  // through the machine permanently. So the root is at the road and the axle is
+  // at the drum's centre, 0.80 u up, and the difference between those two is
+  // supplied here.
+  //
+  // THE SIGN IS A PROPERTY OF THE PART. mira's rule is "a POSITIVE rotation
+  // about local Y takes local +x toward local -z", which is exactly what
+  // GLMath.localPose does, and the bill projects FORWARD along +x -- so +34
+  // degrees sends the tip down and slightly back into the machine, which is the
+  // stroke. Verified against her authored arrival point rather than reasoned:
+  // the tip vertex sits at local (0.524, 0, ~0.800), 0.520 u out along +x from
+  // the pivot, and rotating that by +34 degrees puts it at
+  // (0.431, 0.509) -- her table's two numbers to three decimals.
+  // 0.8004 AND NOT THE BRIEF'S 0.80, AND IT IS NOT A TYPO TO TIDY UP.
+  // `tools/blender/enemy_hedger.py:196` derives it as `MAST_PIVOT_Z = 0.870 * F`
+  // with `F = 0.920`, because the pivot's whole justification is that it IS the
+  // drum's centre and the drum is authored at 0.87F. The brief's 0.80 and
+  // 0.87F agree only if F were 0.9195. The difference is 0.016 board px at this
+  // body's sizeScale -- two hundredths of a pixel, invisible -- so this is
+  // written down purely so that if the figure height ever moves, the pivot
+  // moves with it instead of staying at a literal that used to be right.
+  var STRIKE_BY_MODEL = {
+    "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004], swing: 0.5934119,
+                     tipCheck: 0.509 }
+  };
 
-  // THE GESTURE ITSELF IS PROVISIONAL AND IS NOT THE RENDERER'S TO CHOOSE.
-  // mira owns the shape, the amplitude and whether the strike is aimed at all;
-  // these are stated placeholders so the plumbing could be measured before her
-  // curve and suki's mesh existed. +x is the direction the body faces, so a
-  // forward swing is a NEGATIVE rotation about y.
-  var STRIKE_SWING = -0.95;             // radians at full extension
-
-  // PROVISIONAL, AND IT IS A DESIGN DECISION RATHER THAN A PLUMBING ONE.
-  // 1 turns the swing plane towards the tower that was struck; 0 is unaimed.
-  // Both paths are exercised from one build through `strikeSeam()`, so the
-  // default costs the seam nothing and carries the art department's answer
-  // instead of an engineering convenience. It sits at 0 because the only
-  // identity statement on the record -- that the Hedger is a machine clearing
-  // an obstruction rather than a thing fighting -- argues for unaimed, and
-  // because unaimed is the smaller mechanism: no bearing to latch and no
-  // lifetime mismatch to get wrong. mira owns this number.
-  var STRIKE_AIM = 0;
-
-  // A BEARING TO THE THING IT HIT, LATCHED FOR THE WHOLE WINDOW.
+  // ONE SCRATCH MATRIX AND ONE SCRATCH OBJECT, allocation-free per frame. Both
+  // are safe only because `drawActor` consumes them SYNCHRONOUSLY, on the line
+  // after the call, before any other body reaches here -- the same contract the
+  // instance and group matrices above already run on. If the enemy draw is ever
+  // batched or deferred, this becomes a silent aliasing bug of exactly the kind
+  // GLMath.multiply carries its own warning about, and every striking body will
+  // wear the last one's pose.
   //
-  // `resolveAttack` also sets `attackBeam = {x, y, life}` -- cosmetic, read
-  // nowhere by the simulation. It is a bearing to the tower that was struck.
-  //
-  // IT MUST BE LATCHED, and that is the only reason a per-body record exists
-  // here. The two signals have DIFFERENT LIFETIMES: `attackBeam.life` decays at
-  // dt * 4 (0.25 s) and `attackFlash` at dt * 2.5 (0.4 s), so the beam is null
-  // for the last 0.15 s of the window. Read per frame, the aim would snap back
-  // to the walking heading partway through the recovery -- every individual
-  // frame a legal pose, and only the SEQUENCE showing it, which is exactly how
-  // four of ten attack frames shipped wrong in af9501a.
-  //
-  // LATCHED ON A CROSSING -- the value ROSE -- never on an equality against 1,
-  // and idempotent within a rendered frame: the enemy drawActor call sits
-  // inside the camo two-pass loop and runs twice on a camouflaged body, and
-  // `f > st.last` is false on the second visit because the first set `last` to
-  // the same number. A retrigger inside an open window (a shorter interval than
-  // 0.4 s, which no shipped body has) re-latches correctly for the same reason.
-  //
-  // `_glStrike` is RENDER STATE PARKED ON A SIM OBJECT, and it is strictly
-  // one-way: update() never reads it, nothing outside this file names it, and
-  // it dies with the enemy. Effects are feedback the simulation never reads
-  // back, and this stays on the correct side of that line.
-  var strikeSwingMat = new Float32Array(16);
-  var strikeAimMat = new Float32Array(16);
+  // `strikeKey` exists so a model whose group is named differently cannot
+  // inherit a stale key: the object is reused, so leaving `crank` on it while
+  // writing `mast` would hand a `crank`-bearing body a matrix built for another
+  // machine's pivot.
   var strikeMat = new Float32Array(16);
   var strikeOverrides = {};
+  var strikeKey = null;
 
   // THE MODELS THAT DO NOT CARRY THE GROUP, REPORTED RATHER THAN IGNORED.
   //
   // `drawActor` looks the override up by NAME and silently skips a miss, so a
-  // body whose mesh lacks `crank` draws its plain walk -- which is pixel-for-
-  // pixel indistinguishable from a body that has not attacked yet. That is the
-  // soft failure that let an entire preview feature draw the wrong thing past
-  // its own author's commit. Warn once per model, and publish the list through
-  // `strikeSeam()` so a test can assert it is empty.
+  // body whose mesh lacks the group draws its plain walk -- pixel-for-pixel
+  // indistinguishable from a body that has not attacked. That is the soft
+  // failure that let four model-viewer exports stay undefined past their own
+  // author's commit, guarded by `typeof` at every call site, drawing a
+  // plausible picture of the wrong thing. Warn once per model, and publish the
+  // list through `strikeSeam()` so a test can assert it is EMPTY.
   var strikeMissing = {};
 
-  function strikeShape(f) {
-    if (!(f > 0)) return 0;
-    if (f >= 1) return 1;
-    // Smoothstep: full extension at the instant of impact, zero VELOCITY at
-    // rest so the window closes without a pop, and a brief hold at extension
-    // before the recovery. The discontinuity is at the strike, where it belongs.
-    return f * f * (3 - 2 * f);
-  }
+  // The last matrix the strike actually built, published for the pivot check.
+  // A test that re-derives the matrix from the same constants agrees with
+  // itself and proves nothing; this is the one the renderer used.
+  var strikeLast = null;
 
-  // Shortest signed angle from `a` to `b`. A raw difference of bearings can
-  // come back near +/-2pi and would whip the part the long way round.
-  function angleDelta(a, b) {
-    var d = (b - a) % (Math.PI * 2);
-    if (d > Math.PI) d -= Math.PI * 2;
-    if (d < -Math.PI) d += Math.PI * 2;
-    return d;
-  }
-
-  function strikeOf(e, model, yaw) {
-    var f = e ? e.attackFlash : 0;
+  function strikeOf(e, model) {
     // The early out every body on the board takes: one property read and a
-    // compare. The clear is guarded so a board of 500 walkers does not write a
-    // field onto every enemy on every frame to set it to what it already is.
-    if (!(f > 0)) { if (e && e._glStrike) e._glStrike = null; return null; }
-    var m = model ? GLModels.get(renderer, model) : null;
+    // compare.
+    var f = e ? e.attackFlash : 0;
+    if (!(f > 0)) return null;
+    var spec = model ? STRIKE_BY_MODEL[model] : null;
+    if (!spec) return null;
+    var m = GLModels.get(renderer, model);
     var has = false;
     if (m) {
       for (var g = 0; g < m.groups.length; g++) {
-        if (m.groups[g].name === STRIKE_GROUP) { has = true; break; }
+        if (m.groups[g].name === spec.group) { has = true; break; }
       }
     }
     if (!has) {
-      if (model && !strikeMissing[model]) {
+      if (!strikeMissing[model]) {
         strikeMissing[model] = true;
         if (typeof console !== "undefined" && console.warn) {
-          console.warn("World3D: '" + model + "' has no '" + STRIKE_GROUP +
+          console.warn("World3D: '" + model + "' has no '" + spec.group +
             "' group -- its strike will draw as a plain walk.");
         }
       }
       return null;
     }
-    var st = e._glStrike;
-    if (!st || f > st.last) {
-      st = e._glStrike = { last: f, aim: yaw || 0 };
-      if (e.attackBeam) {
-        st.aim = Math.atan2(e.attackBeam.y - e.pos.y, e.attackBeam.x - e.pos.x);
-      }
-    } else {
-      st.last = f;
-    }
-    var s = strikeShape(f);
-    GLMath.localPose(strikeSwingMat, STRIKE_PIVOT, 0, STRIKE_SWING * s, 0,
-      0, 0, 0);
-    var aim = STRIKE_AIM * angleDelta(yaw || 0, st.aim) * s;
-    if (!aim) {
-      strikeOverrides[STRIKE_GROUP] = strikeSwingMat;
-      return strikeOverrides;
-    }
-    // THE AIM TURNS THE SWING PLANE, so it composes OUTSIDE the swing. Built as
-    // two matrices because localPose is Rx*Ry*Rz and this needs Rz*Ry -- and as
-    // two SEPARATE scratch matrices because GLMath.multiply is not alias-safe
-    // and corrupts its source silently.
-    GLMath.localPose(strikeAimMat, STRIKE_PIVOT, 0, 0, aim, 0, 0, 0);
-    strikeOverrides[STRIKE_GROUP] =
-      GLMath.multiply(strikeMat, strikeAimMat, strikeSwingMat);
+    // LINEAR, on mira's instruction and against my own first draft, which eased
+    // the recovery. `angle = stroke * attackFlash` and nothing else: the field
+    // is already a linear 1 -> 0 ramp over 0.400 s, so the whole gesture is one
+    // multiplication. There is no anticipation channel and that is not a
+    // compromise -- a machine doing a chore does not wind up, and frame 0 of the
+    // window is the BOTTOM of the stroke because the cut has already happened.
+    // Easing it made the tool hover at extension, which is a different claim
+    // about the machine than the one the brief makes.
+    GLMath.localPose(strikeMat, spec.pivot, 0, spec.swing * f, 0, 0, 0, 0);
+    strikeLast = { model: model, flash: f, group: spec.group };
+    if (strikeKey && strikeKey !== spec.group) delete strikeOverrides[strikeKey];
+    strikeKey = spec.group;
+    strikeOverrides[spec.group] = strikeMat;
     return strikeOverrides;
   }
 
@@ -3839,6 +3821,29 @@ var World3D = (function () {
     enemyModelFor: enemyModel,
     walkBand: walkBand,
     bandFrame: bandFrame,
+    // WHAT DRIVES A BODY'S ANIMATION, for a viewer that has no road under it.
+    //
+    // `walkBand` says WHICH frames are the walk; this says HOW FAST to step
+    // them, and it is the seam the codex's enemy viewer was re-deriving.
+    //
+    // Returns a rate in CYCLES PER SECOND for a body whose animation is driven
+    // by a CLOCK, and **null for every body whose animation is driven by
+    // DISTANCE** -- which is all of them except the flier. That null is the
+    // useful half of the answer: it tells a caller that this body has no
+    // authored rate at all, so a viewer standing it still has to invent one
+    // (the codex derives speed/stride, which is the right thing to do and is
+    // the caller's business, not this file's).
+    //
+    // WHY A FUNCTION AND NOT THE CONSTANT. Copying `2.6` into the codex would
+    // put a second copy of a number in a file that will never be the one
+    // retuned, and the failure mode is silent: the viewer would go on beating
+    // the old rate after HOVER_HZ moved, and nothing renders wrong enough to
+    // notice. Asking for the rule survives the retune. Measured 2026-08-14:
+    // the codex's own derivation gives the Wisp 2.567 against this 2.6 -- close
+    // by luck rather than by construction, and the next flier will not be.
+    animHz: function (enemy) {
+      return (enemy && enemy.isFlying) ? HOVER_HZ : null;
+    },
     // The board's height under a point, and whether a footprint sits on ONE
     // level. Presentation-derived, but the placement rule reads the second one:
     // a tower bridging a deck edge is half planted and half in mid-air, and
@@ -3863,15 +3868,25 @@ var World3D = (function () {
     // probe can capture aimed and unaimed from one build and mira can overrule
     // the default with a measurement rather than a rebuild. The values in the
     // source are the ones that ship.
-    strikeSeam: function (o) {
-      if (o && typeof o.swing === "number") STRIKE_SWING = o.swing;
-      if (o && typeof o.aim === "number") STRIKE_AIM = o.aim;
+    strikeSeam: function (model) {
       var missing = [];
       for (var k in strikeMissing) missing.push(k);
+      var specs = {};
+      for (var mk in STRIKE_BY_MODEL) specs[mk] = STRIKE_BY_MODEL[mk];
       return {
-        group: STRIKE_GROUP, pivot: STRIKE_PIVOT,
-        swing: STRIKE_SWING, aim: STRIKE_AIM,
-        missingGroupOn: missing
+        models: specs,
+        spec: model ? (STRIKE_BY_MODEL[model] || null) : null,
+        missingGroupOn: missing,
+        // The matrix the renderer ACTUALLY built on its last striking body,
+        // copied out. A check that re-derives it from the published constants
+        // agrees with itself and proves nothing about the pivot; this is the
+        // one the geometry went through. Copied rather than handed over,
+        // because the live one is scratch that the next body overwrites.
+        last: strikeLast ? {
+          model: strikeLast.model, flash: strikeLast.flash,
+          group: strikeLast.group,
+          matrix: Array.prototype.slice.call(strikeMat)
+        } : null
       };
     }
   };

@@ -61,6 +61,84 @@ frozen at `performance.now`, SwiftShader, 1280×720, ROI 360×352 of the model b
   the 1660 Ti**; 58–61 ms on SwiftShader, which is not transferable in a known
   direction and must not be converted into a frame rate.
 
+**2026-08-14 — The strike is re-pointed at the Tripod's `mast` and now carries
+mira's frozen numbers. The group rename caught itself.**
+
+suki's tripod (`47190ee`) replaced `enemy-angry`'s groups with `angry_body`,
+`leg_0`, `leg_1`, `leg_2`, `mast`. `crank` stopped existing **mid-job**, and the
+guard added the same day did exactly what it was built for: `missingGroupOn`
+went non-empty, the warning fired, and the strike drew 0 px instead of drawing
+something plausible against the wrong part. That was the live test of the check,
+on real geometry rather than on a rename.
+
+**The gesture is mira's, from `tools/blender/BRIEF-hedger-tripod-gesture.md`
+(frozen at `d2c567f`), and it is not the renderer's to tune:** group `mast`,
+pivot `[0, 0, 0.8004]`, **34° = 0.5934119 rad**, and the curve is **LINEAR** —
+`angle = 34° * attackFlash`, no easing, no overshoot, no hold. My first draft
+eased the recovery with a smoothstep; that made the tool hover at extension,
+which is a different claim about the machine than the brief makes. **Aim is 0
+and the whole aiming mechanism is gone** — she measured it (strike silhouette
+falls 82.8 → 62.8 px from 0° to 35° of aim, because at yaw 0 the model's +y is
+the depth axis) and rejected it, so the bearing latch, the `attackBeam` lifetime
+problem and the per-body `_glStrike` record all went with it.
+
+**The pivot is 0.8004 and not the brief's 0.80, and that is deliberate.**
+`tools/blender/enemy_hedger.py:196` derives `MAST_PIVOT_Z = 0.870 * F` with
+`F = 0.920`, because the pivot's justification is that it IS the drum's centre.
+0.0004 u is 0.016 board px — two hundredths of a pixel — and it is written down
+only so that if the figure height moves, the pivot moves with it.
+
+**Group and pivot now live in ONE record per model**, because they fail in
+opposite ways: a wrong group name fails loudly (nothing draws, a warning, a
+published list), a wrong pivot fails **silently** — right part, right moment,
+right place on screen, swinging about the road instead of about its own axle.
+Keeping the pair in one object makes "rename the group and forget the pivot"
+impossible rather than merely discouraged.
+
+**And the pivot has an instrument, which is mira's sign check doing double
+duty.** At `attackFlash == 1` the bill tip must arrive **below** the drum's
+centre line at z **0.509 u**, having started at 0.800. Measured through the
+renderer's OWN matrix (`strikeSeam().last`, not a re-derivation): tip
+**0.5145 u**, forward extent 0.5188 → 0.4329 against her predicted 0.520 →
+0.431. Arming it: substituting the group ROOT for the pivot — the value anyone
+would reach for, and the one that is at the road on this body — moves the tip
+**0.468 u = 18.6 board px**, so the metric is not decoration.
+
+**The health-bar budget reproduces to the digit, from a third instrument.**
+Max z over the `mast` group across all 12 gait frames × 0–34°, through the
+shipped model file and the renderer's pivot and swing:
+
+| | mira predicted | suki, built | this rig |
+|---|---|---|---|
+| highest point in the window | 1.0225 u | — | **1.0231 u** |
+| rise over rest | 4.1 board px | 4.10 | **4.10** (worst at gait frame 0) |
+| clearance under the bar | 5.9 board px | 5.90 | **5.90** |
+
+**The RENDERED silhouette top is a different quantity and moves less — 1 `#gl`
+row.** 4.10 board px of geometry projects to ~3.2 `#game` px here, but the
+topmost LIT row is set by the drum's front face while what rises is its rear top
+corner. Both numbers are right; they are not the same measurement and must not
+be differenced. The safety conclusion is unaffected: measured headroom from the
+rendered silhouette to the projected crown line is **4.68 `#game` px**.
+
+**One defect in my own instrument, found by it disagreeing with mira:**
+`TDProbe.screenOf` projects heights from z = 0 because `project()` only adds
+`groundRef` inside `withGround`, which the enemy pass uses and a probe does not.
+The body stands on 7 board px of ground here, so the crown line read ~4 `#game`
+px low and the headroom came out under a pixel. And the tip check first read
+FAIL at 0.5386 u because "the vertex farthest from the pivot" lands on a *corner*
+of the bill's end face, 4.10° above its centre line — a defensible statistic over
+the wrong population, failing a seam that was correct. The tip is the centroid of
+that face.
+
+Controls, re-taken on the tripod mesh with `gl-world.js` served from `ff4c7d6~1`
+so one file differs: two-launch null identical on every hash; a board with no
+attacker **bit-identical** (`ecfe51b2`); a Hedger at rest **bit-identical**
+(`edea5c15`); the window 24 of 26 real decay steps changing pixels, 186 px at
+extension falling to 62, then 0 at the residue and 0 at rest; **wrap back to rest
+0 px**; and with `mast` suppressed the rest and full-strike frames are **0 px
+apart**, so nothing but the mast moves.
+
 **2026-08-14 — The Hedger has an attack animation. It is a per-group override
 composed onto the walk, not a second animation band, and it is driven by
 `attackFlash` rather than by the attack timer.**
