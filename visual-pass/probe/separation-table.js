@@ -46,6 +46,7 @@ var fs = require("fs");
 var path = require("path");
 var os = require("os");
 var cdp = require("./cdp");
+var crypto = require("crypto");
 var serve = require("./serve");
 
 var PORT = 8798, DEVTOOLS = 9338;
@@ -63,7 +64,7 @@ var BEARINGS = [
 
 // Candidate spots on the real path. The chosen one and two alternates give
 // every body a clear-ground reference to be guarded against.
-var SPOTS = [200, 420, 640, 900, 1180, 1450];
+var SPOTS = [120, 200, 300, 420, 540, 640, 760, 900, 1030, 1180, 1300, 1450, 1600, 1750, 1870];
 
 // ---------------------------------------------------------------------------
 // --compare: the go/no-go. Two independent launches, bit-for-bit.
@@ -72,6 +73,22 @@ function compare(fa, fb) {
   var A = JSON.parse(fs.readFileSync(fa, "utf8"));
   var B = JSON.parse(fs.readFileSync(fb, "utf8"));
   var report = { bearings: {}, identical: 0, differing: 0, missing: 0, verdict: null };
+  report.treeHashes = [A.treeAtStart && A.treeAtStart.hash, B.treeAtStart && B.treeAtStart.hash];
+  report.treeStableWithinPass = [A.treeStable, B.treeStable];
+  report.sameTreeAcrossPasses = !!(A.treeAtStart && B.treeAtStart &&
+    A.treeAtStart.hash === B.treeAtStart.hash);
+  report.modelIdentityMatches = JSON.stringify(A.modelIdentity) === JSON.stringify(B.modelIdentity);
+  report.modelIdentity = A.modelIdentity;
+  report.closingNulls = [A.closingNull, B.closingNull];
+  // A DIFFERENCE HERE IS THE GAME MOVING, NOT THE RIG, and the two need
+  // opposite responses. Checked before any pair is compared.
+  if (!report.sameTreeAcrossPasses) {
+    report.verdict = "NO-GO: the two passes loaded DIFFERENT trees -- a file under " +
+      "TD_0.5.0 changed between launches, so any difference below is the game " +
+      "moving and not the rig. Re-run both passes on a still tree.";
+    console.log(JSON.stringify(report, null, 1));
+    process.exit(1);
+  }
   if (JSON.stringify(A.bodies) !== JSON.stringify(B.bodies)) {
     report.verdict = "FAIL: the two passes measured different body lists";
     console.log(JSON.stringify(report, null, 1));
@@ -114,6 +131,45 @@ if (process.argv[2] === "--compare") {
 
 // ---------------------------------------------------------------------------
 
+// THE TREE THIS RUN MEASURED, HASHED.
+//
+// vera found the working tree mutating under a running measurement today: the
+// same suite command gave 104/3, then one failure, then 107/0 minutes apart,
+// because another session was mid-edit. The browser serves this same tree.
+//
+// A page loads every game file ONCE at boot, so an edit landing mid-run cannot
+// change the bodies underneath a single launch. It absolutely changes what the
+// NEXT launch loads -- and the two-launch null would then be comparing two
+// different games and calling the difference a rig fault. So the fingerprint is
+// taken in node either side of each pass and both are recorded: equal hashes
+// mean the two launches loaded the same code and the null means what it claims.
+//
+// A GIT SHA IS NOT ENOUGH ON ITS OWN HERE. The model under test is UNTRACKED --
+// enemy-shielded.js reads "??" -- so a sha would report "clean" straight across
+// a re-export of the very file being measured. This hashes what is on disk.
+function treeFingerprint() {
+  var root = path.join(__dirname, "..", "..", "TD_0.5.0");
+  var files = [path.join(root, "index.html")];
+  // ONLY WHAT THE PAGE LOADS: js/**/*.js plus index.html. tools/ and tests/
+  // live under the same root and change constantly without touching a pixel.
+  (function walk(d) {
+    fs.readdirSync(d, { withFileTypes: true }).forEach(function (e) {
+      var f = path.join(d, e.name);
+      if (e.isDirectory()) walk(f);
+      else if (/\.(js|html)$/.test(e.name)) files.push(f);
+    });
+  })(path.join(root, "js"));
+  files.sort();
+  var h = crypto.createHash("md5"), newest = 0, newestFile = "";
+  files.forEach(function (f) {
+    var st = fs.statSync(f);
+    h.update(path.relative(root, f)).update(fs.readFileSync(f));
+    if (st.mtimeMs > newest) { newest = st.mtimeMs; newestFile = path.relative(root, f); }
+  });
+  return { files: files.length, hash: h.digest("hex"),
+           newestFile: newestFile, newestMtime: new Date(newest).toISOString() };
+}
+
 async function main() {
   var t0 = Date.now();
   var server = await new Promise(function (res, rej) {
@@ -126,6 +182,9 @@ async function main() {
   var E = function (js) { return S.evaluate(js); };
   var J = async function (js) { return JSON.parse(await S.evaluate("JSON.stringify(" + js + ")")); };
   var out = { bearings: {}, timing: {}, guard: { threshold: GUARD, rejected: [] } };
+  global.__partial = out;
+  out.startedUTC = new Date().toISOString();
+  out.treeAtStart = treeFingerprint();
 
   try {
     for (var i = 0; i < 80; i++) {
@@ -175,7 +234,33 @@ async function main() {
     out.discovery = discovery;
     var BODIES = discovery.usable;
     out.bodies = BODIES;
+    // RAW TOP PER MODEL. Two builds of enemy-shielded differ ONLY in this:
+    // triangle count, frame count, group names and palette are identical, so
+    // nothing cheaper tells them apart, and a run that omits it cannot say
+    // afterwards which model it measured. Read out of the RENDERER rather than
+    // the file, so it describes what actually rasterised.
+    out.modelIdentity = await J(
+      "(function(){var r=World3D.renderer(); var o={};" +
+      " " + JSON.stringify(BODIES) + ".forEach(function(id){" +
+      "   var m=GLModels.get(r,'enemy-'+id);" +
+      "   o[id]= m ? {rawTop:+m.top.toFixed(4), frames:m.frames.length," +
+      "               triangles:(m.gpu&&m.gpu.count)?m.gpu.count/3:null} : null;});" +
+      " return o;})()");
     if (BODIES.length < 2) throw new Error("fewer than two meshed bodies to compare");
+
+    // OPENING NULL REFERENCE. Fixed bearing, fixed spot, fixed body, fixed
+    // frame -- banked before the sweep and repeated identically after it, so the
+    // pair differs in nothing but the sweep that happened in between.
+    async function nullShot(key) {
+      await E("TDProbe.camDefault()");
+      await E("TDProbe.cam({yaw:" + BEARINGS[0].yaw + "})");
+      await E("TDProbe.place(" + JSON.stringify(BODIES[0]) + ", 200)");
+      await E("TDProbe.frameAt(" + FRAME + ")");
+      await E("TDProbe.setClock(0)");
+      await E("TDProbe.warm(2)");
+      await E("TDProbe.cap('_w'), TDProbe.cap('" + key + "')");
+    }
+    await nullShot("openNull");
 
     for (var bi = 0; bi < BEARINGS.length; bi++) {
       var BEAR = BEARINGS[bi];
@@ -189,6 +274,8 @@ async function main() {
 
       // ---- choose the spot, and guard every body against its own best ----
       var perSpot = {};
+      out.spotScan = out.spotScan || {};
+      out.spotScan[BEAR.tag] = perSpot;
       for (var si = 0; si < SPOTS.length; si++) {
         var sp = SPOTS[si];
         perSpot[sp] = {};
@@ -327,10 +414,18 @@ async function main() {
       out.timing[BEAR.tag] = out.bearings[BEAR.tag].seconds;
     }
 
+    // CLOSING NULL. Same body, bearing, spot and frame as the reference banked
+    // before the sweep -- the whole sweep is the only thing between them.
+    await nullShot("closeNull");
+    out.closingNull = (await J("TDProbe.diff('openNull','closeNull',0)")).changed;
+
     out.timing.totalSeconds = +((Date.now() - t0) / 1000).toFixed(1);
     out.timing.bodiesMeasured = BODIES.length;
     out.timing.pairsPerBearing = BODIES.length * (BODIES.length - 1) / 2;
 
+    out.finishedUTC = new Date().toISOString();
+    out.treeAtEnd = treeFingerprint();
+    out.treeStable = out.treeAtStart.hash === out.treeAtEnd.hash;
   } finally {
     try { await S.send("Browser.close"); } catch (e) {}
     try { chrome.kill(); } catch (e) {}
@@ -341,5 +436,9 @@ async function main() {
 
 main().catch(function (e) {
   console.error("SEPARATION TABLE FAILED: " + e.stack);
+  // The guard is meant to stop a number being published, not to hide the
+  // evidence for why. Whatever was measured before the throw goes to stdout so
+  // a smothered body can be diagnosed without a second run.
+  if (global.__partial) console.log(JSON.stringify(global.__partial, null, 1));
   process.exit(1);
 });

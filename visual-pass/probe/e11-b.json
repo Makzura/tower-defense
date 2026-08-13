@@ -1,0 +1,9321 @@
+{
+ "bearings": {
+  "front": {
+   "yaw": -1.5707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -1.5707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 200,
+   "spotScore": 0.883,
+   "guard": {
+    "angry": {
+     "atSpot": 217,
+     "ownBest": 228,
+     "ratio": 0.952,
+     "fill": 0.646
+    },
+    "armored": {
+     "atSpot": 145,
+     "ownBest": 145,
+     "ratio": 1,
+     "fill": 0.628
+    },
+    "brute": {
+     "atSpot": 1143,
+     "ownBest": 1294,
+     "ratio": 0.883,
+     "fill": 0.731
+    },
+    "camo_normal": {
+     "atSpot": 124,
+     "ownBest": 135,
+     "ratio": 0.919,
+     "fill": 0.62
+    },
+    "fast": {
+     "atSpot": 108,
+     "ownBest": 108,
+     "ratio": 1,
+     "fill": 0.667
+    },
+    "flying": {
+     "atSpot": 58,
+     "ownBest": 59,
+     "ratio": 0.983,
+     "fill": 0.372
+    },
+    "hive": {
+     "atSpot": 1347,
+     "ownBest": 1347,
+     "ratio": 1,
+     "fill": 0.597
+    },
+    "normal": {
+     "atSpot": 124,
+     "ownBest": 135,
+     "ratio": 0.919,
+     "fill": 0.62
+    },
+    "shielded": {
+     "atSpot": 227,
+     "ownBest": 227,
+     "ratio": 1,
+     "fill": 0.649
+    },
+    "slow": {
+     "atSpot": 186,
+     "ownBest": 186,
+     "ratio": 1,
+     "fill": 0.729
+    },
+    "swarm": {
+     "atSpot": 48,
+     "ownBest": 48,
+     "ratio": 1,
+     "fill": 0.667
+    }
+   },
+   "sameYaw": true,
+   "yaws": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "inRunNull": 0,
+   "place": {
+    "angry": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 13.75,
+     "yaw": 0,
+     "walk": 72,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 217,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "isFlying": false
+    },
+    "armored": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11.55,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 145,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "isFlying": false
+    },
+    "brute": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 16.5,
+     "yaw": 0,
+     "walk": 40,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1143,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "isFlying": false
+    },
+    "camo_normal": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 124,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "isFlying": false
+    },
+    "fast": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 108,
+     "bboxGL": [
+      255,
+      249,
+      9,
+      18
+     ],
+     "isFlying": false
+    },
+    "flying": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 9.35,
+     "yaw": 0,
+     "walk": 0,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 58,
+     "bboxGL": [
+      251,
+      264,
+      13,
+      12
+     ],
+     "isFlying": true
+    },
+    "hive": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 17.6,
+     "yaw": 0,
+     "walk": 32,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1347,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "isFlying": false
+    },
+    "normal": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 124,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "isFlying": false
+    },
+    "shielded": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 12.649999999999999,
+     "yaw": 0,
+     "walk": 48,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 227,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "isFlying": false
+    },
+    "slow": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 56,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 186,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      17
+     ],
+     "isFlying": false
+    },
+    "swarm": {
+     "pos": [
+      140,
+      160
+     ],
+     "radius": 6.050000000000001,
+     "yaw": 0,
+     "walk": 104,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 48,
+     "bboxGL": [
+      257,
+      249,
+      9,
+      8
+     ],
+     "isFlying": false
+    }
+   },
+   "pairs": {
+    "angry|armored": {
+     "changed": 232,
+     "soloA": 217,
+     "soloB": 145,
+     "ratio": 1.282,
+     "bboxGL": [
+      253,
+      245,
+      13,
+      28
+     ],
+     "intersection": 130,
+     "interiorPx": 130,
+     "rimPx": 102,
+     "interiorShare": 0.5603,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 102,
+     "ratioSymmetricDifference": 0.564
+    },
+    "angry|brute": {
+     "changed": 1143,
+     "soloA": 217,
+     "soloB": 1143,
+     "ratio": 1.681,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 217,
+     "interiorPx": 217,
+     "rimPx": 926,
+     "interiorShare": 0.1899,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 926,
+     "ratioSymmetricDifference": 1.362
+    },
+    "angry|camo_normal": {
+     "changed": 223,
+     "soloA": 217,
+     "soloB": 124,
+     "ratio": 1.308,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "intersection": 118,
+     "interiorPx": 118,
+     "rimPx": 105,
+     "interiorShare": 0.5291,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 105,
+     "ratioSymmetricDifference": 0.616
+    },
+    "angry|fast": {
+     "changed": 218,
+     "soloA": 217,
+     "soloB": 108,
+     "ratio": 1.342,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "intersection": 106,
+     "interiorPx": 105,
+     "rimPx": 113,
+     "interiorShare": 0.4817,
+     "intersectionRepainted": 0.9906,
+     "symmetricDifference": 113,
+     "ratioSymmetricDifference": 0.695
+    },
+    "angry|flying": {
+     "changed": 246,
+     "soloA": 217,
+     "soloB": 58,
+     "ratio": 1.789,
+     "bboxGL": [
+      251,
+      245,
+      14,
+      31
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 217,
+     "interiorShare": 0.1179,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 217,
+     "ratioSymmetricDifference": 1.578
+    },
+    "angry|hive": {
+     "changed": 1401,
+     "soloA": 217,
+     "soloB": 1347,
+     "ratio": 1.792,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 163,
+     "interiorPx": 163,
+     "rimPx": 1238,
+     "interiorShare": 0.1163,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1238,
+     "ratioSymmetricDifference": 1.583
+    },
+    "angry|normal": {
+     "changed": 221,
+     "soloA": 217,
+     "soloB": 124,
+     "ratio": 1.296,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "intersection": 118,
+     "interiorPx": 116,
+     "rimPx": 105,
+     "interiorShare": 0.5249,
+     "intersectionRepainted": 0.9831,
+     "symmetricDifference": 105,
+     "ratioSymmetricDifference": 0.616
+    },
+    "angry|shielded": {
+     "changed": 280,
+     "soloA": 217,
+     "soloB": 227,
+     "ratio": 1.261,
+     "bboxGL": [
+      253,
+      245,
+      15,
+      29
+     ],
+     "intersection": 157,
+     "interiorPx": 150,
+     "rimPx": 130,
+     "interiorShare": 0.5357,
+     "intersectionRepainted": 0.9554,
+     "symmetricDifference": 130,
+     "ratioSymmetricDifference": 0.586
+    },
+    "angry|slow": {
+     "changed": 263,
+     "soloA": 217,
+     "soloB": 186,
+     "ratio": 1.305,
+     "bboxGL": [
+      253,
+      245,
+      15,
+      28
+     ],
+     "intersection": 139,
+     "interiorPx": 138,
+     "rimPx": 125,
+     "interiorShare": 0.5247,
+     "intersectionRepainted": 0.9928,
+     "symmetricDifference": 125,
+     "ratioSymmetricDifference": 0.62
+    },
+    "angry|swarm": {
+     "changed": 224,
+     "soloA": 217,
+     "soloB": 48,
+     "ratio": 1.691,
+     "bboxGL": [
+      253,
+      245,
+      13,
+      28
+     ],
+     "intersection": 41,
+     "interiorPx": 41,
+     "rimPx": 183,
+     "interiorShare": 0.183,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 183,
+     "ratioSymmetricDifference": 1.381
+    },
+    "armored|brute": {
+     "changed": 1143,
+     "soloA": 145,
+     "soloB": 1143,
+     "ratio": 1.775,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 145,
+     "interiorPx": 145,
+     "rimPx": 998,
+     "interiorShare": 0.1269,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 998,
+     "ratioSymmetricDifference": 1.55
+    },
+    "armored|camo_normal": {
+     "changed": 145,
+     "soloA": 145,
+     "soloB": 124,
+     "ratio": 1.078,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 124,
+     "interiorPx": 124,
+     "rimPx": 21,
+     "interiorShare": 0.8552,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 21,
+     "ratioSymmetricDifference": 0.156
+    },
+    "armored|fast": {
+     "changed": 136,
+     "soloA": 145,
+     "soloB": 108,
+     "ratio": 1.075,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 107,
+     "interiorPx": 97,
+     "rimPx": 39,
+     "interiorShare": 0.7132,
+     "intersectionRepainted": 0.9065,
+     "symmetricDifference": 39,
+     "ratioSymmetricDifference": 0.308
+    },
+    "armored|flying": {
+     "changed": 193,
+     "soloA": 145,
+     "soloB": 58,
+     "ratio": 1.901,
+     "bboxGL": [
+      251,
+      249,
+      15,
+      27
+     ],
+     "intersection": 10,
+     "interiorPx": 10,
+     "rimPx": 183,
+     "interiorShare": 0.0518,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 183,
+     "ratioSymmetricDifference": 1.803
+    },
+    "armored|hive": {
+     "changed": 1386,
+     "soloA": 145,
+     "soloB": 1347,
+     "ratio": 1.858,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 105,
+     "interiorPx": 104,
+     "rimPx": 1282,
+     "interiorShare": 0.075,
+     "intersectionRepainted": 0.9905,
+     "symmetricDifference": 1282,
+     "ratioSymmetricDifference": 1.718
+    },
+    "armored|normal": {
+     "changed": 133,
+     "soloA": 145,
+     "soloB": 124,
+     "ratio": 0.989,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 124,
+     "interiorPx": 112,
+     "rimPx": 21,
+     "interiorShare": 0.8421,
+     "intersectionRepainted": 0.9032,
+     "symmetricDifference": 21,
+     "ratioSymmetricDifference": 0.156
+    },
+    "armored|shielded": {
+     "changed": 235,
+     "soloA": 145,
+     "soloB": 227,
+     "ratio": 1.263,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "intersection": 136,
+     "interiorPx": 135,
+     "rimPx": 100,
+     "interiorShare": 0.5745,
+     "intersectionRepainted": 0.9926,
+     "symmetricDifference": 100,
+     "ratioSymmetricDifference": 0.538
+    },
+    "armored|slow": {
+     "changed": 196,
+     "soloA": 145,
+     "soloB": 186,
+     "ratio": 1.184,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      21
+     ],
+     "intersection": 129,
+     "interiorPx": 123,
+     "rimPx": 73,
+     "interiorShare": 0.6276,
+     "intersectionRepainted": 0.9535,
+     "symmetricDifference": 73,
+     "ratioSymmetricDifference": 0.441
+    },
+    "armored|swarm": {
+     "changed": 161,
+     "soloA": 145,
+     "soloB": 48,
+     "ratio": 1.668,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "intersection": 32,
+     "interiorPx": 32,
+     "rimPx": 129,
+     "interiorShare": 0.1988,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 129,
+     "ratioSymmetricDifference": 1.337
+    },
+    "brute|camo_normal": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 124,
+     "ratio": 1.804,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 124,
+     "interiorPx": 124,
+     "rimPx": 1019,
+     "interiorShare": 0.1085,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1019,
+     "ratioSymmetricDifference": 1.609
+    },
+    "brute|fast": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 108,
+     "ratio": 1.827,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 108,
+     "interiorPx": 108,
+     "rimPx": 1035,
+     "interiorShare": 0.0945,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1035,
+     "ratioSymmetricDifference": 1.655
+    },
+    "brute|flying": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 58,
+     "ratio": 1.903,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 58,
+     "interiorPx": 58,
+     "rimPx": 1085,
+     "interiorShare": 0.0507,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1085,
+     "ratioSymmetricDifference": 1.807
+    },
+    "brute|hive": {
+     "changed": 1503,
+     "soloA": 1143,
+     "soloB": 1347,
+     "ratio": 1.207,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 971,
+     "interiorPx": 955,
+     "rimPx": 548,
+     "interiorShare": 0.6354,
+     "intersectionRepainted": 0.9835,
+     "symmetricDifference": 548,
+     "ratioSymmetricDifference": 0.44
+    },
+    "brute|normal": {
+     "changed": 1142,
+     "soloA": 1143,
+     "soloB": 124,
+     "ratio": 1.803,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 124,
+     "interiorPx": 123,
+     "rimPx": 1019,
+     "interiorShare": 0.1077,
+     "intersectionRepainted": 0.9919,
+     "symmetricDifference": 1019,
+     "ratioSymmetricDifference": 1.609
+    },
+    "brute|shielded": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 227,
+     "ratio": 1.669,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 227,
+     "interiorPx": 227,
+     "rimPx": 916,
+     "interiorShare": 0.1986,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 916,
+     "ratioSymmetricDifference": 1.337
+    },
+    "brute|slow": {
+     "changed": 1139,
+     "soloA": 1143,
+     "soloB": 186,
+     "ratio": 1.714,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 186,
+     "interiorPx": 182,
+     "rimPx": 957,
+     "interiorShare": 0.1598,
+     "intersectionRepainted": 0.9785,
+     "symmetricDifference": 957,
+     "ratioSymmetricDifference": 1.44
+    },
+    "brute|swarm": {
+     "changed": 1143,
+     "soloA": 1143,
+     "soloB": 48,
+     "ratio": 1.919,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "intersection": 48,
+     "interiorPx": 48,
+     "rimPx": 1095,
+     "interiorShare": 0.042,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1095,
+     "ratioSymmetricDifference": 1.839
+    },
+    "camo_normal|fast": {
+     "changed": 125,
+     "soloA": 124,
+     "soloB": 108,
+     "ratio": 1.078,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "intersection": 107,
+     "interiorPx": 107,
+     "rimPx": 18,
+     "interiorShare": 0.856,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 18,
+     "ratioSymmetricDifference": 0.155
+    },
+    "camo_normal|flying": {
+     "changed": 178,
+     "soloA": 124,
+     "soloB": 58,
+     "ratio": 1.956,
+     "bboxGL": [
+      251,
+      249,
+      14,
+      27
+     ],
+     "intersection": 4,
+     "interiorPx": 4,
+     "rimPx": 174,
+     "interiorShare": 0.0225,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 174,
+     "ratioSymmetricDifference": 1.912
+    },
+    "camo_normal|hive": {
+     "changed": 1385,
+     "soloA": 124,
+     "soloB": 1347,
+     "ratio": 1.883,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 86,
+     "interiorPx": 86,
+     "rimPx": 1299,
+     "interiorShare": 0.0621,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1299,
+     "ratioSymmetricDifference": 1.766
+    },
+    "camo_normal|normal": {
+     "changed": 124,
+     "soloA": 124,
+     "soloB": 124,
+     "ratio": 1,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "intersection": 124,
+     "interiorPx": 124,
+     "rimPx": 0,
+     "interiorShare": 1,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 0,
+     "ratioSymmetricDifference": 0
+    },
+    "camo_normal|shielded": {
+     "changed": 232,
+     "soloA": 124,
+     "soloB": 227,
+     "ratio": 1.322,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "intersection": 119,
+     "interiorPx": 119,
+     "rimPx": 113,
+     "interiorShare": 0.5129,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 113,
+     "ratioSymmetricDifference": 0.644
+    },
+    "camo_normal|slow": {
+     "changed": 194,
+     "soloA": 124,
+     "soloB": 186,
+     "ratio": 1.252,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      20
+     ],
+     "intersection": 116,
+     "interiorPx": 116,
+     "rimPx": 78,
+     "interiorShare": 0.5979,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 0.503
+    },
+    "camo_normal|swarm": {
+     "changed": 143,
+     "soloA": 124,
+     "soloB": 48,
+     "ratio": 1.663,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      20
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 114,
+     "interiorShare": 0.2028,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 114,
+     "ratioSymmetricDifference": 1.326
+    },
+    "fast|flying": {
+     "changed": 163,
+     "soloA": 108,
+     "soloB": 58,
+     "ratio": 1.964,
+     "bboxGL": [
+      251,
+      249,
+      13,
+      27
+     ],
+     "intersection": 3,
+     "interiorPx": 3,
+     "rimPx": 160,
+     "interiorShare": 0.0184,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 160,
+     "ratioSymmetricDifference": 1.928
+    },
+    "fast|hive": {
+     "changed": 1383,
+     "soloA": 108,
+     "soloB": 1347,
+     "ratio": 1.901,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 72,
+     "interiorPx": 72,
+     "rimPx": 1311,
+     "interiorShare": 0.0521,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1311,
+     "ratioSymmetricDifference": 1.802
+    },
+    "fast|normal": {
+     "changed": 79,
+     "soloA": 108,
+     "soloB": 124,
+     "ratio": 0.681,
+     "bboxGL": [
+      255,
+      252,
+      10,
+      17
+     ],
+     "intersection": 107,
+     "interiorPx": 61,
+     "rimPx": 18,
+     "interiorShare": 0.7722,
+     "intersectionRepainted": 0.5701,
+     "symmetricDifference": 18,
+     "ratioSymmetricDifference": 0.155
+    },
+    "fast|shielded": {
+     "changed": 225,
+     "soloA": 108,
+     "soloB": 227,
+     "ratio": 1.343,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "intersection": 107,
+     "interiorPx": 104,
+     "rimPx": 121,
+     "interiorShare": 0.4622,
+     "intersectionRepainted": 0.972,
+     "symmetricDifference": 121,
+     "ratioSymmetricDifference": 0.722
+    },
+    "fast|slow": {
+     "changed": 178,
+     "soloA": 108,
+     "soloB": 186,
+     "ratio": 1.211,
+     "bboxGL": [
+      253,
+      251,
+      15,
+      16
+     ],
+     "intersection": 104,
+     "interiorPx": 92,
+     "rimPx": 86,
+     "interiorShare": 0.5169,
+     "intersectionRepainted": 0.8846,
+     "symmetricDifference": 86,
+     "ratioSymmetricDifference": 0.585
+    },
+    "fast|swarm": {
+     "changed": 127,
+     "soloA": 108,
+     "soloB": 48,
+     "ratio": 1.628,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      18
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 98,
+     "interiorShare": 0.2283,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 98,
+     "ratioSymmetricDifference": 1.256
+    },
+    "flying|hive": {
+     "changed": 1347,
+     "soloA": 58,
+     "soloB": 1347,
+     "ratio": 1.917,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 58,
+     "interiorPx": 58,
+     "rimPx": 1289,
+     "interiorShare": 0.0431,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1289,
+     "ratioSymmetricDifference": 1.835
+    },
+    "flying|normal": {
+     "changed": 178,
+     "soloA": 58,
+     "soloB": 124,
+     "ratio": 1.956,
+     "bboxGL": [
+      251,
+      249,
+      14,
+      27
+     ],
+     "intersection": 4,
+     "interiorPx": 4,
+     "rimPx": 174,
+     "interiorShare": 0.0225,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 174,
+     "ratioSymmetricDifference": 1.912
+    },
+    "flying|shielded": {
+     "changed": 254,
+     "soloA": 58,
+     "soloB": 227,
+     "ratio": 1.782,
+     "bboxGL": [
+      251,
+      249,
+      17,
+      27
+     ],
+     "intersection": 31,
+     "interiorPx": 31,
+     "rimPx": 223,
+     "interiorShare": 0.122,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 223,
+     "ratioSymmetricDifference": 1.565
+    },
+    "flying|slow": {
+     "changed": 242,
+     "soloA": 58,
+     "soloB": 186,
+     "ratio": 1.984,
+     "bboxGL": [
+      251,
+      249,
+      17,
+      27
+     ],
+     "intersection": 2,
+     "interiorPx": 2,
+     "rimPx": 240,
+     "interiorShare": 0.0083,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 240,
+     "ratioSymmetricDifference": 1.967
+    },
+    "flying|swarm": {
+     "changed": 106,
+     "soloA": 58,
+     "soloB": 48,
+     "ratio": 2,
+     "bboxGL": [
+      251,
+      249,
+      15,
+      27
+     ],
+     "intersection": 0,
+     "interiorPx": 0,
+     "rimPx": 106,
+     "interiorShare": 0,
+     "intersectionRepainted": 0,
+     "symmetricDifference": 106,
+     "ratioSymmetricDifference": 2
+    },
+    "hive|normal": {
+     "changed": 1385,
+     "soloA": 1347,
+     "soloB": 124,
+     "ratio": 1.883,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 86,
+     "interiorPx": 86,
+     "rimPx": 1299,
+     "interiorShare": 0.0621,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1299,
+     "ratioSymmetricDifference": 1.766
+    },
+    "hive|shielded": {
+     "changed": 1387,
+     "soloA": 1347,
+     "soloB": 227,
+     "ratio": 1.762,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 187,
+     "interiorPx": 187,
+     "rimPx": 1200,
+     "interiorShare": 0.1348,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1200,
+     "ratioSymmetricDifference": 1.525
+    },
+    "hive|slow": {
+     "changed": 1393,
+     "soloA": 1347,
+     "soloB": 186,
+     "ratio": 1.817,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 140,
+     "interiorPx": 140,
+     "rimPx": 1253,
+     "interiorShare": 0.1005,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1253,
+     "ratioSymmetricDifference": 1.635
+    },
+    "hive|swarm": {
+     "changed": 1380,
+     "soloA": 1347,
+     "soloB": 48,
+     "ratio": 1.978,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "intersection": 15,
+     "interiorPx": 15,
+     "rimPx": 1365,
+     "interiorShare": 0.0109,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1365,
+     "ratioSymmetricDifference": 1.957
+    },
+    "normal|shielded": {
+     "changed": 228,
+     "soloA": 124,
+     "soloB": 227,
+     "ratio": 1.299,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "intersection": 119,
+     "interiorPx": 115,
+     "rimPx": 113,
+     "interiorShare": 0.5044,
+     "intersectionRepainted": 0.9664,
+     "symmetricDifference": 113,
+     "ratioSymmetricDifference": 0.644
+    },
+    "normal|slow": {
+     "changed": 184,
+     "soloA": 124,
+     "soloB": 186,
+     "ratio": 1.187,
+     "bboxGL": [
+      253,
+      251,
+      15,
+      18
+     ],
+     "intersection": 116,
+     "interiorPx": 106,
+     "rimPx": 78,
+     "interiorShare": 0.5761,
+     "intersectionRepainted": 0.9138,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 0.503
+    },
+    "normal|swarm": {
+     "changed": 143,
+     "soloA": 124,
+     "soloB": 48,
+     "ratio": 1.663,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      20
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 114,
+     "interiorShare": 0.2028,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 114,
+     "ratioSymmetricDifference": 1.326
+    },
+    "shielded|slow": {
+     "changed": 257,
+     "soloA": 227,
+     "soloB": 186,
+     "ratio": 1.245,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      25
+     ],
+     "intersection": 149,
+     "interiorPx": 142,
+     "rimPx": 115,
+     "interiorShare": 0.5525,
+     "intersectionRepainted": 0.953,
+     "symmetricDifference": 115,
+     "ratioSymmetricDifference": 0.557
+    },
+    "shielded|swarm": {
+     "changed": 240,
+     "soloA": 227,
+     "soloB": 48,
+     "ratio": 1.745,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "intersection": 35,
+     "interiorPx": 35,
+     "rimPx": 205,
+     "interiorShare": 0.1458,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 205,
+     "ratioSymmetricDifference": 1.491
+    },
+    "slow|swarm": {
+     "changed": 186,
+     "soloA": 186,
+     "soloB": 48,
+     "ratio": 1.59,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      17
+     ],
+     "intersection": 48,
+     "interiorPx": 48,
+     "rimPx": 138,
+     "interiorShare": 0.2581,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 138,
+     "ratioSymmetricDifference": 1.179
+    }
+   },
+   "pairCount": 55,
+   "seconds": 35.4
+  },
+  "three-quarter": {
+   "yaw": -0.8707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -0.8707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 1870,
+   "spotScore": 1,
+   "guard": {
+    "angry": {
+     "atSpot": 279,
+     "ownBest": 279,
+     "ratio": 1,
+     "fill": 0.528
+    },
+    "armored": {
+     "atSpot": 187,
+     "ownBest": 187,
+     "ratio": 1,
+     "fill": 0.499
+    },
+    "brute": {
+     "atSpot": 1593,
+     "ownBest": 1593,
+     "ratio": 1,
+     "fill": 0.692
+    },
+    "camo_normal": {
+     "atSpot": 168,
+     "ownBest": 168,
+     "ratio": 1,
+     "fill": 0.583
+    },
+    "fast": {
+     "atSpot": 141,
+     "ownBest": 141,
+     "ratio": 1,
+     "fill": 0.61
+    },
+    "flying": {
+     "atSpot": 78,
+     "ownBest": 78,
+     "ratio": 1,
+     "fill": 0.4
+    },
+    "hive": {
+     "atSpot": 1823,
+     "ownBest": 1823,
+     "ratio": 1,
+     "fill": 0.556
+    },
+    "normal": {
+     "atSpot": 167,
+     "ownBest": 167,
+     "ratio": 1,
+     "fill": 0.58
+    },
+    "shielded": {
+     "atSpot": 297,
+     "ownBest": 297,
+     "ratio": 1,
+     "fill": 0.624
+    },
+    "slow": {
+     "atSpot": 231,
+     "ownBest": 231,
+     "ratio": 1,
+     "fill": 0.611
+    },
+    "swarm": {
+     "atSpot": 63,
+     "ownBest": 63,
+     "ratio": 1,
+     "fill": 0.636
+    }
+   },
+   "sameYaw": true,
+   "yaws": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "inRunNull": 0,
+   "place": {
+    "angry": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 13.75,
+     "yaw": 0,
+     "walk": 624,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 279,
+     "bboxGL": [
+      817,
+      113,
+      16,
+      33
+     ],
+     "isFlying": false
+    },
+    "armored": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11.55,
+     "yaw": 0,
+     "walk": 496,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 187,
+     "bboxGL": [
+      819,
+      117,
+      15,
+      25
+     ],
+     "isFlying": false
+    },
+    "brute": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 16.5,
+     "yaw": 0,
+     "walk": 352,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1593,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "isFlying": false
+    },
+    "camo_normal": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 168,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "isFlying": false
+    },
+    "fast": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 141,
+     "bboxGL": [
+      820,
+      117,
+      11,
+      21
+     ],
+     "isFlying": false
+    },
+    "flying": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 9.35,
+     "yaw": 0,
+     "walk": 0,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 78,
+     "bboxGL": [
+      820,
+      133,
+      15,
+      13
+     ],
+     "isFlying": true
+    },
+    "hive": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 17.6,
+     "yaw": 0,
+     "walk": 328,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1823,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "isFlying": false
+    },
+    "normal": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 167,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "isFlying": false
+    },
+    "shielded": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 12.649999999999999,
+     "yaw": 0,
+     "walk": 456,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 297,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "isFlying": false
+    },
+    "slow": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 231,
+     "bboxGL": [
+      817,
+      117,
+      18,
+      21
+     ],
+     "isFlying": false
+    },
+    "swarm": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 6.050000000000001,
+     "yaw": 0,
+     "walk": 952,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 63,
+     "bboxGL": [
+      820,
+      118,
+      11,
+      9
+     ],
+     "isFlying": false
+    }
+   },
+   "pairs": {
+    "angry|armored": {
+     "changed": 301,
+     "soloA": 279,
+     "soloB": 187,
+     "ratio": 1.292,
+     "bboxGL": [
+      817,
+      113,
+      17,
+      33
+     ],
+     "intersection": 162,
+     "interiorPx": 159,
+     "rimPx": 142,
+     "interiorShare": 0.5282,
+     "intersectionRepainted": 0.9815,
+     "symmetricDifference": 142,
+     "ratioSymmetricDifference": 0.609
+    },
+    "angry|brute": {
+     "changed": 1592,
+     "soloA": 279,
+     "soloB": 1593,
+     "ratio": 1.701,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 279,
+     "interiorPx": 278,
+     "rimPx": 1314,
+     "interiorShare": 0.1746,
+     "intersectionRepainted": 0.9964,
+     "symmetricDifference": 1314,
+     "ratioSymmetricDifference": 1.404
+    },
+    "angry|camo_normal": {
+     "changed": 291,
+     "soloA": 279,
+     "soloB": 168,
+     "ratio": 1.302,
+     "bboxGL": [
+      817,
+      113,
+      16,
+      33
+     ],
+     "intersection": 156,
+     "interiorPx": 156,
+     "rimPx": 135,
+     "interiorShare": 0.5361,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 135,
+     "ratioSymmetricDifference": 0.604
+    },
+    "angry|fast": {
+     "changed": 273,
+     "soloA": 279,
+     "soloB": 141,
+     "ratio": 1.3,
+     "bboxGL": [
+      817,
+      113,
+      16,
+      33
+     ],
+     "intersection": 141,
+     "interiorPx": 135,
+     "rimPx": 138,
+     "interiorShare": 0.4945,
+     "intersectionRepainted": 0.9574,
+     "symmetricDifference": 138,
+     "ratioSymmetricDifference": 0.657
+    },
+    "angry|flying": {
+     "changed": 319,
+     "soloA": 279,
+     "soloB": 78,
+     "ratio": 1.787,
+     "bboxGL": [
+      817,
+      113,
+      18,
+      33
+     ],
+     "intersection": 38,
+     "interiorPx": 38,
+     "rimPx": 281,
+     "interiorShare": 0.1191,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 281,
+     "ratioSymmetricDifference": 1.574
+    },
+    "angry|hive": {
+     "changed": 1887,
+     "soloA": 279,
+     "soloB": 1823,
+     "ratio": 1.795,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 214,
+     "interiorPx": 213,
+     "rimPx": 1674,
+     "interiorShare": 0.1129,
+     "intersectionRepainted": 0.9953,
+     "symmetricDifference": 1674,
+     "ratioSymmetricDifference": 1.593
+    },
+    "angry|normal": {
+     "changed": 286,
+     "soloA": 279,
+     "soloB": 167,
+     "ratio": 1.283,
+     "bboxGL": [
+      817,
+      113,
+      16,
+      33
+     ],
+     "intersection": 156,
+     "interiorPx": 152,
+     "rimPx": 134,
+     "interiorShare": 0.5315,
+     "intersectionRepainted": 0.9744,
+     "symmetricDifference": 134,
+     "ratioSymmetricDifference": 0.601
+    },
+    "angry|shielded": {
+     "changed": 364,
+     "soloA": 279,
+     "soloB": 297,
+     "ratio": 1.264,
+     "bboxGL": [
+      817,
+      113,
+      19,
+      33
+     ],
+     "intersection": 203,
+     "interiorPx": 194,
+     "rimPx": 170,
+     "interiorShare": 0.533,
+     "intersectionRepainted": 0.9557,
+     "symmetricDifference": 170,
+     "ratioSymmetricDifference": 0.59
+    },
+    "angry|slow": {
+     "changed": 331,
+     "soloA": 279,
+     "soloB": 231,
+     "ratio": 1.298,
+     "bboxGL": [
+      817,
+      113,
+      18,
+      33
+     ],
+     "intersection": 175,
+     "interiorPx": 171,
+     "rimPx": 160,
+     "interiorShare": 0.5166,
+     "intersectionRepainted": 0.9771,
+     "symmetricDifference": 160,
+     "ratioSymmetricDifference": 0.627
+    },
+    "angry|swarm": {
+     "changed": 288,
+     "soloA": 279,
+     "soloB": 63,
+     "ratio": 1.684,
+     "bboxGL": [
+      817,
+      113,
+      16,
+      33
+     ],
+     "intersection": 54,
+     "interiorPx": 54,
+     "rimPx": 234,
+     "interiorShare": 0.1875,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 234,
+     "ratioSymmetricDifference": 1.368
+    },
+    "armored|brute": {
+     "changed": 1593,
+     "soloA": 187,
+     "soloB": 1593,
+     "ratio": 1.79,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 187,
+     "interiorPx": 187,
+     "rimPx": 1406,
+     "interiorShare": 0.1174,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1406,
+     "ratioSymmetricDifference": 1.58
+    },
+    "armored|camo_normal": {
+     "changed": 190,
+     "soloA": 187,
+     "soloB": 168,
+     "ratio": 1.07,
+     "bboxGL": [
+      819,
+      117,
+      15,
+      25
+     ],
+     "intersection": 165,
+     "interiorPx": 165,
+     "rimPx": 25,
+     "interiorShare": 0.8684,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 25,
+     "ratioSymmetricDifference": 0.141
+    },
+    "armored|fast": {
+     "changed": 176,
+     "soloA": 187,
+     "soloB": 141,
+     "ratio": 1.073,
+     "bboxGL": [
+      819,
+      118,
+      15,
+      24
+     ],
+     "intersection": 138,
+     "interiorPx": 124,
+     "rimPx": 52,
+     "interiorShare": 0.7045,
+     "intersectionRepainted": 0.8986,
+     "symmetricDifference": 52,
+     "ratioSymmetricDifference": 0.317
+    },
+    "armored|flying": {
+     "changed": 250,
+     "soloA": 187,
+     "soloB": 78,
+     "ratio": 1.887,
+     "bboxGL": [
+      819,
+      117,
+      16,
+      29
+     ],
+     "intersection": 15,
+     "interiorPx": 15,
+     "rimPx": 235,
+     "interiorShare": 0.06,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 235,
+     "ratioSymmetricDifference": 1.774
+    },
+    "armored|hive": {
+     "changed": 1871,
+     "soloA": 187,
+     "soloB": 1823,
+     "ratio": 1.862,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 139,
+     "interiorPx": 139,
+     "rimPx": 1732,
+     "interiorShare": 0.0743,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1732,
+     "ratioSymmetricDifference": 1.723
+    },
+    "armored|normal": {
+     "changed": 171,
+     "soloA": 187,
+     "soloB": 167,
+     "ratio": 0.966,
+     "bboxGL": [
+      819,
+      118,
+      15,
+      24
+     ],
+     "intersection": 164,
+     "interiorPx": 145,
+     "rimPx": 26,
+     "interiorShare": 0.848,
+     "intersectionRepainted": 0.8841,
+     "symmetricDifference": 26,
+     "ratioSymmetricDifference": 0.147
+    },
+    "armored|shielded": {
+     "changed": 306,
+     "soloA": 187,
+     "soloB": 297,
+     "ratio": 1.264,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "intersection": 174,
+     "interiorPx": 170,
+     "rimPx": 136,
+     "interiorShare": 0.5556,
+     "intersectionRepainted": 0.977,
+     "symmetricDifference": 136,
+     "ratioSymmetricDifference": 0.562
+    },
+    "armored|slow": {
+     "changed": 242,
+     "soloA": 187,
+     "soloB": 231,
+     "ratio": 1.158,
+     "bboxGL": [
+      817,
+      118,
+      18,
+      24
+     ],
+     "intersection": 167,
+     "interiorPx": 158,
+     "rimPx": 84,
+     "interiorShare": 0.6529,
+     "intersectionRepainted": 0.9461,
+     "symmetricDifference": 84,
+     "ratioSymmetricDifference": 0.402
+    },
+    "armored|swarm": {
+     "changed": 203,
+     "soloA": 187,
+     "soloB": 63,
+     "ratio": 1.624,
+     "bboxGL": [
+      819,
+      117,
+      15,
+      25
+     ],
+     "intersection": 47,
+     "interiorPx": 47,
+     "rimPx": 156,
+     "interiorShare": 0.2315,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 156,
+     "ratioSymmetricDifference": 1.248
+    },
+    "brute|camo_normal": {
+     "changed": 1593,
+     "soloA": 1593,
+     "soloB": 168,
+     "ratio": 1.809,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 168,
+     "interiorPx": 168,
+     "rimPx": 1425,
+     "interiorShare": 0.1055,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1425,
+     "ratioSymmetricDifference": 1.618
+    },
+    "brute|fast": {
+     "changed": 1593,
+     "soloA": 1593,
+     "soloB": 141,
+     "ratio": 1.837,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 141,
+     "interiorPx": 141,
+     "rimPx": 1452,
+     "interiorShare": 0.0885,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1452,
+     "ratioSymmetricDifference": 1.675
+    },
+    "brute|flying": {
+     "changed": 1593,
+     "soloA": 1593,
+     "soloB": 78,
+     "ratio": 1.907,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 78,
+     "interiorPx": 78,
+     "rimPx": 1515,
+     "interiorShare": 0.049,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1515,
+     "ratioSymmetricDifference": 1.813
+    },
+    "brute|hive": {
+     "changed": 2063,
+     "soloA": 1593,
+     "soloB": 1823,
+     "ratio": 1.208,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 1328,
+     "interiorPx": 1303,
+     "rimPx": 760,
+     "interiorShare": 0.6316,
+     "intersectionRepainted": 0.9812,
+     "symmetricDifference": 760,
+     "ratioSymmetricDifference": 0.445
+    },
+    "brute|normal": {
+     "changed": 1592,
+     "soloA": 1593,
+     "soloB": 167,
+     "ratio": 1.809,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 167,
+     "interiorPx": 166,
+     "rimPx": 1426,
+     "interiorShare": 0.1043,
+     "intersectionRepainted": 0.994,
+     "symmetricDifference": 1426,
+     "ratioSymmetricDifference": 1.62
+    },
+    "brute|shielded": {
+     "changed": 1592,
+     "soloA": 1593,
+     "soloB": 297,
+     "ratio": 1.685,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 297,
+     "interiorPx": 296,
+     "rimPx": 1296,
+     "interiorShare": 0.1859,
+     "intersectionRepainted": 0.9966,
+     "symmetricDifference": 1296,
+     "ratioSymmetricDifference": 1.371
+    },
+    "brute|slow": {
+     "changed": 1592,
+     "soloA": 1593,
+     "soloB": 231,
+     "ratio": 1.746,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 231,
+     "interiorPx": 230,
+     "rimPx": 1362,
+     "interiorShare": 0.1445,
+     "intersectionRepainted": 0.9957,
+     "symmetricDifference": 1362,
+     "ratioSymmetricDifference": 1.493
+    },
+    "brute|swarm": {
+     "changed": 1593,
+     "soloA": 1593,
+     "soloB": 63,
+     "ratio": 1.924,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "intersection": 63,
+     "interiorPx": 63,
+     "rimPx": 1530,
+     "interiorShare": 0.0395,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1530,
+     "ratioSymmetricDifference": 1.848
+    },
+    "camo_normal|fast": {
+     "changed": 169,
+     "soloA": 168,
+     "soloB": 141,
+     "ratio": 1.094,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "intersection": 139,
+     "interiorPx": 138,
+     "rimPx": 31,
+     "interiorShare": 0.8166,
+     "intersectionRepainted": 0.9928,
+     "symmetricDifference": 31,
+     "ratioSymmetricDifference": 0.201
+    },
+    "camo_normal|flying": {
+     "changed": 238,
+     "soloA": 168,
+     "soloB": 78,
+     "ratio": 1.935,
+     "bboxGL": [
+      820,
+      117,
+      15,
+      29
+     ],
+     "intersection": 8,
+     "interiorPx": 8,
+     "rimPx": 230,
+     "interiorShare": 0.0336,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 230,
+     "ratioSymmetricDifference": 1.87
+    },
+    "camo_normal|hive": {
+     "changed": 1871,
+     "soloA": 168,
+     "soloB": 1823,
+     "ratio": 1.879,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 120,
+     "interiorPx": 120,
+     "rimPx": 1751,
+     "interiorShare": 0.0641,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1751,
+     "ratioSymmetricDifference": 1.759
+    },
+    "camo_normal|normal": {
+     "changed": 168,
+     "soloA": 168,
+     "soloB": 167,
+     "ratio": 1.003,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "intersection": 167,
+     "interiorPx": 167,
+     "rimPx": 1,
+     "interiorShare": 0.994,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1,
+     "ratioSymmetricDifference": 0.006
+    },
+    "camo_normal|shielded": {
+     "changed": 305,
+     "soloA": 168,
+     "soloB": 297,
+     "ratio": 1.312,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "intersection": 160,
+     "interiorPx": 160,
+     "rimPx": 145,
+     "interiorShare": 0.5246,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 145,
+     "ratioSymmetricDifference": 0.624
+    },
+    "camo_normal|slow": {
+     "changed": 243,
+     "soloA": 168,
+     "soloB": 231,
+     "ratio": 1.218,
+     "bboxGL": [
+      817,
+      117,
+      18,
+      24
+     ],
+     "intersection": 156,
+     "interiorPx": 156,
+     "rimPx": 87,
+     "interiorShare": 0.642,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 87,
+     "ratioSymmetricDifference": 0.436
+    },
+    "camo_normal|swarm": {
+     "changed": 186,
+     "soloA": 168,
+     "soloB": 63,
+     "ratio": 1.61,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "intersection": 45,
+     "interiorPx": 45,
+     "rimPx": 141,
+     "interiorShare": 0.2419,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 141,
+     "ratioSymmetricDifference": 1.221
+    },
+    "fast|flying": {
+     "changed": 214,
+     "soloA": 141,
+     "soloB": 78,
+     "ratio": 1.954,
+     "bboxGL": [
+      820,
+      117,
+      15,
+      29
+     ],
+     "intersection": 5,
+     "interiorPx": 5,
+     "rimPx": 209,
+     "interiorShare": 0.0234,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 209,
+     "ratioSymmetricDifference": 1.909
+    },
+    "fast|hive": {
+     "changed": 1868,
+     "soloA": 141,
+     "soloB": 1823,
+     "ratio": 1.902,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 96,
+     "interiorPx": 96,
+     "rimPx": 1772,
+     "interiorShare": 0.0514,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1772,
+     "ratioSymmetricDifference": 1.804
+    },
+    "fast|normal": {
+     "changed": 108,
+     "soloA": 141,
+     "soloB": 167,
+     "ratio": 0.701,
+     "bboxGL": [
+      820,
+      121,
+      12,
+      20
+     ],
+     "intersection": 139,
+     "interiorPx": 78,
+     "rimPx": 30,
+     "interiorShare": 0.7222,
+     "intersectionRepainted": 0.5612,
+     "symmetricDifference": 30,
+     "ratioSymmetricDifference": 0.195
+    },
+    "fast|shielded": {
+     "changed": 287,
+     "soloA": 141,
+     "soloB": 297,
+     "ratio": 1.311,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "intersection": 140,
+     "interiorPx": 129,
+     "rimPx": 158,
+     "interiorShare": 0.4495,
+     "intersectionRepainted": 0.9214,
+     "symmetricDifference": 158,
+     "ratioSymmetricDifference": 0.721
+    },
+    "fast|slow": {
+     "changed": 223,
+     "soloA": 141,
+     "soloB": 231,
+     "ratio": 1.199,
+     "bboxGL": [
+      817,
+      119,
+      18,
+      19
+     ],
+     "intersection": 135,
+     "interiorPx": 121,
+     "rimPx": 102,
+     "interiorShare": 0.5426,
+     "intersectionRepainted": 0.8963,
+     "symmetricDifference": 102,
+     "ratioSymmetricDifference": 0.548
+    },
+    "fast|swarm": {
+     "changed": 163,
+     "soloA": 141,
+     "soloB": 63,
+     "ratio": 1.598,
+     "bboxGL": [
+      820,
+      117,
+      11,
+      21
+     ],
+     "intersection": 41,
+     "interiorPx": 41,
+     "rimPx": 122,
+     "interiorShare": 0.2515,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 122,
+     "ratioSymmetricDifference": 1.196
+    },
+    "flying|hive": {
+     "changed": 1823,
+     "soloA": 78,
+     "soloB": 1823,
+     "ratio": 1.918,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 78,
+     "interiorPx": 78,
+     "rimPx": 1745,
+     "interiorShare": 0.0428,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1745,
+     "ratioSymmetricDifference": 1.836
+    },
+    "flying|normal": {
+     "changed": 237,
+     "soloA": 78,
+     "soloB": 167,
+     "ratio": 1.935,
+     "bboxGL": [
+      820,
+      117,
+      15,
+      29
+     ],
+     "intersection": 8,
+     "interiorPx": 8,
+     "rimPx": 229,
+     "interiorShare": 0.0338,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 229,
+     "ratioSymmetricDifference": 1.869
+    },
+    "flying|shielded": {
+     "changed": 329,
+     "soloA": 78,
+     "soloB": 297,
+     "ratio": 1.755,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      29
+     ],
+     "intersection": 46,
+     "interiorPx": 46,
+     "rimPx": 283,
+     "interiorShare": 0.1398,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 283,
+     "ratioSymmetricDifference": 1.509
+    },
+    "flying|slow": {
+     "changed": 307,
+     "soloA": 78,
+     "soloB": 231,
+     "ratio": 1.987,
+     "bboxGL": [
+      817,
+      117,
+      18,
+      29
+     ],
+     "intersection": 2,
+     "interiorPx": 2,
+     "rimPx": 305,
+     "interiorShare": 0.0065,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 305,
+     "ratioSymmetricDifference": 1.974
+    },
+    "flying|swarm": {
+     "changed": 141,
+     "soloA": 78,
+     "soloB": 63,
+     "ratio": 2,
+     "bboxGL": [
+      820,
+      118,
+      15,
+      28
+     ],
+     "intersection": 0,
+     "interiorPx": 0,
+     "rimPx": 141,
+     "interiorShare": 0,
+     "intersectionRepainted": 0,
+     "symmetricDifference": 141,
+     "ratioSymmetricDifference": 2
+    },
+    "hive|normal": {
+     "changed": 1871,
+     "soloA": 1823,
+     "soloB": 167,
+     "ratio": 1.88,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 119,
+     "interiorPx": 119,
+     "rimPx": 1752,
+     "interiorShare": 0.0636,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1752,
+     "ratioSymmetricDifference": 1.761
+    },
+    "hive|shielded": {
+     "changed": 1871,
+     "soloA": 1823,
+     "soloB": 297,
+     "ratio": 1.765,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 249,
+     "interiorPx": 249,
+     "rimPx": 1622,
+     "interiorShare": 0.1331,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1622,
+     "ratioSymmetricDifference": 1.53
+    },
+    "hive|slow": {
+     "changed": 1875,
+     "soloA": 1823,
+     "soloB": 231,
+     "ratio": 1.826,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 179,
+     "interiorPx": 179,
+     "rimPx": 1696,
+     "interiorShare": 0.0955,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1696,
+     "ratioSymmetricDifference": 1.651
+    },
+    "hive|swarm": {
+     "changed": 1863,
+     "soloA": 1823,
+     "soloB": 63,
+     "ratio": 1.976,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "intersection": 23,
+     "interiorPx": 23,
+     "rimPx": 1840,
+     "interiorShare": 0.0123,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1840,
+     "ratioSymmetricDifference": 1.951
+    },
+    "normal|shielded": {
+     "changed": 299,
+     "soloA": 167,
+     "soloB": 297,
+     "ratio": 1.289,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "intersection": 159,
+     "interiorPx": 153,
+     "rimPx": 146,
+     "interiorShare": 0.5117,
+     "intersectionRepainted": 0.9623,
+     "symmetricDifference": 146,
+     "ratioSymmetricDifference": 0.629
+    },
+    "normal|slow": {
+     "changed": 230,
+     "soloA": 167,
+     "soloB": 231,
+     "ratio": 1.156,
+     "bboxGL": [
+      817,
+      119,
+      18,
+      22
+     ],
+     "intersection": 155,
+     "interiorPx": 142,
+     "rimPx": 88,
+     "interiorShare": 0.6174,
+     "intersectionRepainted": 0.9161,
+     "symmetricDifference": 88,
+     "ratioSymmetricDifference": 0.442
+    },
+    "normal|swarm": {
+     "changed": 185,
+     "soloA": 167,
+     "soloB": 63,
+     "ratio": 1.609,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "intersection": 45,
+     "interiorPx": 45,
+     "rimPx": 140,
+     "interiorShare": 0.2432,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 140,
+     "ratioSymmetricDifference": 1.217
+    },
+    "shielded|slow": {
+     "changed": 331,
+     "soloA": 297,
+     "soloB": 231,
+     "ratio": 1.254,
+     "bboxGL": [
+      817,
+      117,
+      19,
+      28
+     ],
+     "intersection": 190,
+     "interiorPx": 183,
+     "rimPx": 148,
+     "interiorShare": 0.5529,
+     "intersectionRepainted": 0.9632,
+     "symmetricDifference": 148,
+     "ratioSymmetricDifference": 0.561
+    },
+    "shielded|swarm": {
+     "changed": 312,
+     "soloA": 297,
+     "soloB": 63,
+     "ratio": 1.733,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "intersection": 48,
+     "interiorPx": 48,
+     "rimPx": 264,
+     "interiorShare": 0.1538,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 264,
+     "ratioSymmetricDifference": 1.467
+    },
+    "slow|swarm": {
+     "changed": 231,
+     "soloA": 231,
+     "soloB": 63,
+     "ratio": 1.571,
+     "bboxGL": [
+      817,
+      117,
+      18,
+      21
+     ],
+     "intersection": 63,
+     "interiorPx": 63,
+     "rimPx": 168,
+     "interiorShare": 0.2727,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 168,
+     "ratioSymmetricDifference": 1.143
+    }
+   },
+   "pairCount": 55,
+   "seconds": 34.3
+  },
+  "broadside": {
+   "yaw": 0,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": 0,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 1870,
+   "spotScore": 1,
+   "guard": {
+    "angry": {
+     "atSpot": 355,
+     "ownBest": 355,
+     "ratio": 1,
+     "fill": 0.573
+    },
+    "armored": {
+     "atSpot": 211,
+     "ownBest": 211,
+     "ratio": 1,
+     "fill": 0.58
+    },
+    "brute": {
+     "atSpot": 2182,
+     "ownBest": 2182,
+     "ratio": 1,
+     "fill": 0.749
+    },
+    "camo_normal": {
+     "atSpot": 201,
+     "ownBest": 201,
+     "ratio": 1,
+     "fill": 0.618
+    },
+    "fast": {
+     "atSpot": 136,
+     "ownBest": 136,
+     "ratio": 1,
+     "fill": 0.72
+    },
+    "flying": {
+     "atSpot": 82,
+     "ownBest": 82,
+     "ratio": 1,
+     "fill": 0.39
+    },
+    "hive": {
+     "atSpot": 1797,
+     "ownBest": 1797,
+     "ratio": 1,
+     "fill": 0.679
+    },
+    "normal": {
+     "atSpot": 201,
+     "ownBest": 201,
+     "ratio": 1,
+     "fill": 0.618
+    },
+    "shielded": {
+     "atSpot": 219,
+     "ownBest": 219,
+     "ratio": 1,
+     "fill": 0.711
+    },
+    "slow": {
+     "atSpot": 205,
+     "ownBest": 205,
+     "ratio": 1,
+     "fill": 0.686
+    },
+    "swarm": {
+     "atSpot": 49,
+     "ownBest": 49,
+     "ratio": 1,
+     "fill": 0.7
+    }
+   },
+   "sameYaw": true,
+   "yaws": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "inRunNull": 0,
+   "place": {
+    "angry": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 13.75,
+     "yaw": 0,
+     "walk": 624,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 355,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "isFlying": false
+    },
+    "armored": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11.55,
+     "yaw": 0,
+     "walk": 496,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 211,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "isFlying": false
+    },
+    "brute": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 16.5,
+     "yaw": 0,
+     "walk": 352,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 2182,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "isFlying": false
+    },
+    "camo_normal": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 201,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "isFlying": false
+    },
+    "fast": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 136,
+     "bboxGL": [
+      449,
+      57,
+      9,
+      21
+     ],
+     "isFlying": false
+    },
+    "flying": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 9.35,
+     "yaw": 0,
+     "walk": 0,
+     "bucket": 0,
+     "frames": 12,
+     "silhouette": 82,
+     "bboxGL": [
+      444,
+      73,
+      15,
+      14
+     ],
+     "isFlying": true
+    },
+    "hive": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 17.6,
+     "yaw": 0,
+     "walk": 328,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 1797,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "isFlying": false
+    },
+    "normal": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 201,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "isFlying": false
+    },
+    "shielded": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 12.649999999999999,
+     "yaw": 0,
+     "walk": 456,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 219,
+     "bboxGL": [
+      447,
+      57,
+      11,
+      28
+     ],
+     "isFlying": false
+    },
+    "slow": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 11,
+     "yaw": 0,
+     "walk": 520,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 205,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      23
+     ],
+     "isFlying": false
+    },
+    "swarm": {
+     "pos": [
+      1270,
+      220
+     ],
+     "radius": 6.050000000000001,
+     "yaw": 0,
+     "walk": 952,
+     "bucket": 0,
+     "frames": 8,
+     "silhouette": 49,
+     "bboxGL": [
+      449,
+      58,
+      7,
+      10
+     ],
+     "isFlying": false
+    }
+   },
+   "pairs": {
+    "angry|armored": {
+     "changed": 368,
+     "soloA": 355,
+     "soloB": 211,
+     "ratio": 1.3,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 195,
+     "interiorPx": 192,
+     "rimPx": 176,
+     "interiorShare": 0.5217,
+     "intersectionRepainted": 0.9846,
+     "symmetricDifference": 176,
+     "ratioSymmetricDifference": 0.622
+    },
+    "angry|brute": {
+     "changed": 2200,
+     "soloA": 355,
+     "soloB": 2182,
+     "ratio": 1.734,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 336,
+     "interiorPx": 335,
+     "rimPx": 1865,
+     "interiorShare": 0.1523,
+     "intersectionRepainted": 0.997,
+     "symmetricDifference": 1865,
+     "ratioSymmetricDifference": 1.47
+    },
+    "angry|camo_normal": {
+     "changed": 369,
+     "soloA": 355,
+     "soloB": 201,
+     "ratio": 1.327,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 187,
+     "interiorPx": 187,
+     "rimPx": 182,
+     "interiorShare": 0.5068,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 182,
+     "ratioSymmetricDifference": 0.655
+    },
+    "angry|fast": {
+     "changed": 361,
+     "soloA": 355,
+     "soloB": 136,
+     "ratio": 1.47,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 128,
+     "interiorPx": 126,
+     "rimPx": 235,
+     "interiorShare": 0.349,
+     "intersectionRepainted": 0.9844,
+     "symmetricDifference": 235,
+     "ratioSymmetricDifference": 0.957
+    },
+    "angry|flying": {
+     "changed": 382,
+     "soloA": 355,
+     "soloB": 82,
+     "ratio": 1.748,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 55,
+     "interiorPx": 55,
+     "rimPx": 327,
+     "interiorShare": 0.144,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 327,
+     "ratioSymmetricDifference": 1.497
+    },
+    "angry|hive": {
+     "changed": 1826,
+     "soloA": 355,
+     "soloB": 1797,
+     "ratio": 1.697,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 326,
+     "interiorPx": 326,
+     "rimPx": 1500,
+     "interiorShare": 0.1785,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1500,
+     "ratioSymmetricDifference": 1.394
+    },
+    "angry|normal": {
+     "changed": 367,
+     "soloA": 355,
+     "soloB": 201,
+     "ratio": 1.32,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 187,
+     "interiorPx": 185,
+     "rimPx": 182,
+     "interiorShare": 0.5041,
+     "intersectionRepainted": 0.9893,
+     "symmetricDifference": 182,
+     "ratioSymmetricDifference": 0.655
+    },
+    "angry|shielded": {
+     "changed": 365,
+     "soloA": 355,
+     "soloB": 219,
+     "ratio": 1.272,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 196,
+     "interiorPx": 183,
+     "rimPx": 182,
+     "interiorShare": 0.5014,
+     "intersectionRepainted": 0.9337,
+     "symmetricDifference": 182,
+     "ratioSymmetricDifference": 0.634
+    },
+    "angry|slow": {
+     "changed": 375,
+     "soloA": 355,
+     "soloB": 205,
+     "ratio": 1.339,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 184,
+     "interiorPx": 183,
+     "rimPx": 192,
+     "interiorShare": 0.488,
+     "intersectionRepainted": 0.9946,
+     "symmetricDifference": 192,
+     "ratioSymmetricDifference": 0.686
+    },
+    "angry|swarm": {
+     "changed": 373,
+     "soloA": 355,
+     "soloB": 49,
+     "ratio": 1.847,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "intersection": 31,
+     "interiorPx": 31,
+     "rimPx": 342,
+     "interiorShare": 0.0831,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 342,
+     "ratioSymmetricDifference": 1.693
+    },
+    "armored|brute": {
+     "changed": 2200,
+     "soloA": 211,
+     "soloB": 2182,
+     "ratio": 1.839,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 190,
+     "interiorPx": 187,
+     "rimPx": 2013,
+     "interiorShare": 0.085,
+     "intersectionRepainted": 0.9842,
+     "symmetricDifference": 2013,
+     "ratioSymmetricDifference": 1.682
+    },
+    "armored|camo_normal": {
+     "changed": 221,
+     "soloA": 211,
+     "soloB": 201,
+     "ratio": 1.073,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "intersection": 191,
+     "interiorPx": 191,
+     "rimPx": 30,
+     "interiorShare": 0.8643,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 30,
+     "ratioSymmetricDifference": 0.146
+    },
+    "armored|fast": {
+     "changed": 195,
+     "soloA": 211,
+     "soloB": 136,
+     "ratio": 1.124,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "intersection": 135,
+     "interiorPx": 118,
+     "rimPx": 77,
+     "interiorShare": 0.6051,
+     "intersectionRepainted": 0.8741,
+     "symmetricDifference": 77,
+     "ratioSymmetricDifference": 0.444
+    },
+    "armored|flying": {
+     "changed": 264,
+     "soloA": 211,
+     "soloB": 82,
+     "ratio": 1.802,
+     "bboxGL": [
+      444,
+      57,
+      16,
+      30
+     ],
+     "intersection": 29,
+     "interiorPx": 29,
+     "rimPx": 235,
+     "interiorShare": 0.1098,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 235,
+     "ratioSymmetricDifference": 1.604
+    },
+    "armored|hive": {
+     "changed": 1812,
+     "soloA": 211,
+     "soloB": 1797,
+     "ratio": 1.805,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 196,
+     "interiorPx": 196,
+     "rimPx": 1616,
+     "interiorShare": 0.1082,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1616,
+     "ratioSymmetricDifference": 1.61
+    },
+    "armored|normal": {
+     "changed": 198,
+     "soloA": 211,
+     "soloB": 201,
+     "ratio": 0.961,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "intersection": 191,
+     "interiorPx": 168,
+     "rimPx": 30,
+     "interiorShare": 0.8485,
+     "intersectionRepainted": 0.8796,
+     "symmetricDifference": 30,
+     "ratioSymmetricDifference": 0.146
+    },
+    "armored|shielded": {
+     "changed": 242,
+     "soloA": 211,
+     "soloB": 219,
+     "ratio": 1.126,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      28
+     ],
+     "intersection": 182,
+     "interiorPx": 176,
+     "rimPx": 66,
+     "interiorShare": 0.7273,
+     "intersectionRepainted": 0.967,
+     "symmetricDifference": 66,
+     "ratioSymmetricDifference": 0.307
+    },
+    "armored|slow": {
+     "changed": 221,
+     "soloA": 211,
+     "soloB": 205,
+     "ratio": 1.063,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "intersection": 188,
+     "interiorPx": 181,
+     "rimPx": 40,
+     "interiorShare": 0.819,
+     "intersectionRepainted": 0.9628,
+     "symmetricDifference": 40,
+     "ratioSymmetricDifference": 0.192
+    },
+    "armored|swarm": {
+     "changed": 216,
+     "soloA": 211,
+     "soloB": 49,
+     "ratio": 1.662,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "intersection": 44,
+     "interiorPx": 44,
+     "rimPx": 172,
+     "interiorShare": 0.2037,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 172,
+     "ratioSymmetricDifference": 1.323
+    },
+    "brute|camo_normal": {
+     "changed": 2204,
+     "soloA": 2182,
+     "soloB": 201,
+     "ratio": 1.85,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 179,
+     "interiorPx": 179,
+     "rimPx": 2025,
+     "interiorShare": 0.0812,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 2025,
+     "ratioSymmetricDifference": 1.7
+    },
+    "brute|fast": {
+     "changed": 2198,
+     "soloA": 2182,
+     "soloB": 136,
+     "ratio": 1.896,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 114,
+     "interiorPx": 108,
+     "rimPx": 2090,
+     "interiorShare": 0.0491,
+     "intersectionRepainted": 0.9474,
+     "symmetricDifference": 2090,
+     "ratioSymmetricDifference": 1.803
+    },
+    "brute|flying": {
+     "changed": 2182,
+     "soloA": 2182,
+     "soloB": 82,
+     "ratio": 1.928,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 82,
+     "interiorPx": 82,
+     "rimPx": 2100,
+     "interiorShare": 0.0376,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 2100,
+     "ratioSymmetricDifference": 1.855
+    },
+    "brute|hive": {
+     "changed": 2475,
+     "soloA": 2182,
+     "soloB": 1797,
+     "ratio": 1.244,
+     "bboxGL": [
+      426,
+      45,
+      52,
+      63
+     ],
+     "intersection": 1502,
+     "interiorPx": 1500,
+     "rimPx": 975,
+     "interiorShare": 0.6061,
+     "intersectionRepainted": 0.9987,
+     "symmetricDifference": 975,
+     "ratioSymmetricDifference": 0.49
+    },
+    "brute|normal": {
+     "changed": 2198,
+     "soloA": 2182,
+     "soloB": 201,
+     "ratio": 1.845,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 179,
+     "interiorPx": 173,
+     "rimPx": 2025,
+     "interiorShare": 0.0787,
+     "intersectionRepainted": 0.9665,
+     "symmetricDifference": 2025,
+     "ratioSymmetricDifference": 1.7
+    },
+    "brute|shielded": {
+     "changed": 2207,
+     "soloA": 2182,
+     "soloB": 219,
+     "ratio": 1.838,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 193,
+     "interiorPx": 192,
+     "rimPx": 2015,
+     "interiorShare": 0.087,
+     "intersectionRepainted": 0.9948,
+     "symmetricDifference": 2015,
+     "ratioSymmetricDifference": 1.678
+    },
+    "brute|slow": {
+     "changed": 2200,
+     "soloA": 2182,
+     "soloB": 205,
+     "ratio": 1.843,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 180,
+     "interiorPx": 173,
+     "rimPx": 2027,
+     "interiorShare": 0.0786,
+     "intersectionRepainted": 0.9611,
+     "symmetricDifference": 2027,
+     "ratioSymmetricDifference": 1.698
+    },
+    "brute|swarm": {
+     "changed": 2203,
+     "soloA": 2182,
+     "soloB": 49,
+     "ratio": 1.975,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "intersection": 28,
+     "interiorPx": 28,
+     "rimPx": 2175,
+     "interiorShare": 0.0127,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 2175,
+     "ratioSymmetricDifference": 1.95
+    },
+    "camo_normal|fast": {
+     "changed": 201,
+     "soloA": 201,
+     "soloB": 136,
+     "ratio": 1.193,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "intersection": 136,
+     "interiorPx": 136,
+     "rimPx": 65,
+     "interiorShare": 0.6766,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 65,
+     "ratioSymmetricDifference": 0.386
+    },
+    "camo_normal|flying": {
+     "changed": 259,
+     "soloA": 201,
+     "soloB": 82,
+     "ratio": 1.83,
+     "bboxGL": [
+      444,
+      57,
+      15,
+      30
+     ],
+     "intersection": 24,
+     "interiorPx": 24,
+     "rimPx": 235,
+     "interiorShare": 0.0927,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 235,
+     "ratioSymmetricDifference": 1.661
+    },
+    "camo_normal|hive": {
+     "changed": 1812,
+     "soloA": 201,
+     "soloB": 1797,
+     "ratio": 1.814,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 186,
+     "interiorPx": 186,
+     "rimPx": 1626,
+     "interiorShare": 0.1026,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1626,
+     "ratioSymmetricDifference": 1.628
+    },
+    "camo_normal|normal": {
+     "changed": 201,
+     "soloA": 201,
+     "soloB": 201,
+     "ratio": 1,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "intersection": 201,
+     "interiorPx": 201,
+     "rimPx": 0,
+     "interiorShare": 1,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 0,
+     "ratioSymmetricDifference": 0
+    },
+    "camo_normal|shielded": {
+     "changed": 249,
+     "soloA": 201,
+     "soloB": 219,
+     "ratio": 1.186,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      28
+     ],
+     "intersection": 171,
+     "interiorPx": 171,
+     "rimPx": 78,
+     "interiorShare": 0.6867,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 0.371
+    },
+    "camo_normal|slow": {
+     "changed": 216,
+     "soloA": 201,
+     "soloB": 205,
+     "ratio": 1.064,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "intersection": 190,
+     "interiorPx": 190,
+     "rimPx": 26,
+     "interiorShare": 0.8796,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 26,
+     "ratioSymmetricDifference": 0.128
+    },
+    "camo_normal|swarm": {
+     "changed": 207,
+     "soloA": 201,
+     "soloB": 49,
+     "ratio": 1.656,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "intersection": 43,
+     "interiorPx": 43,
+     "rimPx": 164,
+     "interiorShare": 0.2077,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 164,
+     "ratioSymmetricDifference": 1.312
+    },
+    "fast|flying": {
+     "changed": 200,
+     "soloA": 136,
+     "soloB": 82,
+     "ratio": 1.835,
+     "bboxGL": [
+      444,
+      57,
+      15,
+      30
+     ],
+     "intersection": 18,
+     "interiorPx": 18,
+     "rimPx": 182,
+     "interiorShare": 0.09,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 182,
+     "ratioSymmetricDifference": 1.67
+    },
+    "fast|hive": {
+     "changed": 1812,
+     "soloA": 136,
+     "soloB": 1797,
+     "ratio": 1.875,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 121,
+     "interiorPx": 121,
+     "rimPx": 1691,
+     "interiorShare": 0.0668,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1691,
+     "ratioSymmetricDifference": 1.75
+    },
+    "fast|normal": {
+     "changed": 138,
+     "soloA": 136,
+     "soloB": 201,
+     "ratio": 0.819,
+     "bboxGL": [
+      446,
+      63,
+      13,
+      19
+     ],
+     "intersection": 136,
+     "interiorPx": 73,
+     "rimPx": 65,
+     "interiorShare": 0.529,
+     "intersectionRepainted": 0.5368,
+     "symmetricDifference": 65,
+     "ratioSymmetricDifference": 0.386
+    },
+    "fast|shielded": {
+     "changed": 213,
+     "soloA": 136,
+     "soloB": 219,
+     "ratio": 1.2,
+     "bboxGL": [
+      447,
+      57,
+      11,
+      28
+     ],
+     "intersection": 134,
+     "interiorPx": 126,
+     "rimPx": 87,
+     "interiorShare": 0.5915,
+     "intersectionRepainted": 0.9403,
+     "symmetricDifference": 87,
+     "ratioSymmetricDifference": 0.49
+    },
+    "fast|slow": {
+     "changed": 193,
+     "soloA": 136,
+     "soloB": 205,
+     "ratio": 1.132,
+     "bboxGL": [
+      446,
+      59,
+      13,
+      21
+     ],
+     "intersection": 133,
+     "interiorPx": 118,
+     "rimPx": 75,
+     "interiorShare": 0.6114,
+     "intersectionRepainted": 0.8872,
+     "symmetricDifference": 75,
+     "ratioSymmetricDifference": 0.44
+    },
+    "fast|swarm": {
+     "changed": 146,
+     "soloA": 136,
+     "soloB": 49,
+     "ratio": 1.578,
+     "bboxGL": [
+      449,
+      57,
+      9,
+      21
+     ],
+     "intersection": 39,
+     "interiorPx": 39,
+     "rimPx": 107,
+     "interiorShare": 0.2671,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 107,
+     "ratioSymmetricDifference": 1.157
+    },
+    "flying|hive": {
+     "changed": 1797,
+     "soloA": 82,
+     "soloB": 1797,
+     "ratio": 1.913,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 82,
+     "interiorPx": 82,
+     "rimPx": 1715,
+     "interiorShare": 0.0456,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1715,
+     "ratioSymmetricDifference": 1.825
+    },
+    "flying|normal": {
+     "changed": 259,
+     "soloA": 82,
+     "soloB": 201,
+     "ratio": 1.83,
+     "bboxGL": [
+      444,
+      57,
+      15,
+      30
+     ],
+     "intersection": 24,
+     "interiorPx": 24,
+     "rimPx": 235,
+     "interiorShare": 0.0927,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 235,
+     "ratioSymmetricDifference": 1.661
+    },
+    "flying|shielded": {
+     "changed": 250,
+     "soloA": 82,
+     "soloB": 219,
+     "ratio": 1.661,
+     "bboxGL": [
+      444,
+      57,
+      15,
+      30
+     ],
+     "intersection": 51,
+     "interiorPx": 51,
+     "rimPx": 199,
+     "interiorShare": 0.204,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 199,
+     "ratioSymmetricDifference": 1.322
+    },
+    "flying|slow": {
+     "changed": 269,
+     "soloA": 82,
+     "soloB": 205,
+     "ratio": 1.875,
+     "bboxGL": [
+      444,
+      57,
+      15,
+      30
+     ],
+     "intersection": 18,
+     "interiorPx": 18,
+     "rimPx": 251,
+     "interiorShare": 0.0669,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 251,
+     "ratioSymmetricDifference": 1.749
+    },
+    "flying|swarm": {
+     "changed": 131,
+     "soloA": 82,
+     "soloB": 49,
+     "ratio": 2,
+     "bboxGL": [
+      444,
+      58,
+      15,
+      29
+     ],
+     "intersection": 0,
+     "interiorPx": 0,
+     "rimPx": 131,
+     "interiorShare": 0,
+     "intersectionRepainted": 0,
+     "symmetricDifference": 131,
+     "ratioSymmetricDifference": 2
+    },
+    "hive|normal": {
+     "changed": 1812,
+     "soloA": 1797,
+     "soloB": 201,
+     "ratio": 1.814,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 186,
+     "interiorPx": 186,
+     "rimPx": 1626,
+     "interiorShare": 0.1026,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1626,
+     "ratioSymmetricDifference": 1.628
+    },
+    "hive|shielded": {
+     "changed": 1816,
+     "soloA": 1797,
+     "soloB": 219,
+     "ratio": 1.802,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 199,
+     "interiorPx": 198,
+     "rimPx": 1618,
+     "interiorShare": 0.109,
+     "intersectionRepainted": 0.995,
+     "symmetricDifference": 1618,
+     "ratioSymmetricDifference": 1.605
+    },
+    "hive|slow": {
+     "changed": 1812,
+     "soloA": 1797,
+     "soloB": 205,
+     "ratio": 1.81,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 190,
+     "interiorPx": 190,
+     "rimPx": 1622,
+     "interiorShare": 0.1049,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1622,
+     "ratioSymmetricDifference": 1.62
+    },
+    "hive|swarm": {
+     "changed": 1801,
+     "soloA": 1797,
+     "soloB": 49,
+     "ratio": 1.951,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "intersection": 45,
+     "interiorPx": 45,
+     "rimPx": 1756,
+     "interiorShare": 0.025,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 1756,
+     "ratioSymmetricDifference": 1.902
+    },
+    "normal|shielded": {
+     "changed": 242,
+     "soloA": 201,
+     "soloB": 219,
+     "ratio": 1.152,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      28
+     ],
+     "intersection": 171,
+     "interiorPx": 164,
+     "rimPx": 78,
+     "interiorShare": 0.6777,
+     "intersectionRepainted": 0.9591,
+     "symmetricDifference": 78,
+     "ratioSymmetricDifference": 0.371
+    },
+    "normal|slow": {
+     "changed": 199,
+     "soloA": 201,
+     "soloB": 205,
+     "ratio": 0.98,
+     "bboxGL": [
+      446,
+      59,
+      13,
+      23
+     ],
+     "intersection": 190,
+     "interiorPx": 173,
+     "rimPx": 26,
+     "interiorShare": 0.8693,
+     "intersectionRepainted": 0.9105,
+     "symmetricDifference": 26,
+     "ratioSymmetricDifference": 0.128
+    },
+    "normal|swarm": {
+     "changed": 207,
+     "soloA": 201,
+     "soloB": 49,
+     "ratio": 1.656,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "intersection": 43,
+     "interiorPx": 43,
+     "rimPx": 164,
+     "interiorShare": 0.2077,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 164,
+     "ratioSymmetricDifference": 1.312
+    },
+    "shielded|slow": {
+     "changed": 247,
+     "soloA": 219,
+     "soloB": 205,
+     "ratio": 1.165,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      28
+     ],
+     "intersection": 174,
+     "interiorPx": 171,
+     "rimPx": 76,
+     "interiorShare": 0.6923,
+     "intersectionRepainted": 0.9828,
+     "symmetricDifference": 76,
+     "ratioSymmetricDifference": 0.358
+    },
+    "shielded|swarm": {
+     "changed": 221,
+     "soloA": 219,
+     "soloB": 49,
+     "ratio": 1.649,
+     "bboxGL": [
+      447,
+      57,
+      11,
+      28
+     ],
+     "intersection": 47,
+     "interiorPx": 47,
+     "rimPx": 174,
+     "interiorShare": 0.2127,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 174,
+     "ratioSymmetricDifference": 1.299
+    },
+    "slow|swarm": {
+     "changed": 206,
+     "soloA": 205,
+     "soloB": 49,
+     "ratio": 1.622,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      23
+     ],
+     "intersection": 48,
+     "interiorPx": 48,
+     "rimPx": 158,
+     "interiorShare": 0.233,
+     "intersectionRepainted": 1,
+     "symmetricDifference": 158,
+     "ratioSymmetricDifference": 1.244
+    }
+   },
+   "pairCount": 55,
+   "seconds": 30.6
+  }
+ },
+ "timing": {
+  "front": 35.4,
+  "three-quarter": 34.3,
+  "broadside": 30.6,
+  "totalSeconds": 104.7,
+  "bodiesMeasured": 11,
+  "pairsPerBearing": 55
+ },
+ "guard": {
+  "threshold": 0.8,
+  "rejected": []
+ },
+ "startedUTC": "2026-08-13T15:21:22.578Z",
+ "treeAtStart": {
+  "files": 176,
+  "hash": "6b31bd695e80d5fedf462926aa0f5a9e",
+  "newestFile": "js\\gl\\gl-world.js",
+  "newestMtime": "2026-08-13T15:10:45.656Z"
+ },
+ "setup": {
+  "map": "rune-circuit",
+  "gl": [
+   1111,
+   625
+  ],
+  "fittedCamera": {
+   "target": [
+    640,
+    360,
+    0
+   ],
+   "distance": 2021.2373649696563,
+   "pitch": 0.5944591432292686,
+   "yaw": -1.5707963267948966
+  },
+  "orbitConstructorDefault": 900,
+  "ui": [
+   1280,
+   720
+  ],
+  "dpr": 1,
+  "visibility": "visible",
+  "notes": [
+   "rAF stubbed"
+  ]
+ },
+ "camera": {
+  "target": [
+   640,
+   360,
+   0
+  ],
+  "distance": 2021.2373649696563,
+  "pitch": 0.5944591432292686,
+  "yaw": -1.5707963267948966,
+  "viewport": [
+   1111,
+   625
+  ]
+ },
+ "boardClock": {
+  "set": 0
+ },
+ "discovery": {
+  "registered": [
+   "enemy-normal",
+   "enemy-swarm",
+   "enemy-brute",
+   "enemy-hive",
+   "enemy-flying",
+   "enemy-armored",
+   "enemy-fast",
+   "enemy-slow",
+   "enemy-angry",
+   "enemy-camo_normal",
+   "enemy-shielded"
+  ],
+  "usable": [
+   "angry",
+   "armored",
+   "brute",
+   "camo_normal",
+   "fast",
+   "flying",
+   "hive",
+   "normal",
+   "shielded",
+   "slow",
+   "swarm"
+  ],
+  "registeredWithoutType": [],
+  "typesWithoutModel": [
+   "fractal_slime",
+   "colossus",
+   "camo_fast",
+   "midboss",
+   "revenant",
+   "boss",
+   "shieldbearer",
+   "healer",
+   "boss_fast",
+   "camo_heavy"
+  ]
+ },
+ "bodies": [
+  "angry",
+  "armored",
+  "brute",
+  "camo_normal",
+  "fast",
+  "flying",
+  "hive",
+  "normal",
+  "shielded",
+  "slow",
+  "swarm"
+ ],
+ "modelIdentity": {
+  "angry": {
+   "rawTop": 1.19,
+   "frames": 12,
+   "triangles": 4072
+  },
+  "armored": {
+   "rawTop": 1.19,
+   "frames": 8,
+   "triangles": 3520
+  },
+  "brute": {
+   "rawTop": 0.702,
+   "frames": 8,
+   "triangles": 5268
+  },
+  "camo_normal": {
+   "rawTop": 1.19,
+   "frames": 8,
+   "triangles": 3928
+  },
+  "fast": {
+   "rawTop": 1.034,
+   "frames": 8,
+   "triangles": 3508
+  },
+  "flying": {
+   "rawTop": 0.398,
+   "frames": 12,
+   "triangles": 5815
+  },
+  "hive": {
+   "rawTop": 0.695,
+   "frames": 8,
+   "triangles": 7776
+  },
+  "normal": {
+   "rawTop": 0.57,
+   "frames": 8,
+   "triangles": 4032
+  },
+  "shielded": {
+   "rawTop": 1.354,
+   "frames": 8,
+   "triangles": 4552
+  },
+  "slow": {
+   "rawTop": 0.979,
+   "frames": 8,
+   "triangles": 2584
+  },
+  "swarm": {
+   "rawTop": 0.291,
+   "frames": 8,
+   "triangles": 3904
+  }
+ },
+ "spotScan": {
+  "front": {
+   "120": {
+    "angry": {
+     "px": 213,
+     "bboxGL": [
+      205,
+      245,
+      13,
+      28
+     ],
+     "fill": 0.585
+    },
+    "armored": {
+     "px": 140,
+     "bboxGL": [
+      207,
+      249,
+      12,
+      20
+     ],
+     "fill": 0.583
+    },
+    "brute": {
+     "px": 1112,
+     "bboxGL": [
+      193,
+      242,
+      36,
+      46
+     ],
+     "fill": 0.671
+    },
+    "camo_normal": {
+     "px": 127,
+     "bboxGL": [
+      207,
+      249,
+      11,
+      20
+     ],
+     "fill": 0.577
+    },
+    "fast": {
+     "px": 107,
+     "bboxGL": [
+      207,
+      249,
+      9,
+      18
+     ],
+     "fill": 0.66
+    },
+    "flying": {
+     "px": 59,
+     "bboxGL": [
+      203,
+      264,
+      14,
+      12
+     ],
+     "fill": 0.351
+    },
+    "hive": {
+     "px": 1329,
+     "bboxGL": [
+      187,
+      241,
+      48,
+      47
+     ],
+     "fill": 0.589
+    },
+    "normal": {
+     "px": 126,
+     "bboxGL": [
+      207,
+      249,
+      11,
+      20
+     ],
+     "fill": 0.573
+    },
+    "shielded": {
+     "px": 222,
+     "bboxGL": [
+      206,
+      249,
+      15,
+      25
+     ],
+     "fill": 0.592
+    },
+    "slow": {
+     "px": 177,
+     "bboxGL": [
+      206,
+      249,
+      15,
+      17
+     ],
+     "fill": 0.694
+    },
+    "swarm": {
+     "px": 42,
+     "bboxGL": [
+      210,
+      249,
+      9,
+      8
+     ],
+     "fill": 0.583
+    }
+   },
+   "200": {
+    "angry": {
+     "px": 217,
+     "bboxGL": [
+      253,
+      245,
+      12,
+      28
+     ],
+     "fill": 0.646
+    },
+    "armored": {
+     "px": 145,
+     "bboxGL": [
+      255,
+      249,
+      11,
+      21
+     ],
+     "fill": 0.628
+    },
+    "brute": {
+     "px": 1143,
+     "bboxGL": [
+      241,
+      242,
+      34,
+      46
+     ],
+     "fill": 0.731
+    },
+    "camo_normal": {
+     "px": 124,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "fill": 0.62
+    },
+    "fast": {
+     "px": 108,
+     "bboxGL": [
+      255,
+      249,
+      9,
+      18
+     ],
+     "fill": 0.667
+    },
+    "flying": {
+     "px": 58,
+     "bboxGL": [
+      251,
+      264,
+      13,
+      12
+     ],
+     "fill": 0.372
+    },
+    "hive": {
+     "px": 1347,
+     "bboxGL": [
+      235,
+      241,
+      48,
+      47
+     ],
+     "fill": 0.597
+    },
+    "normal": {
+     "px": 124,
+     "bboxGL": [
+      255,
+      249,
+      10,
+      20
+     ],
+     "fill": 0.62
+    },
+    "shielded": {
+     "px": 227,
+     "bboxGL": [
+      254,
+      249,
+      14,
+      25
+     ],
+     "fill": 0.649
+    },
+    "slow": {
+     "px": 186,
+     "bboxGL": [
+      253,
+      249,
+      15,
+      17
+     ],
+     "fill": 0.729
+    },
+    "swarm": {
+     "px": 48,
+     "bboxGL": [
+      257,
+      249,
+      9,
+      8
+     ],
+     "fill": 0.667
+    }
+   },
+   "300": {
+    "angry": {
+     "px": 208,
+     "bboxGL": [
+      313,
+      245,
+      11,
+      28
+     ],
+     "fill": 0.675
+    },
+    "armored": {
+     "px": 139,
+     "bboxGL": [
+      314,
+      249,
+      11,
+      20
+     ],
+     "fill": 0.632
+    },
+    "brute": {
+     "px": 1113,
+     "bboxGL": [
+      301,
+      242,
+      34,
+      46
+     ],
+     "fill": 0.712
+    },
+    "camo_normal": {
+     "px": 121,
+     "bboxGL": [
+      314,
+      249,
+      10,
+      20
+     ],
+     "fill": 0.605
+    },
+    "fast": {
+     "px": 104,
+     "bboxGL": [
+      314,
+      249,
+      9,
+      18
+     ],
+     "fill": 0.642
+    },
+    "flying": {
+     "px": 56,
+     "bboxGL": [
+      310,
+      264,
+      14,
+      12
+     ],
+     "fill": 0.333
+    },
+    "hive": {
+     "px": 1342,
+     "bboxGL": [
+      295,
+      241,
+      47,
+      47
+     ],
+     "fill": 0.608
+    },
+    "normal": {
+     "px": 121,
+     "bboxGL": [
+      314,
+      249,
+      10,
+      20
+     ],
+     "fill": 0.605
+    },
+    "shielded": {
+     "px": 227,
+     "bboxGL": [
+      313,
+      249,
+      14,
+      25
+     ],
+     "fill": 0.649
+    },
+    "slow": {
+     "px": 180,
+     "bboxGL": [
+      312,
+      249,
+      15,
+      17
+     ],
+     "fill": 0.706
+    },
+    "swarm": {
+     "px": 48,
+     "bboxGL": [
+      316,
+      249,
+      9,
+      8
+     ],
+     "fill": 0.667
+    }
+   },
+   "420": {
+    "angry": {
+     "px": 228,
+     "bboxGL": [
+      353,
+      270,
+      17,
+      22
+     ],
+     "fill": 0.61
+    },
+    "armored": {
+     "px": 134,
+     "bboxGL": [
+      354,
+      270,
+      11,
+      19
+     ],
+     "fill": 0.641
+    },
+    "brute": {
+     "px": 1207,
+     "bboxGL": [
+      337,
+      269,
+      44,
+      38
+     ],
+     "fill": 0.722
+    },
+    "camo_normal": {
+     "px": 123,
+     "bboxGL": [
+      354,
+      270,
+      11,
+      18
+     ],
+     "fill": 0.621
+    },
+    "fast": {
+     "px": 90,
+     "bboxGL": [
+      356,
+      270,
+      8,
+      18
+     ],
+     "fill": 0.625
+    },
+    "flying": {
+     "px": 52,
+     "bboxGL": [
+      352,
+      285,
+      12,
+      10
+     ],
+     "fill": 0.433
+    },
+    "hive": {
+     "px": 1019,
+     "bboxGL": [
+      341,
+      264,
+      36,
+      44
+     ],
+     "fill": 0.643
+    },
+    "normal": {
+     "px": 123,
+     "bboxGL": [
+      354,
+      270,
+      11,
+      18
+     ],
+     "fill": 0.621
+    },
+    "shielded": {
+     "px": 156,
+     "bboxGL": [
+      355,
+      270,
+      9,
+      26
+     ],
+     "fill": 0.667
+    },
+    "slow": {
+     "px": 136,
+     "bboxGL": [
+      354,
+      270,
+      11,
+      17
+     ],
+     "fill": 0.727
+    },
+    "swarm": {
+     "px": 39,
+     "bboxGL": [
+      358,
+      270,
+      5,
+      9
+     ],
+     "fill": 0.867
+    }
+   },
+   "540": {
+    "angry": {
+     "px": 208,
+     "bboxGL": [
+      363,
+      309,
+      16,
+      21
+     ],
+     "fill": 0.619
+    },
+    "armored": {
+     "px": 118,
+     "bboxGL": [
+      364,
+      309,
+      11,
+      18
+     ],
+     "fill": 0.596
+    },
+    "brute": {
+     "px": 1114,
+     "bboxGL": [
+      348,
+      308,
+      42,
+      37
+     ],
+     "fill": 0.717
+    },
+    "camo_normal": {
+     "px": 114,
+     "bboxGL": [
+      364,
+      309,
+      11,
+      17
+     ],
+     "fill": 0.61
+    },
+    "fast": {
+     "px": 84,
+     "bboxGL": [
+      366,
+      309,
+      8,
+      17
+     ],
+     "fill": 0.618
+    },
+    "flying": {
+     "px": 45,
+     "bboxGL": [
+      363,
+      324,
+      10,
+      9
+     ],
+     "fill": 0.5
+    },
+    "hive": {
+     "px": 920,
+     "bboxGL": [
+      352,
+      303,
+      34,
+      42
+     ],
+     "fill": 0.644
+    },
+    "normal": {
+     "px": 114,
+     "bboxGL": [
+      364,
+      309,
+      11,
+      17
+     ],
+     "fill": 0.61
+    },
+    "shielded": {
+     "px": 141,
+     "bboxGL": [
+      365,
+      309,
+      9,
+      25
+     ],
+     "fill": 0.627
+    },
+    "slow": {
+     "px": 121,
+     "bboxGL": [
+      364,
+      309,
+      11,
+      16
+     ],
+     "fill": 0.688
+    },
+    "swarm": {
+     "px": 34,
+     "bboxGL": [
+      368,
+      308,
+      5,
+      10
+     ],
+     "fill": 0.68
+    }
+   },
+   "640": {
+    "angry": {
+     "px": 202,
+     "bboxGL": [
+      370,
+      338,
+      16,
+      21
+     ],
+     "fill": 0.601
+    },
+    "armored": {
+     "px": 118,
+     "bboxGL": [
+      372,
+      338,
+      10,
+      18
+     ],
+     "fill": 0.656
+    },
+    "brute": {
+     "px": 1023,
+     "bboxGL": [
+      357,
+      337,
+      39,
+      36
+     ],
+     "fill": 0.729
+    },
+    "camo_normal": {
+     "px": 111,
+     "bboxGL": [
+      372,
+      338,
+      10,
+      17
+     ],
+     "fill": 0.653
+    },
+    "fast": {
+     "px": 81,
+     "bboxGL": [
+      374,
+      338,
+      7,
+      17
+     ],
+     "fill": 0.681
+    },
+    "flying": {
+     "px": 41,
+     "bboxGL": [
+      370,
+      353,
+      11,
+      9
+     ],
+     "fill": 0.414
+    },
+    "hive": {
+     "px": 853,
+     "bboxGL": [
+      360,
+      333,
+      32,
+      40
+     ],
+     "fill": 0.666
+    },
+    "normal": {
+     "px": 111,
+     "bboxGL": [
+      372,
+      338,
+      10,
+      17
+     ],
+     "fill": 0.653
+    },
+    "shielded": {
+     "px": 135,
+     "bboxGL": [
+      373,
+      338,
+      8,
+      25
+     ],
+     "fill": 0.675
+    },
+    "slow": {
+     "px": 112,
+     "bboxGL": [
+      372,
+      338,
+      10,
+      16
+     ],
+     "fill": 0.7
+    },
+    "swarm": {
+     "px": 32,
+     "bboxGL": [
+      375,
+      338,
+      5,
+      9
+     ],
+     "fill": 0.711
+    }
+   },
+   "760": {
+    "angry": {
+     "px": 156,
+     "bboxGL": [
+      426,
+      340,
+      9,
+      26
+     ],
+     "fill": 0.667
+    },
+    "armored": {
+     "px": 109,
+     "bboxGL": [
+      426,
+      344,
+      10,
+      19
+     ],
+     "fill": 0.574
+    },
+    "brute": {
+     "px": 814,
+     "bboxGL": [
+      416,
+      339,
+      29,
+      41
+     ],
+     "fill": 0.685
+    },
+    "camo_normal": {
+     "px": 95,
+     "bboxGL": [
+      426,
+      344,
+      9,
+      18
+     ],
+     "fill": 0.586
+    },
+    "fast": {
+     "px": 80,
+     "bboxGL": [
+      426,
+      344,
+      8,
+      16
+     ],
+     "fill": 0.625
+    },
+    "flying": {
+     "px": 49,
+     "bboxGL": [
+      423,
+      358,
+      13,
+      10
+     ],
+     "fill": 0.377
+    },
+    "hive": {
+     "px": 1038,
+     "bboxGL": [
+      410,
+      337,
+      41,
+      42
+     ],
+     "fill": 0.603
+    },
+    "normal": {
+     "px": 95,
+     "bboxGL": [
+      426,
+      344,
+      9,
+      18
+     ],
+     "fill": 0.586
+    },
+    "shielded": {
+     "px": 183,
+     "bboxGL": [
+      426,
+      344,
+      12,
+      23
+     ],
+     "fill": 0.663
+    },
+    "slow": {
+     "px": 136,
+     "bboxGL": [
+      425,
+      344,
+      12,
+      15
+     ],
+     "fill": 0.756
+    },
+    "swarm": {
+     "px": 36,
+     "bboxGL": [
+      428,
+      343,
+      7,
+      8
+     ],
+     "fill": 0.643
+    }
+   },
+   "900": {
+    "angry": {
+     "px": 155,
+     "bboxGL": [
+      499,
+      340,
+      9,
+      26
+     ],
+     "fill": 0.662
+    },
+    "armored": {
+     "px": 110,
+     "bboxGL": [
+      499,
+      344,
+      10,
+      19
+     ],
+     "fill": 0.579
+    },
+    "brute": {
+     "px": 802,
+     "bboxGL": [
+      490,
+      339,
+      28,
+      41
+     ],
+     "fill": 0.699
+    },
+    "camo_normal": {
+     "px": 97,
+     "bboxGL": [
+      499,
+      344,
+      9,
+      18
+     ],
+     "fill": 0.599
+    },
+    "fast": {
+     "px": 82,
+     "bboxGL": [
+      499,
+      344,
+      8,
+      16
+     ],
+     "fill": 0.641
+    },
+    "flying": {
+     "px": 46,
+     "bboxGL": [
+      497,
+      358,
+      12,
+      10
+     ],
+     "fill": 0.383
+    },
+    "hive": {
+     "px": 1020,
+     "bboxGL": [
+      484,
+      337,
+      41,
+      42
+     ],
+     "fill": 0.592
+    },
+    "normal": {
+     "px": 97,
+     "bboxGL": [
+      499,
+      344,
+      9,
+      18
+     ],
+     "fill": 0.599
+    },
+    "shielded": {
+     "px": 187,
+     "bboxGL": [
+      499,
+      344,
+      12,
+      23
+     ],
+     "fill": 0.678
+    },
+    "slow": {
+     "px": 138,
+     "bboxGL": [
+      498,
+      344,
+      12,
+      15
+     ],
+     "fill": 0.767
+    },
+    "swarm": {
+     "px": 37,
+     "bboxGL": [
+      500,
+      343,
+      8,
+      8
+     ],
+     "fill": 0.578
+    }
+   },
+   "1030": {
+    "angry": {
+     "px": 151,
+     "bboxGL": [
+      567,
+      340,
+      9,
+      26
+     ],
+     "fill": 0.645
+    },
+    "armored": {
+     "px": 110,
+     "bboxGL": [
+      567,
+      344,
+      10,
+      19
+     ],
+     "fill": 0.579
+    },
+    "brute": {
+     "px": 790,
+     "bboxGL": [
+      559,
+      339,
+      28,
+      41
+     ],
+     "fill": 0.688
+    },
+    "camo_normal": {
+     "px": 97,
+     "bboxGL": [
+      567,
+      344,
+      9,
+      18
+     ],
+     "fill": 0.599
+    },
+    "fast": {
+     "px": 80,
+     "bboxGL": [
+      567,
+      344,
+      8,
+      16
+     ],
+     "fill": 0.625
+    },
+    "flying": {
+     "px": 49,
+     "bboxGL": [
+      565,
+      358,
+      12,
+      10
+     ],
+     "fill": 0.408
+    },
+    "hive": {
+     "px": 1002,
+     "bboxGL": [
+      553,
+      337,
+      40,
+      42
+     ],
+     "fill": 0.596
+    },
+    "normal": {
+     "px": 97,
+     "bboxGL": [
+      567,
+      344,
+      9,
+      18
+     ],
+     "fill": 0.599
+    },
+    "shielded": {
+     "px": 184,
+     "bboxGL": [
+      567,
+      344,
+      12,
+      23
+     ],
+     "fill": 0.667
+    },
+    "slow": {
+     "px": 138,
+     "bboxGL": [
+      566,
+      344,
+      12,
+      15
+     ],
+     "fill": 0.767
+    },
+    "swarm": {
+     "px": 39,
+     "bboxGL": [
+      568,
+      344,
+      8,
+      7
+     ],
+     "fill": 0.696
+    }
+   },
+   "1180": {
+    "angry": {
+     "px": 212,
+     "bboxGL": [
+      611,
+      326,
+      15,
+      25
+     ],
+     "fill": 0.565
+    },
+    "armored": {
+     "px": 119,
+     "bboxGL": [
+      615,
+      326,
+      9,
+      21
+     ],
+     "fill": 0.63
+    },
+    "brute": {
+     "px": 1187,
+     "bboxGL": [
+      601,
+      322,
+      38,
+      43
+     ],
+     "fill": 0.726
+    },
+    "camo_normal": {
+     "px": 116,
+     "bboxGL": [
+      615,
+      326,
+      9,
+      20
+     ],
+     "fill": 0.644
+    },
+    "fast": {
+     "px": 83,
+     "bboxGL": [
+      616,
+      326,
+      7,
+      17
+     ],
+     "fill": 0.697
+    },
+    "flying": {
+     "px": 46,
+     "bboxGL": [
+      615,
+      340,
+      11,
+      9
+     ],
+     "fill": 0.465
+    },
+    "hive": {
+     "px": 905,
+     "bboxGL": [
+      604,
+      320,
+      30,
+      45
+     ],
+     "fill": 0.67
+    },
+    "normal": {
+     "px": 116,
+     "bboxGL": [
+      615,
+      326,
+      9,
+      20
+     ],
+     "fill": 0.644
+    },
+    "shielded": {
+     "px": 129,
+     "bboxGL": [
+      616,
+      326,
+      8,
+      23
+     ],
+     "fill": 0.701
+    },
+    "slow": {
+     "px": 118,
+     "bboxGL": [
+      615,
+      326,
+      9,
+      18
+     ],
+     "fill": 0.728
+    },
+    "swarm": {
+     "px": 27,
+     "bboxGL": [
+      617,
+      327,
+      5,
+      7
+     ],
+     "fill": 0.771
+    }
+   },
+   "1300": {
+    "angry": {
+     "px": 228,
+     "bboxGL": [
+      614,
+      289,
+      15,
+      25
+     ],
+     "fill": 0.608
+    },
+    "armored": {
+     "px": 133,
+     "bboxGL": [
+      618,
+      289,
+      10,
+      22
+     ],
+     "fill": 0.605
+    },
+    "brute": {
+     "px": 1294,
+     "bboxGL": [
+      604,
+      285,
+      39,
+      44
+     ],
+     "fill": 0.754
+    },
+    "camo_normal": {
+     "px": 135,
+     "bboxGL": [
+      618,
+      289,
+      10,
+      21
+     ],
+     "fill": 0.643
+    },
+    "fast": {
+     "px": 95,
+     "bboxGL": [
+      619,
+      289,
+      7,
+      18
+     ],
+     "fill": 0.754
+    },
+    "flying": {
+     "px": 48,
+     "bboxGL": [
+      618,
+      304,
+      11,
+      9
+     ],
+     "fill": 0.485
+    },
+    "hive": {
+     "px": 1005,
+     "bboxGL": [
+      607,
+      282,
+      31,
+      48
+     ],
+     "fill": 0.675
+    },
+    "normal": {
+     "px": 135,
+     "bboxGL": [
+      618,
+      289,
+      10,
+      21
+     ],
+     "fill": 0.643
+    },
+    "shielded": {
+     "px": 142,
+     "bboxGL": [
+      619,
+      289,
+      8,
+      24
+     ],
+     "fill": 0.74
+    },
+    "slow": {
+     "px": 131,
+     "bboxGL": [
+      618,
+      289,
+      10,
+      19
+     ],
+     "fill": 0.689
+    },
+    "swarm": {
+     "px": 31,
+     "bboxGL": [
+      620,
+      290,
+      5,
+      7
+     ],
+     "fill": 0.886
+    }
+   },
+   "1450": {
+    "angry": {
+     "px": 175,
+     "bboxGL": [
+      672,
+      266,
+      11,
+      28
+     ],
+     "fill": 0.568
+    },
+    "armored": {
+     "px": 130,
+     "bboxGL": [
+      672,
+      270,
+      11,
+      20
+     ],
+     "fill": 0.591
+    },
+    "brute": {
+     "px": 969,
+     "bboxGL": [
+      663,
+      263,
+      31,
+      46
+     ],
+     "fill": 0.68
+    },
+    "camo_normal": {
+     "px": 112,
+     "bboxGL": [
+      672,
+      270,
+      10,
+      19
+     ],
+     "fill": 0.589
+    },
+    "fast": {
+     "px": 94,
+     "bboxGL": [
+      672,
+      270,
+      9,
+      17
+     ],
+     "fill": 0.614
+    },
+    "flying": {
+     "px": 52,
+     "bboxGL": [
+      671,
+      285,
+      13,
+      11
+     ],
+     "fill": 0.364
+    },
+    "hive": {
+     "px": 1205,
+     "bboxGL": [
+      657,
+      261,
+      44,
+      47
+     ],
+     "fill": 0.583
+    },
+    "normal": {
+     "px": 112,
+     "bboxGL": [
+      672,
+      270,
+      10,
+      19
+     ],
+     "fill": 0.589
+    },
+    "shielded": {
+     "px": 212,
+     "bboxGL": [
+      672,
+      270,
+      13,
+      25
+     ],
+     "fill": 0.652
+    },
+    "slow": {
+     "px": 167,
+     "bboxGL": [
+      670,
+      270,
+      14,
+      17
+     ],
+     "fill": 0.702
+    },
+    "swarm": {
+     "px": 46,
+     "bboxGL": [
+      673,
+      269,
+      9,
+      9
+     ],
+     "fill": 0.568
+    }
+   },
+   "1600": {
+    "angry": {
+     "px": 180,
+     "bboxGL": [
+      758,
+      266,
+      12,
+      28
+     ],
+     "fill": 0.536
+    },
+    "armored": {
+     "px": 135,
+     "bboxGL": [
+      758,
+      270,
+      12,
+      20
+     ],
+     "fill": 0.563
+    },
+    "brute": {
+     "px": 979,
+     "bboxGL": [
+      750,
+      263,
+      31,
+      46
+     ],
+     "fill": 0.687
+    },
+    "camo_normal": {
+     "px": 115,
+     "bboxGL": [
+      758,
+      270,
+      11,
+      19
+     ],
+     "fill": 0.55
+    },
+    "fast": {
+     "px": 94,
+     "bboxGL": [
+      759,
+      270,
+      9,
+      17
+     ],
+     "fill": 0.614
+    },
+    "flying": {
+     "px": 50,
+     "bboxGL": [
+      758,
+      285,
+      13,
+      11
+     ],
+     "fill": 0.35
+    },
+    "hive": {
+     "px": 1235,
+     "bboxGL": [
+      744,
+      261,
+      45,
+      47
+     ],
+     "fill": 0.584
+    },
+    "normal": {
+     "px": 115,
+     "bboxGL": [
+      758,
+      270,
+      11,
+      19
+     ],
+     "fill": 0.55
+    },
+    "shielded": {
+     "px": 218,
+     "bboxGL": [
+      758,
+      270,
+      14,
+      25
+     ],
+     "fill": 0.623
+    },
+    "slow": {
+     "px": 168,
+     "bboxGL": [
+      757,
+      270,
+      14,
+      17
+     ],
+     "fill": 0.706
+    },
+    "swarm": {
+     "px": 47,
+     "bboxGL": [
+      759,
+      269,
+      9,
+      9
+     ],
+     "fill": 0.58
+    }
+   },
+   "1750": {
+    "angry": {
+     "px": 192,
+     "bboxGL": [
+      844,
+      266,
+      13,
+      28
+     ],
+     "fill": 0.527
+    },
+    "armored": {
+     "px": 140,
+     "bboxGL": [
+      845,
+      270,
+      12,
+      20
+     ],
+     "fill": 0.583
+    },
+    "brute": {
+     "px": 1012,
+     "bboxGL": [
+      836,
+      263,
+      32,
+      46
+     ],
+     "fill": 0.688
+    },
+    "camo_normal": {
+     "px": 122,
+     "bboxGL": [
+      845,
+      270,
+      10,
+      19
+     ],
+     "fill": 0.642
+    },
+    "fast": {
+     "px": 102,
+     "bboxGL": [
+      845,
+      270,
+      10,
+      17
+     ],
+     "fill": 0.6
+    },
+    "flying": {
+     "px": 54,
+     "bboxGL": [
+      845,
+      285,
+      13,
+      11
+     ],
+     "fill": 0.378
+    },
+    "hive": {
+     "px": 1263,
+     "bboxGL": [
+      831,
+      261,
+      45,
+      47
+     ],
+     "fill": 0.597
+    },
+    "normal": {
+     "px": 122,
+     "bboxGL": [
+      845,
+      270,
+      10,
+      19
+     ],
+     "fill": 0.642
+    },
+    "shielded": {
+     "px": 222,
+     "bboxGL": [
+      845,
+      270,
+      14,
+      25
+     ],
+     "fill": 0.634
+    },
+    "slow": {
+     "px": 173,
+     "bboxGL": [
+      843,
+      270,
+      14,
+      17
+     ],
+     "fill": 0.727
+    },
+    "swarm": {
+     "px": 45,
+     "bboxGL": [
+      845,
+      269,
+      9,
+      9
+     ],
+     "fill": 0.556
+    }
+   },
+   "1870": {
+    "angry": {
+     "px": 198,
+     "bboxGL": [
+      914,
+      266,
+      12,
+      28
+     ],
+     "fill": 0.589
+    },
+    "armored": {
+     "px": 142,
+     "bboxGL": [
+      914,
+      270,
+      12,
+      20
+     ],
+     "fill": 0.592
+    },
+    "brute": {
+     "px": 1040,
+     "bboxGL": [
+      905,
+      263,
+      33,
+      46
+     ],
+     "fill": 0.685
+    },
+    "camo_normal": {
+     "px": 122,
+     "bboxGL": [
+      914,
+      270,
+      11,
+      19
+     ],
+     "fill": 0.584
+    },
+    "fast": {
+     "px": 103,
+     "bboxGL": [
+      914,
+      270,
+      10,
+      17
+     ],
+     "fill": 0.606
+    },
+    "flying": {
+     "px": 49,
+     "bboxGL": [
+      914,
+      285,
+      13,
+      11
+     ],
+     "fill": 0.343
+    },
+    "hive": {
+     "px": 1281,
+     "bboxGL": [
+      900,
+      261,
+      46,
+      47
+     ],
+     "fill": 0.593
+    },
+    "normal": {
+     "px": 122,
+     "bboxGL": [
+      914,
+      270,
+      11,
+      19
+     ],
+     "fill": 0.584
+    },
+    "shielded": {
+     "px": 224,
+     "bboxGL": [
+      914,
+      270,
+      15,
+      25
+     ],
+     "fill": 0.597
+    },
+    "slow": {
+     "px": 173,
+     "bboxGL": [
+      912,
+      270,
+      15,
+      17
+     ],
+     "fill": 0.678
+    },
+    "swarm": {
+     "px": 48,
+     "bboxGL": [
+      914,
+      269,
+      10,
+      9
+     ],
+     "fill": 0.533
+    }
+   }
+  },
+  "three-quarter": {
+   "120": {
+    "angry": {
+     "px": 200,
+     "bboxGL": [
+      263,
+      373,
+      13,
+      25
+     ],
+     "fill": 0.615
+    },
+    "armored": {
+     "px": 113,
+     "bboxGL": [
+      266,
+      376,
+      10,
+      19
+     ],
+     "fill": 0.595
+    },
+    "brute": {
+     "px": 1036,
+     "bboxGL": [
+      252,
+      372,
+      38,
+      40
+     ],
+     "fill": 0.682
+    },
+    "camo_normal": {
+     "px": 107,
+     "bboxGL": [
+      266,
+      376,
+      10,
+      18
+     ],
+     "fill": 0.594
+    },
+    "fast": {
+     "px": 88,
+     "bboxGL": [
+      267,
+      376,
+      8,
+      16
+     ],
+     "fill": 0.688
+    },
+    "flying": {
+     "px": 41,
+     "bboxGL": [
+      265,
+      389,
+      9,
+      10
+     ],
+     "fill": 0.456
+    },
+    "hive": {
+     "px": 906,
+     "bboxGL": [
+      253,
+      368,
+      37,
+      44
+     ],
+     "fill": 0.557
+    },
+    "normal": {
+     "px": 107,
+     "bboxGL": [
+      266,
+      376,
+      10,
+      18
+     ],
+     "fill": 0.594
+    },
+    "shielded": {
+     "px": 147,
+     "bboxGL": [
+      266,
+      375,
+      10,
+      23
+     ],
+     "fill": 0.639
+    },
+    "slow": {
+     "px": 119,
+     "bboxGL": [
+      266,
+      376,
+      11,
+      15
+     ],
+     "fill": 0.721
+    },
+    "swarm": {
+     "px": 30,
+     "bboxGL": [
+      268,
+      375,
+      8,
+      7
+     ],
+     "fill": 0.536
+    }
+   },
+   "200": {
+    "angry": {
+     "px": 202,
+     "bboxGL": [
+      288,
+      360,
+      14,
+      25
+     ],
+     "fill": 0.577
+    },
+    "armored": {
+     "px": 115,
+     "bboxGL": [
+      292,
+      362,
+      9,
+      20
+     ],
+     "fill": 0.639
+    },
+    "brute": {
+     "px": 1065,
+     "bboxGL": [
+      278,
+      358,
+      38,
+      42
+     ],
+     "fill": 0.667
+    },
+    "camo_normal": {
+     "px": 109,
+     "bboxGL": [
+      292,
+      362,
+      9,
+      19
+     ],
+     "fill": 0.637
+    },
+    "fast": {
+     "px": 86,
+     "bboxGL": [
+      292,
+      362,
+      9,
+      17
+     ],
+     "fill": 0.562
+    },
+    "flying": {
+     "px": 41,
+     "bboxGL": [
+      290,
+      376,
+      10,
+      9
+     ],
+     "fill": 0.456
+    },
+    "hive": {
+     "px": 952,
+     "bboxGL": [
+      278,
+      355,
+      38,
+      44
+     ],
+     "fill": 0.569
+    },
+    "normal": {
+     "px": 109,
+     "bboxGL": [
+      292,
+      362,
+      9,
+      19
+     ],
+     "fill": 0.637
+    },
+    "shielded": {
+     "px": 151,
+     "bboxGL": [
+      292,
+      362,
+      9,
+      23
+     ],
+     "fill": 0.729
+    },
+    "slow": {
+     "px": 127,
+     "bboxGL": [
+      291,
+      362,
+      11,
+      16
+     ],
+     "fill": 0.722
+    },
+    "swarm": {
+     "px": 30,
+     "bboxGL": [
+      294,
+      362,
+      7,
+      7
+     ],
+     "fill": 0.612
+    }
+   },
+   "300": {
+    "angry": {
+     "px": 208,
+     "bboxGL": [
+      322,
+      342,
+      13,
+      26
+     ],
+     "fill": 0.615
+    },
+    "armored": {
+     "px": 118,
+     "bboxGL": [
+      325,
+      345,
+      9,
+      20
+     ],
+     "fill": 0.656
+    },
+    "brute": {
+     "px": 1092,
+     "bboxGL": [
+      311,
+      340,
+      39,
+      43
+     ],
+     "fill": 0.651
+    },
+    "camo_normal": {
+     "px": 113,
+     "bboxGL": [
+      325,
+      345,
+      9,
+      19
+     ],
+     "fill": 0.661
+    },
+    "fast": {
+     "px": 89,
+     "bboxGL": [
+      326,
+      345,
+      8,
+      16
+     ],
+     "fill": 0.695
+    },
+    "flying": {
+     "px": 44,
+     "bboxGL": [
+      324,
+      359,
+      9,
+      9
+     ],
+     "fill": 0.543
+    },
+    "hive": {
+     "px": 987,
+     "bboxGL": [
+      311,
+      336,
+      38,
+      46
+     ],
+     "fill": 0.565
+    },
+    "normal": {
+     "px": 113,
+     "bboxGL": [
+      325,
+      345,
+      9,
+      19
+     ],
+     "fill": 0.661
+    },
+    "shielded": {
+     "px": 153,
+     "bboxGL": [
+      325,
+      345,
+      9,
+      23
+     ],
+     "fill": 0.739
+    },
+    "slow": {
+     "px": 133,
+     "bboxGL": [
+      324,
+      345,
+      12,
+      16
+     ],
+     "fill": 0.693
+    },
+    "swarm": {
+     "px": 34,
+     "bboxGL": [
+      327,
+      345,
+      7,
+      7
+     ],
+     "fill": 0.694
+    }
+   },
+   "420": {
+    "angry": {
+     "px": 178,
+     "bboxGL": [
+      369,
+      345,
+      13,
+      24
+     ],
+     "fill": 0.571
+    },
+    "armored": {
+     "px": 118,
+     "bboxGL": [
+      370,
+      347,
+      9,
+      18
+     ],
+     "fill": 0.728
+    },
+    "brute": {
+     "px": 865,
+     "bboxGL": [
+      357,
+      345,
+      36,
+      37
+     ],
+     "fill": 0.649
+    },
+    "camo_normal": {
+     "px": 106,
+     "bboxGL": [
+      370,
+      347,
+      8,
+      17
+     ],
+     "fill": 0.779
+    },
+    "fast": {
+     "px": 89,
+     "bboxGL": [
+      370,
+      347,
+      8,
+      17
+     ],
+     "fill": 0.654
+    },
+    "flying": {
+     "px": 42,
+     "bboxGL": [
+      368,
+      363,
+      10,
+      8
+     ],
+     "fill": 0.525
+    },
+    "hive": {
+     "px": 975,
+     "bboxGL": [
+      356,
+      340,
+      37,
+      43
+     ],
+     "fill": 0.613
+    },
+    "normal": {
+     "px": 106,
+     "bboxGL": [
+      370,
+      347,
+      8,
+      17
+     ],
+     "fill": 0.779
+    },
+    "shielded": {
+     "px": 174,
+     "bboxGL": [
+      369,
+      347,
+      10,
+      24
+     ],
+     "fill": 0.725
+    },
+    "slow": {
+     "px": 136,
+     "bboxGL": [
+      368,
+      347,
+      13,
+      16
+     ],
+     "fill": 0.654
+    },
+    "swarm": {
+     "px": 37,
+     "bboxGL": [
+      371,
+      346,
+      8,
+      9
+     ],
+     "fill": 0.514
+    }
+   },
+   "540": {
+    "angry": {
+     "px": 173,
+     "bboxGL": [
+      414,
+      369,
+      12,
+      23
+     ],
+     "fill": 0.627
+    },
+    "armored": {
+     "px": 109,
+     "bboxGL": [
+      415,
+      372,
+      9,
+      17
+     ],
+     "fill": 0.712
+    },
+    "brute": {
+     "px": 816,
+     "bboxGL": [
+      403,
+      369,
+      35,
+      37
+     ],
+     "fill": 0.63
+    },
+    "camo_normal": {
+     "px": 102,
+     "bboxGL": [
+      415,
+      372,
+      8,
+      17
+     ],
+     "fill": 0.75
+    },
+    "fast": {
+     "px": 86,
+     "bboxGL": [
+      415,
+      372,
+      8,
+      16
+     ],
+     "fill": 0.672
+    },
+    "flying": {
+     "px": 39,
+     "bboxGL": [
+      414,
+      387,
+      9,
+      8
+     ],
+     "fill": 0.542
+    },
+    "hive": {
+     "px": 904,
+     "bboxGL": [
+      402,
+      365,
+      36,
+      41
+     ],
+     "fill": 0.612
+    },
+    "normal": {
+     "px": 103,
+     "bboxGL": [
+      415,
+      372,
+      8,
+      17
+     ],
+     "fill": 0.757
+    },
+    "shielded": {
+     "px": 161,
+     "bboxGL": [
+      415,
+      372,
+      9,
+      23
+     ],
+     "fill": 0.778
+    },
+    "slow": {
+     "px": 126,
+     "bboxGL": [
+      414,
+      372,
+      11,
+      15
+     ],
+     "fill": 0.764
+    },
+    "swarm": {
+     "px": 37,
+     "bboxGL": [
+      416,
+      371,
+      8,
+      9
+     ],
+     "fill": 0.514
+    }
+   },
+   "640": {
+    "angry": {
+     "px": 165,
+     "bboxGL": [
+      449,
+      389,
+      12,
+      22
+     ],
+     "fill": 0.625
+    },
+    "armored": {
+     "px": 109,
+     "bboxGL": [
+      450,
+      391,
+      9,
+      17
+     ],
+     "fill": 0.712
+    },
+    "brute": {
+     "px": 776,
+     "bboxGL": [
+      439,
+      388,
+      34,
+      36
+     ],
+     "fill": 0.634
+    },
+    "camo_normal": {
+     "px": 96,
+     "bboxGL": [
+      450,
+      391,
+      8,
+      16
+     ],
+     "fill": 0.75
+    },
+    "fast": {
+     "px": 79,
+     "bboxGL": [
+      451,
+      391,
+      7,
+      15
+     ],
+     "fill": 0.752
+    },
+    "flying": {
+     "px": 37,
+     "bboxGL": [
+      449,
+      405,
+      10,
+      9
+     ],
+     "fill": 0.411
+    },
+    "hive": {
+     "px": 853,
+     "bboxGL": [
+      438,
+      384,
+      34,
+      41
+     ],
+     "fill": 0.612
+    },
+    "normal": {
+     "px": 96,
+     "bboxGL": [
+      450,
+      391,
+      8,
+      16
+     ],
+     "fill": 0.75
+    },
+    "shielded": {
+     "px": 151,
+     "bboxGL": [
+      450,
+      391,
+      9,
+      23
+     ],
+     "fill": 0.729
+    },
+    "slow": {
+     "px": 119,
+     "bboxGL": [
+      449,
+      391,
+      11,
+      15
+     ],
+     "fill": 0.721
+    },
+    "swarm": {
+     "px": 35,
+     "bboxGL": [
+      451,
+      390,
+      8,
+      9
+     ],
+     "fill": 0.486
+    }
+   },
+   "760": {
+    "angry": {
+     "px": 178,
+     "bboxGL": [
+      490,
+      376,
+      12,
+      25
+     ],
+     "fill": 0.593
+    },
+    "armored": {
+     "px": 107,
+     "bboxGL": [
+      492,
+      378,
+      10,
+      19
+     ],
+     "fill": 0.563
+    },
+    "brute": {
+     "px": 928,
+     "bboxGL": [
+      482,
+      374,
+      33,
+      41
+     ],
+     "fill": 0.686
+    },
+    "camo_normal": {
+     "px": 100,
+     "bboxGL": [
+      493,
+      378,
+      8,
+      18
+     ],
+     "fill": 0.694
+    },
+    "fast": {
+     "px": 83,
+     "bboxGL": [
+      493,
+      378,
+      7,
+      16
+     ],
+     "fill": 0.741
+    },
+    "flying": {
+     "px": 43,
+     "bboxGL": [
+      492,
+      392,
+      9,
+      9
+     ],
+     "fill": 0.531
+    },
+    "hive": {
+     "px": 903,
+     "bboxGL": [
+      481,
+      371,
+      34,
+      43
+     ],
+     "fill": 0.618
+    },
+    "normal": {
+     "px": 100,
+     "bboxGL": [
+      493,
+      378,
+      8,
+      18
+     ],
+     "fill": 0.694
+    },
+    "shielded": {
+     "px": 155,
+     "bboxGL": [
+      492,
+      378,
+      10,
+      23
+     ],
+     "fill": 0.674
+    },
+    "slow": {
+     "px": 126,
+     "bboxGL": [
+      491,
+      378,
+      12,
+      16
+     ],
+     "fill": 0.656
+    },
+    "swarm": {
+     "px": 33,
+     "bboxGL": [
+      493,
+      378,
+      8,
+      7
+     ],
+     "fill": 0.589
+    }
+   },
+   "900": {
+    "angry": {
+     "px": 184,
+     "bboxGL": [
+      543,
+      352,
+      12,
+      26
+     ],
+     "fill": 0.59
+    },
+    "armored": {
+     "px": 114,
+     "bboxGL": [
+      545,
+      355,
+      10,
+      19
+     ],
+     "fill": 0.6
+    },
+    "brute": {
+     "px": 964,
+     "bboxGL": [
+      535,
+      350,
+      33,
+      42
+     ],
+     "fill": 0.696
+    },
+    "camo_normal": {
+     "px": 105,
+     "bboxGL": [
+      545,
+      355,
+      9,
+      19
+     ],
+     "fill": 0.614
+    },
+    "fast": {
+     "px": 89,
+     "bboxGL": [
+      545,
+      355,
+      8,
+      16
+     ],
+     "fill": 0.695
+    },
+    "flying": {
+     "px": 44,
+     "bboxGL": [
+      544,
+      369,
+      10,
+      9
+     ],
+     "fill": 0.489
+    },
+    "hive": {
+     "px": 982,
+     "bboxGL": [
+      533,
+      347,
+      35,
+      45
+     ],
+     "fill": 0.623
+    },
+    "normal": {
+     "px": 104,
+     "bboxGL": [
+      545,
+      355,
+      9,
+      19
+     ],
+     "fill": 0.608
+    },
+    "shielded": {
+     "px": 165,
+     "bboxGL": [
+      545,
+      355,
+      10,
+      22
+     ],
+     "fill": 0.75
+    },
+    "slow": {
+     "px": 132,
+     "bboxGL": [
+      544,
+      355,
+      12,
+      16
+     ],
+     "fill": 0.688
+    },
+    "swarm": {
+     "px": 34,
+     "bboxGL": [
+      546,
+      354,
+      8,
+      7
+     ],
+     "fill": 0.607
+    }
+   },
+   "1030": {
+    "angry": {
+     "px": 198,
+     "bboxGL": [
+      595,
+      329,
+      12,
+      26
+     ],
+     "fill": 0.635
+    },
+    "armored": {
+     "px": 117,
+     "bboxGL": [
+      598,
+      331,
+      10,
+      20
+     ],
+     "fill": 0.585
+    },
+    "brute": {
+     "px": 1010,
+     "bboxGL": [
+      588,
+      326,
+      33,
+      44
+     ],
+     "fill": 0.696
+    },
+    "camo_normal": {
+     "px": 107,
+     "bboxGL": [
+      598,
+      331,
+      9,
+      20
+     ],
+     "fill": 0.594
+    },
+    "fast": {
+     "px": 93,
+     "bboxGL": [
+      598,
+      331,
+      8,
+      17
+     ],
+     "fill": 0.684
+    },
+    "flying": {
+     "px": 51,
+     "bboxGL": [
+      597,
+      345,
+      10,
+      10
+     ],
+     "fill": 0.51
+    },
+    "hive": {
+     "px": 1045,
+     "bboxGL": [
+      585,
+      323,
+      37,
+      47
+     ],
+     "fill": 0.601
+    },
+    "normal": {
+     "px": 106,
+     "bboxGL": [
+      598,
+      331,
+      9,
+      20
+     ],
+     "fill": 0.589
+    },
+    "shielded": {
+     "px": 174,
+     "bboxGL": [
+      597,
+      331,
+      11,
+      23
+     ],
+     "fill": 0.688
+    },
+    "slow": {
+     "px": 139,
+     "bboxGL": [
+      596,
+      331,
+      13,
+      17
+     ],
+     "fill": 0.629
+    },
+    "swarm": {
+     "px": 36,
+     "bboxGL": [
+      598,
+      331,
+      9,
+      7
+     ],
+     "fill": 0.571
+    }
+   },
+   "1180": {
+    "angry": {
+     "px": 219,
+     "bboxGL": [
+      612,
+      299,
+      14,
+      25
+     ],
+     "fill": 0.626
+    },
+    "armored": {
+     "px": 129,
+     "bboxGL": [
+      615,
+      299,
+      10,
+      22
+     ],
+     "fill": 0.586
+    },
+    "brute": {
+     "px": 1206,
+     "bboxGL": [
+      599,
+      294,
+      40,
+      46
+     ],
+     "fill": 0.655
+    },
+    "camo_normal": {
+     "px": 118,
+     "bboxGL": [
+      615,
+      299,
+      10,
+      21
+     ],
+     "fill": 0.562
+    },
+    "fast": {
+     "px": 96,
+     "bboxGL": [
+      616,
+      299,
+      8,
+      19
+     ],
+     "fill": 0.632
+    },
+    "flying": {
+     "px": 44,
+     "bboxGL": [
+      615,
+      315,
+      10,
+      9
+     ],
+     "fill": 0.489
+    },
+    "hive": {
+     "px": 1078,
+     "bboxGL": [
+      601,
+      290,
+      37,
+      50
+     ],
+     "fill": 0.583
+    },
+    "normal": {
+     "px": 118,
+     "bboxGL": [
+      615,
+      299,
+      10,
+      21
+     ],
+     "fill": 0.562
+    },
+    "shielded": {
+     "px": 175,
+     "bboxGL": [
+      615,
+      299,
+      10,
+      25
+     ],
+     "fill": 0.7
+    },
+    "slow": {
+     "px": 144,
+     "bboxGL": [
+      614,
+      299,
+      12,
+      18
+     ],
+     "fill": 0.667
+    },
+    "swarm": {
+     "px": 38,
+     "bboxGL": [
+      616,
+      300,
+      8,
+      7
+     ],
+     "fill": 0.679
+    }
+   },
+   "1300": {
+    "angry": {
+     "px": 228,
+     "bboxGL": [
+      570,
+      269,
+      14,
+      26
+     ],
+     "fill": 0.626
+    },
+    "armored": {
+     "px": 134,
+     "bboxGL": [
+      573,
+      269,
+      10,
+      22
+     ],
+     "fill": 0.609
+    },
+    "brute": {
+     "px": 1279,
+     "bboxGL": [
+      557,
+      263,
+      40,
+      49
+     ],
+     "fill": 0.653
+    },
+    "camo_normal": {
+     "px": 124,
+     "bboxGL": [
+      574,
+      269,
+      9,
+      21
+     ],
+     "fill": 0.656
+    },
+    "fast": {
+     "px": 101,
+     "bboxGL": [
+      575,
+      269,
+      8,
+      19
+     ],
+     "fill": 0.664
+    },
+    "flying": {
+     "px": 46,
+     "bboxGL": [
+      572,
+      286,
+      11,
+      8
+     ],
+     "fill": 0.523
+    },
+    "hive": {
+     "px": 1167,
+     "bboxGL": [
+      558,
+      259,
+      39,
+      52
+     ],
+     "fill": 0.575
+    },
+    "normal": {
+     "px": 124,
+     "bboxGL": [
+      574,
+      269,
+      9,
+      21
+     ],
+     "fill": 0.656
+    },
+    "shielded": {
+     "px": 193,
+     "bboxGL": [
+      573,
+      269,
+      10,
+      25
+     ],
+     "fill": 0.772
+    },
+    "slow": {
+     "px": 153,
+     "bboxGL": [
+      572,
+      269,
+      12,
+      19
+     ],
+     "fill": 0.671
+    },
+    "swarm": {
+     "px": 42,
+     "bboxGL": [
+      573,
+      270,
+      9,
+      8
+     ],
+     "fill": 0.583
+    }
+   },
+   "1450": {
+    "angry": {
+     "px": 236,
+     "bboxGL": [
+      590,
+      230,
+      14,
+      29
+     ],
+     "fill": 0.581
+    },
+    "armored": {
+     "px": 147,
+     "bboxGL": [
+      593,
+      233,
+      11,
+      22
+     ],
+     "fill": 0.607
+    },
+    "brute": {
+     "px": 1293,
+     "bboxGL": [
+      582,
+      226,
+      37,
+      50
+     ],
+     "fill": 0.699
+    },
+    "camo_normal": {
+     "px": 128,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      21
+     ],
+     "fill": 0.61
+    },
+    "fast": {
+     "px": 110,
+     "bboxGL": [
+      594,
+      233,
+      8,
+      19
+     ],
+     "fill": 0.724
+    },
+    "flying": {
+     "px": 63,
+     "bboxGL": [
+      593,
+      248,
+      11,
+      11
+     ],
+     "fill": 0.521
+    },
+    "hive": {
+     "px": 1332,
+     "bboxGL": [
+      579,
+      222,
+      41,
+      54
+     ],
+     "fill": 0.602
+    },
+    "normal": {
+     "px": 127,
+     "bboxGL": [
+      594,
+      233,
+      9,
+      21
+     ],
+     "fill": 0.672
+    },
+    "shielded": {
+     "px": 217,
+     "bboxGL": [
+      593,
+      233,
+      12,
+      25
+     ],
+     "fill": 0.723
+    },
+    "slow": {
+     "px": 170,
+     "bboxGL": [
+      591,
+      233,
+      15,
+      18
+     ],
+     "fill": 0.63
+    },
+    "swarm": {
+     "px": 46,
+     "bboxGL": [
+      594,
+      233,
+      10,
+      8
+     ],
+     "fill": 0.575
+    }
+   },
+   "1600": {
+    "angry": {
+     "px": 250,
+     "bboxGL": [
+      664,
+      192,
+      15,
+      30
+     ],
+     "fill": 0.556
+    },
+    "armored": {
+     "px": 161,
+     "bboxGL": [
+      667,
+      195,
+      12,
+      23
+     ],
+     "fill": 0.583
+    },
+    "brute": {
+     "px": 1387,
+     "bboxGL": [
+      656,
+      187,
+      38,
+      53
+     ],
+     "fill": 0.689
+    },
+    "camo_normal": {
+     "px": 145,
+     "bboxGL": [
+      667,
+      195,
+      11,
+      22
+     ],
+     "fill": 0.599
+    },
+    "fast": {
+     "px": 126,
+     "bboxGL": [
+      668,
+      195,
+      9,
+      19
+     ],
+     "fill": 0.737
+    },
+    "flying": {
+     "px": 64,
+     "bboxGL": [
+      667,
+      211,
+      13,
+      11
+     ],
+     "fill": 0.448
+    },
+    "hive": {
+     "px": 1479,
+     "bboxGL": [
+      652,
+      183,
+      45,
+      57
+     ],
+     "fill": 0.577
+    },
+    "normal": {
+     "px": 145,
+     "bboxGL": [
+      667,
+      195,
+      11,
+      22
+     ],
+     "fill": 0.599
+    },
+    "shielded": {
+     "px": 244,
+     "bboxGL": [
+      667,
+      195,
+      14,
+      26
+     ],
+     "fill": 0.67
+    },
+    "slow": {
+     "px": 190,
+     "bboxGL": [
+      666,
+      195,
+      15,
+      19
+     ],
+     "fill": 0.667
+    },
+    "swarm": {
+     "px": 54,
+     "bboxGL": [
+      668,
+      195,
+      10,
+      9
+     ],
+     "fill": 0.6
+    }
+   },
+   "1750": {
+    "angry": {
+     "px": 265,
+     "bboxGL": [
+      746,
+      150,
+      15,
+      32
+     ],
+     "fill": 0.552
+    },
+    "armored": {
+     "px": 174,
+     "bboxGL": [
+      749,
+      154,
+      13,
+      24
+     ],
+     "fill": 0.558
+    },
+    "brute": {
+     "px": 1496,
+     "bboxGL": [
+      738,
+      144,
+      38,
+      56
+     ],
+     "fill": 0.703
+    },
+    "camo_normal": {
+     "px": 154,
+     "bboxGL": [
+      749,
+      154,
+      11,
+      23
+     ],
+     "fill": 0.609
+    },
+    "fast": {
+     "px": 130,
+     "bboxGL": [
+      749,
+      154,
+      10,
+      20
+     ],
+     "fill": 0.65
+    },
+    "flying": {
+     "px": 74,
+     "bboxGL": [
+      749,
+      170,
+      13,
+      12
+     ],
+     "fill": 0.474
+    },
+    "hive": {
+     "px": 1662,
+     "bboxGL": [
+      733,
+      140,
+      48,
+      61
+     ],
+     "fill": 0.568
+    },
+    "normal": {
+     "px": 154,
+     "bboxGL": [
+      749,
+      154,
+      11,
+      23
+     ],
+     "fill": 0.609
+    },
+    "shielded": {
+     "px": 260,
+     "bboxGL": [
+      749,
+      153,
+      15,
+      27
+     ],
+     "fill": 0.642
+    },
+    "slow": {
+     "px": 213,
+     "bboxGL": [
+      747,
+      154,
+      16,
+      20
+     ],
+     "fill": 0.666
+    },
+    "swarm": {
+     "px": 58,
+     "bboxGL": [
+      749,
+      154,
+      11,
+      9
+     ],
+     "fill": 0.586
+    }
+   },
+   "1870": {
+    "angry": {
+     "px": 279,
+     "bboxGL": [
+      817,
+      113,
+      16,
+      33
+     ],
+     "fill": 0.528
+    },
+    "armored": {
+     "px": 187,
+     "bboxGL": [
+      819,
+      117,
+      15,
+      25
+     ],
+     "fill": 0.499
+    },
+    "brute": {
+     "px": 1593,
+     "bboxGL": [
+      809,
+      107,
+      39,
+      59
+     ],
+     "fill": 0.692
+    },
+    "camo_normal": {
+     "px": 168,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "fill": 0.583
+    },
+    "fast": {
+     "px": 141,
+     "bboxGL": [
+      820,
+      117,
+      11,
+      21
+     ],
+     "fill": 0.61
+    },
+    "flying": {
+     "px": 78,
+     "bboxGL": [
+      820,
+      133,
+      15,
+      13
+     ],
+     "fill": 0.4
+    },
+    "hive": {
+     "px": 1823,
+     "bboxGL": [
+      803,
+      103,
+      52,
+      63
+     ],
+     "fill": 0.556
+    },
+    "normal": {
+     "px": 167,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "fill": 0.58
+    },
+    "shielded": {
+     "px": 297,
+     "bboxGL": [
+      819,
+      117,
+      17,
+      28
+     ],
+     "fill": 0.624
+    },
+    "slow": {
+     "px": 231,
+     "bboxGL": [
+      817,
+      117,
+      18,
+      21
+     ],
+     "fill": 0.611
+    },
+    "swarm": {
+     "px": 63,
+     "bboxGL": [
+      820,
+      118,
+      11,
+      9
+     ],
+     "fill": 0.636
+    }
+   }
+  },
+  "broadside": {
+   "120": {
+    "angry": {
+     "px": 156,
+     "bboxGL": [
+      461,
+      455,
+      12,
+      22
+     ],
+     "fill": 0.591
+    },
+    "armored": {
+     "px": 87,
+     "bboxGL": [
+      464,
+      456,
+      8,
+      17
+     ],
+     "fill": 0.64
+    },
+    "brute": {
+     "px": 826,
+     "bboxGL": [
+      452,
+      453,
+      31,
+      36
+     ],
+     "fill": 0.74
+    },
+    "camo_normal": {
+     "px": 88,
+     "bboxGL": [
+      464,
+      456,
+      8,
+      17
+     ],
+     "fill": 0.647
+    },
+    "fast": {
+     "px": 58,
+     "bboxGL": [
+      465,
+      456,
+      6,
+      14
+     ],
+     "fill": 0.69
+    },
+    "flying": {
+     "px": 29,
+     "bboxGL": [
+      463,
+      469,
+      9,
+      7
+     ],
+     "fill": 0.46
+    },
+    "hive": {
+     "px": 598,
+     "bboxGL": [
+      456,
+      451,
+      24,
+      38
+     ],
+     "fill": 0.656
+    },
+    "normal": {
+     "px": 88,
+     "bboxGL": [
+      464,
+      456,
+      8,
+      17
+     ],
+     "fill": 0.647
+    },
+    "shielded": {
+     "px": 99,
+     "bboxGL": [
+      464,
+      456,
+      7,
+      20
+     ],
+     "fill": 0.707
+    },
+    "slow": {
+     "px": 87,
+     "bboxGL": [
+      464,
+      456,
+      8,
+      15
+     ],
+     "fill": 0.725
+    },
+    "swarm": {
+     "px": 21,
+     "bboxGL": [
+      466,
+      456,
+      4,
+      6
+     ],
+     "fill": 0.875
+    }
+   },
+   "200": {
+    "angry": {
+     "px": 163,
+     "bboxGL": [
+      458,
+      439,
+      12,
+      22
+     ],
+     "fill": 0.617
+    },
+    "armored": {
+     "px": 96,
+     "bboxGL": [
+      461,
+      439,
+      9,
+      19
+     ],
+     "fill": 0.561
+    },
+    "brute": {
+     "px": 868,
+     "bboxGL": [
+      449,
+      437,
+      32,
+      36
+     ],
+     "fill": 0.753
+    },
+    "camo_normal": {
+     "px": 90,
+     "bboxGL": [
+      461,
+      439,
+      9,
+      18
+     ],
+     "fill": 0.556
+    },
+    "fast": {
+     "px": 66,
+     "bboxGL": [
+      463,
+      439,
+      5,
+      16
+     ],
+     "fill": 0.825
+    },
+    "flying": {
+     "px": 33,
+     "bboxGL": [
+      460,
+      452,
+      10,
+      8
+     ],
+     "fill": 0.412
+    },
+    "hive": {
+     "px": 633,
+     "bboxGL": [
+      453,
+      435,
+      25,
+      38
+     ],
+     "fill": 0.666
+    },
+    "normal": {
+     "px": 90,
+     "bboxGL": [
+      461,
+      439,
+      9,
+      18
+     ],
+     "fill": 0.556
+    },
+    "shielded": {
+     "px": 100,
+     "bboxGL": [
+      462,
+      439,
+      7,
+      21
+     ],
+     "fill": 0.68
+    },
+    "slow": {
+     "px": 87,
+     "bboxGL": [
+      461,
+      439,
+      9,
+      16
+     ],
+     "fill": 0.604
+    },
+    "swarm": {
+     "px": 22,
+     "bboxGL": [
+      463,
+      440,
+      5,
+      6
+     ],
+     "fill": 0.733
+    }
+   },
+   "300": {
+    "angry": {
+     "px": 173,
+     "bboxGL": [
+      455,
+      418,
+      12,
+      22
+     ],
+     "fill": 0.655
+    },
+    "armored": {
+     "px": 98,
+     "bboxGL": [
+      458,
+      418,
+      9,
+      19
+     ],
+     "fill": 0.573
+    },
+    "brute": {
+     "px": 932,
+     "bboxGL": [
+      445,
+      415,
+      33,
+      38
+     ],
+     "fill": 0.743
+    },
+    "camo_normal": {
+     "px": 91,
+     "bboxGL": [
+      458,
+      418,
+      9,
+      18
+     ],
+     "fill": 0.562
+    },
+    "fast": {
+     "px": 60,
+     "bboxGL": [
+      460,
+      418,
+      5,
+      15
+     ],
+     "fill": 0.8
+    },
+    "flying": {
+     "px": 36,
+     "bboxGL": [
+      457,
+      432,
+      9,
+      7
+     ],
+     "fill": 0.571
+    },
+    "hive": {
+     "px": 685,
+     "bboxGL": [
+      449,
+      413,
+      27,
+      40
+     ],
+     "fill": 0.634
+    },
+    "normal": {
+     "px": 91,
+     "bboxGL": [
+      458,
+      418,
+      9,
+      18
+     ],
+     "fill": 0.562
+    },
+    "shielded": {
+     "px": 104,
+     "bboxGL": [
+      459,
+      418,
+      7,
+      21
+     ],
+     "fill": 0.707
+    },
+    "slow": {
+     "px": 94,
+     "bboxGL": [
+      458,
+      418,
+      9,
+      16
+     ],
+     "fill": 0.653
+    },
+    "swarm": {
+     "px": 19,
+     "bboxGL": [
+      460,
+      418,
+      5,
+      7
+     ],
+     "fill": 0.543
+    }
+   },
+   "420": {
+    "angry": {
+     "px": 124,
+     "bboxGL": [
+      485,
+      402,
+      8,
+      24
+     ],
+     "fill": 0.646
+    },
+    "armored": {
+     "px": 92,
+     "bboxGL": [
+      485,
+      405,
+      9,
+      18
+     ],
+     "fill": 0.568
+    },
+    "brute": {
+     "px": 666,
+     "bboxGL": [
+      477,
+      401,
+      26,
+      37
+     ],
+     "fill": 0.692
+    },
+    "camo_normal": {
+     "px": 80,
+     "bboxGL": [
+      485,
+      405,
+      8,
+      17
+     ],
+     "fill": 0.588
+    },
+    "fast": {
+     "px": 66,
+     "bboxGL": [
+      485,
+      405,
+      7,
+      15
+     ],
+     "fill": 0.629
+    },
+    "flying": {
+     "px": 41,
+     "bboxGL": [
+      483,
+      419,
+      11,
+      9
+     ],
+     "fill": 0.414
+    },
+    "hive": {
+     "px": 873,
+     "bboxGL": [
+      471,
+      399,
+      37,
+      39
+     ],
+     "fill": 0.605
+    },
+    "normal": {
+     "px": 80,
+     "bboxGL": [
+      485,
+      405,
+      8,
+      17
+     ],
+     "fill": 0.588
+    },
+    "shielded": {
+     "px": 155,
+     "bboxGL": [
+      485,
+      405,
+      11,
+      22
+     ],
+     "fill": 0.64
+    },
+    "slow": {
+     "px": 120,
+     "bboxGL": [
+      484,
+      405,
+      11,
+      14
+     ],
+     "fill": 0.779
+    },
+    "swarm": {
+     "px": 31,
+     "bboxGL": [
+      486,
+      405,
+      7,
+      6
+     ],
+     "fill": 0.738
+    }
+   },
+   "540": {
+    "angry": {
+     "px": 123,
+     "bboxGL": [
+      542,
+      402,
+      8,
+      24
+     ],
+     "fill": 0.641
+    },
+    "armored": {
+     "px": 90,
+     "bboxGL": [
+      542,
+      405,
+      9,
+      18
+     ],
+     "fill": 0.556
+    },
+    "brute": {
+     "px": 658,
+     "bboxGL": [
+      534,
+      401,
+      26,
+      37
+     ],
+     "fill": 0.684
+    },
+    "camo_normal": {
+     "px": 80,
+     "bboxGL": [
+      542,
+      405,
+      8,
+      17
+     ],
+     "fill": 0.588
+    },
+    "fast": {
+     "px": 64,
+     "bboxGL": [
+      543,
+      405,
+      7,
+      15
+     ],
+     "fill": 0.61
+    },
+    "flying": {
+     "px": 35,
+     "bboxGL": [
+      540,
+      419,
+      11,
+      8
+     ],
+     "fill": 0.398
+    },
+    "hive": {
+     "px": 862,
+     "bboxGL": [
+      529,
+      399,
+      37,
+      39
+     ],
+     "fill": 0.597
+    },
+    "normal": {
+     "px": 81,
+     "bboxGL": [
+      542,
+      405,
+      8,
+      17
+     ],
+     "fill": 0.596
+    },
+    "shielded": {
+     "px": 154,
+     "bboxGL": [
+      542,
+      405,
+      11,
+      22
+     ],
+     "fill": 0.636
+    },
+    "slow": {
+     "px": 119,
+     "bboxGL": [
+      541,
+      405,
+      11,
+      14
+     ],
+     "fill": 0.773
+    },
+    "swarm": {
+     "px": 31,
+     "bboxGL": [
+      543,
+      405,
+      7,
+      6
+     ],
+     "fill": 0.738
+    }
+   },
+   "640": {
+    "angry": {
+     "px": 120,
+     "bboxGL": [
+      590,
+      402,
+      8,
+      24
+     ],
+     "fill": 0.625
+    },
+    "armored": {
+     "px": 96,
+     "bboxGL": [
+      590,
+      405,
+      9,
+      18
+     ],
+     "fill": 0.593
+    },
+    "brute": {
+     "px": 655,
+     "bboxGL": [
+      582,
+      401,
+      26,
+      37
+     ],
+     "fill": 0.681
+    },
+    "camo_normal": {
+     "px": 84,
+     "bboxGL": [
+      590,
+      405,
+      8,
+      17
+     ],
+     "fill": 0.618
+    },
+    "fast": {
+     "px": 71,
+     "bboxGL": [
+      590,
+      405,
+      7,
+      15
+     ],
+     "fill": 0.676
+    },
+    "flying": {
+     "px": 41,
+     "bboxGL": [
+      588,
+      419,
+      11,
+      9
+     ],
+     "fill": 0.414
+    },
+    "hive": {
+     "px": 855,
+     "bboxGL": [
+      577,
+      399,
+      37,
+      39
+     ],
+     "fill": 0.593
+    },
+    "normal": {
+     "px": 84,
+     "bboxGL": [
+      590,
+      405,
+      8,
+      17
+     ],
+     "fill": 0.618
+    },
+    "shielded": {
+     "px": 158,
+     "bboxGL": [
+      590,
+      405,
+      11,
+      22
+     ],
+     "fill": 0.653
+    },
+    "slow": {
+     "px": 121,
+     "bboxGL": [
+      589,
+      405,
+      11,
+      14
+     ],
+     "fill": 0.786
+    },
+    "swarm": {
+     "px": 32,
+     "bboxGL": [
+      591,
+      404,
+      7,
+      8
+     ],
+     "fill": 0.571
+    }
+   },
+   "760": {
+    "angry": {
+     "px": 181,
+     "bboxGL": [
+      597,
+      380,
+      13,
+      23
+     ],
+     "fill": 0.605
+    },
+    "armored": {
+     "px": 110,
+     "bboxGL": [
+      600,
+      380,
+      9,
+      20
+     ],
+     "fill": 0.611
+    },
+    "brute": {
+     "px": 1033,
+     "bboxGL": [
+      588,
+      377,
+      35,
+      39
+     ],
+     "fill": 0.757
+    },
+    "camo_normal": {
+     "px": 100,
+     "bboxGL": [
+      600,
+      380,
+      9,
+      19
+     ],
+     "fill": 0.585
+    },
+    "fast": {
+     "px": 69,
+     "bboxGL": [
+      602,
+      380,
+      6,
+      16
+     ],
+     "fill": 0.719
+    },
+    "flying": {
+     "px": 37,
+     "bboxGL": [
+      600,
+      394,
+      11,
+      8
+     ],
+     "fill": 0.42
+    },
+    "hive": {
+     "px": 763,
+     "bboxGL": [
+      591,
+      375,
+      28,
+      42
+     ],
+     "fill": 0.649
+    },
+    "normal": {
+     "px": 100,
+     "bboxGL": [
+      600,
+      380,
+      9,
+      19
+     ],
+     "fill": 0.585
+    },
+    "shielded": {
+     "px": 117,
+     "bboxGL": [
+      601,
+      380,
+      8,
+      22
+     ],
+     "fill": 0.665
+    },
+    "slow": {
+     "px": 101,
+     "bboxGL": [
+      600,
+      380,
+      9,
+      17
+     ],
+     "fill": 0.66
+    },
+    "swarm": {
+     "px": 22,
+     "bboxGL": [
+      603,
+      381,
+      4,
+      6
+     ],
+     "fill": 0.917
+    }
+   },
+   "900": {
+    "angry": {
+     "px": 204,
+     "bboxGL": [
+      599,
+      343,
+      14,
+      24
+     ],
+     "fill": 0.607
+    },
+    "armored": {
+     "px": 117,
+     "bboxGL": [
+      603,
+      343,
+      9,
+      21
+     ],
+     "fill": 0.619
+    },
+    "brute": {
+     "px": 1130,
+     "bboxGL": [
+      590,
+      340,
+      36,
+      41
+     ],
+     "fill": 0.766
+    },
+    "camo_normal": {
+     "px": 114,
+     "bboxGL": [
+      603,
+      343,
+      9,
+      20
+     ],
+     "fill": 0.633
+    },
+    "fast": {
+     "px": 80,
+     "bboxGL": [
+      604,
+      343,
+      7,
+      17
+     ],
+     "fill": 0.672
+    },
+    "flying": {
+     "px": 42,
+     "bboxGL": [
+      603,
+      358,
+      10,
+      8
+     ],
+     "fill": 0.525
+    },
+    "hive": {
+     "px": 845,
+     "bboxGL": [
+      593,
+      337,
+      29,
+      44
+     ],
+     "fill": 0.662
+    },
+    "normal": {
+     "px": 114,
+     "bboxGL": [
+      603,
+      343,
+      9,
+      20
+     ],
+     "fill": 0.633
+    },
+    "shielded": {
+     "px": 128,
+     "bboxGL": [
+      604,
+      343,
+      8,
+      23
+     ],
+     "fill": 0.696
+    },
+    "slow": {
+     "px": 115,
+     "bboxGL": [
+      603,
+      343,
+      9,
+      17
+     ],
+     "fill": 0.752
+    },
+    "swarm": {
+     "px": 25,
+     "bboxGL": [
+      605,
+      344,
+      5,
+      7
+     ],
+     "fill": 0.714
+    }
+   },
+   "1030": {
+    "angry": {
+     "px": 220,
+     "bboxGL": [
+      601,
+      305,
+      16,
+      25
+     ],
+     "fill": 0.55
+    },
+    "armored": {
+     "px": 128,
+     "bboxGL": [
+      605,
+      305,
+      11,
+      21
+     ],
+     "fill": 0.554
+    },
+    "brute": {
+     "px": 1239,
+     "bboxGL": [
+      592,
+      301,
+      38,
+      44
+     ],
+     "fill": 0.741
+    },
+    "camo_normal": {
+     "px": 116,
+     "bboxGL": [
+      606,
+      305,
+      9,
+      20
+     ],
+     "fill": 0.644
+    },
+    "fast": {
+     "px": 84,
+     "bboxGL": [
+      607,
+      305,
+      7,
+      17
+     ],
+     "fill": 0.706
+    },
+    "flying": {
+     "px": 47,
+     "bboxGL": [
+      605,
+      320,
+      12,
+      9
+     ],
+     "fill": 0.435
+    },
+    "hive": {
+     "px": 967,
+     "bboxGL": [
+      595,
+      298,
+      31,
+      47
+     ],
+     "fill": 0.664
+    },
+    "normal": {
+     "px": 116,
+     "bboxGL": [
+      606,
+      305,
+      9,
+      20
+     ],
+     "fill": 0.644
+    },
+    "shielded": {
+     "px": 133,
+     "bboxGL": [
+      607,
+      305,
+      8,
+      24
+     ],
+     "fill": 0.693
+    },
+    "slow": {
+     "px": 122,
+     "bboxGL": [
+      606,
+      305,
+      9,
+      18
+     ],
+     "fill": 0.753
+    },
+    "swarm": {
+     "px": 29,
+     "bboxGL": [
+      608,
+      305,
+      5,
+      8
+     ],
+     "fill": 0.725
+    }
+   },
+   "1180": {
+    "angry": {
+     "px": 161,
+     "bboxGL": [
+      573,
+      275,
+      10,
+      25
+     ],
+     "fill": 0.644
+    },
+    "armored": {
+     "px": 129,
+     "bboxGL": [
+      572,
+      275,
+      11,
+      21
+     ],
+     "fill": 0.558
+    },
+    "brute": {
+     "px": 957,
+     "bboxGL": [
+      562,
+      270,
+      30,
+      45
+     ],
+     "fill": 0.709
+    },
+    "camo_normal": {
+     "px": 110,
+     "bboxGL": [
+      573,
+      276,
+      10,
+      19
+     ],
+     "fill": 0.579
+    },
+    "fast": {
+     "px": 91,
+     "bboxGL": [
+      574,
+      276,
+      9,
+      18
+     ],
+     "fill": 0.562
+    },
+    "flying": {
+     "px": 53,
+     "bboxGL": [
+      572,
+      292,
+      13,
+      10
+     ],
+     "fill": 0.408
+    },
+    "hive": {
+     "px": 1213,
+     "bboxGL": [
+      555,
+      269,
+      44,
+      46
+     ],
+     "fill": 0.599
+    },
+    "normal": {
+     "px": 110,
+     "bboxGL": [
+      573,
+      276,
+      10,
+      19
+     ],
+     "fill": 0.579
+    },
+    "shielded": {
+     "px": 216,
+     "bboxGL": [
+      570,
+      275,
+      13,
+      26
+     ],
+     "fill": 0.639
+    },
+    "slow": {
+     "px": 163,
+     "bboxGL": [
+      571,
+      276,
+      13,
+      17
+     ],
+     "fill": 0.738
+    },
+    "swarm": {
+     "px": 40,
+     "bboxGL": [
+      573,
+      276,
+      8,
+      8
+     ],
+     "fill": 0.625
+    }
+   },
+   "1300": {
+    "angry": {
+     "px": 159,
+     "bboxGL": [
+      504,
+      275,
+      11,
+      25
+     ],
+     "fill": 0.578
+    },
+    "armored": {
+     "px": 129,
+     "bboxGL": [
+      503,
+      275,
+      12,
+      21
+     ],
+     "fill": 0.512
+    },
+    "brute": {
+     "px": 954,
+     "bboxGL": [
+      493,
+      270,
+      30,
+      45
+     ],
+     "fill": 0.707
+    },
+    "camo_normal": {
+     "px": 110,
+     "bboxGL": [
+      505,
+      276,
+      9,
+      19
+     ],
+     "fill": 0.643
+    },
+    "fast": {
+     "px": 94,
+     "bboxGL": [
+      505,
+      276,
+      9,
+      18
+     ],
+     "fill": 0.58
+    },
+    "flying": {
+     "px": 53,
+     "bboxGL": [
+      503,
+      292,
+      13,
+      10
+     ],
+     "fill": 0.408
+    },
+    "hive": {
+     "px": 1200,
+     "bboxGL": [
+      486,
+      269,
+      44,
+      46
+     ],
+     "fill": 0.593
+    },
+    "normal": {
+     "px": 110,
+     "bboxGL": [
+      505,
+      276,
+      9,
+      19
+     ],
+     "fill": 0.643
+    },
+    "shielded": {
+     "px": 214,
+     "bboxGL": [
+      501,
+      275,
+      13,
+      26
+     ],
+     "fill": 0.633
+    },
+    "slow": {
+     "px": 163,
+     "bboxGL": [
+      502,
+      276,
+      14,
+      17
+     ],
+     "fill": 0.685
+    },
+    "swarm": {
+     "px": 42,
+     "bboxGL": [
+      505,
+      276,
+      8,
+      9
+     ],
+     "fill": 0.583
+    }
+   },
+   "1450": {
+    "angry": {
+     "px": 253,
+     "bboxGL": [
+      463,
+      244,
+      16,
+      27
+     ],
+     "fill": 0.586
+    },
+    "armored": {
+     "px": 150,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      22
+     ],
+     "fill": 0.62
+    },
+    "brute": {
+     "px": 1467,
+     "bboxGL": [
+      451,
+      240,
+      42,
+      47
+     ],
+     "fill": 0.743
+    },
+    "camo_normal": {
+     "px": 140,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "fill": 0.667
+    },
+    "fast": {
+     "px": 101,
+     "bboxGL": [
+      469,
+      245,
+      7,
+      18
+     ],
+     "fill": 0.802
+    },
+    "flying": {
+     "px": 57,
+     "bboxGL": [
+      465,
+      260,
+      12,
+      10
+     ],
+     "fill": 0.475
+    },
+    "hive": {
+     "px": 1128,
+     "bboxGL": [
+      456,
+      237,
+      33,
+      50
+     ],
+     "fill": 0.684
+    },
+    "normal": {
+     "px": 140,
+     "bboxGL": [
+      467,
+      245,
+      10,
+      21
+     ],
+     "fill": 0.667
+    },
+    "shielded": {
+     "px": 155,
+     "bboxGL": [
+      468,
+      244,
+      9,
+      26
+     ],
+     "fill": 0.662
+    },
+    "slow": {
+     "px": 141,
+     "bboxGL": [
+      467,
+      245,
+      11,
+      19
+     ],
+     "fill": 0.675
+    },
+    "swarm": {
+     "px": 33,
+     "bboxGL": [
+      469,
+      246,
+      6,
+      7
+     ],
+     "fill": 0.786
+    }
+   },
+   "1600": {
+    "angry": {
+     "px": 284,
+     "bboxGL": [
+      456,
+      186,
+      17,
+      28
+     ],
+     "fill": 0.597
+    },
+    "armored": {
+     "px": 168,
+     "bboxGL": [
+      460,
+      186,
+      12,
+      24
+     ],
+     "fill": 0.583
+    },
+    "brute": {
+     "px": 1666,
+     "bboxGL": [
+      443,
+      181,
+      45,
+      50
+     ],
+     "fill": 0.74
+    },
+    "camo_normal": {
+     "px": 162,
+     "bboxGL": [
+      460,
+      186,
+      12,
+      23
+     ],
+     "fill": 0.587
+    },
+    "fast": {
+     "px": 113,
+     "bboxGL": [
+      463,
+      186,
+      7,
+      20
+     ],
+     "fill": 0.807
+    },
+    "flying": {
+     "px": 61,
+     "bboxGL": [
+      459,
+      202,
+      13,
+      11
+     ],
+     "fill": 0.427
+    },
+    "hive": {
+     "px": 1314,
+     "bboxGL": [
+      448,
+      177,
+      36,
+      54
+     ],
+     "fill": 0.676
+    },
+    "normal": {
+     "px": 162,
+     "bboxGL": [
+      460,
+      186,
+      12,
+      23
+     ],
+     "fill": 0.587
+    },
+    "shielded": {
+     "px": 176,
+     "bboxGL": [
+      461,
+      186,
+      10,
+      26
+     ],
+     "fill": 0.677
+    },
+    "slow": {
+     "px": 163,
+     "bboxGL": [
+      461,
+      186,
+      11,
+      21
+     ],
+     "fill": 0.706
+    },
+    "swarm": {
+     "px": 39,
+     "bboxGL": [
+      463,
+      187,
+      6,
+      9
+     ],
+     "fill": 0.722
+    }
+   },
+   "1750": {
+    "angry": {
+     "px": 316,
+     "bboxGL": [
+      448,
+      119,
+      19,
+      29
+     ],
+     "fill": 0.574
+    },
+    "armored": {
+     "px": 187,
+     "bboxGL": [
+      453,
+      119,
+      13,
+      25
+     ],
+     "fill": 0.575
+    },
+    "brute": {
+     "px": 1932,
+     "bboxGL": [
+      434,
+      113,
+      49,
+      53
+     ],
+     "fill": 0.744
+    },
+    "camo_normal": {
+     "px": 178,
+     "bboxGL": [
+      453,
+      119,
+      12,
+      24
+     ],
+     "fill": 0.618
+    },
+    "fast": {
+     "px": 119,
+     "bboxGL": [
+      455,
+      119,
+      9,
+      20
+     ],
+     "fill": 0.661
+    },
+    "flying": {
+     "px": 70,
+     "bboxGL": [
+      451,
+      135,
+      14,
+      12
+     ],
+     "fill": 0.417
+    },
+    "hive": {
+     "px": 1559,
+     "bboxGL": [
+      440,
+      108,
+      39,
+      59
+     ],
+     "fill": 0.678
+    },
+    "normal": {
+     "px": 178,
+     "bboxGL": [
+      453,
+      119,
+      12,
+      24
+     ],
+     "fill": 0.618
+    },
+    "shielded": {
+     "px": 197,
+     "bboxGL": [
+      454,
+      119,
+      10,
+      27
+     ],
+     "fill": 0.73
+    },
+    "slow": {
+     "px": 185,
+     "bboxGL": [
+      453,
+      119,
+      12,
+      22
+     ],
+     "fill": 0.701
+    },
+    "swarm": {
+     "px": 44,
+     "bboxGL": [
+      456,
+      120,
+      6,
+      9
+     ],
+     "fill": 0.815
+    }
+   },
+   "1870": {
+    "angry": {
+     "px": 355,
+     "bboxGL": [
+      441,
+      56,
+      20,
+      31
+     ],
+     "fill": 0.573
+    },
+    "armored": {
+     "px": 211,
+     "bboxGL": [
+      446,
+      57,
+      14,
+      26
+     ],
+     "fill": 0.58
+    },
+    "brute": {
+     "px": 2182,
+     "bboxGL": [
+      426,
+      50,
+      52,
+      56
+     ],
+     "fill": 0.749
+    },
+    "camo_normal": {
+     "px": 201,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "fill": 0.618
+    },
+    "fast": {
+     "px": 136,
+     "bboxGL": [
+      449,
+      57,
+      9,
+      21
+     ],
+     "fill": 0.72
+    },
+    "flying": {
+     "px": 82,
+     "bboxGL": [
+      444,
+      73,
+      15,
+      14
+     ],
+     "fill": 0.39
+    },
+    "hive": {
+     "px": 1797,
+     "bboxGL": [
+      432,
+      45,
+      42,
+      63
+     ],
+     "fill": 0.679
+    },
+    "normal": {
+     "px": 201,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "fill": 0.618
+    },
+    "shielded": {
+     "px": 219,
+     "bboxGL": [
+      447,
+      57,
+      11,
+      28
+     ],
+     "fill": 0.711
+    },
+    "slow": {
+     "px": 205,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      23
+     ],
+     "fill": 0.686
+    },
+    "swarm": {
+     "px": 49,
+     "bboxGL": [
+      449,
+      58,
+      7,
+      10
+     ],
+     "fill": 0.7
+    }
+   }
+  }
+ },
+ "closingNull": 0,
+ "finishedUTC": "2026-08-13T15:23:06.256Z",
+ "treeAtEnd": {
+  "files": 176,
+  "hash": "509b0cd7eb0ea44c35904869406b1cc7",
+  "newestFile": "js\\gl\\models\\enemy-shielded.js",
+  "newestMtime": "2026-08-13T15:22:41.370Z"
+ },
+ "treeStable": false
+}

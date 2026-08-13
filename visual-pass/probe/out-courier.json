@@ -1,0 +1,1490 @@
+{
+ "pair": [
+  "shielded",
+  "armored"
+ ],
+ "bearings": {
+  "front": {
+   "yaw": -1.5707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -1.5707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 200,
+   "spotScore": 1,
+   "frameCounts": {
+    "shielded": 8,
+    "armored": 8
+   },
+   "cycle": [
+    {
+     "k": 0,
+     "countRatio": 1.263,
+     "outlineRatio": 0.538,
+     "changed": 235,
+     "outlinePx": 100,
+     "interiorPx": 135,
+     "interiorShare": 0.5745,
+     "intersectionRepainted": 0.9926,
+     "courier": {
+      "px": 227,
+      "w": 14,
+      "h": 25,
+      "bucket": 0,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 145,
+      "w": 11,
+      "h": 21,
+      "bucket": 0,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 3,
+     "courierAspect": 0.56,
+     "drudgeAspect": 0.524
+    },
+    {
+     "k": 1,
+     "countRatio": 1.29,
+     "outlineRatio": 0.58,
+     "changed": 238,
+     "outlinePx": 107,
+     "interiorPx": 131,
+     "interiorShare": 0.5504,
+     "intersectionRepainted": 1,
+     "courier": {
+      "px": 228,
+      "w": 14,
+      "h": 25,
+      "bucket": 1,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 141,
+      "w": 12,
+      "h": 20,
+      "bucket": 1,
+      "yaw": 0
+     },
+     "heightDelta": 5,
+     "widthDelta": 2,
+     "courierAspect": 0.56,
+     "drudgeAspect": 0.6
+    },
+    {
+     "k": 2,
+     "countRatio": 1.291,
+     "outlineRatio": 0.583,
+     "changed": 246,
+     "outlinePx": 111,
+     "interiorPx": 135,
+     "interiorShare": 0.5488,
+     "intersectionRepainted": 1,
+     "courier": {
+      "px": 235,
+      "w": 14,
+      "h": 25,
+      "bucket": 2,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 146,
+      "w": 12,
+      "h": 21,
+      "bucket": 2,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 2,
+     "courierAspect": 0.56,
+     "drudgeAspect": 0.571
+    },
+    {
+     "k": 3,
+     "countRatio": 1.287,
+     "outlineRatio": 0.574,
+     "changed": 240,
+     "outlinePx": 107,
+     "interiorPx": 133,
+     "interiorShare": 0.5542,
+     "intersectionRepainted": 1,
+     "courier": {
+      "px": 230,
+      "w": 14,
+      "h": 25,
+      "bucket": 3,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 143,
+      "w": 12,
+      "h": 21,
+      "bucket": 3,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 2,
+     "courierAspect": 0.56,
+     "drudgeAspect": 0.571
+    },
+    {
+     "k": 4,
+     "countRatio": 1.232,
+     "outlineRatio": 0.517,
+     "changed": 236,
+     "outlinePx": 99,
+     "interiorPx": 137,
+     "interiorShare": 0.5805,
+     "intersectionRepainted": 0.9648,
+     "courier": {
+      "px": 232,
+      "w": 14,
+      "h": 26,
+      "bucket": 4,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 151,
+      "w": 11,
+      "h": 22,
+      "bucket": 4,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 3,
+     "courierAspect": 0.538,
+     "drudgeAspect": 0.5
+    },
+    {
+     "k": 5,
+     "countRatio": 1.287,
+     "outlineRatio": 0.584,
+     "changed": 258,
+     "outlinePx": 117,
+     "interiorPx": 141,
+     "interiorShare": 0.5465,
+     "intersectionRepainted": 0.993,
+     "courier": {
+      "px": 247,
+      "w": 14,
+      "h": 26,
+      "bucket": 5,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 154,
+      "w": 11,
+      "h": 22,
+      "bucket": 5,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 3,
+     "courierAspect": 0.538,
+     "drudgeAspect": 0.5
+    },
+    {
+     "k": 6,
+     "countRatio": 1.297,
+     "outlineRatio": 0.614,
+     "changed": 264,
+     "outlinePx": 125,
+     "interiorPx": 139,
+     "interiorShare": 0.5265,
+     "intersectionRepainted": 0.9858,
+     "courier": {
+      "px": 249,
+      "w": 15,
+      "h": 26,
+      "bucket": 6,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 158,
+      "w": 12,
+      "h": 22,
+      "bucket": 6,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 3,
+     "courierAspect": 0.577,
+     "drudgeAspect": 0.545
+    },
+    {
+     "k": 7,
+     "countRatio": 1.283,
+     "outlineRatio": 0.586,
+     "changed": 254,
+     "outlinePx": 116,
+     "interiorPx": 138,
+     "interiorShare": 0.5433,
+     "intersectionRepainted": 0.9857,
+     "courier": {
+      "px": 244,
+      "w": 14,
+      "h": 25,
+      "bucket": 7,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 152,
+      "w": 11,
+      "h": 21,
+      "bucket": 7,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 3,
+     "courierAspect": 0.56,
+     "drudgeAspect": 0.524
+    }
+   ],
+   "contextPairsAtRest": {
+    "angry|armored": {
+     "count": 1.282,
+     "outline": 0.564
+    },
+    "angry|brute": {
+     "count": 1.681,
+     "outline": 1.362
+    },
+    "angry|camo_normal": {
+     "count": 1.308,
+     "outline": 0.616
+    },
+    "angry|fast": {
+     "count": 1.342,
+     "outline": 0.695
+    },
+    "angry|flying": {
+     "count": 1.789,
+     "outline": 1.578
+    },
+    "angry|hive": {
+     "count": 1.792,
+     "outline": 1.583
+    },
+    "angry|normal": {
+     "count": 1.296,
+     "outline": 0.616
+    },
+    "angry|shielded": {
+     "count": 1.261,
+     "outline": 0.586
+    },
+    "angry|slow": {
+     "count": 1.305,
+     "outline": 0.62
+    },
+    "angry|swarm": {
+     "count": 1.691,
+     "outline": 1.381
+    },
+    "armored|brute": {
+     "count": 1.775,
+     "outline": 1.55
+    },
+    "armored|camo_normal": {
+     "count": 1.078,
+     "outline": 0.156
+    },
+    "armored|fast": {
+     "count": 1.075,
+     "outline": 0.308
+    },
+    "armored|flying": {
+     "count": 1.901,
+     "outline": 1.803
+    },
+    "armored|hive": {
+     "count": 1.858,
+     "outline": 1.718
+    },
+    "armored|normal": {
+     "count": 0.989,
+     "outline": 0.156
+    },
+    "armored|shielded": {
+     "count": 1.263,
+     "outline": 0.538
+    },
+    "armored|slow": {
+     "count": 1.184,
+     "outline": 0.441
+    },
+    "armored|swarm": {
+     "count": 1.668,
+     "outline": 1.337
+    },
+    "brute|camo_normal": {
+     "count": 1.803,
+     "outline": 1.609
+    },
+    "brute|fast": {
+     "count": 1.827,
+     "outline": 1.655
+    },
+    "brute|flying": {
+     "count": 1.903,
+     "outline": 1.807
+    },
+    "brute|hive": {
+     "count": 1.207,
+     "outline": 0.44
+    },
+    "brute|normal": {
+     "count": 1.803,
+     "outline": 1.609
+    },
+    "brute|shielded": {
+     "count": 1.669,
+     "outline": 1.337
+    },
+    "brute|slow": {
+     "count": 1.714,
+     "outline": 1.44
+    },
+    "brute|swarm": {
+     "count": 1.919,
+     "outline": 1.839
+    },
+    "camo_normal|fast": {
+     "count": 1.078,
+     "outline": 0.155
+    },
+    "camo_normal|flying": {
+     "count": 1.956,
+     "outline": 1.912
+    },
+    "camo_normal|hive": {
+     "count": 1.883,
+     "outline": 1.766
+    },
+    "camo_normal|normal": {
+     "count": 1,
+     "outline": 0
+    },
+    "camo_normal|shielded": {
+     "count": 1.322,
+     "outline": 0.644
+    },
+    "camo_normal|slow": {
+     "count": 1.252,
+     "outline": 0.503
+    },
+    "camo_normal|swarm": {
+     "count": 1.663,
+     "outline": 1.326
+    },
+    "fast|flying": {
+     "count": 1.964,
+     "outline": 1.928
+    },
+    "fast|hive": {
+     "count": 1.901,
+     "outline": 1.802
+    },
+    "fast|normal": {
+     "count": 0.681,
+     "outline": 0.155
+    },
+    "fast|shielded": {
+     "count": 1.343,
+     "outline": 0.722
+    },
+    "fast|slow": {
+     "count": 1.211,
+     "outline": 0.585
+    },
+    "fast|swarm": {
+     "count": 1.628,
+     "outline": 1.256
+    },
+    "flying|hive": {
+     "count": 1.917,
+     "outline": 1.835
+    },
+    "flying|normal": {
+     "count": 1.956,
+     "outline": 1.912
+    },
+    "flying|shielded": {
+     "count": 1.782,
+     "outline": 1.565
+    },
+    "flying|slow": {
+     "count": 1.984,
+     "outline": 1.967
+    },
+    "flying|swarm": {
+     "count": 2,
+     "outline": 2
+    },
+    "hive|normal": {
+     "count": 1.883,
+     "outline": 1.766
+    },
+    "hive|shielded": {
+     "count": 1.762,
+     "outline": 1.525
+    },
+    "hive|slow": {
+     "count": 1.817,
+     "outline": 1.635
+    },
+    "hive|swarm": {
+     "count": 1.978,
+     "outline": 1.957
+    },
+    "normal|shielded": {
+     "count": 1.299,
+     "outline": 0.644
+    },
+    "normal|slow": {
+     "count": 1.187,
+     "outline": 0.503
+    },
+    "normal|swarm": {
+     "count": 1.663,
+     "outline": 1.326
+    },
+    "shielded|slow": {
+     "count": 1.245,
+     "outline": 0.557
+    },
+    "shielded|swarm": {
+     "count": 1.745,
+     "outline": 1.491
+    },
+    "slow|swarm": {
+     "count": 1.59,
+     "outline": 1.179
+    }
+   },
+   "contextExcluded": [],
+   "contextNote": "single pass, same spot, rest frame -- context for ranking, NOT the gated eleven-body table (no two-launch null)"
+  },
+  "three-quarter": {
+   "yaw": -0.8707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -0.8707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 1870,
+   "spotScore": 1,
+   "frameCounts": {
+    "shielded": 8,
+    "armored": 8
+   },
+   "cycle": [
+    {
+     "k": 0,
+     "countRatio": 1.264,
+     "outlineRatio": 0.562,
+     "changed": 306,
+     "outlinePx": 136,
+     "interiorPx": 170,
+     "interiorShare": 0.5556,
+     "intersectionRepainted": 0.977,
+     "courier": {
+      "px": 297,
+      "w": 17,
+      "h": 28,
+      "bucket": 0,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 187,
+      "w": 15,
+      "h": 25,
+      "bucket": 0,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": 2,
+     "courierAspect": 0.607,
+     "drudgeAspect": 0.6
+    },
+    {
+     "k": 1,
+     "countRatio": 1.268,
+     "outlineRatio": 0.552,
+     "changed": 296,
+     "outlinePx": 129,
+     "interiorPx": 167,
+     "interiorShare": 0.5642,
+     "intersectionRepainted": 0.9882,
+     "courier": {
+      "px": 284,
+      "w": 17,
+      "h": 28,
+      "bucket": 1,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 183,
+      "w": 14,
+      "h": 24,
+      "bucket": 1,
+      "yaw": 0
+     },
+     "heightDelta": 4,
+     "widthDelta": 3,
+     "courierAspect": 0.607,
+     "drudgeAspect": 0.583
+    },
+    {
+     "k": 2,
+     "countRatio": 1.291,
+     "outlineRatio": 0.599,
+     "changed": 304,
+     "outlinePx": 141,
+     "interiorPx": 163,
+     "interiorShare": 0.5362,
+     "intersectionRepainted": 0.9879,
+     "courier": {
+      "px": 286,
+      "w": 16,
+      "h": 28,
+      "bucket": 2,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 185,
+      "w": 14,
+      "h": 25,
+      "bucket": 2,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": 2,
+     "courierAspect": 0.571,
+     "drudgeAspect": 0.56
+    },
+    {
+     "k": 3,
+     "countRatio": 1.271,
+     "outlineRatio": 0.568,
+     "changed": 300,
+     "outlinePx": 134,
+     "interiorPx": 166,
+     "interiorShare": 0.5533,
+     "intersectionRepainted": 0.9822,
+     "courier": {
+      "px": 286,
+      "w": 17,
+      "h": 28,
+      "bucket": 3,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 186,
+      "w": 14,
+      "h": 25,
+      "bucket": 3,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": 3,
+     "courierAspect": 0.607,
+     "drudgeAspect": 0.56
+    },
+    {
+     "k": 4,
+     "countRatio": 1.249,
+     "outlineRatio": 0.54,
+     "changed": 308,
+     "outlinePx": 133,
+     "interiorPx": 175,
+     "interiorShare": 0.5682,
+     "intersectionRepainted": 0.9722,
+     "courier": {
+      "px": 300,
+      "w": 17,
+      "h": 29,
+      "bucket": 4,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 193,
+      "w": 15,
+      "h": 26,
+      "bucket": 4,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": 2,
+     "courierAspect": 0.586,
+     "drudgeAspect": 0.577
+    },
+    {
+     "k": 5,
+     "countRatio": 1.268,
+     "outlineRatio": 0.543,
+     "changed": 322,
+     "outlinePx": 138,
+     "interiorPx": 184,
+     "interiorShare": 0.5714,
+     "intersectionRepainted": 0.9946,
+     "courier": {
+      "px": 311,
+      "w": 18,
+      "h": 27,
+      "bucket": 5,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 197,
+      "w": 14,
+      "h": 25,
+      "bucket": 5,
+      "yaw": 0
+     },
+     "heightDelta": 2,
+     "widthDelta": 4,
+     "courierAspect": 0.667,
+     "drudgeAspect": 0.56
+    },
+    {
+     "k": 6,
+     "countRatio": 1.285,
+     "outlineRatio": 0.585,
+     "changed": 334,
+     "outlinePx": 152,
+     "interiorPx": 182,
+     "interiorShare": 0.5449,
+     "intersectionRepainted": 0.9891,
+     "courier": {
+      "px": 315,
+      "w": 20,
+      "h": 27,
+      "bucket": 6,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 205,
+      "w": 16,
+      "h": 24,
+      "bucket": 6,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": 4,
+     "courierAspect": 0.741,
+     "drudgeAspect": 0.667
+    },
+    {
+     "k": 7,
+     "countRatio": 1.25,
+     "outlineRatio": 0.523,
+     "changed": 320,
+     "outlinePx": 134,
+     "interiorPx": 186,
+     "interiorShare": 0.5813,
+     "intersectionRepainted": 0.9841,
+     "courier": {
+      "px": 313,
+      "w": 18,
+      "h": 27,
+      "bucket": 7,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 199,
+      "w": 15,
+      "h": 24,
+      "bucket": 7,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": 3,
+     "courierAspect": 0.667,
+     "drudgeAspect": 0.625
+    }
+   ],
+   "contextPairsAtRest": {
+    "angry|armored": {
+     "count": 1.292,
+     "outline": 0.609
+    },
+    "angry|brute": {
+     "count": 1.701,
+     "outline": 1.404
+    },
+    "angry|camo_normal": {
+     "count": 1.302,
+     "outline": 0.604
+    },
+    "angry|fast": {
+     "count": 1.3,
+     "outline": 0.657
+    },
+    "angry|flying": {
+     "count": 1.787,
+     "outline": 1.574
+    },
+    "angry|hive": {
+     "count": 1.795,
+     "outline": 1.593
+    },
+    "angry|normal": {
+     "count": 1.283,
+     "outline": 0.601
+    },
+    "angry|shielded": {
+     "count": 1.264,
+     "outline": 0.59
+    },
+    "angry|slow": {
+     "count": 1.298,
+     "outline": 0.627
+    },
+    "angry|swarm": {
+     "count": 1.684,
+     "outline": 1.368
+    },
+    "armored|brute": {
+     "count": 1.79,
+     "outline": 1.58
+    },
+    "armored|camo_normal": {
+     "count": 1.07,
+     "outline": 0.141
+    },
+    "armored|fast": {
+     "count": 1.073,
+     "outline": 0.317
+    },
+    "armored|flying": {
+     "count": 1.887,
+     "outline": 1.774
+    },
+    "armored|hive": {
+     "count": 1.862,
+     "outline": 1.723
+    },
+    "armored|normal": {
+     "count": 0.966,
+     "outline": 0.147
+    },
+    "armored|shielded": {
+     "count": 1.264,
+     "outline": 0.562
+    },
+    "armored|slow": {
+     "count": 1.158,
+     "outline": 0.402
+    },
+    "armored|swarm": {
+     "count": 1.624,
+     "outline": 1.248
+    },
+    "brute|camo_normal": {
+     "count": 1.809,
+     "outline": 1.618
+    },
+    "brute|fast": {
+     "count": 1.837,
+     "outline": 1.675
+    },
+    "brute|flying": {
+     "count": 1.907,
+     "outline": 1.813
+    },
+    "brute|hive": {
+     "count": 1.208,
+     "outline": 0.445
+    },
+    "brute|normal": {
+     "count": 1.809,
+     "outline": 1.62
+    },
+    "brute|shielded": {
+     "count": 1.685,
+     "outline": 1.371
+    },
+    "brute|slow": {
+     "count": 1.746,
+     "outline": 1.493
+    },
+    "brute|swarm": {
+     "count": 1.924,
+     "outline": 1.848
+    },
+    "camo_normal|fast": {
+     "count": 1.087,
+     "outline": 0.201
+    },
+    "camo_normal|flying": {
+     "count": 1.935,
+     "outline": 1.87
+    },
+    "camo_normal|hive": {
+     "count": 1.879,
+     "outline": 1.759
+    },
+    "camo_normal|normal": {
+     "count": 0.991,
+     "outline": 0.006
+    },
+    "camo_normal|shielded": {
+     "count": 1.312,
+     "outline": 0.624
+    },
+    "camo_normal|slow": {
+     "count": 1.218,
+     "outline": 0.436
+    },
+    "camo_normal|swarm": {
+     "count": 1.61,
+     "outline": 1.221
+    },
+    "fast|flying": {
+     "count": 1.954,
+     "outline": 1.909
+    },
+    "fast|hive": {
+     "count": 1.902,
+     "outline": 1.804
+    },
+    "fast|normal": {
+     "count": 0.701,
+     "outline": 0.195
+    },
+    "fast|shielded": {
+     "count": 1.311,
+     "outline": 0.721
+    },
+    "fast|slow": {
+     "count": 1.199,
+     "outline": 0.548
+    },
+    "fast|swarm": {
+     "count": 1.598,
+     "outline": 1.196
+    },
+    "flying|hive": {
+     "count": 1.918,
+     "outline": 1.836
+    },
+    "flying|normal": {
+     "count": 1.935,
+     "outline": 1.869
+    },
+    "flying|shielded": {
+     "count": 1.755,
+     "outline": 1.509
+    },
+    "flying|slow": {
+     "count": 1.987,
+     "outline": 1.974
+    },
+    "flying|swarm": {
+     "count": 2,
+     "outline": 2
+    },
+    "hive|normal": {
+     "count": 1.88,
+     "outline": 1.761
+    },
+    "hive|shielded": {
+     "count": 1.765,
+     "outline": 1.53
+    },
+    "hive|slow": {
+     "count": 1.826,
+     "outline": 1.651
+    },
+    "hive|swarm": {
+     "count": 1.976,
+     "outline": 1.951
+    },
+    "normal|shielded": {
+     "count": 1.289,
+     "outline": 0.629
+    },
+    "normal|slow": {
+     "count": 1.156,
+     "outline": 0.442
+    },
+    "normal|swarm": {
+     "count": 1.609,
+     "outline": 1.217
+    },
+    "shielded|slow": {
+     "count": 1.254,
+     "outline": 0.561
+    },
+    "shielded|swarm": {
+     "count": 1.733,
+     "outline": 1.467
+    },
+    "slow|swarm": {
+     "count": 1.571,
+     "outline": 1.143
+    }
+   },
+   "contextExcluded": [],
+   "contextNote": "single pass, same spot, rest frame -- context for ranking, NOT the gated eleven-body table (no two-launch null)"
+  },
+  "broadside": {
+   "yaw": 0,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": 0,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "spot": 1870,
+   "spotScore": 1,
+   "frameCounts": {
+    "shielded": 8,
+    "armored": 8
+   },
+   "cycle": [
+    {
+     "k": 0,
+     "countRatio": 1.126,
+     "outlineRatio": 0.307,
+     "changed": 242,
+     "outlinePx": 66,
+     "interiorPx": 176,
+     "interiorShare": 0.7273,
+     "intersectionRepainted": 0.967,
+     "courier": {
+      "px": 219,
+      "w": 11,
+      "h": 28,
+      "bucket": 0,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 211,
+      "w": 14,
+      "h": 26,
+      "bucket": 0,
+      "yaw": 0
+     },
+     "heightDelta": 2,
+     "widthDelta": -3,
+     "courierAspect": 0.393,
+     "drudgeAspect": 0.538
+    },
+    {
+     "k": 1,
+     "countRatio": 1.145,
+     "outlineRatio": 0.318,
+     "changed": 241,
+     "outlinePx": 67,
+     "interiorPx": 174,
+     "interiorShare": 0.722,
+     "intersectionRepainted": 0.9831,
+     "courier": {
+      "px": 213,
+      "w": 11,
+      "h": 29,
+      "bucket": 1,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 208,
+      "w": 13,
+      "h": 26,
+      "bucket": 1,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": -2,
+     "courierAspect": 0.379,
+     "drudgeAspect": 0.5
+    },
+    {
+     "k": 2,
+     "countRatio": 1.147,
+     "outlineRatio": 0.322,
+     "changed": 242,
+     "outlinePx": 68,
+     "interiorPx": 174,
+     "interiorShare": 0.719,
+     "intersectionRepainted": 0.9831,
+     "courier": {
+      "px": 218,
+      "w": 12,
+      "h": 30,
+      "bucket": 2,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 204,
+      "w": 13,
+      "h": 27,
+      "bucket": 2,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": -1,
+     "courierAspect": 0.4,
+     "drudgeAspect": 0.481
+    },
+    {
+     "k": 3,
+     "countRatio": 1.14,
+     "outlineRatio": 0.309,
+     "changed": 240,
+     "outlinePx": 65,
+     "interiorPx": 175,
+     "interiorShare": 0.7292,
+     "intersectionRepainted": 0.9831,
+     "courier": {
+      "px": 214,
+      "w": 11,
+      "h": 30,
+      "bucket": 3,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 207,
+      "w": 13,
+      "h": 27,
+      "bucket": 3,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": -2,
+     "courierAspect": 0.367,
+     "drudgeAspect": 0.481
+    },
+    {
+     "k": 4,
+     "countRatio": 1.124,
+     "outlineRatio": 0.294,
+     "changed": 241,
+     "outlinePx": 63,
+     "interiorPx": 178,
+     "interiorShare": 0.7386,
+     "intersectionRepainted": 0.9727,
+     "courier": {
+      "px": 217,
+      "w": 11,
+      "h": 28,
+      "bucket": 4,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 212,
+      "w": 14,
+      "h": 26,
+      "bucket": 4,
+      "yaw": 0
+     },
+     "heightDelta": 2,
+     "widthDelta": -3,
+     "courierAspect": 0.393,
+     "drudgeAspect": 0.538
+    },
+    {
+     "k": 5,
+     "countRatio": 1.155,
+     "outlineRatio": 0.32,
+     "changed": 242,
+     "outlinePx": 67,
+     "interiorPx": 175,
+     "interiorShare": 0.7231,
+     "intersectionRepainted": 0.9943,
+     "courier": {
+      "px": 205,
+      "w": 10,
+      "h": 29,
+      "bucket": 5,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 214,
+      "w": 14,
+      "h": 26,
+      "bucket": 5,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": -4,
+     "courierAspect": 0.345,
+     "drudgeAspect": 0.538
+    },
+    {
+     "k": 6,
+     "countRatio": 1.169,
+     "outlineRatio": 0.348,
+     "changed": 235,
+     "outlinePx": 70,
+     "interiorPx": 165,
+     "interiorShare": 0.7021,
+     "intersectionRepainted": 0.994,
+     "courier": {
+      "px": 202,
+      "w": 10,
+      "h": 30,
+      "bucket": 6,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 200,
+      "w": 13,
+      "h": 27,
+      "bucket": 6,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": -3,
+     "courierAspect": 0.333,
+     "drudgeAspect": 0.481
+    },
+    {
+     "k": 7,
+     "countRatio": 1.155,
+     "outlineRatio": 0.32,
+     "changed": 242,
+     "outlinePx": 67,
+     "interiorPx": 175,
+     "interiorShare": 0.7231,
+     "intersectionRepainted": 0.9943,
+     "courier": {
+      "px": 207,
+      "w": 10,
+      "h": 30,
+      "bucket": 7,
+      "yaw": 0
+     },
+     "drudge": {
+      "px": 212,
+      "w": 14,
+      "h": 27,
+      "bucket": 7,
+      "yaw": 0
+     },
+     "heightDelta": 3,
+     "widthDelta": -4,
+     "courierAspect": 0.333,
+     "drudgeAspect": 0.519
+    }
+   ],
+   "contextPairsAtRest": {
+    "angry|armored": {
+     "count": 1.3,
+     "outline": 0.622
+    },
+    "angry|brute": {
+     "count": 1.734,
+     "outline": 1.47
+    },
+    "angry|camo_normal": {
+     "count": 1.327,
+     "outline": 0.655
+    },
+    "angry|fast": {
+     "count": 1.47,
+     "outline": 0.957
+    },
+    "angry|flying": {
+     "count": 1.748,
+     "outline": 1.497
+    },
+    "angry|hive": {
+     "count": 1.697,
+     "outline": 1.394
+    },
+    "angry|normal": {
+     "count": 1.32,
+     "outline": 0.655
+    },
+    "angry|shielded": {
+     "count": 1.272,
+     "outline": 0.634
+    },
+    "angry|slow": {
+     "count": 1.339,
+     "outline": 0.686
+    },
+    "angry|swarm": {
+     "count": 1.847,
+     "outline": 1.693
+    },
+    "armored|brute": {
+     "count": 1.839,
+     "outline": 1.682
+    },
+    "armored|camo_normal": {
+     "count": 1.073,
+     "outline": 0.146
+    },
+    "armored|fast": {
+     "count": 1.124,
+     "outline": 0.444
+    },
+    "armored|flying": {
+     "count": 1.802,
+     "outline": 1.604
+    },
+    "armored|hive": {
+     "count": 1.805,
+     "outline": 1.61
+    },
+    "armored|normal": {
+     "count": 0.961,
+     "outline": 0.146
+    },
+    "armored|shielded": {
+     "count": 1.126,
+     "outline": 0.307
+    },
+    "armored|slow": {
+     "count": 1.063,
+     "outline": 0.192
+    },
+    "armored|swarm": {
+     "count": 1.662,
+     "outline": 1.323
+    },
+    "brute|camo_normal": {
+     "count": 1.85,
+     "outline": 1.7
+    },
+    "brute|fast": {
+     "count": 1.896,
+     "outline": 1.803
+    },
+    "brute|flying": {
+     "count": 1.928,
+     "outline": 1.855
+    },
+    "brute|hive": {
+     "count": 1.244,
+     "outline": 0.49
+    },
+    "brute|normal": {
+     "count": 1.845,
+     "outline": 1.7
+    },
+    "brute|shielded": {
+     "count": 1.838,
+     "outline": 1.678
+    },
+    "brute|slow": {
+     "count": 1.843,
+     "outline": 1.698
+    },
+    "brute|swarm": {
+     "count": 1.975,
+     "outline": 1.95
+    },
+    "camo_normal|fast": {
+     "count": 1.193,
+     "outline": 0.386
+    },
+    "camo_normal|flying": {
+     "count": 1.83,
+     "outline": 1.661
+    },
+    "camo_normal|hive": {
+     "count": 1.814,
+     "outline": 1.628
+    },
+    "camo_normal|normal": {
+     "count": 1,
+     "outline": 0
+    },
+    "camo_normal|shielded": {
+     "count": 1.186,
+     "outline": 0.371
+    },
+    "camo_normal|slow": {
+     "count": 1.064,
+     "outline": 0.128
+    },
+    "camo_normal|swarm": {
+     "count": 1.656,
+     "outline": 1.312
+    },
+    "fast|flying": {
+     "count": 1.835,
+     "outline": 1.67
+    },
+    "fast|hive": {
+     "count": 1.875,
+     "outline": 1.75
+    },
+    "fast|normal": {
+     "count": 0.819,
+     "outline": 0.386
+    },
+    "fast|shielded": {
+     "count": 1.2,
+     "outline": 0.49
+    },
+    "fast|slow": {
+     "count": 1.132,
+     "outline": 0.44
+    },
+    "fast|swarm": {
+     "count": 1.578,
+     "outline": 1.157
+    },
+    "flying|hive": {
+     "count": 1.913,
+     "outline": 1.825
+    },
+    "flying|normal": {
+     "count": 1.83,
+     "outline": 1.661
+    },
+    "flying|shielded": {
+     "count": 1.661,
+     "outline": 1.322
+    },
+    "flying|slow": {
+     "count": 1.875,
+     "outline": 1.749
+    },
+    "flying|swarm": {
+     "count": 2,
+     "outline": 2
+    },
+    "hive|normal": {
+     "count": 1.814,
+     "outline": 1.628
+    },
+    "hive|shielded": {
+     "count": 1.802,
+     "outline": 1.605
+    },
+    "hive|slow": {
+     "count": 1.81,
+     "outline": 1.62
+    },
+    "hive|swarm": {
+     "count": 1.951,
+     "outline": 1.902
+    },
+    "normal|shielded": {
+     "count": 1.152,
+     "outline": 0.371
+    },
+    "normal|slow": {
+     "count": 0.98,
+     "outline": 0.128
+    },
+    "normal|swarm": {
+     "count": 1.656,
+     "outline": 1.312
+    },
+    "shielded|slow": {
+     "count": 1.165,
+     "outline": 0.358
+    },
+    "shielded|swarm": {
+     "count": 1.649,
+     "outline": 1.299
+    },
+    "slow|swarm": {
+     "count": 1.622,
+     "outline": 1.244
+    }
+   },
+   "contextExcluded": [],
+   "contextNote": "single pass, same spot, rest frame -- context for ranking, NOT the gated eleven-body table (no two-launch null)"
+  }
+ },
+ "guard": {
+  "threshold": 0.8
+ },
+ "setup": {
+  "map": "rune-circuit",
+  "gl": [
+   1111,
+   625
+  ],
+  "fittedCamera": {
+   "target": [
+    640,
+    360,
+    0
+   ],
+   "distance": 2021.2373649696563,
+   "pitch": 0.5944591432292686,
+   "yaw": -1.5707963267948966
+  },
+  "orbitConstructorDefault": 900,
+  "ui": [
+   1280,
+   720
+  ],
+  "dpr": 1,
+  "visibility": "visible",
+  "notes": [
+   "rAF stubbed"
+  ]
+ },
+ "camera": {
+  "target": [
+   640,
+   360,
+   0
+  ],
+  "distance": 2021.2373649696563,
+  "pitch": 0.5944591432292686,
+  "yaw": -1.5707963267948966,
+  "viewport": [
+   1111,
+   625
+  ]
+ },
+ "registered": {
+  "a": true,
+  "b": true,
+  "aType": true,
+  "bType": true
+ },
+ "board": [
+  "angry",
+  "armored",
+  "brute",
+  "camo_normal",
+  "fast",
+  "flying",
+  "hive",
+  "normal",
+  "shielded",
+  "slow",
+  "swarm"
+ ]
+}

@@ -1,0 +1,387 @@
+{
+ "phases": {
+  "A": {
+   "label": "AFTER rebuild (509eba1, as shipped)",
+   "rawTopSlow": 0.979
+  },
+  "B": {
+   "label": "BEFORE rebuild (ddef990)",
+   "rawTopSlow": 1.19
+  }
+ },
+ "controls": {
+  "reregister": {
+   "models": 107,
+   "wasModels": 107
+  },
+  "seamMoved": true,
+  "rawTopRestored": 0.979
+ },
+ "bearings": {
+  "front": {
+   "yaw": -1.5707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -1.5707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "A": {
+    "gleaner": {
+     "changed": 122,
+     "total": 694375,
+     "maxChan": 101,
+     "bboxGL": [
+      914,
+      270,
+      11,
+      19
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    },
+    "tun": {
+     "changed": 173,
+     "total": 694375,
+     "maxChan": 137,
+     "bboxGL": [
+      912,
+      270,
+      15,
+      17
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    }
+   },
+   "B": {
+    "gleaner": {
+     "changed": 122,
+     "total": 694375,
+     "maxChan": 101,
+     "bboxGL": [
+      914,
+      270,
+      11,
+      19
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    },
+    "tun": {
+     "changed": 177,
+     "total": 694375,
+     "maxChan": 98,
+     "bboxGL": [
+      912,
+      270,
+      15,
+      19
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    }
+   },
+   "gleanerNull": 0,
+   "pairAfter": {
+    "count": 1.159,
+    "outline": 0.454,
+    "changedPx": 171,
+    "outlinePx": 67,
+    "interiorPx": 104
+   },
+   "pairBefore": {
+    "count": 0.849,
+    "outline": 0.368,
+    "changedPx": 127,
+    "outlinePx": 55,
+    "interiorPx": 72
+   },
+   "tunVsItself": {
+    "count": 0.777,
+    "outline": 0.137,
+    "changedPx": 136,
+    "outlinePx": 24
+   },
+   "renderedHeight": {
+    "after": 17,
+    "before": 19,
+    "gleaner": 19,
+    "deltaRows": 2
+   }
+  },
+  "three-quarter": {
+   "yaw": -0.8707963267948966,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": -0.8707963267948966,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "A": {
+    "gleaner": {
+     "changed": 167,
+     "total": 694375,
+     "maxChan": 205,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    },
+    "tun": {
+     "changed": 231,
+     "total": 694375,
+     "maxChan": 121,
+     "bboxGL": [
+      817,
+      117,
+      18,
+      21
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    }
+   },
+   "B": {
+    "gleaner": {
+     "changed": 167,
+     "total": 694375,
+     "maxChan": 205,
+     "bboxGL": [
+      820,
+      117,
+      12,
+      24
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    },
+    "tun": {
+     "changed": 239,
+     "total": 694375,
+     "maxChan": 188,
+     "bboxGL": [
+      818,
+      117,
+      17,
+      24
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    }
+   },
+   "gleanerNull": 0,
+   "pairAfter": {
+    "count": 1.156,
+    "outline": 0.442,
+    "changedPx": 230,
+    "outlinePx": 88,
+    "interiorPx": 142
+   },
+   "pairBefore": {
+    "count": 0.852,
+    "outline": 0.355,
+    "changedPx": 173,
+    "outlinePx": 72,
+    "interiorPx": 101
+   },
+   "tunVsItself": {
+    "count": 0.8,
+    "outline": 0.153,
+    "changedPx": 188,
+    "outlinePx": 36
+   },
+   "renderedHeight": {
+    "after": 21,
+    "before": 24,
+    "gleaner": 24,
+    "deltaRows": 3
+   }
+  },
+  "broadside": {
+   "yaw": 0,
+   "camera": {
+    "target": [
+     640,
+     360,
+     0
+    ],
+    "distance": 2021.2373649696563,
+    "pitch": 0.5944591432292686,
+    "yaw": 0,
+    "viewport": [
+     1111,
+     625
+    ]
+   },
+   "A": {
+    "gleaner": {
+     "changed": 201,
+     "total": 694375,
+     "maxChan": 164,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    },
+    "tun": {
+     "changed": 205,
+     "total": 694375,
+     "maxChan": 114,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      23
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    }
+   },
+   "B": {
+    "gleaner": {
+     "changed": 201,
+     "total": 694375,
+     "maxChan": 164,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    },
+    "tun": {
+     "changed": 214,
+     "total": 694375,
+     "maxChan": 108,
+     "bboxGL": [
+      446,
+      57,
+      13,
+      25
+     ],
+     "canvas": [
+      1111,
+      625
+     ]
+    }
+   },
+   "gleanerNull": 0,
+   "pairAfter": {
+    "count": 0.98,
+    "outline": 0.128,
+    "changedPx": 199,
+    "outlinePx": 26,
+    "interiorPx": 173
+   },
+   "pairBefore": {
+    "count": 0.578,
+    "outline": 0.063,
+    "changedPx": 120,
+    "outlinePx": 13,
+    "interiorPx": 107
+   },
+   "tunVsItself": {
+    "count": 0.811,
+    "outline": 0.091,
+    "changedPx": 170,
+    "outlinePx": 19
+   },
+   "renderedHeight": {
+    "after": 23,
+    "before": 25,
+    "gleaner": 25,
+    "deltaRows": 2
+   }
+  }
+ },
+ "setup": {
+  "map": "rune-circuit",
+  "gl": [
+   1111,
+   625
+  ],
+  "fittedCamera": {
+   "target": [
+    640,
+    360,
+    0
+   ],
+   "distance": 2021.2373649696563,
+   "pitch": 0.5944591432292686,
+   "yaw": -1.5707963267948966
+  },
+  "orbitConstructorDefault": 900,
+  "ui": [
+   1280,
+   720
+  ],
+  "dpr": 1,
+  "visibility": "visible",
+  "notes": [
+   "rAF stubbed"
+  ]
+ },
+ "camera": {
+  "target": [
+   640,
+   360,
+   0
+  ],
+  "distance": 2021.2373649696563,
+  "pitch": 0.5944591432292686,
+  "yaw": -1.5707963267948966,
+  "viewport": [
+   1111,
+   625
+  ]
+ }
+}
