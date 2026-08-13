@@ -316,9 +316,10 @@ def write_js(model, filename):
         # BAND 0 IS ALWAYS THE WALK. State poses follow it in authored order and
         # are addressed as bands[n][0]; there is no reserved rest frame and no
         # minus one, which is the whole reason this is a layout and not a
-        # length. An ABSENT `bands` means the entire frame list is the walk --
-        # today's behaviour on every pre-band file -- so nothing already shipped
-        # changes meaning.
+        # length. An ABSENT `bands` means THE EXPORTER DID NOT DECLARE THIS
+        # MODEL'S LAYOUT -- see `_BUILD_INFO` for why that is deliberately not
+        # the same sentence as "the whole list is the walk". Every file shipped
+        # before this field existed keeps its current behaviour either way.
         "  bands: %s," % json.dumps(model["bands"]),
     ] if model.get("bands") is not None else []) + ([
         "  chassisVersion: %d," % model["chassisVersion"],
@@ -360,22 +361,61 @@ def _build_rifleman(group):
     return build
 
 
-# Filled in by `_build_enemy`'s builder and read by `main()` immediately after
-# it returns. A module-level handoff rather than a richer return value, because
-# `build()`'s contract -- "return the frame count" -- is implemented by nine
-# enemy modules, four inline branches and every tower builder, and widening it
-# would touch all of them to serve two optional fields.
+# Filled in by a builder and read by `main()` immediately after it returns. A
+# module-level handoff rather than a richer return value, because `build()`'s
+# contract -- "return the frame count" -- is implemented by nine enemy modules,
+# four inline branches and every tower builder, and widening it would touch all
+# of them to serve two optional fields.
 #
 # BOTH FIELDS ARE ADDITIVE AND BOTH DEFAULT TO ABSENT, AND ABSENCE IS MEANINGFUL
 # RATHER THAN ZERO -- the same pattern twice:
 #
-#   bands   absent -> the whole frame list is the walk, which is what every
-#           pre-band file already means. NOT "no bands".
+#   bands   absent -> THE EXPORTER DID NOT DECLARE THIS MODEL'S LAYOUT.
+#           NOT "no bands", and NOT "pre-band" either. Those three readings
+#           coincide today and DIVERGE the moment a band is added to a family
+#           this exporter does not emit for -- at which point "pre-band" would
+#           be false while "not declared" stays true. Written now for the state
+#           it will be in then, because this file's neighbouring sentence about
+#           CHASSIS_VERSION has already been wrong in two directions in one day.
 #   chassisVersion
 #           absent -> this model is NOT chassis-built. NOT "version 0".
 #           `enemy-brute`, `-swarm`, `-hive` and the imported `-flying` must
 #           never read as a stale chassis.
+#
+# WHICH FAMILIES GET `bands`, AND THE RULE IS THE REASON RATHER THAN THE LIST:
+# emit it wherever THE EXPORTER KNOWS THE LAYOUT.
+#
+#   enemies, recruits  -> YES. Plain cycles. Frame 0 is a real frame of the
+#                         cycle, so `[[0, frames]]` is a TRUE statement.
+#   blubs, summoners   -> NO. Their frame 0 is a RESERVED REST frame and their
+#                         consumers divide `frames.length - 1` by the cycle
+#                         (js/gl/gl-world.js, the BLUB_CYCLE and SUM_CYCLE
+#                         sites). `[[0, frames]]` would be a FALSE statement
+#                         about the layout, and a field that lies is worse than
+#                         a field that is absent.
+#   towers             -> NO, until someone models their layout.
 _BUILD_INFO = {}
+
+
+def _record_layout(module, frames):
+    """Declare one model's frame layout, and its chassis provenance if it has
+    one. Returns `frames`, so it can wrap a return statement.
+
+    A module sets `BANDS` only if it carries state poses AFTER its walk -- the
+    Trestle's plant, the Fieldwright's raised mast. Everything else gets the
+    honest positive statement that all of its frames are the walk.
+
+    THAT DEFAULT IS WHAT MAKES otto'S ARMED PREDICATE TRUE BY CONSTRUCTION.
+    "A walking body must never present a frame outside `bands[0]`" cannot fail
+    on a body that did not opt in, because its single band IS every frame. The
+    failure is reachable only on a body that declared `BANDS` -- which is the
+    right shape for a check, since it can only fire where the risk actually is.
+    """
+    _BUILD_INFO["bands"] = list(getattr(module, "BANDS", None) or [[0, frames]])
+    version = _chassis_version_of(module)
+    if version is not None:
+        _BUILD_INFO["chassisVersion"] = version
+    return frames
 
 
 def _chassis_version_of(module):
@@ -421,20 +461,8 @@ def _build_enemy(module_name):
         td.scene(ortho_scale=getattr(module, "ORTHO_SCALE", 1.5),
                  tile_w=64, tile_h=64)
 
-        def _record(frames):
-            # A module declares BANDS only if it carries state poses after its
-            # walk. Everything else gets the honest positive statement that all
-            # of its frames are the walk -- `[[0, 8]]` SAYS that, where an
-            # omitted field only implied it.
-            _BUILD_INFO["bands"] = (list(getattr(module, "BANDS", None) or
-                                         [[0, frames]]))
-            version = _chassis_version_of(module)
-            if version is not None:
-                _BUILD_INFO["chassisVersion"] = version
-            return frames
-
         if hasattr(module, "export_build"):
-            return _record(module.export_build())
+            return _record_layout(module, module.export_build())
 
         result = module.build()
         if module_name == "enemy_swarm":
@@ -446,7 +474,7 @@ def _build_enemy(module_name):
         else:
             module.set_shield_visible(result[2], False)
             module.animate_walk(result[1], result[2], module.WALK_FRAMES)
-        return _record(module.WALK_FRAMES)
+        return _record_layout(module, module.WALK_FRAMES)
     return build
 
 
@@ -458,7 +486,13 @@ def _build_recruit(tier):
         root = td.root("recruit")
         parts = s.build(s.materials(), root, tier)
         s.animate_walk(parts, s.WALK_FRAMES)
-        return s.WALK_FRAMES
+        # A recruit is a plain walk cycle like an enemy -- frame 0 is a real
+        # frame of the cycle, not a reserved rest pose -- so the exporter DOES
+        # know its layout and `[[0, frames]]` is true of it. gl-world.js reads
+        # `rFrames` as a cycle length at the recruit draw site, which is correct
+        # only until a banded recruit exists; declaring the layout here is what
+        # lets that site be fixed before the trigger ships rather than after.
+        return _record_layout(s, s.WALK_FRAMES)
     return build
 
 
