@@ -563,6 +563,11 @@ TARGETS = [
     # the Skimmer. Deriving one listing from the other does not work -- four of
     # these bodies are named for their type id and the rest for their lore name.
     ("enemy-shielded", "enemy-shielded.js", _build_enemy("enemy_courier")),
+    # The first FOUR-LEGGED body and the first with NO ARMS at all. Both are
+    # carried by `enemy_chassis.animate_walk_grouped` as a two-group diagonal
+    # trot, so nothing in this file or the chassis needed changing for it.
+    ("enemy-shieldbearer", "enemy-shieldbearer.js",
+     _build_enemy("enemy_tender")),
     # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
     # It has the hardest separation problem of the batch: the translucency
     # applies to BOTH camo bodies equally, so the renderer separates them from

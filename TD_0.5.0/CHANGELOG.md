@@ -13,6 +13,77 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The Tender (`enemy-shieldbearer`): the first four-legged body in
+the game, and the first with no arms at all.** 6,452 triangles, 8 frames, on
+`enemy_chassis.py` at `CHASSIS_VERSION 1` with no change to the shared module —
+which is the point, since both firsts are carried by `animate_walk_grouped`.
+
+**Four legs as two diagonal pairs — a trot, which is two antiphase groups**,
+exactly what `walk_phases` and `support_left_frames` already describe. The pairs
+are `(leg_0, leg_3)` and `(leg_1, leg_2)`, and that ordering is the gait's
+contract: renumbering the legs without changing the groups gives a body that
+paces or bounds instead of trotting — which still walks, still plants, and looks
+wrong in a way no gate catches. Feet are `foot_0`..`foot_3` because the sole
+solver resolves names through `bpy.data.objects`, a **global** lookup; four feet
+called `foot_l` would collect `.001` suffixes and the solver would measure the
+wrong foot on three of four.
+
+**No arms, and no shield projectors.** `arms=()` is passed to the gait; the old
+`animate_walk` indexed `parts["arm_l"]` unconditionally and would have raised
+`KeyError` here. The projectors are omitted on a fiction argument, not a cost
+one: this body *is* the shield hardware — it carries the rack the clamped-on
+nodes were issued from — so wearing a set as well would say the opposite of what
+the unit is.
+
+**Nine nodes, not the card's twenty.** 20 nodes over a ~21 board px body is a
+2.1 px pitch on a 2.1 px node: they merge into one bar, destroying the openness
+the count was meant to create. Three ranks of three, node diameter 0.064 u and
+pitch 0.13 u — both exactly at their ruled bounds, neither with slack.
+
+**Its separator is height and crown, NOT openness — a correction to the card.**
+"The only see-through silhouette" was withdrawn as a *read* after measurement:
+the rasteriser dilates on downsample and the renderer closes gaps harder still,
+with the Gleaner's 1.70 px inter-leg gap rendering at 0.00–0.50 px, mean 0.09.
+Openness survives as a zoom reward. What separates this body is being the
+tallest thing on the road with a wide flat frame where every other body has a
+head.
+
+**THE CROWN TARGET IS CARRIED IN MODEL UNITS, AND THAT MATTERS MORE THAN THE
+BODY DOES.** The px figure the brief originally carried was wrong in three
+compounding ways discovered in one day — an unnamed axis, an unnamed viewport,
+and finally an unnamed *canvas*: silhouettes are measured on `#gl` at 1111×625
+while `HOUSE-STANDARD`'s px-per-unit table is `#game` at 1280×720, a 13%
+difference. The rule that survives is **carry the unit quantity and convert only
+at the point of use, knowingly** — a px figure is a rendering of a number, not
+the number.
+
+Crown at the worst bearing, stated in all three rulers so it cannot be misread:
+
+                  units      #game px    #gl px
+      target      0.3639      6.00        5.21
+      BUILT       0.4045      6.67        5.79
+      headroom    0.0406 u  = 11.2% above target
+
+**It clears in every ruler.** The 6.0 target itself came from
+`mira-primitive-audit.js` re-measuring against real primitives rather than
+sharp-box proxies — four of five bodies matched to the digit, but this one's
+worst-bearing crown drops 7.0 → 6.0 because `td_scene.box` bevels by default.
+**That bias is a property of the metric, not the proxy**: under 0.2 px on an
+extent, 1–3% on an area, and a full 1.0 px on a small derived pixel count like
+crown width, which on a 6–7 px quantity is 14–17%.
+
+    brief (proxy)          W 13.5   H 40.1   W/H 0.337   lit 378   crown worst 7.0
+    audit (real primitive) W 13.6   H 40.0   W/H 0.340   lit 358   crown worst 6.0
+    BUILT                  W 13.4   H 40.4   W/H 0.331   lit 392   crown worst 6.67
+
+Gates: `check-model-top` raw 1.593 == posed 1.593, margin 10.0 px — clause 3b by
+construction. Cycle wrap 3.35 px = 0.95× mean, inside the enemy band. Envelope
+27.5 × 18.7 board px, inside both rings with 10.2 px of slack. **The trot adds
+9.4 px of width mid-swing against the Courier's 1.3**, because four legs splay
+fore/aft — still 2.2 px inside the hit circle, but it is much the largest
+swing-phase growth on the roster and is worth knowing before any wider stance is
+proposed.
+
 **2026-08-13 — `animate_walk_grouped`: the gait generalises to any leg count,
 byte-exact on every shipped biped. A CHASSIS EVENT — all six chassis bodies
 re-exported. It is recorded here because `git log` cannot find it: the work was
