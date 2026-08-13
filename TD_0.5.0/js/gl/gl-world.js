@@ -1915,6 +1915,10 @@ var World3D = (function () {
   // height it left and the height it is going to.
   var groundRef = null;
 
+  // One-shot, so a missing js/visuals.js announces itself once rather than
+  // sixty times a second. See the hovered-enemy block in drawOverlays.
+  var warnedNoVisuals3Q = false;
+
   function withGround(z, fn) {
     var prev = groundRef;
     groundRef = z;
@@ -2264,11 +2268,49 @@ var World3D = (function () {
       }
     }
 
-    // The hovered enemy's hit ring, at exactly the radius that can be pointed
-    // at -- the 2D rule: what you see is what you can click. The readout that
-    // goes with it is drawn after the bars, so it lands on top of them.
+    // The hovered enemy's REACH, then its hit ring, at exactly the radius that
+    // can be pointed at -- the 2D rule: what you see is what you can click.
+    // The readout that goes with it is drawn after the bars, so it lands on
+    // top of them.
     if (state.hoveredEnemy && !state.hoveredEnemy.dead) {
       var he = state.hoveredEnemy;
+
+      // HOW FAR THIS THING CAN HIT A TOWER FROM. Same rule as a tower's range
+      // circle and the same grammar: drawGroundRing, projected per point so it
+      // drapes over a raised deck, the reach first and the small ring on top.
+      // Only the hue differs -- and it, the alphas and the width all come out
+      // of js/visuals.js, which is also the only place that decides WHICH
+      // radii exist. Reading `he.attacks` there means the Tyrant's unlocked
+      // leap and a retuned Hedger both arrive here with no change in this file.
+      //
+      // ONE body, not a ring for every body that could be hovered: the camo
+      // ground ring already costs ~15 us per body against a health bar's 1 us,
+      // and it is the per-body overlay term measured to break first.
+      //
+      // DELIBERATELY NOT SUPPRESSED IN BUILD MODE. `pointingAtBoard` does not
+      // hide hover while a tower type is armed, so hovering an enemy mid
+      // placement paints the build ghost's range ring AND this one at once.
+      // That is busier, and it is also exactly the question the feature exists
+      // to answer: will this thing be able to reach the tower I am about to
+      // put here. Two rings answer it; one does not.
+      // The guard is real -- dressing.html loads this file WITHOUT
+      // js/visuals.js -- but a silent miss here is indistinguishable from the
+      // correct output for the twenty of twenty-one enemy types that have no
+      // attack at all. So a body that HAS attacks and finds no resolver says
+      // so, once, by name. dressing.html hovers nothing and stays quiet.
+      if (typeof Visuals3Q !== "undefined" && Visuals3Q.enemyReachesUl) {
+        var reaches = Visuals3Q.enemyReachesUl(he);
+        for (var ri = 0; ri < reaches.length; ri++) {
+          drawGroundRing(ctx, he.pos.x, he.pos.y, ul(reaches[ri]),
+            Visuals3Q.ENEMY_REACH_STROKE, Visuals3Q.ENEMY_REACH_FILL,
+            Visuals3Q.ENEMY_REACH_WIDTH);
+        }
+      } else if (!warnedNoVisuals3Q && he.attacks && he.attacks.length) {
+        warnedNoVisuals3Q = true;
+        console.warn("gl-world: no Visuals3Q.enemyReachesUl -- js/visuals.js " +
+          "is not loaded, so enemy reach rings are silently off.");
+      }
+
       var pad = (typeof Enemy !== "undefined" && Enemy.HOVER_PAD_PX) || 4;
       drawGroundRing(ctx, he.pos.x, he.pos.y, he.radiusPx() + pad,
         "rgba(255,215,110,0.9)", null);
@@ -3946,18 +3988,36 @@ var World3D = (function () {
     // not attacked, so no capture can tell the two apart; a test asserts this
     // list is EMPTY instead. Same reason SiphonFXBeam exports setOcclusion.
     //
-    // The optional argument sets the two PROVISIONAL gesture constants, so a
-    // probe can capture aimed and unaimed from one build and mira can overrule
-    // the default with a measurement rather than a rebuild. The values in the
-    // source are the ones that ship.
+    // STRICTLY READ-ONLY, AND IT HANDS OUT COPIES -- WHICH IT DID NOT AT FIRST,
+    // AND THAT WAS A TRAP WITH A DEMONSTRATED FAILURE BEHIND IT.
+    //
+    // The first version assigned the live record objects into its result. A
+    // caller could then write `strikeSeam("enemy-angry").spec.swing = 0` and
+    // corrupt the renderer's own constants from something that reads like a
+    // getter. juno hit exactly that shape in her own probe: a save/restore
+    // around a swept `spec.swing` where two aborted calls interleaved, so the
+    // "saved" value was itself mid-sweep and the restore wrote 0. **A strike of
+    // zero degrees is a flawless-looking REST POSE** -- every control still
+    // passes, the body still draws, and nothing anywhere reports a fault.
+    //
+    // So: deep-copied, including the pivot array, which is the one a shallow
+    // copy would still have shared. The swing is not a knob any more either --
+    // the override is `angle = swing * attackFlash`, so **sweeping the flash IS
+    // sweeping the angle** (flash 0.5 is exactly half the stroke). That runs
+    // through the game's own drive, cannot corrupt anything, and needs no
+    // write path here at all.
     strikeSeam: function (model) {
       var missing = [];
       for (var k in strikeMissing) missing.push(k);
+      function copy(s) {
+        return s ? { group: s.group, pivot: s.pivot.slice(),
+                     swing: s.swing, tipCheck: s.tipCheck } : null;
+      }
       var specs = {};
-      for (var mk in STRIKE_BY_MODEL) specs[mk] = STRIKE_BY_MODEL[mk];
+      for (var mk in STRIKE_BY_MODEL) specs[mk] = copy(STRIKE_BY_MODEL[mk]);
       return {
         models: specs,
-        spec: model ? (STRIKE_BY_MODEL[model] || null) : null,
+        spec: model ? copy(STRIKE_BY_MODEL[model]) : null,
         missingGroupOn: missing,
         // The matrix the renderer ACTUALLY built on its last striking body,
         // copied out. A check that re-derives it from the published constants
