@@ -47,6 +47,10 @@ import enemy_hive
 import tower_sniper
 import tower_rifleman
 import summon_recruit
+import enemy_drudge
+import enemy_skimmer
+import enemy_tun
+import enemy_hedger
 
 BLEND_DIR = os.path.join(os.path.dirname(__file__), "preview")
 SHEET_DIR = os.path.join(td.OUTPUT_DIR, "preview")
@@ -144,6 +148,167 @@ def preview_enemy_variants():
     for name, ortho_scale, build_variant in cases:
         preview(name, ortho_scale, build_variant(False))
         preview(name + "_shielded", ortho_scale, build_variant(True))
+
+
+# --- the five Easy bodies ----------------------------------------------------
+#
+# WHAT THESE SHEETS ARE, AND THE ONE THING THEY MUST NOT BE USED FOR. At
+# 520x680 per angle this is roughly the player's own MAX ZOOM-IN, about 11x
+# closer than the default camera. That makes it a real view rather than a
+# fiction, and legitimate evidence about SURFACE DETAIL -- a bevel, a weld, a
+# ring separation, whether a part is modelled or implied.
+#
+# It is not evidence about a READ. Silhouette, value separation and whether a
+# separator announces itself are properties of the DEFAULT view (fitted camera,
+# ~2021.24), and a magnified render cannot show any of them. A silhouette that
+# only works zoomed in is not a silhouette. otto's capture from the running game
+# is the read; this is the craft. They answer different questions and neither
+# substitutes for the other.
+#
+# `sizeScale` IS APPLIED TO THE COMPARISON SHEET AND NOT TO THE SINGLES, AND
+# THAT IS DELIBERATE. The Hedger's primary separator is not modelled at all --
+# `sizeScale` 1.25 is applied by the runtime, worth +72 lit px and +5 rows. A
+# five-up rendered at one ortho would show it the same height as the Gleaner and
+# hide the loudest thing about it. So the comparison scales each root by its
+# type's real `sizeScale`; the per-model sheets do not, because those are about
+# surface detail at a fixed magnification.
+
+# (module, sheet name, sizeScale from js/enemy.js, commit the geometry is from)
+EASY_FIVE = (
+    (enemy_normal, "easy_gleaner", 1.00, "(shipped)"),
+    (enemy_drudge, "easy_drudge", 1.05, "a00a774"),
+    (enemy_skimmer, "easy_skimmer", 1.00, "ddef990"),
+    (enemy_tun, "easy_tun", 1.00, "ddef990"),
+    (enemy_hedger, "easy_hedger", 1.25, "e015ef5"),
+)
+
+
+def _build_easy(module):
+    """Build one Easy body and key its walk. Returns its root empty.
+
+    Uses each module's own build/animate rather than `export_build`, because a
+    preview needs the ROOT to spin and `export_build` returns only a frame
+    count. One rig per scene: `_foot_measure` resolves "foot_l" by exact name
+    through `bpy.data.objects`, so two rigs in one scene would silently ground
+    the second against the first one's foot.
+    """
+    root, body, parts = module.build()
+    frames = getattr(module, "WALK_FRAMES", 8)
+    bpy.context.scene.frame_start = 1
+    bpy.context.scene.frame_end = frames
+    module.animate_walk(body, parts, frames)
+    if hasattr(module, "set_shield_visible"):
+        module.set_shield_visible(parts, False)
+    else:
+        import enemy_chassis
+        enemy_chassis.set_shield_visible(parts, False)
+    return root
+
+
+def _render_one_tile(module, name, ortho_scale, frame, size_scale=1.0,
+                     directions=1):
+    """One body, one frame, `directions` yaws -> one PNG. Returns its path."""
+    td.scene(ortho_scale=ortho_scale, tile_w=ANGLE_W, tile_h=ANGLE_H)
+    root = _build_easy(module)
+    if size_scale != 1.0:
+        root.scale = (size_scale, size_scale, size_scale)
+    bpy.context.view_layer.update()
+    td.render_sheet(root, os.path.join("preview", name), 1,
+                    directions=directions,
+                    tile_w=ANGLE_W, tile_h=ANGLE_H, frame_start=frame)
+    return os.path.join(SHEET_DIR, name + ".png")
+
+
+def _compose_row(paths, out_name):
+    """Lay finished tiles side by side into one sheet.
+
+    Composed from RENDERED TILES rather than by putting five rigs in one scene,
+    for the naming reason in `_build_easy`. Blender image pixels are a flat
+    bottom-up RGBA float buffer, so each tile reshapes to (h, w, 4) and the row
+    is one hstack.
+    """
+    tiles = []
+    height = None
+    for path in paths:
+        image = bpy.data.images.load(path)
+        w, h = image.size
+        buf = numpy.array(image.pixels[:], dtype=numpy.float32).reshape(h, w, 4)
+        tiles.append(buf)
+        height = h if height is None else height
+        bpy.data.images.remove(image)
+    row = numpy.hstack(tiles)
+    total_h, total_w = row.shape[0], row.shape[1]
+    out = bpy.data.images.new(out_name, width=total_w, height=total_h,
+                              alpha=True)
+    out.pixels = row.reshape(-1).tolist()
+    out.filepath_raw = os.path.join(SHEET_DIR, out_name + ".png")
+    out.file_format = "PNG"
+    out.save()
+    bpy.data.images.remove(out)
+    path = os.path.join(SHEET_DIR, out_name + ".png")
+    print("  sheet: %s  (%d x %d)" % (path, total_w, total_h))
+    return path
+
+
+def preview_easy_five():
+    """Four craft sheets, the Hedger's crank extremes, and one five-up."""
+    ensure_dirs()
+
+    # Per-model craft sheets: four yaws each, at the module's own ortho.
+    #
+    # THE HEDGER NEEDS A LOOSER FRAME THAN THE OTHERS AND IT IS NOT OPTIONAL.
+    # At the usual 0.92 its crank hit the tile gutter -- `bottomMargin 0.0000`
+    # at one yaw and `contentTop 1.0000` on the crank-high frame, i.e. the arm
+    # was being CLIPPED by the preview. That is a framing fault in the sheet,
+    # not in the model (the game frames from its own camera and the export is
+    # unaffected), but a clipped preview would have shown Diego a shorter arm
+    # than the one that shipped -- which is the same class of error as
+    # rendering a superseded file, with a picture attached.
+    ortho_factor = {enemy_hedger: 1.22}
+
+    for module, name, _scale, commit in EASY_FIVE[1:]:
+        print("preview %s  (geometry from %s)" % (name, commit))
+        preview(name, module.ORTHO_SCALE * ortho_factor.get(module, 0.92),
+                lambda m=module: _build_easy(m))
+
+    # The Hedger's crank at both extremes. kaz's re-measure of the committed
+    # file: low 0.018 u at frame index 0, high 1.182 u at frame index 6, and the
+    # lower end is below the body floor on 5 of 12 frames. Those two frames are
+    # the pair that shows the whole sweep.
+    for label, frame in (("easy_hedger_crank_low", 1),
+                         ("easy_hedger_crank_high", 7)):
+        print("preview %s  (frame %d)" % (label, frame))
+        # FOUR YAWS, NOT ONE, AND THE FIRST VERSION OF THIS WAS USELESS. At a
+        # single yaw the crank hangs directly in front of the torso and
+        # disappears into it -- dark bar on dark body, which is precisely the
+        # low-contrast case juno measured (a 1 px feature at local contrast 10
+        # does not survive a deletion test; at 68 it does). The arm only reads
+        # where it clears the body against empty background, so a one-yaw sheet
+        # showed an arm that is genuinely there and genuinely invisible, and
+        # would have had Diego reviewing a limb he could not see.
+        #
+        # Same 1.22 ortho as the four-yaw sheet: at 0.92 the raised crank
+        # reached `contentTop 1.0000`, clipped at the top of its own tile.
+        _render_one_tile(enemy_hedger, label,
+                         enemy_hedger.ORTHO_SCALE * 1.22, frame, directions=4)
+
+    # The five-up. Same yaw, same lighting, same frame, one ortho for all five
+    # so they share a ruler -- with each root at its type's real sizeScale.
+    print("preview easy_five_compare  (sizeScale applied)")
+    ortho = enemy_hedger.ORTHO_SCALE * 1.25 * 0.98      # frame the tallest
+    tiles = []
+    for module, name, size_scale, _commit in EASY_FIVE:
+        tiles.append(_render_one_tile(module, "_cmp_" + name, ortho, 1,
+                                      size_scale=size_scale))
+    _compose_row(tiles, "easy_five_compare")
+    print("")
+    print("  ORDER: Gleaner, Drudge, Skimmer, Tun, Hedger")
+    print("  sizeScale applied: 1.00 / 1.05 / 1.00 / 1.00 / 1.25")
+    print("  Geometry from: shipped / a00a774 / ddef990 / ddef990 / e015ef5")
+    print("")
+    print("  These are ~11x the default camera -- the player's max zoom-in.")
+    print("  Evidence about SURFACE DETAIL only. A read must be judged at the")
+    print("  fitted camera (~2021.24); see otto's capture for that.")
 
 
 def preview_enemy_normal():
@@ -618,7 +783,9 @@ def validate_recruits():
 
 
 if __name__ == "__main__":
-    if "--validate-recruits" in sys.argv:
+    if "--easy-five" in sys.argv:
+        preview_easy_five()
+    elif "--validate-recruits" in sys.argv:
         validate_recruits()
     elif "--frame-recruits" in sys.argv:
         # BOTH STATES, because they are differently wide. The walk carries the

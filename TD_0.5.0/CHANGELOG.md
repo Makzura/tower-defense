@@ -167,6 +167,45 @@ re-verified at runtime before committing:
   against 0.625); every other type of the 21 is identical under both, which is
   why the mismatch stayed invisible.
 
+**2026-08-13 — preview sheets for the four committed Easy bodies.**
+
+`make_preview.py --easy-five` renders four craft sheets, the Hedger's crank at
+both extremes, and a five-up comparison including the Gleaner. Rendered from the
+committed geometry: Drudge `a00a774`, Skimmer and Tun `ddef990`, Hedger
+`e015ef5`, tree verified clean at HEAD first.
+
+**WHAT THESE SHEETS ARE EVIDENCE OF, WHICH IS NARROWER THAN IT LOOKS.** At
+520x680 per angle this is roughly the player's own max zoom-in, ~11x the fitted
+camera. That makes it a real view and legitimate evidence about SURFACE DETAIL.
+It is not evidence about a READ — silhouette, value separation and whether a
+separator announces itself are properties of the default view, and a magnified
+render cannot show any of them. otto's capture from the running game is the
+read; this is the craft. Both go up and neither substitutes for the other.
+
+**`sizeScale` is applied to the comparison sheet and not to the singles.** The
+Hedger's primary separator is not modelled at all — the runtime applies 1.25,
+worth +72 lit px — so a five-up at one ortho would have shown it the same height
+as the Gleaner and hidden the loudest thing about it.
+
+Two framing faults were caught by rendering and looking, not by arithmetic:
+
+- At the standard 0.92 ortho the Hedger's crank hit the tile gutter —
+  `bottomMargin 0.0000` at one yaw, `contentTop 1.0000` on the crank-high frame.
+  The arm was being clipped by the preview, which would have shown a shorter arm
+  than the one that shipped: the same class of error as rendering a superseded
+  file, with a picture attached. Hedger previews now use 1.22.
+- The crank-extreme sheets were originally one yaw, and at that yaw the arm
+  hangs directly in front of the torso and vanishes into it — dark bar on dark
+  body, which is exactly the low-contrast case juno measured. They now render
+  four yaws. **The arm reads at three of four; at the broadside yaw it merges
+  with the body.** That is a real limitation of the part and is reported rather
+  than framed around.
+
+The five-up is composed from rendered tiles rather than by putting five rigs in
+one scene, because `_foot_measure` resolves "foot_l" by exact name through
+`bpy.data.objects` — a second rig in the same scene would silently ground itself
+against the first one's foot.
+
 **2026-08-13 — the Hedger (`enemy-angry`), body four of five. The Cooper is
 deliberately NOT built.**
 
