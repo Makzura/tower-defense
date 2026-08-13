@@ -167,6 +167,51 @@ re-verified at runtime before committing:
   against 0.625); every other type of the 21 is identical under both, which is
   why the mismatch stayed invisible.
 
+**2026-08-13 — the Skimmer narrowed. The crown deletion was one axis of two.**
+
+otto measured the first Skimmer as reading like the Gleaner — pairwise separation
+0.48/0.50 against 0.80 for the next closest pair, stable at both yaws. mira found
+the cause: **every width-defining group was byte-identical to the Gleaner's.**
+Arms, legs and body agreed to three decimals; the only difference anywhere was
+the body's top, 1.190 -> 1.034. Worse than no change — the build was slightly
+WIDER than the Gleaner and 14% stubbier, so **the card asked for thinner and the
+build delivered shorter**, moving the aspect the wrong way.
+
+Narrowed per the card's own words ("chest emptied and narrowed", "arms cut to
+stubs", "a thinner outline"). Height untouched at 1.034 — that separator works.
+
+    rest pose        arm half   chest half   leg half   y span    x span
+    Gleaner            0.255       0.210       0.167     0.510     0.498
+    Skimmer before     0.255       0.210       0.167     0.510     0.514
+    Skimmer after      0.125       0.125       0.167     0.334     0.445
+
+**3,812 -> 3,508 triangles.** A removal, so it comes in cheaper and more
+distinct, which is the house standard's own worked example.
+
+**Two findings that changed what was built.**
+
+**The shoulder yoke sets a body's width, not the chest.** The yoke is 0.42
+across against the torso's 0.24 — the widest part of the whole body group, wider
+than the cage. A brief asking for a narrower body that changed only the torso
+would have measured no change at all. `torso_frame` now takes all four widths.
+
+**Both horizontal axes matter, because enemies yaw with the path** (otto). The
+on-screen width is not a fixed axis: a body walking north shows x and one walking
+east shows y, so narrowing one axis alone produces a body that reads slighter on
+some stretches of road and not others. x was 3.2% WRONG-SIGNED before this change
+and nothing had asked for it. Both axes now come in, and the figure that matters
+is the **worst-bearing plan width: 14.1 -> 11.0 screen px** against the Gleaner's
+14.1.
+
+**The legs are deliberately not narrowed** and are now the width-defining part at
++-0.167. The card does not ask them to move; whether the stance follows is a
+separate decision. The arms are no longer a shared asset (stubs are a different
+part, 1104 -> 636 vertices per arm); the legs still are.
+
+Preview sheets re-rendered — `easy_skimmer.png` and `easy_five_compare.png` both
+showed the old body and would have been a superseded file with a picture
+attached.
+
 **2026-08-13 — preview sheets for the four committed Easy bodies.**
 
 `make_preview.py --easy-five` renders four craft sheets, the Hedger's crank at

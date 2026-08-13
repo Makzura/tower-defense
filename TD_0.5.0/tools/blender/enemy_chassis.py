@@ -132,26 +132,34 @@ def materials():
 # already moved.
 
 
-def torso_frame(m, body, lift):
+def torso_frame(m, body, lift, torso_w=0.24, yoke_w=0.42, hip_w=0.28,
+                band_w=0.255):
     """Torso, shoulder yoke, hip brace and the two bands. 540 triangles.
 
     The yoke and hip brace are what turn a sparse frame into one connected,
     opaque silhouette. They are structure, not greebles -- both are sized to
     survive the sprite downsample.
+
+    THE FOUR WIDTHS ARE PARAMETERS BECAUSE WIDTH IS A SEPARATOR. Defaults are
+    the Gleaner's and nothing that omits them moves. **The shoulder yoke at
+    0.42 is the widest part of the whole body group** -- wider than the torso,
+    the bands and the cage -- so it, not the chest box, is what actually sets
+    a body's silhouette width. A brief asking for a narrower body that changes
+    only `torso_w` will measure no change at all.
     """
     return [
-        td.box("torso", (0.30, 0.24, 0.34), location=(0.0, 0.0, lift),
+        td.box("torso", (0.30, torso_w, 0.34), location=(0.0, 0.0, lift),
                rotation=(0.0, LEAN, 0.0), mat=m["tin"], parent=body),
-        td.box("shoulder_yoke", (0.21, 0.42, 0.075),
+        td.box("shoulder_yoke", (0.21, yoke_w, 0.075),
                location=(0.015, 0.0, 0.115 + lift), rotation=(0.0, LEAN, 0.0),
                mat=m["tin_dark"], parent=body),
-        td.box("hip_brace", (0.20, 0.28, 0.08),
+        td.box("hip_brace", (0.20, hip_w, 0.08),
                location=(-0.02, 0.0, -0.135 + lift), mat=m["tin_dark"],
                parent=body),
-        td.box("torso_band_a", (0.32, 0.255, 0.045),
+        td.box("torso_band_a", (0.32, band_w, 0.045),
                location=(0.03, 0.0, 0.085 + lift), rotation=(0.0, LEAN, 0.0),
                mat=m["tin_dark"], parent=body),
-        td.box("torso_band_b", (0.32, 0.255, 0.045),
+        td.box("torso_band_b", (0.32, band_w, 0.045),
                location=(-0.02, 0.0, -0.085 + lift), rotation=(0.0, LEAN, 0.0),
                mat=m["tin_dark"], parent=body),
     ]
