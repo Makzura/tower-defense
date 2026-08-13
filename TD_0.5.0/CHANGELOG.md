@@ -13,6 +13,133 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The Tyrant gets a body, and it walks without sliding.**
+
+`enemy-boss` — the wave-35 boss the whole campaign ends on, and the last of the
+two bosses Diego released. 5,392 triangles, 128 frames, 3 groups, sizeScale
+2.40. **Authored gait error A = 0.004 board px**, the lowest of any body on the
+board; the Vanguard's 0.002 is on a body a third smaller, and every other enemy
+reads between 0.28 and 19.87. Diego asked for this one by name — "make sure the
+tyrant doesn't slide but actually walks."
+
+**A container with legs.** No head, no face, no lens: `chassis.head()` is never
+called, and the closed lid is the statement rather than an omission. The hold is
+a **rank of three ordinary cargo cages** at scale 0.46, ranked along the travel
+axis with 0.047 u gaps, breaking the top outline by 0.107 u — a row of identical
+small cages says capacity where one big cage would say importance.
+`cargo_cage()` is SEALED and was placed, never rebuilt. **The hold carries
+nothing**: Diego ruled that the forty bodies the roar calls in come from the
+enemy base, so the hold is empty because it has not taken anything yet, and no
+geometry here depends on its contents.
+
+**The legs are Diego's "2 big moving triangles, perpendicular to the ground",
+apex DOWN** — the Vanguard's blade mirrored, so his primitive is on both bosses
+rather than spent on one. The plate's PLANE is vertical and contains the travel
+axis, so it rotates only about y and shows its whole triangular area at camera
+yaw 0, which is the bearing 25 of 42 road segments give.
+
+**`BRIEF-enemy-boss-tyrant.md` sections 2 and 3 are superseded and the module
+says so.** They specify an apex-UP plate with a flat sole, a heel-to-toe roll
+and duty 0.625. Two measured reasons beyond the art direction, both derived and
+sent up before any geometry was cut:
+
+- **`check-gait-slip.js` cannot score an apex-up Tyrant correctly.** It tracks
+  the mean x of a fixed sole band — a material set, which is the right choice —
+  and on a flat sole rocking about a pin above it that mean is the sole
+  MIDPOINT. The midpoint sweeps 0.49124 u against a 0.55503 u requirement, so a
+  PERFECTLY CORRECT apex-up body scores A = 0.0638 u = 4.87 board px. The gap is
+  exactly the brief's own `B(1-cos θ)` term: the part of the travel that comes
+  from the pivot moving from heel to toe, which no fixed material point can
+  carry. Two people reached the same 0.55 by different routes.
+- **Duty 0.625 is not buildable on a point contact.** Two point-contact legs
+  both planted demand hip heights differing by 0.022–0.050 u against the brief's
+  own 0.005 tolerance. Duty is forced to exactly 0.5 — and 0.5 is the better
+  answer anyway: **exactly one blade is on the road at every one of the 128
+  frames.** This body freezes for 1.3 s every 12 s while it aims, so every frame
+  of its strip has to be a pose it can hold, and none is airborne.
+
+**The general rule, which is worth more than the geometry it settled: a
+measurement error in a report costs one correction; the same error in a GATE
+costs every body the gate touches**, and it is harder to disbelieve because
+turning a finding into a check reads as diligence. Note the direction too — this
+family fails toward ALARM, not toward a false pass, and a scary result from an
+unvalidated instrument is worth exactly what a clean one is.
+
+**So the gate was shown to FAIL as well as pass, on real geometry.**
+`TYRANT_GAIT_DEFECT` (default 1.0, documented, unreachable by a normal export)
+re-exports this same body with its plant travel scaled. Predicted A at 0.8:
+0.088523 u = 6.757 board px. The gate read **0.08850 u = 6.755 board px** on the
+exported file, from an independent measurement path, against 0.00006 u on the
+good build. A gate that has only ever been shown to pass has not been shown to
+do anything, and synthetics prove the arithmetic while saying nothing about the
+population.
+
+**The swing angle is DERIVED, not typed.** Three constraints use up every degree
+of freedom: P = 64 (forced), the brief's 0.4635 pin height (frozen by its own
+section 8), and `2 D sin θ = 63 × 0.899281 / 128 = 0.442615 u`. So **θ =
+28.520°, not the brief's 32** — that 32 was solved against the flat-sole
+identity and died with the sole. `enemy_tyrant.theta_m()` computes it from the
+depth and the schedule, so a later change to either cannot leave a stale angle
+behind. That stale-angle defect is exactly what `gait_solve`'s header describes
+on the chassis's fixed 28 degrees, "out to 19.867 px on the Dray".
+
+**Two things are free and are not authored twice.** The bob: with the apex
+directly under the pin the hip rides at 0.4690 at mid-stance and 0.4124 at both
+extremes, so the body rises and falls 0.0567 u twice per cycle with no keyframe.
+And the cadence: the cycle is distance-keyed, so the half-health speed change
+speeds the walk up by itself and needs no second gait.
+
+**A rigid single-segment leg with a point contact and duty 0.5 cannot clear the
+road on the recovery at ANY swing path** — the swinging blade's clearance is
+`D(cos θ_plant − cos θ_swing)`, which needs the swing angle to exceed the
+planted one in magnitude, and the swing has to pass through zero. That is a
+proof, not a tuning failure, so the leg root lifts through the swing and the
+lift is swallowed by a hip housing whose depth is ASSERTED against the measured
+lift. The Dray and the Vanguard both ship the same declaration.
+
+**One `check_penetration.py` hit was excused, and it is the only excused hit on
+the model.** The AABB pass reports 0.105 u of blade-in-hull overlap that is not
+there: an apex-down plate's local bounding box is half empty, and the empty
+corner is the one that swings highest — it rises 0.2006 u above the pin while
+the real top edge rises 0.0483. That is this checker's own documented limit, "a
+box is a poor proxy for a diagonal taper, whose box is mostly air". **The pair
+is not merely excused; it is replaced** by exact convex separation on the true
+triangle against the true hull footprint, every frame, both legs, raising at
+build time and STRICTER than the test it stands in for. The same pattern covers
+the cage rank, where prefix matching cannot tell cage 1 from cage 2:
+`assert_rank_disjoint()` measures the real gaps. **Clause 8's failure mode is an
+exclusion paired with nothing.**
+
+That solid test earned itself immediately. Its first run returned a clearance of
+**0.00006 u** — a pass by coincidence that any later edit would have turned into
+a defect without anyone touching the line. Dropping `BLADE_B` from −0.160 to
+−0.200 bought 0.035 u for free, because with the apex under the pin the plate's
+area does not depend on that vertex's depth at all; the assert now demands a
+0.020 margin rather than a sign.
+
+**Gates.** `check-gait-slip` A = 0.004 px, B = 0.536 px (F = 128 is three times
+clear of the 43 the brief's frame-count law asks for). `check-model-top` ok at
+the full +10.0 margin, raw top and posed top equal — this body has
+`showHealthBanner: true` at sizeScale 2.40, the largest multiplier in the game
+on that class of error. `check_penetration` CLEAN. `check-model-tags`: the enemy
+family is now complete on all three pages, and the Vanguard's own missing
+`3d.html` tag went with it — 11 gaps down to the 10 pre-existing blub ones.
+Rendered through the game's own `GLRenderer` and shader at the dominant bearing
+before commit; the read judgement is owed to juno.
+
+**Plan extent is 115% of the ring**, against precedent of 203% (brute), 189%
+(hive) and 162% (angry). The brief's own 106.4% counted the legs' x extent
+alone: it omits the hull corner, which is what actually sets this body's plan
+radius, and omits the plates' y offset. A body that does not slide has a plan
+extent of roughly one stride, so the plan budget and a correct gait are
+structurally in tension at every sizeScale above about 1.0.
+
+**`--only=enemy-boss` now matches TWO targets.** `enemy-boss` is a prefix of
+`enemy-boss_fast` and the exporter matches by prefix, so its header's claim that
+"no full target name is a prefix of another" stopped being true with this model.
+A Tyrant run rewrites the Vanguard too — identical in triangles, not in byte
+order. Both files say so.
+
 **2026-08-13 — The models are visible now: bigger previews everywhere, real
 bodies in the index, and a viewer that turns a tier or walks an enemy.**
 

@@ -4330,9 +4330,18 @@ combination. It intentionally lives beside the gunner rather than inside it:
 The Arcane Sniper, the Rifleman and the meshed enemies set the bar. The Warbringer
 now has all seven tiers built through `td_mesh` (no Blender needed for it). **The
 Siphon now has all eleven tiers built too**; **every enemy type with no
-`js/gl/models/enemy-<typeId>.js` still draws as an untextured sphere**, and the
-Tyrant — the wave-35 boss the whole campaign ends on — is one of them. Every
+`js/gl/models/enemy-<typeId>.js` still draws as an untextured sphere**. Every
 future enemy has the same problem to solve.
+
+**Both bosses are now meshed** — the Vanguard (`enemy-boss_fast`) and the Tyrant
+(`enemy-boss`, the wave-35 boss the whole campaign ends on), on 2026-08-13. They
+are the two bodies to read for a GAIT, because they are the only two whose swing
+angle is solved against the stride rather than inherited: `tools/blender/
+gait_solve.py` and their build scripts' headers carry the reasoning, and
+`tools/check-gait-slip.js` is the gate. **Read the Tyrant's before writing a
+contact measure of your own** — it records why a fixed-sole-centroid measure,
+which is the correct choice on every other body here, scores a *correct*
+flat-soled rocking foot at 0.55 of requirement.
 
 **The roster is deliberately not counted here.** It moved by five in a single day
 on 2026-08-13 and any figure written down is wrong by the next commit;

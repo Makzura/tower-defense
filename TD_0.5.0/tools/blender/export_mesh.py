@@ -580,6 +580,22 @@ TARGETS = [
     # fixed 28 degrees. Its build therefore prints two gait lines; that output
     # is the record of the solve and is not noise.
     ("enemy-boss_fast", "enemy-boss_fast.js", _build_enemy("enemy_vanguard")),
+    # THE TYRANT, the wave-35 boss the whole campaign ends on. A container with
+    # legs: no head, no face, no lens, a rank of THREE ordinary cargo cages,
+    # and two big triangular plates apex DOWN -- the Vanguard's blade inverted,
+    # so Diego's "2 big moving triangles as legs" is on both bosses rather than
+    # spent on one. F = 128, duty exactly 0.5, and its swing angle is DERIVED
+    # from the leg depth and the schedule instead of typed.
+    #
+    # ** `--only=enemy-boss` MATCHES THIS AND `enemy-boss_fast` BOTH. ** The
+    # note under `_requested()` -- "no full target name is a prefix of
+    # another" -- stopped being true with this line, and it is the first pair
+    # in TARGETS for which it fails. A Tyrant run therefore rewrites the
+    # Vanguard as well. Its CONTENT is unchanged (a re-export differs in face
+    # order, never in triangles) but the diff is not, so back that file up
+    # before a run. `--only=enemy-boss.` does not help; matching is a plain
+    # prefix test on the target name.
+    ("enemy-boss", "enemy-boss.js", _build_enemy("enemy_tyrant")),
     # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
     # It has the hardest separation problem of the batch: the translucency
     # applies to BOTH camo bodies equally, so the renderer separates them from
