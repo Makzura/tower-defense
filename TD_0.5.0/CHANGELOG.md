@@ -13,6 +13,74 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — CORRECTION: 17° does not comply. It is a real, declared, open
+clause 8 violation, and the sentence saying otherwise was mine.**
+
+The entry below states *"That COMPLIES, and it complies by less than a pixel"*
+for the Hedger's crank at 17°. **That is false.** It came from extrapolating a
+margin linearly out of the 18°–34° span, from a "first contact at 18°" threshold
+found by scanning DOWN from 34° — which identifies only the FIRST crossing and
+says nothing about what happens below it.
+
+Measured properly, on the composed strike pose over all 12 walk frames, by
+`tools/blender/check_strike_penetration.py`:
+
+| angle | box depth | bvh | real triangle pairs |
+|---|---|---|---|
+| 0–1° | CLEAR | — | 0 |
+| 2–7° | 0.006–0.038 | phantom | 0 |
+| 8° | 0.04420 | **REAL** | 1 |
+| 14° | 0.08101 | **REAL** | 2 |
+| 17° | 0.09870 | **REAL** | 2 | ← shipped |
+| 18° | 0.10499 | **REAL** | 3 |
+| 34° | 0.15665 | **REAL** | 5 | ← previous |
+
+**At 17° `hold` intersects `thigh_2`: real triangle-level interpenetration, 2
+pairs, at walk frame 6.**
+
+**FIRST REAL CONTACT IS BETWEEN 7° AND 8°, NOT 18°** — and it is a *different
+pair*. The 18° figure was drum-against-hub; the operative pair is the mast's
+HOLDER against a **THIGH**, and it engages at less than half the smallest angle
+under discussion. The window everyone argued over was never the operative one.
+
+**THE CURVE IS MONOTONIC**, ~0.0063 u/deg from 2° to 34°, no local maximum,
+real-pair count 0→1→2→3→5. An earlier point-set instrument had suggested a peak
+at 15° and a possible second crossing; that was an artefact. **There is no dip
+to exploit and no safe pocket. No stroke angle is clean**, and the largest clean
+angle is 7°, which is not a stroke.
+
+**17° IS HELD ANYWAY, and the tiebreak is that 34° is measurably worse** — 5
+real pairs against 2, box depth 0.15665 against 0.09870. Reverting would make
+the shipped model worse in order to undo a false sentence. **The fix is geometry
+— where the holder sits relative to the thighs — and it is with art direction.**
+Declared open to quality rather than sat on.
+
+**Recording the sequence rather than a clean correction**, because the sequence
+is the useful part: I wrote the compliance sentence, it reached a shipped header
+as settled, and it outlived the doubt that produced it. That is the same failure
+shape this project spent the day on, committed by the person documenting it.
+
+**`tools/blender/check_strike_penetration.py`** measures clause 8 on poses the
+exporter never bakes. It loads `check_penetration.py`'s own predicate,
+exemptions and slack by reading its source rather than reimplementing them —
+`check_penetration` calls `main()` at module level, so a plain import runs the
+whole roster — and composes the pose exactly as `drawActor` does,
+`mast_root.matrix_world @ T(pivot) @ Ry(θ) @ T(-pivot)`, after `frame_set`.
+
+**Three states, not two, and the third is what makes it trustworthy.** Box
+overlap on all three axes is NECESSARY for interpenetration and not SUFFICIENT —
+a flat plate rotated off-axis has a box far fatter than the plate, and this
+project already measures ~0.105 u of phantom box overlap on the Tyrant's
+blade-versus-hull pair. `BVHTree.overlap` is used only to CLASSIFY what the box
+flags, never to replace it, since the box cannot miss. Green at 0–1°, **phantom
+at 2–7° where a box test alone would have reported a violation**, red from 8°.
+
+**Also corrected: the authorship claim in the entry below.** `git log` shows
+every commit in this tree as `Makzura <diego.makzume@gmail.com>` because that is
+the repo's configured identity. **Git authorship carries no information about
+which agent made a commit here**, and it must not be quoted as evidence that it
+does.
+
 **2026-08-14 — The group-gait gate did not cover the body we had just shipped.
 Its body list is now derived and PRINTED; and the Hedger's crank goes to 17°.**
 

@@ -1664,14 +1664,44 @@ var World3D = (function () {
     // so that 1.7% of road is a pre-existing Hedger gap and NOT a cost of this
     // change -- do not report it as one.
     //
-    // **THE MARGIN IS THIN AND IS STATED AS A NUMBER RATHER THAN A SIGN.**
-    // First contact is at 18 degrees; this sits 1 degree below it. Taking the
-    // intrusion as locally linear (0.0523 u over the 16 degrees from 18 to 34,
-    // so ~0.0033 u/deg) the clearance here is of order 0.003 u -- about 0.13
-    // board px at this body's sizeScale of 1.25. That COMPLIES, and it complies
-    // by less than a pixel. If the drum, the hub or the pivot ever move, this
-    // is the first thing that breaks and it will break silently, because the
-    // baked-frame gate cannot see this pose at all.
+    // ** 17 DEGREES DOES NOT COMPLY. THIS IS A KNOWN, DECLARED, OPEN CLAUSE 8
+    // VIOLATION, AND IT IS HELD ONLY BECAUSE 34 IS MEASURABLY WORSE. **
+    //
+    // This comment previously read "that COMPLIES, and it complies by less than
+    // a pixel", from a margin extrapolated linearly from the 18-34 degree span.
+    // That sentence was mine and it was false. Recording the sequence rather
+    // than a clean correction, because the sequence is the useful part: a claim
+    // reached a shipped header as settled and outlived the doubt that produced
+    // it, which is the exact failure this project spent a day on.
+    //
+    // MEASURED, by `tools/blender/check_strike_penetration.py`, on the composed
+    // strike pose over all 12 walk frames -- the pose no baked-frame gate sees:
+    //
+    //     angle   box depth   bvh       real triangle pairs
+    //     0-1     CLEAR       -         0
+    //     2-7     0.006-0.038 phantom   0
+    //     8       0.04420     REAL      1
+    //     17      0.09870     REAL      2      <-- shipped
+    //     34      0.15665     REAL      5      <-- previous
+    //
+    // At 17 degrees `hold` intersects `thigh_2` -- REAL triangle-level
+    // interpenetration, 2 pairs, at walk frame 6. Not a box artefact: the same
+    // instrument classifies 2-7 degrees as phantom at zero intersecting
+    // triangles, which is what makes the REAL verdicts believable.
+    //
+    // FIRST REAL CONTACT IS BETWEEN 7 AND 8 DEGREES, NOT 18. The 18 came from a
+    // different pair (drum against hub) found by scanning DOWN from 34, which
+    // finds only the first crossing. The operative pair is the mast's HOLDER
+    // against a THIGH and it engages at less than half the smallest angle anyone
+    // was considering. The largest clean angle is 7 degrees, which is not a
+    // stroke.
+    //
+    // THE CURVE IS MONOTONIC -- ~0.0063 u/deg from 2 to 34, no local maximum,
+    // real-pair count 0->1->2->3->5. There is no dip to exploit and no safe
+    // pocket, so NO STROKE ANGLE IS CLEAN and no constant here can fix it.
+    // The fix is geometry -- where the holder sits relative to the thighs --
+    // and it is with art direction. Do not tune this number expecting to
+    // resolve it.
     //
     // tipCheck MOVES WITH THE ANGLE, AND IT IS DERIVED FROM THE MESH RATHER
     // THAN FROM THE BRIEF'S IDEALISATION -- WHICH MATTERS MORE AT 17 THAN IT
