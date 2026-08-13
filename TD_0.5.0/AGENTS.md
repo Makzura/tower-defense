@@ -2517,6 +2517,43 @@ and temporary map fissures. The rules that keep it safe:
 `sandbox.html` loads it too; `long-range-dps-debug.html` (superseded) does
 not, which the guards make harmless.
 
+### A moment on top of a loop: the `overrides` strike seam
+
+A baked frame list is a LOOP — a walk, a bolt cycle — and a loop cannot express
+something that happens at a moment. `drawActor(model, x, y, yaw, scale, lift,
+frame, overrides, tilt)` takes an optional `{ groupName: mat4 }` applied AFTER
+the frame's own pose, in that group's LOCAL space. The Hedger's strike
+(2026-08-14) is the enemy-side user; `js/gl/blub-summon.js` is the other.
+
+Four rules, each of which has already cost something:
+
+- **Compose, never replace.** The enemy walk is distance-driven, and the Hedger
+  does not stop to swing (`currentSpeedUlps` returns 0 only for `rooted`,
+  `stunTimer` and `windUpTimer`). A second animation BAND would stop the legs
+  dead in the road; an override leaves the gait running underneath.
+- **The pivot is the group's own root, and it is not one answer per model.** A
+  top-level body group is authored in model space with its root at z = 0 — that
+  is what makes `model.top` equal the posed top so the health bar cannot bury
+  itself. Leaf groups are authored about their own pivots. On `enemy-angry`,
+  `[0,0,0]` on `crank` is the axle at hip height and the same constant on
+  `angry_body` would be the road. **Read the root out of the file; do not take
+  it from a brief.**
+- **Drive it off a signal that only exists when the thing happened.**
+  `attackFlash` is set when an attack RESOLVES. `attackTimer` counts down
+  whether or not anything is in reach, so a pose driven off it telegraphs at
+  empty road. **Gate on a crossing (`f > 0`), never an equality**: these flash
+  fields are decayed by `dt`, are never exactly 1 on a sampled frame, and at a
+  fixed 60 Hz `Math.max(0, f - dt*k)` lands on a float residue (3.75e-16) one
+  step before it reaches a true 0.
+- **A missed group name must be loud.** `drawActor` skips an override whose name
+  is not on the model, and the resulting plain walk is pixel-identical to a body
+  that never triggered. `World3D.strikeSeam().missingGroupOn` publishes every
+  model that was asked and did not carry the group; a test asserts it is empty.
+
+Render state may be parked on a simulation object (the strike latches its
+bearing on `enemy._glStrike`) only while it is strictly one-way: `update()` must
+never read it. That is the same rule as the rest of this section.
+
 ---
 
 ## The debug cash panel is GONE — the sandbox is the testing surface

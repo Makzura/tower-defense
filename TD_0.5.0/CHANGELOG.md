@@ -13,6 +13,107 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — The Hedger has an attack animation. It is a per-group override
+composed onto the walk, not a second animation band, and it is driven by
+`attackFlash` rather than by the attack timer.**
+
+Diego approved the Hedger redesign and singled out the animation: *"the attack
+animation needs to fit with the model tho, since it attacks."* It is the only
+body below boss tier that attacks a tower and it had no attack animation at all.
+
+**Why an override and not a band.** The walk is distance-driven —
+`bandFrame(eBand, e.progress / stride)`, one cycle per stride, so a planted foot
+stays on one patch of road. A band would REPLACE that cycle and stop the legs
+dead in the road on every swing. `drawActor`'s `overrides` argument (built for
+exactly this: *"a recoil, a hammer coming down"*) composes a per-group matrix
+AFTER the baked pose in the group's local space, so the gait carries on
+underneath and the strike cannot fight it by construction. **And the Hedger does
+not stop to swing** — `currentSpeedUlps` returns 0 only for `rooted`,
+`stunTimer` and `windUpTimer`, and `angry` has no wind-up — so it walks straight
+through its own 0.4 s strike. A band was never viable.
+
+**Driven by `attackFlash`, which had zero consumers under `js/gl/`** (0 hits in
+the SERVED file, checked at capture time, not in the repo). It is set to 1 in
+`resolveAttack` — when an attack actually RESOLVES — and decays at `dt * 2.5`.
+Explicitly NOT `attackTimer`: that counts down every 2.5 s whether or not
+anything is in reach, so a pose driven off it rears the body up at empty road,
+which is the one state a strike must never appear in, and it would ship looking
+deliberate.
+
+**The gate is a crossing, never an equality — and measuring it corrected a
+belief we both held.** `attackFlash` was assumed to rest at exactly 0.
+`Math.max(0, f - dt*2.5)` clamps only on undershoot, so at a fixed 60 Hz the
+24th step lands on **3.75e-16** and the exact 0 arrives on step 25. Both
+statements are true of different steps, which is why an equality gate would have
+been wrong in both directions. The same shape sits on `supportFlash`.
+
+**The pivot is read out of the model, not taken from a brief.** An override
+lands in the group's LOCAL space, and that space is not one answer per model.
+Measured on the shipped `enemy-angry`: `angry_body` is authored in model space
+with its root at z = 0 (it carries `model.top` and therefore the health bar),
+while every LEAF group is authored about its own root — `crank` spans local
+z [-0.582, 0] and the frame pose puts it at model (-0.020, -0.325, 0.600). So
+`[0,0,0]` on `crank` is the axle at hip height and the identical constant on
+`angry_body` would be the road. Re-derive per group; do not carry it over.
+
+**A missed lookup is now loud.** `drawActor` skips an override whose name is not
+on the model, and a Hedger drawing its plain walk because the lookup missed is
+pixel-for-pixel identical to one that has not attacked — the same soft failure
+that let the model-viewer exports go undefined past their own commit.
+`strikeOf` warns once per model name and `World3D.strikeSeam().missingGroupOn`
+publishes the list so a test can assert it is EMPTY. **The check was armed
+before it was trusted**: renaming `crank` in the expanded model makes the list
+`["enemy-angry"]`, emits the warning, and makes the strike draw 0 px rather than
+something wrong.
+
+**Measured, at the fitted board camera (distance 2021.2374, target [640,360,0],
+#gl 1111x625, SwiftShader, lane and clock pinned).** Every figure below is
+changed pixels on `#gl` unless it says otherwise.
+
+- **Negative control by construction**: a board whose only body has no `attack`
+  row is **bit-identical** before and after — hash `ecfe51b2` across three
+  browser launches. Not a stub and not a disabled half; the same game on a
+  different board, so the new code simply never runs.
+- **Rest is bit-identical too**: a Hedger with `attackFlash` 0 hashes
+  `b171a7d0` before and after.
+- **Two-launch null** on unchanged source: every hash, bbox and sweep value
+  identical across two separate browser launches, so the before/after
+  comparison is attributable.
+- **The window fires and closes.** 24 of 26 real decay steps change pixels,
+  90 px at full extension falling monotonically to 15, then **0 at the 3.75e-16
+  residue and 0 at true rest**, with the **wrap back to rest bit-identical**.
+  No dead pairs in the interior. 25 distinct frames of 26.
+- **It moves the crank and nothing else.** With `crank` suppressed, the rest
+  frame and the full-strike frame are **0 px apart**. The all-groups-suppressed
+  control reaches **exactly 0** against an empty board first, so the crank's
+  44 px (walk bucket 0) really is the crank and not something else painting
+  there.
+- **The health bar is safe.** The silhouette's top row does not move at any step
+  of the window; headroom to the projected `crownOf` line stays 4.43 #game px.
+  Nothing in the pipeline checked this before.
+
+**`STRIKE_SWING` and `STRIKE_AIM` are provisional and belong to art direction**,
+not to the renderer. `STRIKE_AIM` defaults to 0 (unaimed) because the only
+identity statement on record is that the Hedger is a machine clearing an
+obstruction rather than a thing fighting, and because unaimed is the smaller
+mechanism. The aimed path is not dead: `World3D.strikeSeam({aim: 1})` exercises
+it from the same build (measured cost 67 px), and the bearing it uses is
+**latched on a rise** because `attackBeam.life` decays at `dt * 4` (0.25 s)
+against `attackFlash`'s `dt * 2.5` (0.4 s) — read per frame, the aim would snap
+back to the walking heading for the last 0.15 s of every strike, with every
+individual frame a legal pose. Measured: dropping `attackBeam` mid-window moves
+**0 px** and the latch still reads its original bearing.
+
+**How often it actually fires**, counted from the real `resolveAttack` over the
+real wave 13 (20 Hedgers, interval 1.5): on a deliberately favourable board —
+five towers set 28 px off the path normal, inside the 49.4 px reach —
+**1 to 4 attacks per Hedger, mean 1.95**, over a mean 33.1 s on the road. The
+strike window is **2.4% of a Hedger's life on screen**, so it has to read the
+first time.
+
+No test suite loads `js/gl/gl-world.js`, so the six suites are not evidence
+about this change in either direction; the pixel work is.
+
 **2026-08-14 — The shared grouped gait was wrong above two leg groups: the
 swing phase and the support window rotated in opposite directions.**
 
