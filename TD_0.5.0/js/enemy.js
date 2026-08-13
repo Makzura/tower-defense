@@ -485,9 +485,15 @@ Enemy.TYPES = {
   // half a normal's pace so there is time to bring it down. It is a CHECK, not
   // a filler wave -- 250 remaining health against a 100 HP base means letting
   // it through ends the run, so wave 11 asks whether the board has been built.
-  // (Wave 11 is its only appearance, on all three difficulties: one body on
-  // Easy, two on Normal and Hard. The schedule overrides the 250 UP -- 420 on
-  // Easy -- so the figures below are the type's floor, not what walks in.)
+  //
+  // (Wave 11 is its only appearance, and one body walks in. The wave-11 row in
+  // EASY_WAVES overrides the 250 UPWARDS, so the figures below are the type's
+  // floor rather than what arrives -- read the override off that row, not from
+  // here. Neither the body count per difficulty nor the override value is
+  // repeated in this paragraph any more: the first died when the Normal and
+  // Hard derivations were deleted on 2026-08-12 and EASY_WAVES became the only
+  // schedule, and the second is a schedule number that moves independently of
+  // this type.)
   midboss: {
     id: "midboss",
     displayName: "Midboss",
@@ -775,12 +781,16 @@ Enemy.TYPES = {
 
   // --- v0.4.9: the last four types -----------------------------------------
   //
-  // ALL FOUR ARE SCHEDULED, on all three difficulties. They were added on
-  // 2026-07-30 for the index and the sandbox first -- the owner asked to look
-  // at them before anything was built around them -- and were fitted into the
-  // schedule afterwards. In EASY_WAVES: Shieldbearer 27, Camo Heavy 28,
-  // Healer 32, Vanguard 34. Normal and Hard inherit those and add more, so the
-  // two supports arrive considerably earlier there.
+  // ALL FOUR ARE SCHEDULED, and all four arrive late in the campaign. They
+  // were added on 2026-07-30 for the index and the sandbox first -- the owner
+  // asked to look at them before anything was built around them -- and were
+  // fitted into the schedule afterwards.
+  //
+  // The wave numbers are NOT repeated here: read them off EASY_WAVES in
+  // js/game.js, which is the only schedule. The list that used to sit here was
+  // wrong twice over -- it credited a Normal and a Hard that no longer exist
+  // (those derivations were deleted on 2026-08-12), and it gave each type a
+  // single wave when the Shieldbearer alone appears in several.
   //
   // Nothing carries `sandboxOnly` any more. The flag still works and is still
   // the way to park a type in the index and the sandbox, but the test "every
