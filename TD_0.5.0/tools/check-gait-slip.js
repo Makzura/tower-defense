@@ -101,7 +101,7 @@ var SIZE_SCALE = {
   "enemy-armored": 1.05, "enemy-brute": 1.5, "enemy-colossus": 2.1,
   "enemy-camo_normal": 1, "enemy-flying": 0.85, "enemy-angry": 1.25,
   "enemy-shielded": 1.15, "enemy-hive": 1.6, "enemy-shieldbearer": 1.35,
-  "enemy-boss": 2.4
+  "enemy-boss": 2.4, "enemy-boss_fast": 1.9
 };
 // Types whose frames are NOT distance-driven: gl-world.js drives a flier's
 // band by `boardClock * HOVER_HZ`. A wingbeat has no planted foot and no slip

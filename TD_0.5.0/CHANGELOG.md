@@ -13,6 +13,45 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `gait_solve.contact_x` had the material-point bug it was written
+to avoid. Found by the Vanguard build, in my own module, one commit after the
+rule was written down.**
+
+`contact_x` selected the contact corners by **world z** — *"the corners nearest
+the ground right now"*, the obvious definition. A foot on a rotating hip ROLLS,
+so the world-lowest corners are the heel edge at one end of the plant and the
+toe edge at the other: the function silently changed **which material point it
+tracked** half way through a solve. The two edges differ by
+`half_length * cos(theta)`, which is **even in theta**, so no swing angle can
+cancel it — the solver would converge, report success, and have solved the
+wrong quantity.
+
+This is the same artefact that made three people measure the Gleaner's planted
+sweep as 44.6%, 55.3% and 98.6% of requirement on the same file, and it was
+sitting in the solver written to remove that class of error.
+
+**Fixed by selecting in LOCAL z and measuring in world x.** Local selection
+picks a fixed set of material points once, whatever the pose; averaging their
+world x tracks the sole CENTRE, which is the same quantity
+`tools/check-gait-slip.js` reports — so the pre-export solve and the
+post-export gate now measure the same thing rather than two things that happen
+to be close.
+
+**Why the original test passed: the synthetic foot was 0.08 u long.** Far too
+short for a roll to show. The regression test now uses a **0.30 u** foot that
+genuinely rolls, and additionally asserts that the selected local sole set has
+**exactly one distinct membership across the whole plant** — the property that
+was silently false before. Residual 0.000017383 u = **0.00105 board px** at
+`sizeScale` 1.9.
+
+**A negative control that cannot fail on an axis is not a control on that
+axis.** The module had two negative controls and neither could see this,
+because both used the same undersized foot.
+
+Also: `enemy-boss_fast` added to `SIZE_SCALE` in `check-gait-slip.js`, so the
+Vanguard is quoted at 1.9 rather than silently at 1 — a 1.9x understatement of
+every slip figure for that body.
+
 **2026-08-13 — The contact-measure rule, learned the hard way: a contact
 measure must track a MATERIAL point, and the natural definition is the wrong
 one.**

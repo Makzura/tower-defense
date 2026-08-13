@@ -127,25 +127,53 @@ def _bpy():
     return bpy
 
 
-def contact_x(name, corner_pick=min):
+def contact_x(name, corner_pick=None):
     """The world x of a part's contact, from EVALUATED geometry.
 
-    Mirrors `enemy_chassis._foot_measure`: reads the bound box through
-    `matrix_world` rather than reconstructing the transform chain. `corner_pick`
-    selects which extreme along x counts as the contact -- `min` for a leg that
-    plants its trailing edge, `max` for its leading one; pass a function taking
-    an iterable when a triangle leg contacts at a single vertex.
+    SELECTS THE CONTACT IN **LOCAL** Z AND MEASURES IT IN WORLD X. That split
+    is the whole correctness of this function and it is not a detail.
+
+    An earlier version of this selected in WORLD z -- "the corners currently
+    nearest the ground", which is the obvious definition and is wrong. A foot
+    on a rotating hip ROLLS, so the world-lowest corners are the heel edge at
+    one end of the plant and the toe edge at the other: the function silently
+    changes WHICH MATERIAL POINT it tracks half way through the solve. The two
+    edges differ by `half_length * cos(theta)`, which is EVEN in theta, so no
+    swing angle can cancel it -- the solver would converge, report success, and
+    have solved the wrong quantity.
+
+    That is the same artefact that made three people measure the Gleaner's
+    planted sweep as 44.6%, 55.3% and 98.6% of requirement on the same file.
+    See the header of `tools/check-gait-slip.js`, which selects its sole from
+    REST positions for exactly this reason.
+
+    Selecting in local z picks a fixed set of material points once, whatever
+    the pose. Averaging their world x then tracks the sole CENTRE -- which is
+    the same quantity `check-gait-slip.js` reports, so the pre-export solve and
+    the post-export gate measure the same thing rather than two things that
+    happen to be close.
+
+    Found by the Vanguard build, which hit it in a real rig; the synthetic
+    legs this module was first tested on had a contact box 0.08 u long, far too
+    short for the roll to show. A negative control that cannot fail on an axis
+    is not a control on that axis.
+
+    `corner_pick` overrides the default mean -- pass `min` or `max` for a part
+    that must plant one specific edge. It receives a list of world x values.
     """
     bpy = _bpy()
     from mathutils import Vector
     bpy.context.view_layer.update()
     obj = bpy.data.objects[name]
-    corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
-    lowest_z = min(p.z for p in corners)
-    # Only the corners actually on the ground are contact; a tall part's top
-    # corners are not, and averaging them in would drag the answer.
-    touching = [p for p in corners if p.z <= lowest_z + 1e-4]
-    return corner_pick(p.x for p in touching)
+    local = [Vector(c) for c in obj.bound_box]
+    lowest_local_z = min(c.z for c in local)
+    # A FIXED material set, chosen in the part's own space, so it names the
+    # same vertices at every frame of the cycle.
+    sole = [c for c in local if c.z <= lowest_local_z + 1e-6]
+    xs = [(obj.matrix_world @ c).x for c in sole]
+    if corner_pick is not None:
+        return corner_pick(xs)
+    return sum(xs) / len(xs)
 
 
 def solve_contact_x(leg, contact_name, frame, target_x, axis=1,
