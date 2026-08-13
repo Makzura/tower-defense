@@ -11,13 +11,28 @@
 # at once, on purpose. Roster Law 02 is "stamped, not born", and a faction
 # whose members are literally stamped from one die should be authored from one.
 #
-# THE DANGER, STATED PLAINLY. A shared module means an edit here rewrites five
-# shipped files. That is the intended behaviour and it is also the way to break
-# five models with one careless line. Two things make it loud rather than
-# silent: CHASSIS_VERSION below is written into every generated file's header,
-# and any change to this file re-exports all five in ONE commit that says so.
-# Do not re-export a single body after changing the chassis -- that is how the
-# five stop matching each other.
+# THE DANGER, STATED PLAINLY, AND THE COUPLING IS SILENT. A shared module means
+# an edit here rewrites five shipped files -- Drudge, Skimmer, Tun, Hedger,
+# Cooper. That is the intended behaviour and it is also the way to break five
+# models with one careless line.
+#
+# **NOTHING WARNS YOU.** An earlier version of this header claimed
+# CHASSIS_VERSION was stamped into every generated file so a mismatched set
+# would show up in a diff. IT IS NOT, AND IT NEVER WAS -- the constant is
+# defined below and read by nothing. The claim was written when the plumbing was
+# proposed and the plumbing was never built. It is corrected here rather than
+# quietly deleted because a header that overstates its own safety is worse than
+# one that admits the hazard: a reader who believed that sentence would conclude
+# the coupling announces itself, and it does not.
+#
+# SO THE DISCIPLINE IS MANUAL AND IT IS ON YOU:
+#
+#   * change this file  ->  re-export ALL FIVE bodies, by hand, in ONE commit
+#     that says a chassis change is what it is;
+#   * never re-export a single body after touching the chassis -- that is
+#     exactly how the five stop matching each other, silently;
+#   * assume a sibling instance may be editing this file or a body that
+#     imports it at this moment. Check before you start.
 #
 # WHAT THIS FILE IS NOT. It is not `enemy_normal.py` parameterised.
 # `enemy_normal.py` owns a shipped sprite-sheet contract (assets/normal_walk*.png)
@@ -41,9 +56,19 @@ from mathutils import Vector
 import td_scene as td
 
 # Bump on any change to the geometry this file emits, and re-export ALL five
-# bodies in the same commit. `export_mesh.py` writes it into each generated
-# file's header, so a mismatched set is visible in a diff instead of only on
-# screen.
+# bodies in the same commit.
+#
+# READ BY NOTHING TODAY. This is a marker, not a mechanism -- `export_mesh.py`
+# does not emit it and no generated model contains it. Bumping it warns the next
+# person reading this file and warns nobody reading a diff.
+#
+# WHEN THE PLUMBING LANDS, IT MUST NOT FORCE A RE-EXPORT. Emit this in
+# `write_js` and let each model pick it up at its NEXT export for a reason it
+# already had; **absence then means pre-versioning**. Re-exporting five ~300 KB
+# files to add a header string would be pure churn -- and worse here than
+# elsewhere, because re-exports are not byte-stable on this pipeline (UV-sphere
+# face order is non-deterministic run to run), so five models would show large
+# spurious diffs to buy one line.
 CHASSIS_VERSION = 1
 
 ORTHO_SCALE = 1.5
