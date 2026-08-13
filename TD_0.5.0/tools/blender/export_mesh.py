@@ -443,6 +443,12 @@ TARGETS = [
     ("enemy-armored", "enemy-armored.js", _build_enemy("enemy_drudge")),
     ("enemy-fast", "enemy-fast.js", _build_enemy("enemy_skimmer")),
     ("enemy-slow", "enemy-slow.js", _build_enemy("enemy_tun")),
+    ("enemy-angry", "enemy-angry.js", _build_enemy("enemy_hedger")),
+    # enemy-camo_normal (the Cooper) is NOT here on purpose. Its read defers to
+    # the camo cue, and `isCamo` is drawn nowhere under js/gl/ -- measured at
+    # 0 px on both GL paths against 328 px on the 2D fallback. Building it would
+    # ship a model whose separator does not exist. Held pending Diego's ruling;
+    # the brief is written and ready. Note the underscore when it lands.
 ]
 
 

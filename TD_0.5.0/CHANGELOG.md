@@ -167,6 +167,49 @@ re-verified at runtime before committing:
   against 0.625); every other type of the 21 is identical under both, which is
   why the mismatch stayed invisible.
 
+**2026-08-13 — the Hedger (`enemy-angry`), body four of five. The Cooper is
+deliberately NOT built.**
+
+**Hedger — 4,072 triangles, 12 frames, and the only one of the five over the
+Gleaner's 4,032.** kaz waived the ceiling on the accounting rather than by
+exception: it is the only body that ADDS a limb, and it paid for it — the hold
+comes down 176 triangles to fund a 260-triangle crank, which is the card's own
+trade ("a hold smaller than the Gleaner's, because this frame traded cargo
+space for the arm") implemented in geometry rather than asserted.
+
+The primary separator costs nothing: `sizeScale` 1.25 already puts it at 215 lit
+px in 25 rows against the Gleaner's 148 in 20. **So the geometry is NOT scaled
+up** — baking a second 1.25 into the mesh would land it at 1.5625x and make it a
+brute. The second separator is broken symmetry: one crank hanging off one side
+of a faction that is otherwise symmetrical about its centre line.
+
+**The arm is sized against a measured floor, not against the stated minimums.**
+juno closed the house standard's open bracket — the sceptre reads at 11.6% of its
+figure, the Gleaner's inspection windows do not at 0.7–3% — so the transferable
+floor is ~11%, about 24 px on this body. The stated minimums project to ~20 px²
+and sit AT that floor. The bar was therefore taken LONGER rather than thicker
+(0.52 x 0.105, ~28 px², ~34 with the step plate): length breaks the outline,
+thickness past ~2.5 px buys area inside the silhouette where it is worth least.
+
+**And placement is decided by contrast, not area.** juno measured two 1 px
+features at yaw 45: the lens survives a deletion test at local contrast 68, the
+cargo core does not at contrast 10. Identical area, opposite outcome. So the
+crank hangs low enough to break the outline against empty ROAD — the
+highest-contrast background on the model — rather than against the torso.
+
+Two claims in `enemy_hedger.py`'s header were wrong when first written and were
+caught by measuring the exported file: "below the hip at every crank angle" is
+geometrically impossible for a full revolution (when the bar points up the pivot
+is the lowest part), and the replacement "7 of 12 frames, 0.05 u" was also
+guessed. Measured: **5 of 12 frames, low 0.018 u, high 1.182 against the crown's
+1.190** — so the crank never touches the road and never steals `model.top`.
+
+**Cooper (`enemy-camo_normal`) is held, not forgotten, and `export_mesh.py` says
+why at the empty slot.** Its design defers its read to the camo cue, and `isCamo`
+is drawn nowhere under `js/gl/` — measured at 0 px on both GL paths against 328
+px on the 2D fallback. Building it would ship a model whose separator does not
+exist. Awaiting Diego's ruling; the brief is written and nothing in it is wasted.
+
 **2026-08-13 — the Skimmer (`enemy-fast`) and the Tun (`enemy-slow`), bodies two
 and three of five, both on the shared chassis.**
 

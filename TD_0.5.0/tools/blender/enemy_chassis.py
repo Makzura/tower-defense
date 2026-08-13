@@ -157,7 +157,8 @@ def torso_frame(m, body, lift):
     ]
 
 
-def cargo_cage(m, body, lift, at=(0.0, 0.0, 0.0), core_segments=12):
+def cargo_cage(m, body, lift, at=(0.0, 0.0, 0.0), core_segments=12,
+               scale=1.0, window_mat="cargo_window", core_mat="cargo_core"):
     """THE CARGO CAGE. SEALED -- the faction's universal part.
 
     ============================================================================
@@ -182,24 +183,31 @@ def cargo_cage(m, body, lift, at=(0.0, 0.0, 0.0), core_segments=12):
     version's naked slabs read as detached pink balloons from three of four
     review angles.
     """
+    # `scale` and the two material arguments are the ONLY sanctioned variations,
+    # and they are sanctioned by roster Law 02 in its own words: "the same lens
+    # ring at three scales, variation in count and plating, never in kind". A
+    # uniform scale and a plating swap are exactly that. Proportions, bar count
+    # and construction are not reachable from here and must not become so.
     ax, ay, az = at
     az = az + lift
+    s = scale
 
     def box(name, size, loc, mat, rotation=(0.0, 0.0, 0.0)):
-        return td.box(name, size,
-                      location=(loc[0] + ax, loc[1] + ay, loc[2] + az),
+        return td.box(name, (size[0] * s, size[1] * s, size[2] * s),
+                      location=(loc[0] * s + ax, loc[1] * s + ay,
+                                loc[2] * s + az),
                       rotation=rotation, mat=mat, parent=body)
 
     parts = [
         # The drum and its two coarse guard bars: this is what makes the front
         # read as a caged core after the runtime downsample.
-        td.cyl("cargo_housing", 0.108, 0.075,
-               location=(0.175 + ax, 0.0 + ay, 0.015 + az),
+        td.cyl("cargo_housing", 0.108 * s, 0.075 * s,
+               location=(0.175 * s + ax, 0.0 + ay, 0.015 * s + az),
                rotation=(0.0, math.radians(90.0), 0.0), mat=m["tin_dark"],
                parent=body, verts=core_segments),
-        td.cyl("cargo_core", 0.071, 0.038,
-               location=(0.228 + ax, 0.0 + ay, 0.015 + az),
-               rotation=(0.0, math.radians(90.0), 0.0), mat=m["cargo_core"],
+        td.cyl("cargo_core", 0.071 * s, 0.038 * s,
+               location=(0.228 * s + ax, 0.0 + ay, 0.015 * s + az),
+               rotation=(0.0, math.radians(90.0), 0.0), mat=m[core_mat],
                parent=body, verts=core_segments),
         box("cargo_guard_vertical", (0.030, 0.022, 0.185), (0.252, 0.0, 0.015),
             m["tin_dark"]),
@@ -216,9 +224,9 @@ def cargo_cage(m, body, lift, at=(0.0, 0.0, 0.0), core_segments=12):
         box("cargo_housing_r", (0.18, 0.052, 0.155), (0.015, -0.128, 0.01),
             m["tin_dark"]),
         box("cargo_window_l", (0.102, 0.014, 0.072), (0.025, 0.161, 0.01),
-            m["cargo_window"]),
+            m[window_mat]),
         box("cargo_window_r", (0.102, 0.014, 0.072), (0.025, -0.161, 0.01),
-            m["cargo_window"]),
+            m[window_mat]),
         box("cargo_side_strut_l", (0.018, 0.012, 0.10), (0.025, 0.171, 0.01),
             m["tin_dark"]),
         box("cargo_side_strut_r", (0.018, 0.012, 0.10), (0.025, -0.171, 0.01),
@@ -227,7 +235,7 @@ def cargo_cage(m, body, lift, at=(0.0, 0.0, 0.0), core_segments=12):
         box("cargo_housing_rear", (0.052, 0.18, 0.155), (-0.182, 0.0, 0.01),
             m["tin_dark"]),
         box("cargo_window_rear", (0.014, 0.102, 0.072), (-0.215, 0.0, 0.01),
-            m["cargo_window"]),
+            m[window_mat]),
         box("cargo_rear_strut", (0.012, 0.018, 0.10), (-0.225, 0.0, 0.01),
             m["tin_dark"]),
         box("cargo_retainer", (0.34, 0.27, 0.045), (0.035, 0.0, -0.075),
