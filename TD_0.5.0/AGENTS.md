@@ -1523,6 +1523,28 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   the board's distance-driven walk uses — so a Sprinter scurries here and a
   Colossus plods, for the same reason and by the same arithmetic.
 
+  **ANY MODULE THAT RENDERS THROUGH `r.program` WITHOUT CALLING
+  `GLRenderer.begin` MUST ASSERT THE WHOLE RENDER STATE ITSELF, AND THE FADE IS
+  THE ONE EVERYONE FORGETS** (2026-08-14). `uAlpha` is a uniform; it is written
+  only by `GLRenderer.setFade`, which outside gl-world's camo pass is called
+  only by `begin()`; and **a GL uniform initialises to zero.** So an offscreen
+  render on a screen where the board never draws produces a fully transparent
+  body — and it does so *silently*, because `readPixels` succeeds and a canvas
+  is built. Both `ModelViewer3D` and `TowerPreview3D` shipped this way and both
+  now call `setFade(1)` beside their `setGlow`.
+
+  **The failure repairs itself, which is what made it survive review**: once the
+  board has drawn once, `begin()` has run and every preview is correct for the
+  rest of the session. Only the cold Menu → Index / Menu → Armoury path is
+  broken, and it is the first path a player takes.
+
+  **A render that produced no opaque pixel must return FALSE**, or the fallback
+  the boolean exists for cannot fire and the screen's own "this is not the mesh"
+  line never shows. Both modules scan for one opaque byte and return null when
+  there is none. That null is the one null here that is **not** cached — it can
+  stop being null, and remembering it would hold a slot on its flat glyph for
+  the session over a condition that had already cleared.
+
   **The viewer fits a body to a bounding CYLINDER about its turn axis, not to
   its screen box at one yaw.** `js/gl/tower-preview.js` may fit to the box
   because it renders one fixed yaw; a body that TURNS and is fitted that way

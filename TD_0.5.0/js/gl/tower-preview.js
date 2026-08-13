@@ -179,6 +179,10 @@ var TowerPreview3D = (function () {
 
   var cache = new Map();          // key -> canvas | null
   var CACHE_MAX = 64;
+  // Set by render() when a render came back with no opaque pixel at all, read
+  // and cleared by cached(), which must not remember such a result. See the
+  // guard in render().
+  var emptyRender = false;
   // ONE CACHE FILL PER FRAME, AND NOT BECAUSE THE RENDER IS EXPENSIVE.
   //
   // Measured on the five base bodies: the bbox pass is 0.1-0.9 ms and the rest
@@ -413,10 +417,16 @@ var TowerPreview3D = (function () {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.fb);
     gl.viewport(0, 0, big, big);
-    // Transparent, so the panel colour behind the icon shows through. The
-    // shader always writes alpha 1, so every lit pixel is opaque and only the
-    // cleared background stays clear -- which is precisely the mask an icon
-    // wants.
+    // Transparent, so the panel colour behind the icon shows through: every lit
+    // pixel is opaque and only the cleared background stays clear, which is
+    // precisely the mask an icon wants.
+    //
+    // THIS COMMENT USED TO SAY "the shader always writes alpha 1", AND THAT WAS
+    // THE ASSUMPTION THAT BROKE. It is not a property of the shader, it is a
+    // property of `uAlpha`, which is a uniform -- and the camo pass made it a
+    // variable without anyone revisiting the two places that had written this
+    // sentence down. The opacity is now asserted below, next to `setGlow`,
+    // rather than assumed here.
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -443,6 +453,15 @@ var TowerPreview3D = (function () {
     gl.uniform3fv(r.uniform.fillColor, ICON_FILL);
     gl.uniform1f(r.uniform.keyStrength, ICON_KEY);
     r.setGlow(ICON_GLOW, null);
+    // OPACITY IS ASSERTED, NOT INHERITED. `uAlpha` is a uniform, and outside
+    // gl-world's camo pass the only thing that ever writes it is
+    // `GLRenderer.begin`. A GL uniform initialises to ZERO, so on any screen
+    // reached without the board having drawn -- the index, the armoury -- every
+    // icon rendered here came back fully transparent while this function
+    // happily returned a canvas and its caller returned TRUE. The bug hides
+    // because it repairs itself: once the board has drawn once, `begin()` has
+    // run and every icon is correct for the rest of the session.
+    r.setFade(1);
 
     // Drawn group by group with frame 0's pose, exactly as gl-world's
     // drawActor does it. A single matrix over the whole buffer would show the
@@ -481,6 +500,17 @@ var TowerPreview3D = (function () {
       dst.set(pixels.subarray((big - 1 - row) * stride, (big - row) * stride),
         row * stride);
     }
+
+    // AN EMPTY BITMAP IS A FAILURE, NOT AN ICON. Without this, "the render
+    // succeeded" and "there is something in it" are the same answer, and the
+    // caller's fallback -- the whole reason `draw()` returns a boolean -- can
+    // never fire for the one failure that actually happened. Early-breaks on
+    // the first opaque byte, so the cost lands on the failing case.
+    var opaque = false;
+    for (var ai = 3; ai < dst.length; ai += 4) {
+      if (dst[ai] !== 0) { opaque = true; break; }
+    }
+    if (!opaque) { emptyRender = true; return null; }
     sctx.putImageData(img, 0, 0);
 
     // The rim, then the model over it, both still at supersampled size so the
@@ -561,10 +591,17 @@ var TowerPreview3D = (function () {
     }
     budgetUsed = true;
     lastRenderAt = now;
+    emptyRender = false;
     var made = render(name, px) || null;
-    // A null IS cached: a model that cannot be rendered will not start being
-    // renderable, and retrying it every frame forever is the one failure mode
-    // that would actually cost something.
+    // AN EMPTY RENDER IS NOT REMEMBERED, and it is the exception to the rule
+    // below: it is the one null that can stop being null. The missing-fade bug
+    // produced empty bitmaps until the board had drawn once and correct ones
+    // forever after, so caching it would hold a build slot on its flat glyph
+    // for the whole session over a condition that had already cleared.
+    if (emptyRender) { emptyRender = false; return null; }
+    // Every OTHER null IS cached: a model that cannot be rendered at all will
+    // not start being renderable, and retrying it every frame forever is the
+    // one failure mode that would actually cost something.
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
     cache.set(key, made);
     return made;

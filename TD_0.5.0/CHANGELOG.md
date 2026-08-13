@@ -13,6 +13,53 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — Every 3D preview on a cold page was rendering fully transparent,
+and reporting success.**
+
+Menu → Index → Enemies on a freshly loaded page: the viewer opened, the stage,
+the label, the badge and "1 / 21" all drew, and **the body was absent.** So were
+the meshed rows in the roster, the exhibit in the detail panel, the turning
+tower body, and — by the same mechanism — every icon in the armoury.
+
+**One uniform.** The fragment shader's alpha is `uAlpha`. It is written by
+exactly one function, `GLRenderer.setFade`, and outside gl-world's camo pass
+that function is called from exactly one place: `GLRenderer.begin`. **A GL
+uniform initialises to zero.** On the index the board never draws — `draw()`
+returns straight after `Codex.draw` for `screen === "index"` — so on a cold path
+`begin()` has never run in the process, `uAlpha` is still 0, and every pixel
+rendered by `ModelViewer3D` and `TowerPreview3D` came back fully transparent.
+Both modules re-assert the entire render state rather than inheriting it —
+viewProj, both light directions, ambient, fill, key strength, glow — and the
+fade was the one they missed.
+
+**It hides because it repairs itself.** Play one wave and `begin()` has run, and
+every preview is correct for the rest of the session. The broken path is the
+first one a player takes, and it is the only one — which is why it survived
+every manual check by everyone who had already been playing.
+
+`js/gl/tower-preview.js` carried the sentence *"the shader always writes alpha
+1, so every lit pixel is opaque"*. That has not been true since the camo pass
+made the fade a variable, and nobody revisited the two files that had written
+the assumption down. The comment is now the record of what broke.
+
+**The second defect is the one that made it silent.** `render()` returned a
+canvas and `draw()` returned TRUE for a bitmap with no opaque pixel in it, so
+the callers' fallback could not fire and the viewer's own honesty line — "No 3D
+model yet — showing the flat marker", which exists precisely to say the picture
+is not the mesh — never showed. "I rendered" and "there is something in it" were
+the same answer. Both modules now scan for one opaque byte, early-breaking so
+the cost falls on the failing case, and return null when there is none.
+**That null is deliberately NOT cached**, unlike every other null here: it is
+the one that can stop being null, and remembering it would hold a slot on its
+flat glyph for the session over a condition that had already cleared.
+`ModelViewer3D.stats().empty` counts them.
+
+Found by driving the real game and reading pixels back, with a two-way control
+on the single uniform: cold page 0 lit px, after one `setFade(1)` 21,273 lit px,
+and put back to 0 it returns **bit-identical to the first capture**. No suite
+could have caught it — the harness has no WebGL, so every green result on this
+feature exercised the 2D fallback path.
+
 **2026-08-13 — The Tyrant gets a body, and it walks without sliding.**
 
 `enemy-boss` — the wave-35 boss the whole campaign ends on, and the last of the

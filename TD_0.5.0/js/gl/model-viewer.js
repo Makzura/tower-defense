@@ -160,7 +160,11 @@ var ModelViewer3D = (function () {
   var liveOut = null;                  // reused output canvas for live renders
   var failed = false;
   var stats = { renders: 0, blits: 0, misses: 0, deferred: 0, live: 0,
-                lastRenderMs: 0, totalRenderMs: 0 };
+                empty: 0, lastRenderMs: 0, totalRenderMs: 0 };
+  // Set by render() when a render came back with no opaque pixel at all. Read
+  // and cleared by cached(), which must not remember such a result. See the
+  // guard in render().
+  var emptyRender = false;
 
   // ONE CACHED FILL PER ANIMATION FRAME, reset by requestAnimationFrame rather
   // than by a clock -- a render's own duration counts towards a wall-clock gap,
@@ -409,6 +413,29 @@ var ModelViewer3D = (function () {
     gl.uniform3fv(r.uniform.fillColor, FILL);
     gl.uniform1f(r.uniform.keyStrength, KEY);
     r.setGlow(glow === undefined ? GLOW : glow, tint || null);
+    // THE FADE, AND LEAVING IT OUT MADE EVERY BODY ON THIS SCREEN INVISIBLE.
+    //
+    // The fragment shader's alpha is `uAlpha`, a uniform written by exactly one
+    // function -- `GLRenderer.setFade` -- which outside gl-world's camo pass is
+    // called from exactly one place: `GLRenderer.begin`. A GL uniform
+    // initialises to ZERO. On the index the board never draws (js/game.js
+    // draw() returns straight after Codex.draw for `screen === "index"`), so on
+    // a cold Menu -> Index the renderer's `begin()` has never run in the
+    // process, `uAlpha` is still 0, and every pixel this function renders comes
+    // back fully transparent. `readPixels` succeeds, the canvas is built, the
+    // blit contributes nothing, and `draw()` returns TRUE -- so the caller
+    // believes it drew a body and never runs its fallback.
+    //
+    // It is invisible to every manual check, because it repairs itself: play
+    // one wave and `begin()` has run, and the index is correct for the rest of
+    // the session. The broken path is the FIRST one a player takes.
+    //
+    // The rest of this function already re-asserts the whole render state
+    // rather than inheriting it -- viewProj, both light directions, ambient,
+    // fill, key strength, glow. The fade is simply the one that was missed, and
+    // it belongs in that list rather than being a patch. 1 is the neutral value
+    // and also restores depth writes, so there is nothing to put back.
+    r.setFade(1);
 
     // Drawn group by group with the requested frame's pose, exactly as
     // gl-world's drawActor does it. A single matrix over the whole buffer would
@@ -447,6 +474,32 @@ var ModelViewer3D = (function () {
     for (var row = 0; row < big; row++) {
       dst.set(pixels.subarray((big - 1 - row) * stride, (big - row) * stride),
         row * stride);
+    }
+
+    // AN EMPTY BITMAP IS A FAILURE AND MUST NOT BE REPORTED AS A PICTURE.
+    //
+    // This is the guard that would have caught the missing fade above, and it
+    // is here because the honesty line the viewer shows the player ("No 3D
+    // model yet -- showing the flat marker") is gated on this function's return
+    // value, and that value could not see the one failure that actually
+    // occurred. Every enemy body on the index was blank and the screen said
+    // nothing, because "I rendered" and "there is something in it" were the
+    // same answer.
+    //
+    // Early-breaks on the first opaque byte, so the cost falls on the failing
+    // case and not on the working one.
+    var opaque = false;
+    for (var ai = 3; ai < dst.length; ai += 4) {
+      if (dst[ai] !== 0) { opaque = true; break; }
+    }
+    if (!opaque) {
+      // NOT cached, on the same reasoning as the deferred path: unlike "this
+      // model has no geometry", an empty render can stop happening -- the fade
+      // bug repaired itself the moment the board drew once. Remembering it
+      // forever would freeze a slot on the 2D glyph for the session.
+      stats.empty++;
+      emptyRender = true;
+      return null;
     }
     sctx.putImageData(img, 0, 0);
 
@@ -496,11 +549,18 @@ var ModelViewer3D = (function () {
     }
     budgetUsed = true;
     lastRenderAt = now;
+    emptyRender = false;
     var made = render(name, px, step * 2 * Math.PI / YAW_STEPS, frame,
       glow, tint, null) || null;
-    // A null IS cached: a model that cannot be rendered will not start being
-    // renderable, and retrying it every frame forever is the one failure mode
-    // that would actually cost something.
+    // AN EMPTY RENDER IS NOT REMEMBERED. It is the one null that can stop being
+    // null -- the missing-fade bug produced empty bitmaps until the board drew
+    // once and correct ones forever after -- so caching it would hold the slot
+    // on its 2D glyph for the rest of the session over a condition that had
+    // already cleared.
+    if (emptyRender) { emptyRender = false; return null; }
+    // Every OTHER null IS cached: a model that cannot be rendered at all will
+    // not start being renderable, and retrying it every frame forever is the
+    // one failure mode that would actually cost something.
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
     cache.set(key, made);
     return made;
@@ -642,7 +702,7 @@ var ModelViewer3D = (function () {
     stats: function () {
       return { entries: cache.size, renders: stats.renders,
                misses: stats.misses, deferred: stats.deferred,
-               live: stats.live, blits: stats.blits,
+               live: stats.live, blits: stats.blits, empty: stats.empty,
                lastRenderMs: +stats.lastRenderMs.toFixed(3),
                totalRenderMs: +stats.totalRenderMs.toFixed(3),
                failed: failed };
