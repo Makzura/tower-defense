@@ -12,9 +12,20 @@
 # whose members are literally stamped from one die should be authored from one.
 #
 # THE DANGER, STATED PLAINLY, AND THE COUPLING IS SILENT. A shared module means
-# an edit here rewrites five shipped files -- Drudge, Skimmer, Tun, Hedger,
-# Cooper. That is the intended behaviour and it is also the way to break five
-# models with one careless line.
+# an edit here rewrites SIX shipped files -- Drudge, Skimmer, Tun, Hedger,
+# Cooper, and now the Courier (`enemy-shielded`, shipped 2026-08-13 in e3d08d6).
+# That is the intended behaviour and it is also the way to break six models with
+# one careless line.
+#
+# **DO NOT TRUST THAT COUNT -- DERIVE IT.** It was wrong for the whole window
+# between the Courier's export landing and this line being updated, and it will
+# go wrong again with every body batch 2 adds. The count is whatever this
+# returns, and a command cannot go stale the way a number can:
+#
+#     grep -l "import enemy_chassis" tools/blender/enemy_*.py
+#
+# Read the `enemy_*` glob rather than the directory: `make_preview.py` imports
+# the chassis too and ships no model.
 #
 # **NOTHING WARNS YOU.** An earlier version of this header claimed
 # CHASSIS_VERSION was stamped into every generated file so a mismatched set
