@@ -89,8 +89,35 @@ function loadModel(file) {
 
 // pg is column-major 16, as drawActor hands it to GLMath.multiply.
 function applyX(m, x, y, z) { return m[0] * x + m[4] * y + m[8] * z + m[12]; }
+function applyY(m, x, y, z) { return m[1] * x + m[5] * y + m[9] * z + m[13]; }
 function applyZ(m, x, y, z) { return m[2] * x + m[6] * y + m[10] * z + m[14]; }
 
+// THE RING BUDGET. The frost and camo rings are drawn at `radiusPx() + 4` and
+// the hover ring at `+ 9` (js/enemy.js:1134-1139), in ABSOLUTE board px. The
+// body's own drawn size scales with sizeScale but that pad does not, so the
+// budget SHRINKS as a body grows -- the biggest bodies have the least room, and
+// the Tyrant at 2.4 has the least of anyone.
+//
+// Returned in MODEL UNITS of plan RADIUS, which is the space a rig is authored
+// in: (11 * sizeScale + 4) board px / (31.8032 * sizeScale) px per unit.
+//
+// This matters to the gait and not only to the mesh: a foot planted for a
+// fraction `d` of the cycle must travel back `d * 0.899281` u, so ZERO SLIP
+// COSTS PLAN EXTENT and a sliding gait is cheaper here. The chassis's
+// under-travel is not only its defect -- it is also how every shipped body has
+// been staying inside its own rings.
+function ringBudgetUnits(scale, pad) {
+  return (11 * scale + (pad === undefined ? 4 : pad)) / (UNITS_TO_PX * scale);
+}
+
+// A NULL GROUP MATRIX IS IDENTITY IN MODEL SPACE, AND THAT IS NOT A GUESS.
+// export_mesh.py emits None for the unnamed group "" and for world_fixed, and
+// drawActor spends it as `base = pg ? multiply(instanceMat, pg) : instanceMat`
+// (gl-world.js:1626) -- the group is drawn with the instance matrix unchanged,
+// which in the model's own space is exactly the identity. Substituting IDENT
+// here reproduces the runtime rather than merely avoiding a crash.
+// Measured across the library: only enemy-flying carries nulls, 12 of 96, all
+// of them group 0, which is its unnamed 2223-vertex static remainder.
 var IDENT = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 
 function analyse(name, data, opts) {
@@ -191,6 +218,39 @@ function analyse(name, data, opts) {
     }
     cand.minZ = Math.min.apply(null, cand.z);
   }
+
+  // PLAN EXTENT, per frame, over every vertex through its own group matrix.
+  // Per frame and not over the union: the ring is drawn around the body in the
+  // pose it is currently in, so the figure that can fail is the worst FRAME,
+  // not the swept envelope. Reported as a radius, to compare against the ring.
+  var planWorst = 0, planWorstFrame = -1, planPerFrame = new Array(N);
+  for (f = 0; f < N; f++) {
+    var poseF = frames[band[0] + f];
+    var rMax = 0;
+    for (gi = 0; gi < groups.length; gi++) {
+      var gg = groups[gi];
+      if (!gg.count) continue;
+      var mm = (poseF && poseF[gi]) ? poseF[gi] : IDENT;
+      var lo3 = gg.first * 3, hi3 = (gg.first + gg.count) * 3;
+      for (k = lo3; k < hi3; k += 3) {
+        var vx = pos[k], vy = pos[k + 1], vz = pos[k + 2];
+        var wx = applyX(mm, vx, vy, vz), wy = applyY(mm, vx, vy, vz);
+        var rr = wx * wx + wy * wy;
+        if (rr > rMax) rMax = rr;
+      }
+    }
+    rMax = Math.sqrt(rMax);
+    planPerFrame[f] = rMax;
+    if (rMax > planWorst) { planWorst = rMax; planWorstFrame = f; }
+  }
+  var budget = ringBudgetUnits(scale, 4);
+  out.planRadiusUnits = planWorst;
+  out.planWorstFrame = planWorstFrame;
+  out.ringBudgetUnits = budget;
+  out.planPercentOfRing = 100 * planWorst / budget;
+  out.planRadiusPx = planWorst * unitsToPx * scale;
+  out.ringRadiusPx = 11 * scale + 4;
+  if (opts.verbose) out.planPerFrame = planPerFrame;
 
   var groundZ = Infinity;
   for (c = 0; c < candidates.length; c++) {
@@ -336,7 +396,7 @@ function main() {
       " -- board px, the space `pos` lives in.\n");
   var head = pad("model", 20) + pad("size", 6) + pad("N", 4) + pad("feet", 5) +
     pad("A units", 11) + pad("A px", 9) + pad("B px", 9) + pad("A+B px", 9) +
-    "worst foot";
+    pad("plan/ring", 10) + "worst foot";
   console.log(head);
   console.log(new Array(head.length + 1).join("-"));
   for (i = 0; i < results.length; i++) {
@@ -348,6 +408,7 @@ function main() {
       pad(r.gaitErrorPx.toFixed(3), 9) +
       pad(r.sawtoothPx.toFixed(3), 9) +
       pad(r.totalSlipPx.toFixed(3), 9) +
+      pad(r.planPercentOfRing.toFixed(0) + "%", 10) +
       (r.worstFoot || "-") +
       (r.notes.length ? "   ! " + r.notes.join("; ") : ""));
   }

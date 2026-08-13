@@ -87,6 +87,51 @@ the same 28° and slid by the difference. The predictor is a mechanism, not a
 formula to tune against — it explains the extremes and the ordering, and
 `enemy-armored` departs from it, so a body's own measurement still governs.
 
+**Addendum, same day — the tool also reports PLAN EXTENT, because a zero-slip
+gait costs plan extent and the biggest bodies have the least of it.**
+
+The frost and camo rings sit at `radiusPx() + 4` and the hover ring at `+ 9`
+(`js/enemy.js:1134-1139`), in ABSOLUTE board px. The body scales with
+`sizeScale`; that pad does not. **So the budget shrinks as a body grows**, and
+`boss` at 2.4 has the least room of anything on the board. A foot planted for a
+fraction `d` of the cycle must travel back `d * 0.899281` u, so **zero slip
+necessarily spends more plan extent than sliding does** — the chassis's
+under-travel is not only its defect, it is also how every shipped body has been
+staying inside its own rings.
+
+**Two metrics, and they disagree about which body is worst.** Fore/aft extent
+against ring DIAMETER is the budget the gait spends. Max plan RADIUS at any
+bearing against ring RADIUS is the test the ring can actually fail, since the
+ring is a circle and a vertex is outside it or is not. Per frame in both cases,
+not over the swept union — the ring is drawn around the pose the body is in.
+
+| model | size | fore/aft px | % of dia | max radius px | % of radius |
+|---|---|---|---|---|---|
+| `enemy-armored` | 1.05 | 18.2 | 59% | 10.9 | 70% |
+| `enemy-normal` | 1.00 | 19.0 | 63% | 11.5 | 76% |
+| `enemy-camo_normal` | 1.00 | 19.0 | 63% | 11.8 | 79% |
+| `enemy-shielded` | 1.15 | 23.1 | 69% | 14.2 | 85% |
+| `enemy-fast` | 1.00 | 21.4 | 71% | 12.8 | 85% |
+| `enemy-shieldbearer` | 1.35 | 27.5 | 73% | 16.8 | 89% |
+| `enemy-slow` | 1.00 | 22.2 | 74% | 13.4 | 89% |
+| `enemy-swarm` | 0.55 | 13.6 | 68% | 9.5 | 95% |
+| `enemy-colossus` | 2.10 | 44.3 | 82% | 28.4 | 105% |
+| `enemy-angry` | 1.25 | 35.9 | 101% | 28.8 | 162% |
+| `enemy-hive` | 1.60 | 75.2 | 174% | 40.9 | 189% |
+| `enemy-brute` | 1.50 | 51.9 | 127% | 41.6 | 203% |
+
+**`enemy-brute` and `enemy-hive` swap places between the two columns** — hive is
+worse fore/aft, brute is worse in the round — so quoting one without naming it
+picks the wrong worst body. Overflow is already routine on the large bodies;
+`enemy-colossus` at 105% is the only big one near its ring. The consequence of
+exceeding is that the hover and frost rings draw INSIDE the silhouette, so
+selecting the body and seeing it slowed both stop reading.
+
+For a body at `sizeScale` 2.4 the ring radius is 30.4 board px = 0.39828 u, so a
+symmetric gait at duty `d` with fore/aft contact length `c` needs
+`d * 0.899281 + c <= 0.79656` u to stay inside — at duty 0.6 that leaves
+**0.257 u, or 19.6 board px, of contact length.**
+
 `node tools/check-gait-slip.js [--scale S] [--json] [--verbose] [model ...]`.
 With no arguments it sweeps every `js/gl/models/enemy-*.js` at each type's real
 `sizeScale`. It reads a built `.js` file only — no Blender, no browser. Note
