@@ -278,7 +278,10 @@ better reason than the one I first gave it.
 figures above are a sensitivity table so the answer does not have to be
 re-derived when she supplies it. What I do own is the consequence: **no stride in
 that range breaks the gesture, and none breaks the plan budget either** — plan
-radius envelope goes 0.526 → 0.610 u across the same range, against 0.8930.
+radius envelope goes 0.526 → 0.610 u across the same range, against a frost-ring
+**RADIUS** of 0.4465 u (**118% → 137%**). See the correction at 4k: the 0.8930
+this originally cited is the ring's DIAMETER, and over 100% is the norm on this
+board rather than a failure.
 
 ### 4b. THE ONE BEARING WHERE THIS GESTURE FAILS, stated plainly
 
@@ -437,12 +440,23 @@ its tip at or below the drum's top face.**
   less than the mast root's height above the road (0.80 u), so at *any* stroke
   angle up to 90° the tip is at z ≥ 0.28. This is the defect that was written
   wrong three times on the shipped body's crank; here it cannot occur.
-- **The strike cannot break the plan budget.** Plan radius envelope — **taken
-  over every part of the body, as the plan envelope and not a single axis**,
-  across every gait frame and every angle in the window — is **0.5248 u** against
-  the frost-ring budget of 0.8930, margin **0.368 u**. The stroke actually pulls
-  the tool *inward* (tip goes from 0.520 to 0.431 u forward), so the struck body
-  is narrower in plan than the resting one.
+- **The strike cannot make the plan envelope worse.** Plan radius envelope —
+  **taken over every part of the body, as the plan envelope and not a single
+  axis**, across every gait frame and every angle in the window — is **0.5248 u
+  projected, 0.5331 u built**, against a frost-ring **RADIUS** of **0.4465 u**:
+  **117–119%**. The stroke actually pulls the tool *inward* (tip goes from 0.520
+  to 0.431 u forward), so the struck body is narrower in plan than the resting
+  one — which is the claim that matters here and is unaffected.
+
+  **CORRECTED 2026-08-14 (kaz). This said "against the frost-ring budget of
+  0.8930, margin 0.368 u" and that set a RADIUS against a DIAMETER** — 0.8930 is
+  the ring's full width. The heading said "cannot break the plan budget"; the
+  body **does** exceed the ring, deliberately, as most of the roster does
+  (shipped Hedger 162%, brute 203%, hive 189%, Tyrant 115%, Dray 105%, Tender
+  103%). The cost is that the hover and frost rings draw inside the silhouette.
+  **The Tripod is the tightest comparable body on the board and 26% better than
+  the one it replaces**, which is a stronger claim than the false one it
+  replaces. See the parts brief for why a plan radius is not a half-width.
 
 ### 4l. `bob` and `roll` — the one lever that fixes two things at once
 

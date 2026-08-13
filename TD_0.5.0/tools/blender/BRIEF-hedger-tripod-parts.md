@@ -66,9 +66,25 @@ widening the top quarter's mean. **It is still a real 0.05 and it is a call I
 made, not a rounding error: the head is kept and section 3 says what it buys.**
 0.72 sits inside the pass band and is 0.25 clear of every body that failed.
 
-Plan radius 0.522 u against the frost-ring budget of 0.8930 u at this sizeScale —
-**margin 0.371 u.** This is the most compact body of the four candidates and
-tighter in plan than the machine it replaces, because there is no swinging arm.
+Plan radius **0.522 u projected and 0.5331 u built**, against a frost-ring
+**RADIUS** of **0.4465 u** at this sizeScale — **117% and 119%.**
+
+**CORRECTED 2026-08-14 (kaz). The original said "against the frost-ring budget
+of 0.8930 u, margin 0.371 u" and that compared a RADIUS against a DIAMETER.**
+0.8930 is the ring's full width; the radius is half of it. Caught by suki on the
+built body, verified independently twice. Over 100% is the norm here rather than
+a failure — shipped Hedger **162%**, brute 203%, hive 189%, Tyrant 115%, Dray
+105%, Tender 103% — and what it costs is that the hover and frost rings draw
+inside the body rather than around it. **The Tripod is the tightest comparable
+body on the board and a 26% improvement on the one it replaces.** It exceeds
+deliberately, which is the only way this budget may be exceeded.
+
+**And the reason the two figures reconcile rather than one being wrong: a plan
+RADIUS is not a half-width unless the body is centred on its own origin.**
+Measured on the Gleaner, radius 0.3601 u = 11.45 board px against a half-width
+of 9.51 — off-centre by 1.94 board px. The ring is a **circle about the draw
+position**, so radius-against-radius is the test and half-width understates any
+body that leans. Name which one you mean, every time.
 
 ---
 
