@@ -13,6 +13,58 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — the other six house-standard commits, narrated. Paying a debt
+petra made visible rather than counted.**
+
+Seven commits landed against `tools/blender/HOUSE-STANDARD.md` in one afternoon
+and **not one carried a CHANGELOG entry**, though the preamble above requires one
+for every change. petra reconstructed the section-4 episode and named the rest so
+the debt was visible; these are the six she did not narrate, and they are mine.
+
+- **`c4a5ce3`** — *"the default camera" is a number per viewport.* `fitBounds`
+  depends on aspect, so two rigs whose canvases differed by two pixels produced
+  2021.3631 and 2021.237. Harmless numerically; unless the viewport is stated the
+  next two-rig disagreement reads as a finding when it is a window size. Also:
+  **a single frame is worth about 13% of the silhouette** (the Gleaner runs
+  134–151 lit px across its eight walk frames), so a moving part wants a
+  per-frame curve rather than a number.
+- **`7b05841`** — *measure adjacent-pair separation at three bearings, and never
+  average a width over yaws.* A mean over 12 bearings called the rebuilt Skimmer
+  a uniform shrink — the one thing its card forbids — and nearly reverted a
+  rebuild that had worked; per bearing the narrowing is −10% head-on and −35%
+  broadside, and the separation tracks the anisotropy. Two defects hid behind the
+  standard three-quarter view in one day.
+- **`e5fb26e`** — *bracket a read against synthetic merge, never threshold it.*
+  A part painted the exact colour of the body behind it still changes 0–34 px, so
+  "the picture changed" passes a totally merged part. Measure the part painted to
+  merge, as authored, and painted maximally different; report where the authored
+  value sits between its own two bounds.
+- **`080c6e8`** — *a separator must name its axis, and only height is
+  bearing-invariant.* The Skimmer separated on y and failed head-on; the Tun
+  separated on x and failed broadside, matching the Gleaner on **both** axes
+  visible at that bearing. Neither was a modelling error — both were briefs that
+  never named an axis. **For anything that multiplies, prefer a height
+  separator.** Also records that a cross-commit visual comparison needs a
+  stability control.
+- **`0510ab6`** — *sample the extreme, not the centre.* When a population's
+  members are not simultaneous the player samples them serially, so a median over
+  frames, a mean over yaws and a max over vertices all hide what he sees. Five
+  findings that day were instances, including the fifth and subtlest: **choosing
+  which frame to photograph before measuring which frame carries the defect.**
+- **`845f6a4`** — *a bearing is a camera yaw unless it says otherwise*, and any
+  figure crossing between rigs carries its metric, bearing and viewport. "Yaw 0"
+  was exact in the path-direction convention and pointed, read as a camera yaw,
+  at the one bearing where the defect being fixed did not exist.
+
+**And the process finding underneath all of it, which is the part worth keeping.**
+Two of those commits swept petra's uncommitted edits to the same file in under
+someone else's message — `4a18cc0` carries 135 lines of hers. Nothing was lost
+and `refs/sync-backup` stayed empty, but `git blame` now misattributes her text.
+**The standing rule all day was "explicit paths only, never `git add -A`", and
+explicit paths do not protect you when two people are editing the same file.**
+The rule needs its second half: **`git diff --cached` before every commit, and if
+a hunk is not yours, stop.**
+
 **2026-08-13 — contrast ratio is computed on RENDERED PIXELS, never on palette
 values. The palette-CR method is retired, the bands it fed are palette-space
 only, and `AGENTS.md` finally points at the standard that carries them.**
