@@ -152,6 +152,61 @@ compositing under fade was tested directly with suki's two re-exports of
 `enemy-normal`, which differ only in triangle order: **0 px faded**, so it is not
 observable at this size and alpha.
 
+**2026-08-13 — the day's changelog debt, measured properly: TWENTY-FOUR commits
+are unnarrated anywhere, and six of them carry standing RULES that exist only in
+a commit message.**
+
+**The obvious count is wrong and overstates it by nearly double.** Forty-three of
+today's commits carry no `CHANGELOG.md` edit *of their own* — but entries here
+are routinely written in someone else's commit (six house-standard commits were
+narrated in `fa8712f`, `217d40a` and `fb9ab97` in `9c45869`, `f90819e` in
+`c3a7134`). **The honest measure is "mentioned by hash nowhere in this file",
+and that is 24.** Recording the method because the wrong metric would have sent
+someone to re-narrate a dozen commits that are already covered.
+
+**THE SIX THAT MATTER, because a rule living only in a commit message is
+invisible to every future reader of this project:**
+
+- **`d2f981d`** — *"A whole A4 Siphon occupies 22 × 35 px"* in the house standard
+  was the **BASE** tier, wrong since the day it was written. Proved in Blender
+  units with no camera: the section's own 1.790 u matches base and A1 to 0.3% and
+  A4 to 9%; measured z runs base 1.795 → a4 1.956 → a5 2.072, and section 5
+  already contradicted section 0. The error was safe in direction — everyone had
+  been designing to the tightest box — but the next person to measure A4 would
+  have found 39 px and called the standard 12% out. **Checked: that figure never
+  reached `AGENTS.md`.**
+- **`48be562`** — **occluded is not the same as backdropped**, and the section
+  used to invite the conflation. *Occluded* means geometry drawn in FRONT of a
+  part: a gate, and no material rescues it. *Backdropped* means what sits BEHIND
+  it: not a failure, but what decides how stable the part's contrast is frame to
+  frame. Prefer a backdrop that shades **with** the part — `keyDir` is a
+  world-space uniform that rotates with nothing, so two parts of one model share
+  its yaw, their normals move together and their ratio is buffered.
+- **`7df7d5d`** — `visual-pass/DIRECTION.md` restated the colour clause **without
+  the pointer**, which is exactly how a palette table gets read as a prediction of
+  what lands on screen. Now points at section 4 of the house standard in
+  `AGENTS.md`'s own terms. This is the pointer-not-copy rule catching a third
+  document, and it cites clause 7's reasoning as the precedent.
+- **`9ee7f44`** — **ask whether a tier's value is MECHANICAL before treating weak
+  legibility as a defect.** Written as the question rather than as a verdict about
+  any tier, deliberately: a verdict goes stale the first time someone reprices a
+  tier or moves a mechanic between rows, and the check survives that.
+- **`eaf8865` and `5ad8241`** — **both model gates now say what they do NOT
+  check.** The Hedger passed a four-gate instrument for hours while its crank
+  passed through its own arm, not because a test broke but because **green was
+  read as "sound" when it meant "the things this looks at are fine"**. No added
+  test fixes that; only the tool stating its own scope. Both also record why the
+  obvious fix is worse than nothing: a whole-group AABB interpenetration test
+  reports overlap on every frame of a *correct* model, which is the same as
+  reporting nothing. It has to be per solid, which is what clause 8 already says.
+
+**The remaining eighteen are assets, captions and comment corrections** —
+`6b77474`, `8388034`, `15fc4a3`, `bbde900`, `5672261`, `65c7638`, `a411c48`,
+`0055492`, `cf3d813`, `141e463`, `1d1c29f`, `f3bb74b`, `191a35c`, `a136b3a`,
+`86e5cda`, `147255d`, `ba38c61`, `4d2c411`. **Listed rather than counted**, so
+the debt is a work order and not a number, and so nobody has to re-derive which
+ones they are.
+
 **2026-08-13 — `ac4ca48` deletes wave 11's midboss health override, so the type
 row's 250 is the value again. Four schedule totals move with it, and the
 Rifleman's A5 DPS was one retune behind in six places.**
