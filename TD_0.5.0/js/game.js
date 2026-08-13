@@ -254,11 +254,12 @@ var EASY_WAVES = [
   // property that a half-answer still loses. Measured, the override cost the
   // wave its entire audience. The starting kit is cash-limited to ten or
   // eleven Riflemen by wave 11 ($3326 is every dollar the schedule has paid by
-  // then) and its damage into a single slow body is a hard per-route CEILING --
-  // 270 on the default route, 380 on the most generous - that does not move
-  // with the midboss's health. 420 sat above every one of those ceilings, so no
-  // board a player could build answered it: a wall rather than a check, and it
-  // ended the run on three of the six routes.
+  // then) and its damage into a single slow body is a hard CEILING that does
+  // not move with the midboss's health -- 230 to 416 across the six routes,
+  // depending on route length and how well the board was built. 420 sat above
+  // five of those six ceilings, so on all but the most generous route no board
+  // a player could build answered it. A wall rather than a check, and it ended
+  // the run on five of the six routes.
   //
   // 250 restores the check without the wall. The base has 100 HP and pays an
   // enemy's REMAINING health on a leak, so surviving means removing 150 of it.
