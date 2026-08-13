@@ -13,6 +13,130 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The title screen's strap line is gone, and the title block moved
+down 23 px to take back the space it left.**
+
+The line under the rule read *"35 waves.  6 ley-lines.  N towers.  Hold the
+base."* It counted the towers in `BUILD_SLOTS` rather than the five the armoury
+sells, so it under-reported the game it was advertising. The owner's ruling was
+that it should be **deleted, not corrected**.
+
+Deleting it alone would have swapped one defect for another. Measured on the
+real canvas, foreground ink per world row: before the change the last inked row
+above PLAY was **240** (the strap) and PLAY's first inked row is **319**, a
+clear run of **78** rows. Remove the strap and leave everything where it was and
+that run becomes **101** — a 1.29x hole where the design had a gap. Moving the
+whole block down by the strap's own line box gives **79**, one row from what the
+layout always had.
+
+`titleY` now carries the block: the shadow is `titleY + 5` and the rule
+`titleY + 39`, so the three elements move as one thing and the next person to
+adjust it changes one number instead of four.
+
+**The evidence, because a layout claim is exactly the kind that gets eyeballed.**
+Foreground ink was isolated by drawing the menu and then drawing
+`drawMenuBackdrop()` alone into a cleared canvas and differencing the two — the
+backdrop is the same function in both passes, so it cancels, and no threshold
+has to be guessed for "what colour is text". Against the real previous file
+(streamed out of git at HEAD and injected whole — not a stub, not a partial
+disable), the two states differ in **88,539 device pixels, confined to world
+rows 141–240**, and in **0 pixels below row 300**. Title band 142–202 → 165–225,
+rule 215–217 → 238–239: both exactly +23, both the same height. Every control
+below is untouched to the pixel.
+
+Two traps caught on the way, both already written down and both still worth
+repeating. **Searching the source for the strap's own words matches the
+post-deletion file**, because the comment recording the deletion quotes the
+line verbatim; the discriminator has to be the strap's `towerCount` variable, or
+better, the pixels. And **the first `drawMenu()` of a page's life differs from
+every later one** by a handful of antialiased pixels — that produced a phantom
+78-pixel difference in the button rows which vanished the moment the first draw
+was discarded. A run-to-run null on the same code state returned exactly 0, so
+the phantom looked deterministic and real until the warm-up frame was dropped.
+
+**2026-08-13 — The population question answered by measurement: 400–500
+ordinary enemies costs ~3 ms of a 16.67 ms frame, the failure point is around
+3,000 bodies, and the renderer is not what would break first.**
+
+Diego retired the triangle budget and replaced it with a population
+constraint — *"even with 400-500 of those enemies on screen the game must run
+cleanly"*. Nobody had data past 107 bodies. New rig,
+`visual-pass/probe/pop-*.js`, outside the game tree; it changes no game file
+and is not referenced by `index.html`.
+
+**Answer: yes, with roughly 5x headroom.** 500 all-meshed damaged bodies cost
+**3.10 ms/frame at 1x and 3.78 ms at 3x** sustained, against a 16.67 ms budget.
+Frame time is linear in body count at **5.8 µs per body**, and 16.67 ms is not
+reached until **~2,900–3,000 bodies**. On a heavily loaded machine the same
+board reads 7.2/7.8 ms and the ceiling falls to ~1,150 — still 2.3x past the
+constraint, so the verdict survives the whole measured load band.
+
+**Simulation is not the limit and is not close to it.** kaz's stability model
+`T = R / (1 − speed·60·S)` cliffs at `S` = 5.56 ms/step at 3x. Measured `S` is
+**66 µs/step at 500 bodies** — 84x under — and still only 0.29 ms at 2,000. The
+3x denominator is 0.988 at 500 bodies and 0.959 at 2,000, so simulation
+contributes 1–4% of amplification and **the cost is essentially all render.**
+
+**Draw calls are the scaling term; triangles remain free.** 6.16 GL calls per
+meshed body, 0.70 µs per call, flat across 0.1M–9.7M triangles/frame. The
+fallback sphere is 1 call and **1.55 µs/body against 5.76 for a meshed body** —
+so meshing the rest of the roster is a 3.7x per-body cost, and still fits.
+
+**The 2D overlay is NOT the wall, with one exception that is much worse than
+the wall was expected to be.** Health bars — the term everyone expected to
+dominate — cost **~1 µs/body** (0.3–0.4 ms at 400). The **camo ground ring
+costs ~15 µs/body**, 15x more: it is 44 `project()` calls plus a dashed stroke
+per camo body per frame, and `isCamo` separately makes the GL pass draw that
+body **twice**. At 400 camo bodies the overlay is **68% of the frame**. Today
+the schedule peaks at 28 camo bodies and it costs ~0.3 ms; at population scale
+it is the first thing that breaks. `gl-world.js`'s own comment already says the
+camo second pass "costs one extra walk of a list that is at most a few dozen
+long" — that premise is what expires at 400.
+
+**Towers are a fixed offset, not a scaling term.** 12 fully upgraded towers
+firing add **2.5–3.9 ms of overlay, flat from 100 to 500 bodies** — a
+per-tower cost, not a per-body one. It raises the intercept and does not move
+the slope.
+
+**What the schedule can actually reach: 115 bodies**, wave 30, the Nursery —
+3.5x under the constraint. Measured per-wave against the **uncommitted**
+`EASY_WAVES` retune in the working tree (`count → round(count × 2 × 1.25)` on
+twelve waves), dated by content — 16 `RETUNED` markers in the served file, 0 at
+HEAD — because a served working tree renders what is saved, not what is
+committed. **The retune does not move the ceiling**: it lifts several waves'
+scheduled totals to 88–95 but leaves `interval` alone, so they deploy over a
+longer window and peak at 50–80; the global peak stays wave 30, which the
+retune excludes.
+
+Method notes that cost something to learn, all now in the rig's header
+comments: SwiftShader is right for a pixel null control and **wrong for
+timing** (software raster prices the exact axis the answer turns on); a 1×1
+`readPixels` costs 8–24 ms of round-trip latency, so per-frame fencing swamps
+what it measures; `performance.now()` is quantised to 0.1 ms here, so a single
+`update()` step reads as a median of 0 and must be timed in batches.
+
+**And the one that bounds every timing number this project will ever take: a
+frame-time measurement is not repeatable in parallel with any other capture
+work.** The same sweep, same code, same board ranged **2.5x** across one
+afternoon — 400 bodies at 2.947 ms and later at 9.862 ms — because 33–52
+foreign `chrome.exe` were alive, plus **101 leaked by this rig itself**. The
+rig now counts browser processes at start and end and splits its own from
+foreign; it immediately caught that a deliberately "clean" re-run was the most
+contaminated of the set. Ratios within one launch are load-invariant (the
+firing-board multiplier reproduces at 1.616 and 1.606 while the absolutes
+behind it differ by 1.6x); absolutes are not. Quote the foreign browser count
+beside any millisecond figure.
+
+Four defects in the rig were caught before they reached a table, and the worst
+is worth repeating: making bodies unkillable so the board would not clear meant
+one leak charged the base 6e8 HP, `gameOver` latched, `update()` returned on
+its second line — and **the renderer went on drawing 400 bodies at an entirely
+believable frame time with the simulation at zero.** Both of that run's proof
+metrics reported it and both read as "the towers are not firing"; one of them,
+`tower.damageDealt`, is declared on `Tower` and never incremented by any
+shipped tower, so it could not have been non-zero. Found independently and
+concurrently by a second engineer on the same harness.
+
 **2026-08-13 — `gait_solve.contact_x` had the material-point bug it was written
 to avoid. Found by the Vanguard build, in my own module, one commit after the
 rule was written down.**
