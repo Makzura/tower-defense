@@ -13,6 +13,87 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The models are visible now: bigger previews everywhere, real
+bodies in the index, and a viewer that turns a tier or walks an enemy.**
+
+The owner's complaint was that the build-bar previews are unreadable because
+they are too small, and that the index shows a picture that is not what walks
+the road. Both were true, and the second was worse: `js/codex.js` magnified
+`model.sprite` — the flat 2D fallback drawing, authored before these enemies had
+meshes — so a player studied one picture in the field guide and met a different
+one in the game. That is the one thing a field guide must not do.
+
+**The pictures got bigger and nothing moved to make room.** Build slot 22 → 46,
+store card 26 → 60, armoury loadout row 26 → 46, codex tower rail 22 → 52. The
+build slot needed ten more pixels of height and they came out of the bar's own
+bottom margin (`SLOT_SIZE` 76 → 86, margin 18 → 8), so **`BAR_Y` is 626 exactly
+as it was**: no panel clamp moved, no playable ground was lost, and the five
+suites that assert `L.y + L.h <= BAR_Y` never noticed. Growing the bar upward
+would have moved all of it for a cosmetic gain.
+
+**The armoury loadout row was drawing the flat glyph** while the bar it exists
+to preview drew the mesh. So the row whose entire job is "this is the bar you
+will play with" was showing something else. It draws the mesh now, same
+fallback contract as the other three.
+
+**`js/gl/model-viewer.js` (new) is the VIEWER path, and it is deliberately not
+`js/gl/tower-preview.js`.** That module is the ICON path — five tower families,
+frame 0, one fixed yaw, cached per (model, pixel size) — and every one of those
+restrictions is what makes a 22 px slot cost one `drawImage` and no GL work.
+The viewer needs any registered model at any yaw and any animation frame, which
+is a live render loop, so it carries two policies and the caller picks: CACHED
+(yaw quantised to 24 steps, one render per animation frame, misses fall back to
+the 2D glyph for that frame so nothing is ever blank) for anything over a live
+board, and LIVE (fresh every call, nothing kept) for the index, where `draw()`
+returns before the board is asked to render. Getting the choice wrong costs
+frame time one way and memory the other, never correctness.
+
+**The fit is a bounding CYLINDER about the turn axis, taken across the whole
+walk band.** Fit a turning body to its screen box at one yaw — which is correct
+for the icon path — and it grows and shrinks as it turns, because a rifle
+broadside is about twice the silhouette it is end-on. The body would pump once
+per revolution and read as a zoom. One pass over the posed vertices gives the
+exact extents for every yaw at once. And it is the whole band rather than frame
+0 because a single frame of an animated model is a sample, not a measurement:
+this project has already measured a 0.498 u rest-pose extent against a 0.598 u
+all-frames envelope on one body, the difference occurring at two frames in
+eight. Fitted to the rest pose, a walking viewer clips its own stride twice per
+cycle — and only twice, which is exactly the kind of defect a per-frame review
+passes.
+
+**The enemy viewer** walks the body on the spot while it turns, with an arrow
+either side to step through the roster and Escape to leave. The walk rate is
+derived from the enemy's own speed over its own stride, which is the quantity
+the board's distance-driven walk already uses, so a Sprinter scurries and a
+Colossus plods for the same reason and by the same arithmetic. Frames come from
+`World3D.walkBand`, never from arithmetic on `frames.length`: enemies index
+frame 0 as a walk frame and the summoner family reserves it as a rest pose, so
+any constant would be wrong for one of them. **Eight of the twenty-one types
+have no mesh and reach the flat-marker path here on every load, and the viewer
+says so on screen** — a magnified 2D skin standing in for a body that was never
+modelled is honest only if it admits it.
+
+**The tower body sits left of the upgrade tree on the index and shows the tier
+that is picked**, so a5 and b5 stop being bodies nobody has seen without buying
+them. It says "no new body at this tier" where a tier buys none — Rifleman A1,
+A2 and A4 wear the body below them and the Siphon gives every tier its own, and
+showing the same picture under a different tier name without saying so is the
+guide implying a change the geometry does not make. Which mesh a tier wears is
+asked of `World3D.modelFor`, the same resolver the board asks, so the guide and
+the road cannot disagree.
+
+**The viewer is a modal inside the index rather than a value of `screen`**, and
+the consequence is that `Escape` has two jobs on that screen. `Codex.onKey`
+returns TRUE when it consumed the key and `onKeyDown` routes to it first, so
+Escape closes the viewer when one is up and leaves the index when one is not.
+**That handler existed for a session and was not in the module's return block** —
+written, correct, unreachable, and silent: nothing throws, the arrows simply do
+nothing. It is the same failure as an untagged script file, one scope down.
+
+Suites: 107/0, 207/5, 72/0, 45/0, 53/0 and sandbox green — the same five
+failures, by name, as the recorded clean-extraction baseline. None of them is
+this change.
+
 **2026-08-13 — A manifest gate: every js file on disk must be loaded by a page,
 because no suite can tell you when one is not.**
 

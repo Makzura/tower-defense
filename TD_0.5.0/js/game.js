@@ -136,9 +136,10 @@ var MAX_CANVAS_SCALE = 3;
 // simulation, so these numbers are AUTHORED. The shape they are authored to is
 // the one this file has always documented -- a steep back half, every counter
 // affordable at the wave that demands it, and the v0.4.4 spine intact
-// underneath. tools/simulate-campaign.js still exists if a future session
-// needs to check that a CHANGE did not break something; do not retune from it
-// without being asked.
+// underneath. The campaign simulator still exists if a future session needs
+// to check that a CHANGE did not break something, but it is no longer in
+// this repository -- it lives in the bot's own tree, so a clone of this repo
+// cannot reproduce its figures. Do not retune from it without being asked.
 //
 // For the record, the last simulated readings (taken at 7776 HP, before this
 // turn-up, and now stale): gunners alone lost on every route by wave 21; a
@@ -1178,11 +1179,29 @@ var worldOverlays = [];
 
 // Build bar geometry. Pixels, and pixels are correct here: this is interface
 // chrome anchored to the viewport, not a distance in the game world.
-var SLOT_SIZE = 76;
+// A SLOT GREW FROM 76 TO 86 AND THE BAR DID NOT MOVE. The owner's complaint was
+// that the previews are unreadable because they are too small, and the picture
+// inside a slot was 22 px in a 76 px box -- less than a twelfth of the slot's
+// area, with a 40 px gutter around it and two text rows below.
+//
+// The ten pixels come out of the bar's own bottom margin, not out of the board:
+// the margin was 18 and is now 8, so `BAR_Y` is 626 exactly as it was before.
+// That matters more than it looks. `BAR_Y` is the ceiling every inspection
+// panel clamps against (`inspectionLayout`), it is the floor of the playable
+// area, and five suites assert `L.y + L.h <= BAR_Y` on panels, cards and
+// recruit boxes. Growing the bar UPWARD would have moved all of that for a
+// cosmetic gain. Growing it DOWNWARD into a margin nothing was using moves
+// nothing at all.
+//
+// The bar is also 50 px wider as a result (5 slots, 420 -> 470) and therefore
+// starts 25 px further left: it spans 405..875 rather than 430..850. Nothing
+// else on that line is anywhere near it -- the speed and auto-send buttons are
+// at the right edge past x=1000, the scale bar is bottom-left.
+var SLOT_SIZE = 86;
 var SLOT_GAP = 10;
 var BAR_WIDTH = BUILD_SLOTS.length * SLOT_SIZE + (BUILD_SLOTS.length - 1) * SLOT_GAP;
 var BAR_X = (VIEW_WIDTH - BAR_WIDTH) / 2;
-var BAR_Y = VIEW_HEIGHT - SLOT_SIZE - 18;
+var BAR_Y = VIEW_HEIGHT - SLOT_SIZE - 8;
 
 
 // Match the backing store to the pixels the canvas really occupies on the
@@ -2001,6 +2020,15 @@ function onKeyDown(event) {
     return;
   }
 
+  // THE INDEX OWNS ITS OWN KEYS FIRST, and it has to, because it now has a
+  // modal inside it. The model viewer is a sub-screen of the index rather than
+  // a value of `screen` (see js/codex.js), so Escape has two jobs on this
+  // screen: close the viewer if one is up, leave the index if one is not.
+  // `Codex.onKey` returns TRUE when it consumed the key, and that return is the
+  // only thing stopping one press from doing both -- exactly the rule the pause
+  // menu follows against the board underneath it.
+  if (screen === "index" && Codex.onKey(event.key)) return;
+
   if (screen === "index" || screen === "store") {
     if (event.key === "Escape") openMenu();
     return;
@@ -2249,7 +2277,7 @@ function backToMenuButtonRect() {
 // same rule the build bar and the inspection panel follow.
 //
 // The corner is chosen, not arbitrary: it is the one region of the viewport
-// nothing else claims. The build bar is centred and ends at x=850, the scale
+// nothing else claims. The build bar is centred and ends at x=875, the scale
 // bar sits bottom-LEFT, the cash readout is top-right, and inspectionLayout
 // clamps every panel above BAR_Y -- so a button on this line cannot be covered
 // by, or accidentally covered over, anything else.
@@ -3725,7 +3753,7 @@ function drawBuildBar() {
     ctx.textAlign = "left";
     ctx.font = "11px system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.30)";
-    ctx.fillText(String(i + 1), r.x + 6, r.y + 5);
+    ctx.fillText(String(i + 1), r.x + 6, r.y + 3);
 
     if (type === null) continue;
 
@@ -3736,20 +3764,31 @@ function drawBuildBar() {
     // shows what the player will place. It returns FALSE when it cannot -- no
     // WebGL, no mesh for that tier -- and then the tower's own drawIcon runs
     // exactly as before, so a slot is never left blank.
+    //
+    // 46 PX, WAS 22. `size` is the BOX for both calls, not a radius, so the two
+    // paths stay matched at whatever number this is -- which is why they have
+    // always carried the same literal and still do. The box is what the slot
+    // can actually spare: the picture spans r.y+7 to r.y+53, the name sits at
+    // +54 and the price at +68, and an 86 px slot ends at +86. Nothing here is
+    // centred on the slot any more; the rows are packed from the top so the
+    // picture gets everything that is left.
     if (typeof TowerPreview3D === "undefined" ||
-        !TowerPreview3D.draw(ctx, type, r.x + r.w / 2, r.y + 30, 22)) {
-      type.drawIcon(ctx, r.x + r.w / 2, r.y + 30, 22);
+        !TowerPreview3D.draw(ctx, type, r.x + r.w / 2, r.y + 30, 46)) {
+      type.drawIcon(ctx, r.x + r.w / 2, r.y + 30, 46);
     }
     ctx.globalAlpha = 1;
 
     ctx.textAlign = "center";
     ctx.font = "12px system-ui, sans-serif";
     ctx.fillStyle = affordable ? "#c7d1e0" : "rgba(199,209,224,0.4)";
-    ctx.fillText(type.DISPLAY_NAME, r.x + r.w / 2, r.y + 42);
+    // FIT, NOT BARE. This was a plain fillText, and every display name in the
+    // game is being rewritten right now -- one name a couple of letters longer
+    // than "Summoner" would have run out of the slot and into its neighbour.
+    ctx.fillText(fitText(ctx, type.DISPLAY_NAME, r.w - 8), r.x + r.w / 2, r.y + 54);
 
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillStyle = affordable ? "#ffd76e" : "#e0736e";
-    ctx.fillText("$" + type.COST, r.x + r.w / 2, r.y + 57);
+    ctx.fillText("$" + type.COST, r.x + r.w / 2, r.y + 68);
   }
 
   ctx.textAlign = "left";

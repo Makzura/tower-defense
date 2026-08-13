@@ -178,9 +178,13 @@ var Store = (function () {
       if (!owned) ctx.globalAlpha = 0.45;
       // Same rule as the build bar: the real mesh when it can be rendered, the
       // tower's own glyph when it cannot. A card must never be empty.
+      // 60 px, was 26. An 86 px card was spending a quarter of its height on
+      // the one thing a player buys a tower for -- seeing what it is. The icon
+      // column is 80 px wide before the name starts, so 60 fits inside it with
+      // a 10 px gutter either side and nothing else on the card moved.
       if (Type && (typeof TowerPreview3D === "undefined" ||
-          !TowerPreview3D.draw(ctx, Type, r.x + 42, r.y + r.h / 2, 26))) {
-        Type.drawIcon(ctx, r.x + 42, r.y + r.h / 2, 26);
+          !TowerPreview3D.draw(ctx, Type, r.x + 42, r.y + r.h / 2, 60))) {
+        Type.drawIcon(ctx, r.x + 42, r.y + r.h / 2, 60);
       }
       ctx.restore();
 
@@ -316,10 +320,19 @@ var Store = (function () {
 
       var Type = id === null ? null : MetaProgress.constructorOf(id);
       if (Type) {
-        Type.drawIcon(ctx, r.x + r.w / 2, r.y + 34, 26);
+        // THE REAL BODY HERE TOO, and this row was the odd one out: the build
+        // bar and the store cards have both drawn the mesh since TowerPreview3D
+        // landed, and the loadout row -- the screen whose entire purpose is
+        // "this is the bar you will play with" -- was still drawing the flat
+        // glyph. So the preview a player checked before a run did not match the
+        // bar they then played with. Same fallback contract as everywhere else.
+        if (typeof TowerPreview3D === "undefined" ||
+            !TowerPreview3D.draw(ctx, Type, r.x + r.w / 2, r.y + 30, 46)) {
+          Type.drawIcon(ctx, r.x + r.w / 2, r.y + 30, 46);
+        }
         ctx.font = "11px system-ui, sans-serif";
         ctx.fillStyle = "rgba(199,209,224,0.75)";
-        ctx.fillText(fitText(ctx, Type.DISPLAY_NAME, r.w - 8), r.x + r.w / 2, r.y + 58);
+        ctx.fillText(fitText(ctx, Type.DISPLAY_NAME, r.w - 8), r.x + r.w / 2, r.y + 56);
       } else {
         ctx.font = "12px system-ui, sans-serif";
         ctx.fillStyle = "rgba(199,209,224,0.3)";

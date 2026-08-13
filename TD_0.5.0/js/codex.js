@@ -107,6 +107,24 @@ var Codex = (function () {
     return t.whyCannotUpgrade(named[1]) === null ? named[1] : null;
   }
 
+  // WHICH BODY A PREVIEW INSTANCE IS WEARING, asked of the renderer.
+  //
+  // The tier -> mesh rule lives in gl-world's five selectors and nowhere else;
+  // this asks the same `towerModel` the board asks, through the `modelFor`
+  // export, so the guide and the road can never disagree about what a tier
+  // looks like. A build with no WebGL answers null and every caller falls back
+  // to the 2D glyph, exactly as it did before any of this existed.
+  //
+  // DERIVED RATHER THAN TABLED on purpose: a hand-written table of tier bodies
+  // would be a second copy of a tiering rule, and this file's whole premise is
+  // that nothing in it is written down a second time.
+  function bodyOf(t) {
+    if (typeof World3D === "undefined" || typeof World3D.modelFor !== "function") {
+      return null;
+    }
+    try { return World3D.modelFor(t); } catch (e) { return null; }
+  }
+
   function walkBranch(Type, branch) {
     var t = new Type(-1000, -1000, path);
     var tiers = [];
@@ -144,7 +162,7 @@ var Codex = (function () {
         if (!action || action.upgradeId === null) break;
       }
 
-      tiers.push({
+      var entry = {
         id: action.upgradeId,
         price: action.detail,          // "$850", or the gate's reason
         effects: action.effects || "",
@@ -152,8 +170,14 @@ var Codex = (function () {
         // Resolved NOW, not kept as a thunk: the thunk reads the instance,
         // and the next loop iteration mutates it. Eager resolution captures
         // the honest tier-below -> tier before/after.
-        card: cardFor(action)
-      });
+        card: cardFor(action),
+        // The mesh this tier WEARS, filled in below once the tier has actually
+        // been applied -- a tier's body is what the tower looks like AFTER
+        // buying it, and the instance is still standing one tier down here.
+        // Left null for a gated tier that is shown but never applied.
+        model: null
+      };
+      tiers.push(entry);
 
       // A tier the tower itself refuses (the Siphon's B5 unlock gate) is
       // still worth SHOWING -- the card explains the gate -- but must not be
@@ -161,6 +185,7 @@ var Codex = (function () {
       // one-per-game global state.
       if (action.reason) break;
       if (!advance(t, action)) break;
+      entry.model = bodyOf(t);
     }
     return tiers;
   }
@@ -179,6 +204,8 @@ var Codex = (function () {
         name: Type.DISPLAY_NAME,
         cost: Type.COST,
         stats: base.statLines().slice(totalRows),
+        // The unbought body, from the same resolver every tier uses.
+        model: bodyOf(base),
         branches: (typeof base.panelActions === "function")
           ? { A: walkBranch(Type, "A"), B: walkBranch(Type, "B") }
           : null
@@ -224,9 +251,32 @@ var Codex = (function () {
       // never updated.
       var sprite = new Enemy(path, undefined, id);
 
+      // THE MESH, from the board's own resolver. Null for the types that have
+      // no exported body: gl-world draws those as a coloured sphere and this
+      // guide draws them as their 2D skin, which is the honest answer either
+      // way -- what the guide shows is what walks the road, including when what
+      // walks the road is not a model yet.
+      var mesh = (typeof World3D !== "undefined" &&
+        typeof World3D.enemyModelFor === "function")
+        ? World3D.enemyModelFor(sprite) : null;
+
+      // HOW FAST IT WALKS ON THE SPOT, derived rather than chosen.
+      //
+      // On the board the walk is advanced by DISTANCE COVERED -- one full cycle
+      // per stride, stride = radius * 2.6 px (js/gl/gl-world.js) -- which is why
+      // a planted foot stays on one patch of road and a slowed enemy visibly
+      // trudges. A viewer has no distance, so the rate has to come from
+      // somewhere; taking it from the enemy's OWN speed keeps the one property
+      // that made the board's walk worth having. A Sprinter scurries here and a
+      // Colossus plods, for the same reason and by the same arithmetic.
+      var strideP = Math.max(1, sprite.radiusPx() * 2.6);
+      var walkHz = (typeof ul === "function" ? ul(speed) : speed) / strideP;
+
       return {
         id: id,
         name: type.displayName,
+        mesh: mesh,
+        walkHz: walkHz,
         description: type.description || null,
         sprite: sprite,
         health: type.health,
@@ -291,6 +341,30 @@ var Codex = (function () {
     return { x: TREE_X[branch], y: TREE_Y + i * 54, w: 164, h: 46 };
   }
 
+  // THE TURNING BODY, LEFT OF THE UPGRADE TREE. The owner asked for exactly
+  // this placement -- "for the tower the model appears on the left of the
+  // upgrade UIs, that can be clicked and is slowly turning around" -- and on
+  // this screen the upgrade UI is the two branch columns at TREE_X, so the
+  // panel sits under the stats block in the same column, which is the space
+  // left of them. Sized to what is actually free between the last stat row and
+  // the bottom of the screen; nothing else on this tab moved to make room.
+  function towerBodyRect() {
+    return { x: 300, y: 434, w: 270, h: 262 };
+  }
+
+  // The two doors into the enemy viewer, as their own rectangles so what is
+  // drawn and what is clickable are one shape. Both are the box the body is
+  // drawn into, not the whole row or the whole panel.
+  function enemyRowIconRect(i) {
+    var r = enemyCardRect(i);
+    return { x: r.x + 6, y: r.y + 4, w: 48, h: r.h - 8 };
+  }
+
+  function enemyDetailIconRect() {
+    var r = enemyDetailRect();
+    return { x: r.x + 18, y: r.y + 22, w: 92, h: 92 };
+  }
+
   // --- state ---------------------------------------------------------------
 
   function open() {
@@ -306,10 +380,34 @@ var Codex = (function () {
   }
 
   function onClick(x, y) {
+    // THE VIEWER OWNS EVERY CLICK WHILE IT IS UP, which is the same rule the
+    // index itself follows against the screens under it and the pause menu
+    // follows against the board. A modal that let clicks through would let a
+    // player change the selection behind the thing they are looking at.
+    if (viewer) {
+      if (pointInRect(x, y, viewerArrowRect(-1))) { stepViewer(-1); return; }
+      if (pointInRect(x, y, viewerArrowRect(1))) { stepViewer(1); return; }
+      if (pointInRect(x, y, viewerCloseRect())) { closeViewer(); return; }
+      // Outside the stage closes it. Inside and not on a control does nothing:
+      // the model is the thing you came to look at and clicking it should not
+      // dismiss it.
+      if (!pointInRect(x, y, viewerStageRect())) closeViewer();
+      return;
+    }
+
     if (pointInRect(x, y, tabRect(0))) { tab = "towers"; return; }
     if (pointInRect(x, y, tabRect(1))) { tab = "enemies"; pick = null; return; }
 
     if (tab === "enemies") {
+      // THE MODEL IS THE DOOR. Clicking the body in the detail panel opens the
+      // viewer on it -- the owner's own words, "if the model on the UI is
+      // clicked it opens a page where we can see the enemy walking". Tested
+      // BEFORE the list, because the detail panel is not inside the list
+      // viewport and the viewport test below would reject it.
+      if (pointInRect(x, y, enemyDetailIconRect())) {
+        openViewer("enemy");
+        return;
+      }
       // The VIEWPORT gates the rows, not the rows themselves. A scrolled list
       // has rectangles above and below the box that are still perfectly valid
       // rectangles; without this test a click on the tab strip above the list
@@ -317,10 +415,22 @@ var Codex = (function () {
       if (!pointInRect(x, y, enemyListViewport())) return;
       for (var enemyI = 0; enemyI < enemyModels.length; enemyI++) {
         if (pointInRect(x, y, enemyCardRect(enemyI))) {
+          // A row's own little body opens the viewer straight onto that enemy;
+          // the rest of the row selects it, as it always did. Two targets, one
+          // rectangle each, so what is drawn and what is clickable cannot
+          // disagree -- the rule every other piece of geometry here follows.
           enemyIndex = enemyI;
+          if (pointInRect(x, y, enemyRowIconRect(enemyI))) openViewer("enemy");
           return;
         }
       }
+      return;
+    }
+
+    // The turning body left of the upgrade tree opens the tower viewer on
+    // whichever tier is currently picked. Same door as the enemy tab's.
+    if (pointInRect(x, y, towerBodyRect())) {
+      openViewer("tower");
       return;
     }
 
@@ -367,6 +477,85 @@ var Codex = (function () {
     });
   }
 
+  // THE BODY OF WHATEVER TIER IS PICKED, turning slowly, left of the tree.
+  //
+  // Picking a tier in either column changes what stands here, which is the
+  // "way to see the models of each upgrade of each tower" the owner asked for:
+  // a5 and b5 differ from base by a great deal and no player has ever seen
+  // either of them without buying it.
+  //
+  // CACHED, not live. The index is the one screen where a live render would be
+  // affordable, but this body shares the screen with a rail of five more and a
+  // list of enemies, and the viewer is where a continuous turn belongs. At
+  // ModelViewer3D's 24 yaw steps the turn is a 15 degree step: one revolution
+  // costs 24 renders paid once, over its first turn, and nothing after.
+  function drawTowerBody(ctx, model) {
+    var r = towerBodyRect();
+    var hot = pointInRect(mouse.x, mouse.y, r);
+
+    ctx.fillStyle = "rgba(22,25,34,0.9)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = hot ? "rgba(170,215,255,0.8)" : "rgba(140,179,230,0.28)";
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+    // Which body: the picked tier's, or the unbought one when nothing is
+    // picked. A gated tier carries no model (it is shown but never applied),
+    // so it falls back to the base rather than to a hole.
+    var mesh = model.model;
+    var label = "Unbought";
+    if (pick && model.branches) {
+      var tier = model.branches[pick.branch][pick.tier];
+      if (tier) {
+        label = tier.id;
+        if (tier.model) mesh = tier.model;
+      }
+    }
+
+    var box = 176;
+    var cx = r.x + r.w / 2, cy = r.y + 108;
+    var yaw = (nowMs() / 1000 / ROT_SECONDS) * Math.PI * 2;
+    var drew = false;
+    if (mesh && typeof ModelViewer3D !== "undefined") {
+      drew = ModelViewer3D.draw(ctx, mesh, cx, cy, box, { yaw: yaw, frame: 0 });
+    }
+    if (!drew) {
+      // Never blank: the tower's own glyph, at the same footprint, exactly as
+      // the build bar does it.
+      if (typeof TowerPreview3D === "undefined" ||
+          !TowerPreview3D.draw(ctx, model.type, cx, cy, box)) {
+        model.type.drawIcon(ctx, cx, cy, box * 0.6);
+      }
+    }
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillStyle = "#cfe3ff";
+    ctx.fillText(fitText(ctx, label, r.w - 20), cx, r.y + 202);
+
+    // SAY WHEN A TIER BUYS NO NEW BODY. The Rifleman's A1, A2 and A4 wear the
+    // body below them; the Siphon gives every tier its own. Showing the same
+    // picture under a different tier name without saying so is the guide
+    // implying a change the geometry does not make.
+    var note = "click to open the viewer";
+    if (pick && model.branches) {
+      var carried = model.model;
+      var list = model.branches[pick.branch];
+      for (var i = 0; i < pick.tier; i++) {
+        if (list[i] && list[i].model) carried = list[i].model;
+      }
+      var here = list[pick.tier];
+      if (here && (!here.model || here.model === carried)) {
+        note = "no new body at this tier";
+      }
+    }
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(199,209,224,0.5)";
+    ctx.fillText(fitText(ctx, note, r.w - 20), cx, r.y + 224);
+    ctx.textAlign = "left";
+  }
+
   function drawTowersTab(ctx) {
     // The rail: one card per roster tower.
     towerModels.forEach(function (model, i) {
@@ -381,16 +570,24 @@ var Codex = (function () {
       ctx.strokeStyle = active ? "rgba(255,215,110,0.85)" : "rgba(140,179,230,0.3)";
       ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
-      model.type.drawIcon(ctx, r.x + 34, r.y + r.h / 2, 22);
+      // THE REAL BODY, not the hand-drawn glyph, and at 52 px rather than 22.
+      // The card is 76 px tall and was spending 22 of them on a picture with a
+      // 40 px gutter around it; a rail whose whole job is "which tower is
+      // this" can afford the height it already had.
+      if (typeof TowerPreview3D === "undefined" ||
+          !TowerPreview3D.draw(ctx, model.type, r.x + 38, r.y + r.h / 2, 52)) {
+        model.type.drawIcon(ctx, r.x + 38, r.y + r.h / 2, 34);
+      }
 
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.font = "600 15px system-ui, sans-serif";
       ctx.fillStyle = active ? "#ffd76e" : "#c7d1e0";
-      ctx.fillText(model.name, r.x + 64, r.y + r.h / 2 - 10);
+      ctx.fillText(fitText(ctx, model.name, r.w - 88),
+        r.x + 74, r.y + r.h / 2 - 10);
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,215,110,0.75)";
-      ctx.fillText("$" + model.cost, r.x + 64, r.y + r.h / 2 + 10);
+      ctx.fillText("$" + model.cost, r.x + 74, r.y + r.h / 2 + 10);
     });
 
     var model = towerModels[towerIndex];
@@ -419,6 +616,8 @@ var Codex = (function () {
       ctx.fillStyle = "rgba(199,209,224,0.65)";
       ctx.fillText(fitText(ctx, row[0], statW - valueW - 10), 300, ry);
     });
+
+    drawTowerBody(ctx, model);
 
     // The upgrade tree, or the honest absence of one.
     if (!model.branches) {
@@ -550,6 +749,10 @@ var Codex = (function () {
   // wheel from scrolling the list while the pointer is over the detail panel,
   // where it means nothing.
   function onWheel(x, y, deltaY) {
+    // A modal swallows the wheel too: scrolling a list the player cannot see
+    // is motion with nothing to act on, the same reason the board's wheel is
+    // dead while the pause menu is up.
+    if (viewer) return;
     if (tab !== "enemies") return;
     if (!pointInRect(x, y, enemyListViewport())) return;
     enemyScroll += deltaY;
@@ -781,6 +984,293 @@ var Codex = (function () {
     ctx.restore();
   }
 
+  // THE REAL BODY, WITH THE 2D SKIN AS THE FLOOR.
+  //
+  // This screen used to magnify `model.sprite` everywhere -- the 2D fallback
+  // drawing, authored before these enemies had meshes. So a player studied one
+  // picture in the guide and met a different one on the road, which is the one
+  // thing a field guide must not do. The mesh comes first now and the skin is
+  // what runs when there is no WebGL, or no mesh for that type.
+  //
+  // EIGHT OF THE TWENTY-ONE TYPES HAVE NO MESH and reach the skin path here on
+  // every load. That is not a bug in this function; the board draws those as a
+  // coloured sphere. Both are placeholders and neither is what the type will
+  // eventually look like.
+  //
+  // `opts.live` is the caller's call, not this function's, and getting it
+  // wrong costs frame time rather than correctness: a list of ten rows must be
+  // CACHED (ten readbacks a frame is not a list, it is a stall), and the
+  // full-screen viewer must be LIVE (its yaw is continuous and a revolution of
+  // cache entries at viewer size is tens of megabytes).
+  function drawEnemyBody(ctx, model, x, y, box, opts) {
+    if (model.mesh && typeof ModelViewer3D !== "undefined" &&
+        ModelViewer3D.draw(ctx, model.mesh, x, y, box, opts)) {
+      return true;
+    }
+    // The skin is drawn to the same visual footprint the mesh would fill, so a
+    // row does not jump when a model lands for that type.
+    drawEnemySkin(ctx, model, x, y, box * 0.42, 2.4);
+    return false;
+  }
+
+  // --- the viewer -----------------------------------------------------------
+  //
+  // A body, large, turning slowly, and for an enemy walking on the spot, with
+  // an arrow either side to step through the roster. Opened by clicking the
+  // model in the list or the detail panel; closed by Escape, by the arrows'
+  // own Back, or by clicking outside the stage.
+  //
+  // WHY IT IS A SUB-SCREEN OF THE INDEX RATHER THAN A SCREEN OF ITS OWN.
+  // `screen` is game.js's, and every value of it is a place the player can be
+  // that has its own Back button, its own key map and its own entry in three
+  // switch statements. This is a modal over one tab of one screen; it keeps its
+  // own state here, the index keeps its scroll position and its selection
+  // underneath, and leaving the viewer puts the player back exactly where they
+  // were. That is the "remembers where it was" property, and it is free this
+  // way and fiddly any other.
+  //
+  // THE CLOCK IS READ AT DRAW TIME, never in update(). Nothing here is
+  // simulation: no run is in progress on this screen and the rotation is a
+  // property of the picture, not of the game.
+  var viewer = null;          // { kind: "enemy" | "tower", i: n, t0: ms }
+
+  // One revolution every ROT_SECONDS. "Slowly turning around" is the whole
+  // brief for this motion: fast enough that a player waiting to see the back of
+  // a body does not give up, slow enough to read as a turntable rather than a
+  // spin. At 14 s a 360 px body's rim moves about 80 px/s, which is a shape
+  // turning rather than an object being flung.
+  var ROT_SECONDS = 14;
+  var VIEW_BOX = 360;         // the model's box, logical px
+  var VIEW_CY = 312;
+
+  // The fixed yaw every STATIC preview on this screen uses -- the rail, the
+  // enemy rows, the detail exhibit. A shallow three-quarter, for the reason
+  // js/gl/tower-preview.js gives at length: these bodies carry their identity
+  // along their forward axis, and turning further collapses a weapon into the
+  // body holding it.
+  //
+  // -30 rather than the icon camera's -25 because ModelViewer3D quantises a
+  // cached yaw to 24 steps of 15 degrees: -25 would be silently served as -30
+  // anyway, and asking for a value the cache cannot hold is how a constant
+  // starts lying about what is on screen.
+  var LIST_YAW = -30 * Math.PI / 180;
+
+  // A FUNCTION, NOT A CONSTANT, and the reason is load order: this file is a
+  // classic <script> that runs BEFORE js/game.js, so `VIEW_WIDTH` does not
+  // exist yet at module-definition time. Every other rectangle on this screen
+  // already reads it inside a function for the same reason; a module-scope
+  // `VIEW_WIDTH / 2` here would have thrown at load and taken the whole index
+  // down with it.
+  function viewCx() { return VIEW_WIDTH / 2; }
+
+  function nowMs() {
+    return (typeof performance !== "undefined" && performance.now)
+      ? performance.now() : Date.now();
+  }
+
+  function viewerStageRect() {
+    return { x: viewCx() - 324, y: 84, w: 648, h: 512 };
+  }
+
+  function viewerArrowRect(dir) {
+    var s = viewerStageRect();
+    return { x: dir < 0 ? s.x - 92 : s.x + s.w + 28, y: VIEW_CY - 48,
+             w: 64, h: 96 };
+  }
+
+  function viewerCloseRect() {
+    var s = viewerStageRect();
+    return { x: s.x + s.w - 40, y: s.y + 10, w: 30, h: 30 };
+  }
+
+  // What the viewer is stepping through. For enemies that is the whole roster
+  // in roster order. For a tower it is the bodies that tower can wear, base
+  // first, which is the list the player is actually choosing between.
+  //
+  // A TIER THAT WEARS THE SAME MESH AS THE TIER BEFORE IT IS NOT A SEPARATE
+  // ENTRY, and it says so. Rifleman A1, A2 and A4 buy no new body; the Siphon
+  // gives every tier its own. Showing eleven identical pictures with different
+  // labels would be the guide telling a lie that the geometry does not.
+  function viewerList() {
+    if (!viewer) return [];
+    if (viewer.kind === "enemy") {
+      return enemyModels.map(function (m) {
+        return { label: m.name, mesh: m.mesh, enemy: m, note: null };
+      });
+    }
+    var t = towerModels[towerIndex];
+    var out = [{ label: t.name, mesh: t.model, enemy: null, note: "unbought" }];
+    if (!t.branches) return out;
+    ["A", "B"].forEach(function (branch) {
+      var carried = t.model;
+      t.branches[branch].forEach(function (tier) {
+        if (!tier.model) return;
+        if (tier.model === carried) return;    // no new body at this tier
+        carried = tier.model;
+        out.push({ label: t.name + " " + tier.id, mesh: tier.model,
+                   enemy: null, note: "Path " + branch });
+      });
+    });
+    return out;
+  }
+
+  function openViewer(kind) {
+    viewer = { kind: kind, t0: nowMs() };
+    // Start on whatever the player was already looking at, which is the whole
+    // of "remembers where it was" for the enemy tab.
+    viewer.i = 0;
+    if (kind === "enemy") {
+      viewer.i = Math.max(0, Math.min(enemyModels.length - 1, enemyIndex));
+    }
+  }
+
+  function closeViewer() { viewer = null; }
+
+  // Stepping WRAPS. A field guide is a ring, not a list with two dead ends, and
+  // a disabled arrow at each end is two more states to draw for no gain.
+  function stepViewer(d) {
+    if (!viewer) return;
+    var list = viewerList();
+    if (!list.length) return;
+    viewer.i = ((viewer.i + d) % list.length + list.length) % list.length;
+    // The selection under the viewer follows, so closing it leaves the index
+    // showing what the player was just looking at rather than where they came
+    // in.
+    if (viewer.kind === "enemy") {
+      enemyIndex = viewer.i;
+      keepEnemyRowVisible(viewer.i);
+    }
+  }
+
+  // Scroll the roster so the row the viewer is on is inside the box. Without
+  // this, stepping past the tenth enemy in the viewer and then closing it
+  // leaves the list scrolled to somewhere the selection is not.
+  function keepEnemyRowVisible(i) {
+    var top = i * (ENEMY_ROW_H + ENEMY_ROW_GAP);
+    var bottom = top + ENEMY_ROW_H;
+    if (top < enemyScroll) enemyScroll = top;
+    else if (bottom > enemyScroll + ENEMY_LIST_H) {
+      enemyScroll = bottom - ENEMY_LIST_H;
+    }
+    clampEnemyScroll();
+  }
+
+  function drawViewerArrow(ctx, dir) {
+    var r = viewerArrowRect(dir);
+    var hot = pointInRect(mouse.x, mouse.y, r);
+    ctx.fillStyle = hot ? "rgba(140,199,255,0.22)" : "rgba(28,32,44,0.9)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = hot ? "rgba(170,215,255,0.95)" : "rgba(140,179,230,0.4)";
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+    var cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - dir * 8, cy - 13);
+    ctx.lineTo(cx + dir * 9, cy);
+    ctx.lineTo(cx - dir * 8, cy + 13);
+    ctx.closePath();
+    ctx.fillStyle = hot ? "#e7f2ff" : "rgba(199,209,224,0.8)";
+    ctx.fill();
+  }
+
+  function drawViewer(ctx) {
+    var list = viewerList();
+    if (!list.length) { viewer = null; return; }
+    if (viewer.i >= list.length) viewer.i = 0;
+    var item = list[viewer.i];
+
+    ctx.fillStyle = "rgba(8,9,13,0.93)";
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+    var s = viewerStageRect();
+    ctx.fillStyle = "rgba(18,21,30,0.96)";
+    ctx.fillRect(s.x, s.y, s.w, s.h);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(140,179,230,0.4)";
+    ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w - 1, s.h - 1);
+
+    // THE MOTION. Elapsed time drives both the turn and the walk, and they are
+    // deliberately not locked to each other: a body whose stride completed once
+    // per revolution would look like a wind-up toy.
+    var t = (nowMs() - viewer.t0) / 1000;
+    var yaw = (t / ROT_SECONDS) * Math.PI * 2;
+
+    var drew = false;
+    if (item.enemy) {
+      // Frames come from the model's own walk band, never from arithmetic on
+      // frames.length -- enemies index frame 0 as a walk frame and the summoner
+      // family reserves it as a rest pose, so any constant here would be wrong
+      // for one of them.
+      var frame = (item.mesh && typeof ModelViewer3D !== "undefined")
+        ? ModelViewer3D.walkFrame(item.mesh, t * item.enemy.walkHz) : 0;
+      drew = drawEnemyBody(ctx, item.enemy, viewCx(), VIEW_CY, VIEW_BOX,
+        { yaw: yaw, frame: frame, live: true });
+    } else if (item.mesh && typeof ModelViewer3D !== "undefined") {
+      drew = ModelViewer3D.draw(ctx, item.mesh, viewCx(), VIEW_CY, VIEW_BOX,
+        { yaw: yaw, frame: 0, live: true });
+    }
+    if (!drew && !item.enemy) {
+      // A tower with no mesh falls back to its own glyph, at a size that fills
+      // the same box, so the stage is never empty.
+      var Type = towerModels[towerIndex] && towerModels[towerIndex].type;
+      if (Type && Type.drawIcon) Type.drawIcon(ctx, viewCx(), VIEW_CY, 120);
+    }
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = "700 28px system-ui, sans-serif";
+    ctx.fillStyle = "#cfe3ff";
+    ctx.fillText(fitText(ctx, item.label, s.w - 48), viewCx(), s.y + 402);
+
+    // The second line says what this body IS, and for an enemy that is the
+    // badge -- the one property that changes how it has to be answered.
+    var sub = item.note;
+    if (item.enemy) {
+      var badge = enemyBadge(item.enemy);
+      sub = badge ? badge[0] : "STANDARD — no special ability";
+      ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.6)";
+    } else {
+      ctx.fillStyle = "rgba(199,209,224,0.6)";
+    }
+    if (sub) {
+      ctx.font = "600 13px system-ui, sans-serif";
+      ctx.fillText(fitText(ctx, sub, s.w - 48), viewCx(), s.y + 440);
+    }
+
+    // SAY WHEN THE PICTURE IS NOT THE MESH. A magnified 2D skin standing in for
+    // a body that was never modelled is honest only if it admits it; without
+    // this line it reads as the model, which is the exact failure this whole
+    // feature exists to end.
+    if (!drew) {
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,205,130,0.85)";
+      ctx.fillText("No 3D model yet — showing the flat marker",
+        viewCx(), s.y + 464);
+    }
+
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(199,209,224,0.5)";
+    ctx.fillText((viewer.i + 1) + " / " + list.length, viewCx(), s.y + 486);
+
+    drawViewerArrow(ctx, -1);
+    drawViewerArrow(ctx, 1);
+
+    var close = viewerCloseRect();
+    var closeHot = pointInRect(mouse.x, mouse.y, close);
+    ctx.font = "600 18px system-ui, sans-serif";
+    ctx.fillStyle = closeHot ? "#e7f2ff" : "rgba(199,209,224,0.55)";
+    ctx.fillText("×", close.x + close.w / 2, close.y + 4);
+
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(199,209,224,0.45)";
+    ctx.fillText("← →  previous / next     ·     Esc  back to the index",
+      viewCx(), s.y + s.h + 16);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+  }
+
   function enemyEffectiveHealth(model) {
     var total = model.health;
     if (model.shield) total += model.health * model.shield.ratio;
@@ -963,10 +1453,16 @@ var Codex = (function () {
       ctx.strokeStyle = active ? "rgba(170,215,255,0.9)" : "rgba(140,179,230,0.18)";
       ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
-      // The sprite gets its own column and a cap large enough for the Tyrant
-      // -- the same shape the detail panel's exhibit uses, so the thing in the
+      // The REAL BODY now, at a fixed three-quarter yaw and its rest frame --
+      // the same shape the detail panel's exhibit uses, so the thing in the
       // list and the thing in the panel are recognisably one enemy.
-      drawEnemySkin(ctx, model, r.x + 30, r.y + r.h / 2, 18, 1.5);
+      //
+      // CACHED, and this is the one place where getting the policy wrong would
+      // be felt: ten rows are visible at once, and ten live readbacks a frame
+      // is a stall rather than a list. One entry each, filled one per frame,
+      // and every frame after that is a blit.
+      drawEnemyBody(ctx, model, r.x + 30, r.y + r.h / 2, 46,
+        { yaw: LIST_YAW, frame: 0 });
 
       var textX = r.x + 62;
       var textW = r.w - (textX - r.x) - 96;
@@ -1026,20 +1522,37 @@ var Codex = (function () {
     ctx.strokeStyle = "rgba(140,179,230,0.35)";
     ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
-    drawEnemySkin(ctx, model, r.x + 64, r.y + 68, 38, 2.2);
+    // The exhibit, and the door into the viewer. Its rectangle is
+    // enemyDetailIconRect and it is highlighted on hover, because a picture
+    // that opens something has to say so.
+    var icon = enemyDetailIconRect();
+    if (pointInRect(mouse.x, mouse.y, icon)) {
+      ctx.fillStyle = "rgba(140,199,255,0.10)";
+      ctx.fillRect(icon.x, icon.y, icon.w, icon.h);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(170,215,255,0.7)";
+      ctx.strokeRect(icon.x + 0.5, icon.y + 0.5, icon.w - 1, icon.h - 1);
+    }
+    drawEnemyBody(ctx, model, icon.x + icon.w / 2, icon.y + icon.h / 2, 88,
+      { yaw: LIST_YAW, frame: 0 });
 
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = "700 26px system-ui, sans-serif";
     ctx.fillStyle = "#cfe3ff";
-    ctx.fillText(model.name, r.x + 122, r.y + 20);
+    // FIT, NOT BARE. This was a plain fillText with no fit and no clip, and
+    // every display name in the game is being rewritten -- a name two words
+    // longer would have run straight out of the panel and over the stat
+    // columns. The width is the panel minus the exhibit column and a margin.
+    ctx.fillText(fitText(ctx, model.name, r.w - 142), r.x + 122, r.y + 20);
     var badge = enemyBadge(model);
     ctx.font = "600 12px system-ui, sans-serif";
     ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.6)";
     ctx.fillText(badge ? badge[0] : "STANDARD ENEMY", r.x + 122, r.y + 58);
     ctx.font = "12px system-ui, sans-serif";
     ctx.fillStyle = "rgba(199,209,224,0.5)";
-    ctx.fillText("Select another enemy from the list to compare it.", r.x + 122, r.y + 82);
+    ctx.fillText("Click the model to see it walk  ·  select another from the list to compare.",
+      r.x + 122, r.y + 82);
 
     var effective = enemyEffectiveHealth(model);
     var rows = [
@@ -1123,14 +1636,48 @@ var Codex = (function () {
     if (tab === "towers") drawTowersTab(ctx);
     else drawEnemiesTab(ctx);
 
+    // Last, over everything, because it is a modal: the index underneath keeps
+    // its selection and its scroll, and closing puts the player back exactly
+    // where they were.
+    if (viewer) drawViewer(ctx);
+
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
+  }
+
+  // The keys the index owns. game.js routes them here before its own Escape
+  // handling, so Escape closes the VIEWER when one is up and leaves the index
+  // when one is not -- the same "Escape only ever cancels the innermost thing"
+  // rule the pause menu follows.
+  //
+  // Returns TRUE when it consumed the key, which is what stops Escape doing
+  // two things at once.
+  function onKey(key) {
+    if (!viewer) {
+      // Arrows step the enemy selection even without the viewer open: the list
+      // is a list and a keyboard should walk it. Harmless on the tower tab,
+      // where there is nothing to step.
+      if (tab === "enemies" && (key === "ArrowLeft" || key === "ArrowRight")) {
+        var d = key === "ArrowRight" ? 1 : -1;
+        var n = enemyModels ? enemyModels.length : 0;
+        if (!n) return false;
+        enemyIndex = ((enemyIndex + d) % n + n) % n;
+        keepEnemyRowVisible(enemyIndex);
+        return true;
+      }
+      return false;
+    }
+    if (key === "Escape") { closeViewer(); return true; }
+    if (key === "ArrowLeft") { stepViewer(-1); return true; }
+    if (key === "ArrowRight") { stepViewer(1); return true; }
+    return false;
   }
 
   return {
     open: open,
     onClick: onClick,
     onWheel: onWheel,
+    onKey: onKey,
     draw: draw,
     // Read-only views for the tests, plus the geometry they click through --
     // the same rectangles the screen draws, so a test clicks what a player

@@ -1494,6 +1494,43 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   non-passive so it can `preventDefault` the page scroll. Rows were 26 px and
   fitted all twenty-one types at once, which made the screen a directory: a
   nine-pixel sprite and room for a name and two numbers.
+
+  **The MODEL VIEWER is a modal INSIDE the index, not a value of `screen`**
+  (2026-08-13, `js/gl/model-viewer.js` + the viewer block in `js/codex.js`).
+  Every value of `screen` is a place with its own Back button, its own key map
+  and its own arm in three switch statements; this is one tab of one screen
+  showing a body large, turning, and for an enemy walking on the spot. Keeping
+  it here is what makes "closing it puts the player back exactly where they
+  were" free — the index underneath keeps its scroll, its selection and its
+  tab, because it was never left.
+
+  **The consequence is that `Escape` has two jobs on this screen, and the
+  return value of `Codex.onKey` is the only thing that separates them.**
+  `onKeyDown` in `js/game.js` routes `screen === "index"` to `Codex.onKey`
+  *before* its own Escape handling and returns if the key was consumed: Escape
+  closes the viewer when one is up and leaves the index when one is not. Same
+  rule as the pause menu against the board. A key handler that is written but
+  not EXPORTED is exactly as dead as one that was never written. This one sat
+  that way in the working tree for a session before anyone noticed — nothing
+  throws, the arrows simply do nothing. Same failure as an untagged script
+  file, one scope down.
+
+  **Which frames are the walk comes from `World3D.walkBand`, never from
+  arithmetic on `frames.length`.** Enemies index frame 0 as a walk frame; blubs
+  and summoners reserve it as a rest pose. Any constant would be wrong for one
+  of the two families whichever way it was written. The walk RATE is derived
+  from the enemy's own speed over its own stride, which is the same quantity
+  the board's distance-driven walk uses — so a Sprinter scurries here and a
+  Colossus plods, for the same reason and by the same arithmetic.
+
+  **The viewer fits a body to a bounding CYLINDER about its turn axis, not to
+  its screen box at one yaw.** `js/gl/tower-preview.js` may fit to the box
+  because it renders one fixed yaw; a body that TURNS and is fitted that way
+  grows and shrinks as it goes round — a rifle broadside is about twice the
+  silhouette it is end-on — and reads as a zoom rather than a rotation. The fit
+  is also taken across the whole walk band rather than at frame 0: a single
+  frame of an animated model is a sample, not a measurement, and a viewer
+  fitted to the rest pose clips its own stride twice per cycle.
 - **`"play"`** is a run.
 
 **`update()` tests `screen !== "play"`, not a list of screens to skip.** This
@@ -1618,6 +1655,26 @@ still an unmade decision, and still means the bar's geometry (`SLOT_SIZE`,
 about the bar's shape, not about how many towers the game may contain.
 `tests/run.js`'s "every built tower type is in the build bar" is where it will
 surface.
+
+**`SLOT_SIZE` is 86 and `BAR_Y` is unchanged at 626** (2026-08-13). The slot
+grew from 76 because the preview inside it was 22 px — under a twelfth of the
+slot's area — and the owner could not tell the towers apart. **The ten pixels
+came out of the bar's own bottom margin (18 → 8), not out of the board**, and
+that is the pattern to repeat: `BAR_Y` is the ceiling `inspectionLayout` clamps
+every panel against, the floor of the playable area, and the subject of
+`L.y + L.h <= BAR_Y` assertions in five suites. Growing the bar UPWARD moves all
+of that; growing it DOWNWARD into a margin nothing was using moves nothing. The
+bar is 50 px wider as a result and now spans **x 405–875** rather than 430–850 —
+check that against `speedButtonRect` and the auto-send toggle before widening it
+again.
+
+**The preview and the fallback glyph carry the SAME size literal**, in all four
+places that draw a tower picture (build bar, store card, armoury loadout row,
+codex rail): `size` is the BOX for both `TowerPreview3D.draw` and
+`Type.drawIcon`, so they stay matched at whatever the number is. The loadout row
+was the odd one out until 2026-08-13 — it drew the flat glyph while the bar it
+previews drew the mesh, so the picture a player checked before a run did not
+match the bar they then played with.
 
 **A consequence worth knowing: the expensive towers cannot stand where a
 gunner can.** Placement clearance is derived from each type's own footprint
