@@ -167,6 +167,64 @@ re-verified at runtime before committing:
   against 0.625); every other type of the 21 is identical under both, which is
   why the mismatch stayed invisible.
 
+**2026-08-13 — the Hedger's crank: mirrored to the near hip, made brass, and a
+clause-8 interpenetration that had been shipping since `e015ef5` removed.**
+
+**The mirror.** juno measured what had been reported by eye, and the mechanism was
+not the one that was reported: the crank does not MERGE with the body, it is
+OCCLUDED by it. At yaw 0 the arm sat on the far hip and its visible area swung
+4 px to 63 px across one crank cycle — 8% to 86%, a 16x range within a single
+revolution. Path direction buckets to yaw 0 on 25 of 42 segments across all six
+maps and to the opposite broadside on ONE segment of ONE map, so there was no
+trade between viewing angles to balance: one hip is simply correct.
+
+**A merge is a contrast failure and argues for a lighter part; occlusion is a
+geometry failure and argues for moving it. Same symptom, opposite build.**
+
+**The phase relationship survives the mirror unchanged, verified rather than
+assumed.** Low point stays at frame 1, high at frame 7, handovers at 4 and 10.
+The reason is in the data rather than argued: at frame 1 `foot_l_x == foot_r_x`,
+the legs exactly passing — a side-independent condition, so mirroring cannot
+disturb it. Flipping the offset "to be safe" would have moved the low point onto
+a footfall and broken the thing the offset exists for.
+
+**The material: one brass assembly — bar, plate and collar at one value.** The
+part has TWO neighbours, not one: it lies against the hip AND overhangs the road,
+and the overhang is the entire point of the low placement.
+
+    candidate    vs tin (hip)   vs roadTop   vs roadSide   WORST
+    tin (was)        1.00          1.51         2.66       1.00  FAIL
+    tin_dark         1.91          1.26         1.39       1.26  FAIL
+    stone            1.55          1.02         1.72       1.02  FAIL
+    brass            2.17          3.28         5.75       2.17  PASS
+
+**`tin_dark` is the worst option available and the one that looks nearest to
+passing on a single-neighbour table.** 1.91 against the hip reads as "nearly
+fine"; against the road it is 1.26. It would have cured the hip merge and created
+a road merge exactly where the bar does its silhouette work. **Darkening a part
+that overhangs a dark background is the intuitive move and it is backwards.** A
+material must clear its WORST neighbour, not its nearest one.
+
+**The clause-8 fix, which is not the mirror's fault.** The crank collar passes
+through the arm as it turns, and has since `e015ef5`. Proved per part, per frame:
+
+    shipped   (+y hip, collar 0.75t)   18 penetrating pairs, worst -0.0093 u
+    mirrored  (-y hip, collar 0.75t)   22 penetrating pairs, worst -0.0087 u
+    mirrored  (-y hip, collar 0.60t)    0 penetrating pairs, worst +0.0071 u
+
+**A whole-GROUP AABB test reported "overlap" on all twelve frames for both hips,
+which is useless** — two group boxes intersect happily with every solid far apart,
+and it reads as catastrophic failure. Only the per-part test found the collar.
+Test solids, never groups. Note also that the review instrument which passed this
+model checks crown, cycle, envelope and geometry and has **no interpenetration
+test at all**, so the defect was invisible to the gate that approved it.
+
+**And the below-floor count now names its datum**, because two reasonable data
+give different answers: 6 of 12 frames below the hip brace underside (0.445), 5
+of 12 below the body group's own lowest point (0.379..0.414). They differ on
+frame 4 alone. Both correct, different questions — a count against a threshold is
+meaningless without the threshold.
+
 **2026-08-13 — the Skimmer narrowed. The crown deletion was one axis of two.**
 
 otto measured the first Skimmer as reading like the Gleaner — pairwise separation

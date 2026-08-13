@@ -36,10 +36,22 @@
 # when the bar points UP the lowest part of the assembly is the pivot itself.
 # Making it true at every frame would force the pivot below the hip, and a
 # full-length bar swung from there goes through the road. MEASURED ON THE
-# EXPORTED FILE, not predicted: the lower end is below the hip line on 5 of 12
-# frames, its lowest point is 0.018 u off the road and its highest is 1.182
-# against the crown's 1.190, so the crank never touches the road and never
-# steals model.top. Roughly half the cycle is spent against road, which is what
+# EXPORTED FILE, not predicted, AND THE COUNT NAMES ITS DATUM because two
+# reasonable data give two different answers and this paragraph has already been
+# wrong three times:
+#
+#     below the HIP BRACE UNDERSIDE (fixed world z 0.445)   6 of 12 frames
+#     below the BODY GROUP'S LOWEST POINT (0.379..0.414)    5 of 12 frames
+#
+# Both are correct. They differ on frame 4 alone, where the crank sits at 0.433
+# -- under the hip brace, over the body's lowest point. kaz measured 5 and I
+# measured 6 and neither of us was wrong; we were answering different questions.
+# **A count against a threshold is meaningless without the threshold**, and that
+# is the fourth distinct way this one paragraph has managed to mislead.
+#
+# The crank's lowest point is 0.018 u off the road and its highest is 1.182
+# against the crown's 1.190, so it never touches the road and never steals
+# model.top. Roughly half the cycle is spent against road, which is what
 # delivers the read.
 #
 # BOTH NUMBERS IN THIS PARAGRAPH WERE WRONG WHEN FIRST WRITTEN -- "every crank
@@ -113,12 +125,48 @@ CAGE_SCALE = 0.82
 # 1.190. Verified by export, not by arithmetic alone.
 CRANK_PIVOT_Z = -0.02
 CRANK_PIVOT_X = -0.02
-# Outboard of the swinging forearm, which spans y 0.155..0.255 -- this clears it
-# by 0.015 u at the near face rather than merely looking clear in one pose.
-CRANK_PIVOT_Y = 0.325
+# NEGATIVE, AND THE SIGN IS THE WHOLE FIX. Outboard of the swinging forearm,
+# which spans y -0.255..-0.155 on this side -- cleared by 0.015 u at the near
+# face rather than merely looking clear in one pose.
+#
+# THIS WAS +0.325 AND IT PUT THE CRANK ON THE FAR HIP. juno measured the
+# consequence: at yaw 0 the arm is occluded BY THE HEDGER'S OWN TORSO, its
+# visible area swinging 4 px to 63 px across a single crank cycle -- 8% to 86%,
+# a 16x range within one revolution. At yaw 180 it is never occluded at all.
+# Path direction buckets to yaw 0 on 25 of 42 segments across all six maps and
+# to the opposite broadside on ONE segment of ONE map, so there is no trade
+# between two viewing angles to balance here: one hip is simply correct.
+#
+# I HAD REPORTED THIS BY EYE AS "the arm MERGES with the body at the broadside"
+# AND THE MECHANISM WAS WRONG. A merge is a contrast failure and argues for a
+# lighter material or a bigger part; occlusion is a geometry failure and argues
+# for moving it. Same symptom, opposite build. The lesson is the one this file
+# already carries twice: an observation is not a measurement, and the fix that
+# follows from a guessed mechanism is usually the wrong fix.
+CRANK_PIVOT_Y = -0.325
 
 BAR_LENGTH = 0.52        # past the 0.40 floor; length is what breaks outline
 BAR_THICK = 0.105        # >= 0.10 floor; 2.6 px at sizeScale 1.25
+# Collar radius as a fraction of BAR_THICK. 0.60, DOWN FROM 0.75, AND IT FIXES A
+# DEFECT THAT SHIPPED IN e015ef5 RATHER THAN ONE THE MIRROR INTRODUCED.
+#
+# Clause 8 requires a part not to be inside another and requires it PROVED with
+# solids. Proved here, per part per frame, on both hips:
+#
+#   shipped  (+y hip, 0.75t)   18 penetrating pairs, worst -0.0093 u
+#   mirrored (-y hip, 0.75t)   22 penetrating pairs, worst -0.0087 u
+#   mirrored (-y hip, 0.60t)    0 penetrating pairs, worst +0.0071 u
+#
+# The collar was the only offender in every single case, against the shoulder,
+# upper arm and forearm as the crank turned past them. At 0.60 it is 1.2 screen
+# px across at sizeScale 1.25 instead of 1.6 -- under the resolvable floor
+# either way, so nothing is lost visually and a real overlap goes away.
+#
+# NOTE THE GROUP-LEVEL TRAP THIS WAS NEARLY MISSED BY. A whole-group AABB test
+# reported "overlap" on all twelve frames for both hips, which is useless -- two
+# group boxes intersect happily with every solid far apart. Only the per-part
+# test located the collar. Test the solids, never the groups.
+COLLAR_FACTOR = 0.60
 
 
 def build_arm(m, body, lift):
@@ -134,16 +182,48 @@ def build_arm(m, body, lift):
     crank.parent = body
     crank.location = (CRANK_PIVOT_X, CRANK_PIVOT_Y, CRANK_PIVOT_Z + lift)
 
+    # ONE BRASS ASSEMBLY AT ONE VALUE -- bar, plate and collar all `brass`.
+    #
+    # THE PART HAS TWO NEIGHBOURS, NOT ONE, AND THAT IS WHAT DECIDES THE
+    # MATERIAL. The bar lies against the hip AND overhangs the road -- the
+    # overhang is the entire point of the low placement. Contrast ratios
+    # (road values from gl-world.js:207-208, roadTop #274553, roadSide
+    # #0a1922):
+    #
+    #     candidate    vs tin (hip)   vs roadTop   vs roadSide   WORST
+    #     tin              1.00          1.51         2.66       1.00  FAIL
+    #     tin_dark         1.91          1.26         1.39       1.26  FAIL
+    #     stone            1.55          1.02         1.72       1.02  FAIL
+    #     core_red         1.72          2.60         4.55       1.72  marginal
+    #     brass            2.17          3.28         5.75       2.17  PASS
+    #
+    # `tin_dark` IS THE WORST OPTION AVAILABLE AND THE ONE THAT LOOKS NEAREST
+    # TO PASSING ON A SINGLE-NEIGHBOUR TABLE. 1.91 against the hip reads as
+    # "nearly fine"; against the road it is 1.26. It would cure the hip merge
+    # and create a road merge exactly where the bar does its silhouette work.
+    # Darkening a part that overhangs a dark background is the intuitive move
+    # and it is backwards here. A material must clear its WORST neighbour.
+    #
+    # The plate is brass for the same reason and more urgently: it rides the
+    # outer end, the most unoccluded point on the assembly and the part most
+    # often over open road, where tin_dark is CR 1.26 and would vanish.
+    #
+    # NO INTERNAL VALUE VARIATION. Splitting values across a 27 px arm buys
+    # nothing at this size and costs the outline, which is the only thing the
+    # part is for.
     td.box("crank_bar", (BAR_THICK, BAR_THICK, BAR_LENGTH),
            location=(0.0, 0.0, -BAR_LENGTH * 0.5),
-           mat=m["tin"], parent=crank)
+           mat=m["brass"], parent=crank)
     # Boot-sized, and the same box the foot uses -- this faction builds one
     # kind of flat plate and puts it wherever something has to sit on ground.
+    # It is what makes the bar read as one LUMP rather than a line that
+    # anti-aliases away.
     td.box("crank_plate", (0.18, 0.125, 0.065),
            location=(0.03, 0.0, -BAR_LENGTH - 0.03),
-           mat=m["tin_dark"], parent=crank)
-    # One broad brass band, the same field-repair language as the shin cuff.
-    td.cyl("crank_collar", BAR_THICK * 0.75, 0.055,
+           mat=m["brass"], parent=crank)
+    # The same field-repair language as the shin cuff, now continuous with the
+    # bar it bands rather than a contrasting ring on it.
+    td.cyl("crank_collar", BAR_THICK * COLLAR_FACTOR, 0.055,
            location=(0.0, 0.0, -0.10), mat=m["brass"], parent=crank)
     return crank
 
