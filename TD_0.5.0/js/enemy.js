@@ -1010,13 +1010,23 @@ Enemy.RADIUS_PX = 11;
 // centreline -- which, combined with the old evenly-spaced sequence, is what
 // made a wave read as one object moving rather than as a crowd.
 //
-// 7 is a little under two thirds of the road's half-width (ROAD_WIDTH_UL / 2 =
-// 10.9375). **Full-size sprites now hang off the edge of the road**, and that
-// is the accepted cost rather than an oversight: an enemy is 22 px across on a
-// 22.75 px road, so ANY visible spread overhangs (even 4 did, by about 4 px).
-// Small bodies -- the swarm at 0.55 scale -- stay on it comfortably, which is
-// where the scattering reads best anyway. If this ever needs to be undone, the
-// real fix is a wider road, not a narrower spread.
+// 7 is a little under two thirds of the road's half-width (ROAD_WIDTH_UL / 2).
+// Both are u.l., so that relationship holds at any UNIT_LENGTH.
+//
+// **Full-size enemies now extend past the edge of the road**, and that is the
+// accepted cost rather than an oversight: ANY visible spread overhangs, and 4
+// did too, just less. Small bodies -- the swarm, at the roster's smallest
+// sizeScale -- stay on comfortably, which is where the scattering reads best
+// anyway. If this ever needs to be undone, the real fix is a wider road, not a
+// narrower spread.
+//
+// How far anything overhangs is deliberately not quoted, and it is not a fixed
+// fact: the gameplay circle is per-type and pinned in px (Enemy.RADIUS_PX,
+// radiusPx), while the road's width comes from u.l. through ul(). Retune
+// UNIT_LENGTH and the road changes width while the circles do not, so the
+// overhang is a property of the current UNIT_LENGTH rather than of this
+// constant. Throughout, that circle is the gameplay/hit-test one -- what a
+// renderer draws is a separate question from what the simulation measures.
 //
 // Per-type `laneSpread` still scales this: the midboss sits at 0, the brute at
 // 0.35, a swarm takes the full width.
@@ -1094,10 +1104,21 @@ Enemy.laneOffsetFor = function (n) {
   return ((h >>> 0) / 4294967296) * 2 - 1;   // -1 .. 1
 };
 
-// Extra slack on the hover target only. An enemy is 22 px across and crosses
-// the screen at ~78 px/s, so hit-testing the body exactly makes it a chore to
-// point at. The padding costs nothing: hovering is read-only, so a slightly
-// generous target can never cause a misclick.
+// Extra slack on the hover target only. What the pointer is tested against is
+// the GAMEPLAY circle -- Enemy.radiusPx(), in board px, the space `pos` is in
+// and the space the camera then scales to the screen. It is per-type and
+// per-instance (sizeScale, fractalSizeScale), so there is no one body size to
+// quote; and it is not the drawn body, which is whatever the active renderer
+// puts on screen and is its own question entirely. A small target that moves
+// is a chore to point at exactly, hence the pad. It costs nothing: hovering is
+// read-only, so a slightly generous target can never cause a misclick.
+//
+// No width and no crossing speed are quoted here, on purpose. Both are
+// per-type -- read the size off radiusPx and the speed off BASE_SPEED_ULPS --
+// and the speed is converted from u.l. by ul() at the moment of use, so any
+// px/s figure written down here is one UNIT_LENGTH retune away from being
+// false. The pair that used to sit in this paragraph read as constants
+// measured off the roster, and were neither.
 //
 // The exact value clears the frost ring. The hover ring is drawn at
 // radiusPx() + this; the frost and camo rings sit at radiusPx() + 4 -- so the
