@@ -1155,6 +1155,36 @@ What is available, in descending order of legibility:
 5. **A change in how the piece MOVES.** Free — see section 6 — and under-used.
 6. Hue at constant value. CR ≈ 1.0. Not a signal. Do not spend a tier on it.
 
+### FIRST ASK WHETHER THE TIER'S VALUE IS MECHANICAL
+
+vera's check, 2026-08-13, and it is written as **the question to ask** rather
+than as a verdict about any particular tier — a verdict goes stale the first time
+someone reprices a tier or moves a mechanic between rows; the check survives
+that.
+
+> **Before treating a tier's weak legibility as a defect, ask whether the tier's
+> value is MECHANICAL.** If the purchase is felt in play within seconds — kill
+> speed, range, a new behaviour — and the inspection panel is authoritative for
+> identifying what a tower is, then **a weak silhouette read is a missing BONUS,
+> not a missing PRODUCT**, and no render pass is warranted.
+>
+> **Legibility is load-bearing only where value is partly cosmetic, or where a
+> player must identify a tier at a glance to play correctly.**
+
+The worked example this came from: the Siphon's A1 buys `ramp_per_target` to a
+2.0 cap plus 25 points of `def_pierce`, and A2 doubles the tower's damage
+outright. Neither is sold on appearance, so *"should a $600 tier be a reward
+rather than a read"* — asked below and long treated as open — **has no cosmetic
+content on that path at all.**
+
+**And the trap that nearly produced the opposite answer, because it will catch
+the next reader too: `mechanics: []` on a tier row means no NAMED mechanic, not
+no value.** The payload is in the stat deltas, and **an `ad` delta of `+1` is a
+doubling or a rounding error depending entirely on the base.** A delta is
+meaningless without its base — the same shape as a ratio without its denominator
+or a statistic without its population. `js/towers/beam.config.js` now carries
+that at the row.
+
 ### A tier read is a property of a PAIR, not of a model
 
 **This is the most valuable thing to come out of the 2026-08-12 measurements, and
