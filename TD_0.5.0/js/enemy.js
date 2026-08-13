@@ -1286,8 +1286,27 @@ Enemy.prototype.update = function (dt) {
   if (this.spawnFlash > 0) {
     this.spawnFlash = Math.max(0, this.spawnFlash - dt * 2);
   }
+  // 0.6 -- the SLOWEST decay in this block, deliberately slower than the
+  // phaseFlash roar at 0.7, and the reason is duty cycle rather than taste.
+  //
+  // TWO READERS, and retuning for one means checking the other.
+  //
+  // The Fieldwright's signal mast holds raised while this stays above 0.1:
+  // 1.5 s here, against 0.64 s at the old 1.4. A healer is on the road ~100 s
+  // and pulses ~12 times, so the mast reads for ~18% of that life instead of
+  // ~7%. "Kill the support first" is meant to be learnable by watching, and a
+  // player scanning a wave rather than a single body misses several 0.64 s
+  // events in a row.
+  //
+  // The second reader is the support ring in this file's draw, which expands
+  // to radius + 64 as this value falls. That ring is already specified "wide
+  // and slow" so that ten simultaneous shields read as one body's doing, and a
+  // slower decay serves the same intent -- but note it is on the 2D FALLBACK
+  // only: game.js runs the whole per-actor 2D pass under `if (!world3D)`, so on
+  // the WebGL board Enemy.prototype.draw is never called and that ring is not
+  // on screen at all. The mast is this field's first reader there.
   if (this.supportFlash > 0) {
-    this.supportFlash = Math.max(0, this.supportFlash - dt * 1.4);
+    this.supportFlash = Math.max(0, this.supportFlash - dt * 0.6);
   }
   if (this.healFlash > 0) {
     this.healFlash = Math.max(0, this.healFlash - dt * 2);
