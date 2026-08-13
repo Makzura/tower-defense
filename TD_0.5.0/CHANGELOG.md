@@ -13,6 +13,54 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-14 — Opaque is now the renderer's default rather than a promise each
+caller makes, and the enemy viewer's four claims are settled in pixels.**
+
+`b65435c`. Follow-on to the transparent-preview fix below. That one repaired the
+two callers that exist; this one repairs the class, so the next caller to draw
+through `GLRenderer`'s program without going through `begin()` cannot be handed
+a transparent default again. `this.setFade(1)` in the constructor, placed after
+`this.uniform` and `this._faded` are assigned and after `_link` has already made
+the program current — **all three are required, because a uniform write with no
+current program raises `INVALID_OPERATION` and is silently dropped**, which is
+the shape of fix that reads as done and is not.
+
+Proven rather than assumed, on a cold page with no board draw: `uAlpha` reads
+back **1**, `gl.getError()` is **0**, and with `setFade` stubbed to a no-op —
+which is what deleting the two per-caller calls would do — a body still renders
+**21,040 opaque px**. The control that makes that mean something: stubbed AND
+the uniform forced to 0 renders **0 px**, and `draw()` correctly returns
+**false**, which is the new empty-bitmap guard firing. The per-caller calls are
+now redundant and were left in place.
+
+The viewer itself, measured through the real modal (clicks, not keys), clock
+frozen at `performance.now`, SwiftShader, 1280×720, ROI 360×352 of the model box:
+
+- **Mesh, not skin.** Meshed bodies 20,827–47,682 ink px with the "No 3D model
+  yet" line absent (0 px in its band); unmeshed bodies 2,548–2,837 px with the
+  line present (1,216 px). The same body with its mesh nulled: 20,827 → 1,681
+  px, warning band 0 → 1,216, and restoring is bit-identical.
+- **It walks, in order.** Sampled at whole revolutions so the turn is held
+  **exactly**: all 8 (Normal, Armored), all 12 (Aether Wisp) frames, every frame
+  index confirmed at `ModelViewer3D.walkFrame`, no dead pairs, wrap/mean
+  0.925–1.16. Seam control — a different revolution landing on the same frame —
+  **0 changed px**.
+- **It turns without pumping.** Across 24 yaw steps at one held frame the raw
+  silhouette swings a lot (width ×1.12 Normal to **×1.79 Swarm**) and that is
+  the bodies' real shape: **px per model unit is flat to 0.25–0.91%**, which is
+  the size of one pixel of edge threshold. Gating on raw width would have failed
+  a correct fit.
+- **The arrows wrap and the selection survives.** A full lap of 21 returns a
+  bit-identical label and counter; left from 0 lands on 20 and matches enemy
+  20's label exactly; the detail panel left behind by the viewer is
+  **bit-identical** to selecting that row directly, against a different enemy
+  differing by 8,841 px.
+- **One render per displayed frame**, exactly, on both rasterisers (SwiftShader
+  25/25, 24/24, 23/23; GTX 1660 Ti/D3D11 115/115, 128/128, 134/134), with the
+  modal closed moving the counter 0 over 215 frames. **7.3–9.0 ms per render on
+  the 1660 Ti**; 58–61 ms on SwiftShader, which is not transferable in a known
+  direction and must not be converted into a frame rate.
+
 **2026-08-14 — The Hedger has an attack animation. It is a per-group override
 composed onto the walk, not a second animation band, and it is driven by
 `attackFlash` rather than by the attack timer.**
