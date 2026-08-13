@@ -119,6 +119,46 @@ reference viewport:
 > the revert of a rebuild that had worked. **A body yaws with the path, so width
 > is a curve over bearing and collapsing it to one number is a population error.**
 >
+> **A SEPARATOR MUST NAME ITS AXIS — AND FOR ANYTHING THAT MULTIPLIES, PREFER A
+> HEIGHT SEPARATOR.** mira's rule, 2026-08-13, and it is the most useful thing to
+> come out of the enemy pass because it changes what gets briefed rather than
+> what gets checked.
+>
+> A body has three extents. A bearing fixes a combination: screen width is a
+> blend of **x** and **y**; screen height is **z** plus a blend of x and y. So a
+> separator on x or y **must be measured at the bearing where that axis
+> contributes least to screen width** — head-on for a y separator, broadside for
+> an x separator. **Only a z separator is bearing-invariant.**
+>
+> An enemy's yaw *is* its heading, so it shows the player every bearing during
+> one run. **A width separator is therefore a coin-flip on where the player
+> happens to be looking; a height separator always pays.** (A tower has a fixed
+> yaw, so one bearing is the correct measurement there — this rule is about
+> things that multiply.)
+>
+> **The two defects that produced it are one defect, mirrored, and neither was a
+> modelling mistake — both were briefs that did not name an axis:**
+>
+> | | separator on | reads | fails | vs Gleaner |
+> |---|---|---|---|---|
+> | Skimmer | **y**, −35% | broadside 0.81 | head-on 0.69 | y differed, x did not |
+> | Tun | **x**, +40% | head-on 0.80–0.89 | **broadside 0.57** | **y AND z identical to the digit** |
+>
+> The Tun matched the Gleaner on **both axes visible at broadside**, so its
+> entire separation lived on the one axis that bearing cannot see. It passed
+> review because review shot the two bearings where it happens to work.
+>
+> This also retro-explains the Drudge sitting at 1.00–1.01 at every bearing: its
+> separator is a **distributed profile change plus a 5% scale on all three
+> axes**, not a single-axis move, which is why it does not care about bearing.
+
+> **A CROSS-COMMIT VISUAL COMPARISON NEEDS A STABILITY CONTROL.** Any pair that
+> did *not* change must be re-measured in the same run and shown unchanged,
+> before a pair that did change means anything. Otto produced one by accident —
+> every non-Skimmer pair identical **to the pixel** across two browser launches
+> two commits apart — and it is what made a before/after comparison usable
+> without re-shooting the old model. **It should be required rather than lucky.**
+
 > **MEASURE ADJACENT-PAIR SEPARATION AT THREE BEARINGS, NOT ONE.** Two separate
 > defects hid behind the standard three-quarter view in a single day: the
 > Skimmer's, and then **Gleaner vs Tun at 0.57 broadside — the worst pair on the
