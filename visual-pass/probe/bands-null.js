@@ -35,7 +35,14 @@ async function boot(u){
 async function hash(S,k){return S.evaluate("(function(){var b=TDProbe.frames['"+k+"'],h=0;for(var i=0;i<b.length;i+=4){h=(h*31+b[i]+b[i+1]*7+b[i+2]*13)|0;}return h;})()");}
 (async function(){
   fs.rmSync(BASE,{recursive:true,force:true}); fs.mkdirSync(BASE,{recursive:true});
-  var SHA=sh("git rev-parse HEAD").trim();
+  // PIN THE BASE, NEVER "HEAD". HEAD is a wildcard on a shared tree and it
+  // moved past this change within the hour -- a re-run then extracted a base
+  // that ALREADY CONTAINED the reader and compared it against itself. Measured:
+  // baseGrep went 0 -> 4 while newGrep stayed 4, and the null still reported
+  // "identical" on all eleven bodies. A vacuous pass that looks exactly like
+  // the real one. The grep counts are what exposed it, which is why they are
+  // reported beside every result rather than checked once.
+  var SHA=(process.argv[2] || "6562ee4").trim();
   sh("git archive "+SHA+" | tar -x -C \""+BASE.split("\\").join("/")+"\"");
   var out={baseSha:SHA, note:"base = last commit; working tree = the reader"};
   var server=await new Promise(function(r,j){serve.start(PORT,function(e,s){e?j(e):r(s);});});

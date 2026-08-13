@@ -14,6 +14,15 @@ function sleep(ms) {
 }
 
 function launch(port, profileDir) {
+  // RECLAIM BEFORE CREATING, and this is the half that actually holds.
+  //
+  // The exit handler below is the tidy path and it does NOT run when the parent
+  // is killed -- a probe stopped by a timeout leaves its profile behind, which
+  // is exactly the case that leaks most, because a run that times out is a run
+  // you are about to repeat. Removing any previous profile of the same name at
+  // START always executes, and bounds the leak to one live profile per probe
+  // rather than one per RUN.
+  try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch (e) {}
   fs.mkdirSync(profileDir, { recursive: true });
   var args = [
     "--headless=new",
@@ -35,6 +44,31 @@ function launch(port, profileDir) {
     "about:blank"
   ];
   var child = childProcess.spawn(CHROME, args, { stdio: "ignore" });
+
+  // REMOVE THE PROFILE WHEN CHROME EXITS, and do it HERE rather than in each
+  // probe's `finally`, so a probe that is added later cannot forget.
+  //
+  // `chrome.kill()` leaves `%TEMP%\td-*` behind, and a headless profile is
+  // 20-200 MB. Across one session's probes that reached 552 MB on my side
+  // alone and a sibling filled the volume to zero bytes free with 28 of them.
+  // **The next ENOSPC does not present as a clean disk error** -- it surfaces
+  // as a capture that silently fails, or a git operation that half-writes, and
+  // the measurement it poisons looks like a rendering result.
+  //
+  // Errors are swallowed on purpose: Chrome can still hold handles for a moment
+  // after exit, and a probe must never fail because its own cleanup lost a
+  // race. One retry covers that; anything still left is stale and harmless.
+  child.on("exit", function () {
+    setTimeout(function () {
+      try { fs.rmSync(profileDir, { recursive: true, force: true }); }
+      catch (e) {
+        setTimeout(function () {
+          try { fs.rmSync(profileDir, { recursive: true, force: true }); }
+          catch (e2) { /* stale profile, not worth failing a run over */ }
+        }, 1500);
+      }
+    }, 250);
+  });
   return child;
 }
 
