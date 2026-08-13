@@ -269,22 +269,31 @@ var Codex = (function () {
       // somewhere; taking it from the enemy's OWN speed keeps the one property
       // that made the board's walk worth having. A Sprinter scurries here and a
       // Colossus plods, for the same reason and by the same arithmetic.
-      // A FLIER IS THE BOARD'S ONE EXCEPTION TO THIS RULE AND IT IS NOT
-      // REPRODUCED HERE. `gl-world` drives a wingbeat from `boardClock *
-      // HOVER_HZ` (2.6) rather than from distance, because a stopped flier
-      // would otherwise freeze mid-beat. The derivation below happens to give
-      // the Aether Wisp 2.567 -- within 1.3% of the board, which is why nothing
-      // looks wrong today. **That is luck, not construction.** It falls out of
-      // that one body's speed and radius, and the next flier will land wherever
-      // its own numbers put it.
+      // A FLIER IS THE BOARD'S ONE EXCEPTION AND THE RENDERER IS ASKED FOR IT
+      // RATHER THAN THIS FILE GUESSING. `gl-world` drives a wingbeat from a
+      // clock at `HOVER_HZ` instead of from distance, because a stopped flier
+      // would otherwise freeze mid-beat and hang in the air like a prop.
       //
-      // NOT FIXED HERE ON PURPOSE: the honest fix is to ask the renderer for
-      // the rule rather than to copy 2.6 into this file, and `HOVER_HZ` is
-      // private to gl-world. A second copy of a constant that only one of the
-      // two sites will ever be retuned is worse than a documented seam. Owner:
-      // rendering (otto) -- export it beside `walkBand` and read it here.
+      // `World3D.animHz` returns that authored rate for a body that has one and
+      // NULL for every distance-driven body -- and the null is the useful half:
+      // it says this body has no authored rate at all, so a viewer standing it
+      // still has to invent one, which is this file's business and not the
+      // renderer's. Copying 2.6 into here instead would have put a second copy
+      // of a constant in the file that will never be the one retuned, and it
+      // would fail silently: the viewer would beat the old rate forever and
+      // nothing would render wrong enough for anyone to notice.
+      //
+      // Worth knowing what this fixed and what it did not. The derivation below
+      // gives the Aether Wisp 2.5668 against the board's 2.6 -- within 1.3%,
+      // which is why nothing looked wrong. That was luck falling out of one
+      // body's speed and radius, not construction, and the next flier would
+      // have landed wherever its own numbers put it.
       var strideP = Math.max(1, sprite.radiusPx() * 2.6);
       var walkHz = (typeof ul === "function" ? ul(speed) : speed) / strideP;
+      if (typeof World3D !== "undefined" && typeof World3D.animHz === "function") {
+        var authored = World3D.animHz(sprite);
+        if (authored) walkHz = authored;
+      }
 
       return {
         id: id,
