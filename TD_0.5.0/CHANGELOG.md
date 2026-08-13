@@ -13,6 +13,60 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `animate_walk_grouped`: the gait generalises to any leg count,
+byte-exact on every shipped biped. A CHASSIS EVENT — all six chassis bodies
+re-exported. It is recorded here because `git log` cannot find it: the work was
+swept into `67d0fd2`, "Write down the two things the camo fix taught", by a
+concurrent broad stage, and that commit's message describes none of it.**
+
+The paths are `tools/blender/enemy_chassis.py` and the six generated models
+`enemy-armored`, `-fast`, `-slow`, `-angry`, `-camo_normal`, `-shielded`.
+Content is intact — verified after the fact: `git diff HEAD` is empty against
+the gated working tree, and the gate below still passes on the committed
+content. But the attribution is gone, and **a chassis event nobody can
+attribute is the exact failure the chassis header warns about.** Second sweep of
+the day onto this author; the first took the Courier's CHANGELOG entry into
+`0870861`, a Rifleman DPS commit. History is not being rewritten to repair it —
+this is a shared repo and an additive record is cheaper and safer than a
+force-move.
+
+**What was two-leg-shaped was not the arithmetic.** `walk_phases` is a plain
+triangle wave and `support_left_frames` is a duty-0.5 window; neither knows how
+many legs exist. A quadruped **trot** and a hexapod **alternating tripod** are
+both two antiphase groups — exactly what those two functions already describe —
+so the Dray's six legs and the Tender's and Stacker's four need no new cycle
+arithmetic at all. What *was* two-leg-shaped was `animate_walk`'s body:
+hard-coded `parts["leg_l"]`, literal `"foot_l"` strings, an unconditional
+`parts["arm_l"]` that raises `KeyError` on an armless body, and a binary
+if/else over one support set. `animate_walk` is now a two-group call to the new
+function and nothing else.
+
+**Two groups are exact; more than two are not, and the limit is documented
+rather than left to be discovered.** `walk_phases` is *symmetric*, so shifts `s`
+and `frames/2 − s` sample the same value and swing angles collide in pairs above
+two groups — at six groups over twelve frames the phases come out
+`[0.00, 0.67, 0.67, 0.00, −0.67, −0.67]`, so a "wave" gait reads as three
+phases, not six. Support windows stay distinct and the body never floats
+(verified: minimum support 1 / 2 / 3 groups per frame at 2 / 4 / 6 groups, never
+zero), but the legs visibly swing in pairs. It costs nothing now because every
+batch-2 body is a two-group gait; a true wave gait would need a real phase
+argument on `walk_phases`, which is a shared-function change and not a
+caller-side fix.
+
+**A foot name is derived from its leg key** (`leg_0` → `foot_0`), and that is
+load bearing rather than cosmetic: `_foot_measure` resolves names through
+`bpy.data.objects[...]`, a **global** lookup. Six legs all naming their foot
+`foot_l` collect Blender's automatic `.001` suffixes, and the solver then
+measures the wrong foot on five of six — a body standing on one leg and floating
+on the rest, with nothing raised anywhere.
+
+**The gate, against a baseline captured before the first chassis edit**
+(`scratchpad/suki-enemy-baseline.json`): multiset moved on **0 of 6**,
+framesDigest moved on **0 of 6**. `framesDigest` is the one that matters here,
+and multiset alone would have been negligent — **a gait change moves no
+triangles**, so a multiset check passes unchanged while the walk is visibly
+wrong.
+
 **2026-08-13 — The wave banner shrinks to fit instead of clipping, and the flat
 triangle ceiling is retired.** Two rendering fixes and one measurement guard;
 no model changed.
