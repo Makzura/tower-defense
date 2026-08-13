@@ -238,6 +238,27 @@
 # never reaches the outline. **If that defence fails, 17 deg is a real option and
 # not a mutilation**, and it is the one to take before redesigning the hub-drum
 # joint.
+#
+# **BUT DROPPING TO 17 IS NOT A ONE-CONSTANT CHANGE, AND THAT IS THE TRAP.** The
+# geometry is one constant and a re-export. THE BRIEF IS NOT. The gesture is
+# specified BY a widest-row migration, and 17 deg halves the exact quantity it is
+# specified by -- measured at the built excursion, yaw 0:
+#
+#     stroke  0 deg    widest row =  4 of 27
+#     stroke 17 deg    widest row =  7 of 27    3 rows, 11% of figure height
+#     stroke 34 deg    widest row = 10 of 27    6 rows, 22% of figure height
+#
+# So the brief's headline -- "the machine's widest point drops to its middle and
+# walks back up to its shoulder" -- stops being true at 17. mira's replacement,
+# written in advance so it cannot be skipped: **"the widest row drops three rows,
+# 11% of the figure height, and climbs back"**, with the tip drop 6.0 -> 3.1
+# screen px. Still a real read at 2.45x to 4.27x on every bearing carrying road;
+# a different and smaller one.
+#
+# **Whoever flips the constant owns that sentence too.** A one-line change that
+# silently falsifies the document it was built from is the drift this header
+# exists to prevent, and it is easy to skip precisely because the code edit looks
+# trivial.
 
 import math
 import os
