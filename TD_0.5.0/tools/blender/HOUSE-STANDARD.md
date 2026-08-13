@@ -316,6 +316,41 @@ gesture, with the life taken out of it.
 > has zoom integrated, so maybe one zoomed while measuring"* — against two wrong
 > hypotheses from me.
 >
+> **HOW TO MEASURE "DOES THIS READ": BRACKET IT, NEVER THRESHOLD IT.** juno's
+> method, 2026-08-13, and it is the durable output of the whole enemy pass. At
+> **each yaw and each frame**, measure the part three ways:
+>
+> 1. painted the **exact colour of the body behind it** — synthetic total merge
+> 2. **as authored**
+> 3. painted **maximally different** — synthetic zero merge
+>
+> Then report where the authored value sits between its own two bounds, as a
+> percentage. 100% is as distinct as repainting can make it.
+>
+> **WHY A THRESHOLD CANNOT WORK, and this is the number that proves it: a part
+> painted precisely the colour of the body behind it still changes 0–34 px.** It
+> still owns a silhouette edge and its own shading normals. So *"the picture
+> changed"* **passes a totally merged part** — and so does a ratio against the
+> part's own solo silhouette, which was the guard I had proposed. **Without a
+> synthetic merge measured on the same part at the same yaw and frame, there is
+> no floor at all.**
+>
+> Worked example, the Hedger's crank: separation **never exceeds 80% at any yaw
+> or frame**, and every yaw has frames under 30% — so it never fully merges and
+> never fully reads. The cause turned out to be **occlusion by the model's own
+> torso at the dominant bearing**, not colour: visible area swings **4 px to 63
+> px across one crank cycle**, a 16x range, and path direction buckets to yaw 0
+> on **25 of 42 segments across all six maps**. A threshold or a ratio would have
+> sent someone to the palette for a problem that was geometry and phase.
+>
+> Report a **threshold sweep (0 / 16 / 32 of 255) beside every ratio** — one
+> feature's raw and above-threshold counts differed by **6x**.
+>
+> **Two things this method does NOT settle, and neither should be claimed from
+> it:** whether a 26%-separated part reads as a *glitch* to a player is
+> perceptual and wants a rendered A/B judged by eye; and none of it is measured
+> over `file://`.
+
 > **THE BRACKET IS CLOSED — 2026-08-13, juno.** This section has rested on a
 > single calibrated point since it was written, and it now has both ends:
 >
