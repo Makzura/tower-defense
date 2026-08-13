@@ -60,10 +60,39 @@
 # THE STRIKE IS NOT BAKED AND THERE IS NO SECOND BAND. `bands` stays a single
 # walk band of 12 frames. otto drives the stroke live through `drawActor`'s
 # per-group `overrides`, and the moment this file exports a 13th non-walk frame
-# the walking body cycles through it once per stride. `mast` is keyed to identity
-# on every frame -- that is not animation, it is what makes `mast` a GROUP:
-# `_group_root` walks up to the nearest ancestor holding an ACTION, so an unkeyed
-# empty is transparent and the drum would have been exported as part of the body.
+# the walking body cycles through it once per stride.
+#
+# --- THE LIVE-POSE SEAM IS INVISIBLE TO THIS PIPELINE IN THREE PLACES --------
+#
+# Read this before building any other body that uses `overrides`. Every gate
+# here reads BAKED geometry, so the pose the machine spends 0.4 s in every 2.5 s
+# is guarded by nothing at all. Three separate traps, and **not one of them
+# raises an error or turns a gate red**:
+#
+# 1. **AN UNKEYED GROUP ROOT IS NOT A GROUP.** `mast` is keyed to identity on
+#    every frame. That is not animation -- it is the only thing that MAKES it a
+#    group. `export_mesh._group_root` walks up to the nearest ancestor holding an
+#    ACTION, so an unkeyed empty is transparent to it: the drum, bill, head, core
+#    and hold would have exported inside `angry_body`, and the runtime would have
+#    had no `mast` group to override. The export succeeds, every count is
+#    correct, the walk is right, and the attack silently does nothing. The keys
+#    cost nothing else: the mast still inherits bob and roll through its parent,
+#    because the exporter writes each group's `matrix_world` per frame.
+#
+# 2. **`model.top` IS READ FROM THE REST MESH, SO AN OVERRIDE CAN BURY THE HEALTH
+#    BAR.** `gl-models.js:120-124` takes it as max z over the raw `positions` at
+#    load -- before any frame pose and before any override. Anything the stroke
+#    lifts above the rest silhouette eats the flat 10 board px pad, and it does
+#    so once every 2.5 s, which is worse to look at than a bar simply in the
+#    wrong place. Measured here: 4.10 px of the 10, leaving 5.90.
+#
+# 3. **`check_penetration.py` WALKS THE BAKED FRAMES AND REPORTS THIS BODY
+#    CLEAN.** It is clean, over the walk. At full stroke the drum enters the hub
+#    by 0.0477 u and the tool never sees it. See the posed measurements further
+#    down -- they were taken by hand because nothing takes them for you.
+#
+# The through-line: a gate that is green about the walk is silent about the
+# strike, and the strike is the only thing this body does that the others do not.
 #
 # --- what the gait does, and the one place the brief cannot be met ----------
 #
