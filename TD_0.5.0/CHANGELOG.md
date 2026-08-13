@@ -274,6 +274,42 @@ With no arguments it sweeps every `js/gl/models/enemy-*.js` at each type's real
 that `first`/`count` in `groups[]` are **vertex** indices; reading them as
 triangle indices lands every group matrix on the wrong third of the mesh.
 
+**2026-08-13 — The Vanguard (`boss_fast`) gets a model, and the model gets a
+`<script>` tag. It had neither a tag nor a git entry, and each hid the other.**
+
+The first of the two bosses Diego released for creation. `enemy-boss_fast.js` —
+**3,248 triangles, 3 groups, `sizeScale` 1.90.** Legs are two vertical
+triangular blades, **apex DOWN**, raked so the bulk overhangs a contact point
+that sits *behind* the hip pin: mass ahead of its feet as a coordinate rather
+than as a mood. That is Diego's *"2 big moving triangles as legs, perpendicular
+to the ground"* inverted for this body, which keeps his primitive on both
+bosses — the Tyrant is the same shape mirrored in z — rather than spending it
+on one.
+
+**Measured, gated, and it is the best-walking body in the game.** Authored
+gait error **A = 0.180 board px (0.00298 model units)** — the lowest on the
+board, below `enemy-normal`'s 0.277. `check-model-top` **ok at the full +10.0
+margin** (crown 91.8 board px). Plan extent **77% of its ring**, comfortably
+inside, because a point contact adds no sole length to the swing.
+
+**It shipped unwired and untracked, and this is the part worth keeping.**
+`js/gl/models/` held **110 files against 109 `<script>` tags in `index.html`**,
+and the single gap was the new boss; it was also the only untracked file under
+`js/`, so a clean checkout would have deleted it. Found independently and
+within minutes by rendering and by quality.
+
+**No suite could have caught either half, and the reason generalises: the
+suites take their script list FROM `index.html`.** A model absent from
+`index.html` is not merely unrendered under test — it is **never executed**. It
+cannot throw, cannot fail, and cannot appear in any count. Every suite stays
+green whether the file is correct, broken, or deleted. **"The suites pass" is
+therefore not evidence that a new model loads.** Treat the `<script>` tag as
+part of the model and add it in the same commit; the set difference between
+`js/gl/models/*.js` and the tags in `index.html` is the only thing that checks
+it, and it should be empty.
+
+The tag is added to `sandbox.html` too, as every other model is.
+
 **2026-08-13 — The debug cash panel is deleted. The sandbox is the testing
 surface, and its Max Field command moved out of the dying file.**
 
