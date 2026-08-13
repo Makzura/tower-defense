@@ -13,6 +13,51 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The debug cash panel is deleted. The sandbox is the testing
+surface, and its Max Field command moved out of the dying file.**
+
+At the owner's instruction: *"That debug cheat panel can go, we have the sandbox
+which gives everything we need to test towers and enemies."* It sat on the first
+screen a player sees.
+
+**Deleted, not hidden.** `js/debug-cash.js` is gone from the tree and no page
+loads it. Removed with it: the floating cash box, the Give/Set/+$50/+$500/+$5000
+buttons, the Reset-to-`STARTING_CASH` button, and the `window.addEventListener
+("load", ...)` that built them. `index.html` lost its `<script>` line.
+
+**What survived and where it went.** The panel also carried the shared Max Field
+command — force every placed tower to exact A2/B5, fire its abilities and leave
+AUTO on — and that is the sandbox's, not the game's. It moved verbatim to
+`js/sandbox/sandbox-max-field.js` and is exposed as `window.SandboxMaxField`
+(was `window.DebugMaxField`). `sandbox.html` loads it; `index.html` does not.
+
+**That load site is now the whole guard, and it is stronger than the naming
+convention it replaces.** `tests/harness.js` skips `js/debug-*.js` by filename,
+which only works for a file `index.html` names. Loading from `sandbox.html`
+instead keeps a testing aid out of the shipping page *and* out of the harness by
+construction, with nothing to remember. The `debug-` prefix skip at
+`tests/harness.js:35` still stands for anything that must load from
+`index.html`.
+
+**The check that proves it is gone rather than merely unreferenced, and it
+failed before this change.** `tests/sandbox.smoke.js` counts the `load`
+listeners registered when the sandbox page boots. It asserted **3** — game,
+debug panel, sandbox — and the deletion took it to **2**, which is a red test,
+not a silent pass. Updated to 2 with the reason written beside it, so a
+re-introduced panel that registers a listener turns it red again. The new file
+registers no listener at all and only exposes a function.
+
+Suites after: `run.js` 107/0, `content.test.js` 207/5 (its standing baseline),
+`blub` 53/0, `beam` 45/0, `long-range-dps` 72/0, both smoke tests passing —
+including *"the sandbox MAX FIELD button makes every tower exact A2/B5"* and
+*"its three active abilities fire immediately and stay AUTO"*, which is the
+evidence that the move did not break the command.
+
+Two stale prose references followed the file out: `js/sandbox/sandbox.js` and
+`js/scene/long-range-dps-scene.js` both cited `debug-cash.js` as the precedent
+for keeping a testing aid's DOM out of the render loop. The rule is house
+standard on its own and no longer needs to point at a deleted file.
+
 **2026-08-13 — `tools/blender/check_penetration.py`: the interpenetration gate
 clause 8 has always required and only one model ever had. It finds a real defect
 in the Tender, shipped the same day.**

@@ -447,9 +447,9 @@
 
 <script src="js/game.js"></script>
 
-<!-- Shared temporary field-max command. Its floating cash panel is suppressed
-     here because the sandbox already owns a sidebar. -->
-<script src="js/debug-cash.js"></script>
+<!-- The field-max command behind the sidebar button. Sandbox-only: index.html
+     does not name it, so it is absent from the shipping page. -->
+<script src="js/sandbox/sandbox-max-field.js"></script>
 
 <!-- Sandbox wiring last: it edits BUILD_SLOTS and wraps update() before
      init() runs, so the game boots straight into sandbox rules. -->

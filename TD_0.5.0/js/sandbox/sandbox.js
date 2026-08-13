@@ -14,7 +14,7 @@
 // Everything else is untouched, which is the point: what you learn here
 // about a tower is true in the shipping game.
 //
-// Structure follows js/debug-cash.js's precedent -- all DOM, no canvas
+// Structure follows the house rule for a testing aid -- all DOM, no canvas
 // drawing in the game's render loop except one clearly-scoped overlay, and
 // nothing in js/game.js was changed to accommodate this file. It hooks the
 // game by wrapping its public functions, not by editing them.
@@ -677,11 +677,11 @@
       });
     });
 
-    // The same shared command the purple debug panel exposes. debug-cash.js
-    // suppresses its own floating panel when this sidebar exists, so the
-    // button lives in exactly one place per page.
+    // js/sandbox/sandbox-max-field.js holds the command; this sidebar owns the
+    // only button for it. It used to be shared with the game's floating debug
+    // cash panel, which was deleted on 2026-08-13.
     els.maxField.addEventListener("click", function () {
-      var result = window.DebugMaxField.run();
+      var result = window.SandboxMaxField.run();
       els.maxFieldStatus.textContent = result.towers + " tower" +
         (result.towers === 1 ? "" : "s") + " maxed · " +
         result.abilities + " AUTO fired";

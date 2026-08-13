@@ -484,7 +484,8 @@ js/codex.js         the index screen (screen === "index"): the tower/enemy
                      from Enemy.TYPES + EASY_WAVES -- so it cannot go stale
 js/game.js          setup, map chooser, waves, victory/loss, base HP,
                      placement, main loop, all drawing
-js/debug-cash.js    TEMPORARY debug panel -- delete before release
+js/sandbox/sandbox-max-field.js  the sidebar's Max Field command. Loaded by
+                     sandbox.html ONLY, so it is absent from the shipping page
 tests/harness.js    boots the game in Node against a stubbed canvas
 tests/assert.js     minimal test runner, no dependencies
 tests/run.js        the test suite (the original gunner/wave game)
@@ -1643,12 +1644,11 @@ geometry in u.l., which a viewport rectangle in pixels has no business in.
 separately — including by `tests/run.js`'s placement fixture, which searches for
 ground that satisfies both.
 
-**The bottom-right corner belongs to the speed toggle, and `js/debug-cash.js`
-was moved out of it** (2026-07-29). That panel is a fixed DOM overlay and it
-covered the button completely — a canvas button underneath one is not a button.
-The debug panel yielded rather than the game moving, because it is the
-disposable one: it is marked for deletion before release and no game code
-refers to it.
+**The bottom-right corner belongs to the speed toggle**, and the rule it
+produced outlived the collision that taught it: a fixed DOM overlay put in that
+corner covers the button completely, and a canvas button underneath one is not
+a button. (The overlay in question was the debug cash panel, moved out of the
+corner 2026-07-29 and deleted outright 2026-08-13.)
 
 A consequence worth knowing: while a panel is open, its Sell button also
 blocks *building* on the ground beneath it. That is correct and consistent
@@ -2414,27 +2414,30 @@ not, which the guards make harmless.
 
 ---
 
-## The debug cash panel is temporary — remove it before release
+## The debug cash panel is GONE — the sandbox is the testing surface
 
-`js/debug-cash.js` puts a floating panel in the bottom-right corner that grants
-arbitrary cash. **The owner asked for it for testing and asked for it to be
-removed afterwards.** It is loud on purpose: dashed magenta border, the words
-"REMOVE BEFORE RELEASE" across the top.
+`js/debug-cash.js` was deleted on 2026-08-13 at the owner's instruction: *"That
+debug cheat panel can go, we have the sandbox which gives everything we need to
+test towers and enemies."* It put a floating cash-granting panel on the first
+screen a player sees. It is not hidden, not gated behind a flag — the file is
+gone and no page loads it.
 
-**To remove it:** delete the file, delete its one `<script>` line from
-index.html. That is the whole job. Nothing in the game refers to it, and no
-game code was shaped around it.
+**Its Max Field command survived and moved to `js/sandbox/sandbox-max-field.js`,
+loaded by `sandbox.html` only.** `tests/harness.js` reads its script list out of
+`index.html`, so the suite never sees it either.
 
-Two deliberate choices worth preserving if you add other debug tools:
+Two choices from it worth preserving if you add another testing aid:
 
-- **It is DOM, not canvas.** No debug code in the render loop, no debug
-  branches in the input handling, and it is visibly not part of the game.
-- **It is not loaded by the tests.** `tests/harness.js` skips
-  `js/debug-*.js`, so the suite exercises the shipping game. Keep the
-  `debug-` prefix for anything similar.
+- **DOM, not canvas.** No testing code in the render loop, none in the input
+  handling, and it is visibly not part of the game.
+- **Load it from `sandbox.html`, not `index.html`.** That single fact is what
+  keeps it out of the shipping page *and* out of the test harness, and it does
+  not depend on anyone remembering a filename convention. (The old `debug-`
+  prefix skip at `tests/harness.js:35` still works and is still worth keeping
+  for anything that must load from `index.html`.)
 
-The one place the game *did* change for it is the `INPUT`/`TEXTAREA` guard in
-`onKeyDown`, and that is worth keeping regardless.
+The one place the game *did* change for that panel is the `INPUT`/`TEXTAREA`
+guard in `onKeyDown`, and that is worth keeping regardless.
 
 ---
 

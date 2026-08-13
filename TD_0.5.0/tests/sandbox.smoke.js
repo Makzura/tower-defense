@@ -214,10 +214,16 @@ function check(label, condition, detail) {
 
 console.log("\nSandbox smoke test\n");
 
-// Boot: game.js runs init(), the shared debug UI suppresses its floating box,
-// then sandbox.js wraps the game.
-check("all load listeners registered (game, shared debug command, sandbox)",
-  windowListeners.load.length === 3,
+// Boot: game.js runs init(), then sandbox.js wraps the game.
+//
+// TWO, not three, since 2026-08-13. js/debug-cash.js was the third: it
+// registered a load listener to build its floating cash panel, and it was
+// deleted at the owner's instruction. Its Max Field command lives on in
+// js/sandbox/sandbox-max-field.js, which registers nothing and only exposes a
+// function -- so this count is the check that the panel really is gone rather
+// than merely unreferenced.
+check("all load listeners registered (game, sandbox)",
+  windowListeners.load.length === 2,
   "listeners = " + windowListeners.load.length);
 windowListeners.load.forEach(function (fn) { fn(); });
 

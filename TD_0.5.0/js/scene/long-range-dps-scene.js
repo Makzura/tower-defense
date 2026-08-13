@@ -10,12 +10,12 @@
 // Per AGENTS.md's house rule, simulation stays out of the DOM: tower.update()
 // (js/towers/tower-runtime.js) never touches `document`. Everything in this
 // file that reads/writes the DOM panel is scene wiring, not simulation --
-// same split as js/debug-cash.js uses for its floating panel.
+// the same split js/sandbox/ uses for its sidebar.
 //
-// This is a genuine deliverable (spec section 8.4), not a temporary aid like
-// js/debug-cash.js, so it is not named debug-*.js and is not skipped by the
-// test harness convention -- it simply is not loaded by tests/harness.js
-// because it is not referenced from index.html.
+// This is a genuine deliverable (spec section 8.4), not a temporary aid, so it
+// is not named debug-*.js and is not skipped by the test harness convention --
+// it simply is not loaded by tests/harness.js because it is not referenced
+// from index.html.
 // ---------------------------------------------------------------------------
 
 (function () {
