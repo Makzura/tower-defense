@@ -202,7 +202,40 @@ This group does not render. game.js:2801 and 2821 call Effects.beginWorld (the c
 
 The boss row in Enemy.TYPES (enemy.js:635) is the most heavily designed thing in the file: 5000 HP, sizeScale 2.4, laneSpread 0 so it fills the road, the slowest mover in the game at 15 u.l./s, an aimed shot with a 1.3 s wind-up that stops it dead and picks the highest-DPS tower on the whole map with no range limit, a roar at half health that conjures a 1000-point shield and calls a court back in, and a leap that jumps 90 u.l., lands a 120 u.l. shockwave for 80 damage and a 3 s stun after a 1.5 s crouch. None of that exists visually. It goes through the identical enemySphere() path as every other unmodelled type: a 12x8 ball, ~198 triangles, one flat red 236/92/76, one dark grey-green lid, zero emissive. In 03-enemies-spheres-before.png it is the largest and most saturated object on the board and it is a red pot with a lid. COLOUR is worse than the other spheres, not better: DIRECTION fixes red as 'enemy cores' - the small hot thing seen through a slot in dark plate - and here 100% of the biggest body in the campaign is rendered in it, which inverts both the colour vocabulary and the 'largest surface takes the darkest value' rule in one asset. MOTION is the same abs(sin) uniform-scale hop as a 1 HP camo_fast: the slowest thing in the game bounces like a beach ball, with no contact shadow to land against. The leap is a position change with no arc, no crouch, no landing in the renderer. EFFECT is the most serious failure: every one of the fight's five signature moments is invisible in the shipping GL path. The wind-up ring, the aimed-shot bolt to the targeted tower, the leap shockwave at its real radius and the stun ring are all authored in Enemy.prototype.draw (enemy.js 2153-2199) and are dead code under the GL renderer, which draws no enemy overlays at all. The 1000-point shield is a number on a hover card. The roar is a text banner. After 6000 effective HP it dies to Effects.enemyKilled: ten canvas particles and '+$3000', the same burst a 1 HP Swarm gets. Note also that the telegraph colours in the unreachable 2D code are ember orange (255,206,120 / 255,196,120 / 255,160,110), which DIRECTION reserves for the Warbringer's forge - so even the code that does exist paints the boss's attacks in a tower's colour. COHESION fails all five quick tests while being the single most visible asset in the campaign. PERF gets a 2: one instance, ~198 tris, one draw call - and there is no performance argument here whatsoever. A single boss on screen has effectively the entire budget available; PERF.md says geometry is cheap, fill rate is the sensitive axis (which a mesh does not touch), and the stress scene leaves ~3 ms free. The most important asset in the game was given the cheapest possible implementation for no reason the budget supports.
 
-**First change to make:** Author a real Tyrant mesh - six of the eight criteria are hard-capped at 1 by the primitive and nothing else can move until it exists. Build it as the heavy DIRECTION describes: armoured chassis first, unnatural organic contamination visibly grown through the plating, red core emissive on the geometry - and in the same pass wire windUpTimer, the roar and the leap to uGlow on that model's own emissive parts plus a world-space GL telegraph, so the 1.3 s wind-up and the 120 u.l. shockwave stop being invisible.
+> **⚠ DO NOT EXECUTE THE ORGANIC CLAUSE BELOW. Annotated 2026-08-13 by kaz; the
+> audit text is left intact because this is a dated record.**
+>
+> hugo corrected `DIRECTION.md` under Diego's standing authorisation (`1d1c29f`),
+> and the instruction below is now wrong twice over:
+>
+> 1. **Flesh tracks CAMPAIGN POSITION, not strength.** `EASY_WAVES` is the only
+>    wave table in the build (`js/game.js:223` and `:667`), so **every body that
+>    exists today is an Easy body, and Diego ruled Easy contains no flesh at
+>    all** — Hive, Brute, Revenant and the wave-35 boss included. The "heavy end
+>    gets organic matter" rule this paragraph cites no longer exists.
+> 2. **Diego demoted the Tyrant explicitly** — *"the Tyrant is nothing, it's just
+>    a machine bigger than others that was given more resources to capture
+>    humans."* No organic matter, no special significance.
+>
+> **And when flesh does arrive in later content it is CARE, NOT CONTAMINATION.**
+> The machine is succeeding: captives are raised and studied as material, so the
+> organic housing is the best-kept part of the body — clean, sealed, warmed,
+> serviced — while the machine around it goes dented and filthy. Husbandry, not
+> rot. *"Unnatural organic contamination"* is wrong in register as well as in
+> placement.
+>
+> **Everything else in the paragraph survives, because it is a rendering gap
+> rather than a fiction claim:** the Tyrant is a ~198-triangle sphere, all five
+> of its signature moments are authored in `Enemy.prototype.draw` and are **dead
+> code under the GL renderer**, and wiring `windUpTimer`, the roar and the leap
+> to `uGlow` plus a world-space GL telegraph is still the right work. **Build the
+> machine version.**
+>
+> **Scope: the Tyrant and the Vanguard are excluded from the enemy-model pass —
+> Diego is building them himself.** This note exists so nobody else executes the
+> deleted instruction, not as a work item.
+
+**First change to make:** Author a real Tyrant mesh - six of the eight criteria are hard-capped at 1 by the primitive and nothing else can move until it exists. Build it as the heavy DIRECTION describes: armoured chassis first, ~~unnatural organic contamination visibly grown through the plating~~ **[SUPERSEDED — see above; pure machine]**, red core emissive on the geometry - and in the same pass wire windUpTimer, the roar and the leap to uGlow on that model's own emissive parts plus a world-space GL telegraph, so the 1.3 s wind-up and the 120 u.l. shockwave stop being invisible.
 
 ### `G25` The Siphon beam
 
