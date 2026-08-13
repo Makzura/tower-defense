@@ -696,8 +696,8 @@ Enemy.TYPES = {
       shield: 1000,                 // flat, conjured -- not a ratio of anything
       speedMultiplier: 1.35,        // 20.25 u.l./s -- "a little faster"
       attackIntervalMultiplier: 0.75,  // every 9 s instead of every 12
-      announce: "THE TYRANT ROARS",
-      announceDetail: "1000 shield, faster, leaping — and it has called a court back with it",
+      announceSuffix: " COMMITS ITS RESERVES",
+      announceDetail: "1000 shield, faster, leaping — and forty more bodies spent, healers and hives among them",
       // The second attack, unlocked here. From now on the pool cycles.
       //
       // THE LEAP IS THE MENACE (2026-08-01, at the owner's instruction: "make
@@ -2002,8 +2002,8 @@ Enemy.prototype.breakShield = function () {
 // Has this enemy crossed a health threshold that changes what it is?
 //
 // A `phases` row is `{ atHealthFraction, shield, speedMultiplier,
-// attackIntervalMultiplier, summon, announce }` -- everything the boss's roar
-// does, as data. Phases fire IN ORDER and ONCE: `phasesEntered` is a counter,
+// attackIntervalMultiplier, summon, announce | announceSuffix, announceDetail }`
+// -- everything the boss's roar does, as data. Phases fire IN ORDER and ONCE: `phasesEntered` is a counter,
 // not a set of flags, so an enemy healed back above a threshold cannot
 // re-trigger one and a two-phase enemy that drops straight past both in a
 // single hit enters both, in order.
@@ -2063,8 +2063,28 @@ Enemy.prototype.enterPhase = function (phase) {
     this.pendingSpawns = this.pendingSpawns ? this.pendingSpawns.concat(called) : called;
   }
 
-  if (phase.announce && typeof Effects !== "undefined") {
-    Effects.announce(phase.announce, phase.announceDetail || "");
+  // The title comes from ONE of two fields, and THE GUARD MUST TEST THE
+  // COMPOSED RESULT, never either field alone. A guard on `phase.announce` by
+  // itself goes false the moment a phase uses the suffix form, and the banner
+  // then silently never fires -- nothing throws, nothing logs, and the only
+  // symptom is a missing banner at the one moment in the campaign that has
+  // one. That is the whole failure mode of this pair; keep them together.
+  //
+  // `announceSuffix` composes the title from the type's own displayName, so
+  // the line survives a rename -- every name in the game is being replaced and
+  // this one is not settled. It carries its own leading space and takes no
+  // article, because a proper noun would read wrong with one.
+  //
+  // Both fields stay STRINGS. Enemy.TYPES is data -- every value in it is a
+  // scalar, a string or a plain object -- and a callable in there would make
+  // this call site handle two shapes forever. A phase that needs a wholly
+  // custom line adds `announce` back, and the `||` prefers it.
+  var title = phase.announce ||
+    (phase.announceSuffix
+      ? this.type.displayName.toUpperCase() + phase.announceSuffix
+      : null);
+  if (title && typeof Effects !== "undefined") {
+    Effects.announce(title, phase.announceDetail || "");
   }
 };
 
