@@ -1,0 +1,95 @@
+THE FOUR EASY BODIES - PREVIEW SHEETS
+Rendered 2026-08-13 by tools/blender/make_preview.py --easy-five
+
+
+WHAT THESE ARE EVIDENCE OF, WHICH IS NARROWER THAN IT LOOKS
+-----------------------------------------------------------
+520x680 per angle is roughly the PLAYER'S OWN MAX ZOOM-IN - about 11x the
+fitted camera (~2021.24). That makes it a real view rather than a fiction, and
+legitimate evidence about SURFACE DETAIL: a bevel, a weld, whether a part is
+modelled or implied, whether a join is clean.
+
+It is NOT evidence about a READ. Silhouette, value separation, and whether a
+separator announces itself are properties of the DEFAULT view, and a magnified
+render cannot show any of them. A silhouette that only works zoomed in is not a
+silhouette.
+
+  -> For the read, use otto's capture from the running game at the fitted
+     camera. The two sheets answer different questions and neither substitutes
+     for the other.
+
+
+THE ONE THING THAT WILL MISLEAD YOU IF NOBODY SAYS IT
+------------------------------------------------------
+  easy_five_compare.png   HAS sizeScale APPLIED
+  every other sheet       does NOT
+
+That is deliberate, and the sheets are not comparable to each other because of
+it.
+
+The comparison sheet is about SEPARATION - can you tell these five apart - so
+each body is scaled by its type's real runtime sizeScale. This matters most for
+the Hedger, whose primary separator is NOT MODELLED AT ALL: the runtime applies
+1.25, worth +72 lit px and +5 rows. Rendered at one ortho it would appear the
+Gleaner's height, and the sheet would have lied by omission.
+
+The single-body sheets are about SURFACE DETAIL at fixed magnification, so they
+are deliberately unscaled - scaling them would change how much detail resolves
+and make the four sheets incomparable.
+
+  sizeScale, from js/enemy.js:
+    Gleaner (normal)   1.00      Tun (slow)       1.00
+    Drudge (armored)   1.05      Hedger (angry)   1.25
+    Skimmer (fast)     1.00
+
+
+THE SHEETS
+----------
+  easy_five_compare.png          2600x680   START HERE. sizeScale APPLIED.
+                                            Left to right: Gleaner, Drudge,
+                                            Skimmer, Tun, Hedger. Same yaw,
+                                            same light, same frame.
+
+  easy_drudge.png                520x2720   four yaws, one per row. Unscaled.
+  easy_skimmer.png               520x2720   four yaws. Unscaled.
+  easy_tun.png                   520x2720   four yaws. Unscaled.
+  easy_hedger.png                520x2720   four yaws. Unscaled.
+
+  easy_hedger_crank_low.png      520x2720   frame 1  - crank at its low point
+                                            (0.018 u off the road)
+  easy_hedger_crank_high.png     520x2720   frame 7  - crank at its high point
+                                            (1.182 u, under the crown's 1.190)
+
+
+GEOMETRY PROVENANCE
+-------------------
+Rendered from the committed sources with the tree verified clean at HEAD, and
+the Hedger's exported md5 checked before rendering (f5c05ad8...), because a
+superseded file had already reached two people's measurements once that day.
+
+  Gleaner   enemy_normal.py    (shipped, unchanged)
+  Drudge    enemy_drudge.py    a00a774
+  Skimmer   enemy_skimmer.py   ddef990
+  Tun       enemy_tun.py       ddef990
+  Hedger    enemy_hedger.py    e015ef5
+
+The Cooper (enemy-camo_normal) is deliberately absent. Its read defers to the
+camo cue, and isCamo is drawn nowhere under js/gl/ - 0 px on both GL paths
+against 328 px on the 2D fallback. Building it would have shipped a model whose
+separator does not exist. Held pending a ruling.
+
+
+KNOWN LIMITATION, REPORTED RATHER THAN FRAMED AROUND
+-----------------------------------------------------
+On the crank sheets the Hedger's arm READS AT THREE OF FOUR YAWS AND MERGES
+WITH THE BODY AT THE BROADSIDE - dark bar against dark torso, where the arm
+lies along the view axis. That is a property of the part, not of the render,
+and the sheets were re-rendered at four yaws specifically so it would be
+visible rather than hidden by a flattering single angle.
+
+The Hedger's PRIMARY separator is scale, not the arm, and that one is intact at
+every bearing - it is still 25% taller than everything around it at the
+broadside. The arm is the second separator and it is degraded at one bearing.
+
+What generalises: a limb mounted outboard of a body needs its clearance checked
+at EVERY yaw, not at the yaw it was designed against.
