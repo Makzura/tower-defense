@@ -574,6 +574,12 @@ TARGETS = [
     # sealed cage was not widened. Six legs are an alternating tripod, which is
     # TWO antiphase groups, so `animate_walk_grouped` carried it unchanged.
     ("enemy-colossus", "enemy-colossus.js", _build_enemy("enemy_dray")),
+    # THE FIRST BODY WHOSE SWING ANGLE IS SOLVED RATHER THAN AUTHORED. The
+    # Vanguard runs `gait_solve` at build time against its own leg length, so
+    # its planted foot travels the stride instead of inheriting the chassis's
+    # fixed 28 degrees. Its build therefore prints two gait lines; that output
+    # is the record of the solve and is not noise.
+    ("enemy-boss_fast", "enemy-boss_fast.js", _build_enemy("enemy_vanguard")),
     # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
     # It has the hardest separation problem of the batch: the translucency
     # applies to BOTH camo bodies equally, so the renderer separates them from
