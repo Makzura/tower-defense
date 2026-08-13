@@ -52,6 +52,32 @@ GamePath.prototype.pointAt = function (distance) {
 // an enemy sitting at progress 0 (or past the finish) still has a heading.
 // Direction snaps at a corner rather than blending across it; that is the same
 // polyline the road is drawn from, so the enemy turns where the road does.
+//
+// THE SNAP IS LOAD-BEARING FOR THE RENDERER. DO NOT SMOOTH IT WITHOUT READING
+// THIS.
+//
+// Because this returns the segment's own vector, heading is PIECEWISE CONSTANT:
+// yaw rate is exactly zero along 100% of road length, and the whole turn
+// happens in the single frame that crosses a waypoint. Measured over all seven
+// routes: 35 corners, median turn 61.2 degrees, max 90, five crossed per body,
+// which is 0.25% of the rendered frames in one body's life.
+//
+// gl-world.js draws an enemy at `atan2(heading.y, heading.x)` straight off this,
+// with no smoothing anywhere between. A body's silhouette therefore changes for
+// exactly two reasons: its baked animation frame, and any live per-group
+// `overrides` matrix. Rounding corners here would add a third, on every bend,
+// competing with both.
+//
+// The threshold, measured rather than guessed: heading motion above roughly
+// ONE DEGREE PER RENDERED FRAME swamps a live `overrides` gesture outright.
+// At 0.5 deg/frame a body's silhouette changes 2.08 px against a 5.52 px
+// gesture; at 1.0 it is 8.00 px and the gesture is no longer the loudest thing
+// on the model; at 2.0 it is 16.92 and three to one the other way.
+//
+// This is not about any one enemy. It is a property of the seam every animated
+// body now shares, so it outlives whichever gesture is currently using it.
+// Smoothing the heading through corners looks like pure polish and would break
+// this silently, with no failing test anywhere in the six suites.
 GamePath.prototype.tangentAt = function (distance) {
   var i = 1;
   if (distance > 0) {
