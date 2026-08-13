@@ -293,6 +293,55 @@ var Effects = (function () {
     ctx.textBaseline = "top";
   }
 
+  // The banner is CENTRED, which is what makes its overflow dangerous: an
+  // over-long title does not run off the right edge, it loses half a name off
+  // EACH SIDE at once and reads as a broken build rather than as a long name.
+  // Both banner lines were drawn with a bare fillText and no width, so that
+  // failure was silent and total. It became reachable when boss titles started
+  // being composed -- `displayName` plus an `announceSuffix` like
+  // " COMMITS ITS RESERVES" -- so the string is data now, not a constant.
+  //
+  // SHRINK TO FIT, NEVER CLIP, AND NO MINIMUM SIZE.
+  //
+  // `fitText` in game.js is the house helper and it ELLIPSISES. That is right
+  // for a panel and wrong here: an ellipsised proper noun is the one string a
+  // player cannot mentally complete, and "THE ABATTOIR COMMITS ITS RESER..."
+  // at the campaign's loudest moment reads worse than a small name. Shrinking
+  // also keeps the incentive to choose short names honest, since a long one
+  // still looks visibly weaker at the moment it most wants to look strong.
+  //
+  // THERE IS DELIBERATELY NO FLOOR. A minimum font size would reintroduce
+  // clipping below it, and "how small can 700-weight text be and still read"
+  // is a legibility judgement no width measurement can settle -- it wants a
+  // person looking at a rendered A/B, not a number. The `> 1` below is a
+  // loop bound, NOT a designed minimum; do not read it as one.
+  //
+  // WHY `measureText` AT RUNTIME RATHER THAN A TABLE. `system-ui` resolves to
+  // a different family per platform -- San Francisco on macOS, Segoe UI on
+  // Windows -- so any advance table measured on one machine is wrong on
+  // another, and the honest ceiling would be the minimum across every shipped
+  // platform. Measuring here measures the player's ACTUAL resolved font on
+  // the player's ACTUAL machine, so the whole cross-platform problem
+  // disappears instead of being managed. That is juno's argument and it
+  // retired a measurement job rather than completing one.
+  function setBannerFont(ctx, text, weight, basePx) {
+    var px = basePx;
+    var maxWidth = VIEW_WIDTH - 80;   // 40 px of air each side at 1280
+    ctx.font = weight + " " + px + "px system-ui, sans-serif";
+    var w = ctx.measureText(text || "").width;
+    if (w <= maxWidth) return;
+    // One proportional guess, then step. The guess is NOT trusted: advances
+    // are only approximately linear in size for a given face, and hinting and
+    // sub-pixel rounding break it at small sizes -- 17 px is small. The loop
+    // is what guarantees the fit; the guess only makes it short.
+    px = Math.max(1, Math.floor(px * maxWidth / w));
+    ctx.font = weight + " " + px + "px system-ui, sans-serif";
+    while (px > 1 && ctx.measureText(text || "").width > maxWidth) {
+      px -= 1;
+      ctx.font = weight + " " + px + "px system-ui, sans-serif";
+    }
+  }
+
   function drawScreen(ctx) {
     if (baseFlash > 0) {
       // Screen-edge pulse, not a full wash: it must read as "the base was
@@ -312,13 +361,13 @@ var Effects = (function () {
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "700 44px system-ui, sans-serif";
       ctx.fillStyle = "rgba(207,227,255," + (0.95 * bAlpha).toFixed(3) + ")";
+      setBannerFont(ctx, banner.title, "700", 44);
       ctx.fillText(banner.title, VIEW_WIDTH / 2, 150);
 
       if (banner.subtitle) {
-        ctx.font = "600 17px system-ui, sans-serif";
         ctx.fillStyle = "rgba(199,209,224," + (0.8 * bAlpha).toFixed(3) + ")";
+        setBannerFont(ctx, banner.subtitle, "600", 17);
         ctx.fillText(banner.subtitle, VIEW_WIDTH / 2, 186);
       }
     }

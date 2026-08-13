@@ -232,11 +232,38 @@ function review(name, model, scale) {
     ", swing adds " + (envW - restW).toFixed(1) + ")");
 
   // --- 4. geometry ----------------------------------------------------------
+  //
+  // THE FLAT 4032 "GLEANER PARITY" CEILING WAS RETIRED 2026-08-13, because it
+  // measures the wrong thing and it misfired on the first model of batch 2.
+  // A model's cost is its triangles TIMES how many of it are on the road at
+  // once, and by that measure the ranking inverts: the Tender is the dearest
+  // MODEL in its batch (6,328) and the second cheapest body on the road
+  // (12,656), while the Stacker is the cheapest model (1,908) and by far the
+  // dearest body (122,112) because one wave-25 spawn cascades to 64 of it.
+  // The old flag would have sent a smith to shave a model that costs nothing
+  // and waved through the one type in the game that multiplies.
+  //
+  // MAX_ON_ROAD is the largest simultaneous population, read off EASY_WAVES
+  // (js/game.js). It is a schedule fact, so it goes stale if the waves change
+  // -- an absent entry prints no peak rather than guessing one.
+  var MAX_ON_ROAD = {
+    "enemy-normal": 30, "enemy-swarm": 30, "enemy-fast": 18, "enemy-slow": 14,
+    "enemy-armored": 10, "enemy-angry": 10, "enemy-flying": 8, "enemy-brute": 4,
+    "enemy-hive": 3, "enemy-camo_normal": 10, "enemy-camo_fast": 12,
+    "enemy-camo_heavy": 6, "enemy-shielded": 6, "enemy-revenant": 6,
+    "enemy-healer": 3, "enemy-shieldbearer": 2, "enemy-colossus": 1,
+    // 1 T3 -> 4 T2 -> 16 T1 -> 64 T0. The only type that multiplies.
+    "enemy-fractal_slime": 64
+  };
   var moving = model.groups.filter(function (g) { return g.name; }).length;
+  var onRoad = MAX_ON_ROAD[name];
   lines.push("  geometry      " + model.triangles + " triangles, " +
     model.groups.length + " groups (" + moving + " animated), " +
-    model.palette.length + " colours   [ceiling 4032 = Gleaner parity]" +
-    (model.triangles > 4032 ? "  *** OVER CEILING ***" : ""));
+    model.palette.length + " colours" +
+    (onRoad
+      ? "   peak " + (model.triangles * onRoad).toLocaleString() +
+        " tri (x" + onRoad + " on road)   [Gleaner 120,960; hive 23,328]"
+      : "   [no schedule entry -- peak not computed]"));
 
   console.log(name + "   scale " + scale.toFixed(2));
   lines.forEach(function (l) { console.log(l); });
