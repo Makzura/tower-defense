@@ -28,6 +28,30 @@ there. That makes the authored slip zero by construction rather than small by
 luck, and it keeps being zero when someone later changes the leg length -- which
 is the failure this whole file exists to make impossible.
 
+THIS MODULE STEERS ON ONE FOOT AND CERTIFIES A WHOLE BODY. READ THIS BEFORE
+TRUSTING A CONVERGENCE. `enemy_chassis.animate_walk_grouped` drives its
+bisection from `groups[0][0]` and measures no other contact, so what a
+successful solve proves is "group 0's foot lands where it was told" -- not "this
+body's gait is correct". On a biped, and on the two-group quadruped and hexapod
+trots, those are the same statement because every other leg is the same leg at
+another phase. **Above two groups they come apart, and the solver reports
+success either way.**
+
+It happened, on 2026-08-14, on the first body ever to pass three groups: the
+solve converged while `foot_1` and `foot_2` slid **19.31 and 14.33 board px**
+against `foot_0`'s 0.24. The cause was in the chassis (the swing phase and the
+support window rotated in opposite directions), but the reason it could sit
+there unseen is this file: **a gate that measures one member of the population
+it certifies cannot fail on the others.**
+
+**So the convergence of this module is not the gate.** `tools/check-gait-slip.js`
+iterates EVERY foot and reports a worst foot; it is the instrument that answers
+"is this body's gait correct", and it would have caught the above the first time
+a three-group body ran. Run it on anything with more than two leg groups, and do
+not let a clean solve here stand in for it. `verify_plant` below is a per-contact
+re-measure and exists for the same reason -- but it too only checks the contact
+you hand it, so hand it all of them.
+
 SOLVE THE ANGLE, NOT A TRANSLATION. Translating a leg root in x would also
 land the contact, and it is wrong: the leg would slide horizontally out of its
 own hip. The rotation is the joint the body actually has, so the rotation is

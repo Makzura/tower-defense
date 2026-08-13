@@ -84,8 +84,26 @@ free there is the **inertness**, since `int(round(N/2))` is banker's-rounded and
 count is even (8 on eleven bodies, 12 Hedger, 36 Vanguard, 128 Tyrant), which is
 why the harness reads zero.
 
+**NOTHING SHIPPED IS WRONG, AND NOBODY NEEDS TO RE-CHECK THE ROSTER.** Say it
+plainly because the fix reads scarier than it is: all ten bodies in
+`js/gl/models/` are correct, were correct before this commit, and are unchanged
+by it. The trap was armed for the first body ever built with **more than two leg
+groups**, and that body is the Tripod, which does not exist yet. Every shipped
+walker passes exactly two groups, and at two groups the defect cannot occur.
+
+**Which bodies were re-exported, since "a chassis change" is two different blast
+radii.** A chassis edit reaches the five bodies that call its sub-assemblies AND
+the two that take only `materials()`/`animate_walk_grouped()`, so the honest
+answer is per-file rather than "all of them": **re-exported to read the digests —
+`enemy-colossus` (Dray), `enemy-shieldbearer` (Tender), `enemy-angry` (Hedger).
+Not re-exported — every other model.** None of the three was committed, because
+none of them changed: the digests are identical and the working copies were
+restored.
+
 Rule written into `AGENTS.md` under "Building a model that looks like the ones
-that already work". No model file changed. (Re-exporting to check the digests
+that already work", and the one-foot-certifies-the-body warning into
+`gait_solve.py`'s own header, where the next person reading the solver will find
+it. No model file changed. (Re-exporting to check the digests
 does rewrite `positions`/`normals` line ordering, but that is pre-existing
 export nondeterminism — two consecutive exports with no edit between them
 differ the same way, and the sorted triangle multiset is identical.)
