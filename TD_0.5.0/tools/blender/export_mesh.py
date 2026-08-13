@@ -455,6 +455,11 @@ TARGETS = [
     # and the cue is being ported into the GL path, so the model no longer
     # depends on something that does not exist.
     ("enemy-camo_normal", "enemy-camo_normal.js", _build_enemy("enemy_cooper")),
+    # BATCH 2, briefed by mira 2026-08-13. THE TARGET NAME IS THE TYPE ID and
+    # not the lore name: `shielded` is the Courier, exactly as `fast` above is
+    # the Skimmer. Deriving one listing from the other does not work -- four of
+    # these bodies are named for their type id and the rest for their lore name.
+    ("enemy-shielded", "enemy-shielded.js", _build_enemy("enemy_courier")),
     # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
     # It has the hardest separation problem of the batch: the translucency
     # applies to BOTH camo bodies equally, so the renderer separates them from
