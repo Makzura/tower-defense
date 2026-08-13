@@ -13,6 +13,74 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `tools/blender/check_penetration.py`: the interpenetration gate
+clause 8 has always required and only one model ever had. It finds a real defect
+in the Tender, shipped the same day.**
+
+`visual-pass/model-review.js` says in its own header that it has no
+interpenetration test; `enemy-angry` shipped from `e015ef5` with the crank collar
+through the arm past every green gate; `tower_warbringer.penetration()` was the
+only body in the project that ever ran one. This generalises the check the Dray
+was built against into a tool that covers every module implementing
+`export_build()`, discovered from the directory rather than listed.
+
+**FINDING — `enemy-shieldbearer` (the Tender) walks its own feet through each
+other.** `foot_0` and `foot_2` (front and rear, same side) overlap **0.0947 u at
+frame 3**, and `foot_1`/`foot_3` identically at frame 7. Reproduced from the
+module's own constants to four decimals: the leg rows sit at x = ±0.09, so the
+fore/aft pitch is **0.180 — exactly the foot's own length**, and the two feet
+ABUT at rest with zero to spare. They are in opposite trot groups, so any swing
+closes them; at full stride their centres are 0.0966 apart while their
+half-extents sum to 0.1913. That is **1.4 to 2.5 screen px** depending on
+bearing, at sizeScale 1.35. Not fixed here — it is a shipped body and the fix is
+a re-export, so it is reported rather than taken.
+
+## What the tool does, and the four things it is built on
+
+- **Per PART, never per group.** A group-level box check reports overlap on
+  essentially every pair and gives confidence instead of coverage. That was
+  tried here before.
+- **Declared contacts live in the body module**, as `PENETRATION_CONTACTS`
+  triples with a REASON — clause 8's "state why in the code". A module that
+  declares nothing is reported as **undeclared, not clean**.
+- **Limb-internal pairs are exempt structurally, not by naming.** Parts sharing
+  an animated limb root are one rigid solid. A limb root is identified as an
+  animated node that itself rides on another animated node, so no convention is
+  needed. The BODY root is deliberately excluded from that exemption — it is
+  where a drum meets a rail, and exempting it would have hidden a Dray defect.
+- **The report is sorted worst-first and says so in its own banner**, because
+  reading the tail of a severity-sorted list is how the Dray's foot collision
+  survived a first look.
+
+**The split that makes an undeclared body readable: MOVING pairs versus STATIC
+pairs.** Two parts on the same animated root are rigid with respect to each
+other, so their overlap is identical on every frame and is nearly always
+construction — a band round a torso, a lens in its ring. Two parts on DIFFERENT
+roots swing through each other, and that is the class the Hedger's collar
+belonged to and the class the Tender's feet belong to. Without that split a body
+with no contact list prints a hundred lines of its own welds.
+
+**It is proved able to fail.** `--selftest` confirms the body clean, then
+translates one part bodily into another and requires the same code to report
+that pair; it fails loudly if it does not. A gate nobody has seen red is not
+evidence.
+
+**Roster run, all eight bodies with an `export_build()`** — moving / static
+undeclared pairs: cooper 51/72, courier 82/105, **dray 0/0 (declared, CLEAN)**,
+drudge 18/63, hedger 46/80, skimmer 52/73, tender 40/142, tun 58/65. **Only the
+Dray declares its contacts**, so every other list is a starting point rather
+than a defect list, and most of what is in them is joints. The ones that are not
+joint-shaped and want their owner's eye: the Tender's feet above, the Tun's
+`drum_body`/`repair_cuff` at 0.1330, and the Drudge's `leg_l_shin`/`sheath_hip`
+at 0.1239.
+
+**And a caveat that has to travel with the numbers:** an AABB pass over-reports
+under rotation, which is the right direction to fail but means a hit on a long
+thin member tilted away from the axes may be its bounding box rather than its
+solid. The Tender's `leg_0_shin`/`leg_2_shin` at 0.0884 is probably exactly
+that; its feet at 0.0947 are not, because a foot's box inflates only 6% at 18
+degrees and the overlap is half the foot.
+
 **2026-08-13 — The Dray: the first six-legged body, and the first whose hold is
 not a cargo cage.** `enemy-colossus`, 3,672 triangles, 8 frames, built on
 `enemy_chassis.py` at CHASSIS_VERSION 1 with no change to any geometry it emits.

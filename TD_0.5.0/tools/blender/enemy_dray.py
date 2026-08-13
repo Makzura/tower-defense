@@ -123,7 +123,7 @@
 #    `visual-pass/model-review.js` says so in its own header; `enemy-angry`
 #    shipped with a crank collar through an arm past every green one. The
 #    instrument that found both is the per-frame per-part AABB pass in
-#    `tools/blender/enemy_dray_check.py`, and it is worth running on any body
+#    `tools/blender/check_penetration.py`, and it is worth running on any body
 #    whose limbs are short relative to the shared gait's fixed 0.057 lift.
 #
 # ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ SHIN_LO, SHIN_HI = 0.012, 0.058
 RAIL_LO = 0.126             # > FOOT_T + SWING_LIFT = 0.102
 # > KNEE_HI + SWING_LIFT (0.175) IS NOT ENOUGH, and the first build proved it.
 # Two terms the rest-pose arithmetic misses, both measured per frame by
-# `tools/blender/enemy_dray_check.py` rather than reasoned:
+# `tools/blender/check_penetration.py` rather than reasoned:
 #
 #   * the RAIL COMES DOWN TO MEET THE LEG. The rail rides the body, which bobs
 #     `BOB` and rolls `ROLL_DEG`; the leg does not. At the worst frame the rail
@@ -286,6 +286,60 @@ REST_TOP = SEAT_TOP + REST_H
 NOSE_X = 0.230
 LENS_Z = 0.160              # low on the front, as the card asks
 TAIL_X = -0.265
+
+
+# --- declared contacts -------------------------------------------------------
+#
+# Read by `tools/blender/check_penetration.py`. Each entry is
+# (prefix_a, prefix_b, reason) and matches in either order. AGENTS.md clause 8:
+# "Exclude the parts that are SUPPOSED to touch -- hands and forearms on the
+# grip, inlays in the head, the ground under a rested weapon -- and state why in
+# the code."
+#
+# PARTS OF ONE LIMB ARE NOT LISTED HERE. The checker exempts them structurally,
+# because they share an animated root and therefore never move relative to each
+# other. Listing them by prefix would ALSO exempt the six legs from each other,
+# which is precisely how six colliding feet read as a clean model on the first
+# run of that tool.
+PENETRATION_CONTACTS = [
+    ("knee_", "rail_", "a leg is socketed into its rail and slides up into it "
+     "through the swing -- that is what the rail depth is for"),
+    ("knee_", "cross_brace_", "same socket, seen from the brace that ties the "
+     "two rails"),
+    ("leg_", "rail_", "the shin passes into the rail at rest so the limb does "
+     "not read as detached"),
+    ("leg_", "cross_brace_", "as above"),
+    ("drum", "cradle_roller_", "the drum RESTS on the rollers -- contact is "
+     "the whole point of a cradle, and the bands ride them at the two y where "
+     "a band and a roller coincide"),
+    ("drum", "drum_", "shell, rolled rims and brass bands are one assembly"),
+    ("bench_", "bench_", "the bench is one bolted-together object"),
+    ("lens", "lens_ring", "the lens is seated in its ring, as on every body in "
+     "the faction"),
+    ("lens_ring", "prow", "and the ring is let into the prow plate"),
+    ("lens", "prow", "as above"),
+    ("prow", "bench_post", "the prow head, the bench post and its plate are "
+     "one welded front structure -- the post reaches the deck THROUGH the prow, "
+     "which is the only thing there is for it to land on"),
+    ("prow", "bench_bolt_plate", "as above"),
+    ("bench_foot_board", "prow", "as above"),
+    ("prow", "rail_", "the prow is bolted to the head of the frame -- it has "
+     "to reach the rails or the whole nose floats"),
+    ("prow", "cross_brace_", "and to the forward cross brace, which is what "
+     "the checker caught me omitting when the body-specific list was carried "
+     "over by hand"),
+    ("rail_", "cross_brace_", "the cradle is one welded frame"),
+    ("cradle_roller_", "rail_", "the rollers bear on both rails -- that is "
+     "what carries the load"),
+    ("cradle_roller_", "cross_brace_", "as above"),
+    ("tail_plate", "rail_", "bolted to the back of the frame"),
+    ("tail_plate", "cross_brace_", "as above"),
+    ("bench_post", "rail_", "bolted THROUGH the deck, which is what makes the "
+     "bench read as aftermarket rather than moulded in"),
+    ("bench_post", "cross_brace_", "as above"),
+    ("bench_bolt_plate", "rail_", "the plate is the bolted joint itself"),
+    ("bench_bolt_plate", "cross_brace_", "as above"),
+]
 
 
 def build_drum(m, body, lift):
@@ -522,7 +576,7 @@ def build():
     # and a rail that bobs down to meet it. The first build passed all three
     # and still put the knee 0.0046 u above the rail on two frames in eight.
     # The authority is the per-frame per-part pass in
-    # `tools/blender/enemy_dray_check.py`; run it after any change to a
+    # `tools/blender/check_penetration.py`; run it after any change to a
     # constant above and read its table, not these three lines.
     assert RAIL_LO > FOOT_T + SWING_LIFT, "rail sits on the lifted foot"
     assert RAIL_HI > KNEE_HI + SWING_LIFT + BOB, "lifted knee leaves the rail"
