@@ -704,6 +704,54 @@ re-verified at runtime before committing:
   against 0.625); every other type of the 21 is identical under both, which is
   why the mismatch stayed invisible.
 
+**2026-08-13 — the Cooper (`enemy-camo_normal`), and it is deliberately
+indistinguishable from the Gleaner.**
+
+Diego ruled on camo: *"do the camos like the others, just make them a bit
+translucent or sum."* So a camo body is an ORDINARY body and the identifying cue
+is the renderer's, not the mesh's. This model was held for most of the job
+because its read deferred to a cue that was drawn nowhere under `js/gl/` — 0 px
+on both GL paths against 328 px on the 2D fallback. That cue is now being ported
+into the GL path, so the model no longer depends on something that does not
+exist.
+
+**A pairwise separation sweep will put Cooper-vs-Gleaner at or near the bottom of
+the board. That is this model working.** The note is in the file header too,
+because the number looks exactly like a failure.
+
+A cooper is a barrel-maker and this one has closed its hold. The Gleaner's cargo
+weeps — lit panes, a glowing core behind bars; the Cooper's is capped, blinded
+and sealed. The gasket lid's only silhouette job is its rim: 0.125 against the
+drum's 0.108, so it stands 0.017 u proud and squares off a profile that was
+round. It is also placed to ENCLOSE the glowing core, so the sealed cage's
+construction needs no change — only the panes' colour, which is the plating
+variation Law 02 sanctions in its own words.
+
+Three things deliberately not modelled: the **eight bolt heads** (0.4 px each,
+under the floor where a feature stops existing, times up to 107 bodies on
+screen); the **blinded windows**, which are recoloured rather than covered,
+because blinding a window is a material fact and modelling a cover would add
+solids to say what the palette already says; and **any second silhouette
+feature**. The grab handle is kept as fiction and is expected not to read.
+
+**3,928 triangles — and the expectation going in was that it would be the
+cheapest of the batch. It is the second DEAREST.**
+
+    Tun     2,584      Skimmer  3,508      Drudge  3,520
+    Cooper  3,928      Gleaner  4,032      Hedger  4,072
+
+The reason is structural and it confirms the house standard rather than
+contradicting it: **this is the only body in the batch defined by ADDITION.** The
+Drudge removed a torso, two bands, a hip brace, two knees, two upper arms and
+two shoulders; the Skimmer removed a crown and two full arms; the Tun replaced a
+sixteen-part cage with a six-part drum. The Cooper is the Gleaner part for part
+plus a lid. *Look for the removal first* is the standard's own advice, and the
+one card that removes nothing is the one that costs most.
+
+The registered name keeps its underscore — `enemy-camo_normal` — and the lookup
+was verified by RUNNING `enemyModel()` against the built file, with a hyphenated
+control returning null.
+
 **2026-08-13 — the Hedger's crank: mirrored to the near hip, made brass, and a
 clause-8 interpenetration that had been shipping since `e015ef5` removed.**
 

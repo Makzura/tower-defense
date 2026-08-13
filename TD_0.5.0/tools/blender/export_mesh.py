@@ -444,11 +444,26 @@ TARGETS = [
     ("enemy-fast", "enemy-fast.js", _build_enemy("enemy_skimmer")),
     ("enemy-slow", "enemy-slow.js", _build_enemy("enemy_tun")),
     ("enemy-angry", "enemy-angry.js", _build_enemy("enemy_hedger")),
-    # enemy-camo_normal (the Cooper) is NOT here on purpose. Its read defers to
-    # the camo cue, and `isCamo` is drawn nowhere under js/gl/ -- measured at
-    # 0 px on both GL paths against 328 px on the 2D fallback. Building it would
-    # ship a model whose separator does not exist. Held pending Diego's ruling;
-    # the brief is written and ready. Note the underscore when it lands.
+    # THE UNDERSCORE IS LOAD BEARING. enemyModel() looks up "enemy-" + typeId
+    # and the type id is `camo_normal`, so the registered name keeps it.
+    # Verified by RUNNING that lookup, not by reading it.
+    #
+    # This entry was held for most of the job because the Cooper's read defers
+    # to the camo cue and `isCamo` was drawn nowhere under js/gl/ -- 0 px on
+    # both GL paths against 328 px on the 2D fallback. Diego has since ruled
+    # ("do the camos like the others, just make them a bit translucent or sum")
+    # and the cue is being ported into the GL path, so the model no longer
+    # depends on something that does not exist.
+    ("enemy-camo_normal", "enemy-camo_normal.js", _build_enemy("enemy_cooper")),
+    # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
+    # It has the hardest separation problem of the batch: the translucency
+    # applies to BOTH camo bodies equally, so the renderer separates them from
+    # everything else and NOT from each other. Whatever tells a Runlet from a
+    # Cooper has to be in the mesh.
+    #
+    # enemy-camo_heavy (the Cask) is a live unmodelled type -- hp 20,
+    # sizeScale 1.4, scheduled at js/game.js:381 in wave 28 -- and is a
+    # legitimate candidate later. No read plan has been commissioned for it.
 ]
 
 
