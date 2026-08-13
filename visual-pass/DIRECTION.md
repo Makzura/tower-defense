@@ -123,6 +123,16 @@ From the model contract in `AGENTS.md`: separate by VALUE first, hue second, and
 the largest surface takes the darkest value. A palette of five colours inside 8%
 luminance renders as one dark blob — that already happened once to the Rifleman.
 
+**That is an AUTHORING rule, and this file does not carry the measurement.** The
+clause is `AGENTS.md:4395-4405` and it has not moved once; how you *check* it is
+section 4 of `tools/blender/HOUSE-STANDARD.md`, which has been retracted and
+re-ruled repeatedly and is the only place the instrument lives. Two things
+follow, and rendering asked for both to be stated here. Contrast is computed on
+**rendered pixels**, and the CR bands in that document are **palette-space**
+bands, so a rendered ratio must never be compared against them. And nothing in
+this section — the colour table below included — predicts what lands on screen.
+It tells you how to author. The frame is measured, not inferred.
+
 The shared palette is the `PALETTE` dict in `tools/blender/td_scene.py:78-145`,
 and that file is the only copy — `td_mesh.py` holds no palette. **Read the
 names out of it; do not quote them from memory.** The version of this list
