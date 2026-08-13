@@ -268,10 +268,22 @@ GLRenderer.prototype.setGlow = function (amount, tint) {
 //
 // DEPTH WRITES GO OFF while it fades, or the transparent body would carve a
 // hole in the depth buffer and hide whatever is behind it. Depth TESTING stays
-// on, so the wreck is still occluded by the world in front of it. The fading
-// object's own triangles then composite in buffer order rather than back to
-// front, which on a 23 px body over one second is not something a player can
-// see -- and a full depth sort for one corpse would be.
+// on, so the wreck is still occluded by the world in front of it.
+//
+// THE FADING OBJECT'S OWN TRIANGLES THEN COMPOSITE IN BUFFER ORDER, AND EVERY
+// FRONT-FACING SURFACE PASSES -- so wherever two surfaces of the same body
+// overlap on screen, that pixel is blended twice.
+//
+// WHAT THAT IS TRUE FOR, AND WHAT IT IS NOT. The original justification was
+// "on a 23 px body over one second a player cannot see it", and for the wreck
+// fade that is still exactly right: it is small, it is transient, and nobody is
+// reading it. **Both premises fail for a camouflaged enemy**, which is
+// translucent for its whole life and which the player is staring at precisely
+// to identify. Measured there: 93-95% of interior pixels depart from the
+// single-layer law, mean 30/255 and worst 107/255, and the departure is
+// BRIGHTER -- so the translucency reads weakest exactly where the body is
+// thickest. Camo bodies therefore use `setDepthOnly` + `setDepthEqual` below to
+// lay their own depth first; the wreck does not need to and does not.
 //
 // State, not an argument, exactly like setGlow: a caller that fades a body must
 // put it back.
@@ -294,6 +306,40 @@ GLRenderer.prototype.setFade = function (alpha) {
     this._faded = true;
   }
   gl.uniform1f(this.uniform.alpha, Math.max(0, a));
+};
+
+// DEPTH PRE-PASS: write this body's own depth and no colour.
+//
+// Followed by setDepthEqual(true) and a second draw of the same body, only the
+// surface that won the pre-pass compares EQUAL, so exactly one layer blends and
+// the single-layer law holds by construction.
+//
+// COST, MEASURED RATHER THAN ASSUMED, and it is one extra call per GROUP and
+// not per body: an animated model issues a draw call per animated group, so a
+// five-group enemy costs five extra calls, not one. Twelve camo bodies on a
+// board measured 121 draw calls against 61 -- +60, at roughly 0.9 us each, so
+// about 54 us a frame, or 0.3% of a 16.7 ms budget.
+//
+// BLEND IS DISABLED HERE deliberately: a colour-masked blended draw would still
+// cost the blend unit for output nobody keeps. `_faded` is cleared with it so
+// the next setFade() call cannot think blending is already enabled.
+GLRenderer.prototype.setDepthOnly = function (on) {
+  var gl = this.gl;
+  if (on) {
+    gl.colorMask(false, false, false, false);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    this._faded = false;
+  } else {
+    gl.colorMask(true, true, true, true);
+  }
+};
+
+// EQUAL keeps only the surface a pre-pass already laid down. LEQUAL is the
+// board's default and every other draw needs it back.
+GLRenderer.prototype.setDepthEqual = function (on) {
+  var gl = this.gl;
+  gl.depthFunc(on ? gl.EQUAL : gl.LEQUAL);
 };
 
 // Bind a mesh's three buffers once, so a model with several animated groups

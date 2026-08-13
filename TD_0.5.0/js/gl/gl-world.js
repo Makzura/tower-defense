@@ -1328,6 +1328,24 @@ var World3D = (function () {
       // here so the mesh branch and the sphere branch cannot drift apart, and
       // so the sphere types that are still fliers rise too.
       var lift = groundHeightAt(e.pos.x, e.pos.y) + flightLift(e, radius);
+      // A CAMO BODY IS DRAWN TWICE: depth first, then colour.
+      //
+      // With depth writes off, EVERY front-facing surface of a translucent body
+      // passes the depth test, so an arm over a chest blends that pixel twice
+      // and it comes out BRIGHTER -- the translucency reads weakest exactly
+      // where the body is thickest. Laying the body's own depth first and then
+      // blending with depthFunc EQUAL keeps precisely one layer.
+      //
+      // Measured on the shipping bodies before the fix: 93-95% of interior
+      // pixels departed from the single-layer law, mean 30/255, worst 107/255,
+      // against a rim that was clean at 4/255 -- which is what ruled out
+      // antialiasing, since a coverage artefact would do the opposite.
+      for (var sub = 0; sub < (wantCamo ? 2 : 1); sub++) {
+      if (wantCamo) {
+        if (sub === 0) { renderer.setFade(1); renderer.setDepthOnly(true); }
+        else { renderer.setDepthOnly(false); renderer.setFade(CAMO_ALPHA);
+               renderer.setDepthEqual(true); }
+      }
       if (model) {
         // THE WALK, ADVANCED BY DISTANCE. One full cycle per stride, so a
         // planted foot stays on one patch of road, a slowed enemy's legs drag
@@ -1356,11 +1374,16 @@ var World3D = (function () {
           lift + beat * radius * 0.22, yaw,
           radius * (0.94 + beat * 0.10));
       }
+      }
+      // Depth compare goes back to the board's LEQUAL immediately. EQUAL is
+      // only ever correct against a pre-pass this body just laid, and leaving
+      // it on would silently reject the next body's every fragment.
+      if (wantCamo) renderer.setDepthEqual(false);
     }
       // Put it back, for the same reason setGlow is put back: fade is STATE,
       // and a pass that left it on would hand its translucency to the wrecks
       // and to every later frame's first body.
-      if (wantCamo) renderer.setFade(1);
+      if (wantCamo) { renderer.setDepthOnly(false); renderer.setFade(1); }
     }
     // THE WRECKS, drawn last of the bodies. They were the only translucent
     // thing on the board until camo enemies joined them, and a blended draw

@@ -148,6 +148,61 @@ is a proxy-versus-solid difference rather than a build error, and it is the same
 lesson as the torus trap one paragraph up: **the instrument's primitive is not
 the shipped primitive.**
 
+**2026-08-13 — A camouflaged body no longer blends over itself. Depth pre-pass
+for camo enemies, and the `setFade` note now says what it is true for.**
+
+`setFade` turns depth writes off, so EVERY front-facing surface of a translucent
+body passes the depth test. Where two surfaces of the same body overlap on
+screen — arm over chest, near leg over far leg — that pixel was blended twice.
+Measured against the exact single-layer law `alpha*opaque + (1-alpha)*plate`,
+which holds in 0-255 space because GL blends after the shader's sRGB encode:
+**93-95% of interior pixels departed from it, mean 30/255, worst 107/255.**
+
+**The departure is BRIGHTER, not darker** — 46 pixels brighter against 11
+darker, mean +24 — because the stacked term is `(1-a)*a*(c1 - board)` and a lit
+body is brighter than the dark road. **So the translucency read weakest exactly
+where the body is thickest**, which is most of what a player looks at. Diego
+asked for a body that reads as not solid; it was reading solid on the mass and
+translucent only on the thin parts.
+
+Fixed with a depth pre-pass: each camo body is drawn once with `colorMask(false)`
+and depth writes ON, then again blended with `depthFunc(EQUAL)`, so only the
+surface that won the pre-pass composites. Two new renderer seams,
+`setDepthOnly` and `setDepthEqual`.
+
+Two competing explanations were refuted by the same numbers, one of them the
+author's own. **Antialiasing: refuted, because the RIM is the CLEAN population**
+(0.38 share, mean 4/255) — a coverage artefact would do the opposite. **"Any
+group self-overlaps": refuted** — a single thin arm deviates by 4.3 where a
+torso-and-head group deviates by 35.5, so it tracks self-overlap and not group
+count.
+
+Acceptance, all measured at the fitted camera 2021.237 / viewport 1111x625:
+
+- **Gate:** interior deviation 0.93-0.95 share → **0.018-0.03**, mean 30 →
+  **0.28**, worst 107 → **1.5** (8-bit rounding).
+- **Negative control:** a board with NO camo bodies is **bit-identical** before
+  and after. Pass 2 never runs, so the change is provably inert where it should
+  be. A first attempt at this control was WRONG — stubbing `colorMask` alone
+  still drew the pre-pass in colour — and the corrected pair is board-level.
+- **The wreck fade shares `setFade` and is drawn after camo.** GL state after a
+  camo frame: colorMask all true, `depthFunc` LEQUAL, BLEND off, depth writes
+  on. Nothing leaks.
+- **No z-fighting or dropout** from the EQUAL compare: 100/100 body px at the
+  fitted camera and 10420/10420 at distance 180, where depth precision is worst.
+  No polygon offset needed.
+- **Cost:** one extra call per GROUP, not per body — twelve camo bodies measured
+  121 draw calls against 61, so +60 at ~0.9 us = **~54 us a frame, 0.3% of a
+  16.7 ms budget.**
+
+**The `setFade` note is corrected in the same commit.** It justified unsorted
+compositing with "on a 23 px body over one second a player cannot see it" —
+small, and transient. That is still exactly right for the wreck fade, which is
+why the wreck does not use the pre-pass. **Both premises fail for a camo body**,
+which is translucent for its whole life and which the player is staring at to
+identify. The note now says which case it covers and which it does not — a
+ratified justification whose conditions had changed underneath it.
+
 **2026-08-13 — Camouflaged enemies finally have a visual cue on the 3D board:
 translucent bodies drawn last, plus the 2D pack's dashed ring ported into the
 overlay pass.** The owner's ruling was *"do the camos like the others, just make
