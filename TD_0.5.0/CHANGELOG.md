@@ -13,6 +13,105 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The Dray: the first six-legged body, and the first whose hold is
+not a cargo cage.** `enemy-colossus`, 3,672 triangles, 8 frames, built on
+`enemy_chassis.py` at CHASSIS_VERSION 1 with no change to any geometry it emits.
+
+Six legs are an ALTERNATING TRIPOD, which is TWO antiphase groups — exactly
+what `walk_phases` and `support_left_frames` already describe — so
+`animate_walk_grouped` carried a hexapod with no new cycle arithmetic, as its
+own docstring predicted. The tripods `(leg_0, leg_3, leg_4)` and
+`(leg_1, leg_2, leg_5)` are the gait's contract: renumber the legs without
+changing the groups and the body shuffles both sides together, still walks,
+still plants, and looks wrong in a way no gate catches. Feet are `foot_0`..
+`foot_5` because the sole solver resolves names through `bpy.data.objects`, a
+GLOBAL lookup, and six feet named alike would silently solve five of them
+against one object.
+
+NO CARGO CAGE, ruled rather than omitted: a body carries the sealed cage unless
+the body IS the container, and the card makes the Dray "a container that was
+given the smallest frame that would move it". The drum is a new part in
+`enemy_dray.py`; `chassis.cargo_cage` was not widened.
+
+THE CHASSIS COUPLING IS NOT ONE NUMBER, and the header that said it was has now
+been wrong three times — six, then six-still (having missed the Tender), and
+the derive command it offered instead matched the file containing it, so it
+over-reported by exactly one, the same size as the errors it existed to catch.
+Corrected: EIGHT bodies import the chassis, a change to `materials()` or
+`animate_walk_grouped()` reaches all eight, and a change to any sub-assembly
+reaches SEVEN — because the Dray calls no chassis geometry at all.
+
+## Three things measured on this body that generalise
+
+**A ROLL ADDS TO THE PLAN EXTENT, IT DOES NOT SHRINK IT.**
+`animate_walk_grouped` rolls about the body root, which stands at z = 0 on the
+GROUND rather than through the body's own centre, so a roll swings a tall load
+sideways and the y extent grows by roughly `height × sin(roll)` instead of
+falling by a cosine. On this body the chassis default of 2.6° would have spent
+the whole plan budget; `ROLL_DEG` is 0.9. The next author of a tall-load body
+will reach for 2.6 and it will cost them silently.
+
+**THE SHARED GAIT'S SWING LIFT IS FIXED AT 0.057 u AND IT SIZES THE CHASSIS.**
+`swing_z = 0.012 + 0.045·|cos t|` is not a parameter. On a 0.48 u chassis leg
+it is 12% of the limb; on this body's 0.12 u leg it is 48%, and the solver
+translates the whole leg ROOT. Two separate constraints fall out — the rail has
+to swallow the lifted knee and clear the lifted foot, and the fore/aft leg
+pitch has to exceed the foot's own length plus the closing travel of an
+antiphase pair. Both were got wrong first time.
+
+**REST-POSE ARITHMETIC IS NOT A CLEARANCE.** All three of `build()`'s asserts
+passed on a build whose feet ran 0.070 u — 2.9 screen px — through each other
+on every frame and whose knee left its rail on two frames in eight. They compare
+two rest-pose numbers; the real clearance is between a leg that lifts and a rail
+that bobs down to meet it, and the two extremes are not simultaneous in either
+direction. `tools/blender/enemy_dray_check.py` is the per-frame per-part AABB
+pass that found both, written because `visual-pass/model-review.js` states in
+its own header that it has no interpenetration test and `enemy-angry` shipped a
+collar through an arm past every green gate. 741 pairs × 8 frames, clean.
+
+## Measured, with the ruler named
+
+- **Plan envelope 52.8 board px worst SINGLE FRAME** against a 54.2 px frost
+  ring — inside both rings with 1.4 px of slack, 97.4% of the 0.8115 u budget
+  that `(22·sizeScale + 8) / (31.8032·sizeScale)` gives at sizeScale 2.10. The
+  tightest budget on the board, and the brief spent 97% of it on purpose.
+- **Health bar margin exactly 10.0 px**, raw top EQUAL to posed top (0.548 at
+  frame 0). Clause 3b holds by construction, not by tolerance: the group owning
+  the topmost geometry sits at z = 0 with identity rotation at frame 1.
+- **Cycle wrap 1.51 board px = 0.68× mean**, below the observed 0.76–1.09 band —
+  and continuous. The per-pair sequence is `1.5 3.1 2.4 1.5 | 1.5 3.1 2.4` with
+  a wrap of 1.5, period-4 and equal to a value that already appears twice
+  inside. On a short-legged body the sole-solve LIFT dominates frame-to-frame
+  displacement rather than the leg rotation, and its steps are unequal because
+  `swing_z` is a cosine sampled at four points while the rotation is a triangle
+  wave. The mean is pulled up by the large steps; nothing is discontinuous. The
+  hive sits at 0.76×/0.52× on the same instrument and ships.
+- **Aspect W/H 1.021**, mean over 4 frames × 8 yaws, screen px in the 1280×720
+  logical view — a RASTER statistic, quoted in its own space with its definition
+  attached, because it has no model-unit form. The brief's 1.037 was measured on
+  a sharp-box proxy before the back rest existed. Wider than tall holds; the
+  only two bodies it is briefed against sit at 0.840 and 0.809.
+- **Peak cost 7,344 triangles** — 3,672 × 2 on the road, the Tyrant's roar
+  crowd rather than the wave table.
+
+## The brief conflict, stated rather than resolved quietly
+
+The operator's back rest was ruled in at 0.26 u because a human leftover only
+survives every bearing if it breaks the TOP of the silhouette. Measured on the
+shipped geometry by dropping the rest's own 108 triangles and re-rasterising:
+it adds **+7 to +27 px across the four front bearings, 11.0 px mean, and 0 px
+at all three rear bearings** — and it still adds 0 px there when raised a
+further 0.079 u, which is the point at which the aspect claim fails.
+
+The cause is structural rather than a size that can be tuned. The projection's
+depth term pushes forward geometry DOWN at rear bearings, and the drum's top
+line sits at x = 0 and pays no such penalty — so a crown feature mounted AHEAD
+of a wide low drum cannot break the top from behind it at any height the aspect
+can afford. Curing it means putting the feature on top of the load, which the
+card forbids twice ("no head above the load", "bolted ahead of the drum").
+Shipped with the aspect intact, because that is a board-wide categorical
+separator and the leftover's worst-bearing figure is a per-feature target.
+
 **2026-08-13 — `visual-pass/probe/rank-page.js`: six defects in the rank solver,
 every one of which produced a CONFIDENT wrong answer.** The candidate A rank
 (five enemies, ascending height, gap = the narrower neighbour) now passes all

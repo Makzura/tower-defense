@@ -568,6 +568,12 @@ TARGETS = [
     # trot, so nothing in this file or the chassis needed changing for it.
     ("enemy-shieldbearer", "enemy-shieldbearer.js",
      _build_enemy("enemy_tender")),
+    # The first SIX-LEGGED body, and the first whose hold is not a cargo cage
+    # -- the Dray IS the container, which is the lore lead's stated exception
+    # to the cage rule, so the drum is a new part in `enemy_dray.py` and the
+    # sealed cage was not widened. Six legs are an alternating tripod, which is
+    # TWO antiphase groups, so `animate_walk_grouped` carried it unchanged.
+    ("enemy-colossus", "enemy-colossus.js", _build_enemy("enemy_dray")),
     # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
     # It has the hardest separation problem of the batch: the translucency
     # applies to BOTH camo bodies equally, so the renderer separates them from

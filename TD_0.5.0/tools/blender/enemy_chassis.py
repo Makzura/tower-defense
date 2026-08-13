@@ -12,20 +12,34 @@
 # whose members are literally stamped from one die should be authored from one.
 #
 # THE DANGER, STATED PLAINLY, AND THE COUPLING IS SILENT. A shared module means
-# an edit here rewrites SIX shipped files -- Drudge, Skimmer, Tun, Hedger,
-# Cooper, and now the Courier (`enemy-shielded`, shipped 2026-08-13 in e3d08d6).
-# That is the intended behaviour and it is also the way to break six models with
-# one careless line.
+# an edit here rewrites EIGHT shipped files -- Drudge, Skimmer, Tun, Hedger,
+# Cooper, the Courier (`enemy-shielded`, e3d08d6), the Tender
+# (`enemy-shieldbearer`, cd5f387) and the Dray (`enemy-colossus`). That is the
+# intended behaviour and it is also the way to break eight models with one
+# careless line.
 #
-# **DO NOT TRUST THAT COUNT -- DERIVE IT.** It was wrong for the whole window
-# between the Courier's export landing and this line being updated, and it will
-# go wrong again with every body batch 2 adds. The count is whatever this
-# returns, and a command cannot go stale the way a number can:
+# **DO NOT TRUST THAT COUNT -- DERIVE IT.** It has been wrong twice: once for
+# the whole window between the Courier's export landing and the line being
+# updated, and again for the whole window after the Tender, which imported the
+# chassis and was never added to the list. The count is whatever this returns,
+# and a command cannot go stale the way a number can:
 #
-#     grep -l "import enemy_chassis" tools/blender/enemy_*.py
+#     grep -l "import enemy_chassis" tools/blender/enemy_*.py | grep -v chassis
 #
 # Read the `enemy_*` glob rather than the directory: `make_preview.py` imports
-# the chassis too and ships no model.
+# the chassis too and ships no model. And keep the second `grep`: the first one
+# matches THIS FILE, because the sentence you are reading contains the string
+# it searches for. Without it the command over-reports by exactly one, which is
+# the same size as the errors it exists to catch.
+#
+# **THE COUPLING IS NOT UNIFORM, AND THE DRAY IS THE CASE THAT SHOWS IT.** The
+# seven bodies above it call the sub-assemblies -- change `legs()` and they all
+# move. The Dray calls NO geometry from this file at all: it builds its own
+# drum, cradle, six legs, bench and prow, and takes only `materials()`,
+# `animate_walk_grouped()` and `BODY_REFERENCE_Z`. So a change to the shared
+# PALETTE or the shared GAIT reaches all eight, and a change to any
+# sub-assembly reaches seven. Re-export by which of those you touched, and say
+# which in the commit -- "a chassis change" is now two different blast radii.
 #
 # **WHAT WARNS YOU, AND HOW TO CHECK IT RATHER THAN BELIEVE IT.**
 # `export_mesh.py` now stamps `CHASSIS_VERSION` into every model it builds
