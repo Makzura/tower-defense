@@ -338,6 +338,28 @@ SOLE_BAND = 0.02
 # deliberately sets it, so it cannot reach a shipped export.
 GAIT_DEFECT = float(os.environ.get("TYRANT_GAIT_DEFECT", "1.0"))
 
+# THE SECOND NEGATIVE CONTROL, for the second instrument, and it defaults to
+# off. `blade_hull_clearance()` below replaces a gate rather than merely
+# excusing it (see PENETRATION_CONTACTS), so it carries the same burden the
+# gait gate does: **a threshold that has never rejected anything is a threshold
+# nobody has tested.** Catching the 0.00006 u pass-by-coincidence on the first
+# build was a near-miss flagged, not a hit rejected, and those are different
+# claims.
+#
+# TYRANT_HULL_DEFECT lowers the HULL ONLY -- by exactly this much, in model
+# units -- and touches nothing else. It is applied AFTER the `worst_plate_top`
+# assert and only to the hull's placement, deliberately: a control that trips
+# two instruments at once has tested neither, so this one isolates the single
+# instrument under test.
+#
+#   baseline                clearance +0.03486 u   PASS
+#   TYRANT_HULL_DEFECT=0.02 clearance +0.01486 u   MUST RAISE (margin, air)
+#   TYRANT_HULL_DEFECT=0.06 clearance -0.02514 u   MUST RAISE (blade in solid)
+#
+# Those three are registered here BEFORE the runs, and the run output is the
+# check. 0.0 unless somebody sets it, so it cannot reach a shipped export.
+HULL_DEFECT = float(os.environ.get("TYRANT_HULL_DEFECT", "0.0"))
+
 
 PENETRATION_CONTACTS = [
     ("blade_", "hip_housing_", "THE BLADE IS PINNED INTO ITS HOUSING and "
@@ -361,7 +383,13 @@ PENETRATION_CONTACTS = [
      "with a bevel pad -- which is STRICTER than the test it replaces and "
      "raises at build time. An exclusion paired with a sharper instrument is "
      "not an exclusion that grew; clause 8's failure is one paired with "
-     "nothing"),
+     "nothing. **DO NOT COPY THIS ENTRY WITHOUT REPEATING THE CHECK. The "
+     "Vanguard faced the same reported pair on the same primitive and did NOT "
+     "excuse it -- it raised its whole frame to 0.46, because ITS 26 hits were "
+     "verified REAL and this one is verified AIR.** The difference is a "
+     "measurement, not a judgement, and the measurement is the only thing that "
+     "makes this entry legitimate rather than the Vanguard's answer being "
+     "wrong"),
     ("hull", "hull_lid", "the lid seats into the top of the hull -- it is a "
      "closed lid let into the rim, not a plate resting on one"),
     ("cargo_", "cargo_", "each cage is ONE SEALED ASSEMBLY; every glow surface "
@@ -1049,7 +1077,11 @@ def build():
             "container. Raise HULL_GAP or lower BLADE_B." % (
                 rise, at[0], at[1], HULL_GAP))
 
-    underside = hip_z + HULL_GAP
+    # HULL_DEFECT is 0.0 for every real build. It is subtracted HERE and not
+    # from HULL_GAP itself, so the `worst_plate_top` assert above still runs
+    # against the nominal gap: the control has to trip ONE instrument, or it
+    # has tested neither. See its definition for the registered predictions.
+    underside = hip_z + HULL_GAP - HULL_DEFECT
     _hull, lid_top = build_hull(m, body, underside)
 
     # The exact solid test that stands in for the AABB pass on this one pair.
@@ -1062,11 +1094,22 @@ def build():
     # coincidence that any later edit would have turned into a defect without
     # anyone touching this line.
     if clear < 0.020:
+        # TWO DIFFERENT FAULTS, AND THE MESSAGE MUST NOT CONFLATE THEM. A
+        # negative clearance is the blade INSIDE the hull; a small positive one
+        # is a margin nobody should be relying on. The first version said
+        # "comes within -0.02514 u", which reads as a near miss and is a
+        # penetration -- found by running the negative control, which is the
+        # second thing that control bought.
+        if clear < 0.0:
+            fault = "the blade is %.5f u INSIDE the hull" % -clear
+        else:
+            fault = ("the blade clears the hull by only %.5f u, under the "
+                     "0.020 margin" % clear)
         raise AssertionError(
-            "the blade comes within %.5f u of the hull (leg %d, frame %d), "
-            "under the 0.020 margin. This is a SOLID test, not the AABB pass, "
-            "so it is not an artefact. Lower BLADE_B -- its depth costs no "
-            "plate area -- or raise HULL_GAP." % (clear, cleg, cframe))
+            "%s (leg %d, frame %d). This is a SOLID test on the true triangle,"
+            " NOT the AABB pass, so it is not an artefact. Lower BLADE_B -- "
+            "its depth costs no plate area -- or raise HULL_GAP."
+            % (fault, cleg, cframe))
     build_hip_housings(m, body, hip_z, underside, report["worst_swing_lift"])
     cages = build_rank(m, body, lid_top)
     spans, gaps = assert_rank_disjoint(cages)
@@ -1124,5 +1167,8 @@ def export_build():
     if GAIT_DEFECT != 1.0:
         print("  tyrant: *** TYRANT_GAIT_DEFECT=%.4f -- THIS IS THE NEGATIVE "
               "CONTROL AND MUST NOT BE COMMITTED ***" % GAIT_DEFECT)
+    if HULL_DEFECT != 0.0:
+        print("  tyrant: *** TYRANT_HULL_DEFECT=%.4f -- THIS IS THE NEGATIVE "
+              "CONTROL AND MUST NOT BE COMMITTED ***" % HULL_DEFECT)
     bpy.context.scene.frame_set(1)
     return WALK_FRAMES

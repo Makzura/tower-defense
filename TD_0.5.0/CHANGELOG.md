@@ -164,6 +164,28 @@ a defect without anyone touching the line. Dropping `BLADE_B` from −0.160 to
 area does not depend on that vertex's depth at all; the assert now demands a
 0.020 margin rather than a sign.
 
+**And that assert now has its own negative control, because catching a near
+miss is not the same claim as rejecting a hit.** kaz's point, and it is the
+right one: **a threshold that has never rejected anything is a threshold nobody
+has tested.** `TYRANT_HULL_DEFECT` (default 0.0) lowers the hull by a stated
+amount and nothing else — applied after the plate-rise assert and only to the
+hull's placement, because a control that trips two instruments at once has
+tested neither. Three predictions registered before the runs, three exact hits:
+
+| defect | predicted | measured | result |
+|---|---|---|---|
+| 0.000 | +0.03486 u | +0.03486 u | passes |
+| 0.020 | +0.01486 u | +0.01486 u | **raises** — margin, still air |
+| 0.060 | −0.02514 u | −0.02514 u | **raises** — blade inside the solid |
+
+The third is a genuine penetration rejected, which is the case the instrument
+exists for and the case it had never been shown to catch. **The control also
+found a defect in the check's own error message**: the first version reported
+the third case as "comes within −0.02514 u of the hull", which reads as a near
+miss and is a body part inside another body part. The two faults are now worded
+separately. A check that cannot say which fault it found is half a check, and
+only running it into a real failure shows that.
+
 **Gates.** `check-gait-slip` A = 0.004 px, B = 0.536 px (F = 128 is three times
 clear of the 43 the brief's frame-count law asks for). `check-model-top` ok at
 the full +10.0 margin, raw top and posed top equal — this body has
