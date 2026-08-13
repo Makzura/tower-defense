@@ -13,6 +13,86 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `tools/check-gait-slip.js`: does a planted foot stay on the road?
+No shipped walker is at zero, and the reason is one hard-coded angle.**
+
+The walk is distance-driven. `gl-world.js` advances the frame index by
+`progress / stride`, `stride = radiusPx * 2.6 = 28.6 * sizeScale` board px, and
+`drawActor` scales the model by `unitsToPx * sizeScale` with `unitsToPx =
+31.8032` on all 109 models in the library. So **one full walk cycle is exactly
+`28.6 / 31.8032 = 0.899281` MODEL UNITS of travel — for every body, at every
+`sizeScale`, at every speed.** A planted foot must travel backward along
+**model local +X** (the heading; `GLMath.modelYaw` maps local +X onto
+`atan2(heading.y, heading.x)`) by exactly that much per cycle, or the body
+slides. Nothing in this pipeline had ever checked it.
+
+**Two components, two different fixes, reported separately.**
+
+- **A — gait error.** Peak-to-peak of the planted contact's world track across
+  its plant, wrap included. Authored, rig-fixable, target zero.
+- **B — quantization sawtooth.** `bandFrame` FLOORS (`gl-world.js:1565`), so the
+  pose is held while the body keeps translating. A perfectly authored foot
+  still creeps forward by `stride / N` and snaps back once per frame. The
+  amplitude is `stride / N` no matter how good the gait is, and **the only
+  lever on it is N.**
+
+**The instrument was proved able to fail before it was trusted.** Four
+synthetic rigs, one planted foot each: authored backward travel of exactly
+`S/N` per frame reads **A = 0.00000000**; half of it reads 7.150 px; none of it
+reads 14.300 px; double reads 14.300 px the other way. 14.300 is exactly four
+frame-steps of `stride/N` at `sizeScale` 1, so the scale is calibrated and not
+merely monotone. It also recovers `enemy_chassis.support_left_frames()`'s own
+support windows without being told them.
+
+**The shipped roster, at each type's own `sizeScale`, board px.** Not one body
+reads zero:
+
+| model (lore name) | size | N | A px | B px | A+B px |
+|---|---|---|---|---|---|
+| `enemy-normal` (Gleaner) | 1.00 | 8 | 0.277 | 3.575 | 3.852 |
+| `enemy-camo_normal` (Cooper) | 1.00 | 8 | 0.277 | 3.575 | 3.852 |
+| `enemy-shielded` (Courier) | 1.15 | 8 | 0.985 | 4.111 | 5.096 |
+| `enemy-fast` (Skimmer) | 1.00 | 8 | 1.901 | 3.575 | 5.476 |
+| `enemy-slow` (Tun) | 1.00 | 8 | 3.935 | 3.575 | 7.510 |
+| `enemy-armored` (Drudge) | 1.05 | 8 | 3.965 | 3.754 | 7.719 |
+| `enemy-brute` | 1.50 | 8 | 4.192 | 5.363 | 9.555 |
+| `enemy-shieldbearer` (Tender) | 1.35 | 8 | 5.098 | 4.826 | 9.925 |
+| `enemy-swarm` | 0.55 | 8 | 5.346 | 1.966 | 7.312 |
+| `enemy-angry` (Hedger) | 1.25 | 12 | 3.164 legs / 8.622 crank | 2.979 | 11.602 |
+| `enemy-hive` | 1.60 | 8 | 12.881 | 5.720 | 18.601 |
+| `enemy-colossus` (Dray) | 2.10 | 8 | 19.867 | 7.508 | 27.375 |
+
+`enemy-flying` is excluded from the slip claim and flagged by the tool: a
+flier's band is driven by `boardClock * HOVER_HZ`, not by distance, so it has
+no planted foot and A is not defined for it. The Hedger's worst contact is its
+`crank`, a wheel with a two-frame contact, not a foot; its legs read 3.164.
+
+**The cause is one number that was never tied to the stride.**
+`enemy_chassis.animate_walk_grouped` authors the plant as a fixed hip rotation,
+`swing_deg = 28.0`, so a planted foot's backward travel is
+`L * (sin θ + sin θ/2)` where `L` is hip height above the sole — **a function
+of leg length, and of nothing else.** Against the required `3/8 * 0.899281 =
+0.3372 u`:
+
+| body | hip z | predicted travel | shortfall | measured A |
+|---|---|---|---|---|
+| `enemy-normal` | 0.480 | 0.3415 | 0.0042 | 0.0087 |
+| `enemy-slow` | 0.425 | 0.3023 | 0.0349 | 0.1237 |
+| `enemy-brute` | 0.567 | 0.4026 | 0.0654 (over) | 0.0879 |
+| `enemy-colossus` | 0.120 | 0.0854 | 0.2519 | 0.2975 |
+
+So **the Gleaner is right by coincidence**: 28° happens to solve the stride to
+within 1.3% for a 0.480 u hip. Every body that changed its leg length inherited
+the same 28° and slid by the difference. The predictor is a mechanism, not a
+formula to tune against — it explains the extremes and the ordering, and
+`enemy-armored` departs from it, so a body's own measurement still governs.
+
+`node tools/check-gait-slip.js [--scale S] [--json] [--verbose] [model ...]`.
+With no arguments it sweeps every `js/gl/models/enemy-*.js` at each type's real
+`sizeScale`. It reads a built `.js` file only — no Blender, no browser. Note
+that `first`/`count` in `groups[]` are **vertex** indices; reading them as
+triangle indices lands every group matrix on the wrong third of the mesh.
+
 **2026-08-13 — The debug cash panel is deleted. The sandbox is the testing
 surface, and its Max Field command moved out of the dying file.**
 
