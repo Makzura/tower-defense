@@ -167,6 +167,39 @@ re-verified at runtime before committing:
   against 0.625); every other type of the 21 is identical under both, which is
   why the mismatch stayed invisible.
 
+**2026-08-13 — the Skimmer (`enemy-fast`) and the Tun (`enemy-slow`), bodies two
+and three of five, both on the shared chassis.**
+
+Committed together, and that is a deviation from one-model-per-commit worth
+naming: their `<script>` tags are consecutive lines in the same three pages, so
+splitting them would have meant one commit that leaves a page half-updated. The
+generated files are independent and separately reviewable.
+
+**Skimmer — 3,812 triangles.** The separator is a removal: the crown is gone. The
+Gleaner's raked antenna is the top fifth of the figure (z 0.960 to 1.190) and
+nothing occludes it, so deleting it changes the outline at the one place that
+always reads. It is also view-independent, which an addition at this size is
+not. Measurable consequence: `model.top` drops from 1.190 to 1.034 — the head box
+now owns the extreme, which is the check that the removal is real and not
+cosmetic. The lens was deliberately NOT used: it sits interior to the
+silhouette, so moving it changes no outline and is a recolour by definition.
+The hold moves up and back — placement only, the cage is untouched — and the
+stride goes to 34 degrees against the Gleaner's 28, which costs zero triangles.
+
+**Tun — 2,584 triangles, the cheapest Easy body and the widest.** It is also the
+only one that does not carry the cargo cage, and that is a DECLARED deviation
+under kaz's ruling: where a card wants a hold that is genuinely a different
+object rather than the cage relocated, it is built as a new part and reported.
+`cargo_cage` is not called by `enemy_tun.py` at all — nothing in the sealed part
+is widened, restyled or re-proportioned. The drum's width is budgeted against
+the runtime frost ring at 30 board px: it may take the full 22, which is
+22 / 31.8032 = 0.692 u across, so the outer radius sits just inside 0.346 u. The
+leg tuck is kept because it is better structure, not spent to buy width.
+
+Both rig the body root at z = 0. `node tools/check-model-top.js` reports raw top
+exactly equal to posed top for both, margin +10.0 board px across all frames —
+the construction guarantee, not a comfortable number.
+
 **2026-08-13 — the Drudge (`enemy-armored`), the first of five Easy bodies, and
 the shared chassis they are all built on.**
 

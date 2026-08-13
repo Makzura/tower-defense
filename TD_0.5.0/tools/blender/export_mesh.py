@@ -441,6 +441,8 @@ TARGETS = [
     # _build_enemy. THE FILE NAME IS THE TYPE ID: gl-world.js::enemyModel()
     # looks up "enemy-" + enemy.typeId, so `camo_normal` keeps its underscore.
     ("enemy-armored", "enemy-armored.js", _build_enemy("enemy_drudge")),
+    ("enemy-fast", "enemy-fast.js", _build_enemy("enemy_skimmer")),
+    ("enemy-slow", "enemy-slow.js", _build_enemy("enemy_tun")),
 ]
 
 
