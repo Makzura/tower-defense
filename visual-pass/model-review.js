@@ -22,6 +22,22 @@
 // eight would ship silently, and it nearly did: a drum sized off the REST
 // footprint rather than the walk envelope went into a build brief 20% too wide.
 //
+// WHAT THIS TOOL DOES NOT CHECK -- stated because it PASSED a model that had a
+// real defect. enemy-angry shipped from e015ef5 with the crank collar passing
+// through the arm: 18 penetrating pairs, worst -0.0093 u, and every gate below
+// was green. There is no interpenetration test here at all.
+//
+// The obvious addition would make things worse rather than better. suki's first
+// attempt compared whole-GROUP bounding boxes and reported overlap on all twelve
+// frames for BOTH hips -- which is the same as reporting nothing, because two
+// group boxes intersect happily with every solid far apart. A group-level check
+// added in good faith would give false CONFIDENCE, not coverage. The test has to
+// be PER PART, which is what AGENTS.md clause 8 already says and what her
+// per-part run found in one pass (collar 0.75t -> 0.60t, 0 pairs, +0.0071 u).
+//
+// So: green here means the four things below are green. It does not mean the
+// model is sound, and it should never be quoted as if it did.
+//
 // CHECK 2 IS A CROSS-CHECK, NOT A GATE, and that is a ruling rather than a
 // preference. Max vertex displacement is dominated by whichever SINGLE vertex
 // moves fastest, so a wing sweeping edge-on moves vertices hard while changing
