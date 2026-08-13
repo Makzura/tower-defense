@@ -65,6 +65,82 @@ explicit paths do not protect you when two people are editing the same file.**
 The rule needs its second half: **`git diff --cached` before every commit, and if
 a hunk is not yours, stop.**
 
+**2026-08-13 — RETRACTION, same day, of my own ranking claim. A palette table
+cannot reject, cannot threshold and CANNOT RANK. It can only flag a gross
+difference.**
+
+**The claim was mine and it was drawn from one frame of a twelve-frame
+population.** In the entry below I wrote that the palette table still *ranks* —
+order preserved, magnitude not — from a sweep whose rendered medians were
+monotone non-decreasing. Measured across all twelve frames of the same sweep,
+under the same conditions, **every frame carries at least one rank inversion
+against palette order**:
+
+    frame       0  1  2  3  4  5  6  7  8  9 10 11
+    inversions  3  1  5  7  7  4  1  4  7  8  7  3
+
+**Frame 6 has the fewest — one, and that one a 0.002 near-tie — and frame 6 is
+the column I was given.** Frame 3 has seven, frame 9 has eight. juno reports the
+slice as her error rather than mine; the inference from what I was handed was
+sound, which is exactly what makes it worth recording.
+
+**The failures are severe, not marginal.** `tin` at palette 1.00 against
+`tin_dark` at 1.91 — nearly a full CR of paper advantage — **renders in the wrong
+order on six of twelve frames.** Largest reversed gap measured: **1.17**
+(`core_red` 1.72 beating `black` 2.89). A material with a large palette advantage
+can render *worse* than a same-material pair across half a crank cycle.
+
+**WHAT THE DATA DOES SUPPORT, and it is what the standard now says.** The palette
+figure separates gross tiers without ordering inside them. Above **palette CR
+3.5** (`grey75`, `teal`, `white`) candidates rendered 1.85–3.46, always clear of
+and correctly ordered against everything below, on every frame. The eight from
+**palette 1.00 to 2.89** rendered inside a **1.12–1.57** band and were scrambled
+within it on every frame. So a brief-writer can tell *"obviously much lighter"*
+from *"roughly similar"* and nothing finer — **and nearly every real material
+decision on this project sits inside the scrambled band.** The useful range of
+the table is the range almost nobody needs.
+
+**THE SUPERSESSION CHAIN IS NOW IN THE STANDARD, because one question was ruled
+four times in two days and a reader arriving cold cannot otherwise reconcile
+them.** Every step narrowed what a palette table may be used for, and **every
+step was overturned by a wider population rather than by a better argument**: the
+ceiling claim died to two rendered pairs; "cannot settle within 0.7 CR" died to
+eleven candidates; "it ranks" died to twelve frames. If a fifth ruling comes it
+will come from a second part, not from an argument.
+
+**A LIVE CLAIM ABOUT A SHIPPED MODEL IS WITHDRAWN WITH IT.** `brass` 1.41 against
+`tin_dark` 1.28 — the figure that made the Hedger's crank material look *measured
+rather than lucky* — **is frame 6 alone**, and `tin`/`tin_dark` reverses on half
+the cycle at a wider palette gap than brass enjoys. **Brass over `tin_dark` is
+not established across the crank cycle.** The outcome may well still be right;
+the reason given for it is not evidence. Owed: that pair across all twelve
+frames, and brass against the **road** — the second neighbour, the one that
+actually decided the material, never measured on pixels at all.
+
+**THE PROCESS LESSON, AND IT COST TWO OF US: A SECOND SIGNATURE IS NOT A SECOND
+SOURCE.** I inferred the ranking from one column; kaz then **ran the monotonicity
+check himself, confirmed it, and wrote "verified rather than taken" into a
+ruling.** The arithmetic was right both times. Neither of us asked what
+population the column was. So this is not a manager accepting a report too
+readily — it is a manager **independently reproducing an error and giving it a
+second signature**, the "verify, do not take" habit running in reverse.
+**Re-deriving a number from the same sample tests the arithmetic and nothing
+else; verifying a claim means asking what it was measured over.**
+
+**And it happened underneath this document's own rule.** *Sample the extreme, not
+the centre, when a population's members are not simultaneous* was committed to
+`HOUSE-STANDARD.md` at `0510ab6`, hours earlier. Twelve walk frames are exactly
+that kind of population, and the claim was built on **one interior frame** —
+neither extreme nor centre. **The section carrying the rule broke it**, and that
+is recorded in place rather than tidied away, because a document that shows its
+own rule being violated inside itself is worth more than one that reads clean.
+
+**What is NOT affected:** the p90 refutation of the ceiling claim, which is
+per-pixel within a single frame and so cannot be flattered by frame choice; the
+monotone compression and its crossover at palette CR ≈ 1.2, which are properties
+of the mapping rather than of the ordering; and the palette-space ruling on the
+bands.
+
 **2026-08-13 — contrast ratio is computed on RENDERED PIXELS, never on palette
 values. The palette-CR method is retired, the bands it fed are palette-space
 only, and `AGENTS.md` finally points at the standard that carries them.**
@@ -123,13 +199,15 @@ two-pair version could not reach:
 - **the "over 2.0" band is close to unreachable in rendered units**, which is
   what makes the bands palette-space rather than merely miscalibrated.
 
-**But the palette table still RANKS.** The rendered median is monotone
-non-decreasing in the palette figure across the sweep, with one tie. So order is
-preserved and magnitude is not: shortlist and rank with it, never reject or
-threshold with it. The first retraction's "cannot settle two candidates within
-0.7 CR" rested on the withdrawn figure and does not survive it. **Read narrowly —
-one part, one bearing, two frames.** The compression curve is that crank's
-geometry, not a transfer function.
+**~~But the palette table still RANKS — the rendered median is monotone
+non-decreasing in the palette figure, so order is preserved and magnitude is
+not.~~ RETRACTED THE SAME DAY; see the entry above this one.** The sweep it was
+inferred from was one frame of twelve, and it was the best of the twelve. Across
+the full population every frame carries at least one rank inversion. The live
+rule is that a palette table **can only flag a gross difference** — it cannot
+reject, threshold or rank. The rest of this entry stands; the compression curve
+and the crossover are unaffected, because those are properties of the mapping
+rather than of the ordering.
 
 **THE MECHANISM IS THREE TERMS, NOT ONE, and getting the set right matters
 because two of them are levers someone might reach for.** Per-face illumination
@@ -153,7 +231,8 @@ distance fade.
   marginal at ~9–13% against an ~11% floor. The honest sentence is *occlusion
   eliminated outright, contrast improved, threshold not met* — which is why a
   before/after at the least flattering frame goes to the owner to judge by eye.
-- **Brass over `tin_dark` is now MEASURED rather than lucky** — 1.41 against 1.28
+- **~~Brass over `tin_dark` is now MEASURED rather than lucky~~ — WITHDRAWN, see
+  the entry above: that figure is frame 6 alone** — 1.41 against 1.28
   rendered, the same order the palette gave. **Brass against the ROAD, the second
   neighbour and the one that actually decided the material, has never been
   measured on pixels. Owed.**

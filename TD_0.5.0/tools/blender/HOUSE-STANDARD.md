@@ -775,26 +775,104 @@ is precisely what two parts at different angles do not have.
 ALSO RETRACTED.** The table can still **shortlist** a palette before anything is
 lit. It cannot **reject** one, and it cannot be compared against a threshold.
 
-**But it RANKS, and that is worth more than the first retraction allowed.** The
-first form of this consequence said the table "cannot settle a choice between two
-candidates whose paper figures differ by less than about 0.7 CR" — that rested on
-the withdrawn error figure and does not survive it. Across juno's eleven
-candidates the rendered median is **monotone non-decreasing** in the palette
-figure, with one tie (`grey35` 1.04 and `olive` 1.31 both land at 1.19). So
-**order is preserved and magnitude is not.** Use the palette table to rank
-candidates and to shortlist; never to reject one, and never against the bands
-below.
+**IT DOES NOT RANK EITHER. ~~But it RANKS: across juno's eleven candidates the
+rendered median is monotone non-decreasing in the palette figure, so order is
+preserved and magnitude is not.~~ RETRACTED WITHIN THE HOUR IT WAS WRITTEN, and
+the way it failed is the most useful thing in this section.**
 
-**The live consequence: brass over `tin_dark` for the Hedger's crank is now
-MEASURED rather than lucky** — 1.41 against 1.28 rendered, the same order the
-palette gave. That is one neighbour only. **Brass against the ROAD — the second
-neighbour, and the one that actually decided the material — has never been
-measured on pixels, and is owed.**
+That claim was mine, inferred from a **single frame** of a twelve-frame
+population. Measured across all twelve, same conditions, **every frame has at
+least one rank inversion against palette order**:
 
-**Read "monotone" as narrowly as it was measured.** One part, one bearing, two
-frames. What is established is that the compression did not reorder *this*
-sweep; a second part of a different shape would earn the general claim, and until
-someone runs one, "the palette ranks" is a working assumption and not a result.
+    frame       0  1  2  3  4  5  6  7  8  9 10 11
+    inversions  3  1  5  7  7  4  1  4  7  8  7  3
+
+**Frame 6 has the fewest — one, and that one a 0.002 near-tie — and frame 6 is
+the column I was given.** Frame 3 has seven.
+
+**And the failures are not near-ties.** `tin` (palette 1.00) against `tin_dark`
+(palette 1.91) — nearly a full CR of palette advantage — **reverses on six of
+twelve frames**: a material with a large paper advantage renders *worse* than a
+same-material pair on half the crank cycle. The largest reversed gap measured is
+**1.17** (`core_red` 1.72 beating `black` 2.89).
+
+So the honest rule is the blunt one: **a palette table cannot reject, cannot
+threshold, and cannot rank. It can only flag a GROSS difference.**
+
+> **THE CHAIN, because this one question was ruled three times in a day and a
+> reader arriving cold cannot otherwise reconcile them.** Each ruling was correct
+> on what its author could see, and each was overturned by a *wider population*
+> rather than by an argument:
+>
+> 1. **"A pair failing on paper cannot be rescued by lighting"** (kaz, ratified
+>    2026-08-12, from albedo arithmetic) — **dead.** Two rendered pairs.
+> 2. **"Cannot settle two candidates within about 0.7 CR"** (kaz, on those two
+>    pairs) — **dead.** The 0.7 was an impression from the same two pairs and its
+>    author withdrew it against an eleven-candidate sweep.
+> 3. **"It ranks: order preserved, magnitude not"** (mine, on that sweep) —
+>    **dead.** The sweep I was shown was one frame of twelve.
+> 4. **"It can only flag a gross difference"** (juno, all twelve frames) — the
+>    live rule, and the one above.
+>
+> **Every step narrowed what the palette table may be used for, and every step
+> came from someone measuring more of the same thing rather than arguing about
+> it.** If a fifth ruling arrives it will most likely come from a second part,
+> not from a better argument — see the last line of this block.
+
+**WHAT THE DATA DOES SUPPORT, which is narrower and still worth having.** The
+palette figure separates gross tiers without ordering within them. The three
+candidates above **palette CR 3.5** (`grey75` 3.67, `teal` 4.24, `white` 6.30)
+rendered at 1.85–3.46, always clear of and correctly ordered against the eight
+below, **on every frame measured**. The eight from **palette 1.00 to 2.89**
+rendered inside a band of roughly **1.12–1.57** and were scrambled within it on
+every frame.
+
+**Read what that means before reaching for it.** You can tell *"obviously much
+lighter"* from *"roughly similar"*. You cannot choose between two candidates
+anywhere inside palette 1.00–2.89 — **and going by this project's own palettes,
+that is where very nearly every real material decision sits.** The useful range
+of the table is the range almost nobody needs.
+
+> **THE PROCESS LESSON, AND IT COST TWO OF US — A SECOND SIGNATURE IS NOT A
+> SECOND SOURCE.** petra inferred the ranking from one column; **kaz then ran the
+> monotonicity check himself, confirmed it, and wrote "verified rather than taken"
+> into a ruling.** The arithmetic was correct both times. **Neither asked what
+> population the column was**, and it was one frame of twelve, the best of them.
+> So this is not a manager accepting a report too readily — it is **a manager
+> independently reproducing an error and thereby giving it a second signature**,
+> which is the "verify, do not take" habit running in reverse. Re-deriving a
+> number from the same sample tests the arithmetic and nothing else. **Verifying
+> a claim means asking what it was measured over, not recomputing it.**
+>
+> A one-frame slice of a twelve-frame population **is the same error as a figure
+> quoted without its space**: it looks like a measurement and it is a sample.
+> This section produced that error three times in one day at three different
+> scales.
+>
+> **AND IT HAPPENED UNDERNEATH THIS DOCUMENT'S OWN RULE.** *Sample the extreme,
+> not the centre, when a population's members are not simultaneous* was committed
+> to this file at `0510ab6`, hours before. Twelve walk frames are the textbook
+> non-simultaneous population — the player sees them serially — and the ranking
+> claim was built on a **single interior frame**, which is neither the extreme nor
+> the centre. **The section carrying the rule broke it.** Left here in place
+> deliberately: a document that records its own rule being violated inside itself
+> is worth more than one that quietly reads correct.
+
+**AND THE SAME SLICE DEMOTES A LIVE CLAIM ABOUT A SHIPPED MODEL.** `brass` 1.41
+against `tin_dark` 1.28 — the figure that made the Hedger's material choice look
+"measured rather than lucky" — **is also frame 6 only**, and `tin`/`tin_dark`
+reverses on half the cycle at a wider palette gap than brass enjoys. **Brass over
+`tin_dark` is NOT established across the crank cycle. Owed: that pair over all
+twelve frames — and brass against the ROAD**, the second neighbour and the one
+that actually decided the material, which has never been measured on pixels at
+all.
+
+**THE SURVIVING HALF IS ITSELF PROVISIONAL. Everything here is one part, one
+bearing.** A second geometry — commissioned by kaz from juno — decides whether
+*"above 3.5 separates"* is a property of the engine or of this crank. **If it is
+this crank's, a palette table has no remaining job at all, and this section
+should then say exactly that** rather than leave standing a rule nobody can act
+on. Do not treat the gross-tier claim as settled in the meantime.
 
 ### The Siphon palette, measured
 
