@@ -4,9 +4,13 @@ Settled 2026-08-09 from the owner's brief plus the setting already written into
 the game files. Criterion 7 scores an asset against THIS document. If an asset
 looks good but does not belong here, it does not score 4.
 
-**Corrected 2026-08-13 against the world the owner ratified on 2026-08-12.**
-That ruling is the authority; where this file disagreed with it, this file was
-wrong. It governed rule 2, which has been rewritten. Two standing notes:
+**Corrected 2026-08-13 against three rulings by the owner.** His word is the
+authority; where this file disagreed with it, this file was wrong. The
+2026-08-12 flesh ruling governed **rule 2**. Two later rulings the same week
+governed **rule 1** (*"Yes tech goes tech, magic goes magic"* — the wizard look
+follows the branch, not the tier) and the **colour table in rule 3** (mana takes
+its colour from its use, not its user; cyan is not a faction marker). All three
+sections have been rewritten. Two standing notes:
 
 - **Every enemy and tower name below is PROVISIONAL** and scheduled for renaming
   once the naming pass lands. Names here identify bodies, they do not fix them.
@@ -49,25 +53,58 @@ visible brood cells and a rear hatch.
 
 ## The three rules that follow
 
-**1. Towers are ARCANE TECH WITH A HUMAN INSIDE, and the magic is earned late.**
+**1. Towers are ARCANE TECH WITH A HUMAN INSIDE, and the magic follows the
+BRANCH, not the tier.**
 
-The tier ladder is the story: early tiers are *craft* — iron, brass, wood,
-leather, honest hardware. Ley light arrives at tier 3 and grows. A tower's
-final tier may look like sorcery; its base tier may not.
+The owner, 2026-08-13: *"Yes tech goes tech, magic goes magic."*
 
-The owner's "old magician wizard" note applies HERE, and only to the towers that
-have earned it — the Arcane Sniper's ritual tiers above all, then the
-Warbringer's ley-veined path A. It is a costume and a ritual vocabulary
-(robes, seals, rune circles, floating focus objects), laid over working
-hardware. It is never a substitute for the hardware.
+A tower does not earn sorcery by climbing. It commits to a kind of answer and
+then becomes more of that answer. **A technology branch ends in more technology
+at max tier; a magic branch ends in more sorcery.** A maxed hardware path that
+sprouts robes at tier 5 is wrong, and so is a maxed ritual path that resolves
+into clean machinery.
+
+This file said the opposite until 2026-08-13 — *"the tier ladder is the story
+… ley light arrives at tier 3 and grows"* — and hung the wizard read on tier
+depth. That was wrong, but the reason it looked right is worth keeping: **tier 3
+is where a tower commits its branch.** The crosspath lock fires there on all
+three multi-branch towers — `js/smasher.js:257`, `js/blub.js:271`, and
+`lockThreshold: 3` at `js/towers/long-range-dps.config.js:273`. The visual
+divergence begins exactly where the mechanical divergence begins. Tier 3 is the
+fork, not the arrival of magic.
+
+Early tiers are still *craft* — iron, brass, wood, leather, honest hardware —
+because a tower that has not committed has not diverged yet. That part survives.
+
+**The Arcane Sniper and the Summoner fork both ways as they upgrade.** That was
+the owner's original ruling and is now explicit. The Summoner is already built
+this way and is the clearest example in the game: family B is Cyberblub,
+Mechablub, Mechablub MK2, SuperBlub, and family A is Blub, Mini Blub, Hungry
+Blub (`js/blub.js:193-229`). One branch is machinery and says so in every name;
+the other is not.
+
+Where a branch does go magic, the owner's "old magician wizard" note applies to
+it: a costume and a ritual vocabulary (robes, seals, rune circles, floating
+focus objects) laid over working hardware. It is never a substitute for the
+hardware.
+
+*Not yet ruled, do not assign:* which of the Arcane Sniper's two paths is the
+ritual one. In code they are mechanical only — A is reach, pierce and cone; B is
+damage, execute and crit — and carry no fiction yet. That pairing is settled
+with the owner, not inside a model brief. The model already carries both `ley`
+and `sigil` (`tower_sniper.py`), so the vocabulary for either exists.
 
 The concept doc's hard cap stands and is not overridden by the brief:
 
 > A3 — *"a bit arcane"* — the owner's phrase, and the ceiling for it: **this
 > must never become a wizard.**
 
-That cap is specific to the Warbringer, who is a smith. The Sniper is the tower
-that carries the wizard read; the Warbringer carries at most ley in the metal.
+That cap is specific to the Warbringer, who is a smith, and it costs him
+nothing: his two branches are reach-and-damage and speed-and-slows
+(`js/smasher.js:16`), so he forks hardware into hardware and never had a magic
+branch to climb. He carries at most ley in the metal. The Sniper and the
+Summoner are the two towers that can carry a wizard read, and only down the
+branch that goes that way.
 
 **2. Enemies are TECH — and organic matter is earned by CAMPAIGN POSITION, not
 by strength.**
@@ -106,9 +143,10 @@ Not creature-design and not contamination either: it is livestock plant bolted
 onto industrial plant. The organic part must never read as an accident, a
 disease, or something that happened *to* the machine.
 
-*Not yet ruled, do not invent:* what colour enemy-held mana is. The table below
-gives ley cyan to the player and red to enemy cores; the first asset that needs
-enemy mana must ask rather than pick.
+**Enemy-held mana is now ruled, and there is no enemy palette.** See the mana
+rule in section 3 — mana takes its colour from its use, never from its user, so
+a machine using mana looks like mana being used for that purpose. Do not build a
+corrupted variant of anything.
 
 **The Tyrant is demoted and gets none of this.** The owner: *"the Tyrant is
 nothing, it's just a machine bigger than others that was given more resources
@@ -144,15 +182,64 @@ Note while you are in there: `flesh` and `skin` are in that dict already and are
 **human** colours — the recruits, a bare forearm. No enemy uses either, and
 under rule 2 none currently may.
 
+**MANA TAKES ITS COLOUR FROM ITS USE, NEVER FROM ITS USER.** The owner,
+2026-08-13: *"Raw mana is light blue and changes colours depending on how it's
+used. Used by enemies or not doesn't change the mana's rules — the world is not
+racist."*
+
+Three things follow, and the third is the one that bites:
+
+- **Raw mana is light blue.** That is its resting state, before anyone spends
+  it. `ley` is the palette key that carries it.
+- **A colour is an application, not an allegiance.** Violet on a ritual is
+  violet because of the ritual, not because a defender is holding it.
+- **Enemy-held mana obeys the identical rules. There is no enemy palette and no
+  corrupted variant.** When the machines gain the ability to use mana, it looks
+  like mana being used for that purpose — the same as it would in anyone's
+  hands.
+
+**Do not invent a colour for a use that does not exist yet.** The rule is
+recorded here; each use gets its colour when there is an asset that needs one.
+
+This corrects the row below, which until 2026-08-13 gave ley cyan to "the
+player's power, friendly energy". **The shipped assets never agreed with that
+row.** `ley` is on five enemy models and in every case it is the enemy's shield
+— `shield_ley` at `enemy_normal.py:93`, `enemy_brute.py:73`, `enemy_hive.py:146`,
+`enemy_swarm.py:98`, `enemy_chassis.py:185`. A shield is mana deployed to stop
+damage, it looks the same in anyone's hands, and it has been drawn that way in
+the game since those models were built.
+
 Colour meaning is fixed and must not drift:
 
 | colour | means |
 |---|---|
-| **ley cyan** | the player's power, the network, friendly energy |
-| **violet / magenta** | ritual and covenant — the Sniper's cost-bearing magic |
-| **ember orange** | forge, labour, heat, the Warbringer |
-| **red** | enemy cores, enemy life, threat |
+| **ley cyan** (`ley`) | **raw mana** — unspent, at rest, in transit, or shielding. Not a side and not a faction. |
+| **violet / magenta** (`sigil`) | mana spent on ritual and covenant — the Sniper's cost-bearing magic |
+| **ember orange** (`ember`) | forge, labour, heat, the Warbringer — see the caution below |
+| **red** (`core_red`) | a lit enemy core — what the machine has taken, caged because it cannot hold it itself |
 | **gold** (`gold` `#E8B84B`) | money, bounty, a shield breaking — and the Rifleman's tailoring |
+
+**"Threat" was struck from the red row.** It was the last allegiance read in
+this table: it told you whose colour red was rather than what red is. The core
+is described by the model that owns it (`enemy_normal.py:16-22`) as *"what it
+has already taken … the machine cannot hold mana itself"*.
+
+*Unresolved, and it goes to the owner before any asset changes:* if the caged
+core is taken mana and raw mana is light blue, the red core needs a reason —
+either it is mana already put to a use, or it is not mana. **Do not repaint it
+to find out.** `core_red` is on 8 of 9 enemy bodies and a guess here repaints
+the whole roster; it is also rendering's asset to change, not this file's.
+Two measurements to hand whoever asks: `core_amb` sits on exactly the two
+bodies that *consume* rather than carry — the Brute's furnace and the Hive's
+foundry — and `core_vio` is declared in the palette and used by nothing.
+
+**Caution on ember: it is not established as a mana colour, so do not use it as
+one.** `#FF7A3C` is declared inside the Rifleman's block of `td_scene.py`, which
+calls him *"the one tower with no magic in him"* and his lit cigar and lamp
+*"fire and filament rather than enchantment"*. The Warbringer re-declares the
+same hex separately at `tower_warbringer.py:61`. Whether a forge glow is mana
+put to work or simply heat is a question for the owner, not an inference from
+this table.
 
 **`brass` `#B98A38` is not gold and carries no meaning.** It is a machine
 material — tarnished fittings — and `td_scene.py:98-101` says so itself. It is
@@ -168,8 +255,9 @@ on: arcing current, a rune circle in mid-air, heat haze at a muzzle.
 ## Quick test for any asset
 
 1. Would this belong on a worked, powered surface — not a field, not a forest?
-2. If it is a tower: is there a person in there, and is the magic proportionate
-   to the tier?
+2. If it is a tower: is there a person in there, and does its look match the
+   BRANCH it committed to at tier 3 — tech going further into tech, magic
+   further into magic?
 3. If it is an enemy: is it fabricated, and does it read as re-fitted human
    hardware? Everything in the build today is an Easy body, so it must carry
    **no organic matter at all** — including the heaviest and the boss. If it is
