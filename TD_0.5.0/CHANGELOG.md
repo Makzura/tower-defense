@@ -13,6 +13,60 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — `tools/blender/gait_solve.py`: solve the swing angle against the
+stride instead of hand-picking it. Measured residual 0.00143 board px.**
+
+The companion to `tools/check-gait-slip.js`. That tool measures the slide after
+the fact; this one removes it before the export. A planted contact must travel
+backward along model local +X by `duty * 0.899281` u across its plant, so state
+where the contact must be per frame and find the angle that puts it there —
+rather than the chassis's approach of fixing `swing_deg = 28.0` and discovering
+the error afterwards.
+
+**It solves the ANGLE, not a translation.** Translating a leg root in x would
+also land the contact, and it would slide the leg horizontally out of its own
+hip. The rotation is the joint the body actually has.
+
+**Bisection on EVALUATED geometry**, the same rule `enemy_chassis._foot_measure`
+follows — step the scene to the frame and ask Blender where the contact is, so
+no analytic model of the leg exists to go stale when the part is reshaped.
+Bisection and not a secant on purpose: which corner of a part touches the ground
+changes as the leg rolls, so contact-x is piecewise linear in the angle and a
+secant step across one of those corners diverges. Bisection needs only
+monotonicity.
+
+**Proved able to fail before being trusted, under Blender, on synthetic legs.**
+Two pivots of different heights, 0.90 and 0.55 u reach, each solved over a
+64-frame plant out of 128 that WRAPS past the end of the cycle (frames 96..31):
+
+| reach | first-guess half-swing | residual | at sizeScale 2.4 |
+|---|---|---|---|
+| 0.90 u | 14.235° | 0.000018739 u | **0.00143 board px** |
+| 0.55 u | 23.727° | 0.000018831 u | **0.00143 board px** |
+
+**The residual is the same for both, and that is the entire point** — it is set
+by the solver tolerance, not by the geometry, which is exactly what the fixed
+28° was not. Against the shipped roster's 0.277 px (best) and 19.867 px (worst)
+this is three to four orders of magnitude down.
+
+Two negative controls, both of which must fail and do. A 0.12 u reach — the
+Dray's — is REFUSED rather than given a plausible angle: *"contact cannot reach
+x=0.22131 at frame 97: the bracket spans x -0.09859..0.09859"*, naming the
+reachable span so the reader knows to change the geometry and not the angle.
+And `verify_plant` rejects a deliberately truncated plant at a tolerance it
+cannot meet. `swing_angle_for` returns `None` rather than a number when the
+geometry cannot cover the span at any angle.
+
+`verify_plant` is separate from the solver deliberately: the solver's own
+convergence check can only report that it hit the target it was given, never
+that the target was right. Verification re-walks the finished keyframes
+including the cycle wrap, which the solver never sees — and the check that
+actually counts is `tools/check-gait-slip.js` run on the EXPORTED file, because
+only that reads what ships.
+
+The arithmetic half imports without `bpy` and can be run and tested outside
+Blender.
+
 **2026-08-13 — `tools/check-gait-slip.js`: does a planted foot stay on the road?
 No shipped walker is at zero, and the reason is one hard-coded angle.**
 
