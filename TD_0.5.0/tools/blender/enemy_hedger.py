@@ -1,6 +1,14 @@
 # ---------------------------------------------------------------------------
 # Enemy type `angry` -- the Tripod. 14 hp, speed x0.7, bounty 15, sizeScale 1.25.
 #
+# **THIS BODY HAS THREE NAMES AND ALL THREE ARE HERE ON PURPOSE.** The build
+# script is `enemy_hedger.py`, the enemy type id is `angry`, the exported model
+# is `enemy-angry.js`, and what the player sees is **the Tripod**. rhea wrote a
+# clause 8 ruling naming only "the Hedger" and nobody searching for `angry` or
+# Tripod would have found it; she also had to check the exporter to be sure kaz
+# and I were describing one body and not two with identical measurements. Any
+# document about this body should carry all of the names it answers to.
+#
 #   blender --background --factory-startup --python tools/blender/export_mesh.py \
 #           -- --only=enemy-angry
 #
@@ -232,12 +240,27 @@
 #   projected rows, so a smaller stroke shrinks the denominator with it. 315
 #   appearing to improve at 17 deg is that artefact, not a gain.
 #
-# 34 IS KEPT. It is the measured knee, the intrusion does not start until 18 deg
-# -- the top 47% of a linear ramp on a gesture that is 2.4% of a body's life, so
-# roughly 1.1% of its time on screen -- and the defence of the overlap is that it
-# never reaches the outline. **If that defence fails, 17 deg is a real option and
-# not a mutilation**, and it is the one to take before redesigning the hub-drum
-# joint.
+# **RULED, 2026-08-14: THE STROKE IS 17 DEGREES, NOT 34.** rhea ruled that clause
+# 8 reaches a pose that is never baked -- on the clause's own words, "in some
+# pose, WHATEVER THE NUMBERS SAY", which is an instruction that a passing
+# measurement does not discharge. `check_penetration.py` walks baked frames
+# because those were the only poses that existed when it was written: **the
+# instrument narrowed, the rule did not.** kaz took the disposition to 17 rather
+# than declare an exclusion. First contact is at 18 deg, so 17 is clean by
+# construction rather than by margin.
+#
+# The exposure that was argued over, stated correctly: `attackFlash` decays
+# 1 -> 0, so time above a threshold f is `(1 - f) * T`, giving
+# `0.4 * (1 - 18/34) = 0.1882 s` -- **47% of the window, 1.11% of a body's time
+# on screen.** The intuitive `f * T` gives 53% and 1.25% and is wrong. It changed
+# no conclusion, which is why it was worth catching.
+#
+# **NOTHING IN THIS FILE CHANGES FOR IT, AND THAT IS NOT AN OVERSIGHT.** The
+# stroke angle is not in the mesh. It is `angle = deg * attackFlash` in otto's
+# runtime override; this file exports one walk band and a `mast` group keyed to
+# identity. So there is no re-export, the geometry is untouched, and every gate
+# result above still stands. What this header owns is the SPEC, and the spec is
+# now 17.
 #
 # **BUT DROPPING TO 17 IS NOT A ONE-CONSTANT CHANGE, AND THAT IS THE TRAP.** The
 # geometry is one constant and a re-export. THE BRIEF IS NOT. The gesture is
