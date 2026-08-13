@@ -13,6 +13,95 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The Courier (`enemy-shielded`) is modelled: the first of batch 2,
+and the first body whose unique part is a shape no primitive in the toolkit can
+produce.** 4,552 triangles, 8 frames, built on `enemy_chassis.py` at
+`CHASSIS_VERSION 1` with no change to the shared module.
+
+The body is the narrowed Skimmer frame carrying a FULL-SIZE sealed hold. That
+combination is the card's "proportionally the largest hold on any small unit"
+taken literally: the cage stays at scale 1.0 and the frame comes in around it,
+so the hold ends up the widest part of the whole body — its side struts at
+±0.177 against the shoulder yoke's ±0.125 — by being the only thing that did not
+shrink. Scaling the cage UP would have produced a wide body instead of a body
+with a big hold, which is the opposite read.
+
+**The field yoke is a 2:1 ellipse and the ratio is the separator, not styling.**
+mira measured the Courier against the Drudge — the pair this body's own card
+names — and the only thing holding them apart is that the Courier's height range
+never overlaps the Drudge's at any frame or bearing. A circular hoop puts the
+apex at z 0.98, under the crown, and the two collapse into each other:
+
+    ellipse, apex 1.24   H 26.2 [25.1-27.8]   W/H 0.463   lit 223
+    circle,  r 0.26      H 24.0 [20.9-26.4]   W/H 0.507   lit 192
+
+**And that is why it is twenty tube segments rather than a scaled torus.**
+Scaling a torus's major plane scales its TUBE with it: built at R 0.26, minor
+0.030 and scaled 2×, the bar comes out **0.120 thick at the apex** against the
+0.05 it should be, and the apex overshoots to z 1.30. Both errors land exactly
+where the separator lives. A circular torus keeps the section and loses the
+shape; you cannot have both from one primitive. 400 triangles against the
+torus's 192, and worth it — cost is triangles × bodies on the road, and at six
+Couriers that is +1,248 against a 26,808 peak.
+
+**The general rule, which cost nothing to learn here and a re-export to learn
+later: a visual brief owes the smith the CONSTRAINT, not the measuring proxy's
+construction.** mira's rasteriser models the hoop as twenty boxes because boxes
+are what it speaks; built literally that is 1,944 triangles for a shape a chain
+of tubes draws in 400. The proxy was scaffolding and was never meant to ship.
+
+**The hold is sealed, and it is NOT a separator — that claim was made and then
+withdrawn the same afternoon, which is worth recording because the withdrawal is
+the useful half.** Dark-versus-lit hold looked like a second axis against the
+Drudge until juno swept the exact pair: a `core_red` part against a body
+repainted uniformly to `tin` measures **palette CR 1.72 but a rendered median of
+1.27–1.34**, against a 2.0 band. Two values that measure as the same value are
+not a read. The seal is built anyway — it is right for the fiction, it is the
+cage's own sanctioned plating swap through `window_mat` / `core_mat`, it
+reshapes nothing, and it pays at the zoomed camera — but it buys nothing, and if
+some other constraint ever pushes back, the seal is what gives way and the
+geometry is not.
+
+**So the Courier/Drudge pair rests on the height range alone**, which is why the
+2:1 ellipse is not negotiable: there is nothing behind it.
+
+Not built, both deliberately: the card's thumb-latch (measured at +1.2 px of
+silhouette and +0.0 at the worst bearing — below the feature floor, cut as a
+read and kept as a zoom reward), and "the most upright body in the family",
+which is unreachable from here because the 20° stoop is `chassis.LEAN`, a module
+constant baked into four of `torso_frame`'s five boxes. Standing it up needs a
+defaulted `lean=` argument on the shared chassis, which is scheduled as its own
+additive pass; it is worth about 0.4 screen px and is not what makes this
+silhouette.
+
+Gates: `check-model-top.js` reports raw top 1.274 == posed top 1.274, margin
+10.0 px — clause 3b holds by construction, the body root sits at z = 0.
+`check-model-tags.js` clean after adding the tag to `index.html`, `sandbox.html`
+and `3d.html`. Cycle continuity 4.08 px wrap = 0.98× mean, inside the observed
+enemy band. Envelope 23.0 × 13.6 board px, 10.3 px of slack to the frost ring.
+`model-review.js` also prints `*** OVER CEILING ***` against a 4,032 "Gleaner
+parity" limit that has been retired — cost is triangles × bodies on the road,
+and by that measure this body is mid-pack.
+
+Built-versus-briefed, measured on mira's own instrument, because an estimate and
+a built model disagreeing is worth more than either alone:
+
+    briefed (proxy)   W 12.2   H 26.2 [25.1-27.8]   W/H 0.463   lit 223
+    BUILT             W 11.4   H 25.8 [24.3-27.0]   W/H 0.442   lit 217
+
+Aspect came out slightly *better* than briefed. **But the Drudge separation
+came out at 0.2 px where the brief predicted 1.0** — Courier height low 24.3
+against the Drudge's high 24.1 — and with the sealed-hold axis withdrawn that
+0.2 px is now the entire separation between the two. Flagged to mira, not
+accepted, and not silently patched by raising the hoop.
+
+Most of the 0.8 px is accounted for: the proxy's bar is a BOX 0.05 × 0.05 with
+corners 0.0354 from centre, where the built bar is a round tube at 0.025
+everywhere, so the proxy ring is fractionally larger in every direction. That
+is a proxy-versus-solid difference rather than a build error, and it is the same
+lesson as the torus trap one paragraph up: **the instrument's primitive is not
+the shipped primitive.**
+
 **2026-08-13 — Camouflaged enemies finally have a visual cue on the 3D board:
 translucent bodies drawn last, plus the 2D pack's dashed ring ported into the
 overlay pass.** The owner's ruling was *"do the camos like the others, just make
@@ -62,6 +151,78 @@ the two-pass split costs nothing on a board with no camo on it. Buffer-order
 compositing under fade was tested directly with suki's two re-exports of
 `enemy-normal`, which differ only in triangle order: **0 px faded**, so it is not
 observable at this size and alpha.
+
+**2026-08-13 — `ac4ca48` deletes wave 11's midboss health override, so the type
+row's 250 is the value again. Four schedule totals move with it, and the
+Rifleman's A5 DPS was one retune behind in six places.**
+
+**Diego reported two things and they were one cause.** The midboss read **420**
+where he had set 250, and it was unkillable with the starting kit.
+`js/game.js` authored `health: 420` on the wave-11 row on 2026-07-30, and a
+wave's `health` **overrides** the type row — there is no HP scaling in this
+game, `Enemy.healthOf` is a pure override — so **the row he edited was never
+what spawned.** Measured, 420 was above what any buildable board could deliver:
+the starter kit is cash-limited to ten or eleven Riflemen by wave 11, and its
+damage into one slow body is a hard per-route ceiling (270 `rune-circuit`, 380
+`mana-coil`) that **does not move with the enemy's health**, so wave 11 ended
+the run on three of six routes. **Deleted rather than reduced**, so the type row
+is the only site the number lives at. No mechanism changed.
+
+**FOUR PINNED TOTALS MOVE, AND `AGENTS.md` CARRIED THEM IN TWENTY-FIVE PLACES.**
+`tests/run.js` moves five pins in step, and the suite is green at 107/0.
+Verified independently at runtime before writing — `waveEffectiveHealth` summed
+over `EASY_WAVES` returns 25 799 exactly.
+
+    scheduled HP     23 867 -> 23 697        effective HP   25 969 -> 25 799
+    kill bounties   $23 503 -> $23 333       run purse     $36 204 -> $36 017
+
+**Three more figures move that were not on anyone's list**, found by grepping the
+digits rather than the passage: the **clear-bounty total $2 596 → $2 579** (the
+purse arithmetic only reconciles with it, and an independent `waveBounty` sum
+returns 2 579), the **bounty-to-effective-HP ratio 0.905 → 0.9044**, and its
+against-declared-health twin **0.9847 → 0.9846**. That ratio pair is quoted
+three times and is the anchor of the conservation-exception argument, which is
+why a stale one would have mattered more than the totals did.
+
+> **AND THE SAME FIGURE WAS SPELLED TWO WAYS, WHICH IS HOW A BULK REPAIR LEAVES
+> SURVIVORS.** The clear-bounty total appears as `$2 596` in the purse table and
+> as `$2596` — no thin space — in the prose and the current-values row. A sweep
+> keyed to the spaced form fixed the table and left the other two **contradicting
+> it in the same document.** Found only by reading the staged diff in full,
+> because the survivors sit in *unchanged context* that no diff flags. Grep every
+> moved constant in both spellings before believing a bulk replace is done.
+
+**THE RIFLEMAN'S A5 DPS WAS WRONG IN SIX PLACES, INCLUDING AN ARGUMENT.**
+Reported by nadia and **confirmed independently at source before acting**:
+`js/soldier.js:336` has `damage: 8, shots: 5, cooldown: 34/60`, so
+`5 × 8 / (34/60) = **70.59**`, not the `5 × 8 / 0.6 = 66.7` the document
+carried. The source comment at `js/soldier.js:34` already says *"70.6 DPS (0.6 s
+and 66.7 until…)"* — **the code had recorded its own supersession and the
+document never followed.** The burst rate moves with it, 8.33/s → 8.82/s.
+
+> **One of the six is an ARGUMENT, and it survives in the same direction:**
+> *"Path A wins on the tower — 66.7 DPS against path B's 50"* is now 70.6
+> against 50, so the conclusion is **stronger**, not merely still true. That is
+> the good case; the dangerous one is a stale number that reverses an argument,
+> which is what the path-A price ladder did on 2026-08-12.
+
+**HELD, NOT WRITTEN — the entry for the campaign-tools rebuild.**
+`tools/simulate-campaign.js` and `tools/measure-starter-kit.js` are **rebuilt but
+uncommitted**; both last landed at `e3bd3f4` and both are dirty in the working
+tree. An entry here would describe work no clone has, so it belongs in the
+commit that lands the code, not ahead of it. Same rule that held the `AGENTS.md`
+model clause for `enemy-flying.js` on 2026-08-12.
+
+**And for the same reason the PROVENANCE VOID banner over the starter-kit table
+STAYS.** What did change is the sentence under it: *"re-measuring is unauthorised
+new work and sits with vera"* is now false — it was authorised and done, and
+**`js/meta.js:283`'s "somewhere around wave 17" was right all along**. Measured
+wave 11 on three of six routes before the wave-11 fix and **17–18 on the default
+route after it**; the dead tool's 11 and the table's w19–20 were both artefacts,
+and the 420 midboss was what had broken the premise. The banner still stays,
+for two independent reasons now recorded beside it: the repaired tool is not in
+`HEAD`, and **the table's own figures are still the dead tool's output** — they
+want re-running, not un-flagging.
 
 **2026-08-13 — `f90819e` retires the three-difficulty claims from the roster
 comments, and `AGENTS.md` stops counting the model roster it cannot keep up

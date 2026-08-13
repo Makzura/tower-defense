@@ -1,7 +1,7 @@
 # Tower Defense — project context
 
 **Version 0.5.0** — one thirty-five-wave campaign schedule at 797 bodies /
-25 969 effective HP, which can be won or lost and ends on a boss. (Three
+25 799 effective HP, which can be won or lost and ends on a boss. (Three
 selectable difficulties existed from 2026-07-30 to 2026-08-12; Normal and Hard
 were placeholders and the whole concept was deleted. See the change log.)
 A **twenty-one**-type enemy roster (swarms, armor, camo,
@@ -615,7 +615,7 @@ begins. The next wave starts when that countdown reaches zero.
 
 | waves | scheduled bodies | scheduled HP | effective HP |
 |---:|---:|---:|---:|
-| 35 | 797 | 23 867 | 25 969 |
+| 35 | 797 | 23 697 | 25 799 |
 
 Both totals are pinned by `tests/run.js` (`scheduled health across the full
 schedule` / `and what it actually takes to clear it`). Effective exceeds
@@ -817,13 +817,13 @@ time kills fewer of them. A wave says how many, how often and which type —
 groups) carries a `health` override, resolved through `Enemy.healthOf`, the
 same resolver the spawner uses.
 
-**Easy is thirty-five waves, 797 enemies, 23 867 scheduled HP**
+**Easy is thirty-five waves, 797 enemies, 23 697 scheduled HP**
 (2026-07-29, v0.4.7, rescaled since; it was 33 waves and 4308 HP, before that 20
 waves and 3094, before that two waves and 52). Both figures are pinned by
 `tests/run.js`. Scheduled HP is no longer the whole story, so
 two more numbers matter:
 
-- **25 969 EFFECTIVE HP on Easy** — what the player actually has to remove. The
+- **25 799 EFFECTIVE HP on Easy** — what the player actually has to remove. The
   owner's original target was half that ("make it so that the total is like
   13500 hp", 2026-07-29); the spine was rescaled afterwards and 13 500 is no
   longer what the schedule aims at. A
@@ -937,8 +937,8 @@ The full table with per-wave HP is a comment on `WAVES` itself;
 Balance math below).
 
 **The schedule's length is an ECONOMY constraint, not just a difficulty one.**
-Scheduled kill bounties are the bulk of the run's lifetime purse ($23 503 of
-$36 204 all in — see the table in the economy section).
+Scheduled kill bounties are the bulk of the run's lifetime purse ($23 333 of
+$36 017 all in — see the table in the economy section).
 At the old 454 HP the $800 Siphon was unbuyable — it would have sat in
 the build bar permanently greyed out, which is not meaningfully different from
 not shipping it. A test pins `purse > dearest tower × 2`; if a tower is ever
@@ -991,7 +991,7 @@ never read as a win — do not add a second assignment or derive the flag from
 `waveIndex`. The loss check runs before the victory check so a final enemy
 that both empties the board and zeroes the base reads as the defeat it is.
 
-Since total effective HP (25 969) far exceeds the base's 100, an undefended base
+Since total effective HP (25 799) far exceeds the base's 100, an undefended base
 really is destroyed — the loss path is reachable in ordinary play, not just
 by tests. Both outcomes are pinned: the loss freeze by the original tests,
 the victory path (and the manual-idiom non-victory) by
@@ -1130,11 +1130,11 @@ is one line in `Enemy.TYPES`.
 2026-07-29, at the owner's request: *"give money at the end of each round,
 around 1/10 of the hp of the wave."* `waveBounty(wave)` is
 `round(waveEffectiveHealth(wave) × WAVE_CLEAR_BOUNTY_FRACTION)`, and the
-fraction is 0.1. About **$2596** across the schedule.
+fraction is 0.1. About **$2579** across the schedule.
 
 **The bounty is a tenth of the wave's HP, not a tenth of its cash value** — HP
 and cash are now separate quantities entirely, since a body's bounty prices its
-whole threat rather than its hit points. Against the $36 204 lifetime purse the
+whole threat rather than its hit points. Against the $36 017 lifetime purse the
 clear bonus is about **7%**. Two further rewards ride on the same payout since
 2026-07-31 — the redistributed $5000 and the rising $50 + $5-per-wave allowance
 — and `waveReward()` is where the three are summed. If it is meant to stay a tenth of
@@ -1370,9 +1370,9 @@ The current authored purse is:
 | Easy starting stake | $600 |
 | progression rewards, waves 1–34 | $5 000 |
 | escalating wave allowance, waves 1–34 | $4 505 |
-| scheduled kill bounties | $23 503 |
-| wave-clear bonuses | $2 596 |
-| **authored total** | **$36 204** |
+| scheduled kill bounties | $23 333 |
+| wave-clear bonuses | $2 579 |
+| **authored total** | **$36 017** |
 
 The total excludes Fractal descendants, conditional boss summons and the
 Siphon's A3 charge bonus.
@@ -1910,13 +1910,23 @@ bar only, best build order found by sweeping:
 > different reason than it used to. That conclusion is the load-bearing part
 > and nothing here contradicts it.
 >
-> **The wave number is genuinely unknown and is being left that way.** Three
-> sources disagree — `js/meta.js:283` says "somewhere around wave 17
-> (measured — see AGENTS.md)", the table below says w19-w20, and the dead tool
-> now reports 11. **Do not reconcile them by picking one.** 11 is the dead
-> tool's output; 17 traces to a single route (`null-meridian`) of the v0.4.5
-> table further down, which is superseded. Re-measuring is unauthorised new
-> work and sits with vera.
+> **~~The wave number is genuinely unknown and is being left that way. Three
+> sources disagree… Re-measuring is unauthorised new work and sits with vera.~~
+> ANSWERED 2026-08-13, and `js/meta.js:283` was right all along.** It was
+> authorised, and measured through a repaired `measure-starter-kit.js`: **wave
+> 11 on three of six routes before the wave-11 fix, and wave 17–18 on the
+> default route after it.** So "somewhere around wave 17" was correct, and what
+> had broken it was the 420 HP midboss override deleted in `ac4ca48` — not the
+> starter kit and not the meta curve. The dead tool's 11 and the table's w19–20
+> were both artefacts.
+>
+> **THE BANNER ABOVE STAYS UNTIL TWO THINGS ARE TRUE.** The repaired tool is
+> **not in `HEAD`** as of this writing — `tools/measure-starter-kit.js` and
+> `tools/simulate-campaign.js` are uncommitted in the simulation division's tree
+> — so no clone can reproduce the figure above yet. And **the table below is
+> still the DEAD tool's output** whatever happens to the tool: those numbers
+> want re-running, not un-flagging. Lift the banner only when the rebuilt tool
+> is committed *and* the table has been re-measured through it.
 
 | policy | rune-circuit | mana-coil | sigil-lattice | null-meridian |
 |---|---|---|---|---|
@@ -2163,7 +2173,7 @@ the stretch the starting stake is tuned on):
 roster change and were stale; the ones above are what `tests/run.js` pins.)
 
 The opening contains `5 × 4 + 8 × 4 = 52` HP; the full thirty-five-wave
-schedule contains **23 867 scheduled / 25 969 effective** HP (per-wave table is a
+schedule contains **23 697 scheduled / 25 799 effective** HP (per-wave table is a
 comment on `WAVES`). Damage dealt plus health leaked to the base must add back
 to the *effective* total; that is the quickest whole-run conservation check —
 note it is a check on HP, not on cash. **Damage does not pay at all.**
@@ -2179,7 +2189,7 @@ clear actually realises. Anything balanced against the fossil clause is
 balanced against a game three times richer than the one that ships. (The
 figures here read 6466/8056 until 2026-07-30.
 Those were the v0.4.6 schedule's and were left behind when v0.4.7 rewrote it;
-23 867/25 969 are what `tests/run.js` asserts and what the harness reports.)
+23 697/25 799 are what `tests/run.js` asserts and what the harness reports.)
 
 **Effective, not scheduled, and the difference is v0.4.7's.** A shield is
 health the player must remove and a Revenant is two bodies, so effective HP is
@@ -2197,12 +2207,12 @@ on an Enemy is the same idea at the instance level.
    with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
    scales bounty with a wave's `health` override, so the ratio survives an
    override but would not survive a retune of either field. Across the whole
-   schedule the ratio is 0.905, and per type it runs 0.4545 (`colossus`) to
+   schedule the ratio is 0.9044, and per type it runs 0.4545 (`colossus`) to
    1.5 (`fast`, `camo_fast`, `camo_heavy`).
 
    **The denominator is EFFECTIVE HP — what you must actually remove — and
-   naming it is load-bearing.** 0.905 is `23 503 / 25 969`; against *declared*
-   health the same figure would be 0.9847, so the two readings are not
+   naming it is load-bearing.** 0.9044 is `23 333 / 25 799`; against *declared*
+   health the same figure would be 0.9846, so the two readings are not
    interchangeable. Every per-type number above is bounty over effective HP
    too. Measured across all 21 types on 2026-08-12.
 
@@ -2215,7 +2225,7 @@ on an Enemy is the same idea at the instance level.
    the 12 cannot be removed without the 36. `revenant` splits the same way
    (1.25 declared, 0.625 effective). Every other type is identical under both,
    which is why the mismatch stayed invisible. **Do not "correct" the range to
-   1.6667** — that would contradict the 0.905 three lines above it.
+   1.6667** — that would contradict the 0.9044 three lines above it.
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
    removes more health than the schedule names while earning exactly the
@@ -2700,7 +2710,7 @@ being precise about what moved:
   damage.
 - **`waveEffectiveHealth` did NOT change**, and must not. It measures what the
   player has to REMOVE — which is what the clear bounty is a tenth of — and
-  that is still what it measures, now 25 969. It is simply no longer a purse.
+  that is still what it measures, now 25 799. It is simply no longer a purse.
   **Confusing the two is now the easiest way to get the economy wrong**; there
   is a warning to that effect on the function itself.
 - **What it costs the player is exactly 1 364 HP** — the shields the schedule
@@ -2710,7 +2720,7 @@ being precise about what moved:
   to read "$4 092 off a $42 443 purse, a 10% pay cut", and that was damage-era
   arithmetic end to end**: $4 092 is 1 364 × 3 at the retired
   `CASH_PER_DAMAGE`, and $42 443 was the 2026-07-30 purse against a current
-  authored $36 204. Only the 1 364 HP survived the bounty merge; it is still
+  authored $36 017. Only the 1 364 HP survived the bounty merge; it is still
   measured against the real `WAVES`, not estimated. Nobody has asked for the
   schedule or the prices to move in compensation and neither was touched.
 
@@ -3188,7 +3198,7 @@ shots close together and then pauses:
 
 **The cycle is measured from one burst's START to the next**, not from the last
 shot of a burst. That is what makes the owner's DPS figures come out —
-`3 × 1 / 1.2 = 2.5` at base, `5 × 8 / 0.6 = 66.7` at A5 — and it is why
+`3 × 1 / 1.2 = 2.5` at base, `5 × 8 / (34/60) = 70.6` at A5 — and it is why
 `attacksPerSecond()` is `shotsPerBurst / burstCooldown` for a burst weapon. Shot
 spacing is therefore a *shape*: it decides how bunched a burst is, never how
 often one happens. Every tier keeps `(shots − 1) × spacing` comfortably under the
@@ -3247,7 +3257,7 @@ weapon all the way up.
 rebuilt path B and specifically to answer the dominance the rebuild created (see
 the note further down): **A4 went from 2 to 4 damage**, and **A5 from 3 to 8
 damage with 0.6 s between bursts instead of 0.7**. Shot spacing did not move.
-The ladder is now 1 / 1 / 2 / 4 / 8 damage, and A5 is 66.7 DPS where it was 21.4.
+The ladder is now 1 / 1 / 2 / 4 / 8 damage, and A5 is 70.6 DPS where it was 21.4.
 Both retuned tiers still keep `(shots − 1) × spacing` under the cooldown
 (0.28 s against 0.6 s at A5), which is the relationship a test pins.
 
@@ -3308,7 +3318,7 @@ And path A, for comparison, after its own 2026-07-30 retune:
 |---|---|---|---|
 | A3 | 2 | 4.44/s burst | 8.9 |
 | A4 | 4 | 6.25/s burst | 25.0 |
-| A5 | 8 | 8.33/s burst | **66.7** |
+| A5 | 8 | 8.82/s burst | **70.6** |
 
 **The two branches now answer each other, and getting there took two passes.**
 The path B rebuild landed first and left full B at 44 DPS against full A's 21.4 —
@@ -3317,7 +3327,7 @@ for $150 *less*, and while also carrying camo detection, armor pierce, +25 range
 quietly fixed, and the owner's answer was the A4/A5 retune above. Where it sits
 now:
 
-- **Path A wins on the tower** — 66.7 DPS against path B's 50 (60 crosspathed into A1+A2).
+- **Path A wins on the tower** — 70.6 DPS against path B's 50 (60 crosspathed into A1+A2).
 - **And path A is CHEAPER**, which is the thing to look at first: full A is
   $6 700 all in (300 + 200/325/700/1900/3275) against full B's $7 500
   (300 + 200/350/750/2100/3800). **$800 less, not $150 more** — this passage
@@ -4598,8 +4608,8 @@ no mechanic was moved to match the description.
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
-| The schedule | 35 waves, 797 enemies, 23 867 scheduled HP / **25 969 effective**, plus each Hive's brood and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
-| Wave clear bounty | a tenth of the wave's effective HP, ~$2596 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
+| The schedule | 35 waves, 797 enemies, 23 697 scheduled HP / **25 799 effective**, plus each Hive's brood and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
+| Wave clear bounty | a tenth of the wave's effective HP, ~$2579 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
 | Wave reward, all in | clear bounty + redistributed opening cash + rising allowance | `waveReward`, `waveProgressionReward`, `waveEscalatingReward` |
 | The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
 | Tyrant roar | +1000 shield, ×1.35 speed, intervals ×0.75 (12 s → 9 s), leap unlocked, and 40 bodies / 2780 HP called in at 1.5× — the running mob plus 2 Hives, 3 Shieldbearers, 3 Healers, 2 Colossi | `Enemy.TYPES.boss.phases[0]` |
@@ -4664,9 +4674,9 @@ no mechanic was moved to match the description.
 | Rifleman burst | cycle runs burst-START to burst-START; spacing is shape, not cost | `Soldier.prototype.attacksPerSecond` |
 | Rifleman automatic | B3 onwards: 2.5 shots/s, derived from the burst it replaces | `Soldier.BASE_AUTO_SHOTS_PER_SECOND` |
 | Rifleman A damage ladder | 1 / 1 / 2 / 4 / 8 | `Soldier.UPGRADES` |
-| Rifleman A5 | 8 dmg x 5 shots / 0.6 s = 66.7 DPS | `Soldier.UPGRADES` |
+| Rifleman A5 | 8 dmg x 5 shots / (34/60) s = 70.6 DPS | `Soldier.UPGRADES` |
 | Rifleman B5 | 20 dmg @ 2.5/s = 50 DPS (3.0/s and 60 with A1+A2), plus 4 recruits at 7.5 DPS each while alive, 45 s cooldown | `Soldier.UPGRADES` |
-| Rifleman full A | 6400 on top of $300 (200/325/700/1900/3275) = $6700 for 66.7 DPS | `Soldier.UPGRADES` |
+| Rifleman full A | 6400 on top of $300 (200/325/700/1900/3275) = $6700 for 70.6 DPS | `Soldier.UPGRADES` |
 | Rifleman full B | 7200 on top of $300 (200/350/750/2100/3800) = $7500 | `Soldier.UPGRADES` |
 | Rifleman cost | 300 | `Soldier.COST` |
 | Rifleman footprint | 11.25 u.l. — the gunner's, so it stands where a gunner can | `Soldier.FOOTPRINT_RADIUS_UL` |
@@ -4692,7 +4702,7 @@ no mechanic was moved to match the description.
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | $36 204 = $23 503 kill bounties + $2 596 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake | asserted in `tests/run.js` |
+| Easy run purse | $36 017 = $23 333 kill bounties + $2 579 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |
