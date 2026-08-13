@@ -13,6 +13,54 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — A manifest gate: every js file on disk must be loaded by a page,
+because no suite can tell you when one is not.**
+
+`tests/harness.js` takes its script list out of `index.html`. The corollary had
+never been written down anywhere and it is the half that ships defects: **a file
+with no `<script>` tag is never executed by any suite.** It cannot throw, cannot
+fail, cannot appear in a count. Every number the six suites print is identical
+whether that file is correct, broken or deleted, so a green board says nothing
+about it at all.
+
+The Vanguard boss demonstrated it the same day. Its model was on disk, tagged by
+no page, **and untracked in git** — while the `boss_fast` type was wired into
+`js/enemy.js`, `js/game.js`, `tests/content.test.js` and `tests/run.js`. So the
+boss was scheduled, tested and green, with nothing reaching the renderer, and a
+clean checkout would have deleted the only copy. Two people found the unwired
+half by hand within minutes of each other; no instrument found either half,
+because no instrument was looking. Rendering fixed both in `d11be9a`.
+
+`tools/check-script-manifest.js` is a set difference in both directions, run
+against `index.html` and `sandbox.html` together — loading only from
+`sandbox.html` is a deliberate documented pattern and counts as wired. **Both
+directions matter and they fail differently:** a tag with no file 404s and is
+found the moment anyone looks; a file with no tag is silent, and that is the one
+that ships.
+
+**Three classes, not two, because a gate that instantly reddens the board on
+somebody else's old defect teaches everyone to ignore it.** Deliberate
+exceptions are listed with their reasons (a v0.3.5 tombstone, a skin-pack
+template, a scene loaded by a node entry point rather than a page).
+Pre-existing unwired files sit in a **dated ledger** that prints loudly every
+run without failing the build — currently `js/gl/blub-hp.js`,
+`js/gl/siphon-enemy-fx.js` and `js/gl/siphon-ground.js`, 2 737 lines between
+them, two of which are called by files that *are* loaded. They were recorded
+unwired on 2026-08-12 and were still unwired a day later, which is the argument
+for the check: a defect nobody's instrument can see does not get fixed by being
+noticed once. Anything in neither list fails the build.
+
+**A leftover excuse outlives the problem**, so the check also fails when an
+entry in either list is no longer unwired or no longer present. Fixing a file
+and leaving its excuse behind is its own defect, and the next reader believes
+it.
+
+**Self-tested against planted violations rather than trusted.** A new unwired
+file, a tag pointing at nothing, and a stale exception each turn it red; and it
+refuses to run at all — exit 2, not a pass — if the disk walk or the tag regex
+scrapes implausibly little, because a check that can only ever say "clean" is
+not a check. The planted-orphan case reproduces the Vanguard exactly.
+
 **2026-08-13 — The title screen's strap line is gone, and the title block moved
 down 23 px to take back the space it left.**
 

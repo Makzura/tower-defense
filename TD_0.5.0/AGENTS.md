@@ -204,6 +204,18 @@ Things to know if a test misleads you:
 
 - `tests/harness.js` reads the script list **out of `index.html`**, so a new
   game file is picked up automatically. It skips `js/debug-*.js`.
+- **The corollary is the dangerous half: a file with NO `<script>` tag is never
+  executed by any suite.** It cannot throw, cannot fail, and cannot appear in
+  any count, so every suite reports the same numbers whether that file is
+  correct, broken or deleted. **"The suites pass" is not evidence that a file
+  loads.** A boss shipped this way on 2026-08-13 — model on disk, no tag, and
+  all six suites green, while the type itself was wired into `js/enemy.js`,
+  `js/game.js` and two suites. **Add the `<script>` tag in the same commit as
+  the file.** `node tools/check-script-manifest.js` is the standing check:
+  every `js/**/*.js` is tagged by `index.html` or `sandbox.html`, and every tag
+  points at a file that exists. Deliberate exceptions are listed in that file
+  with their reasons, and pre-existing unwired files sit in a dated ledger that
+  prints every run without failing the build. `tools/ci-check.js` runs it.
 - A hidden browser tab pauses `requestAnimationFrame` entirely, so the canvas
   freezes and nothing simulates. That has fooled a debugging session before —
   if the game looks dead in a background tab, it is not a bug.

@@ -249,6 +249,25 @@ results.forEach(function (x) {
   cleared.forEach(function (n) { console.log("      GONE " + n); });
 });
 
+// THE SUITES CANNOT SEE THE WHOLE TREE, so the gate does not stop at them.
+// `tests/harness.js` takes its script list out of `index.html`, which means a
+// file with no <script> tag is never executed by any suite: it cannot throw,
+// cannot fail, and cannot appear in any count above. Every number on this page
+// stays identical whether such a file is correct, broken or deleted. Added
+// 2026-08-13 after a boss shipped with a model no page loaded and all six
+// suites stayed green. See tools/check-script-manifest.js for the full story.
+console.log("");
+var manifest = cp.spawnSync("node",
+  [path.join(ROOT, "tools", "check-script-manifest.js")],
+  { cwd: ROOT, encoding: "utf8" });
+console.log((manifest.stdout || "").replace(/\n+$/, ""));
+if (manifest.stderr) console.log(manifest.stderr.replace(/\n+$/, ""));
+if (manifest.status !== 0) {
+  console.log("  <-- MANIFEST: a js file is loaded by no page, or a page asks");
+  console.log("      for a file that is not there. No suite can catch either.");
+  bad++;
+}
+
 console.log("");
 if (bad) {
   console.log(bad + " problem(s) against the measured baseline. A NEW name is a");
