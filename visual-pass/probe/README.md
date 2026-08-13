@@ -41,8 +41,45 @@ navigation, assert the thing you navigated away from is gone.
 
 ## Before reporting a mechanism, check it exists — and that it is running
 
-The same failure as everything above, in a different instrument, and harder to
-see because the instrument is a `git log` rather than a probe.
+**I had a remembered mechanism, it fit the observation, and I reported it
+without asking what a world where it was false would look like.**
+
+That is the whole rule, and it is not about git. It is the question this
+directory already asks of a rendering claim — *what would a
+broken-in-the-opposite-direction implementation photograph as?* — asked of an
+explanation instead of an image. An explanation that fits the evidence is the
+start of a check, not the end of one.
+
+Three corollaries, each of which cost somebody a run today.
+
+**A negative existential needs its search space stated, or it is not a finding.**
+Correcting me, kaz read the post-commit hook and `git-sync.sh`, found no timer,
+and wrote "there is no scheduler, no auto-commit, no daemon". The search was
+bounded and the claim was universal. What he actually had — *the post-commit
+path contains no timer* — was true, and was all he had. Say which space you
+searched, every time.
+
+**A true note about something that has since stopped being true is worse than a
+wrong one, because it survives checking.** The mechanism I quoted was real, and
+sat in my own notes as a live fact with no date beside it and no way to test it.
+Nothing about reading it suggested it needed testing. **Date a claim, or write
+the command that settles it beside the claim** — the second is better, because
+it turns something you believe into something you can run:
+
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+      Where-Object { $_.CommandLine -like '*autopush*' }
+
+**Verify a correction as hard as the thing it corrects.** I checked kaz's
+account instead of accepting it, which is how the still-live half surfaced; he
+then checked mine independently and found two properties neither of us had
+named. Neither pass was wasted.
+
+---
+
+The git-specific version, which is where all of that came from.
+
+The same failure in a different instrument, and harder to see because the
+instrument is a `git log` rather than a probe.
 
 I reported that my uncommitted edit reached HEAD inside another agent's commit
 **because something commits working-tree changes on a timer**. The observation
