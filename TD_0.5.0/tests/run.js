@@ -197,7 +197,7 @@ test("the schedule is the authored thirty-five waves, opening intact", function 
     { count: 16, interval: 0.55, health: 6 },
     { count: 10, interval: 0.9,  type: "armored", health: 7 },
     { count: 10, interval: 1,    type: "slow",    health: 14 },
-    { count: 1,  interval: 1,    type: "midboss", health: 420 }
+    { count: 1,  interval: 1,    type: "midboss" }
   ], "the introduction, up to and including the midboss");
 
   // A health override changes toughness only, never the type's identity, its
@@ -225,8 +225,8 @@ test("the schedule totals about 26 000 authored effective HP", function (t) {
   var total = 0;
   h.game.WAVES.forEach(function (wave) { total += h.game.waveEffectiveHealth(wave); });
 
-  t.ok(Math.abs(total - 25969) < 100,
-    "25 969 authored effective HP across the schedule (" + total + ")");
+  t.ok(Math.abs(total - 25799) < 100,
+    "25 799 authored effective HP across the schedule (" + total + ")");
 
   // THE CURVE, not just the total. Wave 35 alone is more than the first
   // twenty-one put together, and the last third is where the growth lives --
@@ -2098,8 +2098,8 @@ test("wave arithmetic records the incoming burst and total health", function (t)
 
   t.near(waveOneBurst, 5, 0.001, "wave 1 burst HP/s");
   t.near(waveTwoBurst, 4, 0.001, "wave 2 burst HP/s");
-  t.eq(scheduled, 23867, "scheduled health across the full schedule");
-  t.eq(effective, 25969, "and what it actually takes to clear it");
+  t.eq(scheduled, 23697, "scheduled health across the full schedule");
+  t.eq(effective, 25799, "and what it actually takes to clear it");
   t.ok(unpaid > 0 && unpaid < effective * 0.25,
     "shields remain a real part of the work (" + unpaid + " of " + effective + ")");
   t.ok(supplied < waveOneBurst, "one gunner is below the wave 1 burst");
@@ -2138,7 +2138,7 @@ test("wave arithmetic records the incoming burst and total health", function (t)
     killIncome += h.game.waveKillBounty(wave);
     clearIncome += h.game.waveBounty(wave);
   });
-  t.eq(killIncome, 23503, "scheduled kill bounties");
+  t.eq(killIncome, 23333, "scheduled kill bounties");
   var progressionIncome = 0;
   var escalatingIncome = 0;
   for (var waveNumber = 1; waveNumber <= h.game.WAVES.length; waveNumber++) {
@@ -2147,7 +2147,7 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   }
   var purse = killIncome + clearIncome + progressionIncome + escalatingIncome +
     h.game.STARTING_CASH;
-  t.eq(purse, 36204, "authored run purse before conditional rewards");
+  t.eq(purse, 36017, "authored run purse before conditional rewards");
   var dearest = h.game.BUILD_SLOTS.reduce(function (max, type) {
     return type && type.COST > max ? type.COST : max;
   }, 0);

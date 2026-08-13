@@ -245,11 +245,32 @@ var EASY_WAVES = [
 
   // --- 11: THE MIDBOSS. The line the roster is split on.
   //
-  // 420 rather than the type's own 250 (2026-07-30). The base has 100 HP and
-  // pays an enemy's REMAINING health on a leak, so this was already a wave you
-  // could not simply let through; what the extra 170 buys is that you can no
-  // longer half-answer it either -- a board that gets it to 40% still loses.
-  { count: 1,  interval: 1,    type: "midboss", health: 420 },    // 420 HP
+  // NO HEALTH OVERRIDE, DELIBERATELY. This row carries the midboss type's own
+  // 250, so the type row in js/enemy.js is the only place that number lives --
+  // edit it there and this wave follows. It is the one wave in the schedule
+  // authored that way, and the reason is below.
+  //
+  // It WAS overridden to 420, from 2026-07-30 to 2026-08-13, to buy the
+  // property that a half-answer still loses. Measured, the override cost the
+  // wave its entire audience. The starting kit is cash-limited to ten or
+  // eleven Riflemen by wave 11 ($3326 is every dollar the schedule has paid by
+  // then) and its damage into a single slow body is a hard per-route CEILING --
+  // 270 on the default route, 380 on the most generous - that does not move
+  // with the midboss's health. 420 sat above every one of those ceilings, so no
+  // board a player could build answered it: a wall rather than a check, and it
+  // ended the run on three of the six routes.
+  //
+  // 250 restores the check without the wall. The base has 100 HP and pays an
+  // enemy's REMAINING health on a leak, so surviving means removing 150 of it.
+  // A well-built board kills it outright and walks on; an ordinary one lives on
+  // about ten points of base; a board that never got built still dies. That is
+  // the shape wave 24 teaches at 90 HP against a 100 HP base -- ruined, warned,
+  // and still holding the break in which to fix it.
+  //
+  // BEFORE RAISING IT AGAIN, measure the kit's ceiling on the weakest route.
+  // The knee is exactly ceiling + 100, it is a step and not a gradient, and
+  // sweeping this number only chooses which side of it the player lands on.
+  { count: 1,  interval: 1,    type: "midboss" },                 // 250 HP
 
   // --- 12-21: the second roster, one new type at a time.
   //
