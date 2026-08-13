@@ -30,6 +30,41 @@
 //
 // `first`/`count` in groups[] are VERTEX indices, not triangle indices.
 //
+// ===========================================================================
+// A CONTACT MEASURE MUST TRACK A **MATERIAL** POINT. THIS IS THE RULE THAT
+// COST THREE PEOPLE A DAY, AND THE NATURAL DEFINITION IS THE WRONG ONE.
+// ===========================================================================
+//
+// The obvious way to find the contact is "the lowest vertices, this frame".
+// It is wrong, and it is wrong in the direction that looks like diligence.
+//
+// A foot ROLLS. The set of lowest vertices is a geometric LOCUS, and as the
+// foot rolls that locus jumps between entirely different MATERIAL points. On
+// enemy-normal's `leg_l` the changeover is total: the sole goes flat at frames
+// 0 and 4 (26 coplanar vertices at the minimum) and stands on a single corner
+// elsewhere -- rest x +0.125 through the toe half, -0.035 through the heel
+// half -- so frame 0 to frame 1 shares ZERO of 26 vertices, and so does frame
+// 4 to frame 5. The displacement of that locus is not the displacement of
+// anything physical.
+//
+// Measured three ways on the same file, same group, same window {6,7,0,1}:
+//
+//     mean of the lowest vertices per frame   0.18643 u    55.3%   WRONG
+//     fixed sole set, chosen once at rest     0.33251 u    98.6%   right
+//     one material vertex (heel 2856)         0.34252 u   101.6%   right
+//
+// The two material routes bracket 100% from either side. The locus measure
+// under-reports the true sweep by about 45% and reads as a body that slides:
+// a FALSE ALARM, not a false pass, which is the harder kind to disbelieve.
+//
+// So `sole` below is computed ONCE from the REST positions and then tracked --
+// it is a fixed set of material points, not a per-frame lowest set. The
+// per-frame minimum z is used ONLY to decide whether the foot is down, never
+// to decide where it is.
+//
+// `contactChurn` reports the membership change anyway, so that anyone who
+// reimplements this the natural way is told rather than left to discover it.
+//
 // Usage:
 //   node tools/check-gait-slip.js                    # every meshed enemy
 //   node tools/check-gait-slip.js enemy-normal ...   # named models
@@ -215,8 +250,30 @@ function analyse(name, data, opts) {
       }
       cand.x[f] = sx / cand.sole.length;
       cand.z[f] = mz;
+      // The LOCUS of lowest vertices this frame -- computed only to report how
+      // badly it churns, never to measure position. See the header.
+      var lowest = {};
+      for (k = 0; k < cand.sole.length; k++) {
+        var vj = cand.sole[k];
+        var zj = applyZ(m, pos[vj], pos[vj + 1], pos[vj + 2]);
+        if (zj <= mz + 1e-4) lowest[vj] = 1;
+      }
+      cand.lowest = cand.lowest || [];
+      cand.lowest[f] = lowest;
     }
     cand.minZ = Math.min.apply(null, cand.z);
+    // Membership overlap between consecutive frames, wrap included.
+    var churn = [], worstChurn = 1;
+    for (f = 0; f < N; f++) {
+      var a = cand.lowest[f], bnext = cand.lowest[(f + 1) % N];
+      var ka = Object.keys(a), shared = 0;
+      for (k = 0; k < ka.length; k++) if (bnext[ka[k]]) shared++;
+      var frac = ka.length ? shared / ka.length : 1;
+      churn.push({ from: f, to: (f + 1) % N, of: ka.length, shared: shared });
+      if (frac < worstChurn) worstChurn = frac;
+    }
+    cand.churn = churn;
+    cand.worstOverlap = worstChurn;
   }
 
   // PLAN EXTENT, per frame, over every vertex through its own group matrix.
@@ -334,6 +391,11 @@ function analyse(name, data, opts) {
       restMinZ: cd.restMinZ,
       minContactZ: cd.minZ,
       plantedFrames: planted,
+      // How much the lowest-vertex LOCUS churns. 0 means a frame pair shares
+      // no material point at all -- a rolling foot. Reported so that a reader
+      // who measures the locus instead of a fixed material set is warned.
+      worstLocusOverlap: cd.worstOverlap,
+      locusChurn: opts.verbose ? cd.churn : undefined,
       spans: spanReports,
       gaitErrorUnits: worst,
       gaitErrorPx: worst * unitsToPx * scale,

@@ -13,6 +13,49 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The contact-measure rule, learned the hard way: a contact
+measure must track a MATERIAL point, and the natural definition is the wrong
+one.**
+
+Three people measured the Gleaner's planted sweep and got 44.6%, 55.3% and
+98.6% of requirement. The low answers were not arithmetic slips — they came from
+the most obvious definition available, *"the lowest vertices, this frame"*.
+
+**A foot ROLLS, so the set of lowest vertices is a geometric LOCUS that jumps
+between different MATERIAL points as it rolls.** On `enemy-normal`'s `leg_l` the
+changeover is total: the sole goes flat at frames 0 and 4 (26 coplanar vertices
+at the minimum) and stands on a single corner elsewhere — rest x +0.125 through
+the toe half, −0.035 through the heel half. Frame 0 to frame 1 shares **zero of
+26** vertices; so does frame 4 to frame 5. The displacement of that locus is not
+the displacement of anything physical.
+
+Three measures, same file, same group, same window {6,7,0,1}:
+
+| measure | sweep | of requirement | |
+|---|---|---|---|
+| mean of the lowest vertices per frame | 0.18643 u | 55.3% | **wrong** |
+| fixed sole set, chosen once at rest | 0.33251 u | 98.6% | right |
+| one material vertex (heel 2856) | 0.34252 u | 101.6% | right |
+
+**The two material routes bracket 100% from either side.** The locus measure
+under-reports by about 45% and reads as a body that slides — a **false alarm,
+not a false pass**, which is the harder kind to disbelieve because it looks like
+diligence.
+
+`check-gait-slip.js` was already correct here: its `sole` is computed once from
+the REST positions and then tracked, so it is a fixed set of material points.
+The per-frame minimum z is used only to decide whether the foot is DOWN, never
+where it IS. That was correct by construction and undocumented, which is exactly
+the kind of correctness that dies when someone reimplements it — so the rule is
+now written into the file's header, and the tool additionally reports
+`worstLocusOverlap`, the smallest membership overlap between consecutive frames.
+It reads **0.000** on `enemy-normal`, so anyone measuring the locus is told.
+
+**And the premise this corrects: the Gleaner is not a defect.** At 98.6-101.6%
+of requirement its slip is 0.168-0.277 board px, a fifth of a screen pixel.
+*"No walker's foot is exactly still"* and *"the roster slides"* are very
+different claims and only the first is true. The real defects are the heavies.
+
 **2026-08-13 — `tools/blender/gait_solve.py`: solve the swing angle against the
 stride instead of hand-picking it. Measured residual 0.00143 board px.**
 
