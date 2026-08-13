@@ -48,23 +48,36 @@ Openness survives as a zoom reward. What separates this body is being the
 tallest thing on the road with a wide flat frame where every other body has a
 head.
 
-**THE CROWN TARGET IS CARRIED IN MODEL UNITS, AND THAT MATTERS MORE THAN THE
-BODY DOES.** The px figure the brief originally carried was wrong in three
-compounding ways discovered in one day — an unnamed axis, an unnamed viewport,
-and finally an unnamed *canvas*: silhouettes are measured on `#gl` at 1111×625
-while `HOUSE-STANDARD`'s px-per-unit table is `#game` at 1280×720, a 13%
-difference. The rule that survives is **carry the unit quantity and convert only
-at the point of use, knowingly** — a px figure is a rendering of a number, not
-the number.
+**CROWN IS A RASTERISED STATISTIC AND HAS NO MODEL-UNIT FORM — IT IS QUOTED IN
+ITS OWN SPACE ON PURPOSE.** The instrument (`scratchpad/mira-six2.js`,
+`mira-primitive-audit.js`) defines `crown` as the **mean width of the top three
+lit rows**: horizontal, screen-space, and sampled from whichever model axis
+faces the camera at that bearing.
 
-Crown at the worst bearing, stated in all three rulers so it cannot be misread:
+      crown, worst bearing, #game space (1280x720)
+      target      6.00 px
+      BUILT       6.67 px      +11.2%
 
-                  units      #game px    #gl px
-      target      0.3639      6.00        5.21
-      BUILT       0.4045      6.67        5.79
-      headroom    0.0406 u  = 11.2% above target
+**Both sides come from that one instrument with that one definition, so the
+comparison holds — and there is deliberately no unit column.** An earlier draft
+of this entry carried one (0.3639 u / 0.4045 u); it was withdrawn. Converting a
+bearing-dependent raster statistic into model units is a **category error, not a
+mis-scaling** — there is no ruler-independent version to convert to — and the
+attempt had also applied the *vertical* scale (16.49) to a *horizontal*
+quantity.
 
-**It clears in every ruler.** The 6.0 target itself came from
+The general rule — **carry the unit quantity and convert only at the point of
+use** — holds for a *geometric extent* (an apex height, a section radius, a plan
+envelope) and **stops at a rasterised statistic**. For those the honest form is
+the opposite: **keep it in its own space and name the space, the canvas and the
+definition.** The rule was live because a px figure in the brief had been found
+wrong in three compounding ways in a single day — unnamed axis, then unnamed
+camera distance, then unnamed *canvas* (silhouettes rasterise on `#gl` at
+1111×625 while `HOUSE-STANDARD`'s px-per-unit table is `#game` at 1280×720, a
+13% gap). The Courier's 1.24 u apex was untouched by all three, because that one
+is a genuine geometric extent.
+
+The 6.0 target itself came from
 `mira-primitive-audit.js` re-measuring against real primitives rather than
 sharp-box proxies — four of five bodies matched to the digit, but this one's
 worst-bearing crown drops 7.0 → 6.0 because `td_scene.box` bevels by default.
