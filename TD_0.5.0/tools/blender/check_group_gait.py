@@ -52,6 +52,18 @@
 # Skimmer and Tun take the wrapper. A grep for `animate_walk_grouped` alone
 # shows five of the eight and makes the other three look like anomalies.
 #
+# **AND `AGENTS.md` ALREADY SAID SO -- SEE ITS CLAUSE AT ~:4473, "prefer immunity
+# by CONSTRUCTION to immunity by arithmetic".** It clears both bosses of the
+# `groups[0][0]` steering defect on the grounds that "neither module calls the
+# defective functions at all", and it names `chassis.animate_walk_grouped` in the
+# list. That is this whole paragraph in one sentence, and it was in the source of
+# truth before any of the three of us derived it -- from source, from the call
+# graph, and from a Blender run. **When a dispute is about a MECHANISM, grep
+# `AGENTS.md` before grepping the code** (petra's rule, and she is the archivist,
+# so it cost her most to say). Note also WHY that clause survived the Tripod
+# landing while my sentence rotted: it names the REASON, which keeps holding when
+# the leg count changes. Stated as a count it would have gone stale the same day.
+#
 # **THE ROOT CAUSE IS ONE SCREEN BELOW, IN THE CODE.** `derive_bodies()` selects
 # on `"import enemy_chassis" in handle.read()` -- **the population is defined by
 # IMPORT and the perturbation propagates by CALL.** Those sets are not equal and
