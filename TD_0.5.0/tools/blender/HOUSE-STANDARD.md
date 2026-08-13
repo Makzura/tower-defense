@@ -515,17 +515,57 @@ contrast ratio, not luminance gap, is the right instrument.
 > because every setter puts back — one missed `else` from a ground enemy
 > inheriting a flier's lantern.
 
-**Every figure in the table below is a CEILING, never an underestimate.** This is
-kaz's addition and it is the half I could not have reached: the shader lights
-palette colours before they reach the screen, and shading a pair **down** drives
-their ratio toward 1.0, while shading **up** only ever approaches the raw
-luminance ratio. So the raw palette figure is the best case a pair can achieve
-under any lighting at all, and real shadow can only be worse.
+> **⚠ RETRACTED 2026-08-13 — THE "CEILING" CLAIM BELOW IS FALSE, AND IT WAS MINE.
+> COMPUTE CONTRAST ON RENDERED PIXELS, NEVER ON PALETTE VALUES.**
+>
+> I wrote and ratified the claim that every palette figure is a ceiling, so a pair
+> failing on paper could not be rescued by lighting. **juno measured it and it is
+> wrong in both directions:**
+>
+> | pair | palette CR | rendered CR |
+> |---|---|---|
+> | tin bar on tin hip | **1.00** | **1.25 – 1.40** |
+> | brass bar on tin hip | **2.17** | **1.30 – 1.88** |
+>
+> **Roughly 0.3–0.7 CR of error with no reliable sign**, so the palette figure is
+> not usable even as a conservative bound. Shading *manufactures* contrast where
+> two materials are identical and *eats* it where they differ.
+>
+> **The error was a hidden assumption, not arithmetic.** The proof ran: shading
+> multiplies both colours, so their ratio moves toward 1.0. That holds only if
+> **both surfaces receive the same illumination** — and two parts at different
+> angles under one directional key do not. A bar lying across a hip has different
+> normals from the hip, so the two take different multipliers and the ratio can
+> move either way. The shader also lights in linear and converts to sRGB once at
+> the end. **The palette number is ALBEDO: an input to the render, not a
+> prediction of it.**
+>
+> **So "a pair that fails on paper cannot be rescued by lighting" is false.** Tin
+> on tin is CR 1.00 on paper and renders at 1.25–1.40 from geometry alone.
+>
+> **What survives is most of the section: contrast ratio is still the right
+> instrument and the thresholds below still stand.** What changes is the input.
+> **Measure the candidate material on RENDERED PIXELS before it is exported** —
+> juno can run a candidate in one pass, which catches this before a build instead
+> of after one.
+>
+> **This invalidates a METHOD, not a value.** The Hedger's crank was chosen brass
+> over tin on palette arithmetic — a method now known to carry error larger than
+> some of the margins it was deciding between. Brass still came out better than
+> tin when rendered, but that was **luck rather than knowledge**, and the table it
+> was chosen from cannot be trusted for the next call.
 
-**Consequence: a pair that fails on paper cannot be rescued by lighting.** When a
-CR figure here says two parts merge, that is a proof and not a prediction. It
-also means this table can be used to reject a palette *before* anything is
-lit — which is the whole point of having it.
+**~~Every figure in the table below is a CEILING, never an underestimate.~~
+RETRACTED — see the box above.** The reasoning was kaz's: the shader lights
+palette colours before they reach the screen, and shading a pair **down** drives
+their ratio toward 1.0 while shading **up** only ever approaches the raw
+luminance ratio. It assumed a single illumination shared by both surfaces, which
+is precisely what two parts at different angles do not have.
+
+**~~Consequence: a pair that fails on paper cannot be rescued by lighting.~~
+ALSO RETRACTED.** The table can still **shortlist** a palette before anything is
+lit. It cannot **reject** one, and it cannot settle a choice between two
+candidates whose paper figures differ by less than about 0.7 CR.
 
 ### The Siphon palette, measured
 
