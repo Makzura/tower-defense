@@ -18,7 +18,29 @@ hers to change.
 
 ## 0. The box, and the ruler
 
-At the default camera a whole A4 Siphon occupies **22 x 35 px (screen)**.
+At the default camera a whole **base / A1** Siphon occupies **22 x 35 px (screen)**.
+
+> **TIER LABEL CORRECTED 2026-08-13 (mira, measured; kaz, confirmed and landed).
+> This line said A4 from the day it was written, and it is the base tier.** The
+> proof needs no camera and no projection, because it is in Blender units: this
+> section's own height figure is **1.790 u**, which matches base and A1 to 0.3%
+> and A4 to **9%**. Measured z extents: base 1.795, a1 1.795, a2 1.796, a3 1.877,
+> **a4 1.956**, a5 2.072. Section 5 of this document already contradicted section
+> 0 — it says the figure grows 1.790 → 2.080 across five tiers, which is only
+> consistent if 1.790 is the *bottom* of that range.
+>
+> Boxes, mira's rig at yaw 90: **base 21.6 x 35.7, A1 21.9 x 35.7, A4 21.5 x
+> 39.3.** Lit px: **base 458, A1 461, A4 493** against the 447/462 recorded
+> below. **A4 is 7% above the documented figure; A1 is within one pixel of it.**
+>
+> **The direction was safe and the label was not.** Base is the smallest A-tier,
+> so everyone has been designing to the tightest box. But the next person to
+> measure A4 would have got 39 px of height and concluded the standard was 12%
+> out. This was nearly compounded: I instructed mira to re-anchor her rasteriser
+> on A4, which would have scaled her instrument to make 493 read as 462 and
+> carried a **6.7% error into every model from here.** She checked before
+> complying. **"Reads at 22 x 35 px" is the most-quoted line in this project** —
+> quote it with its tier.
 
 | | measured | by |
 |---|---|---|
@@ -212,7 +234,98 @@ gesture, with the life taken out of it.
 
 ---
 
-## 3. A feature needs roughly 40–50 px to be a feature
+## 3. A feature needs roughly 40–50 px to be a feature — **ON A TOWER**
+
+> **SCOPED 2026-08-13 (kaz's ruling, standing). THE 40–50 px FLOOR IS A TOWER
+> NUMBER AND DOES NOT TRANSFER TO AN ENEMY.** It was calibrated on the sceptre:
+> **52 px on a 447 px figure = 11.6%.** The Gleaner at the same camera is
+> **~148 lit px** — a third of the linear size — so applying an absolute pixel
+> threshold across a 3x difference in the subject is a correct measurement
+> against the wrong population. **The proportional form is what carries:
+> ~11% of the figure, which is ~16 px on a 148 px body.**
+>
+> Worked example, the Drudge: measured silhouette separation **30.6 px = 20.7%
+> of the figure**, against the sceptre's 11.6%. **Proportionally 1.8x the
+> most-discussed feature in the game.** Passed.
+>
+> **AND THE PROPORTIONAL FORM IS THE ONLY ONE THAT SURVIVES A ZOOMABLE CAMERA.**
+> This is the deeper reason and it outranks the population argument. The player
+> controls distance from 180 to 4200; a figure measured at 900 is **2.247x**
+> linear and ~5x in area the same figure measured at the fitted default of
+> ~2022. **An absolute pixel floor therefore has a different value at every
+> camera distance and is not a property of the model at all.** A ratio of two
+> lengths measured in the same frame is invariant under it. When a rule must
+> name the view it protects (section 2), a rule expressed as a proportion does
+> not have to.
+>
+> This was found the hard way: two honest measurements of the Gleaner disagreed
+> by 2.3x linear and 4.5x in area, and one of them was taken at `OrbitCamera`'s
+> **constructor default of 900** rather than the distance `gl-world.js:947`
+> solves with `fitBounds()`. Diego identified the cause in one line — *"the game
+> has zoom integrated, so maybe one zoomed while measuring"* — against two wrong
+> hypotheses from me.
+>
+> **THE BRACKET IS CLOSED — 2026-08-13, juno.** This section has rested on a
+> single calibrated point since it was written, and it now has both ends:
+>
+> | | feature | of figure | verdict |
+> |---|---|---|---|
+> | reads | sceptre, **52 px** | 11.6% of 447 px | the calibrated point |
+> | **does NOT read** | **Gleaner inspection windows, 1–4 px** | **0.7–3% of 134 px** | measured negative |
+>
+> The negative control is strong: all three windows together occupy 0–6 px, and
+> **deleting them entirely changes ZERO pixels above a 32/255 threshold at four
+> of eight yaws** — a feature that provably does not read, on a shipping model,
+> at the camera the game boots into. That is the measurement this section asked
+> for and could not have without someone building the negative case.
+>
+> **AND AREA ALONE CANNOT BE THE FLOOR.** At yaw 45 the **lens is 1 px and
+> survives** a 32/255 deletion; the **cargo core is also 1 px and does not.**
+> Identical area, opposite outcome, local contrast 68 against 10.
+>
+> **THE THIRD TERM IS OCCLUSION, AND IT IS A GATE RATHER THAN A MODIFIER**
+> (mira, 2026-08-13, read off the source geometry rather than inferred from
+> pixels). My first form of this rule said *area AND contrast, either alone
+> insufficient, high contrast survivable below the area floor* — internally
+> inconsistent, because an AND cannot be survivable below one of its terms. The
+> form that fits all four data points:
+>
+> > **A feature reads if it clears the AREA floor, OR if it clears the CONTRAST
+> > floor while being UNOCCLUDED. Occlusion gates the second route; it does not
+> > scale it.**
+>
+> 1. **Area** — >= ~11% of the figure's lit px.
+> 2. **Contrast** — >= CR 2.0 against the material it directly abuts (section 4).
+> 3. **Unoccluded** — no geometry of the model's own crosses in front of it.
+>
+> | feature | area | contrast | unoccluded | outcome |
+> |---|---|---|---|---|
+> | sceptre, 52 px = 11.6% | **pass** | pass | pass | **reads** |
+> | lens, 1 px @ yaw 45 | fail | pass, CR 3.27 | **pass** | **survives** |
+> | cargo core, 1 px @ yaw 45 | fail | pass, CR 3.27 | **FAIL** | **dies** |
+> | inspection windows, 0–6 px | fail | pass on paper | **FAIL** | **dies** |
+>
+> The occlusion column is geometry, not interpretation: the **lens** ball's face
+> reaches x=0.228 against its ring's 0.183, so it stands ~0.045 u proud with
+> nothing in front of it; the **cargo core**'s face is at x=0.247 with
+> `cargo_guard_vertical` and `cargo_guard_horizontal` both spanning 0.237–0.267
+> — **two bars directly across it**; the **windows** sit behind
+> `cargo_side_strut_l` at y=0.171. **That is why identical area and identical
+> material gave opposite outcomes.**
+>
+> **The consequence for a brief, and it is the sentence to use: a small feature
+> does not need to be bigger — it needs to be moved to where nothing crosses it,
+> which is the silhouette edge. That is free, where area is not.** This is
+> section 6's "motion at an unoccluded extremity" and section 7's "don't spend
+> detail at a beam origin" arriving a third time, which is the first sign it is
+> the real variable rather than a third patch. **Occlusion is checkable in the
+> build script before anything is exported**, which is the property a floor most
+> wants.
+>
+> **Every figure here is at the fitted default (~2021).** At distance 900 those
+> same invisible windows are 4–27 px and clearly visible — which is section 2's
+> point arriving inside section 3, and the reason the proportional form is the
+> durable one. None of this is measured over `file://`, only over http.
 
 The one calibrated point: the sceptre at **52 px, 11% of the figure**, is the
 most-discussed feature on this model and it reads.
@@ -248,6 +361,33 @@ contrast ratio, not luminance gap, is the right instrument.
 | **under 1.25** | they are the same value. They merge into one shape. |
 | **1.25 – 1.6** | separates only across a long, roughly straight boundary |
 | **over 2.0** | reads as two things anywhere, including across a jagged 3 px edge |
+
+> **THE TABLE IS EXACTLY RIGHT FOR ENEMIES AND UNDERSTATES CONTRAST ON TOWERS —
+> because EMISSION IS INERT ON EVERY GROUND ENEMY.** Verified in the shader
+> 2026-08-13 (mira found it, kaz confirmed, juno reached it independently). The
+> fragment shader's only emissive term is `lit += uGlowTint * (vEmi * uGlow)` —
+> purely multiplicative — and in the enemy draw loop `setGlow` is called **only
+> under `if (e.isFlying)`**, and put back immediately after. **A walker never
+> sets it.**
+>
+> So the Gleaner's three authored emission tiers — lens 4.2, cargo core 1.55,
+> inspection windows 0.58 — **all render as flat `core_red` #DE4F54, identical to
+> one another.** The tuning comment in `enemy_normal.py` explaining that panes at
+> emission 2 "blew out to flat pink tabs" is live in the Blender and sprite paths
+> and **inert in the shipping GL renderer.**
+>
+> Three consequences. This table is computed on base albedo, which is exactly
+> what an enemy renders, so **it is correct as written wherever it has actually
+> been used**; it would understate contrast on **towers**, where `towerGlow` is
+> non-zero. **There is no bloom on a ground enemy to rescue a sub-threshold
+> feature — the spread is zero by construction, not by measurement.** And nobody
+> should "fix" a model over this: it is a fact to know before anyone briefs
+> *make it glow* on a walker.
+>
+> Related hazard, low priority, for the GL owner: `setGlow` is state rather than
+> an argument, and the sphere-type branch has no put-back of its own. Safe today
+> because every setter puts back — one missed `else` from a ground enemy
+> inheriting a flier's lantern.
 
 **Every figure in the table below is a CEILING, never an underestimate.** This is
 kaz's addition and it is the half I could not have reached: the shader lights
