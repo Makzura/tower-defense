@@ -298,6 +298,18 @@ explicit paths do not protect you when two people are editing the same file.**
 The rule needs its second half: **`git diff --cached` before every commit, and if
 a hunk is not yours, stop.**
 
+> *(Later the same day this rule was stated canonically in
+> `.claude/org/PROTOCOL.md` → **"Anything you quote to direct someone else's work
+> carries its provenance"**, and it gained two halves this entry does not have:
+> **"stop" needs a next step** — the `git apply --cached` recipe for staging only
+> your own hunk, because without one the next person under time pressure commits
+> anyway — and **vera's finding that `git diff --cached --name-only` cannot
+> detect this failure at all**, since it prints the same single filename whether
+> or not someone else's hunks rode along inside it. **Do not act on the
+> two-thirds version recorded above; the file-list check reads as diligence and
+> is blind by construction.** The rule is not repeated here — that is the point
+> of it living there.)*
+
 **2026-08-13 — RETRACTION, same day, of my own ranking claim. A palette table
 cannot reject, cannot threshold and CANNOT RANK. It can only flag a gross
 difference.**
