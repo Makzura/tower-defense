@@ -104,6 +104,36 @@ reference viewport:
 > f0-vs-f3 at 224 px against f0-vs-f6 at 111 px on the Hedger's crank. This is
 > why *frame* is one of the terms every figure must name.
 
+> **REST POSE AND ALL-FRAMES ARE TWO DIFFERENT WIDTHS, AND THE SECOND IS THE ONE
+> A PLAYER SEES.** Rest answers *how wide is it standing*; the all-frames union
+> answers *how wide is the space it sweeps*. For a walking body they differ by a
+> lot — the pre-rebuild Skimmer was 0.510 u at rest and **0.571 swept**, because
+> the arms swing outward. Quote which one, every time. (otto, 2026-08-13.)
+>
+> **AND NEVER AVERAGE A WIDTH OVER YAWS.** Kaz swept mean width over 12 bearings,
+> found the rebuilt Skimmer at 0.871 of the Gleaner's width and 0.868 of its
+> height, and reported *a uniform shrink — the one thing the card forbids*. The
+> mean was correct and it **destroyed the signal**: per bearing the narrowing is
+> **−10% head-on and −35% broadside**, and the measured separation tracks the
+> anisotropy (0.69 front, 0.81 broadside) rather than the mean. It nearly caused
+> the revert of a rebuild that had worked. **A body yaws with the path, so width
+> is a curve over bearing and collapsing it to one number is a population error.**
+>
+> **MEASURE ADJACENT-PAIR SEPARATION AT THREE BEARINGS, NOT ONE.** Two separate
+> defects hid behind the standard three-quarter view in a single day: the
+> Skimmer's, and then **Gleaner vs Tun at 0.57 broadside — the worst pair on the
+> board, on a model that scores 0.80–0.89 at the two standard views and was
+> signed off on them.** Front, three-quarter and broadside cost one run.
+
+> **MODELS ARE NAMED FOR THE `typeId`. LORE NAMES LIVE IN CARDS AND COMMIT
+> SUBJECTS ONLY.** `enemyModel()` is `"enemy-" + enemy.typeId`, so the Hedger
+> ships as **`enemy-angry.js`** and `tools/blender/enemy_hedger.py` exports
+> `--only=enemy-angry`. Two people lost real work to this in one day — juno was
+> about to escalate for a missing export because grepping `enemy-hedger` returned
+> nothing, and an earlier count dropped every underscored id including
+> `camo_normal`. **A name correct in one namespace and absent in the other reads
+> exactly like a missing asset.**
+
 **So any feature under about 0.05 u does not exist.** That one line rejects more
 bad detail than everything else here combined. Note also that x and z are nearly
 double y: a gesture aimed into the screen is worth half a gesture aimed across
