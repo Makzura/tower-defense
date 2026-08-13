@@ -39,6 +39,43 @@ In practice that means: after a click, assert the state moved; after opening a
 panel, assert what it is showing (not merely that something is); after a
 navigation, assert the thing you navigated away from is gone.
 
+## Before reporting a mechanism, check it exists — and that it is running
+
+The same failure as everything above, in a different instrument, and harder to
+see because the instrument is a `git log` rather than a probe.
+
+I reported that my uncommitted edit reached HEAD inside another agent's commit
+**because something commits working-tree changes on a timer**. The observation
+was true; the mechanism was not the reason. kaz checked it in four minutes —
+read `.git/hooks/post-commit`, read `visual-pass/git-sync.sh`, grep his own
+commits for the file — and none of it held. The real cause is duller and more
+useful: **`git commit --only <path>` isolates by FILE, not by hunk.** It commits
+the working-tree state of that path, so the other agent committing `gl-world.js`
+correctly carried my uncommitted lines in the same file. They followed the
+discipline exactly and it still swept me, because we were both writing one file.
+
+So: *the log is reliable for any file with one writer, and cannot be made
+reliable for a file with two.* `--only` is not the protection there; one writer
+per file is.
+
+**The half I got wrong is worth more than being right would have been.**
+`visual-pass/autopush.js` **does** exist — it stages everything and commits
+every 90 s, and `visual-pass/HANDOFF.md` lists it as the first of three
+processes to start, "restart it after every reboot". My mistake was not
+inventing a mechanism; it was quoting a real one **without checking it was
+running**. It was not: zero processes. One `Get-Process` would have settled it,
+and I never ran it because I was reading it out of my own notes, where it was
+written as a live fact.
+
+**A remembered mechanism is a claim about the past.** Before it explains
+anything, check the code is there *and* that it is currently doing the thing.
+Both halves — the first is the one that gets asked for, the second is the one
+that actually catches you.
+
+The stakes are why this is in the repo and not only in a notebook: "something is
+committing on a timer" turns into "stop trusting the log", which is false,
+expensive, and very hard to walk back once a team believes it.
+
 ## Solve in the page, not in the driver
 
 Anything that reproduces the app's arithmetic must run **in the page, against
