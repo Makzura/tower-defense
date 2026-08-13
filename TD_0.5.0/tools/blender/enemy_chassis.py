@@ -546,6 +546,136 @@ def _set_sole_height(leg, foot_name, frame, target_z):
     bpy.context.scene.frame_set(frame)
 
 
+def _group_phase_offsets(count):
+    """Whole-frame phase offsets for `count` leg groups, as fractions of a cycle.
+
+    Groups are evenly spaced: two groups are antiphase, three are thirds. The
+    offsets are FRACTIONS here and are converted to whole frames by the caller,
+    because `walk_phases` is a sampled list and a fractional index into it would
+    need interpolation -- which would silently change the biped's values and
+    break the one property this generalisation has to keep.
+    """
+    return tuple(float(i) / count for i in range(count))
+
+
+def animate_walk_grouped(body, parts, groups, frames=8, swing_deg=28.0,
+                         arm_swing_deg=14.0, bob=0.03, roll_deg=2.6,
+                         arms=("arm_l", "arm_r")):
+    """The gait for any number of legs, in any number of evenly-phased groups.
+
+    `groups` is a sequence of sequences of leg-root keys in `parts`:
+
+        ((("leg_l",), ("leg_r",)))                  a biped
+        (("leg_0", "leg_3"), ("leg_1", "leg_2"))    a quadruped trot
+        (("leg_0", "leg_3", "leg_4"),               a hexapod alternating tripod
+         ("leg_1", "leg_2", "leg_5"))
+
+    Every leg in a group shares one phase, and groups are spaced evenly around
+    the cycle. **A quadruped trot and a hexapod alternating tripod are both TWO
+    antiphase groups**, which is why this needed no new cycle arithmetic:
+    `walk_phases` was never two-leg-shaped, it is a plain triangle wave, and
+    `support_left_frames` was never two-leg-shaped either -- it is a duty-0.5
+    window, which is exactly a trot and exactly a tripod. What was two-leg-shaped
+    was only this function's BODY: hard-coded dict keys and foot-name strings.
+
+    A FOOT NAME IS DERIVED FROM ITS LEG KEY -- `leg_0` -> `foot_0`. That matters
+    more than it looks: `_foot_measure` resolves the name through
+    `bpy.data.objects[...]`, a GLOBAL lookup, so six legs need six unique foot
+    names. A multi-leg body that names every foot `foot_l` gets Blender's
+    automatic `.001` suffixes and this solver silently measures the WRONG FOOT on
+    five of six legs, producing a body that stands on one leg and floats on the
+    rest with no error raised anywhere.
+
+    `arms` may be empty for a body that has none -- the Dray and the Stacker.
+    The old function indexed `parts["arm_l"]` unconditionally and raised
+    KeyError on an armless body.
+
+    TWO GROUPS ARE EXACT. MORE THAN TWO ARE NOT, AND HERE IS THE LIMIT.
+    `walk_phases` is a SYMMETRIC triangle wave, so shifts `s` and
+    `frames/2 - s` sample the same value. With more than two groups the swing
+    angles therefore COLLIDE in pairs -- measured, at six groups over twelve
+    frames the phases at frame 0 are
+
+        [0.00, 0.67, 0.67, 0.00, -0.67, -0.67]
+
+    so a six-group "wave" gait reads as three phases, not six. The SUPPORT
+    windows stay distinct (three groups planted on every frame, verified), so
+    the body never floats and the feet still plant in sequence -- but the legs
+    visibly swing in pairs.
+
+    That costs nothing today: a quadruped trot and a hexapod alternating tripod
+    are both TWO groups, which is what every body in this batch wants. **If a
+    true wave gait is ever briefed, `walk_phases` needs a genuine phase argument
+    rather than a list rotation, and that is a change to a shared function used
+    by nine shipped bodies -- not a caller-side fix.** Verified at 2, 4 and 6
+    groups: minimum support 1, 2 and 3 groups per frame respectively, never
+    zero.
+    """
+    base_z = body.location[2]
+    swing = math.radians(swing_deg)
+    arm_swing = math.radians(arm_swing_deg)
+    phases = walk_phases(frames)
+    base_support = support_left_frames(frames)
+    offsets = _group_phase_offsets(len(groups))
+    # Whole-frame shifts. Group 0 is the reference and takes the unshifted
+    # phase list and the unshifted support window, so a two-group call
+    # reproduces the hand-tuned biped exactly rather than approximately.
+    shifts = [int(round(o * frames)) for o in offsets]
+    rests = dict((leg, tuple(parts[leg].location))
+                 for group in groups for leg in group)
+
+    def group_phase(g, f):
+        return phases[(f + shifts[g]) % frames]
+
+    def group_plants(g, frame):
+        # The support window, rotated by the same whole-frame shift as the
+        # phase. For two groups this is the original set and its exact
+        # complement -- verified, not assumed: at frames=8 the base is
+        # {1,2,7,8} and the shift of 4 gives {3,4,5,6}.
+        return (((frame - 1 - shifts[g]) % frames) + 1) in base_support
+
+    for f in range(frames):
+        frame = 1 + f
+        t = 2.0 * math.pi * f / frames
+        for g, group in enumerate(groups):
+            phase = group_phase(g, f)
+            for leg in group:
+                key(parts[leg], frame, rotation=(0.0, swing * phase, 0.0),
+                    location=rests[leg])
+        if arms:
+            # Arms counter the FIRST group, which is what "arms counter the
+            # legs" meant when there were only two of them.
+            for i, arm in enumerate(arms):
+                if arm in parts:
+                    key(parts[arm], frame,
+                        rotation=(0.0, arm_swing * math.sin(t + math.pi * (1 - i)),
+                                  0.0))
+        key(body, frame,
+            location=(0.0, 0.0, base_z - bob * abs(group_phase(0, f))),
+            rotation=(math.radians(roll_deg) * group_phase(0, f), 0.0, 0.0))
+
+    for f in range(frames):
+        frame = 1 + f
+        t = 2.0 * math.pi * f / frames
+        swing_z = 0.012 + 0.045 * abs(math.cos(t))
+        # PLANTED FEET ARE SOLVED BEFORE SWINGING ONES, and the order is load
+        # bearing rather than tidy: `_set_sole_height` steps the scene to the
+        # frame and measures EVALUATED geometry, so a leg solved later sees the
+        # body position the earlier solves left behind. The original solved the
+        # stance foot first and this preserves that, which is a precondition of
+        # reproducing its output.
+        planted = [g for g in range(len(groups)) if group_plants(g, frame)]
+        swinging = [g for g in range(len(groups)) if not group_plants(g, frame)]
+        for g in planted:
+            for leg in groups[g]:
+                _set_sole_height(parts[leg], leg.replace("leg", "foot", 1),
+                                 frame, 0.0)
+        for g in swinging:
+            for leg in groups[g]:
+                _set_sole_height(parts[leg], leg.replace("leg", "foot", 1),
+                                 frame, swing_z)
+
+
 def animate_walk(body, parts, frames=8, swing_deg=28.0, arm_swing_deg=14.0,
                  bob=0.03, roll_deg=2.6):
     """The shared gait, with evaluated sole planting.
@@ -561,44 +691,18 @@ def animate_walk(body, parts, frames=8, swing_deg=28.0, arm_swing_deg=14.0,
     straight, pushing the feet through the floor -- measurable, not taste: the
     rendered sheet had zero transparent rows beneath the model, so there was no
     ground margin left for the game's cast shadow.
+
+    THIS IS NOW A TWO-GROUP CALL TO `animate_walk_grouped` AND NOTHING ELSE.
+    It keeps its own name because nine shipped bodies call it and because "the
+    biped gait" is what they mean, not "the general gait with these arguments".
+    The delegation is only legitimate because it is CHECKED rather than assumed:
+    every shipped body's `framesDigest` is unchanged across it, which is the one
+    piece of evidence that matters, since a gait change moves no triangles at
+    all and would therefore pass a multiset check while looking wrong on screen.
     """
-    base_z = body.location[2]
-    swing = math.radians(swing_deg)
-    arm_swing = math.radians(arm_swing_deg)
-    phases = walk_phases(frames)
-    support_left = support_left_frames(frames)
-    leg_l_rest = tuple(parts["leg_l"].location)
-    leg_r_rest = tuple(parts["leg_r"].location)
-
-    for f in range(frames):
-        frame = 1 + f
-        t = 2.0 * math.pi * f / frames
-        phase = phases[f]
-
-        key(parts["leg_l"], frame, rotation=(0.0, swing * phase, 0.0),
-            location=leg_l_rest)
-        key(parts["leg_r"], frame, rotation=(0.0, -swing * phase, 0.0),
-            location=leg_r_rest)
-        key(parts["arm_l"], frame,
-            rotation=(0.0, arm_swing * math.sin(t + math.pi), 0.0))
-        key(parts["arm_r"], frame, rotation=(0.0, arm_swing * math.sin(t), 0.0))
-        key(body, frame,
-            location=(0.0, 0.0, base_z - bob * abs(phase)),
-            rotation=(math.radians(roll_deg) * phase, 0.0, 0.0))
-
-    # Plant one stance foot on every sample. Swing clearance is lowest at
-    # heel-strike/toe-off and highest halfway through recovery, so the lifted
-    # leg reads as a step rather than a second grounded foot skating forwards.
-    for f in range(frames):
-        frame = 1 + f
-        t = 2.0 * math.pi * f / frames
-        swing_z = 0.012 + 0.045 * abs(math.cos(t))
-        if frame in support_left:
-            _set_sole_height(parts["leg_l"], "foot_l", frame, 0.0)
-            _set_sole_height(parts["leg_r"], "foot_r", frame, swing_z)
-        else:
-            _set_sole_height(parts["leg_r"], "foot_r", frame, 0.0)
-            _set_sole_height(parts["leg_l"], "foot_l", frame, swing_z)
+    animate_walk_grouped(body, parts, (("leg_l",), ("leg_r",)), frames=frames,
+                         swing_deg=swing_deg, arm_swing_deg=arm_swing_deg,
+                         bob=bob, roll_deg=roll_deg)
 
 
 # --- the fidelity test -------------------------------------------------------

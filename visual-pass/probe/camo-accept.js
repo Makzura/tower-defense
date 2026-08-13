@@ -1,4 +1,26 @@
 // Acceptance run for the camo depth pre-pass. kaz's five conditions.
+//
+// THE NEGATIVE CONTROL IN HERE IS THE SECOND ONE I WROTE. The first was
+// unfalsifiable and it is worth keeping the wreck of it, because it looked
+// exactly like a working test.
+//
+// It stubbed the RENDERER seam -- `setDepthOnly` neutralised so `colorMask`
+// stayed on -- and expected the pre-fix pixels back. It did not reproduce
+// them, and I read that as the fix being wrong. **The fault was the stub.**
+// Neutralising `colorMask` alone still DRAWS THE PRE-PASS, in colour: an
+// opaque body underneath a blended one. That is a THIRD behaviour the code has
+// never had, neither before the fix nor after it. A broken test reporting a
+// broken fix, and nothing in its output said so.
+//
+// THE RULE: to prove a change inert, stub at the level that DECIDES WHETHER
+// THE WORK HAPPENS, not at a flag inside the work. Better still, do not stub
+// at all -- find an input for which the new path cannot run.
+//
+// Which is what `cond2b` does now. A board with NO camo bodies never enters
+// pass 2, so old and new must be BIT-IDENTICAL by construction; the same board
+// WITH a camo body is the companion positive. Two halves, no stub, nothing to
+// get wrong. Stubbing a renderer seam to simulate "before" should be treated
+// as suspect generally: it manufactures a state the program never had.
 "use strict";
 var fs=require("fs"), path=require("path"), os=require("os"), cp=require("child_process");
 var cdp=require("./cdp"), serve=require("./serve");

@@ -337,6 +337,21 @@ GLRenderer.prototype.setDepthOnly = function (on) {
 
 // EQUAL keeps only the surface a pre-pass already laid down. LEQUAL is the
 // board's default and every other draw needs it back.
+//
+// EQUAL IS ONLY SAFE BECAUSE NOTHING PERTURBS THE TRANSFORM BETWEEN THE TWO
+// PASSES, and that is a condition on the CALLER rather than a property of the
+// technique. Interpolated depth is bit-reproducible across two draws of
+// identical geometry under an identical matrix, so the second pass compares
+// exactly equal and nothing drops out -- measured at the fitted camera and
+// again at distance 180, where precision is worst: 10420 of 10420 body pixels
+// survived, no polygon offset needed.
+//
+// Change ANYTHING between the passes -- the model matrix, the animation frame,
+// the camera, the viewport, a tilt or an override -- and the two rasterisations
+// no longer agree bit for bit. The body then fails its own EQUAL test and
+// vanishes in whole or in part, which photographs as a disappearing enemy
+// rather than as a depth bug. A caller that cannot promise an identical
+// transform wants LEQUAL and a sort, not this.
 GLRenderer.prototype.setDepthEqual = function (on) {
   var gl = this.gl;
   gl.depthFunc(on ? gl.EQUAL : gl.LEQUAL);
