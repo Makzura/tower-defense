@@ -13,6 +13,52 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — The wave banner shrinks to fit instead of clipping, and the flat
+triangle ceiling is retired.** Two rendering fixes and one measurement guard;
+no model changed.
+
+**The banner could lose half a name off EACH SIDE, silently.** Both banner lines
+were drawn with a bare centred `fillText` and no width. Because the text is
+centred, an over-long title does not run off the right edge — it clips
+symmetrically and reads as a broken build rather than as a long name. Harmless
+while titles were constants; reachable now that boss titles are COMPOSED from
+`displayName` plus an `announceSuffix` like `" COMMITS ITS RESERVES"`, so the
+string is data.
+
+`setBannerFont` in `js/effects.js` shrinks until it fits. It deliberately does
+**not** use `fitText`, which ellipsises: that is right for a panel and wrong
+here, because an ellipsised proper noun is the one string a player cannot
+mentally complete. There is deliberately **no minimum size** — a floor would
+reintroduce clipping below it, and "how small can 700-weight text be and still
+read" is a legibility judgement no width measurement can settle. The `> 1` in
+the loop is a bound, not a designed value.
+
+It measures at runtime rather than from a per-character table because
+`system-ui` resolves to a different family per platform — San Francisco on
+macOS, Segoe UI on Windows — so any table measured on one machine is wrong on
+another. Measuring here measures the player's *actual* resolved font on the
+player's *actual* machine, and the cross-platform problem disappears instead of
+being managed.
+
+**The 4032 "Gleaner parity" triangle ceiling in `visual-pass/model-review.js` is
+retired.** It measures the wrong thing and misfired on the first model of batch
+2. A model's cost is triangles TIMES how many are on the road at once, and by
+that measure the ranking inverts: the Tender is the dearest *model* in the batch
+at 6,328 and the second cheapest *body* on the road at 12,656, while the Stacker
+is the cheapest model at 1,908 and by far the dearest body at 122,112, because
+one wave-25 spawn cascades to 64 of it. The old flag would have sent a smith to
+shave a model that costs nothing and waved through the only type in the game
+that multiplies.
+
+**`visual-pass/tree-parse-guard.js` refuses to measure rather than recording a
+false zero.** `tests/harness.js` loads every `js/` file into ONE context, so a
+single half-saved file from any division takes all six suites to 0/212 — that
+exact result was measured, with 107/0 minutes later. It is transient by
+construction, so it is worst in an unattended batch run; it is **invisible to a
+null-model control**, because the file never rendered, it failed to parse; and
+it is not confined to `js/gl/`. The tell: a real regression fails a readable
+subset, a total wipe means the harness never booted.
+
 **2026-08-13 — The Courier (`enemy-shielded`) is modelled: the first of batch 2,
 and the first body whose unique part is a shape no primitive in the toolkit can
 produce.** 4,552 triangles, 8 frames, built on `enemy_chassis.py` at
