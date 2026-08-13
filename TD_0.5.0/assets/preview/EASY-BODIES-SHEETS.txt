@@ -1,4 +1,4 @@
-THE FOUR EASY BODIES - PREVIEW SHEETS
+THE FIVE EASY BODIES - PREVIEW SHEETS (plus the Gleaner they derive from)
 Rendered 2026-08-13 by tools/blender/make_preview.py --easy-five
 
 
@@ -21,7 +21,7 @@ silhouette.
 
 THE ONE THING THAT WILL MISLEAD YOU IF NOBODY SAYS IT
 ------------------------------------------------------
-  easy_five_compare.png   HAS sizeScale APPLIED
+  easy_bodies_compare.png   HAS sizeScale APPLIED
   every other sheet       does NOT
 
 That is deliberate, and the sheets are not comparable to each other because of
@@ -40,20 +40,25 @@ and make the four sheets incomparable.
   sizeScale, from js/enemy.js:
     Gleaner (normal)   1.00      Tun (slow)       1.00
     Drudge (armored)   1.05      Hedger (angry)   1.25
-    Skimmer (fast)     1.00
+    Skimmer (fast)     1.00      Cooper (camo_normal) 1.00
 
 
 THE SHEETS
 ----------
-  easy_five_compare.png          2600x680   START HERE. sizeScale APPLIED.
+  easy_bodies_compare.png        3120x680   START HERE. sizeScale APPLIED.
                                             Left to right: Gleaner, Drudge,
-                                            Skimmer, Tun, Hedger. Same yaw,
-                                            same light, same frame.
+                                            Skimmer, Tun, Hedger, Cooper.
+                                            Same yaw, light and frame.
+                                            RENAMED from easy_five_compare:
+                                            it carries six bodies, and a name
+                                            saying five would keep being read
+                                            after it stopped being true.
 
   easy_drudge.png                520x2720   four yaws, one per row. Unscaled.
   easy_skimmer.png               520x2720   four yaws. Unscaled.
   easy_tun.png                   520x2720   four yaws. Unscaled.
   easy_hedger.png                520x2720   four yaws. Unscaled.
+  easy_cooper.png                520x2720   four yaws. Unscaled.
 
   easy_hedger_crank_low.png      520x2720   frame 1  - crank at its low point
                                             (0.018 u off the road)
@@ -69,14 +74,18 @@ superseded file had already reached two people's measurements once that day.
 
   Gleaner   enemy_normal.py    (shipped, unchanged)
   Drudge    enemy_drudge.py    a00a774
-  Skimmer   enemy_skimmer.py   ddef990
+  Skimmer   enemy_skimmer.py   1769dcf   (narrowed after the first build)
   Tun       enemy_tun.py       ddef990
-  Hedger    enemy_hedger.py    e015ef5
+  Hedger    enemy_hedger.py    22a8091   (crank mirrored, brass)
+  Cooper    enemy_cooper.py    8f42a2c
 
-The Cooper (enemy-camo_normal) is deliberately absent. Its read defers to the
-camo cue, and isCamo is drawn nowhere under js/gl/ - 0 px on both GL paths
-against 328 px on the 2D fallback. Building it would have shipped a model whose
-separator does not exist. Held pending a ruling.
+THE COOPER IS SUPPOSED TO LOOK LIKE THE GLEANER. Diego ruled that camo bodies
+are ordinary bodies and the cue is the renderer's (translucency), so the mesh
+is not asked to carry the read. In this sheet the two should be near-identical
+apart from the gasket lid and the blinded panes. That is the model working.
+
+The Runlet (enemy-camo_fast) is absent, awaiting a read plan. The Cask
+(enemy-camo_heavy) is a live unmodelled type - hp 20, wave 28 - not commissioned.
 
 
 KNOWN LIMITATION, REPORTED RATHER THAN FRAMED AROUND

@@ -51,6 +51,7 @@ import enemy_drudge
 import enemy_skimmer
 import enemy_tun
 import enemy_hedger
+import enemy_cooper
 
 BLEND_DIR = os.path.join(os.path.dirname(__file__), "preview")
 SHEET_DIR = os.path.join(td.OUTPUT_DIR, "preview")
@@ -174,12 +175,18 @@ def preview_enemy_variants():
 # surface detail at a fixed magnification.
 
 # (module, sheet name, sizeScale from js/enemy.js, commit the geometry is from)
-EASY_FIVE = (
+#
+# RENAMED FROM `EASY_FIVE`, and the sheet with it, because it now carries SIX
+# bodies. A constant called "five" holding six is the same class of error as a
+# count quoted without its threshold or a separation figure quoted without its
+# metric -- a name that stops being true and keeps being read.
+EASY_BODIES = (
     (enemy_normal, "easy_gleaner", 1.00, "(shipped)"),
     (enemy_drudge, "easy_drudge", 1.05, "a00a774"),
-    (enemy_skimmer, "easy_skimmer", 1.00, "ddef990"),
+    (enemy_skimmer, "easy_skimmer", 1.00, "1769dcf"),
     (enemy_tun, "easy_tun", 1.00, "ddef990"),
-    (enemy_hedger, "easy_hedger", 1.25, "e015ef5"),
+    (enemy_hedger, "easy_hedger", 1.25, "22a8091"),
+    (enemy_cooper, "easy_cooper", 1.00, "8f42a2c"),
 )
 
 
@@ -250,7 +257,7 @@ def _compose_row(paths, out_name):
     return path
 
 
-def preview_easy_five():
+def preview_easy_bodies():
     """Four craft sheets, the Hedger's crank extremes, and one five-up."""
     ensure_dirs()
 
@@ -266,7 +273,7 @@ def preview_easy_five():
     # rendering a superseded file, with a picture attached.
     ortho_factor = {enemy_hedger: 1.22}
 
-    for module, name, _scale, commit in EASY_FIVE[1:]:
+    for module, name, _scale, commit in EASY_BODIES[1:]:
         print("preview %s  (geometry from %s)" % (name, commit))
         preview(name, module.ORTHO_SCALE * ortho_factor.get(module, 0.92),
                 lambda m=module: _build_easy(m))
@@ -294,17 +301,18 @@ def preview_easy_five():
 
     # The five-up. Same yaw, same lighting, same frame, one ortho for all five
     # so they share a ruler -- with each root at its type's real sizeScale.
-    print("preview easy_five_compare  (sizeScale applied)")
+    print("preview easy_bodies_compare  (sizeScale applied)")
     ortho = enemy_hedger.ORTHO_SCALE * 1.25 * 0.98      # frame the tallest
     tiles = []
-    for module, name, size_scale, _commit in EASY_FIVE:
+    for module, name, size_scale, _commit in EASY_BODIES:
         tiles.append(_render_one_tile(module, "_cmp_" + name, ortho, 1,
                                       size_scale=size_scale))
-    _compose_row(tiles, "easy_five_compare")
+    _compose_row(tiles, "easy_bodies_compare")
     print("")
-    print("  ORDER: Gleaner, Drudge, Skimmer, Tun, Hedger")
-    print("  sizeScale applied: 1.00 / 1.05 / 1.00 / 1.00 / 1.25")
-    print("  Geometry from: shipped / a00a774 / ddef990 / ddef990 / e015ef5")
+    print("  ORDER: Gleaner, Drudge, Skimmer, Tun, Hedger, Cooper")
+    print("  sizeScale applied: 1.00 / 1.05 / 1.00 / 1.00 / 1.25 / 1.00")
+    print("  Geometry from: shipped / a00a774 / 1769dcf / ddef990 / 22a8091"
+          " / 8f42a2c")
     print("")
     print("  These are ~11x the default camera -- the player's max zoom-in.")
     print("  Evidence about SURFACE DETAIL only. A read must be judged at the")
@@ -783,8 +791,11 @@ def validate_recruits():
 
 
 if __name__ == "__main__":
-    if "--easy-five" in sys.argv:
-        preview_easy_five()
+    # `--easy-five` kept as an alias: it is in the CHANGELOG and in messages
+    # sent to three people today, and breaking a documented command to fix
+    # a name is a worse trade than carrying one extra string.
+    if "--easy-bodies" in sys.argv or "--easy-five" in sys.argv:
+        preview_easy_bodies()
     elif "--validate-recruits" in sys.argv:
         validate_recruits()
     elif "--frame-recruits" in sys.argv:
