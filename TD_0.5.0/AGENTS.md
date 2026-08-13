@@ -1263,8 +1263,9 @@ Both build constraints come from geometry, so they stay correct when the map
 changes. This was a bug once already — an arbitrary 2.5 m exclusion radius left
 a visible 31 px gap between towers and the road — so do not reintroduce magic
 numbers here. (**That 31 px is in PRE-2026-07-27 pixels**: `31 / 1.552 = 19.97`,
-i.e. ~20 u.l. under the old `UNIT_LENGTH`, which is `20.8 px` today. The lesson
-is unchanged; only the figure is dated. See `js/units.js:47-48`.)
+i.e. ~20 u.l. under the old `UNIT_LENGTH` — what `ul(20)` renders today is
+whatever the current constant makes it, and is deliberately not restated here.
+The lesson is unchanged; only the figure is dated. See `js/units.js:47-48`.)
 
 **Not on the road:**
 `buildClearancePx(type)` = `ul(ROAD_WIDTH_UL / 2 + type.FOOTPRINT_RADIUS_UL)`
@@ -2311,7 +2312,7 @@ a hand-tuned line this crude policy does not reproduce.
 opening figures above (1 gunner → 2 killed / 11 leaked / base 66; 2 gunners →
 4 / 9 / 83) were not re-measured. A lane offset changes the chord an enemy
 walks through a gunner's circle by about 1% — the perpendicular distance moves
-by up to ±4.16 px against a 104 px radius — and a 4 HP normal takes ~3.9 damage
+by up to **±4 u.l. against the 100 u.l. reference radius** — and a 4 HP normal takes ~3.9 damage
 per pass, so 1% can flip a kill. If `tests/run.js` fails on one of those by one
 or two, **that is this change**: re-record the number here and in the test. If
 it fails by more, or anything else fails, it is a real bug.

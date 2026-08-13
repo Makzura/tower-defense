@@ -31,27 +31,72 @@ board px, **explicitly not the drawn body**. They quote **no figure at all**,
 because the drawn-body measurements are still in dispute — which is the right
 call: a comment that names the wrong quantity is worse than one that names none.
 
-**And the "~78 px/s" turned out to be datable, which gives this project a tool it
-did not have.** It is `50 u.l./s × 1.552`, and **1.552 is the pre-2026-07-27
+**And the "~78 px/s" is ALMOST CERTAINLY datable, which gives this project a tool
+it did not have — but the derivation is an inference and is recorded as one.**
+It is most likely `50 u.l./s × 1.552`, where **1.552 is the pre-2026-07-27
 `UNIT_LENGTH`** (`js/units.js:47-48` — 19.4 old px per unit over a 12.5
-re-anchoring factor, tuned down by a third on 2026-07-27 to 1.04). So it was a
-u.l.-derived pixel value **frozen before the re-anchoring: true when written and
-false from the moment the constant was tuned.**
+re-anchoring factor, tuned down by a third on 2026-07-27 to 1.04). That would
+make it a u.l.-derived pixel value **frozen before the re-anchoring: true when
+written and false from the moment the constant was tuned.**
+
+**The competing candidate, named because it is not eliminated: `75 u.l./s × 1.04`
+is EXACTLY 78**, with no rounding, where the 1.552 reading needs 77.6 to round.
+It is argued down rather than ruled out — no top-level enemy type carries
+`speedMultiplier: 1.5`; the only 1.5 in the roster is `summon.speedMultiplier` in
+the Tyrant's brood block (`js/enemy.js:733`), an odd referent for a comment about
+"an enemy" crossing the screen. Against that, both halves of the original
+sentence describe the *ordinary* enemy — 22 px is `2 × RADIUS_PX` at scale 1, and
+50 u.l./s is the base at multiplier 1 — and the "~" fits a rounded 77.6.
+
+**HISTORY CANNOT SETTLE IT, and that is a fact about this repository worth
+knowing on its own.** `git log -S "78 px/s"` bottoms out at the re-root, and the
+root commit is `50ed7ef`, 2026-08-09, *"Baseline before visual quality pass"* —
+**the game predates its own repository.** Any comment older than that arrives in
+an import with no authorship behind it, so no archaeology is available for it.
+Recorded as an inference rather than hardened into a fact.
 
 > **THE DATING RULE: divide a suspicious px figure by 1.552 and by 1.04. A hit on
 > a round u.l. value marks it as a FOSSIL rather than a typo** — and tells you
 > which era authored it. This distinguishes the two cases that otherwise look
 > identical and want opposite repairs: a typo is corrected, a fossil is dated.
 
-**Swept `AGENTS.md` with it, and the result is one hit.** Every `px` figure ≥ 10
-tested for an integer u.l. value under 1.552 but not under 1.04: **one candidate,
-and it is correctly scoped past tense** — *"an arbitrary 2.5 m exclusion radius
-left a visible 31 px gap between towers and the road"*. `31 / 1.552 = 19.97`,
-i.e. ~20 u.l. of the old constant, which is 20.8 px today. The sentence is a
-historical note and stays; it now says which era its pixels are in, because
-nothing marked it and a reader would otherwise measure today's gap and find a
-different number. **Three further hits in `CHANGELOG.md` were left alone: this
-file is history, and a figure true on the day it was written is not drift.**
+**THE SWEEP HAS TWO CLASSES, NOT ONE, AND THE FIRST VERSION OF IT REPORTED THE
+SECOND CLASS AS PASSING.** Filtering for "round u.l. under 1.552 **but not** under
+1.04" excludes exactly the figures authored in the *current* era — and those are
+not clean. **A px figure that divides evenly by 1.04 into a round u.l. value is a
+fossil that has not rotted yet**; it rots at the next `UNIT_LENGTH` retune, which
+`js/units.js` openly invites ("tune this by feel"). **A 1.552 hit means it has
+already rotted; a 1.04 hit means it will. Both want the identical repair —
+delete the number and point at the u.l. source.**
+
+- **Class A, already rotted — one hit**, correctly scoped past tense: *"an
+  arbitrary 2.5 m exclusion radius left a visible 31 px gap between towers and
+  the road"*. `31 / 1.552 = 19.97`, i.e. ~20 u.l. of the old constant. The
+  sentence is a historical note and stays; it now says which era its pixels are
+  in, because otherwise a reader measures today's gap, finds a different number
+  and files a defect against a true sentence.
+- **Class B, will rot — one genuine hit, repaired**: *"the perpendicular distance
+  moves by up to ±4.16 px against a 104 px radius"*. Both figures are `ul()` of
+  round u.l. values — `104 / 1.04 = 100`, the reference radius, and
+  `4.16 / 1.04 = 4`. Now stated as **±4 u.l. against the 100 u.l. reference
+  radius**, which cannot rot.
+
+**And the class-B filter over-reports, so divisibility is a prompt and not a
+verdict.** *"Rows were 26 px"* divides to exactly 25 u.l. and is a **false
+positive** — a canvas list-row height that was never u.l.-derived. **Ask what the
+figure is a rendering OF before repairing it**; the same near-match trap that
+makes a keyword sweep a demolition tool.
+
+**One hit was my own annotation**, written an hour earlier: dating the 31 px, I
+added "which is `20.8 px` today" — itself a class-B fossil, created by the pass
+that introduced the test. It now points at `ul(20)` instead of restating a
+number. **A tool for finding hardcoded conversions will catch the ones you write
+while explaining it.**
+
+**Three further hits in `CHANGELOG.md` were left alone: this file is history, and
+a figure true on the day it was written is not drift.** And when grepping the
+game for these constants, scope out `js/gl/models/*.js` — generated geometry,
+where a bare number matches inside million-character coordinate arrays.
 
 **`fb9ab97` — `js/towers/beam.config.js`, comments only.** The Siphon A2 row
 reads `mechanics: []` and looks like a tier charging 900 against A1's 600 for
