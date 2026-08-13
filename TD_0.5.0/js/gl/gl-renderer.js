@@ -124,6 +124,36 @@ function GLRenderer(canvas) {
   // setFade can be called per body without touching BLEND on every one.
   this._faded = false;
 
+  // OPAQUE IS THE DEFAULT OF THE RENDERER, NOT A PROMISE EACH CALLER MAKES.
+  //
+  // `uAlpha` is a GL uniform, so it initialises to ZERO -- fully transparent --
+  // and until 0527eac the only thing that ever wrote it was `begin()`. Any
+  // caller that drew through this program without going through `begin()` got a
+  // body rendered entirely transparent: `readPixels` succeeded, the blit
+  // contributed nothing, and the caller's "did I draw" check said yes. That is
+  // what happened to every 3D preview on the index and the armoury, where the
+  // board never draws, and it repaired itself the moment a wave was played --
+  // so it was invisible to manual checking and the broken path was the first
+  // one a player took.
+  //
+  // Fixing it in each caller fixes the two callers that exist today. Setting it
+  // HERE means the class cannot hand anyone a transparent default again, which
+  // is the failure mode worth designing out: it is silent, it looks like
+  // success, and the next caller to draw without `begin()` will be written by
+  // someone who has never heard of this bug.
+  //
+  // SAFE AT THIS POINT IN THE CONSTRUCTOR, and it is the one thing that could
+  // make this line a no-op: `setFade` writes a uniform, which requires the
+  // program to be CURRENT, and a uniform write with no current program raises
+  // INVALID_OPERATION and is silently dropped. `gl.useProgram(this.program)`
+  // ran immediately after `_link` above, `this.uniform` is assigned, and
+  // `this._faded` is initialised on the line above -- all three of setFade's
+  // requirements are met. Verified by reading the uniform back on a cold page
+  // (1, not 0) with `gl.getError()` clean, and by rendering a body through
+  // ModelViewer3D with `setFade` stubbed to a no-op so this line is the only
+  // thing keeping it opaque.
+  this.setFade(1);
+
   // td_scene's lights, converted into this file's axes. The 2D board's light
   // comes from the upper LEFT of frame, which with +Y going into the board is
   // a sun sitting to the left and behind the viewer.
