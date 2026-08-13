@@ -1262,7 +1262,9 @@ u.l., named `*_UL` or `*_ULPS`.
 Both build constraints come from geometry, so they stay correct when the map
 changes. This was a bug once already — an arbitrary 2.5 m exclusion radius left
 a visible 31 px gap between towers and the road — so do not reintroduce magic
-numbers here.
+numbers here. (**That 31 px is in PRE-2026-07-27 pixels**: `31 / 1.552 = 19.97`,
+i.e. ~20 u.l. under the old `UNIT_LENGTH`, which is `20.8 px` today. The lesson
+is unchanged; only the figure is dated. See `js/units.js:47-48`.)
 
 **Not on the road:**
 `buildClearancePx(type)` = `ul(ROAD_WIDTH_UL / 2 + type.FOOTPRINT_RADIUS_UL)`

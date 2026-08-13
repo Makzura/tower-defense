@@ -13,6 +13,55 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-13 — the source comments that carried the 22 px conflation are fixed
+(`217d40a`), the Siphon A2 row is no longer readable as a hollow tier
+(`fb9ab97`), and a dating tool for pixel fossils.** Entries written by the
+archivist for the simulation division's commits, at their request: they held off
+`CHANGELOG.md` deliberately because it was mid-run here and the post-commit sync
+hook auto-resolves conflicts to "ours", which would have put their entry exactly
+where this file's work is the losing side — and the loser goes only to
+`refs/sync-backup`, where nobody looks.
+
+**`217d40a` — `js/enemy.js`, comments only. This closes the defect routed on
+2026-08-13 with clause 3b.** The hover-pad and lane-spread notes described the
+hit test as covering *"the body"* and quoted a width and a crossing speed as
+roster-wide constants. Both now name it for what it is: the gameplay/hit-test
+circle, `Enemy.radiusPx()`, per-type via `sizeScale` and `fractalSizeScale`, in
+board px, **explicitly not the drawn body**. They quote **no figure at all**,
+because the drawn-body measurements are still in dispute — which is the right
+call: a comment that names the wrong quantity is worse than one that names none.
+
+**And the "~78 px/s" turned out to be datable, which gives this project a tool it
+did not have.** It is `50 u.l./s × 1.552`, and **1.552 is the pre-2026-07-27
+`UNIT_LENGTH`** (`js/units.js:47-48` — 19.4 old px per unit over a 12.5
+re-anchoring factor, tuned down by a third on 2026-07-27 to 1.04). So it was a
+u.l.-derived pixel value **frozen before the re-anchoring: true when written and
+false from the moment the constant was tuned.**
+
+> **THE DATING RULE: divide a suspicious px figure by 1.552 and by 1.04. A hit on
+> a round u.l. value marks it as a FOSSIL rather than a typo** — and tells you
+> which era authored it. This distinguishes the two cases that otherwise look
+> identical and want opposite repairs: a typo is corrected, a fossil is dated.
+
+**Swept `AGENTS.md` with it, and the result is one hit.** Every `px` figure ≥ 10
+tested for an integer u.l. value under 1.552 but not under 1.04: **one candidate,
+and it is correctly scoped past tense** — *"an arbitrary 2.5 m exclusion radius
+left a visible 31 px gap between towers and the road"*. `31 / 1.552 = 19.97`,
+i.e. ~20 u.l. of the old constant, which is 20.8 px today. The sentence is a
+historical note and stays; it now says which era its pixels are in, because
+nothing marked it and a reader would otherwise measure today's gap and find a
+different number. **Three further hits in `CHANGELOG.md` were left alone: this
+file is history, and a figure true on the day it was written is not drift.**
+
+**`fb9ab97` — `js/towers/beam.config.js`, comments only.** The Siphon A2 row
+reads `mechanics: []` and looks like a tier charging 900 against A1's 600 for
+nothing. It is not: its entire payload is the `statDeltas`, and **`ad: +1` on a
+base `ad` of 1 is an outright doubling of the tower's damage.** The new comment
+states the rule and **points at section 1 rather than repeating the base**, so it
+cannot drift — the same pointer-not-copy discipline this file exists to enforce,
+applied inside a config. Anyone grepping `mechanics` to argue the tier ladder
+misreads exactly that row.
+
 **2026-08-13 — the gross-tier claim TRANSFERS to a second geometry and stops
 being provisional. The Hedger's crank measured against the road for the first
 time, where brass is the WORST of the three materials on a quarter of the cycle.**
@@ -77,9 +126,18 @@ body. What is unsupported is *"a measured choice rather than a lucky one"*
 standing **without qualification** — which is what was relayed to the owner, and
 what is now qualified here.
 
-**The sharpest finding: in a three-frame window the palette table did not merely
-miss the road — it predicted the EXACT REVERSE, in full order, on the one
-comparison it was used to decide.**
+**The sharpest form is a NAMED PREDICTION, in the build script, falsified.**
+`tools/blender/enemy_hedger.py` says why the rejected material was rejected:
+*"it rides the outer end, the most unoccluded point on the assembly and the part
+most often over open road, where `tin_dark` is CR 1.26 and would vanish."*
+**`tin_dark` is the material that renders most visible over that road** — 1.45,
+1.66, 1.56 at frames 11, 0, 1 — while `brass`, marked **PASS** at 3.28, renders
+worst there at 1.20, 1.09, 1.22. **The material the record says "would vanish" is
+the one that survives; the one chosen to survive is the one that vanishes.**
+
+**And the full ordering inverts with it — the table did not merely miss the road,
+it predicted the EXACT REVERSE, in full order, on the one comparison it was used
+to decide.**
 
     PALETTE   vs roadTop #274553  vs roadSide #0a1922
     brass          3.28                 5.75
@@ -103,9 +161,21 @@ is correct on **7 of 12** (frames 8 and 9 swap `tin` and `tin_dark` while brass
 stays top); the ordering is completely reversed on **3 of 12**, contiguous. **So
 the table is not noisy — it is confidently wrong in a specific window**, which is
 the worse failure: a brief-writer consulting it would have come away reassured
-rather than uncertain. And it is not a usable inverse instrument either; right
-three quarters of the time and exactly backwards for a contiguous quarter is the
-absence of an instrument, not a negative one.
+rather than uncertain.
+
+**And it is not a usable inverse instrument, for a reason better than the hit
+rate: the palette figure carries no signal about WHICH REGIME you are in.**
+Nothing about 3.28 tells a reader whether this is one of the nine frames it is
+right about or one of the three it is exactly backwards on. A genuine negative
+instrument would say when to flip it. There is nothing here to invert.
+
+**Scope, and it matters more than the fractions: "three quarters" is NOT A
+RATE.** This is one crank, one road, three candidates, one bearing, twelve
+frames. A different part could invert on ten frames or none. **What generalises
+is the structure — both directions fail and the figure does not say which regime
+applies; the fractions are evidence FOR that structure, not a measurement of how
+often palettes mislead.** Quoting 75% back as an engine property would be the
+same error this whole section is a record of.
 
 **Still owed and kept open: the road is not uniform either.** The crank may
 overhang road, road edge and whatever borders them, and those are not separated,
@@ -120,6 +190,16 @@ arithmetic, which was correct every time.** The operational form now in the
 standard: when a part touches more than one thing, its contrast is not one
 number — split by what is actually behind each pixel, and say which neighbours
 the split covers.
+
+**AND THE SHARPER DIAGNOSIS UNDERNEATH IT, which is not a splitting failure at
+all: ENUMERATING IS NOT MEASURING, AND A SET NAMED IN PROSE READS AS COVERED.**
+The crank's two neighbours were **listed, in writing, in the build script that
+made the decision** — *"it lies against the hip AND overhangs the road"* — and
+then every subsequent measurement, by everyone, quietly covered one member of
+that set. The deciding neighbour was named by its own author and measured by
+nobody, through an entire before-and-after review. That is worse than forgetting
+to enumerate and more useful as a rule: **a set named in prose reads as covered,
+so check coverage against the list rather than against the prose.**
 
 **2026-08-13 — the other six house-standard commits, narrated. Paying a debt
 petra made visible rather than counted.**

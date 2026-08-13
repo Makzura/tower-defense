@@ -944,9 +944,23 @@ standing **without qualification** — not the choice itself. The crank did **no
 ship on a lucky ordering: brass is genuinely better overall and clearly better
 against the body.
 
-**THE SHARPEST THING IN IT: IN A THREE-FRAME WINDOW THE PALETTE TABLE DID NOT
-MERELY MISS THE ROAD — IT PREDICTED THE EXACT REVERSE, IN FULL ORDER, ON THE ONE
-COMPARISON IT WAS USED TO DECIDE.** Not one pair swapping. All three positions:
+**THE SHARPEST FORM IS A NAMED PREDICTION, IN THE BUILD SCRIPT, FALSIFIED.**
+`tools/blender/enemy_hedger.py` states in plain words why the rejected material
+was rejected:
+
+> *"it rides the outer end, the most unoccluded point on the assembly and the
+> part most often over open road, where `tin_dark` is CR 1.26 and would vanish."*
+
+**`tin_dark` is the material that renders MOST VISIBLE over that road** — 1.45,
+1.66, 1.56 at frames 11, 0 and 1 — while `brass`, which the same table marked
+**PASS** at 3.28, renders **worst** there at 1.20, 1.09, 1.22. **The material the
+record says "would vanish" is the one that survives; the one chosen to survive is
+the one that vanishes.** No ordering argument is needed to feel that, which is
+why it leads.
+
+**AND THE FULL ORDERING INVERTS WITH IT — the table did not merely miss, it
+predicted the exact reverse, in full order, on the one comparison it was used to
+decide.** Not one pair swapping. All three positions:
 
     PALETTE   vs roadTop #274553   vs roadSide #0a1922
     brass          **3.28**              **5.75**
@@ -976,9 +990,23 @@ is too broad.** Across the full cycle:
 
 **So the table is not noisy. It is CONFIDENTLY WRONG IN A SPECIFIC WINDOW**, and
 that is the worse failure: a brief-writer consulting it would have come away
-*reassured*, not uncertain. Nor is it a usable inverse instrument — right about
-the winner three quarters of the time and exactly backwards for a contiguous
-quarter is the absence of an instrument, not a negative one.
+*reassured*, not uncertain.
+
+**Nor is it a usable inverse instrument, and the reason is the mechanism rather
+than the hit rate: the palette figure carries no signal about WHICH REGIME YOU
+ARE IN.** Nothing about 3.28 tells a reader whether this is one of the nine
+frames the table is right about or one of the three it is exactly backwards on. A
+genuine negative instrument would at least say when to flip it. **There is
+nothing here to invert.**
+
+> **SCOPE, and it matters more than the fractions: "three quarters" is NOT A
+> RATE.** It is this crank, this road, three candidates, one bearing, twelve
+> frames — the one part anyone has measured this way. A different part could
+> invert on ten frames of twelve or none. **What generalises is the structure —
+> both directions fail, and the figure does not say which regime applies. The
+> fractions are evidence FOR that structure, not a measurement of how often
+> palettes mislead.** Do not let 75% be quoted back as an engine property; that
+> is the same shape as every other error this section recorded today.
 
 **One bearing, and the "road" mask itself mixes two surfaces 1.5 CR apart in the
 palette** — which is what makes the sub-neighbour split below more than
@@ -994,14 +1022,16 @@ turns on it while the crank ships as authored. **But it stops being optional the
 moment anyone executes the ruling to move the part off the hip**, because the
 part would then lie against the neighbour whose behaviour is understood least.
 
-> **The habit this one is really about is narrower than splitting a population:
-> nobody ENUMERATED what the crank lies against.** The road went unmeasured
-> through an entire before-and-after review, not because the split was done
-> wrongly but because the neighbour was never listed. **Naming the members of a
-> set is a different discipline from splitting a statistic over it**, and it is
-> the one that failed first here — the deciding neighbour was named in the
-> original commit message and then never measured by anyone, including its
-> author.
+> **THE HABIT THIS ONE IS REALLY ABOUT IS NOT SPLITTING A POPULATION:
+> ENUMERATING IS NOT MEASURING, AND A SET NAMED IN PROSE READS AS COVERED.** The
+> crank's two neighbours were **listed, in writing, in the build script that made
+> the decision** — *"it lies against the hip AND overhangs the road"* — and then
+> every subsequent measurement, by everyone, quietly covered one member of that
+> set. **The set was not unlisted. It was listed and half-measured**, and the
+> deciding neighbour was named by its own author and measured by nobody through
+> an entire before-and-after review. **Check coverage against the list, not
+> against the prose** — prose that names both members reads as evidence that both
+> were looked at.
 
 > **THE POPULATION LESSON, FOURTH INSTANCE IN ONE SECTION IN ONE DAY, AND ALWAYS
 > THE SAME SHAPE: a statistic quoted over a population that was never split.**
@@ -1103,12 +1133,36 @@ albedo, even carrying the sweep's largest upward correction, does not plausibly
 become a read at these part sizes. But it is no longer *proved*, and the
 difference is load-bearing rather than pedantic:
 
-> **TWO LIVE DECISIONS REST ON THE RETIRED PROOF, and neither owner has been
-> told by the proof itself.** The **A1/A2 tier-legibility call** below, and the
-> **design question routed to vera and Diego** about whether a $600 tier may be a
-> reward rather than a read. Both were reached when this was a proof. Neither is
-> withdrawn — but anyone re-opening either should know the floor under it moved.
-> **A rendered re-measure of `skin_dark → gold_dark` is OWED, against juno.**
+> **~~TWO LIVE DECISIONS REST ON THE RETIRED PROOF.~~ ONE DOES, AND IT IS NOT
+> VERA'S — she has answered and her call never rested on this proof at all.** It
+> rested on the **rendered** measurement recorded below: `siphon-base` against
+> `siphon-a1` through the real `drawActor` path, 20 px at the default camera and
+> 1,415 px zoomed in. Retracting the ceiling claim removed something that would
+> have made her answer *more* extreme and left her evidence untouched.
+>
+> **AND SHE DISSOLVED THE SECOND QUESTION RATHER THAN ANSWERING IT.** *"May a
+> $600 tier be a reward rather than a read"* presumes a tier might be sold on
+> appearance. On this path it is not: **A1 (600) buys ramp to a 2.0 cap plus 25%
+> proportional `defPierce`; A2 (900) carries `mechanics: []` and an `ad` delta of
+> +1 against a base `ad` of 1 — an outright doubling of the tower's damage.**
+> Both are felt in kill speed within seconds. **A weak silhouette read there is a
+> missing bonus, not a missing product.** Recorded so the next reader does not
+> commission a render pass to answer a question with no cosmetic content.
+> (Verified in `js/towers/beam.config.js`; `defPierce` ownership at
+> `AGENTS.md`'s mitigation table.)
+>
+> **THE OWED MEASUREMENT WAS THE WRONG ONE.** `skin_dark → gold_dark` explains
+> *why* A1 reads weakly; the live question is *whether*. Replaced:
+>
+> > **Owed, unscheduled: `siphon-a1` → `siphon-a2` at the default camera through
+> > `drawActor`.** A2 is the only A-tier with no render-path number at all, and
+> > its z extent of 1.796 against base 1.795 is exactly the sub-pixel non-signal
+> > section 5 predicts. **Measure from a1, NOT from base** — the player buys A2
+> > while owning A1, so `base → a2` is cumulative and overstates the purchase.
+>
+> **That last clause is a delta quoted against the wrong reference**, the same
+> error as measuring a walk envelope from the rest pose. Fourth distinct instance
+> of that shape today, from four different people.
 
 **Consequence, now a prediction rather than a proof: A1 and A2 are unlikely to be
 legible tier purchases at game scale.** They are hue changes at constant value on
