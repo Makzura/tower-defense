@@ -32,20 +32,43 @@
 # construction.
 #
 # So: **perturb a line that is unconditionally executed, ideally the exact line
-# under test.** Re-armed as `phases[(f + shifts[g] + 1) % frames]` the control
-# lights 26,276 floats across 8 of the 10 bodies. **ONE** body stays at zero:
-# `enemy_normal`, which authors its own `animate_walk` (:342) and never reaches
-# the shared gait -- **every zero is explained by code, not by story**, which is
-# the bar. A partial control result is only trustworthy once you can name why
-# each zero is a zero.
+# under test.** Re-armed on the exact line under test, the control lights
+# **24,236 floats of 217,152, across 8 of the 11 bodies. THREE stay at zero, and
+# all three are predicted rather than anomalous:**
 #
-# CORRECTION, 2026-08-14. This paragraph used to name `enemy_vanguard` as a
-# second zero "with its own walk, and its header says so". **That is false --
-# `enemy_vanguard.py:152` is `import enemy_chassis as chassis`.** It reaches the
-# shared gait like any other chassis body and it is not a negative control. The
-# claim was believed because it travelled beside a true one about `enemy_normal`.
-# A comment that misdescribes WHY a control is a control is worse than no
-# comment: the next person preserves it for the stated reason.
+#     enemy_normal     does not import the chassis at all; own walk at :342
+#     enemy_tyrant     imports it, calls neither walk function
+#     enemy_vanguard   imports it, calls neither walk function
+#
+# Re-measured 2026-08-14 over the current population. **Every zero is explained
+# by code, not by story** -- that is the bar, and a partial control result is
+# only trustworthy once you can name why each zero is a zero.
+#
+# **A BODY REACHES THE SHARED GAIT BY EITHER OF TWO PATHS, AND GREPPING FOR ONE
+# OF THEM IS WHY THIS COMMENT HAS NOW BEEN WRONG TWICE.** Directly via
+# `chassis.animate_walk_grouped` (`enemy_dray.py:650`, `enemy_hedger.py:705`,
+# `enemy_tender.py:314`), or via the biped wrapper `chassis.animate_walk`
+# (`enemy_chassis.py:857`), which calls it at :881. Cooper, Courier, Drudge,
+# Skimmer and Tun take the wrapper. A grep for `animate_walk_grouped` alone
+# shows five of the eight and makes the other three look like anomalies.
+#
+# **THE ROOT CAUSE IS ONE SCREEN BELOW, IN THE CODE.** `derive_bodies()` selects
+# on `"import enemy_chassis" in handle.read()` -- **the population is defined by
+# IMPORT and the perturbation propagates by CALL.** Those sets are not equal and
+# they diverge by exactly the bodies that import the chassis for palette and
+# geometry only. Today that is the Tyrant and the Vanguard; it will be true of
+# every future body built that way, so expect this list to grow and do not read
+# a new zero as a broken harness.
+#
+# TWICE-WRONG, RECORDED, BECAUSE THE SHAPE REPEATS. This paragraph first named
+# two zeros and was right when written. A later edit deleted `enemy_vanguard` on
+# the grounds that it imports the chassis and therefore "reaches the shared gait
+# like any other chassis body" -- **the false step is `import => reaches`**, and
+# it left `8 of the 10` standing beside a single named zero, so the arithmetic
+# contradicted itself by exactly one body in a comment whose own closing rule is
+# that every zero must be named. Then the Tyrant landed and made the original
+# sentence stale too. **A citation can rot in both directions: the claim can go
+# false, and the population it was true of can change underneath it.**
 #
 # THIS IS NOT THE WHOLE GATE. It compares rigs before export. Finish with
 # `framesDigest` on the exported file -- that is the end-to-end confirmation on
@@ -89,10 +112,18 @@ def derive_bodies():
 # covered anyway, so that a control run has a case which MUST stay at zero.
 # Without one, "no differences" cannot be distinguished from "harness blind".
 #
-# `enemy_normal` only. It authors its own `animate_walk` at :342 and never
-# reaches the shared gait. `enemy_vanguard` was listed here too and does not
-# belong -- it imports the chassis (:152), so it is an ordinary covered body and
-# its zero would have meant the harness was broken, not that the control worked.
+# `enemy_normal` only, and the reason is exact: **it is the only body that does
+# not import the chassis at all**, which is what `derive_bodies()` selects on, so
+# it is the only one that would be missed without being named here. Verified:
+# zero matches for `import enemy_chassis`.
+#
+# **`enemy_vanguard` and `enemy_tyrant` also read zero under the control, and
+# that is CORRECT rather than a broken harness.** They import the chassis for
+# palette and geometry but call neither `animate_walk_grouped` nor the
+# `animate_walk` wrapper that reaches it -- see the header. They are held out of
+# ANCHORS only because the anchor set is defined by IMPORT and not by CALL, which
+# is the same mismatch the header is about. **Keep the code, and do not read
+# their zeros as a fault.**
 ANCHORS = ("enemy_normal",)
 
 BODIES = tuple(sorted(set(derive_bodies()) | set(ANCHORS)))
