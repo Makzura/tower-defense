@@ -5450,12 +5450,16 @@ function drawEnemyHover() {
   // decided in js/visuals.js and nowhere else, so this branch and the 3D
   // overlay cannot disagree about it. Returned in u.l., converted once here.
   //
-  // UNGUARDED ON PURPOSE, and the 3D branch's `typeof` guard is not an
-  // inconsistency to be tidied up: gl-world.js is also loaded by pages that do
-  // not load js/visuals.js, while index.html is the only thing that reaches
-  // here and already depends on Visuals3Q throughout. A missing module should
-  // throw here, because the alternative is a reach ring that silently does not
-  // draw -- which is exactly what a correct enemy with no attack looks like.
+  // UNGUARDED ON PURPOSE: index.html is the only thing that reaches here and
+  // already depends on Visuals3Q throughout. A missing module should throw
+  // here, because the alternative is a reach ring that silently does not draw
+  // -- which is exactly what a correct enemy with no attack looks like.
+  //
+  // The 3D branch in gl-world.js guards where this does not. That asymmetry
+  // was justified by dressing.html loading gl-world.js without js/visuals.js;
+  // that page was deleted with the map surround on 2026-08-14, so no page
+  // exercises the difference today. Both sides are still correct as written --
+  // see the note at that guard before treating either as the odd one out.
   var reaches = Visuals3Q.enemyReachesUl(e);
   for (var ri = 0; ri < reaches.length; ri++) {
     ctx.beginPath();

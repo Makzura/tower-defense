@@ -91,14 +91,18 @@ var ROOT = rootArg ? path.resolve(rootArg) : path.resolve(__dirname, "..");
 // THE PAGE LIST IS DERIVED, AND IT WAS HARDCODED FOR ONE DAY -- long enough to
 // produce a false accusation, which is why this comment is long.
 //
-// The first version of this file said `["index.html", "sandbox.html"]`. There
-// are FIVE pages: `index.html`, `sandbox.html`, `3d.html`,
+// The first version of this file said `["index.html", "sandbox.html"]`. At the
+// time there were FIVE pages: those two plus `3d.html`,
 // `long-range-dps-debug.html` and `dressing.html`. So the check reported
 // `js/gl/gl-dressing.js` as loaded by nothing, and I escalated it to the GL
-// engineer as an orphan at risk of a clean checkout. It is loaded by
+// engineer as an orphan at risk of a clean checkout. It was loaded by
 // `dressing.html`, its own instrument page, sitting untracked beside it. The
 // correct finding was the pair being untracked -- which the git leg says by
 // itself, without help.
+//
+// Both files were deleted with the map surround on 2026-08-14, so the page
+// count is now four and the example cannot be reproduced. The lesson is kept
+// because it is about the SHAPE of the defect, not about those two files.
 //
 // **A HARDCODED POPULATION INSIDE A CHECK IS THE SAME DEFECT THE CHECK EXISTS
 // TO CATCH.** The gate's whole purpose is "the set on disk must equal the set
@@ -439,7 +443,7 @@ if (untrackedButTagged.length) {
   // `tests/harness.js` builds its script list from `index.html` and
   // `sandbox.smoke.js` from `sandbox.html`, so an untracked file tagged by
   // EITHER breaks every suite for anyone who clones. The instrument pages
-  // (`3d.html`, `dressing.html`, `long-range-dps-debug.html`) carry no suite,
+  // (`3d.html`, `long-range-dps-debug.html`) carry no suite,
   // so the loss there is the instrument, not the build. Both are real; only
   // one stops the tests, and a warning that overstates gets discounted whole.
   var SUITE_PAGES = { "index.html": 1, "sandbox.html": 1 };

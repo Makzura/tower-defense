@@ -294,72 +294,10 @@ var World3D = (function () {
         ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P);
     });
 
-    // THE WORLD BEYOND THE FRAME.
-    //
-    // Baked into THIS builder, so the surround is part of the board's single
-    // existing draw call and adds no second one -- triangles, not draw calls.
-    //
-    // It is emitted AFTER `bounds` would be read but BEFORE it is assigned on
-    // purpose: `bounds` is what `ensureMap` hands to `camera.fitBounds`, so a
-    // surround that widened it would move the camera, and every before/after
-    // comparison of this feature would then differ in the camera as well as in
-    // the geometry. The surround is deliberately invisible to the fit.
-    //
-    // Nothing here goes inside the board rect, which contains the 1280x720 play
-    // rect, and nothing here is stamped into the height field below -- so it
-    // cannot remove a build spot. Measured, not assumed: the height field is
-    // built from zones and route polylines only, and a port that never reads
-    // props reproduces the live field cell for cell (0 of 32,880 differing).
-    if (surroundEnabled && typeof GLSurround !== "undefined") {
-      GLSurround.build(g, { minX: minX, minY: minY, maxX: maxX, maxY: maxY,
-                            P: P, routes: routePaths });
-    }
-
     bounds = { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
     heightField = buildHeightField(minX, minY, maxX, maxY, env, routePaths,
       roadWidth);
     return g.build(renderer);
-  }
-
-  // THE SURROUND SWITCH, AND WHY IT IS A SWITCH.
-  //
-  // A before/after on a rendering change taken from two browser launches is two
-  // scenes that were never in the same state. With this, both states come from
-  // ONE launch, ONE camera and ONE board, differing in this flag and in nothing
-  // else -- which is the only form in which the pairing kaz requires (zero diff
-  // inside the play rect, non-zero outside it, same run) is a controlled
-  // experiment. It ships ON; only a probe turns it off.
-  var surroundEnabled = true;
-  var lastMap = null, lastRoutePaths = null;
-
-  // REBUILDS THE MESH AND DOES NOT RE-FIT THE CAMERA, deliberately. `ensureMap`
-  // ends in `camera.fitBounds`, which rewrites wantDistance -- and a camera that
-  // moved between the two captures would make the pairing measure the camera
-  // instead of the surround. The board bounds are unchanged by this flag anyway
-  // (the surround is emitted before `bounds` is assigned and never widens it),
-  // so re-fitting would be a no-op that is not guaranteed to be one.
-  function setSurround(on) {
-    var want = !!on;
-    if (want === surroundEnabled && mapMesh) {
-      return { surround: surroundEnabled, rebuilt: false };
-    }
-    surroundEnabled = want;
-    if (mapMesh && lastMap && lastRoutePaths) {
-      var old = mapMesh, gl = renderer && renderer.gl;
-      mapMesh = buildMapMesh(lastMap, lastRoutePaths);
-      if (gl && old) {
-        // A rebuild per capture would otherwise leak a megabyte of vertex
-        // buffer each time, and a probe takes several.
-        if (old.pos) gl.deleteBuffer(old.pos);
-        if (old.nrm) gl.deleteBuffer(old.nrm);
-        if (old.col) gl.deleteBuffer(old.col);
-        if (old.emi) gl.deleteBuffer(old.emi);
-      }
-      camera.bounds = bounds;
-    }
-    return { surround: surroundEnabled, rebuilt: true,
-             triangles: mapMesh ? mapMesh.count / 3 : null,
-             bake: (typeof GLSurround !== "undefined") ? GLSurround.lastBake() : null };
   }
 
   // --- which model draws which actor ---------------------------------------
@@ -1040,8 +978,6 @@ var World3D = (function () {
     if (typeof BlubFXCircles !== "undefined") BlubFXCircles.reset();
     if (typeof EnemyWreck !== "undefined") EnemyWreck.reset();
     mapMesh = buildMapMesh(map, routePaths);
-    lastMap = map;
-    lastRoutePaths = routePaths;
     camera.bounds = bounds;
     camera.fitBounds(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
   }
@@ -2383,11 +2319,18 @@ var World3D = (function () {
       // That is busier, and it is also exactly the question the feature exists
       // to answer: will this thing be able to reach the tower I am about to
       // put here. Two rings answer it; one does not.
-      // The guard is real -- dressing.html loads this file WITHOUT
-      // js/visuals.js -- but a silent miss here is indistinguishable from the
-      // correct output for the twenty of twenty-one enemy types that have no
-      // attack at all. So a body that HAS attacks and finds no resolver says
-      // so, once, by name. dressing.html hovers nothing and stays quiet.
+      // THE GUARD IS NOW UNEXERCISED, and that is recorded rather than acted
+      // on. It was here because dressing.html loaded this file WITHOUT
+      // js/visuals.js; that page was deleted with the map surround on
+      // 2026-08-14, and every remaining page that loads gl-world.js
+      // (index.html, sandbox.html) also loads js/visuals.js. Kept as defence
+      // against the next such page, not because one exists -- check before
+      // citing this guard as evidence that a page can miss the module.
+      //
+      // The report below still earns its place: a silent miss here is
+      // indistinguishable from the correct output for the twenty of
+      // twenty-one enemy types that have no attack at all. So a body that HAS
+      // attacks and finds no resolver says so, once, by name.
       if (typeof Visuals3Q !== "undefined" && Visuals3Q.enemyReachesUl) {
         var reaches = Visuals3Q.enemyReachesUl(he);
         for (var ri = 0; ri < reaches.length; ri++) {
@@ -4064,13 +4007,8 @@ var World3D = (function () {
     // that is a picture no amount of shading fixes. Both answer safely when
     // there is no 3D board at all, so the 2D fallback keeps its old behaviour.
     groundHeightAt: function (x, y) { return enabled ? groundHeightAt(x, y) : 0; },
-    // THE SURROUND, PUBLISHED AS A SWITCH so a probe can capture both states
-    // from one launch, one camera and one board. Ships ON. Same reason
-    // SiphonFXBeam exports setOcclusion: a before/after built by editing the
-    // source and relaunching is two scenes that were never in the same state.
-    setSurround: setSurround,
     // The board's height field itself, read-only, for a test that has to prove
-    // a dressing change did not move a build spot. The PICTURE not changing is
+    // a scenery change did not move a build spot. The PICTURE not changing is
     // not that proof -- placement reads this, never the screen.
     heightField: function () {
       if (!heightField) return null;
@@ -4082,10 +4020,7 @@ var World3D = (function () {
       return { triangles: mapMesh ? mapMesh.count / 3 : 0,
                vertices: mapMesh ? mapMesh.count : 0,
                drawCalls: mapMesh ? 1 : 0,
-               bounds: bounds,
-               surround: surroundEnabled,
-               surroundBake: (typeof GLSurround !== "undefined")
-                 ? GLSurround.lastBake() : null };
+               bounds: bounds };
     },
     isLevelUnder: function (x, y, radius) {
       if (!enabled || !heightField) return true;
