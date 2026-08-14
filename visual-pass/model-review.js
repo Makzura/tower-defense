@@ -271,6 +271,22 @@ function review(name, model, scale) {
     // 1 T3 -> 4 T2 -> 16 T1 -> 64 T0. The only type that multiplies.
     "enemy-fractal_slime": 64
   };
+  // THE "observed enemy band 0.76-1.09x mean" PRINTED BESIDE THE WRAP IS A
+  // BIPED BAND -- every model it was derived from walks on two legs, where the
+  // step distribution is near-uniform and the mean is a fair yardstick.
+  //
+  // A TRIPOD GAIT IS BIMODAL AND FAILS THE BAND WHILE BEING PERFECTLY REGULAR.
+  // enemy-colossus, six legs in two antiphase tripods, per-pair:
+  //     1.5  3.1  2.4  1.5  1.5  3.1  2.4  | wrap 1.5
+  // Eight steps with period 4, the wrap identical to three interior steps, no
+  // discontinuity anywhere -- and it reports 0.68x mean, "outside" the band,
+  // purely because the 3.1s pull the mean up. The band is the wrong yardstick
+  // for a gait whose steps are not unimodal; the cycle is not wrong.
+  //
+  // So READ THE PER-PAIR LIST BEFORE BELIEVING THE RATIO. If the wrap matches
+  // the interior steps it resembles, the cycle is continuous whatever the mean
+  // says. Quote the band for two-legged bodies only, until someone derives one
+  // for the multi-leg gaits.
   var moving = model.groups.filter(function (g) { return g.name; }).length;
   var onRoad = MAX_ON_ROAD[name];
   lines.push("  geometry      " + model.triangles + " triangles, " +

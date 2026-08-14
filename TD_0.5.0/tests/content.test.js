@@ -1088,6 +1088,24 @@ test("the boss banner is driven by a flag on the type, not by the midboss", func
 
 group("enemies that fight back");
 
+// Drives `enemy.attackTowers` one small frame at a time -- the same order
+// game.js uses (update, then attackTowers) -- until it returns a hit or the
+// frame budget runs out. A facesTarget attack no longer resolves inside the
+// single call that commits to it: it stops, turns, THEN strikes, so a test
+// that wants to see the hit land has to cross those frames the way the real
+// loop does. Returns the hit tower, or null if the budget ran out first.
+function driveAttackToResolution(enemy, towers, maxSeconds) {
+  var dt = 1 / 60;
+  var elapsed = 0;
+  while (elapsed < maxSeconds) {
+    enemy.update(dt);
+    var hit = enemy.attackTowers(dt, towers);
+    elapsed += dt;
+    if (hit) return hit;
+  }
+  return null;
+}
+
 test("an angry enemy chews through a gunner and the loop sweeps it out", function (t) {
   var h = harness.boot();
   h.run("cash = 100000");
@@ -1102,11 +1120,20 @@ test("an angry enemy chews through a gunner and the loop sweeps it out", functio
   var angry = h.spawnAt(g.pathProgress, undefined, "angry");
   angry.speedUlps = 0;
 
-  h.step(2.6);
-  t.eq(g.currentHp, 40, "one swing at 2.5 s");
-  h.step(2.5);
+  // `angry.attack.facesTarget` (2026-08-14) adds a stop-turn-strike-return
+  // posture on top of the swing: a 90-degree turn each way (0.3 s) plus the
+  // 0.4 s strike, so each swing now costs 2.5 s of interval PLUS up to 1.6 s
+  // of posture before the next one is even eligible, rather than landing the
+  // instant the interval expires. Measured directly off this exact fixture
+  // (gunner at (530, 505), a frozen angry at its road projection, real
+  // game-loop steps) rather than derived, because the posture's own turn
+  // angle depends on where the tower sits relative to the road here: 2.833 s,
+  // 6.400 s, 9.967 s. The margins below clear each with room before the next.
+  h.step(2.9);
+  t.eq(g.currentHp, 40, "one swing, landed after its stop-turn-strike");
+  h.step(3.7);
   t.eq(g.currentHp, 20, "two");
-  h.step(2.5);
+  h.step(3.6);
   t.eq(g.currentHp, 0, "three swings kill a 60 HP gunner");
 
   t.eq(h.game.towers.indexOf(g), -1, "and the destroyed tower leaves the board");
@@ -1144,7 +1171,14 @@ test("an attacker hits one tower, the nearest, not everything in reach", functio
   var far = { x: angry.pos.x + 20, y: angry.pos.y, hits: 0,
     takeDamage: function (n) { this.hits += n; }, isDestroyed: function () { return false; } };
 
+  // facesTarget means this call only COMMITS (it picks the nearest and turns
+  // toward it); driveAttackToResolution crosses the turn and the strike the
+  // way the real loop would. Selection itself is decided right here, at
+  // commit, from the same candidate list attackCandidates always used --
+  // this is exactly what the fix reused rather than a second lookup.
   angry.attackTowers(3, [far, near]);
+  var hit = driveAttackToResolution(angry, [far, near], 1);
+  t.eq(hit, near, "the nearest one was the one it turned to face and hit");
   t.eq(near.hits, 20, "the nearest one took the swing");
   t.eq(far.hits, 0, "the other took nothing");
 });
@@ -1161,12 +1195,22 @@ test("a tower out of reach is safe, and the swing lands the moment one is not", 
 
   t.eq(angry.attackTowers(5, [out]), null, "nothing in reach, nothing hit");
   t.eq(out.hits, 0, "and no damage");
+  t.eq(angry.attackPosture, null, "and nothing committed either");
 
   // The timer stays expired rather than restarting, so walking into range is
-  // punished immediately instead of granting a free interval of safety.
+  // punished immediately instead of granting a free interval of safety --
+  // this call COMMITS on the very same frame it comes into reach, which is
+  // the part facesTarget did not change. Landing the hit is now a turn and a
+  // strike away rather than instant; driveAttackToResolution crosses them.
   out.x = angry.pos.x + 4;
-  t.eq(angry.attackTowers(0, [out]), out, "it swings the instant one is in reach");
+  t.eq(angry.attackTowers(0, [out]), null, "commits the instant one is in reach");
+  t.ok(angry.attackPosture !== null, "and is now turning to face it");
+  t.eq(out.hits, 0, "no damage on the commit frame itself");
+
+  var hit = driveAttackToResolution(angry, [out], 1);
+  t.eq(hit, out, "the swing lands once the turn and strike play out");
   t.eq(out.hits, 20, "for its full damage");
+  t.eq(angry.attackPosture, null, "and it has turned back and resumed by then");
 });
 
 test("defences come off the type onto the enemy, and mitigation applies them", function (t) {

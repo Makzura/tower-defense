@@ -30,10 +30,12 @@
 var fs = require("fs"), path = require("path"), os = require("os");
 var cdp = require("./cdp"), serve = require("./serve");
 
-var PORT = 8803, DEVTOOLS = 9343;
+var PORT = 8813, DEVTOOLS = 9353;
 var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
-var A = "shielded";      // Courier
-var B = "armored";       // Drudge
+// Pair from argv, so the same rig serves Courier/Drudge and Tender/Drudge
+// rather than a second copy drifting away from this one.
+var A = process.argv[2] || "shielded";      // Courier by default
+var B = process.argv[3] || "armored";       // Drudge
 var GUARD = 0.80;
 var SPOTS = [120, 200, 300, 420, 540, 640, 760, 900, 1030, 1180, 1300, 1450, 1600, 1750, 1870];
 var BEARINGS = [

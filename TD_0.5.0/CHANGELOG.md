@@ -13,191 +13,6 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
-**2026-08-14 — CORRECTION: there was never a coverage gap in
-`check_group_gait.py`. "The boss shipped outside its own gate" was mine and it
-was wrong, and the error was `import` ⇒ `reaches`.**
-
-An entry below says the group-gait gate "did not cover the body we had just
-shipped", because `enemy_tyrant` was absent from its `BODIES` list. **The
-premise is false.** `enemy_tyrant` and `enemy_vanguard` import the chassis and
-**call neither** `animate_walk_grouped` nor the `animate_walk` wrapper that
-reaches it — each defines its own `animate_walk` and says so
-(`enemy_tyrant.py:971`, `enemy_vanguard.py:656`). Verified by counting the call
-sites: **eight callers**, `cooper`, `courier`, `dray`, `drudge`, `hedger`,
-`skimmer`, `tender`, `tun` — and **two importers that never call**, the two
-bosses. The original hand-maintained list had covered every real gait user all
-along.
-
-**The harness perturbs a line and propagates by CALL; the recipe in the comment
-selected by IMPORT.** Those are different properties, and I derived the wrong
-one while writing a change whose whole point was that a derivation beats a
-literal. The derivation was right as a principle and measured the wrong thing.
-
-**The error's direction is worth being exact about: it made the covered set too
-LARGE, never too small.** No body was ever hidden. What it did was manufacture
-two zeros that no code explained and then present them as coverage — which is
-worse than an obvious gap, because the file's own standard is that **every zero
-must be explained by code, not by story**, and unexplained zeros are what a
-blind harness looks like.
-
-**What stands from that commit** — the coverage line printed first and
-unconditionally on every run, and the anchor guard — is unaffected and still
-worth having: a gate that reports its scope only when it fails lets a shrinking
-scope pass as a clean run. **What does not stand is the justification.** The
-file has since been corrected in place and now records the import-versus-call
-mismatch directly; no further change is needed there.
-
-**And the same shape, one level up, in prose about the code rather than in the
-code**: a count of "three callers" of the shared gait was circulated and the
-real number is eight. The code was accurate throughout and the sentences about
-it were not — which is precisely the failure the original commit was correcting
-in a comment.
-
-**2026-08-14 — CORRECTION: 17° does not comply. It is a real, declared, open
-clause 8 violation, and the sentence saying otherwise was mine.**
-
-The entry below states *"That COMPLIES, and it complies by less than a pixel"*
-for the Hedger's crank at 17°. **That is false.** It came from extrapolating a
-margin linearly out of the 18°–34° span, from a "first contact at 18°" threshold
-found by scanning DOWN from 34° — which identifies only the FIRST crossing and
-says nothing about what happens below it.
-
-Measured properly, on the composed strike pose over all 12 walk frames, by
-`tools/blender/check_strike_penetration.py`:
-
-| angle | box depth | bvh | real triangle pairs |
-|---|---|---|---|
-| 0–1° | CLEAR | — | 0 |
-| 2–7° | 0.006–0.038 | phantom | 0 |
-| 8° | 0.04420 | **REAL** | 1 |
-| 14° | 0.08101 | **REAL** | 2 |
-| 17° | 0.09870 | **REAL** | 2 | ← shipped |
-| 18° | 0.10499 | **REAL** | 3 |
-| 34° | 0.15665 | **REAL** | 5 | ← previous |
-
-**At 17° `hold` intersects `thigh_2`: real triangle-level interpenetration, 2
-pairs, at walk frame 6.**
-
-**FIRST REAL CONTACT IS BETWEEN 7° AND 8°, NOT 18°** — and it is a *different
-pair*. The 18° figure was drum-against-hub; the operative pair is the mast's
-HOLDER against a **THIGH**, and it engages at less than half the smallest angle
-under discussion. The window everyone argued over was never the operative one.
-
-**THE CURVE IS MONOTONIC**, ~0.0063 u/deg from 2° to 34°, no local maximum,
-real-pair count 0→1→2→3→5. An earlier point-set instrument had suggested a peak
-at 15° and a possible second crossing; that was an artefact. **There is no dip
-to exploit and no safe pocket. No stroke angle is clean**, and the largest clean
-angle is 7°, which is not a stroke.
-
-**17° IS HELD ANYWAY, and the tiebreak is that 34° is measurably worse** — 5
-real pairs against 2, box depth 0.15665 against 0.09870. Reverting would make
-the shipped model worse in order to undo a false sentence. **The fix is geometry
-— where the holder sits relative to the thighs — and it is with art direction.**
-Declared open to quality rather than sat on.
-
-**Recording the sequence rather than a clean correction**, because the sequence
-is the useful part: I wrote the compliance sentence, it reached a shipped header
-as settled, and it outlived the doubt that produced it. That is the same failure
-shape this project spent the day on, committed by the person documenting it.
-
-**`tools/blender/check_strike_penetration.py`** measures clause 8 on poses the
-exporter never bakes. It loads `check_penetration.py`'s own predicate,
-exemptions and slack by reading its source rather than reimplementing them —
-`check_penetration` calls `main()` at module level, so a plain import runs the
-whole roster — and composes the pose exactly as `drawActor` does,
-`mast_root.matrix_world @ T(pivot) @ Ry(θ) @ T(-pivot)`, after `frame_set`.
-
-**Three states, not two, and the third is what makes it trustworthy.** Box
-overlap on all three axes is NECESSARY for interpenetration and not SUFFICIENT —
-a flat plate rotated off-axis has a box far fatter than the plate, and this
-project already measures ~0.105 u of phantom box overlap on the Tyrant's
-blade-versus-hull pair. `BVHTree.overlap` is used only to CLASSIFY what the box
-flags, never to replace it, since the box cannot miss. Green at 0–1°, **phantom
-at 2–7° where a box test alone would have reported a violation**, red from 8°.
-
-**Also corrected: the authorship claim in the entry below.** `git log` shows
-every commit in this tree as `Makzura <diego.makzume@gmail.com>` because that is
-the repo's configured identity. **Git authorship carries no information about
-which agent made a commit here**, and it must not be quoted as evidence that it
-does.
-
-**2026-08-14 — The group-gait gate did not cover the body we had just shipped.
-Its body list is now derived and PRINTED; and the Hedger's crank goes to 17°.**
-
-**`check_group_gait.py` carried a hand-maintained `BODIES` literal with the
-derivation written in the comment directly above it.** `enemy_tyrant` landed,
-was never added, and **the boss shipped outside its own gate.** A list that must
-be edited when a body is added will eventually not be.
-
-**Derived now — and the derivation is printed on every run, first, before any
-comparison.** That distinction is the fix. Swapping a literal for a
-comprehension nobody reads only moves where the omission hides: *a derivation
-you have never watched produce a different answer is a literal with extra
-steps.* Shown changing:
-
-    BEFORE (hand-maintained literal): 10 bodies
-    AFTER  (derived + anchor):        11 bodies
-    ADDED  : enemy_tyrant
-    REMOVED: (none)
-
-and the run now opens with
-
-    coverage: 11 bodies (10 derived + 1 anchor)
-      derived (import enemy_chassis): enemy_cooper, enemy_courier, enemy_dray,
-        enemy_drudge, enemy_hedger, enemy_skimmer, enemy_tender, enemy_tun,
-        enemy_tyrant, enemy_vanguard
-      negative-control anchors:       enemy_normal
-
-A gate that only reports its scope when it fails lets a *shrinking* scope pass
-as a clean run. A zero from a gate covering nothing is still a zero.
-
-**A FALSE COMMENT ABOUT WHY A CONTROL IS A CONTROL, CORRECTED.** The header
-named `enemy_normal` **and** `enemy_vanguard` as negative-control anchors "even
-though they author their own walks". `enemy_vanguard.py:152` is `import
-enemy_chassis as chassis` — it reaches the shared gait like any other chassis
-body, so its zero would have meant **the harness was blind**, not that the
-control held. The claim was believed because it travelled beside a true one
-about `enemy_normal`. `ANCHORS` is now `enemy_normal` alone, and a guard prints
-a loud line if any anchor is found in the derived set. Verified in both
-directions: clean for `("enemy_normal",)`, fires for
-`("enemy_normal", "enemy_vanguard")`.
-
-**THE HEDGER'S CRANK: 34° → 17°, AND NO EXCLUSION IS DECLARED.** At 34° the
-drum's rim reaches 0.0523 u into the hub at z 0.595 for ~53% of each gesture
-window. `check_penetration.py` walks the BAKED frames and reports clean,
-correctly — nothing exports this pose; it is composed at draw time from
-`attackFlash`. The instrument narrowed; the rule did not.
-
-Clause 8 has no waiver: remove the overlap, or declare the parts as meant to
-touch. Magnitude and frequency fit through neither door. **The exclusion door is
-closed by the measurement itself: first contact is at 18° of a 34° stroke, so
-the parts meet only because the stroke travels PAST the point where they meet.**
-That is an overshoot, not an abutment, and signing "these are meant to meet"
-would be untrue.
-
-17° holds every bearing 34° held, at 42% of the silhouette change at the
-dominant one. **Bearing 270 fails at BOTH angles** (0.96x at 34°, 0.97x at 17°),
-so that 1.7% of road is a pre-existing Hedger gap and **not a cost of this
-change.**
-
-**THE MARGIN IS THIN AND IS RECORDED AS A NUMBER, NOT A SIGN.** First contact is
-at 18°; this sits 1° below it. Taking the intrusion as locally linear —
-0.0523 u over the 16° from 18° to 34°, so ~0.0033 u/deg — the clearance is of
-order **0.003 u, about 0.13 board px** at this body's `sizeScale` of 1.25. It
-complies, and it complies by less than a pixel. If the drum, hub or pivot ever
-move this breaks first, and it breaks **silently**, because the baked-frame gate
-cannot see this pose at all.
-
-`tipCheck` moves with the angle and is not a literal to tidy: the tip sits
-0.520 u out along +x of the pivot, so its world z is `0.8004 - 0.520·sin(swing)`
-— 0.5096 at 34°, which reproduces mira's authored 0.509, and 0.648 here.
-
-**One methodological rule, into the tool headers: compare ABSOLUTE px across
-angles, RATIOS within an angle.** The silhouette band is the mast's projected
-rows, so a smaller stroke shrinks the denominator with it — bearings appearing
-to "improve" at 17° is the denominator moving, not a gain. An instrument whose
-scale tracks its subject produces numbers that look comparable and are not.
-
 **2026-08-14 — `World3D.animHz` closes the flier-cadence seam: a preview can ask
 what drives a body instead of re-deriving it.**
 
@@ -978,6 +793,156 @@ Suites: 107/0, 207/5, 72/0, 45/0, 53/0 and sandbox green — the same five
 failures, by name, as the recorded clean-extraction baseline. None of them is
 this change.
 
+**2026-08-14 — Clause 8 reaches a pose the exporter never sees, and no render
+can discharge it.**
+
+The first body with a live attack pose is **one body under three names** — the
+Blender script `tools/blender/enemy_hedger.py` ("the Hedger"), the enemy type
+`angry`, and the Tripod on screen. Its strike is a per-group `overrides` matrix
+composed on top of the baked walk at draw time, driven by `attackFlash`, and
+nothing exports it. `tools/blender/check_penetration.py` walks
+`range(1, frames + 1)` — the baked frames — so it reports **CLEAN, correctly**,
+over the walk, while at full stroke the drum's rim reaches **0.0523 u into the
+hub at z 0.595**, from 18° of a 34° stroke, for **47% of each gesture window**
+and about 1.1% of a body's time on screen. Found by suki against her own passing
+gate.
+
+**Disposition: the stroke goes to 17°, and no exclusion is declared.** First
+contact at 18° of a 34° stroke is an overshoot, not an abutment, so the
+design-intent claim an exclusion requires is one the geometry contradicts.
+
+**CORRECTED SAME DAY — 17° DOES NOT COMPLY, and this entry said it did.** The
+posed sweep landed and found **2 intersecting triangle pairs, `hold` against
+`thigh_2`, at walk frame 6**. First real contact is between **7° and 8°**, the
+largest clean angle is **7°**, which is not a stroke, and the curve is monotonic
+at ~0.0063 u/deg from 2° to 34° — there is no safe pocket. **So no stroke angle
+that reads as a gesture is clean; this is geometry, not a constant**, and it is
+with art direction.
+
+Three corrections in that, each about the instruments rather than the body.
+**The operative pair is the holder against a THIGH, not the drum against its
+hub** — a different pair from the one the 18° figure came from, so the window
+everyone argued over was never the operative one and the body was violating
+below half the smallest angle discussed. **The non-monotonic 15° peak that made
+a safe pocket seem possible was an artefact of a point-set instrument.** And
+"17° is clean by construction" was never measured — it was inferred from a
+threshold found on a different pair, and it reached this file and `AGENTS.md`
+before anyone tested it.
+
+**RETRACTED THE SAME DAY: an earlier version of this entry said the gesture no
+longer rotates. It does.** Verified in the shipping code — `gl-world.js:1792`
+is `swing: 0.2967060`, exactly 17.000°, and `:1860` passes it as **ry**, a
+rotation about y. The declared violation is still in the file's own header at
+`:1731`. **The 17° rotation and its open violation are current state.**
+
+A re-authoring of the strike as a **recoil** — a pure translation of `mast`
+along its own axis, following the ruling that the implement is a gun — is
+**proposed and not landed**. It would remove this overlap by construction, and
+it would not clear the body: `mast` also carries the hold, slung under the drum
+where the hub is, so a slide needs its own sweep of the full travel.
+
+**The mistake is worth more than the correction.** A design decision was
+relayed to me and I wrote it into `AGENTS.md` and here as current, ahead of any
+code. That is the mirror of a stale claim — **a claim arriving before its
+truth** — and it is the worse direction, because the operative document would
+have described a gesture the code does not implement, making the code's own
+header look like the thing that was out of date. **Record a gesture change
+against a commit sha, never against a description of intent.** Neither the
+rendering lead nor I can see the other's working tree; that is precisely why
+the document has to follow the file rather than the plan.
+
+**The body is UNPROVEN, not cleared.** A translation cannot produce that
+intrusion; it can produce a different one nobody has measured. `mast` carries
+the **hold**, slung under the drum in the same place as the hub — the drum stays
+above the hub under a horizontal slide and is safe by construction, **the hold
+is not, and it is in the same group.** A per-z-slice sweep of 0 → 0.12 u closes
+it, with a number.
+
+**And the clause is not settled by an instance that stopped existing.** The
+ruling rests on the clause's own words — *"in some pose, whatever the numbers
+say"* — and every condition that made the seam dangerous is unchanged:
+`check_penetration.py` still walks baked frames, `overrides` still compose live,
+and a body can still pass every gate with parts inside each other for part of
+every gesture.
+
+**The three-row validation this clause now demands is what made the result
+assertable**, and it caught the mirror error in the same run: the instrument
+reports CLEAR at 0–1°, flags 2–7° on the box test and then classifies them
+**phantom** at zero intersecting triangles, reporting REAL only from 8°. **A box
+test alone would have called 2° a violation** — exactly the false-fail direction
+added to clause 8 hours earlier, caught by the instrument built afterwards.
+
+**The group is `mast`.** It has been `mast` since `47190ee`; `crank` does not
+exist on this body and appears only in a commit subject. Named here because the
+change log is where people look to find when a value moved, and they will search
+for the group.
+
+**THE MARGIN BEHIND THE 17° IS NOT YET MEASURED, and that is recorded here
+deliberately.** First contact was measured at 18°, so 17° is below the observed
+threshold — but the clearance behind it, about 0.13 board px, is an
+extrapolation from the 18°–34° span at ~0.0033 u/deg. A vertex-set sweep across
+14°–18° came back **non-monotonic, peaking at 15°**, so the approach geometry
+changes character inside the window we are operating in and a single crossing
+cannot be assumed. **Until the solid sweep lands, "17° complies" rests on an
+extrapolation, not a measurement.** A measured clearance at 14–18° is
+commissioned. Nothing here says the ruling is unmet; it says the margin is not
+yet a number.
+
+**Complying costs one constant and no geometry.** The stroke is not in the mesh:
+`gl-world.js:1740` is `angle = stroke * attackFlash`, and the model deliberately
+exports one walk band with `mast` keyed to identity so the strike stays live. So
+`enemy-angry.js` does not move, every gate figure on that body stands, and there
+is no re-export to churn the file through export nondeterminism. Recorded
+because the first sign-off on this ruling — mine — said "the 17° re-export",
+and both the model smith and the rendering lead corrected it in the direction of
+the ruling costing less, not more. Measured across bearings, 17° holds every bearing 34°
+holds, at 42% of the silhouette change at the dominant one — **complying cost no
+bearing that reads.** Recorded because the next person facing this clause will
+assume it costs them something.
+
+Two corrections folded in, both from the division that produced the original
+figures: the exposure is 47% and 1.11%, not 53% and 1.25% — `attackFlash` decays
+1→0, so time above a threshold `f` is `(1 − f)·T`, not `f·T` — and the proposed
+top-taper fix was withdrawn after a per-z-slice sweep put the contact on the
+hub's **side** at mid-height, not over its top face. Bearing 270 fails to read
+at **both** angles and is a pre-existing gap, not a cost of compliance.
+
+**Ruled: the clause applies, and the wording is widened to match how everyone
+already quotes it** — any pose the player can be shown, and part-inside-part
+rather than only weapon-inside-body. The grounds are in the clause's own text:
+the failure arrives "in some pose, **whatever the numbers say**", which is a
+direct instruction that a passing measurement does not discharge it. The tool
+walks baked frames because those were the only poses that existed when it was
+written. **The instrument narrowed; the rule did not.** A body must not be able
+to satisfy every gate in the pipeline and still have parts inside each other for
+half of every gesture.
+
+**A clean silhouette is a statement about severity, not a clearance.** Clause 8
+mandates solids precisely because appearance-based measurement gave a false pass
+once — its own text records a version that "reported 10 mm of clearance while
+the haft ran through the man's chest". So the capture of whether the outline
+breaks is worth having and does not settle the clause.
+
+**Two dispositions, and the distinction is the load-bearing part.** Either
+remove the overlap, or **declare** it under the exclusion the clause already
+carries — parts that are *supposed* to touch, stated in code with the reason.
+An exclusion is a claim about **design intent**. "Small enough" and "not
+visible" are **waivers**, and this clause has no waiver.
+
+**Constraints on whatever grows to cover posed geometry.** One source of truth
+for the pose — a Blender-side gate holding its own copy of a matrix the renderer
+owns is two copies that will drift, which is why `CLAUDE.md` is a pointer today;
+baking the stroke extremes as gate-only frames keeps one. And it must be shown
+to FAIL on the Hedger at full stroke and pass at 17°, which is clean by
+construction, before it is trusted.
+
+**This is the third instance of one pattern, not an incident.** `crownOf()`
+takes `model.top` from `GLModels.expand()`, computed before any frame transform,
+and buries the health bar inside posed bodies — recorded 2026-08-12, never
+gated. An unkeyed group root exports as part of its parent with no error. And
+this. All three are a pipeline quantity derived from the rest or baked state and
+consumed by something that poses.
+
 **2026-08-14 — The manifest gate gets a third leg: the git index. Two commits
 on this branch cannot be booted by anyone who clones them.**
 
@@ -1132,6 +1097,112 @@ every later one** by a handful of antialiased pixels — that produced a phantom
 78-pixel difference in the button rows which vanished the moment the first draw
 was discarded. A run-to-run null on the same code state returned exactly 0, so
 the phantom looked deterministic and real until the warm-up frame was dropped.
+
+**2026-08-13 — Waves 12, 13 and 16 trade per-body health for bodies: four
+groups at half the health and 2.5x the count. Eight further waves are held.**
+
+**Reconstructed after the fact.** `6ec794a` landed the code and the test re-pins
+with no entry here. Everything below is taken from the DIFF and re-measured
+against HEAD through the game's own resolvers, not from the commit message —
+see the note on the held count at the end, which is why.
+
+Diego approved `k = 2, m = 1.25, b = 1.00` on twelve mid-game waves and asked
+for a playtest. Three landed.
+
+**The rule, per group:** `health -> health / 2`, `count -> round(count x 2 x
+1.25)`, applied only where `Enemy.healthOf` resolves EVEN — so the halving is
+exact and no health is invented by rounding — where `count > 1`, and where the
+type is not a single-purpose body. **It is two separable operations.** The SWAP
+(`health / 2`, `count x 2`) is exactly income-neutral, because `count x health`
+is the invariant `Enemy.bountyOf` prices against; it buys texture and nothing
+else. The INFLATION — the extra x1.25 on the count — is the only part that moves
+a total. There is deliberately no bounty haircut: **$9 505 of the purse is
+wave-number-only rewards** ($10 105 counting the stake) and no schedule change
+touches it, so inflating health would dilute spending power with no second site
+to keep it honest.
+
+**It lands on four GROUPS across three waves, not on whole waves.** Wave 12's
+`swarm` (16 x 2 HP -> 40 x 1) and its stock normals (12 x 10 -> 30 x 5); wave
+13's `angry` (8 x 18 -> 20 x 9); wave 16's `armored` (10 x 10 -> 25 x 5). Each
+of the three OPENS with a group the rule does not touch, which is why they land
+clear of the spine. Every multiplication is exact; nothing needed rounding.
+
+**Wave 11 is the floor, and it is not a matter of taste.** `tests/run.js`
+deep-equals `WAVES.slice(0, 11)` against a literal — "the introduction, up to
+and including the midboss" — so wave 12 is the first wave any retune may touch.
+
+**The totals, all six re-pinned in `tests/run.js`:**
+
+| | before | after |
+|---|---:|---:|
+| scheduled bodies | 797 | 866 |
+| scheduled HP | 23 697 | 23 796 |
+| effective HP | 25 799 | 25 898 |
+| scheduled kill bounties | $23 333 | $23 438 |
+| wave-clear bonuses | $2 579 | $2 590 |
+| authored purse | $36 017 | $36 133 |
+
+**And two DERIVED figures moved that no search for those totals would have
+found**, because they quote no total: the money density in the balance-math
+section is `kill bounties / effective HP` and goes **0.9044 -> 0.9050**, and its
+declared-health counterpart in the next clause is `kill bounties / scheduled HP`
+and goes **0.9846 -> 0.9850**. The first was stated in three places.
+
+**Two ratios are called "money density" and they are not the same number.** The
+balance tooling reports **1.3961 -> 1.3952**, which is *purse* over effective HP
+— it carries the schedule-blind $10 105. `AGENTS.md` means *kill bounties* over
+effective HP. Both are now pinned by name in `curve-verify.js`.
+
+**The per-type bounty ratios did NOT move**, and the passage now says why: they
+are computed at each type's BASE health, so they are properties of `Enemy.TYPES`
+that a wave `health` override cannot touch — `Enemy.bountyOf` scales bounty in
+the same proportion. Checked across all 21 types; none changed.
+
+**Why eight are held, and it is the finding worth keeping.** `interval` is
+untouched, so a retuned group deploys 2.5x the bodies at the old spacing. Driven
+through the real loop with no towers, peak effective health ON THE ROAD across
+the twelve fell **10 070 -> 8 482, -15.8%, while authored health rose 25%** —
+eight of twelve got LIGHTER at their peak moment, and the twelve ran 3.9 minutes
+longer. An analytic model predicted +18% by assuming groups stay co-resident;
+that stops being true once a wave deploys over 87 s against a 46 s transit, and
+only the loop showed it. Second ground: `tests/run.js` pins each of the twenty
+original v0.4.4 waves to its opening group's exact count, interval and type, and
+seven of the held waves are old-wave openers. That table is the only surviving
+record of a curve somebody actually measured — nothing simulated currently
+reaches past wave 20 — so it is held rather than re-pinned.
+
+**Twelve were approved. Three landed — 12, 13 and 16, the waves a player
+currently reaches. Eight were held: 19, 21, 22, 23, 27, 31, 32 and 33**, all
+above the wave-18 camo wall that no simulated run passes, because the change
+lowers peak load and no measurement of these waves was available to confirm the
+effect. **One, wave 17, was never eligible:** all three of its groups resolve to
+odd health, so the halving rule cannot reach it.
+
+**The commit message says "nine are held" and then names eight. The correct
+figure is eight held and one ineligible** — confirmed from the diff and by an
+independent measurement of the schedule before the patch was cut, which found
+eleven waves changed and wave 17 byte-identical. The message is pushed and
+cannot be repaired, so this entry is the correction.
+
+**Wave 12 ships WITH that regression, deliberately** — peak load 222 -> 164,
+deploying over 90 s instead of 70 — because it is early enough that a player
+reports it rather than a simulator inferring it.
+
+**Widening the scope later means dividing each retuned group's `interval` by
+2.5 in the same change.** That restores the deployment window and turns the
+-15.8% into +25%. Anyone widening without it repeats the regression eight more
+times.
+
+Six suites at the recorded floor on the committed content: run 107/0, content
+207/5 with the same five names, beam 45/0, blub 53/0, long-range-dps 72/0,
+sandbox smoke passed.
+
+**One note on the population entry below.** Its ceiling measurement was taken
+against the TWELVE-wave draft of this retune ("16 RETUNED markers"), which never
+shipped — the working tree now carries four markers across three waves. Its
+conclusion survives, since the global peak stays wave 30 and none of the three
+landed waves is wave 30, but it holds a fortiori for a subset and was not
+re-taken for it.
 
 **2026-08-13 — The population question answered by measurement: 400–500
 ordinary enemies costs ~3 ms of a 16.67 ms frame, the failure point is around

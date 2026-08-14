@@ -514,11 +514,42 @@ var Codex = (function () {
   // a5 and b5 differ from base by a great deal and no player has ever seen
   // either of them without buying it.
   //
-  // CACHED, not live. The index is the one screen where a live render would be
-  // affordable, but this body shares the screen with a rail of five more and a
-  // list of enemies, and the viewer is where a continuous turn belongs. At
-  // ModelViewer3D's 24 yaw steps the turn is a 15 degree step: one revolution
-  // costs 24 renders paid once, over its first turn, and nothing after.
+  // LIVE, EXCEPT UNDER THE MODAL -- and the cached version of this was the
+  // "laggy" rotation the owner reported on 2026-08-14.
+  //
+  // THE MECHANISM, because it is not a frame-rate fault and it feels exactly
+  // like one. On the cached path ModelViewer3D quantises yaw to YAW_STEPS = 24.
+  // ROT_SECONDS is 14, so the picture is BIT-IDENTICAL for 583 ms and then
+  // jumps 15 degrees. The index redraws at the full rAF rate the whole time --
+  // measured 7 structural changes in 65 rendered frames, with the other 56
+  // frames byte-for-byte equal, against 37 of 38 in the modal beside it. No
+  // timing number can tell those two apart; only the pixels can.
+  //
+  // The previous comment here justified the cache with "this body shares the
+  // screen with a rail of five more". That was wrong, and it was the whole
+  // reason for the choice: the rail draws through TowerPreview3D (a different
+  // module with its own cache), and so does this function's own fallback below.
+  // This is the ONLY ModelViewer3D call on the towers tab, so there is no
+  // budget here to compete for.
+  //
+  // Raising YAW_STEPS instead was considered and cannot reach the brief. The
+  // ask is "smooth like the viewer", the viewer moves every frame, and matching
+  // that by quantising needs ~840 entries per body against a 128-entry cache --
+  // and the Siphon alone wears eleven bodies. 72 steps would still be a jump
+  // every 194 ms.
+  //
+  // `!viewer` IS LOAD-BEARING. The modal draws OVER this tab, so an unguarded
+  // live flag would put two full FBO-plus-readback renders in every frame of
+  // the one screen that already pays for one -- and the picture it would buy is
+  // under a 93% opaque backdrop. With the modal up this reverts to the cached
+  // path, which is bounded at ONE render per 583 ms rather than one per frame.
+  //
+  // Not zero, and the measurement is the reason this sentence is not the one I
+  // first wrote: because the live path never writes the cache, opening the
+  // viewer finds it COLD and fills it as the panel's yaw walks on underneath --
+  // 7 cached renders during a 4 s modal window, measured, against 50 live ones
+  // for the modal itself. It stops after one revolution (24 entries) and it is
+  // 1/35 of what the unguarded flag would cost, which is the trade being made.
   function drawTowerBody(ctx, model) {
     var r = towerBodyRect();
     var hot = pointInRect(mouse.x, mouse.y, r);
@@ -547,7 +578,8 @@ var Codex = (function () {
     var yaw = (nowMs() / 1000 / ROT_SECONDS) * Math.PI * 2;
     var drew = false;
     if (mesh && typeof ModelViewer3D !== "undefined") {
-      drew = ModelViewer3D.draw(ctx, mesh, cx, cy, box, { yaw: yaw, frame: 0 });
+      drew = ModelViewer3D.draw(ctx, mesh, cx, cy, box,
+        { yaw: yaw, frame: 0, live: !viewer });
     }
     if (!drew) {
       // Never blank: the tower's own glyph, at the same footprint, exactly as

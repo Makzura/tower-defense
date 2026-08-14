@@ -207,10 +207,99 @@ var Visuals3Q = (function () {
     ctx.stroke();
   }
 
+  // -------------------------------------------------------------------------
+  // THE REACH AN ENEMY CAN ATTACK A TOWER FROM -- decided in ONE place.
+  //
+  // Same rule as "range circles: only for the tower you asked about": the
+  // reach is painted only for the body under the cursor, and what counts as
+  // that reach is decided once. Two call sites draw it -- the 3D overlay in
+  // js/gl/gl-world.js and drawEnemyHover in js/game.js -- and two call sites
+  // that must agree about a radius cannot be shown to agree by checking each
+  // on its own.
+  //
+  // RETURNED IN u.l., never in pixels, so ul() still converts exactly once at
+  // the draw. That is the same contract every other distance in the game has,
+  // and it is what lets the 2D and 3D branches share this without either of
+  // them inheriting the other's idea of a pixel.
+  //
+  // READ FROM THE INSTANCE, NEVER FROM Enemy.TYPES. `Enemy.attacksOf`
+  // reconciles the singular `attack:` spelling with the plural `attacks:` one,
+  // the constructor stores the reconciled list as `this.attacks`, and the
+  // Tyrant's roar concats its leap into that same array. So the instance's
+  // list is the one true list BY CONSTRUCTION: it covers both spellings and
+  // the phase unlock without this file knowing that either exists, and a
+  // retune of a reach in js/enemy.js moves the drawn ring with no change here.
+  //
+  // A MISSING reachUl IS THE WHOLE MAP, NOT ZERO. Enemy.attackCandidates
+  // spells that out as Infinity -- the Tyrant's aimed shot has relied on it
+  // since 2026-07-30 -- and an unbounded reach draws NOTHING, which is the
+  // rule js/blub.js already follows for a tower whose rangePx is Infinity. A
+  // circle round the entire board is not information. A zero-radius ring reads
+  // as a bug, so a zero, a negative and a NaN draw nothing either.
+  //
+  // NOT INCLUDED: `leap.radiusUl`. That is the shockwave at where the Tyrant
+  // LANDS, not a reach from where it stands, so drawing it here would answer a
+  // different question in the same ink.
+  //
+  // Deduped, because two attacks may share a radius and two identical rings
+  // stacked are only a darker ring.
+  function enemyReachesUl(enemy) {
+    var out = [];
+    var attacks = enemy && enemy.attacks;
+    if (!attacks) return out;
+    for (var i = 0; i < attacks.length; i++) {
+      var spec = attacks[i];
+      if (!spec) continue;
+      var r = spec.reachUl;
+      if (typeof r !== "number" || !isFinite(r) || r <= 0) continue;
+      var seen = false;
+      for (var j = 0; j < out.length; j++) {
+        if (out[j] === r) { seen = true; break; }
+      }
+      if (!seen) out.push(r);
+    }
+    return out;
+  }
+
+  // THE INK. One constant, so swapping the hue is one line and both renderers
+  // move together -- the alternative is two files that agree today.
+  //
+  // Warm red rather than the orange js/enemy.js flashes on a strike: the 3D
+  // overlay already draws a warm ring concentrically inside a blue one (the
+  // tower deadzone, rgba(230,140,120,0.5)), and an orange reach ring lands
+  // close enough to that to be read as part of it.
+  //
+  // The WIDTH is the tower range ring's own (drawGroundRing defaults to 1.5
+  // and the tower passes no width), and so is the FILL alpha, so an enemy's
+  // reach and a tower's reach are the same kind of statement in the same
+  // grammar and only the hue says which is which.
+  //
+  // THE STROKE ALPHA IS THE ONE DEPARTURE AND IT IS MEASURED, NOT DERIVED. A
+  // saturated red and a pale blue do not composite alike over the road, so
+  // matching the tower's 0.55 by number would not match it by weight. Both
+  // candidates were rendered on the real board over the road the ring crosses
+  // and their luminance delta against that ground compared with the tower
+  // range ring's own delta at the same spot; the figures are in CHANGELOG.md
+  // under this change. A palette number is an input to the render, never a
+  // prediction of it, which is why this was not settled on paper.
+  //
+  // The fill is separate from the stroke on purpose. A wash's perceived weight
+  // scales with AREA, so a reach several times a tower's range wants a lighter
+  // one; keeping it here makes that a one-line change if a retune asks for it.
+  var ENEMY_REACH_RGB = "255,86,74";
+  var ENEMY_REACH_STROKE = "rgba(" + ENEMY_REACH_RGB + ",0.91)";
+  var ENEMY_REACH_FILL = "rgba(" + ENEMY_REACH_RGB + ",0.07)";
+  var ENEMY_REACH_WIDTH = 1.5;
+
   return {
     GROUND_SQUASH: GROUND_SQUASH,
     LIGHT_X: LIGHT_X,
     LIGHT_Y: LIGHT_Y,
+    ENEMY_REACH_RGB: ENEMY_REACH_RGB,
+    ENEMY_REACH_STROKE: ENEMY_REACH_STROKE,
+    ENEMY_REACH_FILL: ENEMY_REACH_FILL,
+    ENEMY_REACH_WIDTH: ENEMY_REACH_WIDTH,
+    enemyReachesUl: enemyReachesUl,
     ellipse: ellipse,
     shadow: shadow,
     platform: platform,

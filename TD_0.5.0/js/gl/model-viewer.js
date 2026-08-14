@@ -47,6 +47,17 @@
 //   growth at all. That matters: a viewer-sized entry is hundreds of KB, and a
 //   revolution's worth of them at every walk frame would be tens of MB.
 //
+// ANY BODY THE PLAYER WATCHES TURN HAS TO BE LIVE, and that is the rule the two
+// policies above do not state on their own. YAW_STEPS quantises a cached turn
+// to 15 degrees, so at the index's 14-second revolution a cached body holds one
+// pose for 583 ms and then jumps -- measured 2026-08-14 as 7 changes in 65
+// rendered frames while the modal beside it changed in 37 of 38. The owner
+// reported that as "laggy" and it is not a frame-rate fault at all; the screen
+// is drawing at full rate throughout. Raising YAW_STEPS does not reach it
+// either: matching a 60 Hz turn needs ~840 entries per body against CACHE_MAX
+// of 128. Cached is for a body at a FIXED yaw (the rail, the enemy rows, an
+// icon); live is for one that turns.
+//
 // The policy is the caller's to choose because only the caller knows what else
 // is on the screen. Getting it wrong is not a correctness failure in either
 // direction -- it is frame time in one and memory in the other.

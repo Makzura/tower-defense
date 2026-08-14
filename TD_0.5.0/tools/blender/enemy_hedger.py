@@ -460,6 +460,18 @@ PENETRATION_CONTACTS = (
     ("hold", "thigh_1", "as thigh_0"),
     ("hold_plate_0", "thigh_0", "as hold/thigh_0"),
     ("hold_plate_0", "thigh_1", "as hold/thigh_0"),
+    # CONSTRUCTION, AND IT MUST BE DECLARED EXPLICITLY FOR THE *POSED* CHECK.
+    # The bar plates are bolted THROUGH the hold's end faces, so they overlap it
+    # by design and RIGIDLY -- same group, identical at every frame and every
+    # strike angle. `check_penetration.py` never reports it, because it drops
+    # pairs sharing a limb root ("internal pairs not checked").
+    # `check_strike_penetration.py` does NOT inherit that structural exemption,
+    # so without these two lines it reports `hold / hold_plate_0` as a REAL
+    # contact at EVERY angle including zero -- constant depth 0.00900 -- which
+    # masks the pose-dependent pair that is the only reason to run it.
+    ("hold", "hold_plate_0", "the plate is bolted through the hold's end face; "
+                             "same group, rigid, identical at every angle"),
+    ("hold", "hold_plate_1", "as hold/hold_plate_0"),
 )
 
 

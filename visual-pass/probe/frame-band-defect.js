@@ -69,8 +69,19 @@ async function main() {
       " var f0=m.frames[0];" +
       " var st=f0.map(function(mat){ var c=Array.prototype.slice.call(mat);" +
       "   c[14] = (c[14]||0) + 3.0; return c; });" +
+      " var walk = m.frames.length;" +
       " m.frames.push(st);" +
+      // DECLARE THE LAYOUT. Appending a frame without setting `bands` is the
+      // ABSENT case under the contract -- "the exporter did not declare this
+      // model's layout" -- whose documented fallback is the whole frame list.
+      // A CONFORMING reader must therefore walk all nine frames and MUST
+      // present the state pose, so this file would have stayed red against
+      // every correct implementation while reading as a defect report.
+      // Caught by the reader's author, who correctly refused to edit the test
+      // he was being judged by. The line is mine and this is it.
+      " m.bands = [[0, walk],[walk, 1]];" +
       " return { framesNow:m.frames.length, groups:m.groups.length," +
+      "          bands:m.bands, walkFrames:walk," +
       "          matrixLen:f0[0].length };})()");
     out.framesAfter = await E("TDProbe.frameCount()");
 

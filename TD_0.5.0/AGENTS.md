@@ -1,7 +1,7 @@
 # Tower Defense — project context
 
-**Version 0.5.0** — one thirty-five-wave campaign schedule at 797 bodies /
-25 799 effective HP, which can be won or lost and ends on a boss. (Three
+**Version 0.5.0** — one thirty-five-wave campaign schedule at 866 bodies /
+25 898 effective HP, which can be won or lost and ends on a boss. (Three
 selectable difficulties existed from 2026-07-30 to 2026-08-12; Normal and Hard
 were placeholders and the whole concept was deleted. See the change log.)
 A **twenty-one**-type enemy roster (swarms, armor, camo,
@@ -117,18 +117,23 @@ way and report success. See the 2026-08-13 rank-rig entry in the change log.
 suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
 Where this file says "the five unit suites" it means these six minus the smoke
 test, and that is a correct count, not a stale one. Name the set a count counts
-before repairing it. These are the current measured results, taken on
-2026-08-10 after the Summoner landed and confirmed on 2026-08-11 at commit
-`77a7865`:
+before repairing it. These are the current measured results, **re-run
+2026-08-14 after the wave 12/13/16 retune landed** (`6ec794a`):
 
 ```
-node tests/run.js                 105 pass / 3 fail   core game and difficulty
-node tests/content.test.js        182 pass / 30 fail  content, visuals and index
-node tests/long-range-dps.test.js  70 pass / 1 fail   the Longshot spec
+node tests/run.js                 107 pass / 0 fail   core game and schedule
+node tests/content.test.js        207 pass / 5 fail   content, visuals and index
+node tests/long-range-dps.test.js  72 pass / 0 fail   the Longshot spec
 node tests/beam.test.js            45 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
-node tests/sandbox.smoke.js       2 failures          sandbox integration
+node tests/sandbox.smoke.js       passed              sandbox integration
 ```
+
+**The five content failures, by name**, so nobody has to re-derive them: "the
+Tyrant's numbers are the ones that were asked for", "the roar shields it, speeds
+it up, and calls the wave back", "after the roar it alternates shot and leap,
+and still attacks rarely", "B4 pierces DEFENCE in flat percentage points, never
+below zero", and "path B answers a brute with damage, not with pierce".
 
 **The content line dipped to `181 / 31` for part of 2026-08-09.**
 Adding the Summoner broke one codex test twice over, and both halves were real:
@@ -226,10 +231,27 @@ Things to know if a test misleads you:
   escapes. The manifest check's third leg compares the tags against
   `git ls-files`. It is skipped, and says so in its output, when run against an
   extraction that has no git index.
+- **`node tools/check-script-manifest.js --rev <sha>` asks the other question:
+  was the branch bootable at that commit?** It reads the page and the file list
+  out of git objects, so it needs no checkout and no extraction. The default
+  form is prospective (catch it before it lands); `--rev` is retrospective
+  (prove it afterwards). Both are useful and they are not the same gate.
 - **Seed a gate run from a commit and you inherit that commit's defects.** When
   you materialise a commit to measure it, take a CONTROL run before the
   treatment: confirm the materialised tree boots at all before attributing any
   failure to your own change.
+- **GIT AUTHORSHIP CARRIES NO INFORMATION IN THIS REPO. Never attribute a
+  commit from it.** Every commit is authored `Makzura
+  <diego.makzume@gmail.com>` — that is the checkout's configured
+  `user.email`, so it is what the owner, every agent and the outside
+  collaborator all commit as. Verified across sixty consecutive commits: one
+  distinct author, including commits agents made themselves in this session.
+  **`git log --format=%ae` here is a check that can only ever return one
+  value**, and two people reasoned from it in one evening — one to accuse, one
+  to exonerate — each finding it persuasive *because* it looked like hard
+  evidence. A wrong instrument that flatters your own diligence is the hardest
+  kind to doubt. Attribute from the commit message, the working tree, or by
+  asking; never from authorship.
 - A hidden browser tab pauses `requestAnimationFrame` entirely, so the canvas
   freezes and nothing simulates. That has fooled a debugging session before —
   if the game looks dead in a background tab, it is not a bug.
@@ -503,6 +525,31 @@ tools/fixed-list.js `node tools/fixed-list.js <model>` -- lists the solids a
                      model classifies as map-fixed, with their bounds
 tools/check-parts.js one-line summary per model: fixed tris, emissive tris,
                      and the bounding box of everything held still
+tools/ci-check.js   `node tools/ci-check.js` -- the gate the whole company
+                     runs. Diffs failing test NAMES, not pass/fail totals, and
+                     runs the script-manifest check described under "Things to
+                     know if a test misleads you"
+tools/blender/check_penetration.py  PER-PART, PER-FRAME solid overlap, the
+                     clause 8 gate. The unit compared is the mesh OBJECT and it
+                     pairs every part with every other; group roots are used
+                     only to EXEMPT pairs sharing a limb. Walks the keyed frame
+                     range. NEEDS BLENDER
+tools/blender/check_group_gait.py  compares rigs before export by perturbing
+                     the shared gait and diffing. Prints its derived coverage
+                     on every run -- do not copy that roster into a document.
+                     Its body list keys on which scripts IMPORT the chassis,
+                     while the perturbation travels by CALL, so a body that
+                     imports for palette and geometry only reads zero and is
+                     EXPECTED, not a broken harness. NEEDS BLENDER
+                     -- READ THESE TWO, DO NOT GREP THEM. Both use Blender's
+                     vocabulary, so a search for "part", "group", "baked" or
+                     "posed" returns nothing and reads as absence.
+                     -- NEITHER SEES A LIVE POSED OVERRIDE. That case is ruled
+                     to a future check on the JS side under plain `node`,
+                     because JS holds the overrides matrix, the stroke constant
+                     and the composition order, and Python holds only the
+                     solids. Until it exists, "clean" from these two is
+                     narrower than it sounds
 js/codex.js         the index screen (screen === "index"): the tower/enemy
                      field guide. DERIVES everything it shows -- tower stats
                      from statLines(), the upgrade tree by walking each path
@@ -577,24 +624,29 @@ tests/blub.test.js                   one per numbered item in the
 tests/sandbox.smoke.js               boots sandbox.html against a stubbed DOM
 tools/price-upgrades.js              the DPS model behind the upgrade prices
                                       (not loaded by the game or the suite)
-tools/simulate-campaign.js           plays the scripted waves through the real
-                                      game under scripted building policies;
-                                      the arithmetic behind the schedule
-                                      (not loaded by the game or the suite)
-tools/measure-starter-kit.js         does the STARTER kit still lose? Added
+-- THE TWO BALANCE INSTRUMENTS LEFT THIS REPOSITORY on 2026-08-14 (`0f6bbc3`),
+   at the owner's ruling that the game repo is his cross-machine sync and our
+   tooling does not belong in it. They now live in `THE_COMPANY/tools/balance/`
+   and take the game tree as `TD_ROOT`.
+simulate-campaign.js  MOVED. Plays the scripted waves through the real game
+                                      under scripted building policies; the
+                                      arithmetic behind the schedule
+measure-starter-kit.js  MOVED. Does the STARTER kit still lose? Added
                                       2026-07-29 because the Soldier put camo
                                       detection on the starter bar for the
                                       first time, which is the premise the
                                       whole meta-progression loop rests on
-                                      (not loaded by the game or the suite)
-                                      ** PROVENANCE VOID as of 2026-08-12:
-                                      lines 63-67 rebuild BUILD_SLOTS around
-                                      g.Tower, the gunner deleted 2026-07-30,
-                                      so it measures a roster that no longer
-                                      exists. Its output is not evidence about
-                                      the shipping game. NOT re-run and NOT
-                                      repaired here -- that is unauthorised
-                                      new work, with vera. **
+                                      ** THE CONSEQUENCE, WHICH IS A COST OF
+                                      THE RULING AND NOT A DEFECT: A CLONE OF
+                                      THIS REPOSITORY CANNOT REPRODUCE THESE
+                                      FIGURES. Anything sourced to either tool
+                                      is reproducible only by someone with the
+                                      company tree beside the game tree.
+                                      ** AND DO NOT RESTORE THEM FROM HISTORY.
+                                      The deleted blobs are `e3bd3f4`'s broken
+                                      gunner-pegged version; `git checkout` on
+                                      these paths gets the tool that was wrong,
+                                      not the repaired one that moved. **
 
 -- superseded, safe to delete (see the banner in the HTML):
 long-range-dps-debug.html            old static test bench, replaced by sandbox.html
@@ -645,12 +697,12 @@ first enemy spawns immediately; `interval` is the delay between later enemies
 in that wave. When a wave's last enemy spawns, the `WAVE_BREAK` countdown
 begins. The next wave starts when that countdown reaches zero.
 
-**The schedule, measured 2026-08-12** by summing `waveCount` and
+**The schedule, measured 2026-08-14** by summing `waveCount` and
 `waveEffectiveHealth` over `WAVES`:
 
 | waves | scheduled bodies | scheduled HP | effective HP |
 |---:|---:|---:|---:|
-| 35 | 797 | 23 697 | 25 799 |
+| 35 | 866 | 23 796 | 25 898 |
 
 Both totals are pinned by `tests/run.js` (`scheduled health across the full
 schedule` / `and what it actually takes to clear it`). Effective exceeds
@@ -852,21 +904,24 @@ time kills fewer of them. A wave says how many, how often and which type —
 groups) carries a `health` override, resolved through `Enemy.healthOf`, the
 same resolver the spawner uses.
 
-**Easy is thirty-five waves, 797 enemies, 23 697 scheduled HP**
+**Easy is thirty-five waves, 866 enemies, 23 796 scheduled HP**
 (2026-07-29, v0.4.7, rescaled since; it was 33 waves and 4308 HP, before that 20
 waves and 3094, before that two waves and 52). Both figures are pinned by
 `tests/run.js`. Scheduled HP is no longer the whole story, so
 two more numbers matter:
 
-- **25 799 EFFECTIVE HP on Easy** — what the player actually has to remove. The
+- **25 898 EFFECTIVE HP on Easy** — what the player actually has to remove. The
   owner's original target was half that ("make it so that the total is like
   13500 hp", 2026-07-29); the spine was rescaled afterwards and 13 500 is no
   longer what the schedule aims at. A
   shield is health you must chew through and a Revenant is two bodies, so
   effective HP is `count × health × (1 + shieldRatio) × (1 + revives)` per
   group — `waveEffectiveHealth` in game.js is the one implementation, and the
-  clear bounty reads the same function. Everything the schedule *names* pays,
-  so this is also the run's lifetime purse.
+  clear bounty reads the same function. **This is NOT the run's purse** — a
+  shield is counted here and pays nothing, so effective HP (25 898) and
+  scheduled kill bounties ($23 438) are different quantities and always will
+  be. See "A SHIELD PAYS NOTHING, EVER" below, which says the same thing from
+  the other end.
 - **Plus two amounts no table can state**, both decided by how the run goes.
   Every seven seconds a living Hive drops five hatchlings, each with a shield
   equal to its own life and each paying nothing — about 160 points of unpaid
@@ -874,12 +929,15 @@ two more numbers matter:
   boss's roar calls in another 2780 HP at 1.5× speed. Neither is a gap in the
   arithmetic; both are the point of the enemy that produces them.
 
-On top of that, **finishing a wave pays a tenth of it** — about $1350 across a
+On top of that, **finishing a wave pays a tenth of it** — about $2 590 across a
 run. See "Finishing a wave pays a tenth of it" below.
 
-Waves 1–10 are the introduction and are pinned exactly: single-type, no
+Waves 1–11 are the introduction and are pinned exactly: single-type, no
 `groups`, no v0.4.7 content, with waves 1–2 byte-identical to the original
-opening the starting-stake economy is measured against.
+opening the starting-stake economy is measured against. **The pin is
+`tests/run.js`'s deep-equal on `WAVES.slice(0, 11)`, "the introduction, up to
+and including the midboss" — so wave 12 is the first wave any retune may
+touch**, which is where the 2026-08-14 retune starts.
 
 **Overriding health rather than adding tougher enemy TYPES is deliberate.** A
 type is a balance decision the owner makes; late-wave scaling is the same
@@ -968,12 +1026,13 @@ point of the change: damage on its own no longer pays.
 section below, after this one.
 
 The full table with per-wave HP is a comment on `WAVES` itself;
-`tools/simulate-campaign.js` is the reproducible arithmetic behind it (see
-Balance math below).
+`simulate-campaign.js` is the arithmetic behind it (see Balance math below) —
+**but it left this repository on 2026-08-14 and now lives in
+`THE_COMPANY/tools/balance/`, so a clone of this repo cannot reproduce it.**
 
 **The schedule's length is an ECONOMY constraint, not just a difficulty one.**
-Scheduled kill bounties are the bulk of the run's lifetime purse ($23 333 of
-$36 017 all in — see the table in the economy section).
+Scheduled kill bounties are the bulk of the run's lifetime purse ($23 438 of
+$36 133 all in — see the table in the economy section).
 At the old 454 HP the $800 Siphon was unbuyable — it would have sat in
 the build bar permanently greyed out, which is not meaningfully different from
 not shipping it. A test pins `purse > dearest tower × 2`; if a tower is ever
@@ -1026,7 +1085,7 @@ never read as a win — do not add a second assignment or derive the flag from
 `waveIndex`. The loss check runs before the victory check so a final enemy
 that both empties the board and zeroes the base reads as the defeat it is.
 
-Since total effective HP (25 799) far exceeds the base's 100, an undefended base
+Since total effective HP (25 898) far exceeds the base's 100, an undefended base
 really is destroyed — the loss path is reachable in ordinary play, not just
 by tests. Both outcomes are pinned: the loss freeze by the original tests,
 the victory path (and the manual-idiom non-victory) by
@@ -1165,11 +1224,11 @@ is one line in `Enemy.TYPES`.
 2026-07-29, at the owner's request: *"give money at the end of each round,
 around 1/10 of the hp of the wave."* `waveBounty(wave)` is
 `round(waveEffectiveHealth(wave) × WAVE_CLEAR_BOUNTY_FRACTION)`, and the
-fraction is 0.1. About **$2579** across the schedule.
+fraction is 0.1. About **$2 590** across the schedule.
 
 **The bounty is a tenth of the wave's HP, not a tenth of its cash value** — HP
 and cash are now separate quantities entirely, since a body's bounty prices its
-whole threat rather than its hit points. Against the $36 017 lifetime purse the
+whole threat rather than its hit points. Against the $36 133 lifetime purse the
 clear bonus is about **7%**. Two further rewards ride on the same payout since
 2026-07-31 — the redistributed $5000 and the rising $50 + $5-per-wave allowance
 — and `waveReward()` is where the three are summed. If it is meant to stay a tenth of
@@ -1405,16 +1464,23 @@ The current authored purse is:
 | Easy starting stake | $600 |
 | progression rewards, waves 1–34 | $5 000 |
 | escalating wave allowance, waves 1–34 | $4 505 |
-| scheduled kill bounties | $23 333 |
-| wave-clear bonuses | $2 579 |
-| **authored total** | **$36 017** |
+| scheduled kill bounties | $23 438 |
+| wave-clear bonuses | $2 590 |
+| **authored total** | **$36 133** |
 
 The total excludes Fractal descendants, conditional boss summons and the
 Siphon's A3 charge bonus.
 It is the single-route schedule total. Twin Confluence mirrors every scheduled
-body onto its second route, so it also mirrors kill income: $47 006 in scheduled
-kills and $59 707 including its one stake, progression rewards and one set of
-HP-based clear bonuses.
+body onto its second route, so it also mirrors kill income. **The two figures
+that used to stand here — $47 006 in scheduled kills and $59 707 all in — are
+PROVENANCE VOID as of 2026-08-14 and have been removed rather than updated.**
+Neither reproduces: $47 006 is not twice any kill total this schedule has ever
+had, and $59 707 decomposes as `47 006 + 5 000 + 4 505 + 600 + 2 596`, where
+$2 596 is a clear-bounty figure retired on 2026-08-13. **No resolver computes
+per-route income** — the mirroring is a spawn-time behaviour, not a schedule
+function — so the replacement must be measured through a run and must not be
+derived by doubling the single-route total. Until someone does, the mirroring
+is the claim and the amount is unknown.
 The Siphon exception is intentional: `baseGoldPerDamage = 1` is now only the internal
 unit for A3's extra charge-generated gold. Ordinary Siphon beam damage pays no
 cash, and `goldGenerated` / `bonusGold` count only that explicit bonus.
@@ -1718,8 +1784,9 @@ gunner can.** Placement clearance is derived from each type's own footprint
 they need more room from the road. Anything that picks a build spot
 programmatically — `Maps.bestSpots` rates ground for a *gunner* — must re-check
 `whyCannotBuild` for the actual type, or it will silently fall back to placing
-a gunner. Both `tools/simulate-campaign.js` and the roster test in
-`tests/run.js` search for type-legal ground for exactly this reason.
+a tower of the wrong type. Both `simulate-campaign.js` (now in
+`THE_COMPANY/tools/balance/`) and the roster test in `tests/run.js` search for
+type-legal ground for exactly this reason.
 
 **Input priority in `onClick`, in order:** speed toggle → auto-send toggle →
 wave skip → build bar → the open panel's Sell button → existing tower → empty
@@ -1991,8 +2058,8 @@ fact that a fresh profile cannot win — that IS the loop.
 
 **The Soldier's B3 changed the PREMISE of that loop, and it was re-measured
 rather than assumed.** Until 2026-07-29 the reason a fresh profile could not
-win was simple: nothing on the starter bar could see camo, so waves 13, 16 and
-26 leaked whatever they liked. The Soldier's B3 *is* camo detection, so for the
+win was simple: nothing on the starter bar could see camo, so waves 14, 18 and
+28 leaked whatever they liked. The Soldier's B3 *is* camo detection, so for the
 first time the starter bar could buy the thing the loop is built on withholding.
 
 **What it costs is no longer close, and the old figures were pegged to a deleted
@@ -2015,13 +2082,19 @@ Sniper has no detection and "corrects" a sentence that is right.
 answer is that **the loop survives, for a new reason**. Scripted play, starter
 bar only, best build order found by sweeping:
 
-> **PROVENANCE VOID, CONCLUSION INTACT (2026-08-12).** The tool that produced
-> the table below is pegged to the deleted gunner — `tools/measure-starter-kit.js`
-> lines 63-67 rebuild `BUILD_SLOTS` around `g.Tower`, removed 2026-07-30 — so
-> **the figures are no longer sourced to a live instrument.** What survives is
-> the *finding*: the starter bar loses on every route, and it loses for a
-> different reason than it used to. That conclusion is the load-bearing part
-> and nothing here contradicts it.
+> **THE TABLE BELOW IS PROVENANCE VOID; THE INSTRUMENT IS NOT (restated
+> 2026-08-14).** ~~The tool that produced the table below is pegged to the
+> deleted gunner.~~ **The flag is on the TABLE, and it was moved there
+> deliberately.** `measure-starter-kit.js` has since been repaired, reproduces,
+> and carries an acceptance check beside it that was broken on purpose to prove
+> it can fail — it is a live instrument that happens to live in another
+> repository (see the file map). What is still void is **these four rows**: they
+> are the output of the dead gunner-pegged version, they have NOT been
+> re-measured, and a migration is not a re-measurement.
+>
+> What survives is the *finding*: the starter bar loses on every route, and it
+> loses for a different reason than it used to. That conclusion is the
+> load-bearing part and nothing here contradicts it.
 >
 > **~~The wave number is genuinely unknown and is being left that way. Three
 > sources disagree… Re-measuring is unauthorised new work and sits with vera.~~
@@ -2033,13 +2106,18 @@ bar only, best build order found by sweeping:
 > starter kit and not the meta curve. The dead tool's 11 and the table's w19–20
 > were both artefacts.
 >
-> **THE BANNER ABOVE STAYS UNTIL TWO THINGS ARE TRUE.** The repaired tool is
-> **not in `HEAD`** as of this writing — `tools/measure-starter-kit.js` and
-> `tools/simulate-campaign.js` are uncommitted in the simulation division's tree
-> — so no clone can reproduce the figure above yet. And **the table below is
-> still the DEAD tool's output** whatever happens to the tool: those numbers
-> want re-running, not un-flagging. Lift the banner only when the rebuilt tool
-> is committed *and* the table has been re-measured through it.
+> **THE BANNER STAYS, AND ITS CONDITION HAS BEEN RESTATED BECAUSE THE OLD ONE
+> BECAME UNSATISFIABLE.** It used to read *"lift only when the rebuilt tool is
+> committed **and** the table has been re-measured through it"*, and
+> ~~`tools/measure-starter-kit.js` and `tools/simulate-campaign.js` are
+> uncommitted in the simulation division's tree~~. Both halves rotted on
+> 2026-08-14: the tools are committed, but **in `THE_COMPANY`, so the first
+> condition can never be met in this repository** and read literally the banner
+> would be permanent.
+>
+> **LIFT IT WHEN THE TABLE HAS BEEN RE-MEASURED THROUGH THE RELOCATED TOOL —
+> that is the whole condition.** Those numbers want re-running, not
+> un-flagging.
 
 | policy | rune-circuit | mana-coil | sigil-lattice | null-meridian |
 |---|---|---|---|---|
@@ -2286,7 +2364,7 @@ the stretch the starting stake is tuned on):
 roster change and were stale; the ones above are what `tests/run.js` pins.)
 
 The opening contains `5 × 4 + 8 × 4 = 52` HP; the full thirty-five-wave
-schedule contains **23 697 scheduled / 25 799 effective** HP (per-wave table is a
+schedule contains **23 796 scheduled / 25 898 effective** HP (per-wave table is a
 comment on `WAVES`). Damage dealt plus health leaked to the base must add back
 to the *effective* total; that is the quickest whole-run conservation check —
 note it is a check on HP, not on cash. **Damage does not pay at all.**
@@ -2302,7 +2380,7 @@ clear actually realises. Anything balanced against the fossil clause is
 balanced against a game three times richer than the one that ships. (The
 figures here read 6466/8056 until 2026-07-30.
 Those were the v0.4.6 schedule's and were left behind when v0.4.7 rewrote it;
-23 697/25 799 are what `tests/run.js` asserts and what the harness reports.)
+23 796/25 898 are what `tests/run.js` asserts and what the harness reports.)
 
 **Effective, not scheduled, and the difference is v0.4.7's.** A shield is
 health the player must remove and a Revenant is two bodies, so effective HP is
@@ -2320,14 +2398,24 @@ on an Enemy is the same idea at the instance level.
    with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
    scales bounty with a wave's `health` override, so the ratio survives an
    override but would not survive a retune of either field. Across the whole
-   schedule the ratio is 0.9044, and per type it runs 0.4545 (`colossus`) to
-   1.5 (`fast`, `camo_fast`, `camo_heavy`).
+   schedule the ratio is 0.9050, and per type — **each type at its own BASE
+   health, which is a property of `Enemy.TYPES` and not of the schedule** — it
+   runs 0.4545 (`colossus`) to 1.5 (`fast`, `camo_fast`, `camo_heavy`).
 
    **The denominator is EFFECTIVE HP — what you must actually remove — and
-   naming it is load-bearing.** 0.9044 is `23 333 / 25 799`; against *declared*
-   health the same figure would be 0.9846, so the two readings are not
+   naming it is load-bearing.** 0.9050 is `23 438 / 25 898`; against *declared*
+   health the same figure would be 0.9850, so the two readings are not
    interchangeable. Every per-type number above is bounty over effective HP
-   too. Measured across all 21 types on 2026-08-12.
+   too. Schedule ratios measured 2026-08-14; the per-type range measured across
+   all 21 types, and a wave `health` override cannot move it because
+   `Enemy.bountyOf` scales bounty in the same proportion.
+
+   **AND THERE IS A SECOND RATIO IN CIRCULATION UNDER THE SAME NAME. IT IS NOT
+   THIS ONE.** The balance tooling reports a "money density" of **1.3952**,
+   which is *authored purse over effective HP* — it carries the $10 105 of
+   purse that no schedule change touches. **The figure this passage means is
+   kill bounties over effective HP, 0.9050.** Say which numerator you mean
+   wherever either appears.
 
    The trap this closes, because it has already been reported as a defect
    once: **`shielded` reads 20/12 = 1.6667 against declared health and
@@ -2338,7 +2426,8 @@ on an Enemy is the same idea at the instance level.
    the 12 cannot be removed without the 36. `revenant` splits the same way
    (1.25 declared, 0.625 effective). Every other type is identical under both,
    which is why the mismatch stayed invisible. **Do not "correct" the range to
-   1.6667** — that would contradict the 0.9044 three lines above it.
+   1.6667** — that would contradict the 0.9050 schedule ratio at the head of
+   this exception.
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
    removes more health than the schedule names while earning exactly the
@@ -2354,13 +2443,18 @@ on an Enemy is the same idea at the instance level.
 Shots per kill is therefore only a clean diagnostic on undefended, unshielded
 bodies that were not born of a Hive — check it against scheduled normals.
 
-**The whole-campaign arithmetic lives in `tools/simulate-campaign.js`** — it
-plays the real schedule through the real loop under scripted building
-policies (no towers, stop at N gunners, greedy build at `Maps.bestSpots`).
+**The whole-campaign arithmetic does NOT live in this repository.**
+`simulate-campaign.js` moved to `THE_COMPANY/tools/balance/` on 2026-08-14 and
+takes this tree as `TD_ROOT`. It plays the real schedule through the real loop
+under scripted building policies (no towers, stop at N starter towers, greedy
+build at `Maps.bestSpots`) — **and running it requires the company tree beside
+this one, so a clone of this repository cannot reproduce anything sourced to
+it.** That is a cost of the owner's ruling on what belongs in the game repo,
+not a defect.
 
 > **STALE as of the v0.4.5 roster change.** Every policy it scripts builds
-> gunners, and gunners cannot answer camo (now waves 14/18/28) or brutes (now
-> 20/22/31/34) by design, so "greedy honest building wins on every route" is no
+> gunners, and gunners cannot answer camo (waves 14/18/28) or brutes (now
+> waves 20/22/29/31/33) by design, so "greedy honest building wins on every route" is no
 > longer a claim this tool can make about the current schedule. It needs
 > re-running, and it needs the policy v0.4.7 measured by hand in the browser:
 > a core of gunners, then Longshots, then path A on each of them (A1 is the
@@ -2387,8 +2481,9 @@ answer faster and more reliably than playing.
 **How v0.4.5 was measured, given no Node.** That session ran on a machine
 where `node` does not exist, so none of the five suites could be executed.
 Instead the real game was loaded from `file://` and driven through its own
-`update()` from the browser console — what `tools/simulate-campaign.js` does,
-by hand. **The schedule is measured, not guessed**, on all four routes:
+`update()` from the browser console — what `simulate-campaign.js` does, by hand
+(the tool is in `THE_COMPANY/tools/balance/`, not this repo). **The schedule is
+measured, not guessed**, on all four routes:
 
 | policy | rune-circuit | mana-coil | sigil-lattice | null-meridian |
 |---|---|---|---|---|
@@ -2428,9 +2523,14 @@ HP and two more waves left the survival margin almost exactly where it was.
 Re-measured again after the Hive correction and the lane-offset rewrite:
 unchanged.
 
-That is the economy doing its job rather than luck: income is proportional to
-damage ($1 per point when this was measured, $3 since 2026-07-30), so a heavier
-schedule funds the towers that answer it. **What a turn-up
+That is the economy doing its job rather than luck — **though not by the
+mechanism this passage originally gave.** ~~Income is proportional to damage
+($1 per point when this was measured, $3 since 2026-07-30).~~ Damage has paid
+nothing since the 2026-07-31 bounty merge removed `CASH_PER_DAMAGE`. **The
+conclusion survives on the real mechanism:** `Enemy.bountyOf` prices a body at
+`type.bounty × health / type.health`, so a wave's `health` override raises its
+bounty in the same proportion, and a heavier wave still funds the towers that
+answer it. **What a turn-up
 on this economy buys is more to DO, not a thinner margin** — which is the right
 outcome for the easy tier, and worth knowing before anyone tries to make the
 game harder by adding HP alone. If a future ask wants a genuinely harder tier,
@@ -2875,18 +2975,20 @@ being precise about what moved:
   damage.
 - **`waveEffectiveHealth` did NOT change**, and must not. It measures what the
   player has to REMOVE — which is what the clear bounty is a tenth of — and
-  that is still what it measures, now 25 799. It is simply no longer a purse.
+  that is still what it measures, now 25 898. It is simply no longer a purse.
   **Confusing the two is now the easiest way to get the economy wrong**; there
   is a warning to that effect on the function itself.
-- **What it costs the player is exactly 1 364 HP** — the shields the schedule
-  carries, all of them Bulwarks — and under bounties that costs no income
-  whatsoever. A Bulwark pays the same `bounty()` whether the player removed 12
-  or 36, so a shield is a cost in TIME and in nothing else. **This bullet used
-  to read "$4 092 off a $42 443 purse, a 10% pay cut", and that was damage-era
-  arithmetic end to end**: $4 092 is 1 364 × 3 at the retired
-  `CASH_PER_DAMAGE`, and $42 443 was the 2026-07-30 purse against a current
-  authored $36 017. Only the 1 364 HP survived the bounty merge; it is still
-  measured against the real `WAVES`, not estimated. Nobody has asked for the
+- **What it costs the player is 1 786 HP** — the shields the schedule carries,
+  all of them Bulwarks (`shielded` is the only scheduled type with a `shield`
+  block) — and under bounties that costs no income whatsoever. A Bulwark pays
+  the same `bounty()` whether the player removed 12 or 36, so a shield is a
+  cost in TIME and in nothing else. **Measured 2026-08-14** against the real
+  `WAVES`, with the same expression `tests/run.js` uses for the shield
+  component, and it does **not** move with the wave 12/13/16 retune — no
+  retuned group carries a shield. **This bullet used to read "$4 092 off a
+  $42 443 purse, a 10% pay cut", and that was damage-era arithmetic end to
+  end**: $4 092 was `CASH_PER_DAMAGE` × a then-current shield total, and
+  $42 443 was the 2026-07-30 purse against a current authored $36 133. Nobody has asked for the
   schedule or the prices to move in compensation and neither was touched.
 
 **HEALED HEALTH PAYS NOTHING EITHER**, for the same reason and by the same
@@ -3063,9 +3165,12 @@ does. The rule is now split across the two places that decide different things:
 | is a swing worth spending | `update` → `sightedIn` | yes, needs one visible |
 | what the swing damages | `covers` | **no — physical reach only** |
 
-**This does not weaken the camo waves, and not by luck.** A wave names exactly
-one type, so during waves 13/16/26 there is nothing visible on the board for a
-detectionless smasher to swing at, and `sightedIn` keeps its hammer still. The
+**This does not weaken the camo waves, and not by luck.** **A camo wave never
+mixes camo with visible bodies** — that is the rule, and it is narrower than
+"a wave names exactly one type", which is false (wave 16 has three groups and
+wave 28 has two, `camo_normal` ×12 plus `camo_heavy` ×6). So during waves 14,
+18 and 28 there is nothing visible on the board for a detectionless smasher to
+swing at, and `sightedIn` keeps its hammer still. The
 counter-cost split the schedule depends on is untouched. Both halves have a
 test — "a swing lands on camo caught in the zone, without detection" and "a
 smasher alone still cannot clear a camo wave" — and if you ever remove the
@@ -4229,10 +4334,13 @@ lie — and prints its own fleet rows instead.
 It is a **90-coin purchase** in `js/meta.js`, not part of the opening kit. That
 was a decision, not an omission: `starter: true` would put a tower producing
 free damage forever into the starting hand, and *a fresh profile cannot win* is
-the premise the whole meta loop rests on — the one `tools/measure-starter-kit.js`
-exists to keep checking. **That tool's provenance is void** — it is pegged to
-the gunner deleted 2026-07-30; see the file map and the Balance math section —
-so right now **nothing live is checking this premise.** The premise stands as a
+the premise the whole meta loop rests on — the one `measure-starter-kit.js`
+exists to keep checking. ~~That tool's provenance is void.~~ **The tool was
+repaired and reproduces; what is void is the starter-kit TABLE, which is still
+the dead version's output** — see the file map and the Balance math section.
+The instrument now lives in `THE_COMPANY/tools/balance/`, so **checking this
+premise is possible but not reproducible from a clone of this repository**, and
+the table has not been re-measured through it. The premise stands as a
 design decision; what has lapsed is the instrument that verified it. If the
 owner wants it in the opening hand it is one field plus a re-run, and the
 re-run needs the tool repaired first — unauthorised work sitting with vera,
@@ -4693,9 +4801,157 @@ while the haft ran through the man's chest. Exclude the parts that are SUPPOSED
 to touch -- hands and forearms on the grip, inlays in the head, the ground under
 a rested weapon -- and state why in the code.
 
+**BOTH MEASUREMENT ERRORS ARE NOW REPRODUCED WITH NUMBERS, and they fail in
+OPPOSITE directions. Anyone building a penetration check reads these first.**
+
+- **Vertex-to-vertex is blind to interpenetration — a FALSE PASS.** Minimum
+  distance between two vertex sets stays positive straight through an overlap,
+  because a vertex can sit inside another solid's face while being nowhere near
+  any of its vertices. Measured 2026-08-14 on the Tripod's strike at 34°: a
+  vertex-set sweep reported **+0.02181 u of clearance** where the solids carry
+  **0.0523 u of penetration**. That is this clause's founding failure,
+  reproduced by the rendering lead *after reading the clause*, and reported
+  against himself. It is the whole reason the mandate says solids.
+- **A bare AABB is too fat for a faceted solid — a FALSE FAIL.** The Tripod's
+  hub is a 16-gon prism of radius 0.1564 whose axis-aligned box reaches
+  **0.221 at the corners**. Test posed vertices against that box and the gate
+  goes red on a body that complies, and the natural reading of that red — "take
+  the angle lower" — makes a correct model worse. Use the solid, or a hull, or
+  accept per-face tests; do not let the bounding volume become the claim.
+
+**A check that fails in the safe direction is not safe.** The false pass ships a
+defect; the false fail spends someone's day making a compliant body wrong. Any
+new penetration gate is validated against three rows on a real body: **red at
+the known-bad, green at the known-good, and silent on a designed abutment.**
+
 Related, and the reason the failure happened at all: a two-handed weapon at rest
 belongs OFF the centreline. On the model's own axis it will pass through the
 torso in some pose, whatever the numbers say.
+
+**THE CLAUSE REACHES A POSE THE EXPORTER NEVER SEES. Ruled 2026-08-14.** It
+covers **any pose the player can be shown**, not only the baked frames, and it
+covers **part inside part**, not only weapon inside body — the narrower wording
+above is the original incident, not the boundary. The clause says the failure
+arrives "in some pose, whatever the numbers say", which is a direct instruction
+that a passing measurement does not discharge it; `check_penetration.py` walks
+the exported frames because those were the only poses that existed when it was
+written. **The instrument narrowed. The rule did not.**
+
+The first body with a live attack pose is **one body under three names, and all
+three are needed to find this again**: the Blender script is
+`tools/blender/enemy_hedger.py` ("the Hedger"), the enemy type is `angry`, and
+the player sees **the Tripod**. Its strike is a per-group `overrides` matrix
+composed on top of the baked walk at draw time and is never exported, so
+`check_penetration.py` passes it correctly while the drum rim reaches
+**0.0523 u into the hub at z 0.595**, from 18° of a 34° stroke, for **47% of
+each gesture window** — about 1.1% of a body's time on screen. A body must not
+be able to satisfy every gate in the pipeline and still have parts inside each
+other for half of every gesture.
+
+**Be careful adding any frame outside the walk cycle to a shipped model, and
+know whether the body is banded — the hazard is CONDITIONAL.** `walkBand()`
+(`js/gl/gl-world.js:1553`) returns `bands[0]` when the field is present and
+validates, and **falls back to the whole strip when it is not**. Inside a valid
+band, `bandFrame()` at `:1571` keeps the index within it. So a **banded** body
+is protected by construction, and an **unbanded** one is exposed: any frame
+added outside its walk cycles once per stride, every frame individually correct
+and only the sequence wrong, which a per-frame review passes.
+
+Measured across the fifteen enemy models on 2026-08-14 — **banded, protected:**
+`angry`, `armored`, `boss`, `boss_fast`, `camo_normal`, `colossus`, `fast`,
+`shieldbearer`, `shielded`, `slow`. **`bands` null, exposed:** `brute`,
+`flying`, `hive`, `normal`, `swarm` — exactly the bodies not re-exported in the
+batch that introduced the field. The exporter emits `bands` now, so a re-export
+is the fix and no body is wrong today. `angry` — the Hedger, the one body with a
+live strike — is on the protected side.
+
+Gate poses still belong in a declared band or in a separate export that
+`index.html` never loads. **If you choose the separate export, give it an
+`ALLOWED` entry in `tools/check-script-manifest.js`** — an unwired model is
+exactly what that gate fails the build on, and the wrong repair to that red is
+to wire a gate-only model into the shipping page.
+
+**A clean silhouette does NOT discharge this clause, and no render can.** The
+clause mandates solids precisely because appearance-based measurement gave a
+false pass once — the first version "reported 10 mm of clearance while the haft
+ran through the man's chest". "It never breaks the outline" is a statement about
+severity, and it is worth having; it is not a clearance.
+
+**Two dispositions only, and the difference matters.** Either remove the
+overlap, or DECLARE it under the exclusion above — and an exclusion is a claim
+that the parts are *supposed* to touch, by design, stated in code with its
+reason, as hands on a grip or the ground under a rested weapon are. **"Small
+enough" and "not visible" are not exclusions; they are waivers, and this clause
+has no waiver.** Whoever declares one signs the design claim.
+
+**Whatever grows to cover posed geometry must satisfy two things.** The pose
+must have ONE source of truth — a Blender-side gate holding its own copy of a
+matrix the renderer owns is two copies of the truth and they will drift; baking
+the stroke extremes as gate-only frames keeps one. And it must be shown to FAIL
+on a real known-bad before it is trusted. A posed check that does not go red on
+the body that prompted it has not been shown to work.
+
+**KNOWN VIOLATION, DECLARED, OPEN — this is CURRENT STATE, verified in the
+shipping code 2026-08-14.** `js/gl/gl-world.js:1792` carries
+`swing: 0.2967060` for `enemy-angry`, which is exactly **17.000°**, and `:1860`
+passes it to `GLMath.localPose` as **ry — a rotation**. The file declares the
+violation itself at `:1731`. The Tripod does **not** comply at any stroke angle
+that reads as a gesture: 2 intersecting triangle pairs, `hold` against
+`thigh_2`, first real contact between 7° and 8°, largest clean angle 7°, and
+monotonic at ~0.0063 u/deg from 2° to 34°, so no safe pocket exists.
+
+**It is held at 17° deliberately and that is the right call:** 34° is
+measurably worse at 5 real pairs against 2. The violation predates the ruling
+and the ruling reduced it. Take this entry out when the geometry lands, not
+before.
+
+**PROPOSED, NOT LANDED — re-authoring the strike as a recoil.** The implement
+has been ruled a gun, so the gesture would become a pure **translation** of
+`mast` along its own axis with no rotation. If that lands it removes *this*
+overlap by construction — the measured intrusion comes entirely from rotating a
+rigid body about its own centre, which lowers one side whatever it raises.
+**Nothing about it is in the code yet**, and it does not clear the body: `mast`
+also carries the **hold**, slung under the drum in the same place as the hub, so
+a slide needs its own per-z-slice sweep of the full travel before anything here
+changes.
+
+**This paragraph exists because I corrected this clause to describe the recoil
+as current, and it was not.** A design decision was relayed to me and I wrote it
+into the operative document ahead of the code. **That is worse than a stale
+claim: the code's own header would have looked like the out-of-date thing.**
+Record a gesture change here only against a commit sha in `js/gl/gl-world.js`,
+never against a description of intent — neither of us can see the other's
+working tree, which is exactly why the file has to follow the code.
+
+**Read the ruling on its grounds, not on that instance.** The grounds are the
+clause's own text — *"in some pose, whatever the numbers say"* — and every
+condition that made the seam dangerous is untouched: `check_penetration.py`
+still walks baked frames only, `overrides` still compose live at draw time, and
+a body can still satisfy every gate in the pipeline while having parts inside
+each other for part of every gesture. **A principle argued from an instance is
+not refuted when the instance goes away.**
+
+**AND THE BODY IS UNPROVEN, NOT CLEARED — do not record it as compliant.** A
+translation cannot produce *that* intrusion; it can produce a different one
+nobody has measured. `mast` carries the **hold**, slung *under* the drum in the
+same place as the hub. The drum stays above the hub under a horizontal slide
+and is safe by construction; **the hold is not, and it is in the same group.**
+A sweep of 0 → 0.12 u per z-slice, every part of `mast` against every part
+outside it, is what closes this — a measured number, not the argument above.
+
+**Note what the earlier round cost, because the shape recurs.** The operative
+pair turned out to be the holder against a **thigh**, never the drum against
+its hub where the original 18° figure came from — **the window everyone argued
+over was never the operative one.** A non-monotonic reading that made a safe
+pocket look possible was an artefact of a point-set instrument. And "clean by
+construction" reached this file having never been measured, inferred from a
+threshold found on a *different pair*.
+
+**That makes THREE states, not two, and only the middle one is a loophole.**
+Compliant; **declared violation** — measured, owned, dated, and visible like
+this one; or a declared **exclusion**, which is a claim that the parts are
+*supposed* to touch. A known violation is honest. An exclusion asserting design
+intent over an overshoot is not.
 
 **Checks before calling a model done:** `--validate-riflemen` (or its
 equivalent) passes; `--frame-riflemen` reports the ortho actually used;
@@ -4880,8 +5136,8 @@ no mechanic was moved to match the description.
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
-| The schedule | 35 waves, 797 enemies, 23 697 scheduled HP / **25 799 effective**, plus each Hive's brood and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
-| Wave clear bounty | a tenth of the wave's effective HP, ~$2579 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
+| The schedule | 35 waves, 866 enemies, 23 796 scheduled HP / **25 898 effective**, plus each Hive's brood and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
+| Wave clear bounty | a tenth of the wave's effective HP, ~$2 590 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
 | Wave reward, all in | clear bounty + redistributed opening cash + rising allowance | `waveReward`, `waveProgressionReward`, `waveEscalatingReward` |
 | The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
 | Tyrant roar | +1000 shield, ×1.35 speed, intervals ×0.75 (12 s → 9 s), leap unlocked, and 40 bodies / 2780 HP called in at 1.5× — the running mob plus 2 Hives, 3 Shieldbearers, 3 Healers, 2 Colossi | `Enemy.TYPES.boss.phases[0]` |
@@ -4974,7 +5230,7 @@ no mechanic was moved to match the description.
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | $36 017 = $23 333 kill bounties + $2 579 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake | asserted in `tests/run.js` |
+| Easy run purse | $36 133 = $23 438 kill bounties + $2 590 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |

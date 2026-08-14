@@ -294,10 +294,72 @@ var World3D = (function () {
         ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P);
     });
 
+    // THE WORLD BEYOND THE FRAME.
+    //
+    // Baked into THIS builder, so the surround is part of the board's single
+    // existing draw call and adds no second one -- triangles, not draw calls.
+    //
+    // It is emitted AFTER `bounds` would be read but BEFORE it is assigned on
+    // purpose: `bounds` is what `ensureMap` hands to `camera.fitBounds`, so a
+    // surround that widened it would move the camera, and every before/after
+    // comparison of this feature would then differ in the camera as well as in
+    // the geometry. The surround is deliberately invisible to the fit.
+    //
+    // Nothing here goes inside the board rect, which contains the 1280x720 play
+    // rect, and nothing here is stamped into the height field below -- so it
+    // cannot remove a build spot. Measured, not assumed: the height field is
+    // built from zones and route polylines only, and a port that never reads
+    // props reproduces the live field cell for cell (0 of 32,880 differing).
+    if (surroundEnabled && typeof GLSurround !== "undefined") {
+      GLSurround.build(g, { minX: minX, minY: minY, maxX: maxX, maxY: maxY,
+                            P: P, routes: routePaths });
+    }
+
     bounds = { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
     heightField = buildHeightField(minX, minY, maxX, maxY, env, routePaths,
       roadWidth);
     return g.build(renderer);
+  }
+
+  // THE SURROUND SWITCH, AND WHY IT IS A SWITCH.
+  //
+  // A before/after on a rendering change taken from two browser launches is two
+  // scenes that were never in the same state. With this, both states come from
+  // ONE launch, ONE camera and ONE board, differing in this flag and in nothing
+  // else -- which is the only form in which the pairing kaz requires (zero diff
+  // inside the play rect, non-zero outside it, same run) is a controlled
+  // experiment. It ships ON; only a probe turns it off.
+  var surroundEnabled = true;
+  var lastMap = null, lastRoutePaths = null;
+
+  // REBUILDS THE MESH AND DOES NOT RE-FIT THE CAMERA, deliberately. `ensureMap`
+  // ends in `camera.fitBounds`, which rewrites wantDistance -- and a camera that
+  // moved between the two captures would make the pairing measure the camera
+  // instead of the surround. The board bounds are unchanged by this flag anyway
+  // (the surround is emitted before `bounds` is assigned and never widens it),
+  // so re-fitting would be a no-op that is not guaranteed to be one.
+  function setSurround(on) {
+    var want = !!on;
+    if (want === surroundEnabled && mapMesh) {
+      return { surround: surroundEnabled, rebuilt: false };
+    }
+    surroundEnabled = want;
+    if (mapMesh && lastMap && lastRoutePaths) {
+      var old = mapMesh, gl = renderer && renderer.gl;
+      mapMesh = buildMapMesh(lastMap, lastRoutePaths);
+      if (gl && old) {
+        // A rebuild per capture would otherwise leak a megabyte of vertex
+        // buffer each time, and a probe takes several.
+        if (old.pos) gl.deleteBuffer(old.pos);
+        if (old.nrm) gl.deleteBuffer(old.nrm);
+        if (old.col) gl.deleteBuffer(old.col);
+        if (old.emi) gl.deleteBuffer(old.emi);
+      }
+      camera.bounds = bounds;
+    }
+    return { surround: surroundEnabled, rebuilt: true,
+             triangles: mapMesh ? mapMesh.count / 3 : null,
+             bake: (typeof GLSurround !== "undefined") ? GLSurround.lastBake() : null };
   }
 
   // --- which model draws which actor ---------------------------------------
@@ -978,6 +1040,8 @@ var World3D = (function () {
     if (typeof BlubFXCircles !== "undefined") BlubFXCircles.reset();
     if (typeof EnemyWreck !== "undefined") EnemyWreck.reset();
     mapMesh = buildMapMesh(map, routePaths);
+    lastMap = map;
+    lastRoutePaths = routePaths;
     camera.bounds = bounds;
     camera.fitBounds(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
   }
@@ -1643,90 +1707,103 @@ var World3D = (function () {
   // written down purely so that if the figure height ever moves, the pivot
   // moves with it instead of staying at a literal that used to be right.
   var STRIKE_BY_MODEL = {
-    // 17 DEGREES, NOT 34, AND THIS IS A CLAUSE 8 COMPLIANCE CHANGE.
+    // A RECOIL, NOT A STROKE -- AND THE DOWN-STROKE'S CONSTANTS ARE DELETED
+    // RATHER THAN ZEROED.
     //
-    // At 34 degrees the drum's rim reaches 0.0523 u into the hub at z 0.595 for
-    // about 53% of each gesture window. `check_penetration.py` walks the BAKED
-    // frames and reports clean, correctly -- nothing exports this pose, because
-    // it is composed here at draw time from `attackFlash`. The instrument
-    // narrowed; the rule did not.
+    // hugo ruled the implement is a gun, so the gesture is re-authored: the
+    // mast pitches UP and rides BACK, instead of a bill coming down. `swing`
+    // and `tipCheck` retire with the stroke they described. They are removed
+    // outright, not set to zero, because a zeroed rotation draws a
+    // flawless-looking REST POSE -- the body draws, every control passes, the
+    // wrap is clean, and nothing reports a fault. That failure was demonstrated
+    // on this seam tonight, from a probe that wrote a swept value back through
+    // what looked like a getter. If this record ever loses its group again, the
+    // loud path is wanted, never a silent identity matrix.
     //
-    // rhea ruled clause 8 has NO WAIVER: remove the overlap, or declare the
-    // parts as meant to touch. Magnitude and frequency are a waiver argument
-    // and fit through neither door. The exclusion door is closed by the
-    // measurement itself -- first contact is at 18 degrees of a 34 degree
-    // stroke, so the parts meet only because the stroke travels PAST the point
-    // where they meet. That is an overshoot, not an abutment, and signing "these
-    // are meant to meet" would be untrue.
+    // WHY NO ANGLE COULD HAVE SAVED THE STROKE. `check_strike_penetration.py`
+    // walks the COMPOSED pose over all 12 walk frames -- the pose no baked-frame
+    // gate can see -- and finds first real contact between 7 and 8 degrees,
+    // between the mast's holder and a thigh. The curve is monotonic at
+    // ~0.0063 u/deg with no local maximum, so the largest clean angle is 7
+    // degrees, which is not a stroke. Do not re-tune a rotation here expecting
+    // to resolve it: the down-stroke was retired, not shrunk.
     //
-    // 17 holds every bearing 34 held, at 42% of the silhouette change at the
-    // dominant one. Bearing 270 fails at BOTH angles (0.96x at 34, 0.97x at 17),
-    // so that 1.7% of road is a pre-existing Hedger gap and NOT a cost of this
-    // change -- do not report it as one.
+    // THE PIVOT IS NOT THE GROUP ROOT, WHATEVER IT GETS CALLED. Measured on the
+    // shipped mesh, `mast`'s frame-0 root translation is (0.0000, 0.0000,
+    // 0.0000) -- it is at the ROAD, and it has to be, because `mast` carries the
+    // drum, which is the model's tallest geometry, and `model.top` is max z over
+    // the RAW positions array. An elevated root would take the health bar with
+    // it. 0.8004 is the DRUM'S CENTRE, `0.870 * F` with `F = 0.920` from
+    // `tools/blender/enemy_hedger.py:196`. Calling it "the mast root" is the one
+    // slip that would invite someone to simplify this to [0, 0, 0], which is the
+    // real root and the wrong axle -- silently, since a pivot error draws a
+    // plausible picture with the wrong mechanism under it.
     //
-    // ** 17 DEGREES DOES NOT COMPLY. THIS IS A KNOWN, DECLARED, OPEN CLAUSE 8
-    // VIOLATION, AND IT IS HELD ONLY BECAUSE 34 IS MEASURABLY WORSE. **
+    // THE SIGN IS DERIVED, NOT TAKEN FROM THE WORD "UP". `GLMath.localPose`
+    // maps (x, z) -> (cos*x + sin*z, -sin*x + cos*z), so a POSITIVE rotation
+    // takes local +x toward local -z, i.e. DOWN. The bill projects along +x, so
+    // pitching it UP is NEGATIVE. Checked against the measured tip rather than
+    // asserted: the tip face centroid sits 0.5188 u out and 0.0050 u above the
+    // pivot, and -10 degrees lifts it from z 0.8054 to 0.8641 while +10 would
+    // drive it to 0.7466.
     //
-    // This comment previously read "that COMPLIES, and it complies by less than
-    // a pixel", from a margin extrapolated linearly from the 18-34 degree span.
-    // That sentence was mine and it was false. Recording the sequence rather
-    // than a clean correction, because the sequence is the useful part: a claim
-    // reached a shipped header as settled and outlived the doubt that produced
-    // it, which is the exact failure this project spent a day on.
+    // ROTATE FIRST, THEN DISPLACE -- and this seam gets that order for free,
+    // which is worth stating because getting it backwards produces a picture
+    // that looks entirely correct and puts solid through solid. Pitching first
+    // lifts the drum's rear underside clear of the hub band; sliding first
+    // sweeps through it. `localPose` applies (tx, ty, tz) AFTER its pivot
+    // correction, so one call is exactly `Translate . RotateAboutPivot` and
+    // there is no composition order left to get wrong. It is deliberately NOT
+    // built as two matrices multiplied together.
     //
-    // MEASURED, by `tools/blender/check_strike_penetration.py`, on the composed
-    // strike pose over all 12 walk frames -- the pose no baked-frame gate sees:
+    // 10 DEGREES, NOT THE 6.5 FIRST SPECIFIED, and the reason generalises: 6.5
+    // was the lowest swept value plus a margin, and a margin assumes more pitch
+    // means more clearance. This clearance surface is NOT monotonic, so 6.5 was
+    // not a margin, it was an untested point sitting above a tested one. 10 is
+    // already swept and clear beyond 0.50 u. Both numbers are art direction's;
+    // neither is the renderer's to tune.
     //
-    //     angle   box depth   bvh       real triangle pairs
-    //     0-1     CLEAR       -         0
-    //     2-7     0.006-0.038 phantom   0
-    //     8       0.04420     REAL      1
-    //     17      0.09870     REAL      2      <-- shipped
-    //     34      0.15665     REAL      5      <-- previous
+    // Cost: 1.5 board px of the 10 board px health-bar pad, against the 4.1 the
+    // down-stroke was spending.
     //
-    // At 17 degrees `hold` intersects `thigh_2` -- REAL triangle-level
-    // interpenetration, 2 pairs, at walk frame 6. Not a box artefact: the same
-    // instrument classifies 2-7 degrees as phantom at zero intersecting
-    // triangles, which is what makes the REAL verdicts believable.
+    // ---- VALIDATION STATUS: THIS POSE IS OUTSIDE EVERY BAKED GATE ----------
     //
-    // FIRST REAL CONTACT IS BETWEEN 7 AND 8 DEGREES, NOT 18. The 18 came from a
-    // different pair (drum against hub) found by scanning DOWN from 34, which
-    // finds only the first crossing. The operative pair is the mast's HOLDER
-    // against a THIGH and it engages at less than half the smallest angle anyone
-    // was considering. The largest clean angle is 7 degrees, which is not a
-    // stroke.
+    // Nothing exports this pose. It is composed here at draw time from
+    // `attackFlash`, so `check_penetration.py`, `check_group_gait.py` and every
+    // other instrument that walks the exported `frames` array reports CLEAN on
+    // it and always will -- correctly, and uninformatively. They are not broken
+    // and they are not evidence. **`tools/blender/check_strike_penetration.py`
+    // is the only instrument that sees this pose at all.**
     //
-    // THE CURVE IS MONOTONIC -- ~0.0063 u/deg from 2 to 34, no local maximum,
-    // real-pair count 0->1->2->3->5. There is no dip to exploit and no safe
-    // pocket, so NO STROKE ANGLE IS CLEAN and no constant here can fix it.
-    // The fix is geometry -- where the holder sits relative to the thighs --
-    // and it is with art direction. Do not tune this number expecting to
-    // resolve it.
+    // LAST VALIDATED AT: nothing. The 10 degree pitch and the 0.12 u slide are
+    // art direction's landed values and suki's run against this exact motion --
+    // pitch first, then slide, in that order -- has not come back. **No
+    // compliance claim is made here and none should be added until it does.**
+    // If the run is dirty the PITCH moves and only the pitch: the slide, the
+    // pivot, the group and the acceptance check all stand.
     //
-    // tipCheck MOVES WITH THE ANGLE, AND IT IS DERIVED FROM THE MESH RATHER
-    // THAN FROM THE BRIEF'S IDEALISATION -- WHICH MATTERS MORE AT 17 THAN IT
-    // DID AT 34.
+    // The angles that HAVE been measured, on the down-stroke this replaces, by
+    // that script, over all 12 walk frames:
     //
-    // The brief's form is `0.8004 - 0.520 * sin(swing)`, from a tool tip 0.520 u
-    // out along +x at exactly the pivot's height. Measured on the built mesh,
-    // the centroid of the bill's end face is 0.5188 u out and sits 0.0050 u
-    // ABOVE the pivot, so the true arrival is
+    //     2-7 deg    boxes overlap, PHANTOM      0 real triangle pairs
+    //     8 deg      REAL                        1
+    //     17 deg     REAL                        2    <- shipped, as a
+    //                                                    DECLARED violation
+    //     34 deg     REAL                        5
     //
-    //     atan2(0.0050, 0.51882) - swing, at radius 0.51882
+    // 17 degrees shipped as a **declared** violation rather than a discovered
+    // one, held only because 34 is measurably worse, and that distinction is
+    // recorded here deliberately: the two look identical in a diff and are
+    // completely different decisions.
     //
-    // giving 0.5144 at 34 degrees and 0.6535 here. That reproduces what the
-    // rig reads through the renderer's own matrix to four decimals at both
-    // angles, and it is 0.005 u away from the brief's form at both.
-    //
-    // 0.005 u is FIXED while the tip travel halves with the angle, so the same
-    // error is 1.7% of travel at 34 degrees and 3.4% here -- it grows as the
-    // stroke shrinks. This field's entire job is to catch a silent pivot error,
-    // and spending half its tolerance on a known systematic offset is how a
-    // gate quietly stops being able to fail. mira's 0.509 remains the authored
-    // INTENT; the 0.005 is the built mesh against that intent, not the
-    // renderer against either.
-    "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004], swing: 0.2967060,
-                     tipCheck: 0.6535 }
+    // AND THE TRAP IN THAT TABLE, which generalises past this file: **box
+    // overlap is NECESSARY, NOT SUFFICIENT.** From 2 to 7 degrees the bounding
+    // boxes intersect and not one triangle does. A gate that reported box hits
+    // as violations would have called a clean body dirty across a five-degree
+    // band -- a check that cannot return the right answer, in the direction
+    // that looks like diligence.
+    "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004],
+                     pitch: -0.1745329, slide: -0.12 }
   };
 
   // ONE SCRATCH MATRIX AND ONE SCRATCH OBJECT, allocation-free per frame. Both
@@ -1785,15 +1862,28 @@ var World3D = (function () {
       }
       return null;
     }
-    // LINEAR, on mira's instruction and against my own first draft, which eased
-    // the recovery. `angle = stroke * attackFlash` and nothing else: the field
-    // is already a linear 1 -> 0 ramp over 0.400 s, so the whole gesture is one
-    // multiplication. There is no anticipation channel and that is not a
-    // compromise -- a machine doing a chore does not wind up, and frame 0 of the
-    // window is the BOTTOM of the stroke because the cut has already happened.
-    // Easing it made the tool hover at extension, which is a different claim
-    // about the machine than the one the brief makes.
-    GLMath.localPose(strikeMat, spec.pivot, 0, spec.swing * f, 0, 0, 0, 0);
+    // BOTH CHANNELS LINEAR IN THE SAME DRIVE, on art direction's instruction
+    // and against my own first draft, which eased the recovery. `pitch * f` and
+    // `slide * f` and nothing else: `attackFlash` is already a linear 1 -> 0
+    // ramp over 0.400 s, so the whole gesture is two multiplications. There is
+    // no anticipation channel and that is not a compromise -- a machine does not
+    // wind up to absorb a recoil, and frame 0 of the window is the FULL recoil
+    // because the shot has already happened.
+    //
+    // Keeping it linear is also what makes the drive an instrument: because the
+    // pose is exactly proportional to the flash, SWEEPING THE FLASH SWEEPS THE
+    // GESTURE, and a probe needs no write access to any constant here. The
+    // shoot asserts that proportionality at flash 1, 0.5, 0.25, 0.1, 0.05 and
+    // 0.02 -- the low points included precisely because the easing this
+    // replaced lived in the TAIL, where the first three would not have seen it.
+    //
+    // ONE localPose CALL, DELIBERATELY, NOT TWO MATRICES MULTIPLIED. It applies
+    // (tx, ty, tz) after its own pivot correction, so this IS
+    // `Translate . RotateAboutPivot` -- rotate first, then displace -- and there
+    // is no composition order left for anyone to get backwards. See the record
+    // above for why that order is load-bearing rather than cosmetic.
+    GLMath.localPose(strikeMat, spec.pivot, 0, spec.pitch * f, 0,
+      spec.slide * f, 0, 0);
     strikeLast = { model: model, flash: f, group: spec.group };
     if (strikeKey && strikeKey !== spec.group) delete strikeOverrides[strikeKey];
     strikeKey = spec.group;
@@ -3974,6 +4064,29 @@ var World3D = (function () {
     // that is a picture no amount of shading fixes. Both answer safely when
     // there is no 3D board at all, so the 2D fallback keeps its old behaviour.
     groundHeightAt: function (x, y) { return enabled ? groundHeightAt(x, y) : 0; },
+    // THE SURROUND, PUBLISHED AS A SWITCH so a probe can capture both states
+    // from one launch, one camera and one board. Ships ON. Same reason
+    // SiphonFXBeam exports setOcclusion: a before/after built by editing the
+    // source and relaunching is two scenes that were never in the same state.
+    setSurround: setSurround,
+    // The board's height field itself, read-only, for a test that has to prove
+    // a dressing change did not move a build spot. The PICTURE not changing is
+    // not that proof -- placement reads this, never the screen.
+    heightField: function () {
+      if (!heightField) return null;
+      return { minX: heightField.minX, minY: heightField.minY,
+               w: heightField.w, h: heightField.h, cell: HEIGHT_CELL,
+               data: heightField.data };
+    },
+    mapMeshInfo: function () {
+      return { triangles: mapMesh ? mapMesh.count / 3 : 0,
+               vertices: mapMesh ? mapMesh.count : 0,
+               drawCalls: mapMesh ? 1 : 0,
+               bounds: bounds,
+               surround: surroundEnabled,
+               surroundBake: (typeof GLSurround !== "undefined")
+                 ? GLSurround.lastBake() : null };
+    },
     isLevelUnder: function (x, y, radius) {
       if (!enabled || !heightField) return true;
       return levelUnder(x, y, radius).flat;
@@ -3992,18 +4105,19 @@ var World3D = (function () {
     // AND THAT WAS A TRAP WITH A DEMONSTRATED FAILURE BEHIND IT.
     //
     // The first version assigned the live record objects into its result. A
-    // caller could then write `strikeSeam("enemy-angry").spec.swing = 0` and
+    // caller could then write `strikeSeam("enemy-angry").spec.pitch = 0` and
     // corrupt the renderer's own constants from something that reads like a
     // getter. juno hit exactly that shape in her own probe: a save/restore
-    // around a swept `spec.swing` where two aborted calls interleaved, so the
-    // "saved" value was itself mid-sweep and the restore wrote 0. **A strike of
-    // zero degrees is a flawless-looking REST POSE** -- every control still
+    // around a swept rotation where two aborted calls interleaved, so the
+    // "saved" value was itself mid-sweep and the restore wrote 0. **A zeroed
+    // gesture is a flawless-looking REST POSE** -- every control still
     // passes, the body still draws, and nothing anywhere reports a fault.
     //
     // So: deep-copied, including the pivot array, which is the one a shallow
-    // copy would still have shared. The swing is not a knob any more either --
-    // the override is `angle = swing * attackFlash`, so **sweeping the flash IS
-    // sweeping the angle** (flash 0.5 is exactly half the stroke). That runs
+    // copy would still have shared. Neither channel is a knob any more either --
+    // the override is `pitch * attackFlash` and `slide * attackFlash`, so
+    // **sweeping the flash sweeps the whole gesture** (flash 0.5 is exactly
+    // half of both). That runs
     // through the game's own drive, cannot corrupt anything, and needs no
     // write path here at all.
     strikeSeam: function (model) {
@@ -4011,7 +4125,7 @@ var World3D = (function () {
       for (var k in strikeMissing) missing.push(k);
       function copy(s) {
         return s ? { group: s.group, pivot: s.pivot.slice(),
-                     swing: s.swing, tipCheck: s.tipCheck } : null;
+                     pitch: s.pitch, slide: s.slide } : null;
       }
       var specs = {};
       for (var mk in STRIKE_BY_MODEL) specs[mk] = copy(STRIKE_BY_MODEL[mk]);

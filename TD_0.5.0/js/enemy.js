@@ -11,7 +11,9 @@
 // Nine opt-in mechanics on a type turn that data into behaviour, and each is read by
 // asking whether the enemy HAS one, never which type it is:
 //
-//   attack   swings at the nearest tower in reach        (attackTowers)
+//   attack   swings at the nearest tower in reach, and    (attackTowers,
+//            optionally (`facesTarget`) stops to turn      beginAttackPosture)
+//            toward it, strike, and turn back first
 //   shield   a pool that soaks damage first, and what     (takeDamage,
 //            breaking it does to the enemy                breakShield)
 //   revive   gets back up once, at full health            (tryRevive)
@@ -182,6 +184,15 @@ function Enemy(path, health, typeId, overrides) {
   this.windUpAttack = null;
   this.shockwaveFlash = 0;           // cosmetic, for a leap's landing
   this.attackBeam = null;            // cosmetic, {x, y, life} -- where a shot went
+
+  // Facing posture. An attack spec with `facesTarget: true` makes the enemy
+  // stop, turn to face what it is about to hit, strike, and turn back --
+  // instead of swinging through its own gesture at whatever angle it happened
+  // to be walking. null when not posturing; see beginAttackPosture and
+  // headingVec. Entirely separate from windUpTimer/windUpAttack above: a spec
+  // that carries both composes them (turn, THEN wind up, THEN strike) inside
+  // this one state machine, and a spec with neither is untouched by any of it.
+  this.attackPosture = null;
 
   // Camo: this enemy is invisible to towers without detection. A property of
   // the TYPE, copied onto the instance because that is where every consumer
@@ -452,18 +463,27 @@ Enemy.TYPES = {
   },
 
   // The one that hits BACK. Every other enemy walks past your towers; this
-  // one stops to swing at them.
+  // one stops, turns to face what it is about to hit, strikes, and turns
+  // back before it resumes (2026-08-14, at the owner's instruction: "when an
+  // enemy attacks -- like the angry -- he should stop, turn toward the
+  // attacked tower, attack, turn back, walk back"). See `facesTarget` below
+  // and Enemy.prototype.beginAttackPosture.
   //
   // The behaviour is DATA, not a branch on the type id. `attack` is read by
   // Enemy.prototype.attackTowers, which asks "does this enemy have an attack"
-  // and never "is this enemy angry" -- so the rule in this file's header ("no
-  // type has behaviour of its own, so nothing branches on which one an enemy
-  // is") still holds. A second attacking type is one more row here.
+  // (and, for the posture, "does this SPEC carry facesTarget") and never "is
+  // this enemy angry" -- so the rule in this file's header ("no type has
+  // behaviour of its own, so nothing branches on which one an enemy is")
+  // still holds. A second attacking type, or a second attack on this one, is
+  // one more row/flag here, never a new branch in attackTowers.
   //
   // Tuned to be a threat to POSITION, not a race: 20 damage every 2.5 s at
   // 47.5 u.l. reach means a gunner (60 HP) standing in its path dies in three
   // swings, but only if it is left standing there. It cannot reach a tower
-  // built at the far side of a loop.
+  // built at the far side of a loop. The posture's own worst-case stopped
+  // time (a full turn out, the strike, a full turn back) is 1.6 s against
+  // this 2.5 s interval -- see Enemy.assertAttackPostureBudget, which is
+  // what actually enforces that this stays true.
   angry: {
     id: "angry",
     displayName: "Angry",
@@ -477,7 +497,8 @@ Enemy.TYPES = {
     attack: {
       damage: 20,
       reachUl: 47.5,                // a little past a gunner's own footprint
-      intervalSeconds: 2.5
+      intervalSeconds: 2.5,
+      facesTarget: true             // stop, turn, strike, turn back -- see above
     }
   },
 
@@ -1170,6 +1191,35 @@ Enemy.prototype.refreshPos = function () {
   this.pos = this.positionAt(this.progress);
 };
 
+// Which way this body is FACING, as a unit {x, y} -- distinct from where it
+// is (positionAt) and derived, never stored, for the same reason the road
+// itself has no stored heading: read fresh, it cannot go stale.
+//
+// Three cases, in order:
+//
+//   no posture, a path       -> EXACTLY this.path.tangentAt(this.progress).
+//                                Not equivalent, identical: the same call,
+//                                so a caller that switches to this method is
+//                                a provable no-op whenever nothing is
+//                                posturing, and js/path.js's corner-snap
+//                                (see GamePath.prototype.tangentAt) reaches
+//                                every reader through this one seam.
+//   an active attackPosture  -> the slewed facing tickAttackPosture is
+//                                maintaining, which is what makes a stop,
+//                                turn, strike and turn-back visible at all.
+//   no path                  -> null, the same fallback js/gl/gl-world.js and
+//                                js/gl/enemy-wreck.js already use at their
+//                                own `e.path && e.path.tangentAt` guards.
+//
+// Nothing here goes through ul(): a facing is a unit vector, dimensionless,
+// not a distance, and the turn RATE this composes with is degrees per
+// second -- an angle, never converted. See Enemy.ATTACK_TURN_RADIANS_PER_SECOND.
+Enemy.prototype.headingVec = function () {
+  if (this.attackPosture) return this.attackPosture.facing;
+  if (!this.path || !this.path.tangentAt) return null;
+  return this.path.tangentAt(this.progress);
+};
+
 // How fast this enemy is walking RIGHT NOW: what its type walks at, times the
 // timed slow on it, times whatever the run has permanently done to it (a
 // broken shield doubles it, a revive stops it dead).
@@ -1188,6 +1238,10 @@ Enemy.prototype.currentSpeedUlps = function () {
   // telegraphed attack fair -- the seconds it spends aiming are seconds it is
   // not advancing, so the trade is legible from the board.
   if (this.windUpTimer > 0) return 0;
+  // Stopped to face, strike and turn back -- see attackPosture. Every phase
+  // of it, including the two turns, holds speed at zero; only phase 5 (the
+  // posture clearing to null) gives it back.
+  if (this.attackPosture) return 0;
 
   var speed = this.speedUlps * this.slowMultiplier * this.speedScale;
 
@@ -1275,7 +1329,10 @@ Enemy.prototype.update = function (dt) {
     this.flash = Math.max(0, this.flash - dt * 5);
   }
   if (this.attackFlash > 0) {
-    this.attackFlash = Math.max(0, this.attackFlash - dt * 2.5);
+    // Same rate a facesTarget spec's strike phase is timed against -- see
+    // Enemy.ATTACK_STRIKE_SECONDS. One constant, not two numbers that happen
+    // to agree today.
+    this.attackFlash = Math.max(0, this.attackFlash - dt * Enemy.ATTACK_FLASH_DECAY_PER_SECOND);
   }
   if (this.shieldFlash > 0) {
     this.shieldFlash = Math.max(0, this.shieldFlash - dt * 1.5);
@@ -1606,6 +1663,86 @@ Enemy.attacksOf = function (type) {
   return type.attack ? [type.attack] : [];
 };
 
+// --- facing posture -----------------------------------------------------
+//
+// `facesTarget: true` on any element of an attack pool (single `attack` or
+// either entry of `attacks`) makes that ONE spec stop, turn to face what it
+// is about to hit, strike, and turn back -- see Enemy.prototype.attackTowers
+// and tickAttackPosture below. Every other spec, including the Tyrant's
+// (spelled `attacks:`, plural, and read through the same Enemy.attacksOf
+// above), is untouched: the flag is read off the SPEC, never off a type id,
+// so opting one attack in never opts in a pool it shares a type with.
+//
+// A turn rate is an ANGLE per second, not a distance -- it must never go
+// through ul(). The facing it produces is a unit vector, dimensionless, for
+// the same reason.
+Enemy.ATTACK_TURN_DEGREES_PER_SECOND = 300;
+Enemy.ATTACK_TURN_RADIANS_PER_SECOND =
+  Enemy.ATTACK_TURN_DEGREES_PER_SECOND * Math.PI / 180;
+
+// The strike beat's length is NOT a second duration invented for this: it is
+// exactly attackFlash's own life. attackFlash is set to 1 in resolveAttack
+// and decayed at `dt * Enemy.ATTACK_FLASH_DECAY_PER_SECOND` in update(),
+// which is the same drive js/gl/gl-world.js's strike gesture already runs
+// on -- so the body stands still for precisely as long as that gesture
+// plays, by construction, and retuning the decay rate retunes the stop to
+// match rather than leaving the two to drift apart.
+Enemy.ATTACK_FLASH_DECAY_PER_SECOND = 2.5;
+Enemy.ATTACK_STRIKE_SECONDS = 1 / Enemy.ATTACK_FLASH_DECAY_PER_SECOND;
+
+// Shortest signed distance from one angle to another, in radians, in
+// (-PI, PI] -- the turn never goes the long way round.
+Enemy.shortestAngleDelta = function (fromRadians, toRadians) {
+  var delta = (toRadians - fromRadians) % (Math.PI * 2);
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  return delta;
+};
+
+Enemy.unitVectorForAngle = function (radians) {
+  return { x: Math.cos(radians), y: Math.sin(radians) };
+};
+
+// The worst a `facesTarget` spec can cost in stopped time: a full 180-degree
+// turn out, the strike window, a full 180-degree turn back, and any wind-up
+// -- which for a facesTarget spec is spent inside this same posture rather
+// than the separate windUpTimer path (see beginAttackPosture). 180 is the
+// most any single turn can ever be, by construction of shortestAngleDelta.
+Enemy.worstCaseAttackPostureSeconds = function (spec) {
+  var halfTurnSeconds = Math.PI / Enemy.ATTACK_TURN_RADIANS_PER_SECOND;
+  return halfTurnSeconds * 2 + Enemy.ATTACK_STRIKE_SECONDS +
+    (spec.windUpSeconds || 0);
+};
+
+// HARD INVARIANT: a facesTarget attack's worst-case stopped time must stay
+// strictly below its own intervalSeconds. If it does not, attackTimer can
+// expire again before the posture has ever finished returning the body to
+// its walk, so the body stops dead the instant it has ever had a target and
+// never advances again. Thrown, not logged, and called for every attack of
+// every type at the bottom of this section -- so retuning the turn rate, the
+// strike window or an attack's own intervalSeconds without checking this
+// trips it at load, on every boot, rather than shipping a road-blocker.
+Enemy.assertAttackPostureBudget = function (spec, label) {
+  if (!spec || !spec.facesTarget) return;
+  var worst = Enemy.worstCaseAttackPostureSeconds(spec);
+  if (!(worst < spec.intervalSeconds)) {
+    throw new Error("facesTarget attack " + label + " can stop for " +
+      worst.toFixed(3) + "s worst case, which is not strictly less than " +
+      "its own intervalSeconds (" + spec.intervalSeconds + "s) -- it would " +
+      "never finish returning to its walk once it had a target.");
+  }
+};
+
+(function assertEveryAttackPostureBudget() {
+  for (var typeId in Enemy.TYPES) {
+    if (!Enemy.TYPES.hasOwnProperty(typeId)) continue;
+    var pool = Enemy.attacksOf(Enemy.TYPES[typeId]);
+    for (var i = 0; i < pool.length; i++) {
+      Enemy.assertAttackPostureBudget(pool[i], typeId + "[" + i + "]");
+    }
+  }
+})();
+
 // How much damage per second a tower puts out, through the vocabulary EVERY
 // tower type answers (js/systems/tower-stats.js). That contract is what makes
 // "shoot the strongest tower" possible without the enemy knowing what a
@@ -1681,6 +1818,10 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
 //   damage/stunSeconds   independent -- an attack may carry either or both
 //   leap            { distanceUl, radiusUl } -- jump forward, then hit
 //                   everything within radiusUl of where it LANDED
+//   facesTarget     stop, turn to face what it is about to hit, strike, turn
+//                   back -- see beginAttackPosture. Composes with
+//                   windUpSeconds (turn, THEN wind up, THEN strike); a spec
+//                   with neither is bit-identical to before this existed.
 //
 // The pool CYCLES. The boss opens with one attack and its roar appends a
 // second, after which it alternates: shot, leap, shot, leap. Deterministic on
@@ -1694,6 +1835,14 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
 // how the Tyrant's aimed shot guarantees there is always something to step to.
 Enemy.prototype.attackTowers = function (dt, towers) {
   if (!this.attacks.length || this.dead || this.leaked) return null;
+
+  // Mid posture: turning, striking or turning back (see currentSpeedUlps,
+  // which is why it is standing still for all of it). Nothing else this
+  // function does applies while this is set -- the attack was already
+  // chosen at commit; only the posture's own clock runs.
+  if (this.attackPosture) {
+    return this.tickAttackPosture(dt, towers);
+  }
 
   // Mid wind-up: it is standing still (see currentSpeedUlps) and the clock is
   // running on the attack it already committed to. The attack that lands is
@@ -1737,10 +1886,13 @@ Enemy.prototype.attackTowers = function (dt, towers) {
   // Checked BEFORE the wind-up so a boss does not stand still telegraphing at
   // an empty stretch of road.
   var spec = null;
+  var candidates = null;
   for (var i = 0; i < this.attacks.length; i++) {
     var option = this.attacks[(this.attackIndex + i) % this.attacks.length];
-    if (this.attackCandidates(option, towers, option.reachUl).length) {
+    var found = this.attackCandidates(option, towers, option.reachUl);
+    if (found.length) {
       spec = option;
+      candidates = found;          // reused below rather than searched twice
       this.attackIndex += i;      // a skipped attack loses its turn, it does not queue
       break;
     }
@@ -1754,6 +1906,13 @@ Enemy.prototype.attackTowers = function (dt, towers) {
 
   this.attackIndex++;
   this.attackTimer = spec.intervalSeconds;
+
+  // Opt-in on the SPEC, never on the type id (see the header on Enemy.TYPES):
+  // a plural `attacks` pool may carry the flag on one element and not the
+  // other, and only that element ever postures.
+  if (spec.facesTarget) {
+    return this.beginAttackPosture(spec, candidates[0].tower, towers);
+  }
 
   if (spec.windUpSeconds > 0) {
     this.windUpTimer = spec.windUpSeconds;
@@ -1831,6 +1990,95 @@ Enemy.prototype.resolveAttack = function (spec, towers) {
   }
 
   return hits.length ? hits[0].tower : null;
+};
+
+// Commit to a facesTarget attack: build the phase list (turn, optionally
+// wind-up, strike, return) and enter the first one. `target` is only ever
+// used to compute the angle to turn toward -- the tower actually hit is
+// whatever resolveAttack finds in reach when the strike phase begins, exactly
+// as an ordinary wind-up already re-resolves against the board at that later
+// moment rather than freezing it at commit.
+//
+// Angles are computed once, here, because the body cannot move while
+// posturing (see currentSpeedUlps): `this.pos` and the target's position are
+// both fixed for the posture's whole life, so nothing needs recomputing
+// mid-turn.
+Enemy.prototype.beginAttackPosture = function (spec, target, towers) {
+  var fromVec = this.headingVec() || { x: 1, y: 0 };
+  var fromAngle = Math.atan2(fromVec.y, fromVec.x);
+  var toAngle = Math.atan2(target.y - this.pos.y, target.x - this.pos.x);
+  var turnOutSeconds =
+    Math.abs(Enemy.shortestAngleDelta(fromAngle, toAngle)) /
+    Enemy.ATTACK_TURN_RADIANS_PER_SECOND;
+  var turnBackSeconds =
+    Math.abs(Enemy.shortestAngleDelta(toAngle, fromAngle)) /
+    Enemy.ATTACK_TURN_RADIANS_PER_SECOND;
+
+  var phases = [
+    { name: "turn", angleFrom: fromAngle, angleTo: toAngle, duration: turnOutSeconds }
+  ];
+  if (spec.windUpSeconds > 0) {
+    phases.push({ name: "windup", angleFrom: toAngle, angleTo: toAngle,
+      duration: spec.windUpSeconds });
+  }
+  phases.push({ name: "strike", angleFrom: toAngle, angleTo: toAngle,
+    duration: Enemy.ATTACK_STRIKE_SECONDS });
+  phases.push({ name: "return", angleFrom: toAngle, angleTo: fromAngle,
+    duration: turnBackSeconds });
+
+  this.attackPosture = { spec: spec, phases: phases, index: -1, timer: 0,
+    facing: fromVec };
+  return this.advanceAttackPosture(towers);
+};
+
+// Move the posture into its next phase, skipping any that need zero time
+// (an attack already facing its target turns for 0 s, not for one idle
+// frame). Damage lands at the START of the strike phase -- resolveAttack is
+// called exactly here, never from tickAttackPosture's per-frame branch -- so
+// attackFlash opens at 1 the same instant the stop that covers its gesture
+// begins. Returns whatever resolveAttack returned, or null if this advance
+// did not reach a strike.
+Enemy.prototype.advanceAttackPosture = function (towers) {
+  var posture = this.attackPosture;
+  var hit = null;
+  do {
+    posture.index++;
+    if (posture.index >= posture.phases.length) {
+      this.attackPosture = null;        // beat 5: resume walking
+      return hit;
+    }
+    var phase = posture.phases[posture.index];
+    posture.timer = phase.duration;
+    posture.facing = Enemy.unitVectorForAngle(phase.angleFrom);
+    if (phase.name === "strike") {
+      hit = this.resolveAttack(posture.spec, towers);
+    }
+  } while (posture.timer <= 0);
+  return hit;
+};
+
+// One frame of an already-active posture: slew the facing toward this
+// phase's target angle at ATTACK_TURN_RADIANS_PER_SECOND (the "windup" and
+// "strike" phases have angleFrom === angleTo, so this is a no-op slew that
+// simply holds the target-facing angle for their duration), and advance to
+// the next phase once the timer runs out. A phase reached from here always
+// has duration > 0 -- advanceAttackPosture already skipped anything shorter.
+Enemy.prototype.tickAttackPosture = function (dt, towers) {
+  var posture = this.attackPosture;
+  var phase = posture.phases[posture.index];
+  posture.timer -= dt;
+
+  if (posture.timer > 0) {
+    var doneFraction = 1 - posture.timer / phase.duration;
+    if (doneFraction < 0) doneFraction = 0;
+    if (doneFraction > 1) doneFraction = 1;
+    var delta = Enemy.shortestAngleDelta(phase.angleFrom, phase.angleTo);
+    posture.facing = Enemy.unitVectorForAngle(phase.angleFrom + delta * doneFraction);
+    return null;
+  }
+
+  posture.facing = Enemy.unitVectorForAngle(phase.angleTo);
+  return this.advanceAttackPosture(towers);
 };
 
 // Health that no bullet in flight has claimed yet. Towers target on THIS

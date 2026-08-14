@@ -5445,6 +5445,28 @@ function drawEnemyHover() {
   var e = enemyAt(worldMouse.x, worldMouse.y);
   if (!e) return;
 
+  // REACH FIRST, under everything else: how far this body can hit a tower
+  // from, in the tower range circle's own grammar. Which radii exist is
+  // decided in js/visuals.js and nowhere else, so this branch and the 3D
+  // overlay cannot disagree about it. Returned in u.l., converted once here.
+  //
+  // UNGUARDED ON PURPOSE, and the 3D branch's `typeof` guard is not an
+  // inconsistency to be tidied up: gl-world.js is also loaded by pages that do
+  // not load js/visuals.js, while index.html is the only thing that reaches
+  // here and already depends on Visuals3Q throughout. A missing module should
+  // throw here, because the alternative is a reach ring that silently does not
+  // draw -- which is exactly what a correct enemy with no attack looks like.
+  var reaches = Visuals3Q.enemyReachesUl(e);
+  for (var ri = 0; ri < reaches.length; ri++) {
+    ctx.beginPath();
+    ctx.arc(e.pos.x, e.pos.y, ul(reaches[ri]), 0, Math.PI * 2);
+    ctx.fillStyle = Visuals3Q.ENEMY_REACH_FILL;
+    ctx.fill();
+    ctx.lineWidth = Visuals3Q.ENEMY_REACH_WIDTH;
+    ctx.strokeStyle = Visuals3Q.ENEMY_REACH_STROKE;
+    ctx.stroke();
+  }
+
   // Ring first, so it is unambiguous WHICH enemy the number belongs to when
   // they are bunched nose to tail. Drawn at exactly the hit radius, so what
   // the player sees is precisely what they can point at -- the same rule the
