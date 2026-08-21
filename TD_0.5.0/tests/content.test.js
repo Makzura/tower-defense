@@ -152,7 +152,7 @@ test("the roster matches the agreed numbers", function (t) {
   t.eq(Enemy.TYPES.fast.health, 2, "fast health");
   t.eq(Enemy.TYPES.fast.speedMultiplier, 1.75, "fast speed");
   t.eq(Enemy.TYPES.slow.health, 7, "slow health");
-  t.eq(Enemy.TYPES.slow.speedMultiplier, 0.8, "slow speed");
+  t.eq(Enemy.TYPES.slow.speedMultiplier, 0.7, "slow speed");
 
   // v0.4.5. The three above are untouched by design -- every wave that used
   // them behaves as it did -- and the six below are the new demands.
@@ -258,6 +258,99 @@ test("the roster matches the agreed numbers", function (t) {
   t.deep(withBlock("support"), ["shieldbearer", "healer", "boss_fast"],
     "three types help the enemies around them");
   t.deep(withBlock("sprint"), ["boss_fast"], "and only the fast boss sprints");
+});
+
+
+// ---------------------------------------------------------------------------
+// THE TIER LADDER IS SCHEDULED, AND ITS HP IS THE HP THE INDEX PRINTS.
+//
+// 2026-08-20, at the owner's instruction: "i want the slime tiers to spawn in
+// accordance to their HP as stated in the index and behave in that manner".
+// The mechanic was already right -- a T4 spawned by hand has always had its
+// 256 points -- but the CAMPAIGN only ever sent one rung of the six, so five
+// of the tiers the index advertises were unreachable except as something
+// else's split children.
+//
+// What this pins is the correspondence itself, in both directions:
+//
+//   every rung the index states is somewhere in the schedule,
+//   every scheduled rung spawns at exactly the HP stated for it,
+//   and the rungs arrive in ascending order, each in a heavier wave.
+//
+// It reads the tier ladder out of the type's own `fractal` block and the
+// health out of Enemy.healthOf -- the two things js/codex.js reads to draw the
+// index -- so a retune of the ladder moves the index and this test together
+// and neither can quietly stop describing the other.
+//
+// NO `health` OVERRIDE ON A FRACTAL GROUP, ever: `Enemy.healthOf` takes the
+// tier branch and discards it, so an override would be a no-op on the body and
+// a lie in waveKillBounty. The schedule is checked for one here because the
+// hazard is invisible at every other altitude -- see the note in js/game.js.
+test("the campaign spends the whole tier ladder, at the index's own HP",
+function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var spec = Enemy.TYPES.fractal_slime.fractal;
+
+  var scheduled = [];
+  h.game.WAVES.forEach(function (wave, i) {
+    h.game.waveGroups(wave).forEach(function (g) {
+      if (g.type !== "fractal_slime") return;
+      scheduled.push({ wave: i + 1, group: g });
+    });
+  });
+
+  t.eq(scheduled.length, spec.maxTier - spec.minTier + 1,
+    "one scheduled group per rung of the ladder");
+
+  var previousWave = 0;
+  var previousHp = 0;
+  scheduled.forEach(function (entry, i) {
+    var tier = spec.minTier + i;
+    var stated = spec.tierZeroHealth * Math.pow(spec.healthMultiplier, tier);
+    var body = new Enemy(h.game.path, entry.group.health, "fractal_slime",
+      { tier: entry.group.tier });
+
+    t.eq(entry.group.tier, tier,
+      "wave " + entry.wave + " carries T" + tier + ", the next rung up");
+    t.eq(entry.group.health, undefined,
+      "and authors no health override on it");
+    t.eq(Enemy.healthOf("fractal_slime", undefined, entry.group.tier), stated,
+      "T" + tier + " is stated at " + stated + " HP");
+    t.eq(body.maxHealth, stated,
+      "and the body that walks out of the gate has exactly that");
+    t.eq(body.fractalTier, tier, "carrying the tier it was scheduled at");
+
+    t.ok(entry.wave > previousWave,
+      "T" + tier + " arrives after T" + (tier - 1) + " (wave " + entry.wave + ")");
+    t.ok(stated > previousHp, "and is heavier than the rung below it");
+    previousWave = entry.wave;
+    previousHp = stated;
+  });
+
+  // BEHAVING IN THAT MANNER: the scheduled tier is not just a health number,
+  // it is how many generations the wave has to be cleared through. A rung at
+  // tier T costs root x (T+1) in total damage and leaves 4^T terminal bodies
+  // walking, which is the real reason a T5 belongs in the finale and nowhere
+  // earlier.
+  var top = scheduled[scheduled.length - 1];
+  var queue = [new Enemy(h.game.path, undefined, "fractal_slime",
+    { tier: top.group.tier })];
+  var totalHp = 0;
+  var terminal = 0;
+  while (queue.length) {
+    var e = queue.shift();
+    totalHp += e.maxHealth;
+    e.takeDamage(e.maxHealth);
+    var children = e.splitOnDeath();
+    if (children) queue = queue.concat(children);
+    else terminal++;
+  }
+  t.eq(top.wave, h.game.WAVES.length, "the top rung is in the last wave");
+  t.eq(totalHp, 1024 * (top.group.tier + 1),
+    "clearing the T5 takes 6 144 points across six generations");
+  t.eq(terminal, Math.pow(spec.splitCount, top.group.tier),
+    "and ends in 1 024 terminal T0s, one point of base damage each");
 });
 
 
@@ -423,6 +516,132 @@ test("the Healer tops up the three most wounded, and none of it pays", function 
   t.eq(healer.supportAllies(8, [healer, whole]), null, "nothing to heal, nothing done");
 });
 
+test("the Healer's pulse throws a tether at each body it heals, and lets go", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var healer = new Enemy(h.game.path, undefined, "healer");
+
+  var hurt = [];
+  for (var i = 0; i < 4; i++) {
+    var e = new Enemy(h.game.path, 100, "normal");
+    e.takeDamage(80 - i * 10);
+    hurt.push(e);
+  }
+  var board = [healer].concat(hurt);
+
+  t.eq(healer.supportLinks.length, 0, "nothing before the first pulse");
+  var helped = healer.supportAllies(8, board);
+  t.eq(healer.supportLinks.length, 3, "one cord per body helped");
+  t.eq(healer.supportLinks[0].target, helped[0], "and each one holds its target");
+  t.eq(healer.supportLinks[2].target, helped[2], "down to the third");
+
+  // Cosmetic only: the tether is how the heal is DRAWN, and the heal itself
+  // lives on the target and outlives it. That is the whole reason this is a
+  // separate lifetime rather than the heal's own four seconds.
+  var span = h.game.Enemy.typeOf("healer").support.tether.seconds;
+  t.near(span, 1.4, 1e-9, "a cord runs for 1.4 s");
+  healer.update(span * 0.5);
+  t.eq(healer.supportLinks.length, 3, "still there halfway through");
+  t.near(healer.supportLinks[0].life, 0.5, 0.02, "at half its life");
+  t.ok(hurt[0].healTimer > 0, "with the heal it delivered still running");
+  healer.update(span * 0.6);
+  t.eq(healer.supportLinks.length, 0, "and gone once its life runs out");
+  t.ok(hurt[0].healTimer > 0, "while the heal carries on without it");
+
+  // A REFERENCE THAT CANNOT BE HELD PAST THE BODY. The cord is the only place
+  // this file keeps a pointer to another enemy, so the sweep that drops a dead
+  // target is what stops a Healer pinning a wave's worth of corpses alive.
+  healer.supportAllies(8, board);
+  t.eq(healer.supportLinks.length, 3, "a fresh pulse, three fresh cords");
+  hurt[0].dead = true;
+  hurt[1].leaked = true;
+  healer.update(1 / 60);
+  t.eq(healer.supportLinks.length, 1, "the dead and the leaked drop theirs at once");
+  t.eq(healer.supportLinks[0].target, hurt[2], "the one still walking keeps its own");
+
+  // THE CORD BELONGS TO THE SPEC, NOT TO SUPPORTING, and this leg is what
+  // holds that. It used to be checked on the Shieldbearer, which authored no
+  // tether until 2026-08-18 -- when the owner asked for a curve to each body
+  // it shields, and the assertion became a record of the old design rather
+  // than of the rule. The Vanguard is the supporter that still authors none:
+  // it shields ITSELF, and a cord from a body to its own chest would be a
+  // line of length zero.
+  var vanguard = new Enemy(h.game.path, undefined, "boss_fast");
+  t.eq(vanguard.type.support.tether, undefined, "the Vanguard authors no cord");
+  vanguard.supportAllies(7, [vanguard].concat(hurt));
+  t.eq(vanguard.supportLinks.length, 0, "and throws none");
+  t.ok(vanguard.shield > 0, "while its own shield still lands");
+});
+
+test("the Shieldbearer throws a bowed cord and a stream of plates at each " +
+  "body it shields", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var bearer = new Enemy(h.game.path, undefined, "shieldbearer");
+  var spec = Enemy.TYPES.shieldbearer.support;
+
+  // The three fields the two renderers read. `arc` is what separates this mark
+  // from the Healer's straight cord, and `chips` are the shields going out --
+  // both boards read them off this row, so a change here moves both pictures
+  // and neither renderer holds a second copy.
+  t.ok(!!spec.tether, "it authors a cord");
+  t.ok(spec.tether.arc > 0, "bowed, not straight");
+  t.ok(spec.tether.chips > 0, "and carrying plates");
+  t.ok(spec.tether.seconds > 0 &&
+    spec.tether.seconds < spec.intervalSeconds,
+    "gone well before the next pulse");
+
+  var mob = [];
+  for (var i = 0; i < 12; i++) mob.push(new Enemy(h.game.path, 100, "normal"));
+  var helped = bearer.supportAllies(10, [bearer].concat(mob));
+  t.eq(helped.length, spec.targets, "ten bodies at a time");
+  t.eq(bearer.supportLinks.length, spec.targets, "one cord each");
+  t.eq(bearer.supportLinks[0].target, helped[0], "and each one holds its body");
+  t.ok(mob[0].shield > 0, "which is carrying a real grant, not just a picture");
+
+  bearer.update(spec.tether.seconds * 1.05);
+  t.eq(bearer.supportLinks.length, 0, "the cords let go on their own");
+  t.ok(mob[0].shield > 0, "while the shield they delivered stays");
+});
+
+test("the Healer hovers, and hovering is a height and not a targeting rule", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var healer = new Enemy(h.game.path, undefined, "healer");
+  var walker = new Enemy(h.game.path, undefined, "normal");
+  var flier = new Enemy(h.game.path, undefined, "flying");
+
+  // THE THREE HEIGHTS, in the order they must be in: a walker is lifted just
+  // off its own shadow, the Healer drifts above the road, and the Wisp is in
+  // the air. All three come out of one function so the 2D board, the 3D board,
+  // the wreck and the shots cannot disagree about where a body is.
+  t.near(walker.visualBodyLift(),
+    walker.radiusPx() * Enemy.GROUND_LIFT_RADII, 1e-9, "a walker rides its ground lift");
+  t.near(healer.visualBodyLift(), healer.radiusPx() * 1.25, 1e-9,
+    "the Healer rides its type's own hover");
+  t.near(flier.visualBodyLift(),
+    flier.radiusPx() * Enemy.FLIGHT_LIFT_RADII, 1e-9, "and the Wisp its flight lift");
+  t.ok(healer.visualBodyLift() > walker.visualBodyLift(),
+    "the Healer is off the road");
+  t.ok(healer.visualBodyLift() < flier.visualBodyLift(),
+    "and nowhere near as high as the thing that flies");
+
+  // AND THE ASSERTION THE WHOLE DISTINCTION EXISTS FOR. A hovering body is a
+  // GROUND target: every tower can shoot it, and a board with no air reach
+  // still answers wave 32. Conflating the two would have quietly given the
+  // Healer the Wisp's immunity, which nothing on screen would have shown.
+  t.eq(healer.isFlying, false, "hovering is not flying");
+  var Targeting = h.game.Targeting;
+  var ground = { seesFlying: false, rangePx: 10000, x: healer.pos.x, y: healer.pos.y,
+    stats: { seesFlying: false } };
+  t.eq(Targeting.sees(ground, healer), true, "a tower without air reach can shoot it");
+  t.eq(Targeting.sees(ground, flier), false, "and still cannot shoot the Wisp");
+
+  // The drift rate is the type's, and it is nothing like a wingbeat.
+  t.eq(Enemy.typeOf("healer").hover.animHz, 0.32, "its rings turn once every ~3 s");
+  t.eq(Enemy.typeOf("normal").hover, undefined, "and a walker authors no hover at all");
+});
+
 test("the fast boss sprints the first 400 u.l. and reshields without stacking", function (t) {
   var h = harness.boot();
   var Enemy = h.game.Enemy;
@@ -524,14 +743,21 @@ test("the Tyrant's numbers are the ones that were asked for", function (t) {
 
   var phase = B.phases[0];
   t.eq(phase.atHealthFraction, 0.5, "it roars at half health");
-  t.eq(phase.shield, 200, "gaining a 200 point shield");
+  // 1000 since the 2026-08-01 retune ("make the shield 1000hp instead"). This
+  // read 200 until 2026-08-19 -- the value the roar shipped with against a
+  // 2500 HP body. The CHANGELOG's 2026-08-12 mirror sweep found it and ruled
+  // it "the test being stale rather than the boss", which is why this moved to
+  // the shipping figure rather than the boss moving back.
+  t.eq(phase.shield, 1000, "gaining a 1000 point shield -- a fifth of its own health");
   t.ok(phase.speedMultiplier > 1, "getting faster");
   t.ok(phase.attackIntervalMultiplier < 1, "and attacking more often");
   t.eq(phase.summon.speedMultiplier, 1.5, "the crowd it calls in runs at 1.5x");
 
-  // The second attack: stop, jump 50 u.l., shockwave on landing.
+  // The second attack: stop, jump 90 u.l., shockwave on landing. The jump was
+  // 50 until the same 2026-08-01 retune took every figure in the leap up
+  // together ("make his second attack the jumping one more menacing").
   t.ok(!!phase.addAttack, "and a second attack joins the pool");
-  t.eq(phase.addAttack.leap.distanceUl, 50, "it leaps 50 u.l.");
+  t.eq(phase.addAttack.leap.distanceUl, 90, "it leaps 90 u.l.");
   t.ok(phase.addAttack.leap.radiusUl > 0, "and lands with a radius");
   t.ok(phase.addAttack.damage > 0 && phase.addAttack.stunSeconds > 0,
     "the shockwave both damages and stuns");
@@ -592,28 +818,41 @@ test("the roar shields it, speeds it up, and calls the wave back", function (t) 
 
   boss.takeDamage(2);
   t.eq(boss.phasesEntered, 1, "crossing half fires the roar");
-  t.eq(boss.shieldMax, 200, "200 points of shield out of nowhere");
-  t.eq(boss.shield, 200, "full");
+  // Read off the type rather than typed, for the same reason `half` is: the
+  // roar's shield has moved twice (200 against a 2500 HP body, 1000 since
+  // 2026-08-01) and a literal here is what went stale both times.
+  var conjured = Enemy.TYPES.boss.phases[0].shield;
+  t.eq(conjured, 1000, "the roar conjures 1000 points");
+  t.eq(boss.shieldMax, conjured, "1000 points of shield out of nowhere");
+  t.eq(boss.shield, conjured, "full");
   t.ok(boss.currentSpeedUlps() > walked, "it got faster");
-  // 8 s base × 0.75. This assertion used to read 1.75 off a 3.5 s base, which
-  // was two retunes stale -- the shipping boss has fired every 8 s since
-  // v0.4.7 and every 6 s after the roar.
-  t.eq(boss.attack.intervalSeconds, 6, "and shoots more often -- 6 s, from 8");
+  // 12 s base × 0.75. This assertion read 6 off a base of 8 until 2026-08-19,
+  // which was one retune stale in both halves: the 2026-08-01 pass took both
+  // intervals 8 -> 12 s, so the post-roar figure is 9.
+  t.eq(boss.attack.intervalSeconds, 9, "and shoots more often -- 9 s, from 12");
 
-  // THE TYPE MUST NOT HAVE MOVED. `this.attack` starts as a reference to the
-  // row in Enemy.TYPES, which every enemy of the type shares -- winding the
-  // interval down in place would speed up every future boss, in this run and
-  // the next.
-  t.eq(Enemy.TYPES.boss.attack.intervalSeconds, 8, "the TYPE is untouched");
+  // THE TYPE MUST NOT HAVE MOVED. `this.attacks` starts as a shallow copy of
+  // the type's pool, so its ENTRIES are the very rows in Enemy.TYPES that
+  // every enemy of the type shares -- winding an interval down in place would
+  // speed up every future boss, in this run and the next. (This read
+  // `Enemy.TYPES.boss.attack`, singular, which the type row has never had: the
+  // pool is `attacks`, and the undefined lookup threw instead of asserting.)
+  t.eq(Enemy.TYPES.boss.attacks[0].intervalSeconds, 12, "the TYPE is untouched");
 
   t.eq(boss.attacks.length, 2, "and the leap joined the pool");
   t.ok(!!boss.attacks[1].leap, "as the second entry");
 
   // The summons come out through spawnMinions, the same door a Hive's brood
-  // uses, so the main loop needs no second hook. Thirty bodies since
-  // 2026-07-30, up from twenty-one, and two of them fly.
+  // uses, so the main loop needs no second hook. FORTY bodies since
+  // 2026-08-01, when a support court (2 Hives, 3 Shieldbearers, 3 Healers,
+  // 2 Colossi) joined the running mob of thirty behind it -- 600 HP across
+  // thirty became 2780 across forty. Summed off the type rather than typed,
+  // so the next row added to the roar moves this on its own.
+  var expected = 0;
+  Enemy.TYPES.boss.phases[0].summon.groups.forEach(function (g) { expected += g.count; });
+  t.eq(expected, 40, "the roar's groups sum to forty");
   var called = boss.spawnMinions(1 / 60);
-  t.eq(called.length, 30, "thirty bodies called in");
+  t.eq(called.length, expected, "forty bodies called in");
   t.ok(called.some(function (e) { return e.isFlying; }),
     "including flyers, so the roar asks the air question one last time");
   t.eq(called[0].speedScale, 1.5, "running at 1.5x");
@@ -626,10 +865,11 @@ test("the roar shields it, speeds it up, and calls the wave back", function (t) 
   // 150 rather than the 400 this used to hit for: a shield SPILLS THROUGH (see
   // takeDamage), so 400 against a 200 point shell was never "health untouched"
   // -- it was 200 of spill that the old assertion did not account for. A hit
-  // the shell can actually hold is what tests the ordering.
+  // the shell can actually hold is what tests the ordering, and the 1000 point
+  // shell holds it with room to spare.
   boss.takeDamage(150);
   t.eq(boss.phasesEntered, 1, "it does not roar twice");
-  t.eq(boss.shield, 50, "the new shield takes the hit");
+  t.eq(boss.shield, conjured - 150, "the new shield takes the hit");
   t.eq(boss.health, half - 1, "health untouched while the shield holds");
 });
 
@@ -883,12 +1123,28 @@ test("after the roar it alternates shot and leap, and still attacks rarely", fun
   // Towers all along the road, so it always has something to attack and the
   // cycle is what is being measured rather than target availability.
   //
-  // y=505, not 455: the road's centre line is y=460, so every one of these
-  // fourteen placements was refused as "too close to the path" and the board
-  // this test describes was empty.
+  // THEY FOLLOW THE ROAD, rather than sitting on one straight line beside its
+  // first stretch. The row used to be fourteen placements at a fixed y=505,
+  // which only shadows the route while the route happens to run flat: the boss
+  // walks 675 u.l. during the 45 s pre-roar measurement below and comes to rest
+  // at y=259, where the NEAREST of those towers was 248 px away against the
+  // leap's 228.8 px reach. So the leap had no candidates, every turn fell
+  // through to the aimed shot -- which is documented, correct behaviour (see
+  // attackTowers: "a spec with nothing in reach steps to the next one") -- and
+  // the test read that fall-through as a broken cycle. The premise stated in
+  // this comment was simply never met.
+  //
+  // Spread along the path's own length and offset perpendicular to it, the
+  // widest gap to the nearest tower is ~84 px against that 228.8 px reach, so
+  // the leap always has something and the CYCLE is what the assertion sees.
   var standing = 0;
   for (var i = 0; i < 14; i++) {
-    if (h.placeGunner(w(h, 300 + i * 70), w(h, 505))) standing++;
+    var at = h.game.path.length * (i + 0.5) / 14;
+    var on = h.game.path.pointAt(at);
+    var tan = h.game.path.tangentAt(at);
+    var side = (i % 2) ? 1 : -1;               // alternate banks, so neither crowds the other
+    var pad = w(h, 45) * side;
+    if (h.placeGunner(on.x - tan.y * pad, on.y + tan.x * pad)) standing++;
   }
   t.ok(standing >= 10, "a row of towers actually stands along the road (" + standing + ")");
 
@@ -928,6 +1184,64 @@ test("after the roar it alternates shot and leap, and still attacks rarely", fun
   t.ok(order.length >= 3, "it attacks several times after the roar (" + order.join(", ") + ")");
   var alternates = order.every(function (id, ix) { return ix === 0 || id !== order[ix - 1]; });
   t.ok(alternates, "and never the same attack twice running");
+});
+
+
+test("its aimed shot fires from its eyes and blows up where it lands", function (t) {
+  var h = harness.boot();
+  h.run("cash = 1000000; waveIndex = WAVES.length; enemies = []; bullets = []; towers = []");
+  var tower = h.placeGunner(w(h, 600), w(h, 505));
+  t.ok(!!tower, "a tower stands beside the road to be shot at");
+
+  // ON THE SPEC, NOT ON THE TYPE. The pool gains a leap at the roar and only
+  // the aimed shot has eyes; this is the assertion that stops a future change
+  // from moving the flag up onto the boss row, where the leap would inherit it.
+  var B = h.game.Enemy.TYPES.boss;
+  t.ok(!!B.attacks[0].eyeBeam, "the aimed shot carries an eyeBeam block");
+  t.ok(!B.phases[0].addAttack.eyeBeam, "and the leap does NOT");
+
+  h.run("Effects.reset()");
+  h.run("enemies = [new Enemy(path, undefined, 'boss')]");
+  h.run("enemies[0].progress = path.progressAtPoint(" +
+    w(h, 560) + ", " + w(h, 505) + ")");
+  h.run("enemies[0].refreshPos()");
+  var boss = h.game.enemies[0];
+
+  // Walk the clock until it takes its turn. 20 s covers the 12 s interval plus
+  // the 1.3 s wind-up with room; the loop stops at the shot rather than
+  // running on, so a second attack cannot confuse the count.
+  var fired = false;
+  for (var i = 0; i < 20 * 60 && !fired; i++) {
+    h.step(1 / 60);
+    fired = h.game.Effects.worldState().aoeImpacts.some(function (m) {
+      return m.kind === "tyrant-gaze";
+    });
+  }
+  t.ok(fired, "it took its shot inside 20 s");
+
+  var marks = h.game.Effects.worldState().aoeImpacts;
+  var gaze = marks.filter(function (m) { return m.kind === "tyrant-gaze"; })[0];
+  var blast = marks.filter(function (m) { return m.kind === "tyrant-blast"; })[0];
+
+  t.ok(!!gaze, "a gaze mark was emitted");
+  t.ok(!!blast, "and an explosion where it landed");
+  t.near(gaze.x2, tower.x, 0.001, "the beam ends on the tower it picked");
+  t.near(gaze.y2, tower.y, 0.001, "in both axes");
+  t.ok(gaze.liftPx > boss.radiusPx() * 2,
+    "it leaves the BROW, not the belly (" + gaze.liftPx.toFixed(1) + " px up)");
+  t.ok(gaze.spreadPx > 0, "and as a pair, so it reads as eyes rather than a barrel");
+  t.eq(gaze.particles, undefined, "the beam itself throws no debris along its length");
+  t.near(blast.x, tower.x, 0.001, "the explosion is at the tower");
+  t.ok(blast.radius > 0, "with a radius to it");
+
+  // THE PLAIN BOLT IS SUPPRESSED, not drawn underneath. Both would put a
+  // second line on the board, leaving the body's centre.
+  t.eq(boss.attackBeam, null, "and the old centre-of-body bolt is not drawn too");
+
+  // AND NONE OF IT IS SIMULATION. The damage is the type's 45 whether or not a
+  // single one of those marks was drawn -- the rule js/effects.js opens with.
+  t.eq(tower.currentHp, tower.maxHp - B.attacks[0].damage,
+    "the tower took the spec's damage, unchanged by the fireworks");
 });
 
 
@@ -1210,7 +1524,25 @@ test("a tower out of reach is safe, and the swing lands the moment one is not", 
   var hit = driveAttackToResolution(angry, [out], 1);
   t.eq(hit, out, "the swing lands once the turn and strike play out");
   t.eq(out.hits, 20, "for its full damage");
+
+  // THE POSTURE IS STILL RUNNING HERE, and asserting it null on this line was
+  // a contradiction the helper can never satisfy: damage lands at the START of
+  // the strike phase (see advanceAttackPosture, which calls resolveAttack the
+  // instant it enters "strike"), and driveAttackToResolution returns on the
+  // frame a hit comes back. This fixture's posture is turn 0.3 / strike 0.4 /
+  // return 0.3, so the hit arrives at 0.317 s with 0.7 s of strike and
+  // turn-back still to run. "Turned back and resumed" is a real claim and is
+  // kept -- it just has to be asked after the clock that clears it, not
+  // before, so the remaining phases are driven out here.
+  t.ok(angry.attackPosture !== null, "mid-strike, it is still committed");
+  var spent = 0;
+  while (angry.attackPosture && spent < 2) {
+    angry.update(1 / 60);
+    angry.attackTowers(1 / 60, [out]);
+    spent += 1 / 60;
+  }
   t.eq(angry.attackPosture, null, "and it has turned back and resumed by then");
+  t.eq(out.hits, 20, "without the return turn landing a second swing");
 });
 
 test("defences come off the type onto the enemy, and mitigation applies them", function (t) {
@@ -1248,7 +1580,7 @@ test("a type sets health and speed on the enemy it builds", function (t) {
   t.eq(fast.health, 2, "fast HP");
   t.eq(fast.speedUlps, 87.5, "fast u.l./s -- 1.75 x 50");
   t.eq(slow.health, 7, "slow HP");
-  t.near(slow.speedUlps, 40, 1e-9, "slow u.l./s -- 0.8 x 50");
+  t.near(slow.speedUlps, 35, 1e-9, "slow u.l./s -- 0.7 x 50");
 
   t.eq(normal.maxHealth, 4, "maxHealth tracks the type, so the health bar is right");
   t.eq(fast.typeId, "fast", "the id is recorded on the instance");
@@ -1259,7 +1591,7 @@ test("speed is relative, so retuning the walking speed moves the roster", functi
   h.run("Enemy.BASE_SPEED_ULPS = 125");
 
   t.eq(h.spawnAt(0, undefined, "fast").speedUlps, 218.75, "fast follows the base");
-  t.eq(h.spawnAt(0, undefined, "slow").speedUlps, 100, "slow follows the base");
+  t.eq(h.spawnAt(0, undefined, "slow").speedUlps, 87.5, "slow follows the base");
 
   h.run("Enemy.BASE_SPEED_ULPS = 50");
 });
@@ -1295,7 +1627,7 @@ test("they actually walk at their own speeds", function (t) {
 
   // One second of travel, in pixels, at 19.4 px/m.
   t.near(fast.progress / normal.progress, 1.75, 0.001, "a fast covers 1.75x the ground");
-  t.near(slow.progress / normal.progress, 0.8, 0.001, "a slow covers 0.8x");
+  t.near(slow.progress / normal.progress, 0.7, 0.001, "a slow covers 0.7x");
 });
 
 test("a smasher slow is a multiplier on top of the type's own speed", function (t) {
@@ -1312,7 +1644,10 @@ test("a smasher slow is a multiplier on top of the type's own speed", function (
 
   var slow = h.spawnAt(0, undefined, "slow");
   slow.applySlow(0.65, 3);
-  t.near(slow.speedUlps * slow.slowMultiplier, 14, 1e-9, "slowed slow u.l./s");
+  // 35 x 0.35. Was 14 off the type's old 0.8 multiplier; the type went to 0.7
+  // on 2026-08-19 and this figure follows it, since what is being checked is
+  // the COMPOSITION rather than either number.
+  t.near(slow.speedUlps * slow.slowMultiplier, 12.25, 1e-9, "slowed slow u.l./s");
 });
 
 test("the fastest targeting mode now separates types, not just slows", function (t) {
@@ -4019,10 +4354,15 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   t.eq(fractal.health, 4, "Fractal Slime is listed at its base T1 health");
   t.eq(fractal.bounty, 2, "with its halved base bounty");
   t.eq(fractal.aoeDamageReduction, 0.5, "with its AoE resistance in the detail model");
-  t.eq(fractal.maxTier, 3, "the guide derives the highest campaign tier");
-  t.eq(fractal.maxHp, 64, "and derives that T3's 64 HP");
+  // T3/64/[25] until 2026-08-20, when the whole ladder was scheduled. The
+  // guide DERIVES all three by walking the schedule, so this moved with no
+  // edit to js/codex.js -- which is the property worth pinning here: the index
+  // states the tier range and the campaign now actually spends it.
+  t.eq(fractal.maxTier, 5, "the guide derives the highest campaign tier");
+  t.eq(fractal.maxHp, 1024, "and derives that T5's 1024 HP");
   t.eq(fractal.fractal.splitCount, 4, "the split block reaches the guide");
-  t.deep(fractal.waves, [25], "with its wave 25 introduction");
+  t.deep(fractal.waves, [16, 17, 22, 25, 33, 35],
+    "with one wave per rung of the ladder, in ascending order");
 });
 
 // The roster became a SCROLLING VIEWPORT on 2026-08-01, at the owner's request
@@ -4481,12 +4821,27 @@ function fireFor(h, tower, enemies, seconds) {
 }
 
 // Advance a Soldier through a whole branch, through the real economy.
+//
+// IT UPGRADES THE TOWER IT WAS HANDED. This used to buy for the global
+// `inspected` instead -- `towers[towers.indexOf(inspected)]` -- which quietly
+// ignored the `tower` parameter it takes and reads from on the line above.
+// Callers that had set `inspected` to the same Soldier got away with it; the
+// two that had not (`placeSoldierBeside` does not touch the global) indexed
+// with -1, handed `buyUpgrade` an `undefined` tower, and died on
+// `tower.whyCannotUpgrade` inside game.js rather than reporting a refusal.
+// `buyUpgrade(tower, id)` takes its tower explicitly and never consults
+// `inspected`, so there was nothing the indirection bought.
+//
+// The index is re-read each tier rather than cached: it is the live `towers`
+// array that the buy runs against.
 function buyPath(h, tower, branch, tiers) {
   h.run("cash = 100000000");
   for (var i = 0; i < tiers; i++) {
     var next = tower.nextUpgrade(branch);
     if (!next) break;
-    var refusal = h.run("buyUpgrade(towers[towers.indexOf(inspected)], '" + next.id + "')");
+    var at = h.game.towers.indexOf(tower);
+    if (at < 0) return "tower is not on the board";
+    var refusal = h.run("buyUpgrade(towers[" + at + "], '" + next.id + "')");
     if (refusal) return refusal;
   }
   return null;

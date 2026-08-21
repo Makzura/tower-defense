@@ -415,6 +415,15 @@
   var spawnType = undefined;
   var spawnTier = undefined;
 
+  // WHICH TYPE THE TIER BUTTONS SPAWN, derived and not typed. The row that
+  // carries a `fractal` block is the one with tiers, and it is the only one
+  // -- so a rename of the id, or a second tiered type, arrives here without an
+  // edit, the same way the type dropdown is built out of Enemy.TYPES. `null`
+  // when nothing is tiered, which is what the builder below tests.
+  var SLIME_TYPE = Object.keys(Enemy.TYPES).filter(function (id) {
+    return !!Enemy.TYPES[id].fractal;
+  })[0] || null;
+
   function typeLabel() {
     var type = Enemy.typeOf(spawnType);
     return type.displayName + (type.fractal ? " T" + spawnTier : "");
@@ -432,6 +441,44 @@
     }
     log("spawned " + count + " x " + typeLabel() +
       (health === undefined ? "" : " @ " + health + " HP"));
+  }
+
+  // --- the Fractal Slime's tier ladder --------------------------------------
+  //
+  // One type, six tiers, one mesh at six sizes -- and until this row existed
+  // the only way to see the ladder was to pick the type, pick a tier, spawn,
+  // clear, and do it again five times. That is the workbench making a hard
+  // thing hard: what a size ladder has to be looked at is SIDE BY SIDE.
+  //
+  // WHY IT DOES NOT TOUCH `spawnType` OR `spawnTier`. Those two belong to the
+  // dropdowns above, and a button that silently rewrote them would leave the
+  // controls disagreeing with the board. These spawn a slime and say so; the
+  // dropdowns keep whatever the operator left them on.
+  function spawnSlime(tier) {
+    spawnEnemy(undefined, SLIME_TYPE, undefined, undefined, tier);
+    return enemies[enemies.length - 1];
+  }
+
+  // BIGGEST FIRST, and it is not a matter of taste: they are all put on the
+  // road at the same instant and walk it at the same speed, so the one spawned
+  // furthest back is the one seen last. Leading with T5 puts the ladder in
+  // descending size order along the road, which is the order it reads in.
+  function spawnSlimeLadder(spec) {
+    var back = 0;
+    var previous = null;
+    for (var tier = spec.maxTier; tier >= spec.minTier; tier--) {
+      var e = spawnSlime(tier);
+      // SPACED OFF THE BODIES THEMSELVES, not by a fixed gap in u.l. A T5 is
+      // drawn at radius 26.4 px and a T0 at 7.15, so any single number is
+      // either a T5 standing inside its neighbour or a T0 alone on the map.
+      // Sum of the two radii plus a third of a body between them.
+      if (previous) back += (previous.radiusPx() + e.radiusPx()) * 1.35;
+      e.progress = -back;
+      e.refreshPos();
+      previous = e;
+    }
+    log("spawned the slime ladder, T" + spec.maxTier + " down to T" +
+      spec.minTier);
   }
 
   // Enemies spawned in one burst all sit at progress 0 and overlap exactly.
@@ -454,7 +501,7 @@
 
   function wire() {
     [
-      "towerList", "enemyHp", "enemyType", "enemyTier", "spawnOne", "spawnFive", "spawnWave1", "spawnWave2",
+      "towerList", "enemyHp", "enemyType", "enemyTier", "slimeTiers", "spawnOne", "spawnFive", "spawnWave1", "spawnWave2",
       "spawnTanky", "clearEnemies", "autoWaves",
       "selectedName", "selectedStats",
       "upgradeControls", "buyA", "buyB", "reaimCone", "useAbility", "upgradeNote",
@@ -495,6 +542,36 @@
       });
     }
     buildTypeList();
+
+    // The tier row, built from the type's own `fractal` block so the buttons
+    // are the ladder the game actually has -- minTier through maxTier, plus
+    // the one that spawns all of them. Each label carries the tier's health,
+    // because "T4" and "256 HP" are the same fact and only one of them is
+    // legible from the button.
+    function buildSlimeTiers() {
+      if (!SLIME_TYPE) return;
+      var spec = Enemy.TYPES[SLIME_TYPE].fractal;
+      for (var tier = spec.minTier; tier <= spec.maxTier; tier++) {
+        (function (t) {
+          var button = document.createElement("button");
+          button.textContent = "T" + t;
+          button.title = Enemy.TYPES[SLIME_TYPE].displayName + " T" + t +
+            "  (" + Enemy.healthOf(SLIME_TYPE, undefined, t) + " HP, drawn " +
+            (spec.minSizeScale + t * spec.sizeStep).toFixed(2) + "x)";
+          button.addEventListener("click", function () {
+            spawnSlime(t);
+            log("spawned " + Enemy.TYPES[SLIME_TYPE].displayName + " T" + t);
+          });
+          els.slimeTiers.appendChild(button);
+        })(tier);
+      }
+      var all = document.createElement("button");
+      all.textContent = "Ladder";
+      all.title = "One of every tier at once, biggest first";
+      all.addEventListener("click", function () { spawnSlimeLadder(spec); });
+      els.slimeTiers.appendChild(all);
+    }
+    buildSlimeTiers();
 
     function resetWaveSchedule() {
       enemies = [];

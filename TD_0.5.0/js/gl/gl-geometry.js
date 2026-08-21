@@ -103,6 +103,52 @@ var GLGeometry = (function () {
     return builder;
   }
 
+  // AN ELLIPSOID CENTRED ON ITS OWN MIDDLE -- the shield bubble, and the first
+  // runtime solid here that is not a body or a piece of board.
+  //
+  // WHY NOT `sphere` ABOVE. A bubble has to enclose the body it belongs to, and
+  // bodies are not round: the beacon stands 60 board px tall inside a 15 px
+  // radius, so a sphere big enough to contain it is four times too wide and
+  // reads as a balloon the enemy is standing in. Two radii is the whole
+  // difference, and `renderer.draw` scales uniformly, so the aspect cannot be
+  // supplied at draw time -- it has to be in the mesh.
+  //
+  // DELIBERATELY NOT A REFACTOR OF `sphere`. That function builds geometry that
+  // is already on the board (every sphere enemy and the Tyrant's stand-in), and
+  // rewriting it to delegate here would change the order its floats are
+  // emitted in for no gain anyone can see. The winding note there applies word
+  // for word: wound OUTWARD, because CULL_FACE/BACK otherwise shows the inside
+  // of the far wall.
+  //
+  // CONVEX AND CLOSED, WHICH IS WHAT MAKES IT SAFE TO BLEND. With back faces
+  // culled, exactly one surface of a convex solid covers any given pixel, so
+  // the double-blend that forced the camo bodies into a depth pre-pass
+  // (GLRenderer.setFade) cannot happen here -- there is no second layer to
+  // blend. It is a property of the shape, not a tolerance.
+  function ellipsoid(builder, cx, cy, cz, rx, rz, color, segments, rings,
+                     emissive) {
+    segments = segments || 14;
+    rings = rings || 9;
+    function at(phi, th) {
+      return [cx + rx * Math.sin(phi) * Math.cos(th),
+              cy + rx * Math.sin(phi) * Math.sin(th),
+              cz + rz * Math.cos(phi)];
+    }
+    for (var ring = 0; ring < rings; ring++) {
+      var phi0 = Math.PI * ring / rings, phi1 = Math.PI * (ring + 1) / rings;
+      for (var s = 0; s < segments; s++) {
+        var th0 = Math.PI * 2 * s / segments;
+        var th1 = Math.PI * 2 * (s + 1) / segments;
+        var a = at(phi0, th0), b = at(phi0, th1),
+            c = at(phi1, th1), d = at(phi1, th0);
+        if (ring === 0) builder.tri(a, d, c, color, emissive);
+        else if (ring === rings - 1) builder.tri(a, c, b, color, emissive);
+        else builder.quad(a, d, c, b, color, emissive);
+      }
+    }
+    return builder;
+  }
+
   // A capped cylinder standing on z = 0 -- the placeholder body for a tower
   // whose Blender model has not been exported yet.
   function cylinder(builder, cx, cy, r, h, color, lift, verts) {
@@ -387,6 +433,7 @@ var GLGeometry = (function () {
     Builder: Builder,
     hex: hex,
     sphere: sphere,
+    ellipsoid: ellipsoid,
     cylinder: cylinder,
     ground: ground,
     road: road,

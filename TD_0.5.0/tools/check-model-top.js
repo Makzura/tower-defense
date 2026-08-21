@@ -97,6 +97,21 @@ function enemyScales() {
                                                          : src.length);
     var s = /sizeScale\s*:\s*([0-9.]+)/.exec(body);
     scales[entry[0]] = s ? parseFloat(s[1]) : 1;
+    // A FRACTAL'S ROW IS NOT ITS DRAWN SIZE, and reading it as one grades the
+    // biggest body on the ladder at the smallest body's scale. `sizeScale` is
+    // per TYPE; a fractal also carries `fractalSizeScale = minSizeScale +
+    // tier * sizeStep` per INSTANCE, and radiusPx() multiplies the two -- so
+    // the Fractal Slime's row says 1 while a T5 draws at 2.4. Every figure in
+    // this table is multiplied by the scale, so quoting the small one would
+    // under-report a real miss by 2.4x on the tier the player meets at wave 25.
+    // Derived from the same three fields the game reads, never typed here.
+    var maxTier = /maxTier\s*:\s*([0-9.]+)/.exec(body);
+    var minSize = /minSizeScale\s*:\s*([0-9.]+)/.exec(body);
+    var step = /sizeStep\s*:\s*([0-9.]+)/.exec(body);
+    if (maxTier && minSize && step) {
+      scales[entry[0]] *= parseFloat(minSize[1]) +
+        parseFloat(maxTier[1]) * parseFloat(step[1]);
+    }
   });
   return scales;
 }
@@ -190,6 +205,15 @@ files.forEach(function (file) {
 
   var typeId = /^enemy-(.+)$/.exec(name);
   typeId = typeId ? typeId[1] : null;
+  // A SECOND MODEL FOR ONE TYPE IS STILL THAT TYPE'S SIZE. The Revenant draws
+  // `enemy-revenant` on its first life and `enemy-revenant-undead` after it
+  // gets back up (gl-world.js::enemyModel), and both are scaled by the one
+  // `sizeScale: 1.2` on the `revenant` row. Without this the variant is graded
+  // at 1 and its margin is quoted 20% smaller than the board will show it.
+  if (typeId && scales[typeId] === undefined) {
+    var stem = typeId.replace(/-[a-z0-9]+$/, "");
+    if (scales[stem] !== undefined) typeId = stem;
+  }
   var scale = typeId && scales[typeId] !== undefined ? scales[typeId] : 1;
 
   var unitsToPx = payload.unitsToPx || 31.8032;

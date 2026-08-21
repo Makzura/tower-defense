@@ -61,6 +61,13 @@ var FAIL_LINE = /^[ \t]+FAIL[ \t]+(.+?)[ \t]*$/;
 
 var BASELINE = [
   {
+    // 108 on 2026-08-19, from 107: one test ADDED with the camo model mapping.
+    // `camo_fast` and `camo_heavy` had no mesh under their own ids and drew the
+    // fallback sphere, and no suite asserted that a camo type draws a body at
+    // all -- so the GL path's translucency was being applied to a ball with
+    // everything green. Self-tested by mutating CAMO_SHADOWS: red on three
+    // assertions, green again on restore.
+    //
     // 107 on 2026-08-12, from 105, and the path there is +1 then -2 rather than
     // any test changing its mind:
     //
@@ -75,13 +82,12 @@ var BASELINE = [
     // repaired, because Normal and Hard were deleted as unfinished placeholders.
     // A suite getting SMALLER reads as loss on a totals diff, so it is written
     // down here as a deliberate removal.
-    file: "tests/run.js", pass: 107, fail: 0,
+    file: "tests/run.js", pass: 108, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
   },
   {
-    file: "tests/content.test.js", pass: 207, fail: 5,
     // Was 182/30. Twenty-five repaired on 2026-08-12, none by changing product
     // code: the gunner-deletion roster shift (3), three renames, the recruit
     // cooldown (2), the 2026-08-01 upgrade retune (15) -- upgrades now grant HP
@@ -102,26 +108,57 @@ var BASELINE = [
     //   - the stunned tower passed spawnAt a converted PIXEL value where it
     //     takes a path progress, parking the enemy 307 px from a 104 px reach.
     //
-    // What is LEFT, and none of it is drift:
-    //   - `after the roar it alternates ...` is left RED deliberately. Its two
-    //     setup faults are fixed; what remains is behavioural and belongs to
-    //     vera. It infers the fired attack from `attacks[prev % length]`, but
-    //     js/enemy.js skips an attack with no target and advances the index by
-    //     more than one, so that inference is invalid -- and observing what
-    //     actually fires shows aimed, aimed, aimed and never a leap.
-    //   - `the roar ...` carries the 601/610 trap: :601 reads a key the TYPE
-    //     row has never had, and repairing it exposes :610 underneath.
-    //   - `the Tyrant's numbers ...` is the plain stale-retune repair; nadia
-    //     ruled the CODE canonical -- shield 1000, leap 90 u.l., 9 s post-roar,
-    //     roar summon 40 bodies. Do not "fix" these towards the test.
-    //   - two `towers[-1]` throws, which are fixture bugs of their own.
-    failing: [
-      "the Tyrant's numbers are the ones that were asked for",
-      "the roar shields it, speeds it up, and calls the wave back",
-      "after the roar it alternates shot and leap, and still attacks rarely",
-      "B4 pierces DEFENCE in flat percentage points, never below zero",
-      "path B answers a brute with damage, not with pierce"
-    ]
+    // 217/0 on 2026-08-20: +1 for the Fractal Slime's tier ladder reaching the
+    // schedule. The campaign sent one rung of the six while the index printed
+    // all of them, and no suite compared the two -- so five tiers could have
+    // been dropped from the schedule entirely with every suite green. The new
+    // test walks the schedule against the type's own `fractal` block in both
+    // directions. Self-tested by deleting the T4 group from wave 33: red on
+    // the rung count and on three T4 assertions (the wave left holding that
+    // rung is 35, which states 1024 rather than 256), plus the codex's derived
+    // wave list next door. Green again on restore. NOT red on the ascending
+    // order -- removing a middle rung leaves the rest ascending, which is why
+    // the count is asserted separately from the order.
+    //
+    // 216/0 on 2026-08-19: +1 for the Tyrant's eye beams. Nothing asserted that
+    // its aimed shot produced any mark at all, and on the 3D board it produced
+    // none -- `attackBeam` is drawn by the 2D renderer only, so the boss's
+    // signature attack was invisible there. Self-tested by disabling
+    // `emitEyeBeam`: red, and green again on restore.
+    //
+    // 215/0 on 2026-08-19, from 207/5. The five standing names were closed in
+    // one pass, and NO PRODUCT CODE MOVED for any of them -- every one was the
+    // fixture being wrong about a game that was right, exactly as the notes
+    // below predicted. (215 rather than 212 because the working tree has since
+    // added three tests of its own.)
+    //
+    //   - `the Tyrant's numbers ...` and `the roar ...`: the stale-retune
+    //     repair nadia already ruled on, applied in the direction she named --
+    //     the CODE is canonical. shield 200 -> 1000, leap 50 -> 90 u.l.,
+    //     post-roar 6 -> 9 s, roar summon 30 -> 40 bodies. The 601/610 trap
+    //     was real: `Enemy.TYPES.boss.attack` is a key the type row has never
+    //     had (the pool is `attacks`), and repairing it exposed the summon
+    //     count underneath. The shield, the interval and the body count are
+    //     now DERIVED from the type in the test rather than typed, so the next
+    //     retune moves them on its own instead of going stale a third time.
+    //   - `after the roar it alternates ...`: the behavioural half was a
+    //     SETUP fault after all, not a game defect. The note below was right
+    //     that the fired-attack inference breaks when an attack is skipped --
+    //     but the reason the leap was always skipped is that the tower row sat
+    //     on a fixed y=505 line while the boss walked 675 u.l. away from it
+    //     during the test's own 45 s pre-roar measurement, ending 248 px from
+    //     the nearest tower against the leap's 228.8 px reach. Falling through
+    //     to the aimed shot is documented, correct behaviour. Spreading the
+    //     row along the path's own length (~84 px worst-case gap) makes the
+    //     leap eligible, the index then advances by exactly one, the inference
+    //     is valid again, and the observed order is leap, aimed, leap. The
+    //     strict alternation assertion was kept, not weakened.
+    //   - the two `towers[-1]` throws: `buyPath` bought for the global
+    //     `inspected` instead of the `tower` it is handed, so the two callers
+    //     that never set the global indexed with -1 and handed `buyUpgrade`
+    //     an undefined tower. It now upgrades its own argument.
+    file: "tests/content.test.js", pass: 217, fail: 0,
+    failing: []
   },
   {
     // 72, not 71: one test was ADDED on 2026-08-12. Repairing the B5 gate to

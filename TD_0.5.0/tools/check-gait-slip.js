@@ -118,12 +118,49 @@ var SIZE_SCALE = {
   "enemy-armored": 1.05, "enemy-brute": 1.5, "enemy-colossus": 2.1,
   "enemy-camo_normal": 1, "enemy-flying": 0.85, "enemy-angry": 1.25,
   "enemy-shielded": 1.15, "enemy-hive": 1.6, "enemy-shieldbearer": 1.35,
-  "enemy-boss": 2.4, "enemy-boss_fast": 1.9
+  "enemy-boss": 2.4, "enemy-boss_fast": 1.9, "enemy-midboss": 1.8,
+  // ONE TYPE, TWO MODELS, ONE SIZE. The Revenant swaps to the undead mesh when
+  // it gets back up (gl-world.js::enemyModel), and `sizeScale: 1.2` on the
+  // `revenant` row scales both -- so the variant is graded at 1.2 too. Graded
+  // at the default 1 it would under-report its own slip by 20%.
+  "enemy-revenant": 1.2, "enemy-revenant-undead": 1.2,
+  // AND THE SECOND TYPE TO DO IT, for a different reason and with the same
+  // consequence for this table. The Bulwark swaps to the stripped mesh when its
+  // shield breaks (gl-world.js::enemyModel), and `sizeScale: 1.15` on the
+  // `shielded` row scales both -- the swap is a change of body, never of size.
+  "enemy-shielded-broken": 1.15,
+  "enemy-healer": 1.45,
+  // ONE MODEL, SIX SIZES, AND THE ROW IN js/enemy.js IS THE SMALL ONE. The
+  // Fractal Slime's `sizeScale` is 1, and no instance is ever drawn at it
+  // alone: every body carries `fractalSizeScale = minSizeScale + tier *
+  // sizeStep` = 0.65 + 0.35 * tier on top, and `radiusPx()` multiplies the two.
+  // The ladder is 0.65 / 1.00 / 1.35 / 1.70 / 2.05 / 2.40, so a T5 is drawn at
+  // 2.4 and its slip in board px is 2.4x what this file would otherwise quote.
+  // Graded at the WORST tier, for the same reason the Revenant's variant is
+  // graded at its parent's 1.2 rather than at the default: a gate reads the
+  // summary, and a summary that flatters the body is worse than no summary.
+  "enemy-fractal_slime": 2.4
 };
-// Types whose frames are NOT distance-driven: gl-world.js drives a flier's
-// band by `boardClock * HOVER_HZ`. A wingbeat has no planted foot and no slip
-// to measure, so A is not a defect on these -- it is not even defined.
-var HOVERS = { "enemy-flying": true };
+// Types whose frames are NOT distance-driven: gl-world.js drives these by a
+// CLOCK -- a flier's wingbeat at `HOVER_HZ`, a hovering body's drift at its own
+// type's `hover.animHz`. Neither has a planted foot and neither has a slip to
+// measure, so A is not a defect on these -- it is not even defined.
+//
+// THIS TABLE IS THE ONE THING HERE THAT MUST BE KEPT IN STEP BY HAND, and the
+// cost of forgetting is not a missing check, it is a WRONG one: the Healer's
+// skirt sweeps 8.6 px through a cycle it is supposed to sweep, and graded as a
+// gait that reads as the second-worst body in the library. `clockRate` in
+// js/gl/gl-world.js is the list this mirrors -- a type is on it if it is
+// `isFlying` or carries a `hover` block in js/enemy.js.
+var HOVERS = { "enemy-flying": true, "enemy-healer": true,
+  // The Shieldbearer joined them on 2026-08-18, when its body became the
+  // Auroris beacon: a legless thing on a floating plinth, `hover` block on
+  // its row in js/enemy.js, cycle driven by that block's `animHz`. Left
+  // off this table it grades as a walker whose one ground-touching group is
+  // planted in every frame -- which reads a full cycle as slip, A = 37.0 px at
+  // its sizeScale, and would be the worst figure in the library for a body
+  // that is not touching the road at all.
+  "enemy-shieldbearer": true };
 
 // ---------------------------------------------------------------------------
 
@@ -193,8 +230,8 @@ function analyse(name, data, opts) {
     notes: []
   };
   if (HOVERS[name]) {
-    out.notes.push("HOVER-DRIVEN (boardClock * HOVER_HZ), not distance-driven" +
-      " -- A is not a slip figure for this body");
+    out.notes.push("CLOCK-DRIVEN (boardClock * the body's own rate), not " +
+      "distance-driven -- A is not a slip figure for this body");
   }
   if (data.unitsToPx && Math.abs(data.unitsToPx - UNITS_TO_PX) > 1e-6) {
     out.notes.push("unitsToPx is " + data.unitsToPx + ", not " + UNITS_TO_PX +

@@ -557,13 +557,119 @@ var World3D = (function () {
   // and cached; the per-frame scale handles fractal shrinkage.
   var typePrims = Object.create(null);
 
+  // A SECOND MESH FOR A BODY THAT HAS ALREADY DIED ONCE.
+  //
+  // The Revenant is the only type whose fiction changes mid-life: it comes back
+  // rooted, at full health, and the owner asked for it to come back as a
+  // different thing -- the steampunk zombie walks in, the undead one is what
+  // gets up. So a type may name a variant, and the variant is chosen off state
+  // the simulation already carries.
+  //
+  // `revived`, NOT `rooted` AND NOT `revivesLeft`. All three move at the same
+  // moment today and they are not the same claim. `rooted` is a movement fact
+  // that a future slow, snare or boss effect could set on anything; `revivesLeft`
+  // counts DOWN, so a type with two lives would swap on its first death and then
+  // have nothing left to say on its second. `revived` means exactly "this body
+  // has been dead once", which is the thing the second mesh depicts, and
+  // Enemy.prototype.tryRevive is the only place that sets it.
+  //
+  // FALLS BACK TO THE BASE MESH, never to the sphere: a missing variant file
+  // leaves a Revenant looking like a Revenant instead of turning it into a
+  // coloured ball at the moment it gets up. `tools/check-model-tags.js` is what
+  // catches the missing tag; this only decides that the failure is quiet in the
+  // right direction.
+  //
+  // A SECOND TYPE JOINED ON 2026-08-20 AND MADE THIS A TABLE OF TABLES rather
+  // than a table of one key. The Bulwark's fiction changes mid-life too, and
+  // for a reason the player can see coming: it walks in behind a shield and
+  // comes out the other side of it at twice the speed, and the owner asked for
+  // the stripped machine to be a different body ("the no shield appearing after
+  // the shield break"). So a type names a MAP of state-flag -> model, and the
+  // flag is once more a fact the simulation already carries and already keeps
+  // one-way.
+  //
+  // `shieldBroken`, NOT `shield <= 0`, and js/enemy.js carries the full
+  // argument at the field itself: a Shieldbearer refills a broken Bulwark's
+  // pool, so the pool goes positive again while the doubled speed does not.
+  // Reading the pool would put the halo back on a body that is still running.
+  //
+  // FIRST MATCH WINS, in the table's own key order, so a body that ever
+  // qualifies for two variants gets one answer rather than whichever branch was
+  // written last. Nothing has two today; the rule is here so the second one
+  // does not have to invent it.
+  var ENEMY_VARIANT = {
+    revenant: { revived: "enemy-revenant-undead" },
+    shielded: { shieldBroken: "enemy-shielded-broken" }
+  };
+
+  // A CAMO BODY WEARS THE MODEL OF THE TYPE IT SHADOWS (2026-08-19, at the
+  // owner's instruction: "all camo enemies are modelled as their normal
+  // variants but just transparent"). That is the second half of a ruling whose
+  // first half already shipped -- "do the camos like the others, just make them
+  // a bit translucent or sum" is what the two-pass CAMO_ALPHA draw below exists
+  // for. The translucency was there; what was missing is that a camo body had
+  // no body to BE translucent.
+  //
+  // WHAT THIS FIXES IS MOSTLY THE TWO THAT DREW NOTHING. `camo_fast` and
+  // `camo_heavy` have never had a mesh of their own, so `GLModels.has` failed
+  // and both fell through to the coloured sphere -- a translucent ball beside
+  // a translucent machine. Reading the shadowed type's model gives each of them
+  // the silhouette the player already knows, which is the whole point of a camo
+  // type: it is the SAME threat, and the only difference is that nothing can
+  // see it.
+  //
+  // AN EXPLICIT TABLE, NOT `id.replace("camo_", "")`. The mapping is not a
+  // string operation that happens to work -- `camo_heavy` IS A CAMO SLOW
+  // (the owner, 2026-08-19), and there is no `heavy` in the roster for a prefix
+  // strip to find. Nothing in the type row spells that relationship either:
+  // js/enemy.js still says the Camo Heavy "shadows nothing", which was true of
+  // its STATS -- it is the only camo body with real defences -- and was never a
+  // claim about which body it walks in. What ties it to the Slow is the thing
+  // its own comment says out loud, "heavy, so it plods": 0.65 against the
+  // Slow's 0.7, and sizeScale 1.4 against a body drawn at 1.0. It is the
+  // plodder, walking at a plodder's pace, and now it looks like one.
+  //
+  // A table also fails VISIBLY when a fourth camo type is added: it gets no
+  // row, `GLModels.has` misses, and it draws the sphere it would have drawn
+  // anyway, rather than silently resolving to whatever its name happens to
+  // spell.
+  //
+  // `enemy-camo_normal` (the Cooper) is consequently no longer the body the
+  // Camo Normal walks in. The file, its <script> tags and its export target are
+  // all left alone -- it is a built body that may be wanted again, and deleting
+  // a mesh is not what "use the normal's model" asks for.
+  var CAMO_SHADOWS = {
+    camo_normal: "normal",
+    camo_fast: "fast",
+    camo_heavy: "slow"
+  };
+
   function enemyModel(enemy) {
     var id = enemy && enemy.typeId;
-    if (GLModels.has("enemy-" + id)) return "enemy-" + id;
-    return null;
+    var base = "enemy-" + (CAMO_SHADOWS[id] || id);
+    if (!GLModels.has(base)) return null;
+    var variant = ENEMY_VARIANT[id];
+    // Guarded rather than leaning on ES5's "for-in over undefined is a no-op":
+    // most ids have no variant at all and this is called several times per body
+    // per frame.
+    if (variant) {
+      for (var flag in variant) {
+        if (enemy[flag] && GLModels.has(variant[flag])) return variant[flag];
+      }
+    }
+    return base;
   }
 
-  // --- fliers ---------------------------------------------------------------
+  // --- bodies that are not on the road ---------------------------------------
+  //
+  // TWO WAYS TO BE OFF THE TARMAC AND ONLY ONE OF THEM IS FLIGHT. A flier is up
+  // there because `isFlying` says so, which is a TARGETING fact before it is a
+  // height -- no ground tower may shoot it. A hovering body is up there because
+  // its type carries a `hover` block, which is only ever a picture: the Healer
+  // drifts a foot above the road and every tower on the board can still hit it.
+  // The two are kept apart everywhere below for that reason, and share only the
+  // things that are genuinely the same -- the bob, and the fact that a body
+  // touching nothing cannot have its animation driven by distance.
   //
   // HOW FAR OFF THE ROAD A FLIER RIDES.
   //
@@ -576,8 +682,16 @@ var World3D = (function () {
   // flier is, and a number retyped in four files is a number that will be
   // raised in three of them. It went 1.15 -> 3.45 on 2026-08-12 at the owner's
   // request and this file needed no edit for it, which is the point.
-  var FLIGHT_BOB = 0.16;                  // radii, peak above the rest height
-  var FLIGHT_BOB_HZ = 0.75;
+  //
+  // A HOVERING BODY'S HEIGHT IS ITS TYPE'S OWN, and read the same way for the
+  // same reason -- `hover.liftRadii` in js/enemy.js, which both boards turn
+  // into pixels through Enemy.prototype.visualBodyLift.
+  //
+  // ONE BOB SERVES BOTH. It is not a fact about flight, it is what stops a
+  // suspended thing looking pinned to a height, and 0.16 radii at 0.75 Hz is a
+  // slow breath rather than a flutter on either body.
+  var AIR_BOB = 0.16;                     // radii, peak above the rest height
+  var AIR_BOB_HZ = 0.75;
 
   // HOW SOLID A CAMOUFLAGED BODY IS. The owner asked for "a bit translucent".
   //
@@ -633,15 +747,46 @@ var World3D = (function () {
   // slow enough not to alias against 60 Hz.
   var HOVER_HZ = 2.6;
 
+  // AND THE SECOND BODY THE SAME ARGUMENT APPLIES TO, whose rate is NOT this
+  // constant. The Wisp's 2.6 is a wingbeat; the Healer's is a slow drift of its
+  // rings, and putting both on one number would tie an apparition's rotation to
+  // the speed an insect's wings happen to want. So a hovering type carries its
+  // own `hover.animHz` and this constant stays what it always was: the flier's.
+
   // The board's clock, latched at the top of each pass. The overlay layer draws
   // a flier's health bar from `bar()`, which is handed an actor and no state,
   // and a bar that ignored the bob would float free of the body under it.
   var boardClock = 0;
 
-  function flightLift(enemy, radius) {
-    if (!enemy || !enemy.isFlying) return 0;
-    var bob = Math.sin(boardClock * FLIGHT_BOB_HZ * Math.PI * 2);
-    return radius * (flightLiftRadii() + FLIGHT_BOB * bob);
+  // Is this body drawn off the road at all, by either route. The one predicate
+  // the three answers below share, so a type that starts hovering cannot pick
+  // up the lift and keep a walker's animation, or gain the drift and keep a
+  // ball's bounce.
+  function afloat(enemy) {
+    return !!(enemy && (enemy.isFlying || (enemy.type && enemy.type.hover)));
+  }
+
+  // HOW HIGH THE MODEL IS DRAWN, and the only function in this file that says.
+  // The health bar, the hover card's anchor, the wreck that falls and the shot
+  // that leads a target all read it -- see enemyCrown -- so a body that rises
+  // does not need any of them edited.
+  function bodyLift(enemy, radius) {
+    if (!enemy) return 0;
+    var bob = AIR_BOB * Math.sin(boardClock * AIR_BOB_HZ * Math.PI * 2);
+    if (enemy.isFlying) return radius * (flightLiftRadii() + bob);
+    var hover = enemy.type && enemy.type.hover;
+    if (!hover) return 0;
+    return radius * (hover.liftRadii + bob);
+  }
+
+  // WHAT DRIVES THIS BODY'S CYCLE, in hertz, or 0 for "the road does".
+  // See HOVER_HZ above for the whole of the argument; this is where the two
+  // exceptions to the distance rule are enumerated, and they are the only two.
+  function clockRate(enemy) {
+    if (!enemy) return 0;
+    if (enemy.isFlying) return HOVER_HZ;
+    var hover = enemy.type && enemy.type.hover;
+    return (hover && hover.animHz) || 0;
   }
 
   // A LANTERN THAT DOES NOT EMIT IS NOT A LANTERN.
@@ -683,6 +828,51 @@ var World3D = (function () {
     return LANTERN_BASE + LANTERN_SWING * Math.sin(t);
   }
 
+  // A SUPPORT PULSE, ON THE BODY THAT THREW IT.
+  //
+  // The tethers say which three bodies were healed; this says which body did
+  // it, and it is worth a second mark because those two questions have
+  // different answers and only one of them is what the player must shoot. A
+  // cord is thin and can be crossed by anything on the road between the two
+  // ends of it; the supporter lighting up cannot be mistaken for something
+  // else's cord passing over it.
+  //
+  // DRIVEN BY `supportFlash`, which the simulation already keeps: set to 1 when
+  // a pulse RESOLVES and decayed at 0.6 a second, so this runs for about 1.7 s
+  // out of every eight -- see js/enemy.js, where that decay rate is chosen
+  // against its two readers and this is now the third.
+  //
+  // ONLY A TYPE THAT AUTHORS A TETHER COLOUR GLOWS. `uGlow` multiplies each
+  // material's own emission, so a body with none is unaffected however hard it
+  // is driven, and the Shieldbearer -- which pulses on the same field -- has an
+  // expanding ring for this and no cyan in it anywhere.
+  var SUPPORT_GLOW = 0.85;
+
+  function supportSpec(enemy) {
+    var spec = enemy && enemy.type && enemy.type.support;
+    return (spec && spec.tether) ? spec.tether : null;
+  }
+
+  function supportGlow(enemy) {
+    if (!(enemy && enemy.supportFlash > 0) || !supportSpec(enemy)) return 0;
+    return SUPPORT_GLOW * enemy.supportFlash;
+  }
+
+  // The pulse's own colour in linear light, cached per type exactly as
+  // lanternTint caches the body colour it reads -- and read from the same one
+  // place the tether's is, so the cord and the body it leaves can never be two
+  // different cyans.
+  function supportTint(enemy) {
+    var id = enemy.typeId || "unknown";
+    var hit = typePrims["pulse:" + id];
+    if (hit) return hit;
+    var c = supportSpec(enemy).color;
+    hit = [Math.pow(c.r / 255, 2.2), Math.pow(c.g / 255, 2.2),
+           Math.pow(c.b / 255, 2.2)];
+    typePrims["pulse:" + id] = hit;
+    return hit;
+  }
+
   function enemySphere(enemy) {
     var id = enemy.typeId || "unknown";
     var cached = typePrims["e:" + id];
@@ -705,6 +895,163 @@ var World3D = (function () {
     cached = { mesh: g.build(renderer) };
     typePrims["e:" + id] = cached;
     return cached;
+  }
+
+  // --- the shield bubble -----------------------------------------------------
+  //
+  // At the owner's instruction (2026-08-18): "shielded enemies will have a blue
+  // clear bubble around them". Any body with a shield pool that still holds --
+  // a Bulwark, a Hive's brood, the Tyrant after its roar, and everything a
+  // Shieldbearer has just handed a plate to -- gets a translucent blue shell
+  // around it, on the same condition the 2D board draws its field panels on
+  // (`shieldMax > 0 && (shield > 0 || shieldFlash > 0)`), read from the same
+  // two fields so the two boards cannot disagree about who is shielded.
+  //
+  // IT IS GEOMETRY, NOT A CANVAS CIRCLE, and that is the whole reason it can
+  // exist here at all. AGENTS.md's clause 2 settles this: a translucent disc
+  // painted over the board is visible THROUGH the bodies in front of it, which
+  // is what "looks like a sticker" means. A real shell is occluded by whatever
+  // stands between it and the camera, and it is occluded BY the body inside it,
+  // which is what makes it read as a shell around a thing rather than a wash
+  // over one.
+  //
+  // WHY THE 2D BOARD KEEPS ITS FOUR PANELS. That renderer tried a complete
+  // bubble and rejected it -- see the note in Enemy.prototype.draw: with no
+  // depth buffer and no real alpha, a full ring stack buried the model,
+  // especially on a crowd of Swarm. The panels are what that constraint
+  // produced. This board has both, so it can draw the thing that was wanted;
+  // the fallback keeps the language it can afford.
+  //
+  // SIZED FROM THE MODEL, NEVER FROM A CONSTANT. A bubble has to contain the
+  // body, and the bodies are not the same shape: the beacon is 4.05 radii tall
+  // inside 1.3 of plan, the Fractal Slime is 2.6 tall inside 2.0 of plan, and
+  // one hand-picked pair of radii cuts through half the roster. Both numbers
+  // are measured off the model's own REST-frame geometry, once per model, and
+  // cached with the other per-type primitives.
+  var BUBBLE_PAD = 1.06;                  // of the body it has to contain
+  var BUBBLE_MIN_RADII = 1.05;            // ...and never tighter than this
+  // CLEAR, WHICH IS A CEILING AND NOT A STYLE. The owner asked for a clear
+  // bubble, and the first build read as a frosted egg: 0.13 + 0.17 + 0.34 is
+  // 0.64 at the moment of a grant, and a shell that opaque hides the body it
+  // is around -- which is the exact failure the 2D board's four panels exist
+  // to avoid. These add to at most 0.42 on a fresh full grant and sit at 0.22
+  // for a shield merely holding, so the body reads through it at every value.
+  var BUBBLE_BASE = 0.10;                 // alpha of an empty-ish shield
+  var BUBBLE_HELD = 0.12;                 // ...plus this much at a full one
+  var BUBBLE_FLASH = 0.20;                // ...plus this on a grant or a break
+  // Linear, because that is the space the shader lights in. A pale blue at a
+  // low emission: enough that the unlit side of the shell does not go black
+  // (a shadowed bubble reads as a dent), not so much that it whitens -- the
+  // resting floor is min(1, e * 0.16) of WHITE added to every channel.
+  var BUBBLE_RGB = [0.16, 0.52, 1.0];
+  var BUBBLE_EMISSIVE = 0.22;
+
+  // The body's own extent in RADII, from the rest frame: the widest point in
+  // plan, and the top. Both scale with the instance, so the ratio is a fact
+  // about the model and is cached per model rather than per body -- which is
+  // what makes a T5 Fractal Slime and a T0 share one mesh.
+  function bodyExtentRadii(name) {
+    var m = name ? GLModels.get(renderer, name) : null;
+    if (!m || !m.positions) return null;
+    var pose = (m.frames && m.frames.length) ? m.frames[0] : null;
+    var plan = 0, top = 0;
+    for (var g = 0; g < m.groups.length; g++) {
+      var grp = m.groups[g];
+      var pg = pose ? pose[g] : null;
+      for (var v = grp.first; v < grp.first + grp.count; v++) {
+        var x = m.positions[v * 3], y = m.positions[v * 3 + 1],
+            z = m.positions[v * 3 + 2];
+        if (pg) {
+          var wx = pg[0] * x + pg[4] * y + pg[8] * z + pg[12];
+          var wy = pg[1] * x + pg[5] * y + pg[9] * z + pg[13];
+          var wz = pg[2] * x + pg[6] * y + pg[10] * z + pg[14];
+          x = wx; y = wy; z = wz;
+        }
+        var r2 = x * x + y * y;
+        if (r2 > plan) plan = r2;
+        if (z > top) top = z;
+      }
+    }
+    // Model units -> radii: a body is drawn at `unitsToPx * radiusPx / 11`, so
+    // one model unit is `unitsToPx / 11` of the instance's own radius whatever
+    // size that instance happens to be.
+    var perRadius = m.unitsToPx / 11;
+    return { plan: Math.sqrt(plan) * perRadius, top: top * perRadius };
+  }
+
+  // KEYED ON THE MODEL IT IS ABOUT TO MEASURE, WHICH IS THE ONLY KEY THAT CAN BE
+  // RIGHT. This used to be the type id plus a hand-written `:revived` suffix --
+  // correct for the one type that had a second mesh, and a stale-cache bug the
+  // moment a second one arrived. `enemyModel` is already the single place that
+  // decides which mesh a body wears; asking it, and caching under its answer,
+  // means a variant can be added to ENEMY_VARIANT without a matching edit here.
+  //
+  // IT IS A LIVE CASE ON THE BULWARK, NOT A HYPOTHETICAL. The bubble is drawn
+  // while `shieldFlash` decays, and by then `shieldBroken` is already set -- so
+  // the FIRST Bulwark bubble a board ever draws can be one measured off the
+  // stripped body, whose plan extent is the torso alone against the shielded
+  // body's halo. Under the old key that measurement was cached as "the shielded
+  // bubble" for the rest of the session, and every Bulwark after it wore a
+  // bubble sized to a body it was not in yet.
+  //
+  // The fallback stays the type id: a body with no mesh gets the sphere, and
+  // two sphere-drawn types must not share one bubble.
+  function shieldBubble(enemy) {
+    var model = enemyModel(enemy);
+    var id = model || (enemy.typeId || "unknown");
+    var cached = typePrims["bubble:" + id];
+    if (cached) return cached;
+    var extent = bodyExtentRadii(model);
+    // A sphere type has no mesh to measure. `bodyTopOf`'s own fallback is 2.2
+    // radii and the drawn ball is one radius across, which is what those two
+    // numbers are.
+    if (!extent) extent = { plan: 1.0, top: 2.2 };
+    var rx = Math.max(BUBBLE_MIN_RADII, extent.plan * BUBBLE_PAD);
+    var half = Math.max(BUBBLE_MIN_RADII, extent.top * 0.5 * BUBBLE_PAD);
+    var g = new GLGeometry.Builder();
+    GLGeometry.ellipsoid(g, 0, 0, extent.top * 0.5, rx, half, BUBBLE_RGB,
+      14, 9, BUBBLE_EMISSIVE);
+    cached = { mesh: g.build(renderer) };
+    typePrims["bubble:" + id] = cached;
+    return cached;
+  }
+
+  function bubbleAlpha(enemy) {
+    if (!(enemy.shieldMax > 0)) return 0;
+    var held = Math.max(0, Math.min(1, enemy.shield / enemy.shieldMax));
+    if (!(enemy.shield > 0) && !(enemy.shieldFlash > 0)) return 0;
+    var a = (enemy.shield > 0 ? BUBBLE_BASE + BUBBLE_HELD * held : 0) +
+      BUBBLE_FLASH * (enemy.shieldFlash || 0);
+    return Math.min(0.42, a);
+  }
+
+  // Scratch, so a board full of shielded bodies allocates nothing per frame.
+  var bubbleList = [];
+
+  function drawShieldBubbles(state) {
+    bubbleList.length = 0;
+    var eye = camera.eye();
+    for (var i = 0; i < state.enemies.length; i++) {
+      var e = state.enemies[i];
+      if (!bubbleAlpha(e)) continue;
+      var dx = e.pos.x - eye[0], dy = e.pos.y - eye[1];
+      bubbleList.push({ e: e, far: dx * dx + dy * dy });
+    }
+    if (!bubbleList.length) return;
+    // FAR TO NEAR, because these are the only translucent things on the board
+    // that routinely overlap EACH OTHER -- ten of them at once is precisely
+    // what a Shieldbearer's pulse produces. Depth writes are off while blending
+    // (setFade), so nothing else sorts them.
+    bubbleList.sort(function (a, b) { return b.far - a.far; });
+    for (i = 0; i < bubbleList.length; i++) {
+      var body = bubbleList[i].e;
+      var r = body.radiusPx ? body.radiusPx() : 11;
+      var lift = groundHeightAt(body.pos.x, body.pos.y) + bodyLift(body, r);
+      renderer.setFade(bubbleAlpha(body));
+      renderer.draw(shieldBubble(body).mesh, body.pos.x, body.pos.y, lift,
+        0, r);
+    }
+    renderer.setFade(1);
   }
 
   // A tower with no mesh is a CYLINDER in its own tint, on a pad -- clearly a
@@ -959,7 +1306,7 @@ var World3D = (function () {
     if (typeof EnemyWreck !== "undefined") {
       EnemyWreck.bind({
         project: project, groundAt: groundHeightAt,
-        flightLift: flightLift, modelOf: enemyModel,
+        bodyLift: bodyLift, modelOf: enemyModel,
         tintOf: lanternTint, unitsToPx: GLModels.unitsToPx
       });
     }
@@ -1331,7 +1678,7 @@ var World3D = (function () {
       // A flier rides above its own path point; a walker sits on it. Read once
       // here so the mesh branch and the sphere branch cannot drift apart, and
       // so the sphere types that are still fliers rise too.
-      var lift = groundHeightAt(e.pos.x, e.pos.y) + flightLift(e, radius);
+      var lift = groundHeightAt(e.pos.x, e.pos.y) + bodyLift(e, radius);
       // BUILT ONCE PER RENDERED FRAME, DELIBERATELY OUTSIDE THE CAMO LOOP.
       // `strikeOf` is written to be idempotent within a frame -- the latch
       // moves only when the drive RISES -- but relying on that where hoisting
@@ -1363,8 +1710,10 @@ var World3D = (function () {
         // and a stopped one stops mid-step -- all for free, and all wrong the
         // moment a clock drives it instead. Same rule the sprite pack used.
         //
-        // A FLIER IS THE EXCEPTION, and the only one: see HOVER_HZ above for
-        // why a wingbeat is the one cycle distance cannot drive.
+        // A BODY THAT TOUCHES NOTHING IS THE EXCEPTION -- the flier and the
+        // hovering Healer, and no third case: see HOVER_HZ above for why a
+        // cycle with no foot in it cannot be driven by distance, and
+        // `clockRate` for the two rates that answer instead.
         //
         // WHICH frames are the walk comes from the model's `bands`, never from
         // arithmetic on `frames.length` -- see walkBand. Frame counts are not
@@ -1372,20 +1721,30 @@ var World3D = (function () {
         // and `flying`), so any constant here would already be wrong twice.
         var em = GLModels.get(renderer, model);
         var eBand = walkBand(em);
-        var walk = e.isFlying
-          ? bandFrame(eBand, boardClock * HOVER_HZ)
+        var rate = clockRate(e);
+        var walk = rate
+          ? bandFrame(eBand, boardClock * rate)
           : bandFrame(eBand, (e.progress || 0) / stride);
-        if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
+        // TWO REASONS A BODY LIGHTS UP, and they are lit in this order because
+        // only one of them is an event. The lantern is CONTINUOUS -- it is how
+        // a Wisp says "no ground tower can touch me" and it is true all its
+        // life. A support pulse is a MOMENT, and it belongs to the body that
+        // threw it for as long as `supportFlash` lasts. No body has both, but
+        // the pulse takes precedence if one ever does: a thing that just healed
+        // the wave is a more urgent thing to say than what it is.
+        var pulse = supportGlow(e);
+        if (pulse) renderer.setGlow(pulse, supportTint(e));
+        else if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
         drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk, strike);
         // Put it back. setGlow is state, not an argument, so a flier that left
         // it lit would hand its lantern to the next body drawn.
-        if (e.isFlying) renderer.setGlow(0, null);
+        if (pulse || e.isFlying) renderer.setGlow(0, null);
       } else {
         // Sphere types ROLL their bounce instead: squash on the ground beat,
         // stretch at the top, which is the one animation a ball actually has.
-        // A flying one has no ground to beat against, and its hover is already
-        // in `lift`.
-        var beat = e.isFlying ? 0 : Math.abs(Math.sin(phase));
+        // One that is off the road has no ground to beat against, and whatever
+        // holds it up is already in `lift`.
+        var beat = afloat(e) ? 0 : Math.abs(Math.sin(phase));
         renderer.draw(enemySphere(e).mesh, e.pos.x, e.pos.y,
           lift + beat * radius * 0.22, yaw,
           radius * (0.94 + beat * 0.10));
@@ -1421,6 +1780,11 @@ var World3D = (function () {
         if (wr.glow > 0) renderer.setGlow(0, null);
       }
     }
+    // THE SHIELD BUBBLES, after everything opaque and after the wrecks, for
+    // the reason the wrecks are after the bodies: a blended draw with depth
+    // writes off composites against whatever is already in the buffer, so it
+    // has to be able to see the finished frame behind it. See shieldBubble.
+    drawShieldBubbles(state);
     // Projectiles are NOT drawn here. They were, as one grey cube each, until
     // there was something better; they are light, not geometry -- a tracer, a
     // rail lance, a covenant round -- and every one of those is a gradient with
@@ -2513,6 +2877,10 @@ var World3D = (function () {
     if (typeof SiphonFXRitual !== "undefined") {
       SiphonFXRitual.draw(ctx, state, BLUB_FX_API);
     }
+    // The Healer's cords, under the shots for the same reason the Siphon's beam
+    // is: what the player's own board is doing is never buried by what the road
+    // is doing.
+    drawSupportTethers(ctx, state);
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
     // hardware that fired it and under the cosmetic burst layer. The death
@@ -2650,7 +3018,7 @@ var World3D = (function () {
     // every anti-air round sailing beneath it -- visibly a miss, on the one
     // enemy the game asks you to build a specific answer to.
     var to = groundHeightAt(shot.target.pos.x, shot.target.pos.y) +
-      flightLift(shot.target, shot.target.radiusPx
+      bodyLift(shot.target, shot.target.radiusPx
         ? shot.target.radiusPx() : 11);
     var gx = shot.x - shot._gx, gy = shot.y - shot._gy;
     var gone = Math.sqrt(gx * gx + gy * gy);
@@ -2677,6 +3045,166 @@ var World3D = (function () {
           }
         };
       })(b));
+    }
+  }
+
+  // THE HEALER'S TETHERS.
+  //
+  // A cord from the body that pulsed to each body it healed, thrown on the
+  // pulse and let go a second and a half later. Everything about WHICH bodies
+  // and for HOW LONG is the simulation's -- `supportLinks` on the supporter,
+  // filled by Enemy.prototype.supportAllies and swept by its update -- and this
+  // draws what is there. That split is what puts the same cords on the 2D
+  // fallback (Enemy.prototype.draw) without either renderer knowing about the
+  // other.
+  //
+  // ANCHORED AT THE MIDDLE OF EACH BODY, NOT AT ITS FEET. `enemyTop` is the
+  // model's own crown, so 0.55 of it is a chest on a zombie, a core on the
+  // Healer, and the right height on the next body imported -- none of which
+  // would be true of a number typed here. And the lift is added at BOTH ends
+  // for the same reason: the Healer floats and the thing it heals usually does
+  // not, so a cord that ignored either would leave one end in the road.
+  //
+  // AT TOP LEVEL, OUTSIDE ANY withGround, exactly as the Siphon's beams are: a
+  // cord spans two patches of road that can be at two heights, so each end
+  // pins its own ground through `project`'s default rather than sharing one
+  // reference that would flatten the far end onto the near end's tile.
+  var TETHER_MID = 0.55;                  // of the body's own height
+  var TETHER_REACH = 0.2;                 // of its life, spent flying out
+  var TETHER_FADE = 0.7;                  // of its life, below which it fades
+
+  function tetherAnchor(e) {
+    var r = e.radiusPx ? e.radiusPx() : 11;
+    return project(e.pos.x, e.pos.y,
+      bodyLift(e, r) + enemyTop(e) * TETHER_MID);
+  }
+
+  // A BOWED CORD, WHEN THE SPEC ASKS FOR ONE, AND A STRAIGHT ONE OTHERWISE.
+  //
+  // The Healer throws three cords at the three most wounded bodies and a
+  // straight line is the right mark for it: it AIMS. The Shieldbearer hands
+  // twenty points of shield to ten bodies at once, and ten straight lines out
+  // of one body is a star -- the lines overlap near the source and there is no
+  // reading which went where. A bow separates them, and it also says the right
+  // thing about the gesture: a plate of shield is LOBBED across, not fired.
+  //
+  // `arc` is a fraction of the SPAN, so a target two body-widths away gets a
+  // small bow and one across the board a big one; a constant height would be
+  // invisible on the first and a rainbow on the second.
+  //
+  // THE BOW IS IN THE WORLD, NOT ON THE SCREEN. Every point of the curve is
+  // projected through `project` at its own height above the road, so the cord
+  // passes over the terrain the way anything else in this renderer does. Bent
+  // in screen space it would read as flat ribbon lying on the camera, and it
+  // would bend the wrong way the moment the board was orbited.
+  var TETHER_STEPS = 14;                  // segments in a drawn bow
+  var CHIP_SPREAD = 0.55;                 // of the flight, between first and last
+
+  // One point along a link's bow, `t` from the supporter (0) to the target (1).
+  // Returned in SCREEN space; `lift` is how high the middle of the bow rises.
+  function tetherPoint(from, to, t, lift) {
+    var bow = 4 * t * (1 - t);            // 0 at both ends, 1 in the middle
+    return { x: from.x + (to.x - from.x) * t,
+             y: from.y + (to.y - from.y) * t - lift * bow,
+             scale: from.scale + (to.scale - from.scale) * t };
+  }
+
+  function drawSupportTethers(ctx, state) {
+    for (var i = 0; i < state.enemies.length; i++) {
+      var e = state.enemies[i];
+      var links = e.supportLinks;
+      if (!links || !links.length) continue;
+      var spec = supportSpec(e);
+      if (!spec) continue;
+      var from = tetherAnchor(e);
+      if (!from) continue;
+      var rgb = spec.color.r + "," + spec.color.g + "," + spec.color.b;
+      for (var k = 0; k < links.length; k++) {
+        var link = links[k];
+        var to = tetherAnchor(link.target);
+        if (!to) continue;
+        // Out on the first fifth, held, then faded. `beam`'s own `left` is
+        // what tapers the far end while the cord is still travelling, so the
+        // head of it is bright and the tail behind it has not arrived yet.
+        var reach = Math.min(1, (1 - link.life) / TETHER_REACH);
+        var fade = Math.min(1, link.life / TETHER_FADE);
+        // THE HEIGHT OF THE BOW, in screen pixels, measured off the span it
+        // spans. `arc` absent or zero is a straight cord and takes the cheap
+        // two-point path below, which is what keeps the Healer's tethers
+        // exactly the artefact they already were.
+        var arc = spec.arc || 0;
+        var lift = arc && Math.hypot(to.x - from.x, to.y - from.y) * arc;
+        if (!lift) {
+          var head = { x: from.x + (to.x - from.x) * reach,
+                       y: from.y + (to.y - from.y) * reach,
+                       scale: from.scale };
+          beam(ctx, from, head, rgb, 1.5 * from.scale, fade,
+            0.55 + 0.45 * reach);
+          glow(ctx, head, 3.4 * fade,
+            "rgba(" + rgb + "," + (0.8 * fade).toFixed(3) + ")", 0.85 * fade);
+          continue;
+        }
+        // THE BOW: ONE PATH, THREE STROKES, AND IT IS NOT `beam`.
+        //
+        // Two reasons, and the second is the one that decided it. `beam` draws
+        // a straight segment, so a curve means calling it fourteen times --
+        // three strokes each, ten cords a pulse, 420 strokes a frame for one
+        // enemy's ability. And `beam`'s white core at 0.95 is right for a shot
+        // (a round is hot) and wrong for this: what is travelling here is a
+        // SHIELD, the thing it arrives as is a blue shell, and a white-hot
+        // cord says the beacon is firing at the bodies it is helping. The core
+        // is kept, at half the alpha, because a thin blue line on a blue-grey
+        // road needs something down the middle of it to be seen at all.
+        var path = function () {
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+          for (var s = 1; s <= TETHER_STEPS; s++) {
+            var pt = tetherPoint(from, to, reach * s / TETHER_STEPS, lift);
+            ctx.lineTo(pt.x, pt.y);
+          }
+        };
+        var w = from.scale;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        path();
+        ctx.lineWidth = 5.2 * w;
+        ctx.strokeStyle = "rgba(" + rgb + "," + (0.20 * fade).toFixed(3) + ")";
+        ctx.stroke();
+        path();
+        ctx.lineWidth = 2.2 * w;
+        ctx.strokeStyle = "rgba(" + rgb + "," + (0.62 * fade).toFixed(3) + ")";
+        ctx.stroke();
+        path();
+        ctx.lineWidth = Math.max(0.6, 0.9 * w);
+        ctx.strokeStyle = "rgba(232,250,255," + (0.5 * fade).toFixed(3) + ")";
+        ctx.stroke();
+        ctx.lineCap = "butt";
+        ctx.lineJoin = "miter";
+        // THE SHIELDS THEMSELVES, GOING OUT. The cord says two bodies are
+        // connected; these say which way the help is travelling, which is the
+        // half a line cannot state. They are spread along the flight so the
+        // stream reads as several plates rather than one bead, and each one is
+        // drawn as a disc of the shield's own colour with a white core -- the
+        // same grammar the bubble they are about to become is drawn in.
+        var chips = spec.chips || 0;
+        for (var c = 0; c < chips; c++) {
+          var lead = c / Math.max(1, chips) * CHIP_SPREAD;
+          var at = reach - lead;
+          if (at <= 0 || at > 1) continue;
+          var chip = tetherPoint(from, to, at, lift);
+          var bright = fade * (1 - lead / (CHIP_SPREAD + 0.001) * 0.55);
+          glow(ctx, chip, (4.6 - c * 0.7) * bright,
+            "rgba(" + rgb + "," + (0.85 * bright).toFixed(3) + ")",
+            0.9 * bright);
+        }
+        // And the arrival: the leading plate landing on the body it shields,
+        // held after the flight is over so the last thing the eye sees is the
+        // shield closing rather than the cord going out.
+        if (reach >= 1) {
+          glow(ctx, to, 6.0 * fade,
+            "rgba(" + rgb + "," + (0.5 * fade).toFixed(3) + ")", 0.9 * fade);
+        }
+      }
     }
   }
 
@@ -2905,16 +3433,22 @@ var World3D = (function () {
     // turned, and the one thing a 3D board can say that a 2D one cannot is
     // that the explosion happened somewhere flat.
     //
-    // Four kinds are NOT that shape and are dispatched by name, exactly as the
+    // FIVE kinds are NOT that shape and are dispatched by name, exactly as the
     // 2D pack registers a renderer per kind. A beam remnant is a line between
     // two endpoints; running it through the circle path drew an expanding ring
-    // hundreds of pixels wide, centred on the middle of the shot.
+    // hundreds of pixels wide, centred on the middle of the shot. The Tyrant's
+    // gaze is the same shape and joined them on 2026-08-19.
+    //
+    // `tyrant-blast` is deliberately NOT in that list: the explosion its gaze
+    // sets off IS a circle on the ground, so it wants the common path below and
+    // is named only so a skin pack can claim it later.
     for (i = 0; i < s.aoeImpacts.length; i++) {
       var impact = s.aoeImpacts[i];
       var kind = impact.kind || "area";
       if (kind === "warbringer-swing") { drawForgeSlam(ctx, impact); continue; }
       if (kind === "warbringer-ring") { drawStakeRing(ctx, impact); continue; }
       if (kind === "lance-remnant") { drawLanceRemnant(ctx, impact); continue; }
+      if (kind === "tyrant-gaze") { drawTyrantGaze(ctx, impact); continue; }
       if (kind === "arcane-empowered-hit") { drawCovenantHit(ctx, impact); continue; }
       if (kind === "b5-strike") { drawStrike(ctx, impact); continue; }
       var progress = 1 - impact.life / impact.maxLife;
@@ -3590,6 +4124,41 @@ var World3D = (function () {
   // firing read as a bug rather than as a shot. This is the afterimage, emitted
   // once by the projectile on death because that is the only moment the whole
   // line is known: where it started, and where the crowd actually stopped it.
+  // THE TYRANT'S GAZE, PROJECTED. Two lines from the brow to the tower.
+  //
+  // The 2D pack draws the same impact by subtracting `liftPx` from y and
+  // offsetting the pair in screen space, which is the only height and the only
+  // perpendicular a flat board has. Here both are real: the eyes are projected
+  // at `liftPx` above the Tyrant's own ground, the tower end at its base, and
+  // the pair is separated along the WORLD perpendicular of the shot so the
+  // spread stays on the boss's brow as the board turns instead of swinging
+  // around the camera. That is the same argument `drawEffects` makes about
+  // keeping blasts on the ground plane.
+  function drawTyrantGaze(ctx, impact) {
+    var rgb = impact.tint || "255,96,72";
+    var fade = Math.max(0, Math.min(1, impact.life / impact.maxLife));
+    var dx = impact.x2 - impact.x1;
+    var dy = impact.y2 - impact.y1;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var spread = impact.spreadPx || 0;
+    var nx = -dy / len * spread;
+    var ny = dx / len * spread;
+
+    var hit = project(impact.x2, impact.y2, 0);
+    if (!hit) return;
+
+    for (var side = -1; side <= 1; side += 2) {
+      var eye = project(impact.x1 + nx * side, impact.y1 + ny * side,
+        impact.liftPx || 0);
+      if (!eye) continue;
+      // `left` is 1: unlike a lance, a gaze does not spend itself along its
+      // length, so the far end is as hot as the near one. Width follows the
+      // hit's own px-per-world scale, which is what keeps a beam the same
+      // apparent thickness whether the Tyrant is near the camera or far.
+      beam(ctx, eye, hit, rgb, 1.9 * hit.scale, fade, 1);
+    }
+  }
+
   function drawLanceRemnant(ctx, impact) {
     var rgb = SHOT_RGB[impact.tint] || SHOT_RGB.neutral;
     var fade = Math.max(0, Math.min(1, impact.life / impact.maxLife));
@@ -3767,10 +4336,12 @@ var World3D = (function () {
 
   function enemyCrown(e) {
     var r = e.radiusPx ? e.radiusPx() : 11;
-    // crownOf measures the MODEL; `flightLift` is where that model currently
-    // is. Without the second term a Wisp's health bar hangs at road height,
-    // level with its own dangling legs, while the body floats above it.
-    return crownOf(e, enemyModel(e), r, r / 11) + flightLift(e, r);
+    // crownOf measures the MODEL; `bodyLift` is where that model currently is.
+    // Without the second term a Wisp's health bar hangs at road height, level
+    // with its own dangling legs, while the body floats above it -- and the
+    // same was true of the Healer's the moment it started to hover, which is
+    // why that function answers for both.
+    return crownOf(e, enemyModel(e), r, r / 11) + bodyLift(e, r);
   }
 
   // THE TOP OF THE BODY ITSELF, which is not the same number as its crown.
@@ -3796,7 +4367,7 @@ var World3D = (function () {
 
   // DELIBERATELY NOT LIFTED, unlike enemyCrown above, and this is a known seam
   // rather than an oversight. siphon-beam-draw builds its capsule from a BASE at
-  // `groundAt(actor)` plus this height, so adding flightLift here would not move
+  // `groundAt(actor)` plus this height, so adding bodyLift here would not move
   // the occluder up -- it would STRETCH it from the road to the flier's head and
   // mask every cord crossing the empty air beneath a Wisp. Over-occlusion is the
   // failure that photographs as success. Occluding a flier correctly needs a
@@ -3985,7 +4556,8 @@ var World3D = (function () {
     //
     // Returns a rate in CYCLES PER SECOND for a body whose animation is driven
     // by a CLOCK, and **null for every body whose animation is driven by
-    // DISTANCE** -- which is all of them except the flier. That null is the
+    // DISTANCE** -- which is all of them except the flier and the hovering
+    // Healer; `clockRate` is where those two are enumerated. That null is the
     // useful half of the answer: it tells a caller that this body has no
     // authored rate at all, so a viewer standing it still has to invent one
     // (the codex derives speed/stride, which is the right thing to do and is
@@ -3999,7 +4571,7 @@ var World3D = (function () {
     // the codex's own derivation gives the Wisp 2.567 against this 2.6 -- close
     // by luck rather than by construction, and the next flier will not be.
     animHz: function (enemy) {
-      return (enemy && enemy.isFlying) ? HOVER_HZ : null;
+      return clockRate(enemy) || null;
     },
     // The board's height under a point, and whether a footprint sits on ONE
     // level. Presentation-derived, but the placement rule reads the second one:

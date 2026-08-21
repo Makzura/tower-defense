@@ -46,17 +46,36 @@ def mat_mul(a, b):
             for r in range(4)]
 
 
-def trs(location, rotation):
-    """Translate * Rz * Ry * Rx -- Blender's default XYZ Euler order, so a
-    number copied off a td_scene call means the same thing here."""
+def trs(location, rotation, scale=1.0):
+    """Translate * Rz * Ry * Rx * uniform Scale -- Blender's default XYZ Euler
+    order, so a number copied off a td_scene call means the same thing here.
+
+    THE SCALE IS UNIFORM AND THE RESTRICTION IS THE RENDERER'S, NOT A
+    SIMPLIFICATION. The vertex shader transforms normals with
+    `mat3(uModel) * aNrm` and no inverse-transpose (js/gl/gl-renderer.js:46-49),
+    which is exact for a rotation and for a uniform scale -- the fragment shader
+    normalizes -- and WRONG for a non-uniform one: a normal transformed by S
+    instead of S^-1 tilts, and a squash of 1.12/0.80 swings a 45-degree face by
+    about twenty degrees. So a squash-and-stretch on this pipeline is built out
+    of uniform scales on parts that move against each other (see
+    tools/blender/enemy_slime.py, which splats by growing a puddle while the
+    body shrinks), never by flattening one group. `Node` refuses a non-uniform
+    value rather than leaving that to a comment.
+
+    A scale on a group is spent at DRAW time like any other part of the group
+    matrix, so it costs nothing per frame and nothing in file size.
+    """
     rx, ry, rz = rotation
     cx, sx = math.cos(rx), math.sin(rx)
     cy, sy = math.cos(ry), math.sin(ry)
     cz, sz = math.cos(rz), math.sin(rz)
+    s = float(scale)
     m = [
-        [cy * cz, cz * sx * sy - cx * sz, cx * cz * sy + sx * sz, location[0]],
-        [cy * sz, cx * cz + sx * sy * sz, -cz * sx + cx * sy * sz, location[1]],
-        [-sy, cy * sx, cx * cy, location[2]],
+        [cy * cz * s, (cz * sx * sy - cx * sz) * s,
+         (cx * cz * sy + sx * sz) * s, location[0]],
+        [cy * sz * s, (cx * cz + sx * sy * sz) * s,
+         (-cz * sx + cx * sy * sz) * s, location[1]],
+        [-sy * s, cy * sx * s, cx * cy * s, location[2]],
         [0, 0, 0, 1.0],
     ]
     return m
@@ -69,12 +88,26 @@ def apply(m, p):
 
 
 def invert_rigid(m):
-    """Inverse of a translate*rotate matrix. Everything here is rigid -- size is
-    baked into vertices, never carried as object scale -- so this is exact and a
-    general inverse is not needed."""
+    """Inverse of a translate * rotate * uniform-scale matrix.
+
+    A part's SIZE is still baked into its vertices; the scale this handles is
+    the animated one `trs` can now carry, and it is read back off the matrix
+    rather than passed in -- `matrix_world` composes a whole parent chain, so
+    the only honest source for the scale at this node is the matrix itself.
+    The upper 3x3 is s*R with R orthonormal, so |column| is s and the inverse
+    of s*R is R^T / s. Uniform is what makes that one line instead of a general
+    solve, and `Node` is what guarantees it.
+    """
     r = [[m[i][j] for j in range(3)] for i in range(3)]
     t = [m[i][3] for i in range(3)]
-    inv = [[r[j][i] for j in range(3)] + [0.0] for i in range(3)]
+    s2 = sum(r[k][0] * r[k][0] for k in range(3)) or 1.0
+    # SNAPPED, so that an unscaled node divides by literally 1.0. cos^2 + sin^2
+    # lands on 0.9999999999999999 often enough that dividing by it rewrote the
+    # last digit of a few vertices on every model already in the tree -- a diff
+    # in seven shipped files that means nothing and hides the ones that do.
+    if abs(s2 - 1.0) < 1e-12:
+        s2 = 1.0
+    inv = [[r[j][i] / s2 for j in range(3)] + [0.0] for i in range(3)]
     for i in range(3):
         inv[i][3] = -sum(inv[i][k] * t[k] for k in range(3))
     inv.append([0, 0, 0, 1.0])
@@ -88,19 +121,37 @@ class Node(object):
     `animated` becomes its own export group with a matrix per frame."""
 
     def __init__(self, name, parent=None, location=(0, 0, 0),
-                 rotation=(0, 0, 0), animated=False, world_fixed=False):
+                 rotation=(0, 0, 0), animated=False, world_fixed=False,
+                 scale=1.0):
         self.name = name
         self.parent = parent
         self.location = list(location)
         self.rotation = list(rotation)
         self.animated = animated
         self.world_fixed = world_fixed
+        self.scale = 1.0
+        self.set_scale(scale)
+
+    def set_scale(self, scale):
+        """UNIFORM ONLY, refused rather than documented. See `trs`: the shader
+        transforms normals by the model matrix with no inverse-transpose, so a
+        non-uniform scale ships a body whose lighting is wrong on every sloped
+        face -- and it would ship silently, because the silhouette is right."""
+        if isinstance(scale, (list, tuple)):
+            if max(scale) - min(scale) > 1e-9:
+                raise ValueError(
+                    "node %r: scale must be UNIFORM (got %r). A non-uniform "
+                    "scale skews normals under this renderer; build the squash "
+                    "out of parts that move against each other." %
+                    (self.name, scale))
+            scale = scale[0]
+        self.scale = float(scale)
 
     def matrix_world(self):
-        m = trs(self.location, self.rotation)
+        m = trs(self.location, self.rotation, self.scale)
         node = self.parent
         while node is not None:
-            m = mat_mul(trs(node.location, node.rotation), m)
+            m = mat_mul(trs(node.location, node.rotation, node.scale), m)
             node = node.parent
         return m
 
@@ -122,8 +173,9 @@ class Scene(object):
         self.nodes = []
 
     def node(self, name, parent=None, location=(0, 0, 0), rotation=(0, 0, 0),
-             animated=False, world_fixed=False):
-        n = Node(name, parent, location, rotation, animated, world_fixed)
+             animated=False, world_fixed=False, scale=1.0):
+        n = Node(name, parent, location, rotation, animated, world_fixed,
+                 scale)
         self.nodes.append(n)
         return n
 

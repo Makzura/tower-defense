@@ -137,7 +137,7 @@ function makeElement(tag) {
 
 var IDS = [
   "sidebar",
-  "game", "towerList", "enemyHp", "enemyType", "enemyTier", "spawnOne", "spawnFive", "spawnWave1",
+  "game", "towerList", "enemyHp", "enemyType", "enemyTier", "slimeTiers", "spawnOne", "spawnFive", "spawnWave1",
   "spawnWave2", "spawnTanky", "clearEnemies", "autoWaves", "selectedName",
   "mapList", "selectedStats", "upgradeControls", "buyA", "buyB", "reaimCone", "useAbility",
   "upgradeNote", "maxField", "maxFieldStatus", "showRange", "showDeadzone", "showFootprint", "showLabels",
@@ -382,6 +382,43 @@ elements.clearEnemies.fire("click");
 elements.enemyType.value = "";
 elements.enemyType.fire("change");
 
+// THE TIER ROW. Six buttons and a ladder, built from the type's own `fractal`
+// block rather than typed into the page, so this asserts the DERIVATION as
+// well as the spawn: a seventh tier in js/enemy.js has to arrive here as a
+// seventh button with nothing edited.
+var slimeSpec = sandbox.Enemy.TYPES.fractal_slime.fractal;
+var tierButtons = elements.slimeTiers.childNodes;
+check("the sandbox builds one button per fractal tier, plus the ladder",
+  tierButtons.length === slimeSpec.maxTier - slimeSpec.minTier + 2 &&
+  tierButtons[0].textContent === "T" + slimeSpec.minTier &&
+  tierButtons[tierButtons.length - 1].textContent === "Ladder");
+
+tierButtons[3].fire("click");
+check("a tier button spawns exactly that tier, at its own health and size",
+  sandbox.enemies.length === 1 &&
+  sandbox.enemies[0].typeId === "fractal_slime" &&
+  sandbox.enemies[0].fractalTier === 3 &&
+  sandbox.enemies[0].maxHealth === 64 &&
+  Math.abs(sandbox.enemies[0].radiusPx() - 11 * 1.70) < 1e-9);
+
+// The size ladder is the whole reason the row exists, so it is what the test
+// reads back: six bodies, each strictly wider than the one below it.
+elements.clearEnemies.fire("click");
+tierButtons[tierButtons.length - 1].fire("click");
+var ladder = sandbox.enemies.slice().sort(function (a, b) {
+  return a.fractalTier - b.fractalTier;
+});
+var climbs = ladder.length === 6;
+for (var li = 1; li < ladder.length; li++) {
+  if (!(ladder[li].radiusPx() > ladder[li - 1].radiusPx())) climbs = false;
+  if (ladder[li].maxHealth !== ladder[li - 1].maxHealth * 4) climbs = false;
+}
+check("the ladder button puts one of every tier on the road, each bigger " +
+  "than the last", climbs);
+check("the tier buttons leave the dropdowns alone",
+  elements.enemyType.value === "" && elements.enemyTier.value === "");
+
+elements.clearEnemies.fire("click");
 elements.spawnOne.fire("click");
 check("Spawn 1 puts one enemy on the path", sandbox.enemies.length === 1);
 

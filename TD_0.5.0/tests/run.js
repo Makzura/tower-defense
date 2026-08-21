@@ -647,9 +647,22 @@ test("the last wave's bonus is paid for clearing the board", function (t) {
   t.ok(h.game.allWavesDeployed, "the last wave deployed");
   t.eq(h.game.pendingBounty, h.game.waveReward(last, 35), "its bonus is owed");
 
+  // KILLING EVERYTHING ON THE BOARD IS NO LONGER ONE SWEEP, and the last wave
+  // is the reason: since the tier ladder was scheduled (2026-08-20) wave 35
+  // ends on a T5 Fractal Slime, so a sweep that kills every body standing
+  // leaves four T4s where the T5 was. Six sweeps empty it; the loop runs until
+  // the board is actually clear rather than counting them, so a retune of the
+  // tier cannot quietly turn this into a test of a half-cleared board.
+  //
+  // `noBounty` is set on every body each pass and INHERITED by the children
+  // (Enemy.prototype.splitOnDeath passes it down), so the cascade still pays
+  // nothing and the sum below is the clear bonus alone.
   var before = h.game.cash;
-  h.run("enemies.forEach(function (e) { e.noBounty = true; e.dead = true; })");
-  h.step(1 / 60);
+  for (var sweep = 0; sweep < 20 && h.game.enemies.length; sweep++) {
+    h.run("enemies.forEach(function (e) { e.noBounty = true; e.dead = true; })");
+    h.step(1 / 60);
+  }
+  t.eq(h.game.enemies.length, 0, "the board is empty, cascade and all");
   t.eq(Math.round(h.game.cash - before), h.game.waveReward(last, 35),
     "and clearing the board pays it, with no next wave to call in");
   t.eq(h.game.victory, true, "which is also the win");
@@ -2108,8 +2121,23 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   t.near(waveOneBurst, 5, 0.001, "wave 1 burst HP/s");
   t.near(waveTwoBurst, 4, 0.001, "wave 2 burst HP/s");
   // 23 697 / 25 799 until the 2026-08-13 curve retune landed waves 12, 13, 16.
-  t.eq(scheduled, 23796, "scheduled health across the full schedule");
-  t.eq(effective, 25898, "and what it actually takes to clear it");
+  // 23 796 / 25 898 until 2026-08-20 scheduled the Fractal Slime's whole tier
+  // ladder (T0 in 16, T1 in 17, T2 in 22, T3 in 25, T4 in 33, T5 in 35).
+  //
+  // THE TOTAL BARELY MOVED ON PURPOSE -- +41 of 25 898, 0.16% -- because each
+  // rung was PAID FOR out of the waves around it rather than added on top:
+  // wave 33 funds its T4 exactly (two Bulwarks and a Brute), and the T5's
+  // 1024 is met by wave 35 as far as it can go (-340) with the rest taken off
+  // 27, 29, 30, 31, 32 and 34 at 5-9% each. The curve someone measured is
+  // therefore still the curve, which is the whole reason for the arithmetic.
+  //
+  // WHAT THIS SUM DOES NOT SEE is the cascade, and that is the same deliberate
+  // blindness it already had for a Hive's brood: only the ROOT of a fractal is
+  // authored, so the six roots put 1 372 points in this figure while a fully
+  // cleared board removes 7 748 -- a root at tier T costs root x (T+1) across
+  // its generations. See the note above WAVES.
+  t.eq(scheduled, 24141, "scheduled health across the full schedule");
+  t.eq(effective, 25939, "and what it actually takes to clear it");
   t.ok(unpaid > 0 && unpaid < effective * 0.25,
     "shields remain a real part of the work (" + unpaid + " of " + effective + ")");
   t.ok(supplied < waveOneBurst, "one gunner is below the wave 1 burst");
@@ -2152,7 +2180,16 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   });
   // $23 333 until the 2026-08-13 curve retune. The rise is the HP inflation
   // paying for itself, NOT a bounty change -- `b = 1.00`, no bounty was touched.
-  t.eq(killIncome, 23438, "scheduled kill bounties");
+  //
+  // $23 438 until the tier ladder was scheduled, and THIS ONE FELL -- by $451,
+  // while health barely moved. That is the Fractal Slime's half-price row
+  // doing exactly what it was written to do: it pays $0.50 per point where an
+  // ordinary body pays $1, so converting 1 308 points of scheduled health into
+  // slime roots gives up half the kill money on them. The board gets it back
+  // and more from the generations, which are conditional and so are not in
+  // this sum: clearing all six cascades pays $3 874 against the $686 of roots
+  // counted here, +$3 188 that only a player who actually kills them sees.
+  t.eq(killIncome, 22987, "scheduled kill bounties");
   var progressionIncome = 0;
   var escalatingIncome = 0;
   for (var waveNumber = 1; waveNumber <= h.game.WAVES.length; waveNumber++) {
@@ -2165,7 +2202,12 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   // effective HP rose 0.38%: the $9 505 of progression and escalating rewards
   // is schedule-blind, so inflating health dilutes spending power on its own
   // and no bounty has to be touched to make that happen.
-  t.eq(purse, 36133, "authored run purse before conditional rewards");
+  //
+  // $36 133 until the tier ladder. The $447 it lost is the half-price kill
+  // money above plus the clear bonus following the three waves that got
+  // lighter; the conditional $3 188 the cascades pay is not in an AUTHORED
+  // purse and must not be added to one.
+  t.eq(purse, 35686, "authored run purse before conditional rewards");
   var dearest = h.game.BUILD_SLOTS.reduce(function (max, type) {
     return type && type.COST > max ? type.COST : max;
   }, 0);
@@ -2545,6 +2587,51 @@ test("a full frame draws without throwing", function (t) {
   h.run("baseHp = 0; gameOver = true");
   h.draw();
   t.ok(true, "normal and loss frames completed");
+});
+
+// EVERY CAMO TYPE WEARS A REAL BODY (2026-08-19, at the owner's instruction:
+// "all camo enemies are modelled as their normal variants but just
+// transparent"). Before that mapping existed, `camo_fast` and `camo_heavy` had
+// no mesh registered under their own ids, `enemyModel` returned null, and both
+// drew the coloured sphere -- so the translucency the GL path had already been
+// taught was being applied to a ball.
+//
+// THE TABLE IS READ OUT OF THE SHIPPED FILE, not retyped here. That is the rule
+// `tools/check-gait-slip.js` follows for the same reason: a fixture holding its
+// own copy of a shipped constant is a fixture that agrees with itself while the
+// game disagrees with both. `enemyModel` is private to gl-world's closure, so
+// the table is the smallest honest thing to reach for, and the assertion is the
+// half that actually matters -- that every camo type in the roster names a
+// model the registry really has.
+test("every camo type is drawn as the body it shadows, not as a sphere", function (t) {
+  var fs = require("fs");
+  var h = harness.boot();
+
+  var world = fs.readFileSync(__dirname + "/../js/gl/gl-world.js", "utf8");
+  var literal = /var CAMO_SHADOWS = (\{[\s\S]*?\});/.exec(world);
+  t.ok(!!literal, "gl-world still ships a CAMO_SHADOWS table");
+  var shadows = JSON.parse(literal[1].replace(/(\w+):/g, '"$1":').replace(/'/g, '"'));
+
+  var camo = Object.keys(h.game.Enemy.TYPES).filter(function (id) {
+    return h.game.Enemy.TYPES[id].isCamo;
+  });
+  t.ok(camo.length >= 3, "the roster still has camo types (" + camo.join(", ") + ")");
+
+  camo.forEach(function (id) {
+    var shadowed = shadows[id];
+    t.ok(!!shadowed, id + " names the type it shadows");
+    // The mapped id must be a REAL type and not itself a camo one, which is
+    // what "modelled as their normal variant" means.
+    t.ok(!!h.game.Enemy.TYPES[shadowed], id + " shadows a type that exists (" + shadowed + ")");
+    t.ok(!h.game.Enemy.TYPES[shadowed].isCamo, id + " shadows a NON-camo type");
+    t.ok(h.game.GLModels.has("enemy-" + shadowed),
+      id + " draws enemy-" + shadowed + ", which is registered");
+  });
+
+  // And the pairing itself, since these are the three the owner named.
+  t.eq(shadows.camo_normal, "normal", "a camo normal is a normal");
+  t.eq(shadows.camo_fast, "fast", "a camo fast is a fast");
+  t.eq(shadows.camo_heavy, "slow", "a camo heavy is a camo SLOW -- the plodder");
 });
 
 

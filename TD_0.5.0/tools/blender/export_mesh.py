@@ -544,8 +544,27 @@ TARGETS = [
     # _build_enemy. THE FILE NAME IS THE TYPE ID: gl-world.js::enemyModel()
     # looks up "enemy-" + enemy.typeId, so `camo_normal` keeps its underscore.
     ("enemy-armored", "enemy-armored.js", _build_enemy("enemy_drudge")),
-    ("enemy-fast", "enemy-fast.js", _build_enemy("enemy_skimmer")),
-    ("enemy-slow", "enemy-slow.js", _build_enemy("enemy_tun")),
+    # enemy-fast IS NOT EXPORTED FROM HERE ANY MORE (2026-08-17). The Fast type
+    # is `fast.glb`, imported by `tools/glb_to_model.py --rig quadruped`,
+    # and this row used to build the Skimmer mech into the same filename. Left
+    # in, a plain `--only=enemy-` -- which is every batch run of this file --
+    # would have quietly overwritten the hound with the mech, and nothing
+    # downstream would have complained: the file name, the registered id and the
+    # model contract are all identical either way, so the only symptom is that
+    # the wrong body walks the road. `enemy_skimmer.py` is KEPT, because
+    # `enemy_courier.py` and `enemy_vanguard.py` both measure against its chest
+    # and it is still the chassis's worked example; what it no longer is, is the
+    # source of a shipped file. To rebuild the mech, give it a new target name.
+    # enemy-slow IS NOT EXPORTED FROM HERE ANY MORE (2026-08-19), and this is
+    # the THIRD time this trap has been disarmed -- the Skimmer above, the
+    # Tender behind `enemy-shieldbearer`, and now the Tun. The Slow type is
+    # `slow.glb`, imported by `tools/glb_to_model.py --rig plodder`, and this
+    # row used to build the Tun into the same filename; a plain `--only=enemy-`
+    # would have overwritten the plodder with it and reported nothing, because
+    # the file name, the registered id and the model contract are identical
+    # either way. `enemy_tun.py` is KEPT -- `make_preview.py` still builds its
+    # contact sheet from it -- and what it no longer is, is the source of a
+    # shipped file. To rebuild the Tun, give it a new target name.
     ("enemy-angry", "enemy-angry.js", _build_enemy("enemy_hedger")),
     # THE UNDERSCORE IS LOAD BEARING. enemyModel() looks up "enemy-" + typeId
     # and the type id is `camo_normal`, so the registered name keeps it.
@@ -558,16 +577,45 @@ TARGETS = [
     # and the cue is being ported into the GL path, so the model no longer
     # depends on something that does not exist.
     ("enemy-camo_normal", "enemy-camo_normal.js", _build_enemy("enemy_cooper")),
-    # BATCH 2, briefed by mira 2026-08-13. THE TARGET NAME IS THE TYPE ID and
-    # not the lore name: `shielded` is the Courier, exactly as `fast` above is
-    # the Skimmer. Deriving one listing from the other does not work -- four of
-    # these bodies are named for their type id and the rest for their lore name.
-    ("enemy-shielded", "enemy-shielded.js", _build_enemy("enemy_courier")),
-    # The first FOUR-LEGGED body and the first with NO ARMS at all. Both are
-    # carried by `enemy_chassis.animate_walk_grouped` as a two-group diagonal
-    # trot, so nothing in this file or the chassis needed changing for it.
-    ("enemy-shieldbearer", "enemy-shieldbearer.js",
-     _build_enemy("enemy_tender")),
+    # enemy-shielded IS NOT EXPORTED FROM HERE ANY MORE (2026-08-20), and this
+    # is the FIFTH time this trap has been disarmed -- the Skimmer, the Tender,
+    # the Tun, the Tyrant, and now the Courier. The Bulwark is
+    # `bulwark_shield.glb`, imported by `tools/glb_to_model.py --rig bulwark`,
+    # and this row used to build the Courier into the same filename; a plain
+    # `--only=enemy-` -- which is every batch run of this file -- would have
+    # overwritten the specialist with it and reported nothing, because the file
+    # name, the registered id and the model contract are identical either way.
+    # The only symptom is the wrong body walking the road.
+    #
+    # `enemy_courier.py` is KEPT, for the same kind of reason the other four
+    # are: `enemy_tender.py` and `enemy_vanguard.py` both measure against its
+    # chest, and `enemy_chassis.py`'s own header cites its export as the worked
+    # example of a chassis body. What it no longer is, is the source of a
+    # shipped file. To rebuild the Courier, give it a new target name.
+    #
+    # THE TARGET NAME WAS THE TYPE ID and not the lore name -- `shielded` is the
+    # Courier, exactly as `fast` was the Skimmer -- which is the note this row
+    # used to carry and is worth keeping: deriving one listing from the other
+    # does not work, because four of these bodies are named for their type id
+    # and the rest for their lore name.
+    #
+    # AND THE BULWARK IMPORT IS THE FIRST TO TAKE TWO NAMES AT ONCE.
+    # `enemy-shielded-broken` is the stripped machine the type swaps to when its
+    # shield goes, and it has never been built here -- so it needs no row
+    # removed, and must never be given one.
+    # enemy-shieldbearer IS NOT EXPORTED FROM HERE ANY MORE (2026-08-18), and
+    # this is the SECOND time this exact hazard has been headed off -- read the
+    # `enemy-fast` note above, because the argument is identical. The
+    # Shieldbearer is now `shieldbearer.glb`, imported by
+    # `tools/glb_to_model.py --rig beacon`, and this row used to build the
+    # four-legged Tender into the same filename. Left in, a plain
+    # `--only=enemy-` -- which is every batch run of this file -- would quietly
+    # overwrite the beacon with the Tender, and NOTHING downstream would
+    # complain: the file name, the registered id and the model contract are
+    # identical either way, so the only symptom is the wrong body on the road.
+    # `enemy_tender.py` is KEPT: it is the chassis's four-legged worked example
+    # and `enemy_dray.py` measures against it. What it no longer is, is the
+    # source of a shipped file. To rebuild the Tender, give it a new name.
     # The first SIX-LEGGED body, and the first whose hold is not a cargo cage
     # -- the Dray IS the container, which is the lore lead's stated exception
     # to the cage rule, so the drum is a new part in `enemy_dray.py` and the
@@ -587,15 +635,22 @@ TARGETS = [
     # spent on one. F = 128, duty exactly 0.5, and its swing angle is DERIVED
     # from the leg depth and the schedule instead of typed.
     #
-    # ** `--only=enemy-boss` MATCHES THIS AND `enemy-boss_fast` BOTH. ** The
-    # note under `_requested()` -- "no full target name is a prefix of
-    # another" -- stopped being true with this line, and it is the first pair
-    # in TARGETS for which it fails. A Tyrant run therefore rewrites the
-    # Vanguard as well. Its CONTENT is unchanged (a re-export differs in face
-    # order, never in triangles) but the diff is not, so back that file up
-    # before a run. `--only=enemy-boss.` does not help; matching is a plain
-    # prefix test on the target name.
-    ("enemy-boss", "enemy-boss.js", _build_enemy("enemy_tyrant")),
+    # enemy-boss IS NOT EXPORTED FROM HERE ANY MORE (2026-08-19), the FOURTH
+    # time this trap has been disarmed -- the Skimmer, the Tender, the Tun, and
+    # now the Tyrant. The wave-35 boss is `boss.glb`, a Hunter-Killer imported
+    # by `tools/glb_to_model.py --rig tyrant`, and this row used to build the
+    # container-with-legs into the same filename. `enemy_tyrant.py` is KEPT:
+    # `check-gait-slip.js`'s notes measure against it and it remains the
+    # worked example of a swing angle DERIVED from leg depth rather than typed.
+    #
+    # REMOVING IT ALSO CLOSES THE PREFIX HAZARD THIS BLOCK USED TO WARN ABOUT.
+    # `--only=enemy-boss` matched this row AND `enemy-boss_fast`, which made
+    # the Tyrant the first target in TARGETS to violate `_requested()`'s "no
+    # full target name is a prefix of another" -- so a Tyrant run rewrote the
+    # Vanguard too, identical in triangles and not in bytes. With this row gone
+    # `enemy-boss_fast` is once again the only match for that prefix, and the
+    # note is kept here rather than deleted because the NEXT target whose name
+    # is a prefix of another will bring the hazard straight back.
     # enemy-camo_fast (the Runlet) is deliberately absent, awaiting a read plan.
     # It has the hardest separation problem of the batch: the translucency
     # applies to BOTH camo bodies equally, so the renderer separates them from

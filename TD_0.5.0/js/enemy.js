@@ -97,6 +97,22 @@ function Enemy(path, health, typeId, overrides) {
   this.shield = this.shieldMax;
   this.shieldFlash = 0;              // cosmetic, 1 -> 0, set when it breaks
 
+  // HAS THIS BODY'S SHIELD EVER EMPTIED. One-way, set by `breakShield` and
+  // never cleared, and it is not the same claim as `shield <= 0`.
+  //
+  // A shield is REFILLABLE by something outside this enemy: a Shieldbearer's
+  // pulse picks the ten strongest bodies on the road and hands each a plate,
+  // and a broken Bulwark standing among them is exactly the kind of body that
+  // pulse picks. `shield <= 0` goes false again at that moment; what the
+  // Bulwark got back is 20 points of soak, NOT its shield -- `speedScale` was
+  // doubled permanently by `onBreak` below and nothing puts it back.
+  //
+  // So this is the fact the renderer needs, and reading the pool instead would
+  // have put the halo back onto a body that is still running at 90 u.l./s.
+  // Same argument, and the same one-way shape, as `revived` on the Revenant:
+  // gl-world.js::enemyModel swaps the mesh off both.
+  this.shieldBroken = false;
+
   // What happens when that shield empties, if anything. Read off the instance
   // rather than the type for the same reason: a shield that came from a spawn
   // has no type row to look it up in.
@@ -184,6 +200,25 @@ function Enemy(path, health, typeId, overrides) {
   this.windUpAttack = null;
   this.shockwaveFlash = 0;           // cosmetic, for a leap's landing
   this.attackBeam = null;            // cosmetic, {x, y, life} -- where a shot went
+
+  // THE TETHERS A SUPPORT PULSE THREW, and the one place in this file that
+  // holds a reference to another enemy.
+  //
+  // Cosmetic, like `attackBeam` above, and shaped differently for a reason the
+  // difference between the two makes plain. A Hedger shoots a TOWER, which
+  // cannot move, so a fixed `{x, y}` is the whole truth about where the shot
+  // went and holding the tower would be pointless. A Healer threads a body that
+  // is still walking, and a line drawn to where that body was a second ago is a
+  // line to nothing. So each entry is `{ target, life }` and the target is the
+  // enemy itself, re-read every frame.
+  //
+  // WHAT KEEPS THAT FROM BEING A LEAK. Entries are dropped by update() the
+  // instant the target is dead, has leaked, or the tether's own life runs out
+  // -- under a second and a half, against a support interval of eight -- so the
+  // list is empty far more often than not and nothing here outlives the pulse
+  // that made it. The array is also per-SUPPORTER: only a body with a `support`
+  // spec that asks for tethers ever puts anything in it.
+  this.supportLinks = [];
 
   // Facing posture. An attack spec with `facesTarget: true` makes the enemy
   // stop, turn to face what it is about to hit, strike, and turn back --
@@ -304,7 +339,12 @@ Enemy.TYPES = {
     displayName: "Slow",
     health: 7,
     bounty: 5,
-    speedMultiplier: 0.8,           // 40 u.l./s -- the slow, tanky one
+    // 0.7 since 2026-08-19, at the owner's instruction ("change the slow enemy
+    // speed to 0.7x"). It was 0.8. The type's whole job is to be the body the
+    // board has time to work on, and the plodder that now walks it (see
+    // `enemy-slow`, imported from slow.glb the same day) reads as heavier than
+    // the tun it replaced -- 35 u.l./s is that body's own pace.
+    speedMultiplier: 0.7,           // 35 u.l./s -- the slow, tanky one
     color: { r: 152, g: 96, b: 196 },
     outlineWidth: 3.5,
     // The tanky type is NOT the armored one. Armor lives on `armored` and
@@ -705,7 +745,26 @@ Enemy.TYPES = {
       target: "highestDps",         // your BEST tower, not your nearest
       targets: 1,
       damage: 45,                   // two of these kill a 60 HP gunner
-      stunSeconds: 2
+      stunSeconds: 2,
+      // IT FIRES FROM ITS EYES (2026-08-19, at the owner's instruction). All
+      // four numbers are MEASURED off `enemy-boss` rather than chosen, so a
+      // re-import at a different height moves them with it:
+      //
+      //   liftRadii 2.62   the sensor band sits at model z 0.871..0.942 of a
+      //                    1.076 u body -- 69.2 px at this type's sizeScale of
+      //                    2.4, against a radiusPx of 26.4
+      //   spreadRadii 0.235  the outer two of the three `Tower_Threat_Sensor`
+      //                    lenses are at source x +/-0.335, which is +/-6.2 px
+      //                    once scaled
+      //
+      // ON THE SPEC AND NOT ON THE TYPE, so the leap that joins the pool at the
+      // roar does not inherit them. See emitEyeBeam.
+      eyeBeam: {
+        liftRadii: 2.62,
+        spreadRadii: 0.235,
+        tint: "255,96,72",          // the Tyrant's own red, not a shot tint
+        blastRadiusUl: 18
+      }
     }],
     phases: [{
       atHealthFraction: 0.5,
@@ -843,12 +902,63 @@ Enemy.TYPES = {
     outlineWidth: 4.5,
     sizeScale: 1.35,
     laneSpread: 0.3,
+    // IT IS A BEACON, AND A BEACON HAS NO LEGS.
+    //
+    // The body became `shieldbearer.glb` on 2026-08-18, replacing the
+    // four-legged Tender this repo built in Blender, and that is what puts a
+    // `hover` block on this row. It is the Healer's argument applied to a
+    // second body and not a new one: a cycle is driven by DISTANCE for a body
+    // with a foot on the road, and a legless one left on the tarmac would
+    // skate -- `tools/check-gait-slip.js` measures a group planted in every
+    // frame while the body advances as a full cycle of slip. `hover` hands the
+    // animation a clock instead, and both boards read `liftRadii` through
+    // Enemy.prototype.visualBodyLift.
+    //
+    // IT IS NOT `isFlying`, and the distinction matters as much here as it does
+    // on the Healer: this is a height, not a targeting fact. Every ground tower
+    // can still shoot a Shieldbearer, and killing it first is still the answer
+    // to the waves it walks in.
+    //
+    // 0.55 radii is 8.2 px of clearance -- a plinth floating just clear of the
+    // road, not the Wisp's 3.45 radii of air. The number is also what keeps the
+    // type's silhouette the height it was: the beacon is imported at 1.40 u so
+    // that 1.40 * 31.8032 * 1.35 + 8.2 = 68.3 px, against the 68.4 px the
+    // Tender stood. 0.18 Hz turns its broadcast once every five and a half
+    // seconds, slower than the Healer's drift, because this one dawdles.
+    hover: { liftRadii: 0.55, animHz: 0.18 },
     support: {
       intervalSeconds: 10,
       targets: 10,
       pick: "strongest",            // most life still standing, shield included
       shield: 20,
-      stacks: true
+      stacks: true,
+      // A CORD PER BODY SHIELDED, AND IT IS A DIFFERENT MARK FROM THE HEALER'S.
+      //
+      // At the owner's instruction (2026-08-18): "draw a clear curve towards
+      // each enemy he shields", with "an animation of the shields going out to
+      // that enemy". Until now this type had only the expanding ring, which
+      // says something happened to a lot of bodies at once and does not say
+      // WHICH -- and ten grants at a time is exactly the case where that
+      // question is worth answering, because the answer is the argument for
+      // shooting the beacon rather than the wall it just built.
+      //
+      // `arc` is what separates it from the Healer's straight cord: a bowed
+      // curve reads as something LOBBED rather than aimed, which is the right
+      // grammar for a plate of shield being handed over, and ten of them
+      // leaving one body at once stay legible because the bows separate where
+      // ten straight lines would overlap into a star. Measured as a fraction
+      // of the span, so a close target gets a small bow and a distant one a
+      // big one.
+      //
+      // `chips` are the shields themselves, travelling. They are the half the
+      // owner asked for by name, and they are the half that says the direction:
+      // a curve alone is ambiguous about which end is giving.
+      //
+      // 1.8 s against a ten-second interval, so the board is clear of them for
+      // four fifths of the cycle. Longer than the Healer's 1.4 because these
+      // travel a bow rather than a straight line.
+      tether: { seconds: 1.8, color: { r: 150, g: 214, b: 255 },
+                arc: 0.34, chips: 3 }
     }
   },
 
@@ -873,11 +983,62 @@ Enemy.TYPES = {
     outlineWidth: 4.5,
     sizeScale: 1.45,
     laneSpread: 0.25,
+    // IT DOES NOT WALK, AND THAT IS A PICTURE, NOT A RULE.
+    //
+    // `hover` lifts the body off the road and hands its animation a CLOCK
+    // instead of the distance every walker's cycle is driven by. Both boards
+    // read `liftRadii` -- see Enemy.prototype.visualBodyLift, which is the one
+    // place the number is turned into pixels -- and the 3D board reads
+    // `animHz` for the drift rate, because a thing with nothing planted on the
+    // road has to keep turning while it is slowed, while a Warbringer stun
+    // holds it still, and while it hangs in the sandbox with no path at all.
+    //
+    // IT IS NOT `isFlying`, AND THE TWO MUST NEVER BE CONFLATED. `isFlying` is
+    // a TARGETING fact -- Targeting.sees and RangeFilter both fail closed on it,
+    // so a tower without air reach cannot touch a flier -- and the height is
+    // merely how that fact is drawn. This is only the height. A Healer is a
+    // ground target, every tower can shoot it, and killing it first is the
+    // whole lesson of wave 32; a body that floated its way out of half the
+    // board's reach would be a different enemy entirely.
+    //
+    // 1.25 radii is 20 px of clearance under a 16 px radius, a little over a
+    // quarter of the body's own 65 px height. The Wisp's 3.45 is air; this is a
+    // thing drifting a foot above the tarmac, which is what "floats slightly"
+    // asks for. 0.32 Hz turns its rings once every three seconds -- slow enough
+    // to read as drifting rather than spinning, and deliberately nothing like
+    // the Wisp's 2.6 Hz wingbeat.
+    hover: { liftRadii: 1.25, animHz: 0.32 },
     support: {
       intervalSeconds: 8,
       targets: 3,
       pick: "mostMissingHealth",
-      heal: { perSecond: 15, seconds: 4 }
+      heal: { perSecond: 15, seconds: 4 },
+      // WHAT A PULSE LOOKS LIKE, and it is authored HERE because the answer to
+      // "who is putting that health back" has to be one decision that both
+      // boards read, not a colour typed into each renderer.
+      //
+      // A TETHER PER TARGET, NOT A RING. The Shieldbearer's expanding ring says
+      // "something happened to a lot of bodies at once", which is the right
+      // shape for ten simultaneous grants from a body standing in the middle of
+      // them. Three heals to the three most wounded is a different claim -- it
+      // names WHICH three -- and a line from the healer to each one is the only
+      // mark that can make it. That is also the mark that says which body to
+      // shoot: follow the lines back.
+      //
+      // 1.4 s, against a heal that runs for 4. The tether is the DELIVERY and
+      // the target's own green ring is the effect; drawing the line for the
+      // whole four seconds would leave nine cords standing across the board on
+      // a wave carrying three Healers, and the cue that names three bodies
+      // stops naming anything once it is drawn most of the time.
+      //
+      // The colour is the model's own -- `healer.glb` is cyan from its
+      // core to its tail tips -- and NOT the type's `color`, which stays the
+      // green the codex swatch, the minimap dot and the kill burst have always
+      // used. Those answer "which enemy is this"; a tether answers "this one is
+      // doing that, now", and the two are not the same question. Sitting under
+      // `support` rather than beside `color` is that distinction written down:
+      // it belongs to the pulse, not to the body.
+      tether: { seconds: 1.4, color: { r: 142, g: 232, b: 255 } }
     }
   },
 
@@ -1377,6 +1538,18 @@ Enemy.prototype.update = function (dt) {
   if (this.shockwaveFlash > 0) {
     this.shockwaveFlash = Math.max(0, this.shockwaveFlash - dt * 1.6);
   }
+  // The tethers a support pulse threw, aged and swept. A target that died or
+  // leaked mid-heal drops its cord immediately rather than fading it: the body
+  // it was drawn to is gone from the board on the same step, and a line to
+  // nothing is worse than no line.
+  for (var li = this.supportLinks.length - 1; li >= 0; li--) {
+    var link = this.supportLinks[li];
+    link.life -= dt / link.span;
+    if (link.life <= 0 || link.target.dead || link.target.leaked) {
+      this.supportLinks.splice(li, 1);
+    }
+  }
+
   if (this.attackBeam) {
     this.attackBeam.life -= dt * 4;
     if (this.attackBeam.life <= 0) this.attackBeam = null;
@@ -1595,6 +1768,16 @@ Enemy.prototype.supportAllies = function (dt, enemies) {
   for (var i = 0; i < picked.length; i++) {
     if (spec.shield > 0) picked[i].grantShield(spec.shield, spec.stacks !== false);
     if (spec.heal) picked[i].applyHeal(spec.heal.perSecond, spec.heal.seconds);
+    // A CORD PER BODY HELPED, if this supporter's spec asks for them. Recorded
+    // rather than drawn, because the pulse resolves in the simulation and the
+    // two boards draw it in their own space -- and because `picked` is thrown
+    // away by every caller but the tests. A supporter that pulses again before
+    // its last cords have faded simply carries both sets: they are per-target
+    // and a target cannot be picked twice in one pulse.
+    if (spec.tether) {
+      this.supportLinks.push({ target: picked[i], life: 1,
+                               span: spec.tether.seconds });
+    }
   }
   return picked;
 };
@@ -1922,6 +2105,63 @@ Enemy.prototype.attackTowers = function (dt, towers) {
   return this.resolveAttack(spec, towers);
 };
 
+// LASERS OUT OF ITS EYES, AND A BLAST WHERE THEY LAND (2026-08-19, at the
+// owner's instruction: "when the tyrant attacks a tower, he shoots lasers out
+// of his eyes at that tower and it creates an explosion on impact").
+//
+// PRESENTATION ONLY, and it has to be: this is called from resolveAttack, which
+// is simulation, so the same rule the top of js/effects.js states applies here
+// -- an Effects-free game must play identically. Nothing below is read back,
+// the damage and the stun above are unaffected by whether any of it drew, and
+// the guard means a headless run (every suite) simply skips it.
+//
+// OPT-IN ON THE SPEC, NEVER ON THE TYPE ID, which is the rule `facesTarget`
+// already follows fifteen lines down: the Tyrant's pool holds an aimed shot AND
+// a leap, and only the aimed one has eyes to fire from. A check for
+// `typeId === "boss"` would put beams on the leap as well.
+//
+// TWO BEAMS, NOT ONE. The model carries three `Tower_Threat_Sensor` lenses
+// across the brow; a single line from the head centre reads as a gun barrel,
+// and the pair is what says "it looked at you". The renderers draw the pair
+// from `spreadPx`; this function does not compute either endpoint's offset,
+// because where a lens sits on a face is a fact about the picture and belongs
+// with the drawing.
+//
+// THE HEIGHT IS IN RADII, like FLIGHT_LIFT_RADII and a hover's own liftRadii,
+// so it survives the sizeScale the Tyrant is drawn at instead of being a pixel
+// count that is right at one size only.
+Enemy.prototype.emitEyeBeam = function (spec, tower) {
+  if (typeof Effects === "undefined" || !Effects.aoeImpact) return;
+  var eye = spec.eyeBeam;
+  var radius = this.radiusPx();
+  var liftPx = radius * (eye.liftRadii || 2.6);
+
+  // The beam itself. `particles: false` because a clean energy line should not
+  // throw debris out of thin air along its length -- the debris belongs at the
+  // far end, and the blast below is what makes it. Centred on the midpoint with
+  // half the length as its radius, exactly as `lance-remnant` is, so the impact
+  // cap and the cull treat it like any other mark.
+  Effects.aoeImpact((this.pos.x + tower.x) * 0.5, (this.pos.y + tower.y) * 0.5,
+    Math.max(8, Math.hypot(tower.x - this.pos.x, tower.y - this.pos.y) * 0.5),
+    "tyrant-gaze", {
+      particles: false,
+      life: eye.life || 0.34,
+      x1: this.pos.x, y1: this.pos.y, x2: tower.x, y2: tower.y,
+      liftPx: liftPx,
+      spreadPx: radius * (eye.spreadRadii || 0.235),
+      tint: eye.tint || "255,96,72"
+    });
+
+  // The explosion, at the tower. NO renderer is registered for this kind on
+  // either board, and that is deliberate rather than unfinished: an
+  // unrecognised kind falls through to the circular shockwave-and-debris path
+  // that both `drawAoeImpacts` and gl-world's `drawEffects` already end in,
+  // which is exactly the shape an explosion wants. Naming it anyway is what
+  // lets a skin pack claim it later without touching this file.
+  Effects.aoeImpact(tower.x, tower.y, ul(eye.blastRadiusUl || 18),
+    "tyrant-blast", { life: eye.blastLife || 0.5 });
+};
+
 // Land an attack that has finished winding up (or had no wind-up).
 Enemy.prototype.resolveAttack = function (spec, towers) {
   if (!spec) return null;
@@ -1949,7 +2189,15 @@ Enemy.prototype.resolveAttack = function (spec, towers) {
     if (hits.length) {
       // Cosmetic only: where the shot went, so the player can see what was
       // picked. Read nowhere by the simulation.
-      this.attackBeam = { x: hits[0].tower.x, y: hits[0].tower.y, life: 1 };
+      //
+      // A body with `eyeBeam` draws its own, richer mark and suppresses this
+      // one rather than drawing both -- see emitEyeBeam. The plain bolt leaves
+      // the body's CENTRE, so on the Tyrant it read as a shot from the belly.
+      if (!spec.eyeBeam) {
+        this.attackBeam = { x: hits[0].tower.x, y: hits[0].tower.y, life: 1 };
+      } else {
+        this.emitEyeBeam(spec, hits[0].tower);
+      }
     }
     this.lastBlastRadiusUl = 0;
   }
@@ -2229,6 +2477,24 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
     this.dead = true;
   }
 
+  // THE IMPACT SOUND. This is the one line of audio outside game.js, and it is
+  // here rather than at the dozen places that swing because this function is
+  // the single door every damage source in the game comes through -- the same
+  // property that makes mitigation global. A hook at each caller would have
+  // been a dozen chances to forget one.
+  //
+  // Presentation only and one-way, exactly like the Effects calls elsewhere in
+  // this file: typeof-guarded, told and never asked, and it reads
+  // `lastDamageTaken` (which was computed above for the scoreboard) rather
+  // than making the sound recompute anything.
+  //
+  // A KILLING BLOW IS SILENT HERE. The death explosion fires from game.js's
+  // end-of-life sweep a moment later and covers it; playing both put a thump
+  // under every death that made the two run together.
+  if (typeof Sound !== "undefined" && !this.dead) {
+    Sound.playEnemyHit(this.lastDamageTaken);
+  }
+
   // A no-bounty brood still reports no damage to reward-led mechanics, keeping
   // it from feeding Siphon charges or lifesteal while the brood itself pays $0.
   // TowerScore separately reads lastDamageTaken, so the tower's visible damage
@@ -2242,6 +2508,11 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
 // this function.
 Enemy.prototype.breakShield = function () {
   this.shieldFlash = 1;
+  // BEFORE the early return below, and outside it: "this body has stood without
+  // its shield" is true of every shielded body whose pool has emptied, not only
+  // of the ones whose type has something to say about it. A Hive's brood breaks
+  // and carries no `onBreak` at all.
+  this.shieldBroken = true;
   var onBreak = this.shieldOnBreak;
   if (!onBreak) return;
   if (onBreak.speedMultiplier) this.speedScale *= onBreak.speedMultiplier;
@@ -2430,7 +2701,7 @@ Enemy.prototype.containsPoint = function (x, y, flat) {
 // `pos` remains the point where the enemy touches the path and where every
 // gameplay distance is measured; only picking and drawing use this lift.
 //
-// ONE NUMBER, FOUR READERS. The 2D body, the 3D body (gl-world's flightLift),
+// ONE NUMBER, FOUR READERS. The 2D body, the 3D body (gl-world's bodyLift),
 // the death burst and the hover test all have to agree about where a flier is,
 // and they did not: 3D drew it on the tarmac while 2D lifted it by 1.15. A
 // number retyped in four files is a number that gets raised in three of them.
@@ -2445,9 +2716,20 @@ Enemy.prototype.containsPoint = function (x, y, flat) {
 Enemy.FLIGHT_LIFT_RADII = 3.45;
 Enemy.GROUND_LIFT_RADII = 0.48;
 
+//
+// AND A THIRD HEIGHT SINCE 2026-08-18, for a body that neither walks nor flies.
+// A type carrying a `hover` block rides at its own `liftRadii` -- see the
+// Healer's, which explains at length why that is a picture and not a targeting
+// rule. Read from the type rather than added as a fourth class constant
+// because, unlike the two above, it is not a claim about a CATEGORY of enemy:
+// the Wisp's height is what flying looks like in this game and every flier will
+// want it, while how far off the road one apparition drifts is a fact about
+// that apparition.
 Enemy.prototype.visualBodyLift = function () {
+  var hover = this.type.hover;
   return this.radiusPx() *
-    (this.isFlying ? Enemy.FLIGHT_LIFT_RADII : Enemy.GROUND_LIFT_RADII);
+    (this.isFlying ? Enemy.FLIGHT_LIFT_RADII
+      : (hover ? hover.liftRadii : Enemy.GROUND_LIFT_RADII));
 };
 
 // Screen-space centre of the upright body, for the flat board. Flying bodies
@@ -2477,9 +2759,19 @@ Enemy.prototype.draw = function (ctx, options) {
   // The path coordinate is the enemy's feet. A cast shadow at that point and
   // a lifted body centre are the two cues that turn the old coloured counter
   // into a creature standing in the three-quarter-view world.
-  Visuals3Q.shadow(ctx, x, y + 2, radius * (this.isFlying ? 0.78 : 0.9),
-    radius * 0.38, this.isFlying ? 0.2 : 0.3,
-    this.isFlying ? radius * 1.8 : radius * 0.65);
+  //
+  // A BODY THAT IS NOT ON THE ROAD CASTS THE SOFT SHADOW, whether it is up
+  // there because it flies or because it drifts. This reads `visualBodyLift`
+  // rather than `isFlying` for exactly the reason that function now takes three
+  // heights: the shadow is about where the body IS, and a hovering Healer that
+  // kept a walker's tight, dark contact shadow would look like a thing standing
+  // on stilts. The threshold is the ground lift itself, so nothing that walks
+  // can cross it.
+  var afloat = this.visualBodyLift() >
+    this.radiusPx() * Enemy.GROUND_LIFT_RADII;
+  Visuals3Q.shadow(ctx, x, y + 2, radius * (afloat ? 0.78 : 0.9),
+    radius * 0.38, afloat ? 0.2 : 0.3,
+    afloat ? radius * 1.8 : radius * 0.65);
 
   var customBody = VisualModels.draw("enemy", this.typeId + ":body", ctx, this, options);
   if (!customBody) {
@@ -2753,6 +3045,75 @@ Enemy.prototype.draw = function (ctx, options) {
     ctx.lineWidth = 2;
     ctx.strokeStyle = "rgba(150,230,190," + (0.7 * this.spawnFlash).toFixed(3) + ")";
     ctx.stroke();
+  }
+
+  // THE TETHERS, drawn UNDER the pulse ring below so a cord never crosses the
+  // mark that says where it came from.
+  //
+  // Each one runs from this body's own lifted centre to its target's, so a cord
+  // to a Healer (which floats) and a cord to a zombie (which does not) both
+  // land on the body rather than on the patch of road under it. `visualBodyY`
+  // is asked of the TARGET rather than derived here for the same reason it
+  // exists at all: one function decides how high a body is drawn.
+  //
+  // It grows for the first fifth of its life and fades over the rest -- a cord
+  // that is thrown and then lets go, not a beam somebody holds. The white core
+  // is the same grammar every other beam in this game uses (see gl-world's
+  // `beam`), and it is what stops a thin cyan line disappearing against the
+  // blue-grey road.
+  var links = this.supportLinks;
+  var spec = this.type.support;
+  if (links.length && spec && spec.tether) {
+    var tc = spec.tether.color;
+    var rgb = tc.r + "," + tc.g + "," + tc.b;
+    // A BOW WHEN THE SPEC ASKS FOR ONE. `arc` is a fraction of the span, and a
+    // spec without it draws the straight cord this always drew -- which keeps
+    // the Healer's mark unchanged and gives the Shieldbearer the lobbed one it
+    // now asks for. Both boards read the same field off the same type row, so
+    // the flat fallback and the 3D board make the same claim about the same
+    // pulse; only the space they draw it in differs.
+    var arc = spec.tether.arc || 0;
+    var chips = spec.tether.chips || 0;
+    for (var ti = 0; ti < links.length; ti++) {
+      var lk = links[ti];
+      var reach = Math.min(1, (1 - lk.life) / 0.2);
+      var alpha = Math.min(1, lk.life / 0.7);
+      var endX = lk.target.pos.x;
+      var endY = lk.target.visualBodyY();
+      var bow = arc && Math.hypot(endX - x, endY - bodyY) * arc;
+      // The curve as a point list, so the stroke and the chips travelling it
+      // are the same curve rather than two that have to be kept in step.
+      var at = function (t) {
+        return { x: x + (endX - x) * t,
+                 y: bodyY + (endY - bodyY) * t - bow * 4 * t * (1 - t) };
+      };
+      ctx.lineCap = "round";
+      for (var pass = 0; pass < 2; pass++) {
+        ctx.beginPath();
+        ctx.moveTo(x, bodyY);
+        for (var s = 1; s <= 12; s++) {
+          var p = at(reach * s / 12);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.lineWidth = (pass ? 1.6 : 4.5) * alpha;
+        ctx.strokeStyle = pass
+          ? "rgba(235,255,255," + (0.85 * alpha).toFixed(3) + ")"
+          : "rgba(" + rgb + "," + (0.30 * alpha).toFixed(3) + ")";
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+      // The shields going out, spread along the flight behind the leading one.
+      for (var ci = 0; ci < chips; ci++) {
+        var lead = ci / Math.max(1, chips) * 0.55;
+        var where = reach - lead;
+        if (where <= 0 || where > 1) continue;
+        var cp = at(where);
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, (3.4 - ci * 0.6) * alpha, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(" + rgb + "," + (0.8 * alpha).toFixed(3) + ")";
+        ctx.fill();
+      }
+    }
   }
 
   // A SUPPORT PULSE going out. Wide and slow, like the brood ring above and

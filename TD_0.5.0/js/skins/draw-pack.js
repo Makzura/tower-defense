@@ -1748,6 +1748,57 @@
   //
   // It reuses the same brightness ramp as the live beam, so the remnant of a
   // spent shot is dim at the far end exactly as the shot was.
+  // THE TYRANT'S GAZE: two lines from the brow to whatever it picked.
+  //
+  // Registered for the same reason `lance-remnant` is -- a beam has a SECOND
+  // endpoint, and the circular fallback in Effects.drawAoeImpacts would draw an
+  // expanding ring centred on the middle of the shot, hundreds of pixels wide.
+  //
+  // TWO, AND THEY CONVERGE. The pair leaves the brow `spreadPx` apart and meets
+  // at one point on the tower, which is what separates a look from a muzzle:
+  // parallel lines read as a twin cannon, converging ones read as a thing
+  // focusing on you. The offset is perpendicular to the beam in SCREEN space
+  // here, because that is the only space this flat board has.
+  //
+  // The lift is subtracted from y, which is how every height on the 2D board is
+  // faked (see visualBodyY). The 3D board projects the same numbers as a real
+  // height instead -- same facts, each board in the language it can afford.
+  VisualModels.register("effect", "tyrant-gaze", function (ctx, impact) {
+    var rgb = impact.tint || "255,96,72";
+    var fade = Math.max(0, Math.min(1, impact.life / impact.maxLife));
+    var lift = impact.liftPx || 0;
+
+    var x1 = impact.x1, y1 = impact.y1 - lift;
+    var x2 = impact.x2, y2 = impact.y2;
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = -dy / len * (impact.spreadPx || 0);
+    var ny = dx / len * (impact.spreadPx || 0);
+
+    ctx.save();
+    ctx.lineCap = "round";
+    for (var side = -1; side <= 1; side += 2) {
+      var ex = x1 + nx * side;
+      var ey = y1 + ny * side;
+      // Outer bloom, hot body, white core -- three passes, widest first, the
+      // same stack the lance uses. A single stroke reads as a drawn line; the
+      // stack is what reads as light.
+      var pass = [[7.0, 0.16], [3.0, 0.55], [1.2, 0.9]];
+      for (var i = 0; i < pass.length; i++) {
+        ctx.strokeStyle = i === 2
+          ? "rgba(255,240,232," + (pass[i][1] * fade).toFixed(3) + ")"
+          : "rgba(" + rgb + "," + (pass[i][1] * fade).toFixed(3) + ")";
+        ctx.lineWidth = Math.max(0.5, pass[i][0] * (0.35 + 0.65 * fade));
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    return true;
+  });
+
   VisualModels.register("effect", "lance-remnant", function (ctx, impact) {
     var colour = SHOT_COLOURS[impact.tint] || SHOT_COLOURS.neutral;
     var fade = Math.max(0, Math.min(1, impact.life / impact.maxLife));

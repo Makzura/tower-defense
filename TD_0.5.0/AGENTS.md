@@ -1,7 +1,8 @@
 # Tower Defense — project context
 
-**Version 0.5.0** — one thirty-five-wave campaign schedule at 866 bodies /
-25 898 effective HP, which can be won or lost and ends on a boss. (Three
+**Version 0.5.0** — one thirty-five-wave campaign schedule at 830 bodies /
+25 939 effective HP (plus every body a Fractal Slime's cascade, a Hive's brood
+or the Tyrant's roar creates at runtime), which can be won or lost and ends on a boss. (Three
 selectable difficulties existed from 2026-07-30 to 2026-08-12; Normal and Hard
 were placeholders and the whole concept was deleted. See the change log.)
 A **twenty-one**-type enemy roster (swarms, armor, camo,
@@ -311,8 +312,15 @@ file. Two consequences:
 - **No `fetch`, no `XMLHttpRequest`, no external asset loading.** Also blocked
   over `file://`.
 
-**Nothing is fetched.** No audio, no font files, and nothing that needs a
+**Nothing is fetched.** No audio FILES, no font files, and nothing that needs a
 server. This is what lets the game run from a bare folder by double-click.
+
+This line said "no audio" until 2026-08-18, and that reads wrongly now: the
+game has a full sound effects set. What it has none of is audio *files*. Every sound is
+synthesized at run time out of oscillators and noise buffers by
+`SoundSynthesizer` in `js/game.js`, which needs no asset and no server — see
+the Sound section below. The rule that holds is the one this paragraph is
+named for: nothing is FETCHED.
 
 This used to read "everything is drawn procedurally, no images", and that
 stopped being true: `assets/*.png` ships a full set of Blender-rendered sprite
@@ -556,7 +564,10 @@ js/codex.js         the index screen (screen === "index"): the tower/enemy
                      on a throwaway instance through panelActions(), enemies
                      from Enemy.TYPES + EASY_WAVES -- so it cannot go stale
 js/game.js          setup, map chooser, waves, victory/loss, base HP,
-                     placement, main loop, all drawing
+                     placement, main loop, all drawing -- AND, since
+                     2026-08-18, SoundSynthesizer and the audio panel, which
+                     are in here rather than in a js/audio.js because the ask
+                     was for no new files. See the Sound section
 js/sandbox/sandbox-max-field.js  the sidebar's Max Field command. Loaded by
                      sandbox.html ONLY, so it is absent from the shipping page
 tests/harness.js    boots the game in Node against a stubbed canvas
@@ -697,12 +708,17 @@ first enemy spawns immediately; `interval` is the delay between later enemies
 in that wave. When a wave's last enemy spawns, the `WAVE_BREAK` countdown
 begins. The next wave starts when that countdown reaches zero.
 
-**The schedule, measured 2026-08-14** by summing `waveCount` and
+**The schedule, measured 2026-08-20** by summing `waveCount` and
 `waveEffectiveHealth` over `WAVES`:
 
 | waves | scheduled bodies | scheduled HP | effective HP |
 |---:|---:|---:|---:|
-| 35 | 866 | 23 796 | 25 898 |
+| 35 | 830 | 24 141 | 25 939 |
+
+(866 / 23 796 / 25 898 until the tier ladder landed — see the section below.
+The body count FELL while health rose because the trims that funded the two
+big slimes took whole escort bodies out, and the cascade's own bodies are born
+at runtime and were never in this count.)
 
 Both totals are pinned by `tests/run.js` (`scheduled health across the full
 schedule` / `and what it actually takes to clear it`). Effective exceeds
@@ -739,9 +755,82 @@ wave a bit more chaotic, still deterministic but with more than 1 type"). In
 place of the flat fields a wave may carry `groups: [...]`, a list of groups
 each with its own `count`/`interval`/`type`/`health` and an optional `lead` —
 the pause before that group's first body, used instead of its `interval` — plus
-an optional `tier` on a fractal type (wave 25 is the only group that authors
-one). The groups deploy in order, so a wave reads top to bottom as the thing
-the player watches arrive.
+an optional `tier` on a fractal type (six groups author one; see the tier
+ladder below). The groups deploy in order, so a wave reads top to bottom as the
+thing the player watches arrive.
+
+### The Fractal Slime's tier ladder is SCHEDULED, one rung per wave
+
+2026-08-20, at the owner's instruction: *"i want the slime tiers to spawn in
+accordance to their HP as stated in the index and behave in that manner"*. The
+mechanic was never wrong — a tier spawned by hand has always carried its stated
+health — but the campaign sent **one rung of the six**, the T3 in wave 25, while
+the index advertised all six. Five tiers existed only as somebody else's split
+children.
+
+Per ROOT, and the group's own total where a wave sends more than one:
+
+| wave | group | root HP | to clear | bodies in all |
+|---:|:--|---:|---:|---:|
+| 16 | T0 ×4 | 1 | 4 | 4 |
+| 17 | T1 ×2 | 4 | 16 | 10 |
+| 22 | T2 ×1 | 16 | 48 | 21 |
+| 25 | T3 ×1 | 64 | 256 | 85 |
+| 33 | T4 ×1 | 256 | 1 280 | 341 |
+| 35 | T5 ×1 | 1024 | 6 144 | 1 365 |
+| | **1 372 authored** | | **7 748** | **1 826** |
+
+(The last column counts the root and every generation under it, which is where
+the 1 826 measured figure comes from; only the roots are in `waveCount`.)
+
+**HP is the placement rule, and "to clear" is the difficulty.** A tier T root
+takes `root × (T + 1)` points to remove — it conserves health as it divides,
+four bodies at a quarter each — and ends in `4^T` terminal T0s. The base has
+100 HP and a leak costs the leaker's remaining health, so a T5 that is not
+cleared is 1 024 separate points of base damage. That, not the root, is why T4
+waits for 33 and T5 for the last wave.
+
+**The schedule PAID for the ladder rather than growing by it**: effective HP
+25 898 → 25 939, +0.16%. Wave 33 funds its T4 exactly (two Bulwarks and a
+Brute); wave 35 covers −340 of the T5's 1024 and waves 27, 29, 30, 31, 32 and 34
+give up 641 more at 5–9% each — 1 267 trimmed against 1 308 added, and the 41
+points of difference are the whole rise. **Nothing was taken off a v0.4.4 spine
+opener or off a mechanism body** (Hive, Shieldbearer, Healer, Colossus, boss) —
+what got thinner is ordinary escort.
+
+**Do not quote the authored total as if nothing changed.** A board that clears
+every cascade removes 7 748 points where the six roots count 1 372 (1 826
+bodies born to do it), and earns $3 874 across the generations against the $686
+of roots the purse counts. The
+authored figures are deliberately blind to death-born bodies, exactly as they
+are to a Hive's brood.
+
+**Measured, not asserted** (headless, maxed board, `baseHp` is useless as a
+meter because upgrade paths heal it, so leaks were counted directly):
+
+- 20 mixed maxed towers, wave 35: 1 453 kills, **peak 151 bodies on the road**,
+  zero leaks, 55 s. Without the T5: 88 kills, peak 40, 37 s.
+- 14 maxed Arcane Snipers and nothing else, wave 35: 146 points of leak damage
+  against a 100 HP base — **it loses**. The finale now asks for coverage, not
+  only for single-target damage, and that is the intended shape.
+- The three early rungs cost a weak board nothing: 5 un-upgraded towers took
+  the same 11 / 70 / 100 points of leak damage on waves 16, 17 and 22 with the
+  ladder in and with it stripped out.
+- Simulation cost is linear and small — 1.13 ms per update at 1 024 bodies —
+  and the cascade never puts them all on the road at once anyway.
+
+**T0 is in 16 and not in 12 on purpose.** Wave 12 is the suite's mixed-wave
+fixture (`tests/run.js`, "a mixed wave deploys its groups in order"); a fixture
+that changes shape whenever content lands stops testing the scheduler.
+
+**NEVER give a fractal group a `health` override.** `Enemy.healthOf` takes the
+tier branch and discards it, so it is a no-op on the body and a lie in
+`waveKillBounty`. `tests/content.test.js` checks the whole schedule for one.
+
+**The index derives all of this and must not be edited to match.** Tier range,
+highest campaign HP and the campaign-waves list in `js/codex.js` are read off
+the schedule and the type's own `fractal` block, so scheduling a rung moves the
+guide with no edit — which is the property the test pins.
 
 **The flat form is not legacy, it is the single-group case**, and half the
 schedule still uses it deliberately: a wave of one type is a question with one
@@ -904,13 +993,14 @@ time kills fewer of them. A wave says how many, how often and which type —
 groups) carries a `health` override, resolved through `Enemy.healthOf`, the
 same resolver the spawner uses.
 
-**Easy is thirty-five waves, 866 enemies, 23 796 scheduled HP**
-(2026-07-29, v0.4.7, rescaled since; it was 33 waves and 4308 HP, before that 20
+**Easy is thirty-five waves, 830 enemies, 24 141 scheduled HP**
+(2026-07-29, v0.4.7, rescaled since; 866 / 23 796 until the tier ladder was
+scheduled on 2026-08-20; it was 33 waves and 4308 HP, before that 20
 waves and 3094, before that two waves and 52). Both figures are pinned by
 `tests/run.js`. Scheduled HP is no longer the whole story, so
 two more numbers matter:
 
-- **25 898 EFFECTIVE HP on Easy** — what the player actually has to remove. The
+- **25 939 EFFECTIVE HP on Easy** — what the player actually has to remove. The
   owner's original target was half that ("make it so that the total is like
   13500 hp", 2026-07-29); the spine was rescaled afterwards and 13 500 is no
   longer what the schedule aims at. A
@@ -918,9 +1008,11 @@ two more numbers matter:
   effective HP is `count × health × (1 + shieldRatio) × (1 + revives)` per
   group — `waveEffectiveHealth` in game.js is the one implementation, and the
   clear bounty reads the same function. **This is NOT the run's purse** — a
-  shield is counted here and pays nothing, so effective HP (25 898) and
-  scheduled kill bounties ($23 438) are different quantities and always will
-  be. See "A SHIELD PAYS NOTHING, EVER" below, which says the same thing from
+  shield is counted here and pays nothing, so effective HP (25 939) and
+  scheduled kill bounties ($22 987) are different quantities and always will
+  be. Since 2026-08-20 a THIRD gap sits beside that one: a Fractal Slime's
+  cascade is death-born, so neither figure counts the 6 376 points the six
+  scheduled roots turn into or the $3 188 they pay on the way. See "A SHIELD PAYS NOTHING, EVER" below, which says the same thing from
   the other end.
 - **Plus two amounts no table can state**, both decided by how the run goes.
   Every seven seconds a living Hive drops five hatchlings, each with a shield
@@ -929,7 +1021,7 @@ two more numbers matter:
   boss's roar calls in another 2780 HP at 1.5× speed. Neither is a gap in the
   arithmetic; both are the point of the enemy that produces them.
 
-On top of that, **finishing a wave pays a tenth of it** — about $2 590 across a
+On top of that, **finishing a wave pays a tenth of it** — about $2 594 across a
 run. See "Finishing a wave pays a tenth of it" below.
 
 Waves 1–11 are the introduction and are pinned exactly: single-type, no
@@ -1031,8 +1123,8 @@ The full table with per-wave HP is a comment on `WAVES` itself;
 `THE_COMPANY/tools/balance/`, so a clone of this repo cannot reproduce it.**
 
 **The schedule's length is an ECONOMY constraint, not just a difficulty one.**
-Scheduled kill bounties are the bulk of the run's lifetime purse ($23 438 of
-$36 133 all in — see the table in the economy section).
+Scheduled kill bounties are the bulk of the run's lifetime purse ($22 987 of
+$35 686 all in — see the table in the economy section).
 At the old 454 HP the $800 Siphon was unbuyable — it would have sat in
 the build bar permanently greyed out, which is not meaningfully different from
 not shipping it. A test pins `purse > dearest tower × 2`; if a tower is ever
@@ -1085,7 +1177,7 @@ never read as a win — do not add a second assignment or derive the flag from
 `waveIndex`. The loss check runs before the victory check so a final enemy
 that both empties the board and zeroes the base reads as the defeat it is.
 
-Since total effective HP (25 898) far exceeds the base's 100, an undefended base
+Since total effective HP (25 939) far exceeds the base's 100, an undefended base
 really is destroyed — the loss path is reachable in ordinary play, not just
 by tests. Both outcomes are pinned: the loss freeze by the original tests,
 the victory path (and the manual-idiom non-victory) by
@@ -1224,11 +1316,11 @@ is one line in `Enemy.TYPES`.
 2026-07-29, at the owner's request: *"give money at the end of each round,
 around 1/10 of the hp of the wave."* `waveBounty(wave)` is
 `round(waveEffectiveHealth(wave) × WAVE_CLEAR_BOUNTY_FRACTION)`, and the
-fraction is 0.1. About **$2 590** across the schedule.
+fraction is 0.1. About **$2 594** across the schedule.
 
 **The bounty is a tenth of the wave's HP, not a tenth of its cash value** — HP
 and cash are now separate quantities entirely, since a body's bounty prices its
-whole threat rather than its hit points. Against the $36 133 lifetime purse the
+whole threat rather than its hit points. Against the $35 686 lifetime purse the
 clear bonus is about **7%**. Two further rewards ride on the same payout since
 2026-07-31 — the redistributed $5000 and the rising $50 + $5-per-wave allowance
 — and `waveReward()` is where the three are summed. If it is meant to stay a tenth of
@@ -1464,12 +1556,15 @@ The current authored purse is:
 | Easy starting stake | $600 |
 | progression rewards, waves 1–34 | $5 000 |
 | escalating wave allowance, waves 1–34 | $4 505 |
-| scheduled kill bounties | $23 438 |
-| wave-clear bonuses | $2 590 |
-| **authored total** | **$36 133** |
+| scheduled kill bounties | $22 987 |
+| wave-clear bonuses | $2 594 |
+| **authored total** | **$35 686** |
 
 The total excludes Fractal descendants, conditional boss summons and the
-Siphon's A3 charge bonus.
+Siphon's A3 charge bonus. It was $23 438 / $2 590 / $36 133 until the tier
+ladder was scheduled on 2026-08-20, and the fall is the Fractal Slime's
+half-price row: **the descendants this table excludes now pay $3 188**, so a
+run that clears every cascade is better off, not worse.
 It is the single-route schedule total. Twin Confluence mirrors every scheduled
 body onto its second route, so it also mirrors kill income. **The two figures
 that used to stand here — $47 006 in scheduled kills and $59 707 all in — are
@@ -1519,6 +1614,23 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   currency you cannot see is a currency nobody spends. Before it, the page
   opened straight onto the chooser and the sandbox had no entrance from the
   game at all — you had to know `sandbox.html` existed and open it by hand.
+
+  **The title screen is one COMMAND DECK composition, not a button stack with
+  props beside it** (2026-08-18). A defense node fills the left bay and aims
+  inward; the orbital relay fills the right bay; signal trunks from both end at
+  the controls between them. PLAY is the 480×88 primary command. Armoury,
+  Index and Sandbox are one subordinate horizontal rail of 170×58 controls,
+  so their equal status is visible and none competes with starting a run. The
+  four existing rectangle functions remain the single source for drawing and
+  hit testing.
+
+  **Cyan and gold are the only accent hues on the menu.** Dark blue-gray and
+  off-white are neutral surfaces and text, not extra accents; purple and green
+  do not appear in this screen's renderer. The grid is deliberately faint and
+  sits behind recessed panels, static scanlines and data-stream ticks. There is
+  exactly one ambient animation: a slow cyan halo around PLAY, derived from
+  `performance.now()` and affecting only stroke opacity, so motion never moves
+  a hit target or changes layout.
 - **`"store"`** (added 2026-07-29, `js/store.js`) is the armoury: a **Store**
   tab that sells tower types for meta coins and an **Inventory** tab that puts
   owned towers into the five build-bar slots. Built exactly like the index —
@@ -2364,10 +2476,11 @@ the stretch the starting stake is tuned on):
 roster change and were stale; the ones above are what `tests/run.js` pins.)
 
 The opening contains `5 × 4 + 8 × 4 = 52` HP; the full thirty-five-wave
-schedule contains **23 796 scheduled / 25 898 effective** HP (per-wave table is a
+schedule contains **24 141 scheduled / 25 939 effective** HP (per-wave table is a
 comment on `WAVES`). Damage dealt plus health leaked to the base must add back
 to the *effective* total; that is the quickest whole-run conservation check —
-note it is a check on HP, not on cash. **Damage does not pay at all.**
+note it is a check on HP, not on cash, **and that since 2026-08-20 it needs the
+fourth exception below before it balances at all**. **Damage does not pay at all.**
 `CASH_PER_DAMAGE` was $3 per point for one day, from the 2026-07-30 economy
 revamp until the 2026-07-31 bounty merge removed it, and there is no
 damage-to-cash path in the code now — the removal is recorded in the comment
@@ -2380,7 +2493,8 @@ clear actually realises. Anything balanced against the fossil clause is
 balanced against a game three times richer than the one that ships. (The
 figures here read 6466/8056 until 2026-07-30.
 Those were the v0.4.6 schedule's and were left behind when v0.4.7 rewrote it;
-23 796/25 898 are what `tests/run.js` asserts and what the harness reports.)
+24 141/25 939 are what `tests/run.js` asserts and what the harness reports —
+23 796/25 898 from the 2026-08-13 curve retune until the tier ladder landed.)
 
 **Effective, not scheduled, and the difference is v0.4.7's.** A shield is
 health the player must remove and a Revenant is two bodies, so effective HP is
@@ -2398,23 +2512,27 @@ on an Enemy is the same idea at the instance level.
    with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
    scales bounty with a wave's `health` override, so the ratio survives an
    override but would not survive a retune of either field. Across the whole
-   schedule the ratio is 0.9050, and per type — **each type at its own BASE
+   schedule the ratio is 0.8862, and per type — **each type at its own BASE
    health, which is a property of `Enemy.TYPES` and not of the schedule** — it
    runs 0.4545 (`colossus`) to 1.5 (`fast`, `camo_fast`, `camo_heavy`).
 
    **The denominator is EFFECTIVE HP — what you must actually remove — and
-   naming it is load-bearing.** 0.9050 is `23 438 / 25 898`; against *declared*
-   health the same figure would be 0.9850, so the two readings are not
-   interchangeable. Every per-type number above is bounty over effective HP
-   too. Schedule ratios measured 2026-08-14; the per-type range measured across
+   naming it is load-bearing.** 0.8862 is `22 987 / 25 939`; against *declared*
+   health the same figure would be 0.9522, so the two readings are not
+   interchangeable. (0.9050 = `23 438 / 25 898` until 2026-08-20. It fell
+   because the Fractal Slime pays $0.50 a point where an ordinary body pays $1
+   and the ladder converted 1 308 points of schedule into new slime roots — the
+   cash comes back from the generations, which no schedule figure counts.) Every per-type number above is bounty over effective HP
+   too. Schedule ratios measured 2026-08-20; the per-type range measured across
    all 21 types, and a wave `health` override cannot move it because
    `Enemy.bountyOf` scales bounty in the same proportion.
 
    **AND THERE IS A SECOND RATIO IN CIRCULATION UNDER THE SAME NAME. IT IS NOT
-   THIS ONE.** The balance tooling reports a "money density" of **1.3952**,
+   THIS ONE.** The balance tooling reports a "money density" of **1.3758**
+   (1.3952 until the tier ladder),
    which is *authored purse over effective HP* — it carries the $10 105 of
    purse that no schedule change touches. **The figure this passage means is
-   kill bounties over effective HP, 0.9050.** Say which numerator you mean
+   kill bounties over effective HP, 0.8862.** Say which numerator you mean
    wherever either appears.
 
    The trap this closes, because it has already been reported as a defect
@@ -2426,7 +2544,7 @@ on an Enemy is the same idea at the instance level.
    the 12 cannot be removed without the 36. `revenant` splits the same way
    (1.25 declared, 0.625 effective). Every other type is identical under both,
    which is why the mismatch stayed invisible. **Do not "correct" the range to
-   1.6667** — that would contradict the 0.9050 schedule ratio at the head of
+   1.6667** — that would contradict the 0.8862 schedule ratio at the head of
    this exception.
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
@@ -2439,9 +2557,18 @@ on an Enemy is the same idea at the instance level.
    NOT mean cash equals HP removed across the schedule — see exception 1; that
    stopped being true on 2026-07-31, when bounties replaced the per-damage
    rate.
+4. **A Fractal Slime's cascade is not in the schedule either, and unlike a
+   brood it PAYS.** Only the root is authored, so the six scheduled roots
+   (1 372 points) become 7 748 points of work and $3 874 of income — and unlike
+   the Hive's excess this one HAS a closed form: a tier T root costs
+   `root × (T + 1)` and pays `bounty × (T + 1)`, because each generation
+   conserves the parent's health and the type prices health at a flat $0.50 a
+   point. Whole-run conservation therefore needs `+6 376` on the damage side
+   before it balances.
 
 Shots per kill is therefore only a clean diagnostic on undefended, unshielded
-bodies that were not born of a Hive — check it against scheduled normals.
+bodies that were born of neither a Hive nor a cascade — check it against
+scheduled normals.
 
 **The whole-campaign arithmetic does NOT live in this repository.**
 `simulate-campaign.js` moved to `THE_COMPANY/tools/balance/` on 2026-08-14 and
@@ -2617,6 +2744,143 @@ and temporary map fissures. The rules that keep it safe:
 `sandbox.html` loads it too; `long-range-dps-debug.html` (superseded) does
 not, which the guards make harmless.
 
+### A support mark is DECLARED on the type, and drawn twice
+
+An enemy that helps other enemies is the one case where a cosmetic decision has
+to be made once and obeyed by two renderers. `support.tether` on the type row is
+that decision — `seconds`, `color`, and since 2026-08-18 `arc` and `chips` —
+and `Enemy.prototype.supportAllies` records a `{ target, life }` per body helped
+while `update()` ages and sweeps them. Both boards read the same fields off the
+same row, so **neither renderer holds a palette or a shape of its own**, and a
+supporter whose spec asks for no cord throws none (the Vanguard shields itself;
+a cord to its own chest would be a line of length zero).
+
+Three rules came out of giving the Shieldbearer one:
+
+- **The shape says what the gesture is.** A straight cord AIMS — right for the
+  Healer, which picks the three most wounded. A bow is LOBBED — right for a
+  plate of shield, and it is what keeps ten cords out of one body from
+  collapsing into a star. `arc` is a fraction of the SPAN, never a fixed
+  height: a constant is invisible on a close target and a rainbow on a far one.
+- **Bend it in the WORLD, not on the screen.** Every point of the curve is
+  projected at its own height above the road, so it drapes over terrain and
+  stays right through an orbit. Bent in screen space it is a ribbon lying on
+  the camera.
+- **A curve is not fourteen `beam` calls.** That helper draws a straight
+  segment and costs three strokes; a fourteen-segment bow at ten cords a pulse
+  is 420 strokes a frame, against three for one path stroked three times. Its
+  0.95 white core is also a claim — a hot line reads as a shot — and a
+  supporter is not firing at what it helps.
+
+### A shield is a BUBBLE, and only the 3D board can draw one
+
+Any body with a shield that still holds — `shieldMax > 0 && (shield > 0 ||
+shieldFlash > 0)`, which is a Bulwark, a Hive's brood, the Tyrant after its roar
+and anything a Shieldbearer has touched — wears a translucent blue shell on the
+3D board (2026-08-18, at the owner's request).
+
+**It is GEOMETRY, and that is what makes it possible at all.** Clause 2 of the
+model contract already says why: a translucent disc painted over the board is
+visible THROUGH the bodies in front of it, which is what "looks like a sticker"
+means. A real shell is occluded by whatever stands between it and the camera and
+by the body inside it. It is convex and closed, so with back faces culled
+exactly one surface covers any pixel — the double-blend that forced camo bodies
+into a depth pre-pass cannot happen here, by the shape rather than by a
+tolerance. Drawn after the wrecks, sorted far to near, because depth writes are
+off while blending and ten shells at once is exactly what a pulse produces.
+
+**Sized from the model, never from a constant.** A bubble has to contain a body,
+and the bodies are not one shape: the beacon is 4.05 radii tall inside 1.3 of
+plan, the Fractal Slime 2.6 inside 2.0. Both radii are measured off each model's
+own REST-frame geometry once and cached per type — which is also why one mesh
+serves all six Fractal Slime tiers, since the ratio is a fact about the model and
+the instance scale multiplies both.
+
+**"Clear" is a ceiling, not a style.** The first build totalled 0.64 alpha on a
+fresh grant and read as a frosted egg — the same failure the 2D board's four
+panels exist to avoid. The shipped values total at most 0.42 and sit at 0.22 for
+a shield merely holding.
+
+**THE 2D FALLBACK KEEPS ITS PANELS, AND THAT IS NOT AN OVERSIGHT.** That
+renderer tried a complete bubble and rejected it: with no depth buffer and no
+real alpha, a full ring stack buried the model, especially on a crowd of Swarm
+(the note is in `Enemy.prototype.draw`). The two boards say the same thing about
+the same state in the language each can afford.
+
+### The Tyrant's aimed shot is a pair of eye beams and a blast
+
+When the wave-35 boss takes its aimed shot it fires from the three
+`Tower_Threat_Sensor` lenses across its brow and detonates where the beams land
+(2026-08-19, at the owner's instruction: "when the tyrant attacks a tower, he
+shoots lasers out of his eyes at that tower and it creates an explosion on
+impact"). Two marks, through `Effects.aoeImpact`:
+
+- **`tyrant-gaze`** carries the two endpoints, `liftPx` and `spreadPx`, and has
+  a renderer on each board — `js/skins/draw-pack.js` for the flat one,
+  `drawTyrantGaze` in `gl-world.js` for the projected one. It needs both for
+  `lance-remnant`'s reason: **a beam is a line, and the circular fallback draws
+  an expanding ring centred on the middle of the shot**, hundreds of pixels
+  wide. It sets `particles: false` — a clean energy line should not throw debris
+  out of thin air along its length.
+- **`tyrant-blast`** is the explosion, and has NO renderer on purpose. An
+  unrecognised kind falls through to the shockwave-and-debris path both boards
+  already end in, which is exactly the shape an explosion wants; naming it
+  anyway is what lets a skin pack claim it later.
+
+**IT IS OPT-IN ON THE SPEC, NEVER ON THE TYPE ID** — the rule `facesTarget`
+already follows. The Tyrant's pool holds an aimed shot AND the leap the roar
+unlocks, and only the aimed one has eyes to fire from; a `typeId === "boss"`
+check would put beams on the leap too. The four numbers in the `eyeBeam` block
+are MEASURED off `enemy-boss`, not chosen: the sensor band sits at model z
+0.871..0.942 of a 1.076 u body (**2.62 radii**, 69.2 px at sizeScale 2.4), and
+the outer two lenses are at source x ±0.335 (**0.235 radii**, ±6.2 px). Heights
+are in RADII like `FLIGHT_LIFT_RADII` so they survive a rescale.
+
+**TWO BEAMS, CONVERGING, AND THE PLAIN BOLT IS SUPPRESSED.** A single line reads
+as a gun barrel; a converging pair reads as a thing looking at you. `attackBeam`
+— the old cosmetic bolt — leaves the body's CENTRE, so on a body this tall it
+read as a shot from the belly; a spec with `eyeBeam` does not set it, rather
+than drawing both. Note that `attackBeam` is drawn by the 2D renderer ONLY, so
+before this the boss's signature attack was invisible on the 3D board.
+
+**NONE OF IT IS SIMULATION.** `emitEyeBeam` is called from `resolveAttack`,
+which is simulation, so the rule at the top of `js/effects.js` applies without
+exception: an Effects-free game must play identically. It returns early when
+`Effects` is absent, nothing is read back, and `tests/content.test.js` pins the
+tower taking the spec's 45 whether or not a mark ever drew.
+
+### A camo body is the body it shadows, drawn through
+
+A camo type has no mesh of its own. `gl-world.js::enemyModel` maps it through
+`CAMO_SHADOWS` to the type it shadows and draws THAT model at `CAMO_ALPHA`
+(0.62) — `camo_normal` → `normal`, `camo_fast` → `fast`, `camo_heavy` → `slow`
+(2026-08-19, at the owner's instruction: "all camo enemies are modelled as their
+normal variants but just transparent"). It completes a ruling whose other half
+already shipped: "do the camos like the others, just make them a bit translucent
+or sum" is what the two-pass draw below exists for.
+
+**THE TRANSLUCENCY WAS NEVER THE MISSING PART — THE BODY WAS.** `camo_fast` and
+`camo_heavy` have never had a mesh registered under their own ids, so
+`GLModels.has("enemy-camo_fast")` failed and both fell through to the coloured
+sphere. The 3D board was fading a ball. Only `camo_normal` had a body at all
+(the Cooper, `enemy-camo_normal.js`), and it is no longer the one that walks:
+the file, its `<script>` tags and its `export_mesh.py` row are all still there,
+because a built body that may be wanted again is not something to delete.
+
+**`camo_heavy` IS A CAMO SLOW, and nothing in `Enemy.TYPES` says so.** That row
+still reads "the camo types above shadow a normal and a fast; this one shadows
+nothing", which was a claim about its STATS — it is the only camo body with real
+defences, 5 flat armor behind 20% defense — and never about which body it walks
+in. What ties it to the Slow is the thing its own comment says out loud, "heavy,
+so it plods": ×0.65 against the Slow's ×0.7, at sizeScale 1.4. Do not re-derive
+this mapping from the stat table; it is a decision, and it is written down here.
+
+**THE TABLE IS EXPLICIT, NOT `id.replace("camo_", "")`.** A prefix strip finds no
+`heavy` in the roster, and it would resolve a future `camo_wisp` to whatever its
+name happened to spell rather than failing where someone can see it. A type with
+no row misses `GLModels.has` and draws the sphere it would have drawn anyway.
+`tests/run.js` pins every camo type to a registered, non-camo body.
+
 ### A moment on top of a loop: the `overrides` strike seam
 
 A baked frame list is a LOOP — a walk, a bolt cycle — and a loop cannot express
@@ -2668,6 +2932,96 @@ never read it. That is the same rule as the rest of this section.
 
 ---
 
+## Sound — synthesized, one-way, and switchable off
+
+`SoundSynthesizer` in **`js/game.js`** (2026-08-18) is the game's audio: eight
+sounds, all built at run time out of `OscillatorNode`, `GainNode`,
+`BiquadFilterNode` and a noise buffer. **There are no audio files and there is
+no fetch**, which is what lets it ship under the hard constraint above.
+
+**It is in `game.js` rather than in a `js/audio.js` of its own** because the ask
+was explicitly for no new files. If a future session splits it out, the split is
+mechanical — the `--- Audio ---` and `--- The audio panel ---` sections and one
+`<script>` line before `game.js` in **both** `index.html` and `sandbox.html`,
+which must stay identical.
+
+**IT IS PRESENTATION, AND IT OBEYS THE SAME ONE-WAY RULE AS `js/effects.js`.**
+The simulation tells it things; nothing simulated ever reads anything back. A
+silent game plays identically, every call site is guarded, and every method
+no-ops when there is no `AudioContext` — which is not politeness but a
+requirement: `tests/harness.js` boots `game.js` in Node, where there is none.
+`Math.random()` appears here as well as in `effects.js`, and it is safe for the
+same reason: it picks a pitch and dies. Do not derive a gameplay value from one.
+
+The eight, with the events they are hooked to:
+
+| Sound | Fired from | Notes |
+|---|---|---|
+| `playTowerPlace` | `onClick`, after `addTower` | inharmonic struck-bar partials, ±10% pitch. In the click handler and NOT in `addTower`, because a Summoner's blubs go through `addTower` too and a mechanic placing a body is not the player placing a tower |
+| `playEnemyHit(damage)` | `Enemy.prototype.takeDamage` (js/enemy.js) | the ONE line of audio outside `game.js`, and it is there because that function is the single door every damage source comes through — the same property that makes mitigation global. Scales with damage; **silent on a killing blow**, which the death sound covers |
+| `playEnemyDeath` | `update()`'s end-of-life sweep, beside `Effects.enemyKilled` | the one place a fate is decided exactly once. Up to **3 stack** within 90 ms, each quieter and detuned; the rest are dropped |
+| `playWaveStart` | `spawnScheduledEnemy`, beside `Effects.announce` | major triad over three octaves, ~1.4 s. Once per wave, not once per entrance |
+| `playLowHealthAlert` | `updateLowHealthAlert` | four pulses alternating 620/440 Hz. Cannot stack: a call arriving while one is sounding is dropped |
+| `playGameOver` | `update()`, on the step `baseHp` reaches 0 | 200 → 80 Hz into a feedback-delay tail |
+| `playUIClick` | every button branch in `onClick`, plus `onKeyDown` where it acts | see the note below about the armoury and the index |
+| `playTowerFire(kind)` | `update()`, when the bullet array grew during the tower loop | **no line in any of the five tower files.** A projectile appearing in `bullets` is the only definition of "a tower fired" all five types already agree on. Beam and Summoner towers spawn no bullets and are correctly silent — neither of them fires |
+
+**The armoury and the index play a click on EVERY click**, not only on their
+buttons. Both are full-screen interfaces whose layouts live in `js/store.js` and
+`js/codex.js`; telling a press from a miss in `game.js` would need a second copy
+of those layouts, and a second copy of a layout is exactly what this project has
+been bitten by. The cost is a click on the background of a dense UI screen.
+
+**Rules that are load-bearing:**
+
+- **The context is created on a USER GESTURE**, from inside `onClick` and
+  `onKeyDown` — never from a listener of its own. **The test harness keeps
+  exactly one listener per event name**, so a second `window` `keydown` or a
+  second canvas `click` handler would silently REPLACE the game's and take the
+  whole suite with it. Do not add listeners here; extend the ones that exist.
+- **Everything is rate limited, in REAL time rather than game time.** A beam
+  tower deals damage every step, so `playEnemyHit` without its 45 ms throttle is
+  a buzz rather than a series of impacts; at 3× speed the limits still have to
+  mean what they say. Voices are capped at `SOUND_MAX_VOICES = 28`, claimed from
+  a self-pruning list rather than by timers.
+- **Nothing clips.** Buses run into a compressor and a `tanh` waveshaper BEFORE
+  the master fader, so pulling the volume down never fights a limiter and muting
+  is genuinely silent. Measured at the master output in a browser: every
+  individual sound peaks between 0.14 and 0.56, and the worst case the game can
+  produce — a wave swell, the alarm, twelve deaths, twelve hits, eight shots, a
+  placement and the loss all in one step — peaks at **0.70**.
+- **Every gain change ramps** (30 ms). A fader jumped to zero mid-explosion is a
+  click, and "mute in the middle of a sound" is one of the cases this had to get
+  right.
+- **The low-health warning is a sound AND a light**, and the light is not a
+  fallback for the muted. `updateLowHealthAlert` drives both: the klaxon, and a
+  pulse behind the base HP readout in `drawStatus`. An alert that exists only as
+  a sound is an alert half the audience never receives. The threshold has
+  hysteresis (arms at 25% of `BASE_MAX_HP`, disarms above 32%) because base HP
+  is a free counter that lifesteal pushes back up, and it repeats on a 9 s timer
+  while the danger lasts rather than sounding once and stopping.
+
+**The mixer is drawn on the game canvas**, in the bottom-right chrome row with
+the speed and auto-wave buttons — a speaker button that opens a panel with a
+mute toggle, master/effects/music faders and Quiet/Normal/Loud presets. `M`
+mutes, **on the board only**: `m` already means "change route" on the game-over
+overlay, and one letter that did two things depending on whether you had just
+lost is a key nobody would trust. Opening the panel does not pause the run.
+
+Two rules it inherits from the rest of the HUD, both of which this project has
+paid for before: it is **drawn exactly when it is clickable** (`onClick`'s pause
+and loss branches return before the mixer gets a look, so the panel is not drawn
+under those overlays), and it is listed in **`overInterfaceChrome`**, or the
+build preview offers to put a tower under it.
+
+**Volumes are a PREFERENCE, not run state.** `Sound.reset()` in `restartGame`
+cuts the alarm and clears the rate limiters and leaves the faders alone — the
+same distinction the camera zoom and the speed toggle already make. Nothing
+about audio is saved: `js/meta.js` still holds four fields and no settings, and
+that remains deliberate (see the save/load note in "Deliberately out of scope").
+
+---
+
 ## The debug cash panel is GONE — the sandbox is the testing surface
 
 `js/debug-cash.js` was deleted on 2026-08-13 at the owner's instruction: *"That
@@ -2679,6 +3033,18 @@ gone and no page loads it.
 **Its Max Field command survived and moved to `js/sandbox/sandbox-max-field.js`,
 loaded by `sandbox.html` only.** `tests/harness.js` reads its script list out of
 `index.html`, so the suite never sees it either.
+
+**The Fractal Slime's tier row is the other thing on that page worth copying.**
+Six buttons and a `Ladder`, built from the type's own `fractal` block — so the
+ladder they offer is the ladder the game actually has, and a seventh tier
+arrives as a seventh button with nothing edited. Which type they spawn is
+derived too: the row that carries a `fractal` block, never a typed id. Two rules
+came out of building it. **A shortcut must not rewrite the controls it
+shortcuts** — these leave the type and tier dropdowns exactly where the operator
+left them, because a button that silently changed them would leave the sidebar
+disagreeing with the board. And **spacing comes off the bodies, not off a
+constant**: a T5 is drawn at 26.4 board px and a T0 at 7.15, so any single gap
+is either an overlap or a hike.
 
 Two choices from it worth preserving if you add another testing aid:
 
@@ -2700,10 +3066,22 @@ guard in `onKeyDown`, and that is worth keeping regardless.
 The owner has explicitly excluded these. Do not add them unprompted:
 
 - Moving a placed tower (selling exists; drag-to-reposition does not)
-- Sound
 
 He is building the foundation before choosing a direction. Adding content now
 is actively unhelpful.
+
+**2026-08-18: "Sound" came off this list.** It was the second entry above until
+that date, and it came off the way every other entry has: an explicit,
+fully-specified ask — eight named sounds with their frequencies, durations and
+envelopes, the Web Audio constraints, the events to hook, and the volume and
+mute controls to put on screen. That is the ask this guard was waiting for, and
+what was built is what was asked for and nothing beside it. See the Sound
+section below.
+
+It does NOT generalise. MUSIC is still out of scope: the mixer has a music bus
+and a fader because the ask named "SFX vs Music balance ... for future music
+addition", and **nothing feeds that bus**. A soundtrack is a new decision, not
+an extension of this one. Neither is a second sound for an event that has one.
 
 **2026-07-29: "Save/load" came off this list.** The owner asked for meta coins
 "kept in between run", and a currency that resets on refresh is not a currency.
@@ -2812,7 +3190,7 @@ scheduled** — a passing test in `tests/run.js` pins that.
 |---|---|---|---|---|---|---|---|---|
 | `normal` | 4 | ×1.0 | — | — | — | 1.0 | 1 | nothing in particular |
 | `fast` | 2 | ×1.75 | — | — | — | 1.0 | 3 | coverage early on the road |
-| `slow` | 7 | ×0.8 | — | — | — | 1.0 | 5 | sustained damage |
+| `slow` | 7 | ×0.7 | — | — | — | 1.0 | 5 | sustained damage |
 | `swarm` | 1 | ×1.3 | — | — | — | 0.55 | 7 | *rate*, not damage — every body dies to one hit, the question is how many hits per second |
 | `armored` | 4 | ×0.95 | — | 20% | — | 1.05 | 9 | a flat 20% tax on every hit; blocks nothing outright |
 | `midboss` | 250 | ×0.45 | — | 10% | — | 1.8 | 11 | that a board exists at all by wave 11 |
@@ -2825,8 +3203,8 @@ scheduled** — a passing test in `tests/run.js` pins that.
 | `revenant` | 16 **×2 lives** | ×0.85, **0 after** | — | — | — | 1.2 | 21 | attention — a parked body keeps eating shots meant for the wave behind it |
 | `hive` | 150 | ×0.4 | — | — | — | 1.6 | 26 | speed of kill — it seeds 5 normals every 7 s, and each of THOSE wears a shield equal to its life and pays nothing |
 | `boss` | 5000 **+1000 at half** | ×0.3, **×0.405 after** | — | — | — | 2.4 | 35 | DEPTH — it stops, aims, and hits your single best tower for 45 and a stun; after the roar it also leaps 90 u.l. and shockwaves whatever it lands beside |
-| `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | 27 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays |
-| `healer` | 200 | ×0.4 | — | — | — | 1.45 | 32 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either |
+| `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | 27 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays. **Hovers** since its body became the beacon — a picture, not a targeting rule, exactly as the Healer's is |
+| `healer` | 200 | ×0.4 | — | — | — | 1.45 | 32 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either. **Hovers** — a picture, not a targeting rule (see below) |
 | `boss_fast` | 750 | ×3.5 **for the first 400 u.l.**, then ×1.75 | — | — | — | 1.9 | 34 | TEMPO — 100 shield every 7 s that never stacks, on a body that crosses the opening stretch faster than anything else in the game |
 | `camo_heavy` | 20 | ×0.65 | **5** | 20% | **yes** | 1.4 | 28 | that SEEING it and KILLING it are two separate purchases |
 
@@ -2975,7 +3353,7 @@ being precise about what moved:
   damage.
 - **`waveEffectiveHealth` did NOT change**, and must not. It measures what the
   player has to REMOVE — which is what the clear bounty is a tenth of — and
-  that is still what it measures, now 25 898. It is simply no longer a purse.
+  that is still what it measures, now 25 939. It is simply no longer a purse.
   **Confusing the two is now the easiest way to get the economy wrong**; there
   is a warning to that effect on the function itself.
 - **What it costs the player is 1 786 HP** — the shields the schedule carries,
@@ -2988,7 +3366,7 @@ being precise about what moved:
   retuned group carries a shield. **This bullet used to read "$4 092 off a
   $42 443 purse, a 10% pay cut", and that was damage-era arithmetic end to
   end**: $4 092 was `CASH_PER_DAMAGE` × a then-current shield total, and
-  $42 443 was the 2026-07-30 purse against a current authored $36 133. Nobody has asked for the
+  $42 443 was the 2026-07-30 purse against a current authored $35 686. Nobody has asked for the
   schedule or the prices to move in compensation and neither was touched.
 
 **HEALED HEALTH PAYS NOTHING EITHER**, for the same reason and by the same
@@ -3003,6 +3381,21 @@ A revive deliberately does NOT count as healing: a second life is scheduled
 `{ speedMultiplier: 2 }`, applied to a per-instance `speedScale`. That scale
 MULTIPLIES with the timed slow rather than replacing it, so a slow still works
 on a broken Bulwark.
+
+**`breakShield` ALSO SETS `shieldBroken`, A ONE-WAY FLAG, AND IT IS NOT THE SAME
+CLAIM AS `shield <= 0`** (2026-08-20). It is set for every shielded body whose
+pool empties — including a Hive's brood, which carries no `onBreak` at all — and
+it is never cleared. **The 3D board reads it to swap the Bulwark's mesh** for
+`enemy-shielded-broken`, the same way it reads `revived` to swap the Revenant's;
+see the model section. Reading the POOL there would be wrong, and the case is
+live rather than hypothetical: a Shieldbearer's pulse picks the ten strongest
+bodies on the road, a broken Bulwark is exactly the kind of body it picks, and
+20 points of granted soak puts `shield` back above zero while nothing puts
+`speedScale` back. The halo would return to a machine still running at
+90 u.l./s. **Anything that needs to know "has this body stood without its
+shield" reads `shieldBroken`; anything that needs to know "is it shielded right
+now" reads the pool.** The bubble in `gl-world.js` is the second kind and
+deliberately still reads `shieldMax > 0 && (shield > 0 || shieldFlash > 0)`.
 
 **Revives (v0.4.7).** `revive: { times, healFraction, roots }`. `takeDamage`
 asks `tryRevive()` before setting `dead`, so a revived enemy never registers as
@@ -3113,6 +3506,44 @@ Five things about it that are decisions rather than details:
   healthy wave waits out its full eight seconds rather than retrying every
   frame — an ability that fired the instant the first shot landed is not a
   rhythm the player can read.
+- **A pulse may author a TETHER, and the cord is the spec's, not the
+  mechanic's** (2026-08-18). `tether: { seconds, color }` makes the pulse throw
+  a cyan cord from the supporter to each body it helped;
+  `Enemy.prototype.supportAllies` records them on `supportLinks` and both boards
+  draw what is there. The Shieldbearer authors none and keeps its expanding
+  ring, which is the right shape for its own claim: a ring says "a lot of bodies
+  at once", a cord says **which three**, and naming three of a wave of twenty is
+  the whole reason the Healer's cue is different. The cord is the DELIVERY and
+  the target's green ring is the effect, so it runs 1.4 s against a heal of 4 —
+  nine cords standing across the board would stop naming anything.
+- **`supportLinks` is the only place `js/enemy.js` holds a reference to another
+  enemy**, and the sweep in `update()` is what keeps that safe: a cord is
+  dropped the instant its target is `dead` or `leaked`, and always inside its
+  own 1.4 s. It holds the enemy rather than a `{x, y}` — which is what
+  `attackBeam` does — because a tower cannot move and a healed body is still
+  walking.
+
+**HOVERING IS A HEIGHT. FLYING IS A TARGETING RULE. NEVER CONFLATE THEM**
+(2026-08-18). A type may carry `hover: { liftRadii, animHz }`, which lifts its
+body off the road and hands its animation a clock. It is **cosmetic in full**:
+the Healer is a ground target, every tower on the board can shoot it, and
+killing it first is the whole lesson of wave 32. `isFlying` is the other thing
+entirely — `Targeting.sees` and `RangeFilter` both fail closed on it, so a
+tower without air reach cannot touch a flier — and a Healer that had quietly
+picked up that immunity is a defect **nothing on screen would show**. Three
+readers, one number:
+
+- `Enemy.prototype.visualBodyLift` turns `liftRadii` into pixels and is the only
+  place any of the three heights becomes a number. `GROUND_LIFT_RADII` (0.48) is
+  a walker lifted off its own shadow, `hover.liftRadii` (1.25 on the Healer) is
+  a body drifting above the road, `FLIGHT_LIFT_RADII` (3.45) is air.
+- `gl-world.js::bodyLift` is the 3D half — renamed from `flightLift` when it
+  stopped being only about flight — and the health bar, the hover card's anchor,
+  the falling wreck and a shot leading its target all read it through
+  `enemyCrown`. Adding a hovering type needs **no edit to any of them**.
+- `gl-world.js::clockRate` decides which bodies escape the distance rule, and
+  `tools/check-gait-slip.js`'s `HOVERS` table must be kept in step with it by
+  hand. See the rig section for what happens when it is not.
 
 **Sprint (v0.4.9).** `sprint: { untilUl, speedMultiplier }`, read by
 `currentSpeedUlps` and by `isSprinting()`. Keyed on **progress along the road,
@@ -3209,6 +3640,330 @@ warning:
   `radiusPx()` rather than the ring radii reported four of five meshed enemies
   as overhanging their own rings; with the pads named, only two are. The
   bare-circle reading produces a very convincing false alarm.
+
+**A type may own MORE THAN ONE mesh** (2026-08-16). `enemyModel` resolves
+`enemy-<typeId>` and then consults `ENEMY_VARIANT`, a table in `gl-world.js`
+keyed by type id, whose value is a map of **state flag → model name**, first
+match wins. **There are two entries** (2026-08-20): the Revenant draws
+`enemy-revenant` until it dies and `enemy-revenant-undead` after it gets back
+up, and the **Bulwark** draws `enemy-shielded` until its shield empties and
+`enemy-shielded-broken` afterwards. Three rules, and each one is load-bearing:
+
+- **The predicate is a ONE-WAY fact about what this body has already been
+  through — never a live reading of the mechanic it came from.** The Revenant's
+  is `revived`, never `rooted` and never `revivesLeft`: all three move at the
+  same instant on today's only revive spec and none of them mean the same thing.
+  `rooted` is a movement fact any future snare could set on any type;
+  `revivesLeft` counts *down*, so a two-life type would swap on its first death
+  and have nothing left to say on its second. `revived` means "this body has
+  been dead once", and `Enemy.prototype.tryRevive` is its only writer.
+  The Bulwark's is `shieldBroken`, never `shield <= 0`, and that one has a live
+  counterexample rather than a hypothetical: a Shieldbearer refills a broken
+  Bulwark's pool, so the pool goes positive again while the doubled speed the
+  break bought never comes back. See the shield section for the full argument;
+  `Enemy.prototype.breakShield` is its only writer.
+- **A missing variant falls back to the BASE mesh, not to the sphere.** Losing a
+  `<script>` tag must not turn a Revenant into a coloured ball at the one moment
+  the player is looking at it. `tools/check-model-tags.js` is what actually
+  catches the missing tag; the fallback only chooses which way the failure is
+  quiet.
+- **Every mesh of one type is authored at ONE scale and graded at that type's
+  `sizeScale`.** The variants are imported with a shared `--span` so the swap
+  changes the creature and not its size, and `check-gait-slip.js` /
+  `check-model-top.js` both map `enemy-<type>-<variant>` back to `<type>` — a
+  variant graded at the default 1 under-reports its slip and its crown margin by
+  the whole of the type's scale.
+
+**AND ANYTHING THAT CACHES GEOMETRY PER TYPE MUST CACHE IT PER MODEL INSTEAD**
+(2026-08-20). `gl-world.js` builds a shield bubble sized off the body's own rest
+extent and keeps it in `typePrims`. That cache was keyed on the type id plus a
+hand-written `:revived` suffix — correct while one type had a second mesh, and a
+stale-cache bug the moment a second one arrived. It is now keyed on the name
+`enemyModel` returns, which is the thing it actually measured, so a new
+`ENEMY_VARIANT` row needs no matching edit there. **The Bulwark is what would
+have sprung it:** the bubble draws while `shieldFlash` decays and `shieldBroken`
+is already set by then, so the first Bulwark bubble a board ever drew could be
+one measured off the stripped body — no halo, a much smaller plan extent — and
+every Bulwark for the rest of the session would have worn it.
+
+**Geometry imported through `--rig humanoid` is stored in WORLD space, with the
+joint written into the frame matrix** (`T(J).R.T(-J)`), rather than offset to
+each group's pivot. `GLModels.expand` computes `model.top` — the height the
+health bar is drawn at — from the raw stored positions with *no* group matrix
+applied, so an offset body reports a top partway up itself. Run
+`node tools/check-model-top.js`: five shipped bodies are BURIED, `enemy-normal`
+by 9.7 px into its own chest. Both Revenants read `ok`. The five are left alone
+deliberately — repairing them moves a shipped health bar and is its own change,
+not a side effect of adding an enemy.
+
+**A GAIT IS FOUR PLANT WINDOWS AND NOTHING ELSE** (2026-08-17). `--rig
+quadruped` runs the Fast type on all four legs, and it shares `leg_series` with
+`--rig humanoid` rather than owning a second solver: a walk and a gallop differ
+in WHICH frames each foot is down and in nothing else about a leg. The biped
+holds each boot down for half the cycle precisely so no frame has both feet in
+the air; **a run is the gait that gives that up.** At `RUN_DUTY = 0.25` the four
+windows (16 frames: 0–3, 2–5, 7–10, 9–12) leave frame 6 and frames 13–15 with
+nothing on the road at all — the gathered suspension after the hinds push off
+and the extended one after the fores. `check-gait-slip.js` reads **A = 0.000 px
+on all four paws** at 25 % duty each, so the solver's guarantee does not weaken
+with more legs or shorter contacts. A rig declares its own legs and a declared
+leg that does not arrive is an **error**, not a limp — a source that spells one
+differently would otherwise weld it into the torso and ship a body galloping on
+three, which survives a preview and is found on the board.
+
+Three consequences, each of which was got wrong first:
+
+- **A short contact shortens the leg's arc, and the reach is bought back in the
+  air.** The plant sweep is not a style choice; it is exactly the ground covered
+  while that paw is down. Quartering the contact quarters the arc, so a gallop
+  animated by the duty alone swings its legs *less* than the walk it replaced.
+  `leg_series(swing_reach=)` adds a forward overshoot at mid-swing, zero at both
+  ends, spent entirely on frames no instrument grades.
+- **The body's motion is DERIVED from the windows, never run off a sine of its
+  own.** `airborne_lift` eases a rise over each run of unsupported frames and
+  `fore_centre` phases the pitch off the forehand's landing. Retune a phase and
+  the body follows; a hand-phased sine keeps its old timing and puts the animal
+  at the top of its arc with a paw planted on the road.
+- **A leg follows the body's rise, and only while it is in the air.** A planted
+  paw belongs to the road and must not climb with the chest, or the solve is
+  undone. The body's PITCH is deliberately not followed: it moves each joint by
+  up to 0.04 u (hidden — a thigh joint sits inside its cowl), and following it
+  drags the paw that has just left the road back into it. Measured: **2.946 px**
+  of gait error on two legs with the pitch followed, 0.000 without.
+
+**A SPRING IS THE OTHER HALF OF THE CURVE `airborne_lift` LEAVES AT ZERO**
+(2026-08-20). `--rig bulwark_overdrive` runs the Bulwark after its shield goes,
+and the owner asked for it to move "like a kangaroo, but one leg at a time" —
+so the two legs hop in turn at `BOUND_DUTY = 0.25`, which puts **half the cycle
+in the air**, more than the hound's gallop spends. That much suspension exposes
+what `airborne_lift` does not answer: it eases a rise over every unsupported run
+and returns **0 for every supported frame**, and a body riding zeros through its
+own landing is being *carried* over the road rather than pushing off it.
+`bulwark_body_rise` eases the mirror of the same curve DOWN over each stance —
+zero at both ends, deepest at mid-plant — so the body compresses onto the leg
+that caught it and extends off it. One continuous curve, both halves read off
+the same windows, every inflection in it a footfall. Three things follow:
+
+- **The PLANTED leg must not follow the crouch, and the SWINGING one must.**
+  `plant_leg` sets each leg's own lowest point on the road independently of the
+  body, so a hip that sinks while the sole stays put IS the leg compressing —
+  which is the thing being drawn. That is the same rule the gallop states about
+  the rise, and it is what sizes the crouch: the airborne boot goes down with
+  the body and still has to clear `check-gait-slip.js`'s 0.015 plant band. The
+  two are naturally in opposition — the deepest crouch of one leg's stance falls
+  at the peak of the other's swing — and the instrument is what proves it stayed
+  that way. **A = 0.000 px.**
+- **The pitch is the curve's own vertical VELOCITY**, normalised by its own
+  peak: nose up climbing, nose down falling. `fore_centre` cannot serve a biped
+  with two suspensions per cycle, and a cosine phased off frame 0 would keep its
+  old timing the moment a duty moved.
+- **`swing_reach` IS FOR A JOINTED LEG AND THESE HAVE ONE HINGE.** `BOUND_REACH`
+  was 0.95 — near the hound's 0.85 — and it shipped a straight-legged high kick
+  twice a cycle, because `humanoid_pivot_of` gives a leg a hip and nothing at the
+  knee, so an overshoot cannot fold a limb, only swing the whole rigid thing
+  further. On a body whose foot is a third of its own height that is very
+  visible. It is 0.35, and the spring is bought in the body instead. **Caught on
+  the real renderer and by nothing else**: slip read 0.000 at both values,
+  because a foot in the air has nothing to slide against.
+
+**AND A "FAST AND NIMBLE" WALK IS A DUTY, NOT AN AMPLITUDE.** `--rig bulwark`
+is the same body with its shield, and what separates it from `--rig humanoid` —
+which drew this type until 2026-08-20 — is not bigger numbers. `walk_cycle`
+holds each boot down for exactly half the cycle so that no frame has both feet
+off the road; at `SPRINT_DUTY = 0.46` two frames per cycle do, `airborne_lift`
+gives the body a rise over each, and the stoop drops from the zombie's 0.10 to
+0.045. Lightness is the suspension; the posture and the arm swing only agree
+with it.
+
+**A CYCLE IS ONE STRIDE, BUT A STRIDE NEED NOT BE ONE STEP** (2026-08-18).
+`--rig walker` runs the Midboss — a four-legged salvage machine with two arms
+and a turret — and it is the first body to take **two** steps per stride
+(`MARCH_STEPS`). The format's only rule is that the frame list repeats over one
+stride of 0.899281 u; how many times each foot plants inside it was a choice
+every earlier body made the same way, and it is the wrong one for a short-legged
+body. **A planted foot must travel back the whole share of the stride it is
+down for**, so a single plant at 60 % duty asked the Harvester's 0.408 u leg for
+a 0.539 u sweep: 83°, with the front claw digging 0.156 u through the road at
+one end and the chassis jacking 0.136 u into the air at the other. At two steps
+every one of those figures more than halves and the solve is untouched —
+`solve_hip_angles` is handed `CYCLE_UNITS / MARCH_STEPS` and answers the same
+question. `check-gait-slip.js` reads **A = 0.001 px on all four claws**, two
+plants each. **If a new source's legs are short relative to its body, reach for
+this before reaching for a slipping gait.**
+
+Three more rules came out of that body, and each is general:
+
+- **A gait that never puts two feet down on one side cannot rock.** The owner
+  asked for a chassis that "rocks side-to-side as weight shifts between leg
+  pairs". Pairing the legs front-to-rear — the reading the words alone suggest —
+  keeps one foot down per side on every frame at every duty, so the support is
+  balanced left to right always and `support_roll` correctly derives nothing.
+  The **lateral sequence** (front left, rear left, front right, rear right) is
+  what puts both left claws down together and then both right ones, and it is
+  why an ambling elephant rolls. The roll is read off the support count, so it
+  cannot lean the machine onto a foot that is in the air.
+- **A SOLVE CENTRED UNDER THE HIP COLLAPSES A SPLAYED STANCE.**
+  `solve_hip_angles` puts the sole directly beneath the hip at mid-plant, which
+  is right for every body whose leg hangs straight down (0.012 u of difference
+  on the zombie) and silently rotates the Harvester's front legs 27° back and
+  its rear legs 27° forward on every frame of every plant — the artist's stance
+  gone, and the machine jacked 6 px into the air to reach the road from it.
+  `solve_hip_angles(about_rest=True)` centres the sweep on the pose in the FILE
+  instead. It is opt-in because it spends reach on the splay
+  (`|cx| + anchor <= R`), and it is what a splayed source needs.
+- **The chassis rides down on its own legs** (`stance_drop`). A rigid leg does
+  not hold its shoulder at a constant height above its own claw through a sweep,
+  and `plant_leg` spends the difference by moving the LEG — which keeps the foot
+  honest and slides the leg through a socket that has not moved. The body takes
+  the mean of what its planted legs ask for. On this gait that mean is nearly
+  zero (front and rear legs roll opposite ways, so the body only bobs 2.1 px)
+  and what is left at each socket is the leg's own roll: **0.091 u, 5.2 px,
+  against a shoulder ball 6.9 px across** — the largest approximation in the
+  rig, spent upward as often as downward, under the chassis skirt. **The real
+  fix is a two-link leg with a knee**, and it is the right next change if this
+  body ever has to bear scrutiny at a larger size. **The biped and the
+  quadruped both carry the same defect** and hide it in smaller sweeps.
+- **A rig may place a part by WHERE IT IS, not only by what it is called.**
+  `midboss.glb` names all four legs `leg` and both arms `manipulator_arm`, so
+  the hierarchy says which KIND of limb a mesh is on and only the geometry says
+  which one. `build` therefore centres the body in plan BEFORE calling
+  `group_of`, so a sign test is taken against the machine's own centre line.
+  The three earlier imports reproduce byte-identical across that reordering.
+
+**WHICH WAY A FILE FACES IS THE FILE'S TO SAY, AND GETTING IT WRONG IS SILENT**
+(2026-08-19). A rig declares `source_forward` beside `source_up`, in the same
+SOURCE coordinates, because the up-axis remap fixes which way is up and says
+nothing about which way the body is POINTING once it is standing. The game's
+forward is +X, and the y-up remap sends source +Z there — so every import until
+now assumed "this file faces +Z", which happened to be true of all six.
+
+It is not true of all of them. **`slow.glb` faces −Z** (its ToePlates,
+ChestPlate and FacePlate all sit at negative z, where the Revenant's
+`chest_plate` is at +0.108..+0.295) and **`boss.glb` is z-up AND faces −Y**, so
+the identity remap the beacon needs marches the Tyrant sideways.
+
+**NOTHING IN THE TOOLCHAIN MEASURES FACING, which is why this needs writing
+down.** The plodder was imported backwards first: the gait solved, and
+`check-gait-slip.js` scored **A = 0.000 px**, because a heel plants exactly as
+well as a toe. Every instrument was green and the body walked down the road
+backwards. The check that caught it is comparing the head group's mean x against
+a body known to be right: the Revenant's head sits at +0.0709 and the plodder's
+was at **−0.0753**, the same magnitude with the sign reversed. It reads +0.0753
+now. That comparison is the only facing test this repo has — run it by hand
+against a known-good body after any import.
+
+The defaults are the old behaviour exactly: `+z` under a y-up remap and `+x`
+under a z-up one both land on +X, which is a yaw of zero, and a zero yaw skips
+the rotation entirely rather than multiplying every point by an identity built
+from cos and sin. The six imports that predate this reproduce byte-identical —
+verified by printing the yaw each shipped rig resolves to, not by re-running
+them, since their original flags are not recorded anywhere.
+
+**A RIG IS THE GROUPING, AND SOMETIMES ONLY THE GROUPING** (2026-08-19).
+`--rig plodder` runs the Slow — `slow.glb`, a two-legged machine — and it
+borrows `humanoid_pivot_of` and `walk_cycle` *verbatim*, by reference rather
+than by copy, so a fix to the walk reaches both bodies. A boot plants exactly
+the way a zombie's does and the solve is not a matter of per-file taste.
+
+What it cannot borrow is `humanoid_group_of`, and the reason is a property of
+the FILE and not of the body. **`slow.glb` is FLAT**: all thirty meshes are
+direct children of one `Plodder_Root`, so `chain[1]` — the limb the humanoid rig
+matches on — does not exist. The limb identity is carried in the MESH NAME
+instead (`Thigh.L`, `Forearm.R`, `FacePlate`), which is the other convention an
+exporter reaches for and is no less complete. Pointing the humanoid rig at it is
+not a bad walk, it is a **statue sliding down the road**: every triangle lands in
+the body group, and a body group is drawn with one matrix.
+
+`PLODDER_LIMBS` maps base name → limb, and the side is taken off FIRST because
+the suffix alone is not the limb — `Eye.L` ends the way `Fist.L` does, and a
+suffix-only rule welds the face onto the arms and swings it.
+
+**It fits to 0.979 u, which is the body it REPLACED and not this mesh's own
+proportions.** The Slow has drawn 31.1 px since the chassis built it and is
+deliberately shorter than a normal's 37.8; the humanoid's own 1.19 default would
+have quietly made the slow type the taller of the two. Same argument as the
+beacon's 1.40 — an import inherits the silhouette the waves were balanced to
+read. `node tools/check-gait-slip.js` scores it **A = 0.000 px**.
+
+`--rig tyrant` is the same argument for the wave-35 boss — `boss.glb`, a
+Hunter-Killer with a claw arm and an executioner arm — and it too supplies only
+a `group_of`. It is the first source to break BOTH conventions at once: z-up
+like the beacon, and facing −Y, which nothing before it did. Its names are
+matched differently from the plodder's because the file names parts for the
+MACHINE rather than for the limb: the arms are the `Hunter_` one and the
+`Windup_`/`Executioner_` one, so half the right arm carries no side token at all
+(`Windup_Charge_Ring_01`, `Executioner_Fist`). Two orderings in
+`tyrant_group_of` are load bearing and both are traps —
+**`Foot_Claw_Left_+0.00` carries "claw" AND "foot"**, and **`Chest_Armor_Left`
+and `Phase2_Rib_Vent_Left_01` carry "left" and are TORSO**, so a rule that read
+the side first and asked what the part was second would tear the chest plating
+off and swing it from the shoulder. The shoulders are BODY here rather than
+pauldrons on the arm: `Shoulder_Mass_Left` spans x −1.79..−0.41 against a torso
+half-width of 1.12, so swinging it opens a gap at its inboard edge on the widest
+body in the game. Fitted to **1.076 u**, the body it replaces — AGENTS.md
+balances the roster against the Tyrant's "82 tall and 70 wide" — and it scores
+**A = 0.001 px** on 16 frames with both feet at 50% duty.
+
+**A RIG NEED NOT BE A GAIT** (2026-08-18). `--rig spectre` runs the Healer —
+`healer.glb`, a crystal core inside two counter-rotating rings, six
+shards in orbit, a skirt of ectoplasm and a crown of plumes — and it is the
+first import with **no legs at all**. The three rigs before it are variations on
+one hard constraint (a planted foot must travel back exactly the stride the body
+travels forward, or it skates); a body that touches nothing has no such
+constraint and no plant to solve. What replaces it:
+
+- **The cycle is driven by a CLOCK, and this is the second case of the flier's
+  exemption rather than a new one.** `gl-world.js::clockRate` is now the single
+  place the exceptions to the distance rule are enumerated: `isFlying` gives the
+  Wisp `HOVER_HZ`, and a type carrying a `hover` block gives its own
+  `hover.animHz`. **Anything that plants a foot is still distance-driven and
+  always will be.** `World3D.animHz` answers for both, so the codex viewer needed
+  no edit.
+- **`tools/check-gait-slip.js` must be told**, in `HOVERS`. That table is the one
+  thing in the tool kept in step by hand, and forgetting it does not lose a check
+  — it produces a WRONG one: the Healer's skirt sweeps 12.5 px through a cycle it
+  is supposed to sweep, and graded as a gait that is the second-worst reading in
+  the library. The rule the table mirrors is "`isFlying`, or a `hover` block".
+- **Every term in the cycle is a whole number of turns or a sine of the cycle**,
+  because the caller loops the frame list: a term that ends anywhere but where it
+  started is a visible jump once per cycle forever. Half a turn is admissible on
+  a part that is symmetric about the axis it turns on, and on nothing else.
+- **Three kinds of joint, all measured.** A part that SPINS turns about its own
+  centroid (the six shards are evenly spaced, so their common centroid *is* the
+  axis they orbit); a part that HANGS swings from its top; a part that RISES
+  bends at its base. Nothing in the rig is a coordinate read off a viewport.
+
+**A TRANSLUCENT PART IMPORTS AS AN OPAQUE ONE, AND THE FORMAT CANNOT SAY
+OTHERWISE.** A palette entry is `[r, g, b, emission]` — there is no alpha in it.
+`healer.glb` authors an `aura_shroud` at alpha 0.35, a 0.9 u envelope
+around a 0.5 u core, which imports as a **shell with the whole lantern sealed
+inside it**. It is dropped with `--exclude aura_shroud`, the same mechanism and
+the same reasoning as the undead zombie's `grave_ground`: a decision about the
+SOURCE belongs on the command line and in the run's own output, never buried in
+a rig. **Check a new source's alpha modes before believing its silhouette** —
+this is a property of the format and will apply to the next import too.
+
+**AN IMPORTED EMISSIVE STRENGTH IS A ROUTE TO WHITE, NOT A BRIGHTNESS.** `uGlow`
+is 0 for every body except a flier, so at rest the whole of a material's
+emission is `GLModels.expand`'s resting floor: `min(1, e * 0.16)` added to each
+LINEAR channel. An outside renderer's `emissiveStrength: 5` is a floor of 0.80
+added to all three channels — the hound's first import drew a black dog with
+WHITE panels, on the two parts that carry the type's colour. `--emit-cap` exists
+for that. **This is a property of the renderer, so it applies to any import, not
+to this one body**: check a new model's strengths before believing its palette.
+
+**THE COROLLARY IS THE USEFUL HALF: SATURATION FALLS AS EMISSION RISES.** The
+floor is added to every channel equally, so it is white — a hot number does not
+make a part more orange, it drags all three channels toward 1 together, and the
+brightest heat available is also the palest. A saturated colour on a lit part is
+therefore bought with a LOW emission, which reads as wrong when you write it
+down and is what the numbers actually do. The hound's lava is `e = 0.55` on the
+crust cracks against the `e = 1.55` amber it replaced, and it is the more
+vivid of the two: (254, 127, 93) where the amber pinned both red and green at
+254. A tint entry may carry a fourth number — its own emission — because one
+body's emissive materials are rarely one temperature and `--emit-cap` can only
+flatten them together. It is applied only to materials that already glow, so a
+palette decision cannot turn plating into a lamp.
 
 A wave says how many and how often, **never how tough** — health comes from
 the type, unless the wave carries a `health` override (waves 17–31 do, bar the brutes at 18). An
@@ -4526,6 +5281,16 @@ Siphon now has all eleven tiers built too**; **every enemy type with no
 `js/gl/models/enemy-<typeId>.js` still draws as an untextured sphere**. Every
 future enemy has the same problem to solve.
 
+**A ROCKING FOOT READS SHORT ON THE INSTRUMENT, AND A SHORT READING IS A REAL
+SIGNAL.** `check-gait-slip.js` decides contact from the vertices lowest in the
+REST pose, so a rigid foot that rolls onto a different claw reports a shorter
+plant than the rig authored while still scoring A = 0 on every frame it does
+grade. The Harvester read ten, nine, ten, nine against ten-frame plants
+(2026-08-18) — and the cause was worth finding rather than explaining away: its
+solve was collapsing a splayed stance (see `about_rest` above). With that fixed
+it reads ten, ten, ten, ten. Read the Tyrant's note immediately below before
+concluding a short reading is only an instrument artefact.
+
 **Both bosses are now meshed** — the Vanguard (`enemy-boss_fast`) and the Tyrant
 (`enemy-boss`, the wave-35 boss the whole campaign ends on), on 2026-08-13. They
 are the two bodies to read for a GAIT, because they are the only two whose swing
@@ -4596,12 +5361,145 @@ on 2026-08-13 and any figure written down is wrong by the next commit;
 falling back to the sphere — so `ls js/gl/models/enemy-*.js` against
 `Enemy.TYPES` is the answer, and it is always current.
 
-The Aether Wisp (`enemy-flying`) is the one model here **not authored in this
-repo** — it is Morcoos's work, brought in on 2026-08-12 from his own copy of the
-game. It is also the only one with no `tools/blender/*.py` script behind it: it
-came from a `.glb` through an importer of his rather than from a build script of
-ours. Read it as a worked example, not as something to regenerate from
-`tools/blender`, because nothing here can. (**The load-bearing half is that
+**ELEVEN BODIES NOW COME FROM A `.glb` AND NOT FROM `tools/blender`**, and which
+ones cannot be worked out from the directory listings. `enemy-flying` (the
+Aether Wisp) was the first, brought in on 2026-08-12; both Revenant meshes
+followed on 2026-08-16; **`enemy-fast` joined them on 2026-08-17**;
+**`enemy-midboss` (the Harvester) and `enemy-healer` on 2026-08-18**, both of
+which had drawn a coloured sphere until then; **`enemy-shieldbearer` (the
+Auroris beacon) the same day**; **`enemy-slow` (the plodder) and
+**`enemy-boss` (the Tyrant Hunter-Killer) on 2026-08-19**; and
+**`enemy-shielded` and `enemy-shielded-broken` (the Bulwark, before and after
+its shield goes) on 2026-08-20**. All eleven are
+regenerated by
+`tools/glb_to_model.py` from `glb/`, and none of them can be rebuilt from
+`tools/blender`. **Five of the eleven REPLACED a body this repo had already
+built** — `enemy-fast`, `enemy-shieldbearer`, `enemy-slow`, `enemy-boss` and
+`enemy-shielded` —
+and each cost a row in `export_mesh.py::TARGETS`; see the trap below, which has
+now been sprung five times.
+
+**TWO OF THE ELEVEN ARE ONE BODY IMPORTED TWICE, AND THE SECOND IMPORT IS NOT
+INDEPENDENT OF THE FIRST.** `bulwark_shield.glb` and `bulwark_no_shield.glb` are
+the same machine, and the stripped one is imported with `--span 3.0771` — the
+span the FIRST command prints — so that the pair share a scale rather than
+merely a fitted height. The two files are 3.0771 and 3.0371 source units tall;
+fitting each to 1.354 independently would make the stripped body 1.3% larger and
+grow the Bulwark at the instant its shield pops. Re-run them as a pair, and read
+`glb_to_model.py`'s header for both command lines. The same `--span` rule is why
+the Revenant's two halves are the same size, and that is what the flag exists
+for.
+
+**EVERY SOURCE FILE IS NAMED FOR ITS ENEMY, AND THAT IS A RULE ABOUT `glb/`
+RATHER THAN ABOUT THE IMPORTER** (2026-08-19, at the owner's instruction:
+"in all glb files, rename the corresponding .glb file to its enemy name"). The
+directory used to hold `robo-hound.glb`, `Auroris_Shield_Beacon.glb`,
+`plodder_slow_enemy.glb`, `Tyrant_Hunter_Killer_Boss.glb` and four more
+named for what the artist drew, so
+answering "which file is the Fast?" meant opening files. It is now
+`boss.glb`, `fast.glb`, `flying.glb`, `healer.glb`, `midboss.glb`,
+`revenant.glb`, `revenant-undead.glb`, `shieldbearer.glb`, `slow.glb` — the
+model's own id with `enemy-` taken off. **`bulwark_shield.glb` and
+`bulwark_no_shield.glb` (2026-08-20) are named for the ENEMY and not for the
+model**, and that is the rule holding rather than bending: the enemy is the
+Bulwark, its type id is `shielded` for historical reasons the tower-names
+section explains, and naming a source `shielded.glb` would have named it after
+the id rather than after the thing. Read the `--name` in `glb_to_model.py`'s
+header for the mapping to `enemy-shielded` / `enemy-shielded-broken`. **Nothing at runtime reads a `.glb`**, so the rename could
+not break the game; what it does touch is every `--name` line in
+`glb_to_model.py`'s header and the "Source of truth is X.glb" line each
+generated model carries, and both were retargeted with it.
+
+**THE TWO FILES IN `glb/` THAT ARE STILL NOT NAMED FOR AN ENEMY ARE NOT
+OVERSIGHTS.** `fractal-slime.glb` is the unit sphere described below and is not
+the Fractal Slime's source, so naming it `fractal_slime.glb` would assert
+exactly the thing that paragraph exists to deny — and would put a filename one
+`--name` away from the body `enemy_slime.py` builds. `raptor-war-machine.glb`
+(392 parts, a segmented spine) corresponds to no type in the roster and is
+imported by nothing; it is a source waiting for a body, and giving it an
+enemy's name before it has one would be the same mistake in the other
+direction.
+
+**A SOURCE .glb IS NOT ALWAYS Y-UP.** Seven of the nine are, which is the glTF
+convention and was wired into `glb_to_model.py` as a fact until the beacon
+arrived authored **Z-UP** — base on z = 0, antenna tip at z = 5.35 — and the
+Y-up remap laid a five-metre spire on its side. A rig now declares `source_up`,
+because the convention belongs to the FILE and a rig is written against one
+file's hierarchy. Both maps are proper rotations (the z-up one is the identity),
+so neither can flip a winding and put the back-face cull on the wrong side.
+`fit_axis` stays in SOURCE coordinates for both — it answers "which axis of THIS
+FILE is the body measured along", which is 1 for a y-up file and 2 for a z-up
+one.
+
+**A `.glb` IN `glb/` IS NOT EVIDENCE THAT A BODY CAME FROM ONE. MEASURE THE
+FILE.** `glb/fractal-slime.glb` sits in that directory and is not the Fractal
+Slime's source: 253 500 vertices, 84 500 triangles, one primitive, **zero
+materials**, and every vertex 1.000000 units from the origin — it is a unit
+SPHERE, and whatever displaced it into a slime lived in the authoring tool's
+shader graph and did not survive the export. There is no texture path here to
+bring that back (see clause 7's corollary), so importing it would ship the same
+ball `gl-world`'s fallback already draws, at 84 500 triangles instead of
+nothing. That body is built by `tools/blender/enemy_slime.py` instead, and it is
+the **first enemy authored through `td_mesh`** rather than through Blender or an
+import. Two directory listings cannot tell you any of that; ten lines of
+`struct.unpack` can, and the header of that script carries the numbers.
+
+**`enemy-fast` is the trap of the set, because `enemy_skimmer.py` is still
+there.** The Skimmer mech built that file until the hound replaced it, and its
+row in `export_mesh.py::TARGETS` has been REMOVED for exactly that reason: the
+filename, the registered id and the model contract are identical either way, so
+a batch `--only=enemy-` would have rewritten the hound as the mech with nothing
+anywhere reporting a problem. The script is kept — the Courier and the Vanguard
+both measure against its chest — but it no longer owns a shipped file. **The
+rule this generalises to: a `.glb` import and a Blender target must never name
+the same output.** Whichever one ran last wins, silently. It has a second body
+to protect now: `enemy-fractal_slime.js` is written by
+`tools/blender/enemy_slime.py`, there is a `fractal-slime.glb` a step away in
+`glb/`, and no `--name enemy-fractal_slime` exists anywhere. There must not be
+one.
+
+**AND IT HAS BEEN SPRUNG A SECOND TIME, WHICH IS WHY IT IS A RULE AND NOT AN
+ANECDOTE.** `enemy-shieldbearer` went the same way on 2026-08-18: the four-legged
+Tender (`enemy_tender.py`) built that filename until `shieldbearer.glb`
+replaced it, and its TARGETS row is gone for exactly the Skimmer's reason. The
+script is kept for the same kind of reason too — it is the chassis's four-legged
+worked example and `enemy_dray.py` measures against it — but it no longer owns a
+shipped file.
+
+**AND A THIRD TIME, ON 2026-08-19: `enemy-slow`.** The Tun (`enemy_tun.py`)
+built that filename until `slow.glb` — the plodder — replaced it, and its
+TARGETS row is gone for the Skimmer's reason and the Tender's. `enemy_tun.py`
+is kept because `make_preview.py` still builds its contact sheet from it.
+
+**AND A FOURTH, THE SAME DAY: `enemy-boss`.** The container-with-legs
+(`enemy_tyrant.py`) built the wave-35 boss until `boss.glb` replaced it.
+`enemy_tyrant.py` is kept — it is still the worked example of a swing angle
+DERIVED from leg depth rather than typed. **Removing that row also closed a
+hazard the block itself had been warning about:** `enemy-boss` was the first
+target name in TARGETS that is a PREFIX of another (`enemy-boss_fast`), so
+`--only=enemy-boss` rewrote the Vanguard too — identical in triangles, not in
+bytes. With the row gone the prefix has one match again.
+
+**AND A FIFTH, ON 2026-08-20: `enemy-shielded`.** The Courier
+(`enemy_courier.py`) built the Bulwark until `bulwark_shield.glb` replaced it.
+`enemy_courier.py` is KEPT — `enemy_tender.py` and `enemy_vanguard.py` both
+measure against its chest, and `enemy_chassis.py`'s own header cites its export
+as the worked example of a chassis body. **The second half of that import,
+`enemy-shielded-broken`, has never been built here and must never be given a
+row**, which is the `enemy-fractal_slime` rule pointing the other way: there the
+danger is a `--name` that does not exist yet, here it is a TARGETS row that does
+not exist yet.
+
+Five for five: **every import that has ever landed on a name this repo already
+built has needed a TARGETS row removed in the same change**, so treat that as
+the default expectation rather than as a thing to check for.
+
+**Check TARGETS whenever an import lands on a name this repo has
+ever built**, because nothing else will: the filename, the registered id and the
+model contract are identical either way, and the only symptom is the wrong body
+walking the road.
+
+(**The load-bearing half is that
 `enemy_flying.py` does not exist while `enemy-flying.js` does** — still true on
 2026-08-13. Do not re-derive that by matching the two directory listings:
 **the four original bodies are named for their typeId (`enemy_brute`,
@@ -4610,7 +5508,12 @@ named for their LORE name** — `enemy_skimmer` → `enemy-fast`, `enemy_tun` �
 `enemy-slow`, `enemy_drudge` → `enemy-armored`, `enemy_hedger` → `enemy-angry`,
 `enemy_cooper` → `enemy-camo_normal`. A name-match across the two lists reports
 mismatches that are not real. `enemy_chassis.py` is the shared frame, not a
-body.)
+body. **Three of those five arrows no longer describe a SHIPPED file** —
+`enemy_skimmer`, `enemy_tender` and `enemy_tun` have all lost their TARGETS
+rows to imports, and `enemy_cooper` still has its row but no longer draws the
+Camo Normal, which now wears the `normal`'s body. The arrows are kept because
+they are still what the naming convention IS, and the convention is what this
+paragraph is for; read TARGETS for what is built.)
 
 This is the contract. A model that meets it needs no
 special-casing anywhere in the renderer; a model that skips a clause needs a
@@ -4733,6 +5636,40 @@ at their joints; a limb hangs down and never owns the top.
 **The root's position is not the proof, though.** That root still translates for
 the walk bob, so quote the margin from `tools/check-model-top.js`, which sweeps
 every frame, and never from the root's own z.
+
+**AND THAT RECIPE ASSUMES A BODY THAT NEVER LEAVES THE GROUND. One does.** The
+Fractal Slime jumps: it rises 0.2025 u above its rest pose twice a second, so a
+root at z = 0 reports the RESTING crown and the health bar is swallowed at every
+apex — 6.4 board px inside a T1, 15.5 inside a T5 — with **nothing reporting
+it**, because the bare enemy run of the gate reads the rest frame and the clause
+above allows a rise. The condition is what has to hold; the recipe is one way of
+meeting it, and for an airborne body the way is a PAIR of nodes per group:
+
+- `hop_<g>` — the animation (translate, lean, uniform scale), and **the identity
+  at frame 0**;
+- `<g>` — the exported group, a fixed child at **z = −RISE**.
+
+`td_mesh.build` stores geometry as `inverse(matrix_world at frame 0) * world`,
+so the −RISE and the stored +RISE cancel: the drawn pose at frame f is exactly
+`hop(f) * world`, every rotation and scale still pivots where it was authored,
+and `model.top` becomes the crown of the body AT THE TOP OF ITS JUMP. **RISE is
+measured, never typed** — pose every frame, take the highest vertex — which is
+what makes the gate report a margin of exactly 10.0 px at every instance scale
+instead of approximately. `tools/blender/enemy_slime.py` is the worked example.
+
+The cost is real and belongs with the rule: at rest the bar floats RISE above
+the crown, and `bodyTopOf` — the Siphon's occluder capsule — is that much too
+tall. That is the good direction to be wrong in for a bar and the bad one for an
+occluder, and over-occlusion photographs as success.
+
+**A FRACTAL'S `sizeScale` ROW IS NOT ITS DRAWN SIZE, and both gates were reading
+it as one.** `sizeScale` is per TYPE; a fractal carries `fractalSizeScale =
+minSizeScale + tier * sizeStep` per INSTANCE and `radiusPx()` multiplies the
+two, so the Fractal Slime's row says 1 while a T5 draws at **2.40**. Every
+figure in `check-model-top.js` and `check-gait-slip.js` is multiplied by the
+scale, so quoting the row under-reports a real miss by 2.4× on the tier the
+player meets at wave 25. Both now grade the worst tier — the first by deriving
+it from the type's own three fields, the second from its table.
 
 **The worked example, chosen because it has no hidden multiplier.**
 `enemy-normal` carries 0.620 u of group-root lift; × 31.8032 `unitsToPx` ×
@@ -5008,6 +5945,29 @@ the fallback right now — `enemy-normal`, `brute`, `flying`, `hive`, `swarm` �
 because they have not been re-exported since the field landed; the other seven
 declare an explicit `[[0, n]]` that means exactly the same thing.
 
+**AND ONLY ONE OF THE THREE WRITERS EMITS IT AT ALL, WHICH IS THE READING THE
+PARAGRAPH ABOVE WARNS ABOUT.** `export_mesh.py` declares `bands`;
+**`tools/glb_to_model.py` and `tools/blender/td_mesh.py` do not** — the first
+was written for imported bodies, the second for towers, blubs and summoners,
+which are the families the field is deliberately absent on. So every IMPORTED
+enemy and `enemy-fractal_slime` ship without it for a reason that has nothing to
+do with re-exporting, and a re-export is NOT the fix for them.
+
+It is correct on all of them today, because each ships exactly one cycle and the
+fallback is the whole strip. What it costs is that they are exposed to the
+hazard clause 8 records: a frame added outside the cycle would cycle once per
+stride, every frame individually right and only the sequence wrong. When one of
+those bodies needs a state pose, the fix is to teach its WRITER the field —
+never to hand-edit a generated file.
+
+**Measured 2026-08-18, and it corrects two rows of the dated list below.**
+`bands` present: `angry`, `armored`, `boss`, `boss_fast`, `camo_normal`,
+`colossus`, `shielded`, `slow`. Absent: `brute`, `fast`, `flying`,
+`fractal_slime`, `healer`, `hive`, `midboss`, `normal`, `revenant`,
+`revenant-undead`, `shieldbearer`, `swarm`. `fast` and `shieldbearer` moved from
+the first group to the second without losing anything: both were REPLACED by
+imports, and the writer changed under them.
+
 **A PAIR, NOT A LENGTH, and the reason is a defect this replaces.** Two
 incompatible arithmetics already coexist in `gl-world.js`: enemies index frame 0
 as a walk frame, while blubs and summoners reserve it as a rest pose and count
@@ -5136,8 +6096,8 @@ no mechanic was moved to match the description.
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
-| The schedule | 35 waves, 866 enemies, 23 796 scheduled HP / **25 898 effective**, plus each Hive's brood and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
-| Wave clear bounty | a tenth of the wave's effective HP, ~$2 590 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
+| The schedule | 35 waves, 830 enemies, 24 141 scheduled HP / **25 939 effective**, plus each Hive's brood, each Fractal Slime's cascade and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
+| Wave clear bounty | a tenth of the wave's effective HP, ~$2 594 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
 | Wave reward, all in | clear bounty + redistributed opening cash + rising allowance | `waveReward`, `waveProgressionReward`, `waveEscalatingReward` |
 | The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
 | Tyrant roar | +1000 shield, ×1.35 speed, intervals ×0.75 (12 s → 9 s), leap unlocked, and 40 bodies / 2780 HP called in at 1.5× — the running mob plus 2 Hives, 3 Shieldbearers, 3 Healers, 2 Colossi | `Enemy.TYPES.boss.phases[0]` |
@@ -5157,15 +6117,25 @@ no mechanic was moved to match the description.
 | Run-over buttons | Restart (R/Enter), Choose another route (M), Main menu (Escape) | `restartButtonRect`, `changeMapButtonRect`, `mainMenuButtonRect` |
 | Victory | all waves naturally deployed + board clear + base standing | `allWavesDeployed`, `victory` in game.js |
 | Wave banner | 2.4 s, on each wave's first spawn | `BANNER_SECONDS` in js/effects.js |
+| Sound | 8 synthesized effects, no files, no fetch; created on the first user gesture | `SoundSynthesizer`, `Sound` in js/game.js |
+| Default mix | master 0.7, effects 1.0, music 0.8 (fed by nothing), not muted, not saved | `SoundSynthesizer` constructor |
+| Volume presets | Quiet 0.3 / Normal 0.7 / Loud 1.0 — master only, so a mix the player made is not thrown away | `SOUND_PRESETS`, `applyPreset` |
+| Polyphony cap | 28 voices; ≤3 simultaneous death explosions; worst-case measured peak 0.70 at the master output | `SOUND_MAX_VOICES`, `claimVoices`, `playEnemyDeath` |
+| Low-health alert | arms at 25% of BASE_MAX_HP, disarms above 32%, repeats every 9 s; klaxon AND a pulse behind the HP readout | `LOW_HEALTH_FRACTION`, `LOW_HEALTH_CLEAR_FRACTION`, `LOW_HEALTH_REPEAT`, `updateLowHealthAlert`, `drawStatus` |
+| Mute | the panel's toggle or `M` **on the board only** (`m` is "change route" on the loss overlay) | `Sound.toggleMute`, `onKeyDown`, `drawAudioPanel` |
 | Enemy roster | 21 types, all 21 scheduled, including the flying Aether Wisp | `Enemy.TYPES`, `EASY_WAVES` |
 | Enemy mechanic blocks | `attack`, `shield`, `revive`, `spawns`, `phases`, `support`, `sprint` — data, never a branch on the id | `Enemy.TYPES`, and one method per block |
 | What a shield pays | **nothing, ever** (2026-07-30). Healed HP too. Only health pays | `Enemy.takeDamage`, `Enemy.bounty` |
-| Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks | `Enemy.TYPES.shielded` |
+| Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks, **and a second mesh from that moment on** | `Enemy.TYPES.shielded`, `shieldBroken`, `ENEMY_VARIANT` |
 | Revenant | 16 HP, revives once to full and roots where it fell | `Enemy.TYPES.revenant` |
 | Hive | 150 HP, ordinary, pays normally | `Enemy.TYPES.hive` |
 | Hive brood | 5 normals every 7 s, each with a shield equal to its life and paying $0 | `Enemy.TYPES.hive.spawns` |
 | Shieldbearer | 60 HP, ×0.45; +20 shield to the 10 strongest every 10 s, STACKING. Normal/Hard | `Enemy.TYPES.shieldbearer` |
+| Shieldbearer hover | 0.55 radii off the road, broadcast turning at 0.18 Hz | `Enemy.TYPES.shieldbearer.hover` |
+| Shieldbearer tether | 1.8 s per cord, `rgb(150, 214, 255)`, bowed 0.34 of the span, 3 plates | `Enemy.TYPES.shieldbearer.support.tether` |
 | Healer | 200 HP, ×0.4; 15 HP/s for 4 s to the 3 most wounded every 8 s. Normal/Hard | `Enemy.TYPES.healer` |
+| Healer hover | 1.25 radii off the road, rings turning at 0.32 Hz | `Enemy.TYPES.healer.hover` |
+| Healer tether | 1.4 s per cord, `rgb(142, 232, 255)` | `Enemy.TYPES.healer.support.tether` |
 | Vanguard (fast boss) | 750 HP; ×3.5 for the first 400 u.l. then ×1.75; 100 shield every 7 s, no stacking. Normal/Hard | `Enemy.TYPES.boss_fast` |
 | Camo Heavy | 20 HP, ×0.65, camo, 5 flat armor + 20% defense. Normal/Hard | `Enemy.TYPES.camo_heavy` |
 | Brood trail | 12 u.l. between hatchlings, back along the road | `Enemy.BROOD_TRAIL_UL` |
@@ -5230,7 +6200,7 @@ no mechanic was moved to match the description.
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | $36 133 = $23 438 kill bounties + $2 590 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
+| Easy run purse | $35 686 = $22 987 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |

@@ -388,15 +388,87 @@ var EASY_WAVES = [
   { count: 20, interval: 1.5,  type: "angry", health: 9 },        // 180 HP  first attacker -- PURE, RETUNED
   { count: 10, interval: 0.9,  type: "camo_normal", health: 7 },  //  70 HP  first camo -- PURE
   { count: 5,  interval: 2.2,  type: "shielded", health: 15 },    // 225 HP  first shield -- PURE
-  { groups: [                                                     // 407 HP  old 10 + company -- RETUNED
+  // --- THE FRACTAL SLIME'S TIER LADDER, 16 / 17 / 22 / 25 / 33 / 35 -------
+  //
+  // 2026-08-20, at the owner's instruction: "i want the slime tiers to spawn
+  // in accordance to their HP as stated in the index and behave in that
+  // manner". The index has always printed all six rungs -- T0 = 1, T1 = 4,
+  // T2 = 16, T3 = 64, T4 = 256, T5 = 1024 -- and until this patch the campaign
+  // sent exactly one of them, the T3 in wave 25. The other five existed only
+  // as somebody else's split children, so the guide was advertising a ladder
+  // the schedule never climbed.
+  //
+  // ONE RUNG PER WAVE, ASCENDING, AND THE HP IS THE PLACEMENT RULE. Each tier
+  // sits in the first wave heavy enough to carry it, which is why the gaps
+  // widen as they do: 1 and 4 points are texture in an early mixed wave, 16
+  // is a body, 64 is the event wave 25 was already built around, 256 is a
+  // second boss-weight body in 33, and 1024 has exactly one home in a
+  // thirty-five wave schedule.
+  //
+  // WHAT A RUNG ACTUALLY COSTS IS NOT ITS ROOT. A tier T root takes
+  // root x (T + 1) points to clear -- it conserves health as it divides, four
+  // bodies at a quarter each -- and leaves 4^T terminal T0s walking:
+  //
+  //     T0     1 HP        1 point        1 body
+  //     T1     4 HP        8 points       5 bodies
+  //     T2    16 HP       48 points      21 bodies
+  //     T3    64 HP      256 points      85 bodies
+  //     T4   256 HP    1 280 points     341 bodies
+  //     T5  1024 HP    6 144 points   1 365 bodies
+  //
+  // The base has 100 HP and a leak costs the leaker's remaining health, so the
+  // right column is the difficulty that matters: a T5 that is not cleared is
+  // 1 024 separate points of base damage arriving one at a time. That, not the
+  // root, is why T4 waits for 33 and T5 for the Tyrant's wave.
+  //
+  // THE SCHEDULE PAID FOR IT RATHER THAN GROWING BY IT. Authored effective HP
+  // moved 25 898 -> 25 939, +0.16%: wave 33 funds its T4 exactly (two Bulwarks
+  // and a Brute), wave 35 covers -340 of the T5's 1024 and waves 27, 29, 30,
+  // 31, 32 and 34 give up 641 more at 5-9% each -- 1 267 trimmed against 1 308
+  // added, and the 41 points of difference ARE the whole rise. NOTHING WAS TAKEN
+  // OFF A SPINE OPENER or off a mechanism body -- see the retune note above:
+  // halving a Hive, Shieldbearer, Healer or Colossus is a design change, not a
+  // trim -- so what got thinner is ordinary escort. The curve someone measured
+  // is still the curve; tests/run.js pins both totals.
+  //
+  // AND THE REAL LOAD DID GO UP, WHICH IS THE POINT. Authored says +41; a
+  // board that clears every cascade removes 7 748 points where the six roots
+  // count 1 372, and it earns the difference back at half rate ($3 874 across
+  // the generations against the $686 of roots the purse counts). 1 826 bodies
+  // are born to do it. Do not quote the authored figure as if the schedule
+  // were unchanged.
+  //
+  // DO NOT GIVE A FRACTAL GROUP A `health` OVERRIDE, here or in any later
+  // retune. `fractal_slime` DISCARDS one at every value: `fractalTierOf`
+  // resolves undefined to the default tier, so the constructor always holds a
+  // tier and `Enemy.healthOf` takes the tier branch. Writing `health` would be
+  // a no-op on the body and NOT a no-op on the accounting -- `waveKillBounty`
+  // would declare income for a body that never got tougher. Scale the TIER, or
+  // scale the type row in js/enemy.js; not this. tests/content.test.js checks
+  // the whole schedule for one, because the mistake is invisible in play.
+  //
+  // T0 OPENS THE LADDER IN 16 AND IS THE ONE RUNG THAT DOES NOT DIVIDE. Four
+  // 1 HP bodies among two dozen Swarm: the player meets the terminal rung as
+  // harmless texture first, so that when wave 17's T1 breaks apart, what it
+  // breaks into is already familiar. It is deliberately NOT in wave 12 -- that
+  // wave is the suite's mixed-wave fixture (tests/run.js), and a fixture that
+  // changes shape whenever content lands is a fixture that stops testing the
+  // scheduler.
+  { groups: [                                                     // 406 HP  old 10 + company -- RETUNED
     { count: 14, interval: 0.8,  type: "slow", health: 15 },
     { count: 24, interval: 0.18, type: "swarm", health: 3, lead: 2 },
-    { count: 25, interval: 0.9,  type: "armored", health: 5, lead: 2 }
+    { count: 24, interval: 0.9,  type: "armored", health: 5, lead: 2 },
+    { count: 4,  interval: 0.9,  type: "fractal_slime", tier: 0, lead: 3 }
   ] },
-  { groups: [                                                     // 384 HP
-    { count: 30, interval: 0.18, type: "swarm", health: 3 },
+  // T1, AND THE FIRST DIVISION THE PLAYER EVER SEES. Two 4 HP bodies that
+  // each leave four of wave 16's T0s behind: eight points of scheduled health
+  // teaching a mechanic that will later arrive as 6 144. Cheap on purpose --
+  // the lesson has to be survivable by a board that has not been built for it.
+  { groups: [                                                     // 383 HP
+    { count: 27, interval: 0.18, type: "swarm", health: 3 },
     { count: 14, interval: 0.55, health: 13, lead: 2 },
-    { count: 16, interval: 0.3,  type: "fast", health: 7, lead: 2 }
+    { count: 16, interval: 0.3,  type: "fast", health: 7, lead: 2 },
+    { count: 2,  interval: 2,    type: "fractal_slime", tier: 1, lead: 3 }
   ] },
   { count: 12, interval: 0.6,  type: "camo_fast", health: 9 },    // 108 HP  camo again -- PURE
   { groups: [                                                     // 668 HP  old 11 + company
@@ -425,7 +497,13 @@ var EASY_WAVES = [
   { groups: [                                                     // 652 HP  old 12 + company
     { count: 12, interval: 0.4,  type: "fast", health: 18 },
     { count: 4,  interval: 2.2,  type: "brute", health: 85, lead: 2 },
-    { count: 24, interval: 0.15, type: "swarm", health: 4, lead: 2 }
+    { count: 20, interval: 0.15, type: "swarm", health: 4, lead: 2 },
+    // T2: 16 points that become 21 bodies. The first rung that is a BODY
+    // rather than texture, and the first that asks for a second answer -- the
+    // Brutes above it want the Longshot's flat 10, and twenty-one small
+    // slimes want coverage. Four seconds of lead so the two questions are not
+    // asked in the same breath.
+    { count: 1,  interval: 1,    type: "fractal_slime", tier: 2, lead: 4 }
   ] },
   { groups: [                                                     // 760 HP  old 13 + company
     { count: 14, interval: 0.7,  type: "slow", health: 26 },
@@ -449,9 +527,16 @@ var EASY_WAVES = [
   // everything else.
   { count: 10, interval: 0.8,  type: "flying", health: 9 },       //  90 HP  first flight -- PURE
 
-  // Wave 25 introduces the Fractal Slime at T3: one 64 HP body which divides
-  // through T2, T1 and T0 when killed. Only the root is authored here; all 84
-  // descendants are produced by the one type's `fractal` block.
+  // T3, the middle rung and the wave this whole cascade was designed around.
+  // One 64 HP body which divides through T2, T1 and T0 when killed. Only the
+  // root is authored here; all 84 descendants are produced by the one type's
+  // `fractal` block.
+  //
+  // NO LONGER THE INTRODUCTION. Until 2026-08-20 this was the only Fractal
+  // Slime in the campaign, so it had to be first sight, first division and
+  // first cascade all at once; 16, 17 and 22 now do that work, and what is
+  // left here is the escalation this wave was already sized for. Nothing about
+  // the group changed -- it is the same T3 at the same lead.
   //
   // The root's `lead` is 6, not the 3 the rest of the wave is spaced on. Until
   // 2026-08-12 the tier never reached the spawner, so this group put a 4 HP T1
@@ -462,14 +547,6 @@ var EASY_WAVES = [
   // cascade conserves health -- four bodies at a quarter each, so never more
   // than the root's 64 points are in flight -- and measured peak concurrency
   // does not rise.
-  //
-  // DO NOT GIVE THE FRACTAL SLIME A `health` OVERRIDE, here or in any later
-  // retune. `fractal_slime` DISCARDS one at every value: `fractalTierOf`
-  // resolves undefined to the default tier, so the constructor always holds a
-  // tier and `Enemy.healthOf` takes the tier branch. Writing `health` here
-  // would be a no-op on the body and NOT a no-op on the accounting --
-  // `waveKillBounty` would declare income for a body that never got tougher.
-  // Scale the tier, or scale the type row in js/enemy.js; not this.
   { groups: [                                                     // 984 effective HP + split generations
     { count: 20, interval: 0.45, health: 22 },
     { count: 5,  interval: 1.8,  type: "shielded", health: 20, lead: 2 },
@@ -489,9 +566,9 @@ var EASY_WAVES = [
   //
   // The lesson is stated by the arithmetic, not by the readout: shoot the
   // support, not what it is propping up.
-  { groups: [                                                     // 848 HP  old 15 + the support
+  { groups: [                                                     // 808 HP  old 15 + the support
     { count: 18, interval: 0.3,  type: "fast", health: 16 },
-    { count: 12, interval: 0.6,  type: "armored", health: 20, lead: 2 },
+    { count: 10, interval: 0.6,  type: "armored", health: 20, lead: 2 },
     { count: 2,  interval: 3,    type: "shieldbearer", health: 160, lead: 2 }
   ] },
 
@@ -511,10 +588,10 @@ var EASY_WAVES = [
     { count: 6,  interval: 1.6,  type: "camo_heavy", health: 45, lead: 2 }
   ] },
 
-  { groups: [                                                     // 2074 HP  old 16 + Colossus + escort
+  { groups: [                                                     // 1907 HP  old 16 + Colossus + escort
     { count: 16, interval: 0.6,  type: "slow", health: 34 },
-    { count: 5,  interval: 1.8,  type: "shielded", health: 24, lead: 2 },
-    { count: 4,  interval: 2.2,  type: "brute", health: 95, lead: 2 },
+    { count: 4,  interval: 1.8,  type: "shielded", health: 24, lead: 2 },
+    { count: 3,  interval: 2.2,  type: "brute", health: 95, lead: 2 },
     { count: 1,  interval: 1,    type: "colossus", lead: 3 },
     { count: 2,  interval: 2.5,  type: "shieldbearer", health: 120, lead: 2 }
   ] },
@@ -531,17 +608,17 @@ var EASY_WAVES = [
   // are ordinary work; kill the Hives and the Shieldbearers are propping up a
   // crowd of specks. Do neither and the road fills faster than any board can
   // empty it.
-  { groups: [                                                     // 1200 HP + broods + free shield
+  { groups: [                                                     // 1136 HP + broods + free shield
     { count: 3,  interval: 6,    type: "hive", health: 180 },
     { count: 2,  interval: 4,    type: "shieldbearer", health: 170, lead: 3 },
-    { count: 30, interval: 0.15, type: "swarm", health: 5, lead: 2 },
-    { count: 5,  interval: 1.4,  type: "angry", health: 34, lead: 2 }
+    { count: 24, interval: 0.15, type: "swarm", health: 5, lead: 2 },
+    { count: 4,  interval: 1.4,  type: "angry", health: 34, lead: 2 }
   ] },
-  { groups: [                                                     // 1510 HP  old 17 + company
+  { groups: [                                                     // 1384 HP  old 17 + company
     { count: 24, interval: 0.4,  health: 26 },
-    { count: 4,  interval: 2.2,  type: "brute", health: 100, lead: 2 },
+    { count: 3,  interval: 2.2,  type: "brute", health: 100, lead: 2 },
     { count: 5,  interval: 1.6,  type: "shielded", health: 22, lead: 2 },
-    { count: 12, interval: 0.5,  type: "flying", health: 13, lead: 2 }
+    { count: 10, interval: 0.5,  type: "flying", health: 13, lead: 2 }
   ] },
 
   // --- 32: THE FIELD HOSPITAL. The Healer's introduction. ----------------
@@ -555,17 +632,23 @@ var EASY_WAVES = [
   // The counter is burst, not throughput. A pulse lands every eight seconds
   // and heals over four -- damage that arrives faster than 15 HP/s outruns it,
   // damage that trickles never does.
-  { groups: [                                                     // 1680 HP  old 18 + the support
+  { groups: [                                                     // 1572 HP  old 18 + the support
     { count: 20, interval: 0.28, type: "fast", health: 18 },
-    { count: 10, interval: 0.6,  type: "armored", health: 22, lead: 2 },
+    { count: 8,  interval: 0.6,  type: "armored", health: 22, lead: 2 },
     { count: 3,  interval: 2.5,  type: "healer", health: 260, lead: 2 },
-    { count: 5,  interval: 1.6,  type: "revenant", health: 32, lead: 2 }
+    { count: 4,  interval: 1.6,  type: "revenant", health: 32, lead: 2 }
   ] },
   { groups: [                                                     // 1952 HP  old 19 + company
     { count: 18, interval: 0.55, type: "slow", health: 38 },
     { count: 2,  interval: 5,    type: "hive", health: 200, lead: 3 },
-    { count: 6,  interval: 1.6,  type: "shielded", health: 26, lead: 2 },
-    { count: 4,  interval: 2.2,  type: "brute", health: 100, lead: 2 }
+    { count: 4,  interval: 1.6,  type: "shielded", health: 26, lead: 2 },
+    { count: 3,  interval: 2.2,  type: "brute", health: 100, lead: 2 },
+    // T4. 256 points of root, 1 280 to clear, and 256 terminal bodies against
+    // a 100 HP base -- so this is the wave that asks whether the board can
+    // WIPE rather than snipe, one wave before the two that end the campaign.
+    // It cost this wave exactly what it is worth: the fourth Brute and two of
+    // the six Bulwarks paid for it, and 1952 HP is unchanged.
+    { count: 1,  interval: 1,    type: "fractal_slime", tier: 4, lead: 7 }
   ] },
 
   // --- 34: THE VANGUARD. The first of the two boss waves. ----------------
@@ -584,12 +667,12 @@ var EASY_WAVES = [
   // to kill two 180 HP supporters at the rear while the boss is in front of
   // you, which is the same lesson as wave 27 asked at a moment when there is
   // no room to learn it.
-  { groups: [                                                     // 2500 HP + free shield
-    { count: 30, interval: 0.15, type: "swarm", health: 6 },
+  { groups: [                                                     // 2364 HP + free shield
+    { count: 24, interval: 0.15, type: "swarm", health: 6 },
     { count: 1,  interval: 1,    type: "boss_fast", health: 1400, lead: 4 },
-    { count: 16, interval: 0.3,  type: "fast", health: 20, lead: 2 },
+    { count: 13, interval: 0.3,  type: "fast", health: 20, lead: 2 },
     { count: 2,  interval: 3,    type: "shieldbearer", health: 180, lead: 2 },
-    { count: 6,  interval: 1.3,  type: "angry", health: 40, lead: 2 }
+    { count: 5,  interval: 1.3,  type: "angry", health: 40, lead: 2 }
   ] },
 
   // --- 35: THE BOSS WAVE. -------------------------------------------------
@@ -619,12 +702,24 @@ var EASY_WAVES = [
   // Its roar at half health calls in another 600 HP on top of this, running at
   // 1.5x. See the `boss` row in Enemy.TYPES — everything the fight does is
   // data there, not here.
-  { groups: [                                                     // 7000 HP  old 20 + the Tyrant
+  { groups: [                                                     // 7684 HP  old 20 + the Tyrant
     { count: 30, interval: 0.35, health: 30 },
-    { count: 8,  interval: 0.5,  type: "flying", health: 20, lead: 2 },
+    { count: 6,  interval: 0.5,  type: "flying", health: 20, lead: 2 },
     { count: 1,  interval: 1,    type: "boss", lead: 6 },
-    { count: 10, interval: 1.1,  type: "angry", health: 40, lead: 3 },
-    { count: 6,  interval: 1.5,  type: "shielded", health: 30, lead: 2 }
+    { count: 7,  interval: 1.1,  type: "angry", health: 40, lead: 3 },
+    { count: 4,  interval: 1.5,  type: "shielded", health: 30, lead: 2 },
+    // T5, LAST IN THE LAST WAVE, and the only place 1024 points fit. It walks
+    // in eight seconds behind the final Bulwark, which is after the Tyrant --
+    // deliberately: the boss is still the wave's centre (it enters at 46% of
+    // the wave, tests/run.js pins mid-wave), and the cascade is what the run
+    // ends on rather than something the Tyrant fights alongside.
+    //
+    // 6 144 points across six generations, ending in 1 024 one-point bodies.
+    // A board that cannot clear them loses on leaks alone, which is the
+    // intended shape of a finale and the reason no earlier wave carries this
+    // rung. The 30 opening Normals are untouched -- they are the v0.4.4
+    // spine's twentieth wave and cannot be trimmed to fund anything.
+    { count: 1,  interval: 1,    type: "fractal_slime", tier: 5, lead: 8 }
   ] }
 ];
 
@@ -1336,6 +1431,9 @@ function openMapSelect() {
 function openMenu() {
   screen = "menu";
   paused = false;
+  // A klaxon that followed the player out of a losing run and onto the title
+  // screen would be a warning about a base that no longer exists.
+  Sound.stopAlert();
 }
 
 // Leave the run in progress and go back to the title screen.
@@ -1407,6 +1505,15 @@ function restartGame() {
   // Cosmetic state is run state too -- a restart must not inherit the old
   // run's particles.
   if (typeof Effects !== "undefined") Effects.reset();
+
+  // Neither must it inherit the old run's alarm. Sound.reset() cuts the
+  // klaxon and clears the rate limiters; the VOLUMES are untouched, because a
+  // mix the player set is a preference and not part of the run -- the same
+  // distinction the camera zoom and the speed toggle already make.
+  Sound.reset();
+  lowHealthActive = false;
+  lowHealthTimer = 0;
+  lowHealthPulse = 0;
 
   // A run now OPENS ON A COUNTDOWN rather than on a body (2026-07-31 -- see
   // RUN_START_DELAY). This used to read `waveCountdown = spawnScheduledEnemy()`,
@@ -1548,6 +1655,14 @@ function toGameCoords(event) {
 function onMouseMove(event) {
   mouse = toGameCoords(event);
 
+  // A slider being dragged owns the cursor until the button comes back up,
+  // including outside the panel -- the handle follows the mouse to the edge
+  // and stops there rather than being dropped the moment it leaves the track.
+  if (audioDrag) {
+    dragAudioSliderTo(audioDrag, mouse.x);
+    return;
+  }
+
   // Panning happens here rather than on a timer so the map tracks the cursor
   // exactly: the world point under the grabbed pixel stays under it.
   if (cameraDrag) {
@@ -1576,6 +1691,18 @@ function refreshWorldPointer() {
 }
 
 function onMouseDown(event) {
+  // ABOVE the 3D early-return below, and it has to be: that return exists to
+  // keep the 2D map-grab from fighting the orbit camera, and the mixer is
+  // neither. Left button only -- the orbit camera claims middle and right
+  // (see js/gl/gl-camera.js), and button 0 is the one it leaves alone.
+  if (event.button === 0 && screen === "play" && !paused && !gameOver && !victory) {
+    var press = toGameCoords(event);
+    if (audioPanelMouseDown(press.x, press.y)) {
+      if (event.preventDefault) event.preventDefault();
+      return;
+    }
+  }
+
   // In 3D the orbit camera owns the middle button (it turns the board) and the
   // 2D map-grab must not also run, or the two cameras fight over one gesture.
   if (typeof World3D !== "undefined" && World3D.isEnabled()) return;
@@ -1590,6 +1717,9 @@ function onMouseDown(event) {
 
 function onMouseUp(event) {
   if (event.button === 1) cameraDrag = null;
+  // On window rather than on the canvas (see init), which is what lets a
+  // slider dragged off the edge of the panel still be let go of.
+  if (event.button === 0) audioDrag = null;
 }
 
 // Right-click CANCELS. It is Escape's first job on a mouse button (2026-08-01,
@@ -1656,19 +1786,36 @@ function onWheel(event) {
 function onClick(event) {
   var p = toGameCoords(event);
 
+  // THE AUTOPLAY GATE. A browser will not let a page make a sound until the
+  // user has interacted with it, and this is the interaction. Done here rather
+  // than in a listener of its own on purpose: the test harness keeps exactly
+  // one listener per event name, so a second click handler would silently
+  // replace this one and take the whole suite with it. Cheap after the first
+  // call -- unlock() returns on its first line once the context exists.
+  Sound.unlock();
+
   // The menu owns every click while it is up.
   if (screen === "menu") {
-    if (pointInRect(p.x, p.y, playButtonRect())) openMapSelect();
-    else if (pointInRect(p.x, p.y, storeButtonRect())) Store.open();
-    else if (pointInRect(p.x, p.y, indexButtonRect())) Codex.open();
-    else if (pointInRect(p.x, p.y, sandboxButtonRect())) openSandbox();
+    if (pointInRect(p.x, p.y, playButtonRect())) { Sound.playUIClick(); openMapSelect(); }
+    else if (pointInRect(p.x, p.y, storeButtonRect())) { Sound.playUIClick(); Store.open(); }
+    else if (pointInRect(p.x, p.y, indexButtonRect())) { Sound.playUIClick(); Codex.open(); }
+    else if (pointInRect(p.x, p.y, sandboxButtonRect())) { Sound.playUIClick(); openSandbox(); }
     return;
   }
 
   // The armoury owns every click while it is up, exactly as the index does.
   // Its Back button is handled here so the two screens cannot disagree about
   // how leaving works.
+  //
+  // THE CLICK SOUND IS UNCONDITIONAL ON THIS SCREEN AND ON THE INDEX, and that
+  // is a deliberate trade rather than an oversight. Both are full-screen
+  // interfaces whose buttons belong to Store/Codex and are hit-tested inside
+  // those files, so game.js cannot tell a press from a miss without a second
+  // copy of their layouts here -- and a second copy of a layout is exactly the
+  // kind of thing this project has been bitten by. The cost is a click on the
+  // background of a dense UI screen; the alternative was silent buttons.
   if (screen === "store") {
+    Sound.playUIClick();
     if (pointInRect(p.x, p.y, backButtonRect())) openMenu();
     else Store.onClick(p.x, p.y);
     return;
@@ -1685,6 +1832,7 @@ function onClick(event) {
     // -- and because `Codex.open` resets the index but the modal is not part of
     // `screen`, leaving that way stranded a viewer showing one enemy over a
     // list reset to another.
+    Sound.playUIClick();
     if (!Codex.modalUp() && pointInRect(p.x, p.y, backButtonRect())) openMenu();
     else Codex.onClick(p.x, p.y);
     return;
@@ -1693,11 +1841,15 @@ function onClick(event) {
   // The chooser owns every click while it is up.
   if (screen === "select") {
     if (pointInRect(p.x, p.y, backButtonRect())) {
+      Sound.playUIClick();
       openMenu();
       return;
     }
     var card = mapCardAt(p.x, p.y);
-    if (card !== null) startRun(Maps.LIST[card]);
+    if (card !== null) {
+      Sound.playUIClick();
+      startRun(Maps.LIST[card]);
+    }
     return;
   }
 
@@ -1705,8 +1857,8 @@ function onClick(event) {
   // is clickable, so a click meant for a menu button cannot also land on the
   // board behind it.
   if (paused) {
-    if (pointInRect(p.x, p.y, resumeButtonRect())) paused = false;
-    else if (pointInRect(p.x, p.y, backToMenuButtonRect())) leaveRun();
+    if (pointInRect(p.x, p.y, resumeButtonRect())) { Sound.playUIClick(); paused = false; }
+    else if (pointInRect(p.x, p.y, backToMenuButtonRect())) { Sound.playUIClick(); leaveRun(); }
     return;
   }
 
@@ -1714,20 +1866,26 @@ function onClick(event) {
   // its buttons consume clicks until a new run begins -- same two buttons,
   // same geometry, on either outcome.
   if (gameOver || victory) {
-    if (pointInRect(p.x, p.y, restartButtonRect())) restartGame();
-    else if (pointInRect(p.x, p.y, changeMapButtonRect())) openMapSelect();
+    if (pointInRect(p.x, p.y, restartButtonRect())) { Sound.playUIClick(); restartGame(); }
+    else if (pointInRect(p.x, p.y, changeMapButtonRect())) { Sound.playUIClick(); openMapSelect(); }
     // Through leaveRun(), not openMenu() directly -- that seam is what lets
     // the sandbox, which has no menu screen to switch to, send this button
     // back to index.html instead. See the Screens section of AGENTS.md.
-    else if (pointInRect(p.x, p.y, mainMenuButtonRect())) leaveRun();
+    else if (pointInRect(p.x, p.y, mainMenuButtonRect())) { Sound.playUIClick(); leaveRun(); }
     return;
   }
+
+  // The mixer outranks everything on the board, including the chrome row it
+  // sits in: it is drawn on top of all of it, and the input-priority rule this
+  // file already follows is that whatever is drawn on top consumes the click.
+  if (audioPanelClick(p.x, p.y)) return;
 
   // Chrome over the map claims clicks before the map does, exactly like the
   // build bar below. It sits above the bar in this order only because it is
   // cheaper to test; the two rectangles do not overlap, so the order between
   // them cannot matter.
   if (pointInRect(p.x, p.y, speedButtonRect())) {
+    Sound.playUIClick();
     cycleGameSpeed();
     return;
   }
@@ -1735,6 +1893,7 @@ function onClick(event) {
   // Live for the whole run, unlike the skip beside it -- see
   // autoSkipButtonRect for why a toggle that vanished would be unturnable-off.
   if (waveControlsShown() && pointInRect(p.x, p.y, autoSkipButtonRect())) {
+    Sound.playUIClick();
     toggleAutoSkipWaves();
     return;
   }
@@ -1743,6 +1902,7 @@ function onClick(event) {
   // map and builds on as usual.
   if (waveControlsShown() && betweenWaves() &&
       pointInRect(p.x, p.y, waveSkipButtonRect())) {
+    Sound.playUIClick();
     skipNextWave();
     return;
   }
@@ -1750,6 +1910,7 @@ function onClick(event) {
   // The build bar sits on top of the map, so it gets first claim on a click.
   var slot = slotAt(p.x, p.y);
   if (slot >= 0) {
+    Sound.playUIClick();
     // Clicking the armed slot again disarms it; an empty slot just clears.
     selectedSlot = (slot === selectedSlot || BUILD_SLOTS[slot] === null) ? null : slot;
     refreshBlockReason();
@@ -1763,8 +1924,8 @@ function onClick(event) {
   // The blub rail sits beside the panel and is the same kind of thing: chrome
   // drawn over the board that must eat the click rather than let a tower be
   // built under it.
-  if (inspected && hitsBlubRail(p.x, p.y)) return;
-  if (inspected && runPanelAction(p.x, p.y)) return;
+  if (inspected && hitsBlubRail(p.x, p.y)) { Sound.playUIClick(); return; }
+  if (inspected && runPanelAction(p.x, p.y)) { Sound.playUIClick(); return; }
 
   // EVERYTHING ABOVE THIS LINE IS INTERFACE and reads SCREEN coordinates --
   // the build bar, the panel, the speed and wave buttons are all pinned to
@@ -1783,6 +1944,7 @@ function onClick(event) {
   }
 
   if (inspected && hitsSellButton(p.x, p.y)) {
+    Sound.playUIClick();
     sellTower(inspected);
     return;
   }
@@ -1791,6 +1953,7 @@ function onClick(event) {
   // never build on top of one anyway, so there is nothing to compete with.
   var hit = towerAt(w.x, w.y);
   if (hit) {
+    Sound.playUIClick();
     inspected = hit;
     return;
   }
@@ -1807,6 +1970,12 @@ function onClick(event) {
     built.pathProgress = route.progress / route.path.length * path.length;
     addTower(built);
     cash -= type.COST;
+
+    // The placement clink. Here and not in addTower(), deliberately: a
+    // Summoner's blubs go through addTower too (js/blub.js), and a tower being
+    // PLANTED BY THE PLAYER is a different event from one appearing on the
+    // board -- one is a decision, the other is a mechanic doing its job.
+    Sound.playTowerPlace();
 
     // Placing disarms the slot. One click, one tower -- so the next click on
     // open ground clears the selection instead of building a second one by
@@ -2017,6 +2186,11 @@ function onKeyDown(event) {
   var el = event.target;
   if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
 
+  // The other half of the autoplay gate -- see the note in onClick. A player
+  // who starts a run from the keyboard has interacted just as much as one who
+  // clicked, and without this their first wave arrives in silence.
+  Sound.unlock();
+
   // The menu owns the keyboard while it is up. Numbered top to bottom,
   // matching the buttons.
   if (screen === "menu") {
@@ -2111,6 +2285,18 @@ function onKeyDown(event) {
   // game's, and panning at it feels like a stutter.
   if (screen === "play") {
     var key = (event.key || "").toLowerCase();
+
+    // M mutes. ON THE BOARD ONLY, and that is a constraint rather than a
+    // preference: `m` already means "change map" on the game-over overlay
+    // (see the branch above, which returns before this one), and one letter
+    // that did two things depending on whether you had just lost is exactly
+    // the sort of key nobody trusts. Every other screen reaches the mixer
+    // through the panel.
+    if (key === "m") {
+      Sound.toggleMute();
+      return;
+    }
+
     if (key === "+" || key === "=") {
       zoomCameraAt(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, CAMERA_ZOOM_STEP);
       return;
@@ -2346,6 +2532,8 @@ function waveControlsShown() {
 function overInterfaceChrome(x, y) {
   if (slotAt(x, y) >= 0) return true;
   if (pointInRect(x, y, speedButtonRect())) return true;
+  if (pointInRect(x, y, audioButtonRect())) return true;
+  if (audioPanelOpen && pointInRect(x, y, audioPanelRect())) return true;
   if (waveControlsShown()) {
     if (pointInRect(x, y, autoSkipButtonRect())) return true;
     if (betweenWaves() && pointInRect(x, y, waveSkipButtonRect())) return true;
@@ -2522,6 +2710,15 @@ function update(dt) {
   // is not damage. Passed in rather than read from globals so the dependency
   // is visible from the tower's side.
   worldContext.gold = cash;
+
+  // How long the bullet list was BEFORE the towers acted. Anything past this
+  // index afterwards was fired this step, which is how the shot sound is
+  // hooked without a line in any of the five tower files: a projectile
+  // appearing in this array IS a tower firing, and it is the only definition
+  // of that event all five types already agree on. Beam and Summoner towers
+  // spawn no bullets and are correctly silent here -- neither of them fires.
+  var bulletsBefore = bullets.length;
+
   for (i = 0; i < towers.length; i++) {
     // A STUNNED tower does nothing at all this step -- and that includes its
     // cooldown, which is why this is a `continue` and not a flag passed into
@@ -2540,6 +2737,13 @@ function update(dt) {
     // entire charge bonus, invisibly, until a test caught the totals
     // disagreeing.
     towers[i].update(dt, enemies, bullets, worldContext);
+  }
+
+  // One shot sound for whatever was fired this step, whether that was one
+  // bullet or eleven. Presentation only, and read-only over the array the
+  // towers just wrote -- nothing is put back.
+  if (bullets.length > bulletsBefore) {
+    Sound.playTowerFire(fireKindOf(bullets[bulletsBefore]));
   }
 
   // Bullets still apply and report landed damage, but only the later death
@@ -2572,6 +2776,11 @@ function update(dt) {
       if (typeof Effects !== "undefined") {
         Effects.enemyKilled(gone, killBounty);
       }
+      // Beside the Effects hook and for the same reason: this sweep is the one
+      // place an enemy's fate is decided exactly once, so it is the one place
+      // that cannot double-count a death. The synthesizer decides how many
+      // simultaneous deaths are worth hearing -- see playEnemyDeath.
+      Sound.playEnemyDeath();
     } else if (gone.leaked) {
       // HEALTH, not remainingHealth(): a shield is armour the enemy was
       // wearing, not mass it throws at the base. A Bulwark that walks in
@@ -2597,7 +2806,17 @@ function update(dt) {
   }
 
   baseHp = Math.max(0, baseHp);
-  if (baseHp === 0) gameOver = true;
+  if (baseHp === 0 && !gameOver) {
+    gameOver = true;
+    // The one moment the run ends in defeat. Guarded on the flag rather than
+    // played beside the assignment further down, so a future reordering of
+    // this function cannot turn one loss into a loop of them.
+    Sound.playGameOver();
+  }
+
+  // The base-in-danger warning, which is both a sound and a light -- see
+  // updateLowHealthAlert.
+  updateLowHealthAlert(dt);
 
   enemies = enemies.filter(function (e) { return !e.dead && !e.leaked; });
   if (splitChildren.length) enemies = enemies.concat(splitChildren);
@@ -2666,6 +2885,64 @@ function update(dt) {
 
   // Cash changed this step, so affordability may have flipped.
   refreshBlockReason();
+}
+
+// THE BASE IS IN DANGER. One latch, driving two things: the klaxon and the
+// pulse on the HP readout (see drawStatus).
+//
+// IT IS DELIBERATELY BOTH. A player who has muted the game -- or who cannot
+// hear it -- must still be told, and an alert that exists only as a sound is
+// an alert half the audience never receives. The light is not a fallback that
+// switches on when the sound is off; it is always on, and the sound is the
+// half that can be turned off.
+//
+// The threshold has HYSTERESIS: it arms at a quarter of the starting base HP
+// and only disarms above 32%. Base HP is a free counter that lifesteal pushes
+// back up (see drawStatus), so a base hovering on a single line would
+// otherwise re-trigger the alarm every few seconds. And while it stays low the
+// alarm repeats on a slow timer rather than sounding once: a warning that
+// stopped while the danger continued would be a lie, and one that never
+// stopped would be a reason to mute the game.
+var LOW_HEALTH_FRACTION = 0.25;
+var LOW_HEALTH_CLEAR_FRACTION = 0.32;
+var LOW_HEALTH_REPEAT = 9;        // seconds of game time between alarms
+
+var lowHealthActive = false;
+var lowHealthTimer = 0;
+var lowHealthPulse = 0;           // drives the readout's flash; run state
+
+function updateLowHealthAlert(dt) {
+  // THE RUN IS OVER, SO THE WARNING IS OVER. Without this, a base that fell
+  // from healthy to zero in a single blow armed the latch on the very step it
+  // died -- the timer starts expired, so the klaxon would fire directly on top
+  // of the game-over sound, warning about a base that had already gone. It is
+  // reached only on the step the flag flips: update() returns early ever after.
+  if (gameOver || victory) {
+    lowHealthActive = false;
+    return;
+  }
+
+  if (!lowHealthActive && baseHp <= BASE_MAX_HP * LOW_HEALTH_FRACTION) {
+    lowHealthActive = true;
+    lowHealthTimer = 0;
+    lowHealthPulse = 0;
+  } else if (lowHealthActive && baseHp > BASE_MAX_HP * LOW_HEALTH_CLEAR_FRACTION) {
+    lowHealthActive = false;
+    Sound.stopAlert();
+    return;
+  }
+
+  if (!lowHealthActive) return;
+
+  lowHealthPulse += dt;
+  lowHealthTimer -= dt;
+  if (lowHealthTimer <= 0) {
+    // Safe to call whether or not one is already sounding: the synthesizer
+    // drops a request that arrives while the sequence is still running, which
+    // is what "can be called repeatedly without stacking" means here.
+    Sound.playLowHealthAlert();
+    lowHealthTimer = LOW_HEALTH_REPEAT;
+  }
 }
 
 // Is the run waiting for a wave right now -- everything from the last wave
@@ -2784,6 +3061,11 @@ function spawnScheduledEnemy() {
       "Wave " + (waveIndex + 1) + " / " + WAVES.length,
       waveSummary(wave));
   }
+
+  // The swell goes with the banner: same moment, same reason, and the sound
+  // is timed to be over about when the banner is. One per wave, not one per
+  // route -- this branch runs once however many entrances the map has.
+  if (waveSpawned === 0) Sound.playWaveStart();
 
   var slot = waveGroupAt(wave, waveSpawned);
   // One scheduled beat is mirrored onto every entrance, then the fixed wave
@@ -3100,6 +3382,18 @@ function draw() {
   drawBuildBar();
   drawSpeedButton();
   if (waveControlsShown()) drawAutoSkipButton();
+  // The mixer, and its panel over the top of it. Above the rest of the chrome
+  // and below the run overlays.
+  //
+  // DRAWN EXACTLY WHEN IT IS CLICKABLE. onClick's pause and loss/victory
+  // branches return before the mixer gets a look (they are modals and own
+  // every click), so drawing the button under one of those overlays would put
+  // a live-looking control on screen that swallows nothing -- the same trap
+  // waveSkipButtonRect and waveControlsShown exist to avoid.
+  if (!paused && !gameOver && !victory) {
+    drawAudioButton();
+    drawAudioPanel();
+  }
   drawGameOver();
   drawVictory();
   drawPauseMenu();
@@ -3354,6 +3648,22 @@ function drawStatus() {
   ctx.textAlign = "left";
   ctx.fillStyle = baseHp > BASE_MAX_HP * 0.25 ? "#8ce69d" : "#e0736e";
   ctx.font = "600 24px system-ui, sans-serif";
+
+  // THE VISUAL HALF OF THE LOW-HEALTH ALERT. The readout has been red below a
+  // quarter since long before there was sound; what is new is that it now
+  // PULSES, on the same latch that fires the klaxon (see updateLowHealthAlert).
+  // A muted player gets the whole warning, not a quieter version of it.
+  //
+  // Drawn as a lozenge behind the text rather than by flashing the text
+  // itself: text blinking in and out of legibility is a worse readout at
+  // exactly the moment it matters most.
+  if (lowHealthActive) {
+    var beat = 0.5 + 0.5 * Math.sin(lowHealthPulse * Math.PI * 2 / 0.9);
+    ctx.fillStyle = "rgba(224,115,110," + (0.12 + beat * 0.26).toFixed(3) + ")";
+    ctx.fillRect(14, 26, 208, 30);
+    ctx.fillStyle = "#e0736e";
+  }
+
   ctx.fillText(baseHp > BASE_MAX_HP
     ? "Base " + Math.round(baseHp) + " HP"
     : "Base " + Math.round(baseHp) + " / " + BASE_MAX_HP + " HP", 22, 48);
@@ -4727,21 +5037,21 @@ function mapCardAt(x, y) {
 // anchored to the 1280x720 viewport, not to anything in the world.
 
 function playButtonRect() {
-  return { x: VIEW_WIDTH / 2 - 150, y: 320, w: 300, h: 62 };
+  return { x: VIEW_WIDTH / 2 - 240, y: 334, w: 480, h: 88 };
 }
 
-// The armoury sits directly under PLAY, above the index: it is the screen a
-// player visits between runs, and the index is reference material.
+// PLAY owns the centre. The three smaller destinations form one command rail
+// below it instead of a second stack competing with the primary action.
 function storeButtonRect() {
-  return { x: VIEW_WIDTH / 2 - 150, y: 396, w: 300, h: 52 };
+  return { x: VIEW_WIDTH / 2 - 270, y: 456, w: 170, h: 58 };
 }
 
 function indexButtonRect() {
-  return { x: VIEW_WIDTH / 2 - 150, y: 458, w: 300, h: 52 };
+  return { x: VIEW_WIDTH / 2 - 85, y: 456, w: 170, h: 58 };
 }
 
 function sandboxButtonRect() {
-  return { x: VIEW_WIDTH / 2 - 150, y: 520, w: 300, h: 52 };
+  return { x: VIEW_WIDTH / 2 + 100, y: 456, w: 170, h: 58 };
 }
 
 // Back to the menu from the chooser. Top-left, out of the cards' way.
@@ -4765,70 +5075,83 @@ function drawMenuHex(ctx, x, y, radius, squash) {
 // machinery deliberately echoes the top-down models on the maps without
 // becoming part of map content or simulation.
 function drawMenuReactor() {
-  var radius = 104;
-
   ctx.save();
-  ctx.translate(166, 365);
+  ctx.translate(166, 405);
 
   ctx.beginPath();
-  ctx.ellipse(12, 20, radius * 1.12, radius * 0.72, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.ellipse(10, 88, 118, 31, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.56)";
   ctx.fill();
 
-  drawMenuHex(ctx, 0, 0, radius * 1.03, 0.84);
-  ctx.fillStyle = "#0a202d";
+  // Wide hexagonal footing: the left decoration is now unmistakably a tower,
+  // and its barrel points into the command rail rather than away from the UI.
+  drawMenuHex(ctx, 0, 62, 108, 0.42);
+  ctx.fillStyle = "#0b1a24";
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(68,187,222,0.5)";
+  ctx.strokeStyle = "rgba(74,218,255,0.48)";
   ctx.stroke();
 
-  for (var i = 0; i < 10; i++) {
-    ctx.save();
-    ctx.rotate(i * Math.PI / 5);
-    ctx.fillStyle = "#102a39";
-    ctx.fillRect(radius * 0.58, -11, radius * 0.62, 22);
-    ctx.strokeStyle = "rgba(70,208,255,0.5)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(radius * 0.58, -11, radius * 0.62, 22);
-    ctx.fillStyle = "rgba(105,228,255,0.8)";
-    ctx.fillRect(radius * 0.92, -3, radius * 0.18, 6);
-    ctx.restore();
-  }
+  ctx.fillStyle = "#122b39";
+  ctx.fillRect(-72, 28, 144, 42);
+  ctx.strokeStyle = "rgba(74,218,255,0.38)";
+  ctx.strokeRect(-71.5, 28.5, 143, 41);
+  ctx.fillStyle = "#173746";
+  ctx.fillRect(-54, -31, 108, 61);
+  ctx.strokeRect(-53.5, -30.5, 107, 60);
 
   ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2);
-  ctx.fillStyle = "#1b3e4e";
+  ctx.moveTo(-45, -31);
+  ctx.lineTo(-30, -82);
+  ctx.lineTo(31, -82);
+  ctx.lineTo(46, -31);
+  ctx.closePath();
+  ctx.fillStyle = "#1b4150";
   ctx.fill();
-  ctx.lineWidth = 12;
-  ctx.strokeStyle = "#091c28";
+  ctx.strokeStyle = "rgba(74,218,255,0.55)";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
+  // Armoured turret cap and the inward-facing weapon/sensor boom.
+  ctx.fillStyle = "#091720";
+  ctx.fillRect(-58, -94, 112, 22);
+  ctx.strokeStyle = "rgba(255,197,83,0.65)";
+  ctx.strokeRect(-57.5, -93.5, 111, 21);
   ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.53, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(38,177,219,0.18)";
+  ctx.moveTo(50, -88);
+  ctx.lineTo(126, -77);
+  ctx.lineTo(126, -66);
+  ctx.lineTo(48, -72);
+  ctx.closePath();
+  ctx.fillStyle = "#173746";
   ctx.fill();
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "rgba(78,220,255,0.9)";
+  ctx.strokeStyle = "rgba(74,218,255,0.5)";
   ctx.stroke();
+  ctx.fillStyle = "#ffd76e";
+  ctx.fillRect(119, -77, 10, 12);
 
+  // The cyan core is functional: it runs from the footing to the turret head.
   ctx.beginPath();
-  ctx.arc(-12, -14, radius * 0.23, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(145,241,255,0.95)";
+  ctx.moveTo(-12, 18);
+  ctx.lineTo(-19, -21);
+  ctx.lineTo(0, -55);
+  ctx.lineTo(19, -21);
+  ctx.lineTo(12, 18);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(74,218,255,0.2)";
   ctx.fill();
-  ctx.beginPath();
-  ctx.arc(-12, -14, radius * 0.37, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(74,218,255,0.22)";
-  ctx.lineWidth = 13;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(112,232,255,0.92)";
   ctx.stroke();
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = "700 11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(145,241,255,0.72)";
-  ctx.fillText("LEY CORE", 0, radius + 35);
+  ctx.fillText("DEFENSE NODE // A1", 0, 126);
   ctx.font = "10px system-ui, sans-serif";
   ctx.fillStyle = "rgba(122,178,198,0.55)";
-  ctx.fillText("OUTPUT  98.7%", 0, radius + 51);
+  ctx.fillText("ARC READY  ·  98.7%", 0, 143);
   ctx.restore();
 }
 
@@ -4920,37 +5243,54 @@ function drawMenuComms() {
   ctx.textBaseline = "middle";
   ctx.font = "700 11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(145,241,255,0.72)";
-  ctx.fillText("DEEP-SPACE RELAY", 8, 148);
+  ctx.fillText("ORBITAL RELAY // LINKED", 8, 148);
   ctx.restore();
 }
 
 function drawMenuBackdrop() {
-  ctx.fillStyle = "#06141f";
+  ctx.fillStyle = "#050d13";
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
   // Large wall plates and recessed side bays establish the room before its
   // models are drawn. The centre stays quieter so the controls remain clear.
-  ctx.fillStyle = "#0b2533";
+  ctx.fillStyle = "#091a24";
   ctx.fillRect(0, 24, VIEW_WIDTH, 108);
   ctx.fillRect(0, 625, VIEW_WIDTH, 95);
-  ctx.fillStyle = "#0d2b39";
+  ctx.fillStyle = "#0b202b";
   ctx.fillRect(22, 154, 307, 418);
   ctx.fillRect(951, 154, 307, 418);
-  ctx.fillStyle = "#081d29";
+  ctx.fillStyle = "#071722";
   ctx.fillRect(340, 96, 600, 520);
 
-  ctx.strokeStyle = "rgba(63,143,169,0.32)";
+  // The grid is structural depth, not decoration: low-contrast minor lines
+  // recede behind a sparse set of stronger command-deck divisions.
   ctx.lineWidth = 1;
   for (var x = 0; x <= VIEW_WIDTH; x += 80) {
+    ctx.strokeStyle = x % 320 === 0
+      ? "rgba(74,218,255,0.14)"
+      : "rgba(74,218,255,0.055)";
     ctx.beginPath();
     ctx.moveTo(x + 0.5, 0);
     ctx.lineTo(x + 0.5, VIEW_HEIGHT);
     ctx.stroke();
   }
   for (var y = 24; y <= VIEW_HEIGHT; y += 72) {
+    ctx.strokeStyle = (y - 24) % 288 === 0
+      ? "rgba(74,218,255,0.13)"
+      : "rgba(74,218,255,0.05)";
     ctx.beginPath();
     ctx.moveTo(0, y + 0.5);
     ctx.lineTo(VIEW_WIDTH, y + 0.5);
+    ctx.stroke();
+  }
+
+  // Faint floor-perspective rails deepen the room without sitting behind the
+  // title or competing with the controls.
+  ctx.strokeStyle = "rgba(74,218,255,0.055)";
+  for (var rail = -160; rail <= VIEW_WIDTH + 160; rail += 160) {
+    ctx.beginPath();
+    ctx.moveTo(VIEW_WIDTH / 2, 590);
+    ctx.lineTo(rail, VIEW_HEIGHT);
     ctx.stroke();
   }
 
@@ -4969,22 +5309,28 @@ function drawMenuBackdrop() {
   ctx.fillStyle = "rgba(255,215,110,0.75)";
   ctx.fillRect(590, 613, 100, 3);
 
-  // Cables/circuit trunks bind the side machines to the central terminal.
-  ctx.strokeStyle = "rgba(74,218,255,0.23)";
-  ctx.lineWidth = 4;
+  // Signal trunks terminate at the action cluster, so the tower, relay and
+  // buttons read as one command system rather than three decorations.
+  ctx.strokeStyle = "rgba(74,218,255,0.28)";
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(256, 226);
-  ctx.lineTo(306, 226);
-  ctx.lineTo(306, 282);
-  ctx.lineTo(340, 282);
-  ctx.moveTo(940, 448);
-  ctx.lineTo(978, 448);
-  ctx.lineTo(978, 520);
-  ctx.lineTo(1040, 520);
+  ctx.moveTo(292, 328);
+  ctx.lineTo(352, 328);
+  ctx.lineTo(400, 378);
+  ctx.moveTo(988, 328);
+  ctx.lineTo(928, 328);
+  ctx.lineTo(880, 378);
+  ctx.moveTo(328, 487);
+  ctx.lineTo(370, 487);
+  ctx.moveTo(910, 487);
+  ctx.lineTo(952, 487);
   ctx.stroke();
-  ctx.fillStyle = "rgba(118,234,255,0.8)";
-  ctx.fillRect(302, 222, 8, 8);
-  ctx.fillRect(974, 444, 8, 8);
+  ctx.fillStyle = "rgba(118,234,255,0.86)";
+  ctx.fillRect(288, 324, 8, 8);
+  ctx.fillRect(984, 324, 8, 8);
+  ctx.fillStyle = "rgba(255,197,83,0.78)";
+  ctx.fillRect(324, 483, 8, 8);
+  ctx.fillRect(948, 483, 8, 8);
 
   // Hazard stripes keep the deck industrial instead of reading as another
   // abstract UI background.
@@ -5002,6 +5348,20 @@ function drawMenuBackdrop() {
   }
   ctx.restore();
 
+  // Static data streams and very faint scanlines keep the military-tech read
+  // without adding another animated element to the title screen.
+  for (var bit = 0; bit < 7; bit++) {
+    ctx.fillStyle = bit % 3 === 0
+      ? "rgba(255,197,83,0.26)"
+      : "rgba(74,218,255,0.18)";
+    ctx.fillRect(306, 176 + bit * 50, 3, 16 + (bit % 2) * 8);
+    ctx.fillRect(971, 195 + bit * 47, 3, 12 + (bit % 3) * 6);
+  }
+  ctx.fillStyle = "rgba(166,226,242,0.018)";
+  for (var scan = 2; scan < VIEW_HEIGHT; scan += 6) {
+    ctx.fillRect(0, scan, VIEW_WIDTH, 1);
+  }
+
   drawMenuReactor();
   drawMenuComms();
 
@@ -5018,14 +5378,29 @@ function drawMenuBackdrop() {
   ctx.font = "10px system-ui, sans-serif";
   ctx.fillStyle = "rgba(169,210,223,0.55)";
   ctx.fillText("SECTOR 07   ·   GRID STABLE", 43, 67);
-  ctx.fillStyle = "#69e6ab";
+  ctx.fillStyle = "#5ce2ff";
   ctx.fillRect(43, 83, 72, 3);
-  ctx.fillStyle = "rgba(105,230,171,0.25)";
+  ctx.fillStyle = "rgba(255,197,83,0.25)";
   ctx.fillRect(119, 83, 96, 3);
 }
 
 function drawMenuButton(r, label, key, rgb, primary) {
   var hot = pointInRect(mouse.x, mouse.y, r);
+  var detail = label === "ARMOURY" ? "LOADOUT & STORE"
+    : (label === "INDEX" ? "FIELD DATABASE" : "SIMULATION BAY");
+
+  // The single ambient motion on the screen: PLAY breathes slowly. It marks
+  // the intended next action without moving geometry or distracting from the
+  // command-deck anchors.
+  if (primary) {
+    var menuNow = typeof performance !== "undefined" && performance.now
+      ? performance.now() / 1000
+      : 0;
+    var pulse = 0.5 + Math.sin(menuNow * 2.1) * 0.5;
+    ctx.strokeStyle = "rgba(74,218,255," + (0.10 + pulse * 0.10) + ")";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(r.x - 7.5, r.y - 7.5, r.w + 15, r.h + 15);
+  }
 
   ctx.fillStyle = "rgba(0,0,0,0.38)";
   ctx.fillRect(r.x + 6, r.y + 7, r.w, r.h);
@@ -5064,9 +5439,15 @@ function drawMenuButton(r, label, key, rgb, primary) {
   ctx.fillStyle = "rgba(" + rgb + ",0.9)";
   ctx.fillText(key, r.x + 29, r.y + r.h / 2 + 1);
 
-  ctx.font = (primary ? "700 18px" : "600 14px") + " system-ui, sans-serif";
+  ctx.font = (primary ? "800 25px" : "700 15px") + " system-ui, sans-serif";
   ctx.fillStyle = hot ? "#ffffff" : "#d9f3ff";
-  ctx.fillText(label, r.x + r.w / 2 + 14, r.y + r.h / 2 + 1);
+  ctx.fillText(label, r.x + r.w / 2 + 14,
+    r.y + r.h / 2 + (primary ? 1 : -7));
+  if (!primary) {
+    ctx.font = "700 10px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(" + rgb + ",0.78)";
+    ctx.fillText(detail, r.x + r.w / 2 + 14, r.y + r.h / 2 + 11);
+  }
 }
 
 function drawMenu() {
@@ -5089,8 +5470,8 @@ function drawMenu() {
   // title, its rule and the four controls stand as they always did, one
   // element shorter. Every offset below is expressed against `titleY` so the
   // block can be moved again as one thing.
-  var titleY = 199;
-  ctx.font = "700 74px system-ui, sans-serif";
+  var titleY = 188;
+  ctx.font = "800 70px system-ui, sans-serif";
   ctx.fillStyle = "rgba(0,0,0,0.6)";
   ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2 + 5, titleY + 5);
   ctx.lineWidth = 3;
@@ -5101,13 +5482,21 @@ function drawMenu() {
   ctx.fillStyle = "rgba(74,218,255,0.78)";
   ctx.fillRect(VIEW_WIDTH / 2 - 128, titleY + 39, 256, 2);
 
+  ctx.font = "700 11px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,197,83,0.72)";
+  ctx.fillText("STRATEGIC DEFENSE NETWORK  //  COMMAND AUTHORITY",
+    VIEW_WIDTH / 2, titleY - 58);
+  ctx.font = "700 10px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(74,218,255,0.54)";
+  ctx.fillText("SELECT OPERATION", VIEW_WIDTH / 2, 294);
+
   drawMenuButton(playButtonRect(), "PLAY", "1", "74,218,255", true);
-  drawMenuButton(storeButtonRect(), "ARMOURY  //  STORE & INVENTORY",
+  drawMenuButton(storeButtonRect(), "ARMOURY",
     "2", "255,197,83", false);
-  drawMenuButton(indexButtonRect(), "INDEX  //  TOWERS & ENEMIES",
-    "3", "180,126,255", false);
-  drawMenuButton(sandboxButtonRect(), "SANDBOX  //  SIMULATION BAY",
-    "4", "97,230,170", false);
+  drawMenuButton(indexButtonRect(), "INDEX",
+    "3", "74,218,255", false);
+  drawMenuButton(sandboxButtonRect(), "SANDBOX",
+    "4", "255,197,83", false);
 
   // The coin purse, top right. On the title screen because that is where the
   // decision it funds gets made, and because a currency you cannot see is a
@@ -5126,7 +5515,7 @@ function drawMenu() {
   ctx.fillText("ARMOURY CREDIT", VIEW_WIDTH - 46, 77);
   ctx.textAlign = "center";
 
-  ctx.fillStyle = "rgba(199,209,224,0.4)";
+  ctx.fillStyle = "rgba(199,209,224,0.72)";
   ctx.font = "13px system-ui, sans-serif";
   ctx.fillText("Enter / 1 play    ·    2 armoury    ·    3 index    ·    4 sandbox",
     VIEW_WIDTH / 2, 646);
@@ -5683,3 +6072,1151 @@ var TIER_COLOURS = {
   normal: { text: "#ffd76e", line: "rgba(255,215,110,0.85)", fill: "rgba(255,215,110,0.12)" },
   hard:   { text: "#e08ad8", line: "rgba(224,138,216,0.85)", fill: "rgba(224,138,216,0.12)" }
 };
+
+
+// --- Audio ------------------------------------------------------------------
+//
+// SoundSynthesizer: every sound in the game, synthesized in real time out of
+// the Web Audio API. There are no audio FILES, and there is no fetch -- which
+// is what lets this ship under the "nothing is fetched" hard constraint in
+// AGENTS.md and still run by double-clicking index.html.
+//
+// IT IS PRESENTATION, AND IT OBEYS THE SAME ONE-WAY RULE AS js/effects.js.
+// The simulation TELLS this module things (a tower was placed, an enemy died,
+// a wave started); nothing simulated ever reads anything back out of it. A
+// silent game must play identically, so every call site is `typeof`-guarded
+// and every method here no-ops when there is no audio device. That is not
+// only politeness: the test harness boots this file in Node, where there is no
+// AudioContext at all, and the suites would take the whole game down with them
+// if construction or a play call could throw.
+//
+// Math.random() appears here, which AGENTS.md otherwise confines to
+// effects.js. The reason that rule exists is that nothing simulated may depend
+// on a random number, and nothing does: these values pick a pitch and die.
+// Do not derive a gameplay value from one, exactly as you would not derive one
+// from a particle.
+//
+// WHY IT LIVES IN game.js rather than in a js/audio.js of its own, which is
+// where the rest of this project would put it: the ask was explicitly for no
+// new files. If a future session splits it out, the split is mechanical --
+// this section, the panel drawing below it, and one <script> line before
+// game.js in BOTH index.html and sandbox.html (they must stay identical).
+//
+// THE SIGNAL CHAIN, and why it is shaped this way:
+//
+//   voice -> voice gain -> sfx bus --\
+//                                      +-> compressor -> soft clip -> master
+//   (future music) -> music bus ------/                                  |
+//                                                                   destination
+//
+// The compressor and the soft clip are between the buses and the master fader,
+// not after it, so pulling the master down never has to fight a limiter and
+// muting is genuinely silent rather than merely quiet. The compressor catches
+// the case this game will actually hit -- a screenful of enemies dying inside
+// one frame -- and the tanh waveshaper behind it means that even if something
+// gets past the compressor's attack it saturates instead of clipping into the
+// digital fizz that a bare sum of oscillators produces.
+
+// How many voices may be alive at once. A voice is one oscillator or one noise
+// source; the sounds below cost between two and eight each. Twenty-eight is
+// roughly four simultaneous deaths plus a wave swell, and past that the mix is
+// mud anyway -- so the cap costs nothing audible and bounds the CPU.
+var SOUND_MAX_VOICES = 28;
+
+function SoundSynthesizer() {
+  // Nothing in this constructor may touch the Web Audio API. It runs at load
+  // time, including under the Node test harness, and the context itself is not
+  // allowed to exist until a user gesture anyway (see unlock).
+  this.ctx = null;
+  this.failed = false;          // no AudioContext here; stop trying
+
+  this.master = null;
+  this.sfxBus = null;
+  this.musicBus = null;         // wired and faded, fed by nothing yet
+
+  this.masterVolume = 0.7;
+  this.sfxVolume = 1.0;
+  this.musicVolume = 0.8;
+  this.muted = false;
+
+  this.noiseBuffer = null;
+
+  // Voice budget, as a list of end times. Pruned on use rather than by timers,
+  // so a paused tab cannot leak a counter that never comes back down.
+  this.voiceEnds = [];
+
+  // Per-sound rate limits, in AudioContext seconds. These are REAL time, not
+  // game time, which is what the 3x speed toggle needs them to be: three times
+  // as many deaths per second still has to arrive as a sound and not a buzz.
+  this.lastAt = {};
+  this.deathBurst = [];         // recent death times, for the stacking rule
+
+  // The alarm is the one sound that is a sequence rather than a hit, so it is
+  // the one that needs to know whether it is already running.
+  this.alertUntil = 0;
+  this.alertNodes = null;
+
+  this.lastResumeAttempt = -99;
+}
+
+// The constructor the browser gives us, or null when there is no Web Audio at
+// all (Node, or a browser with it switched off).
+SoundSynthesizer.prototype.audioContextCtor = function () {
+  if (typeof window === "undefined" || !window) return null;
+  return window.AudioContext || window.webkitAudioContext || null;
+};
+
+// Create the context on a USER GESTURE and resume it if the browser parked it.
+// Called from onClick and onKeyDown -- the two handlers this game already has
+// that a browser counts as interaction -- rather than from a listener of its
+// own, deliberately: the test harness keeps exactly one listener per event
+// name, so a second window keydown handler would silently replace the game's.
+//
+// Returns whether there is a usable context afterwards.
+SoundSynthesizer.prototype.unlock = function () {
+  if (this.ctx) {
+    this.resumeIfParked();
+    return true;
+  }
+  if (this.failed) return false;
+
+  var Ctor = this.audioContextCtor();
+  if (!Ctor) { this.failed = true; return false; }
+
+  try {
+    this.ctx = new Ctor();
+  } catch (e) {
+    this.failed = true;
+    return false;
+  }
+
+  this.buildGraph();
+  this.resumeIfParked();
+  return true;
+};
+
+// Browsers suspend the context when the tab goes to the background and after
+// their autoplay timeout. Retried at most once a second: resume() outside a
+// gesture may simply not work, and asking on every sound would be a promise
+// per bullet.
+SoundSynthesizer.prototype.resumeIfParked = function () {
+  if (!this.ctx || this.ctx.state === "running") return;
+  var now = (this.ctx.currentTime || 0);
+  if (now - this.lastResumeAttempt < 1) return;
+  this.lastResumeAttempt = now;
+  if (typeof this.ctx.resume === "function") {
+    try { this.ctx.resume(); } catch (e) { /* nothing to do about it */ }
+  }
+};
+
+SoundSynthesizer.prototype.buildGraph = function () {
+  var ctx = this.ctx;
+
+  this.master = ctx.createGain();
+  this.master.gain.value = this.muted ? 0 : this.masterVolume;
+  this.master.connect(ctx.destination);
+
+  // Soft clip: tanh, so everything under about -6 dBFS passes through
+  // untouched and anything above it bends rather than breaks. 1024 points is
+  // far more than the ear needs and costs one array, once.
+  var shaper = ctx.createWaveShaper();
+  var curve = new Float32Array(1024);
+  for (var i = 0; i < 1024; i++) {
+    var x = (i / 1023) * 2 - 1;
+    curve[i] = Math.tanh(x * 1.6) / Math.tanh(1.6);
+  }
+  shaper.curve = curve;
+  shaper.oversample = "2x";     // the cheap defence against the aliasing a
+                                // waveshaper otherwise introduces
+  shaper.connect(this.master);
+
+  // The mass-kill insurance. A slow-ish release so a burst ducks the mix
+  // smoothly instead of pumping once per body.
+  var comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -12;
+  comp.knee.value = 14;
+  comp.ratio.value = 10;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.18;
+  comp.connect(shaper);
+  this.compressor = comp;
+
+  this.sfxBus = ctx.createGain();
+  this.sfxBus.gain.value = this.sfxVolume;
+  this.sfxBus.connect(comp);
+
+  // Reserved. Nothing feeds this yet -- the fader exists so that adding music
+  // later is a source and a connect(), not a re-plumbing of the whole graph
+  // and a second volume model bolted onto the side of this one.
+  this.musicBus = ctx.createGain();
+  this.musicBus.gain.value = this.musicVolume;
+  this.musicBus.connect(comp);
+};
+
+// Is there a context, is it awake, and is anyone listening? Every play method
+// opens with this, which is what makes a silent game a game that simply does
+// not call into Web Audio at all.
+SoundSynthesizer.prototype.ready = function () {
+  if (!this.ctx || !this.sfxBus) return false;
+  if (this.muted || this.masterVolume <= 0 || this.sfxVolume <= 0) return false;
+  if (this.ctx.state !== "running") { this.resumeIfParked(); return false; }
+  return true;
+};
+
+SoundSynthesizer.prototype.now = function () {
+  return this.ctx ? this.ctx.currentTime : 0;
+};
+
+// Rate limit. Returns false when `name` fired less than `gap` seconds ago,
+// which is how a beam tower doing damage sixty times a second produces a
+// series of impacts rather than a sawtooth.
+SoundSynthesizer.prototype.throttle = function (name, gap) {
+  var t = this.now();
+  var last = this.lastAt[name];
+  if (last !== undefined && t - last < gap) return false;
+  this.lastAt[name] = t;
+  return true;
+};
+
+// Take `n` voices out of the budget for `seconds`, or refuse. The list is
+// pruned here so it can never grow past the cap plus one burst.
+SoundSynthesizer.prototype.claimVoices = function (n, seconds) {
+  var t = this.now();
+  var live = [];
+  for (var i = 0; i < this.voiceEnds.length; i++) {
+    if (this.voiceEnds[i] > t) live.push(this.voiceEnds[i]);
+  }
+  this.voiceEnds = live;
+  if (live.length + n > SOUND_MAX_VOICES) return false;
+  for (var k = 0; k < n; k++) this.voiceEnds.push(t + seconds);
+  return true;
+};
+
+// A gain node with an attack/decay envelope already written into it, connected
+// to the SFX bus. Everything below builds its sound by pointing sources at one
+// of these.
+//
+// The decay is EXPONENTIAL and lands on 0.0001 rather than 0, because
+// exponentialRampToValueAtTime cannot reach zero -- and then a setValueAtTime
+// at the end takes it the rest of the way, so nothing is left holding a
+// hair-thin DC offset. That last step is what keeps a decay smooth instead of
+// ending on the click of a value jump.
+SoundSynthesizer.prototype.env = function (t0, peak, attack, decay, destination) {
+  var g = this.ctx.createGain();
+  var end = t0 + attack + decay;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(peak, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, end);
+  g.gain.setValueAtTime(0, end + 0.001);
+  g.connect(destination || this.sfxBus);
+  return g;
+};
+
+SoundSynthesizer.prototype.osc = function (type, freq, t0, stopAt) {
+  var o = this.ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  o.start(t0);
+  o.stop(stopAt);
+  return o;
+};
+
+// One second of white noise, made once and replayed from different offsets.
+// Generating a fresh buffer per burst would allocate 44 100 floats every time
+// an enemy was hit.
+SoundSynthesizer.prototype.noise = function (t0, stopAt) {
+  if (!this.noiseBuffer) {
+    var rate = this.ctx.sampleRate;
+    var buf = this.ctx.createBuffer(1, rate, rate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    this.noiseBuffer = buf;
+  }
+  var src = this.ctx.createBufferSource();
+  src.buffer = this.noiseBuffer;
+  // A random offset, so two bursts in a row are not the same slice of noise
+  // played twice -- which the ear hears as a repeated sample, not as texture.
+  src.start(t0, Math.random() * 0.85);
+  src.stop(stopAt);
+  return src;
+};
+
+
+// --- The sounds -------------------------------------------------------------
+
+// 1. TOWER PLACEMENT -- a bright metallic clink with a resonant tail.
+//
+// The partials are INHARMONIC (1, 2.76, 5.40, 8.93), which is the classic
+// struck-bar series rather than the harmonic series a pitched instrument uses.
+// That ratio set is the entire difference between "a note" and "metal": stack
+// octaves and fifths here instead and it reads as a chime from a menu, not as
+// a machine being set down on a battlefield.
+//
+// Pitch varies +/-10% per placement, so building five towers in a row does not
+// sound like one sample fired five times.
+SoundSynthesizer.prototype.playTowerPlace = function () {
+  if (!this.ready() || !this.throttle("place", 0.05)) return;
+  if (!this.claimVoices(5, 0.5)) return;
+
+  var t = this.now();
+  var root = 720 * (0.9 + Math.random() * 0.2);
+  var ratios = [1, 2.76, 5.40, 8.93];
+  var levels = [0.25, 0.14, 0.085, 0.045];
+
+  for (var i = 0; i < ratios.length; i++) {
+    // Higher partials die first. That is what a real strike does and it is
+    // what turns four sine waves into one event rather than four.
+    var decay = 0.44 / (1 + i * 0.55);
+    var g = this.env(t, levels[i], 0.004, decay);
+    this.osc("sine", root * ratios[i], t, t + decay + 0.05).connect(g);
+  }
+
+  // The contact itself: three milliseconds of bandpassed noise. Without it the
+  // partials fade IN, however short the attack, and the tower reads as
+  // appearing rather than as being put down.
+  var bp = this.ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 3200;
+  bp.Q.value = 0.9;
+  bp.connect(this.env(t, 0.16, 0.001, 0.035));
+  this.noise(t, t + 0.05).connect(bp);
+};
+
+// 2. ENEMY HIT -- a low percussive thump with a noise skin.
+//
+// `damage` is optional and scales the whole hit between a tap and a slam. The
+// curve is a square root rather than a straight line because damage in this
+// game spans two orders of magnitude (a Siphon tick against a Warbringer
+// blast) and a linear map would make everything below a boss-killer inaudible.
+//
+// THE THROTTLE IS LOAD-BEARING. Beam towers deal damage every single step, so
+// without it this method is called sixty times a second per beam and the game
+// buzzes. 45 ms lets a rifleman's burst come through as three hits while a
+// beam becomes a texture.
+SoundSynthesizer.prototype.playEnemyHit = function (damage) {
+  if (!this.ready() || !this.throttle("hit", 0.045)) return;
+  if (!this.claimVoices(2, 0.3)) return;
+
+  var t = this.now();
+  var intensity = 0.45;
+  if (typeof damage === "number" && damage > 0) {
+    intensity = Math.min(1, Math.sqrt(damage / 30));
+  }
+  intensity = 0.35 + intensity * 0.65;
+
+  // 80-120 Hz fundamental, varied per hit.
+  var f = 80 + Math.random() * 40;
+  var decay = 0.13 + intensity * 0.09;
+
+  // The pitch DROP is the thump. A body struck at a fixed frequency is a beep;
+  // the same body dropping a sixth in sixty milliseconds is an impact.
+  var body = this.ctx.createOscillator();
+  body.type = "sine";
+  body.frequency.setValueAtTime(f * 1.7, t);
+  body.frequency.exponentialRampToValueAtTime(f, t + 0.055);
+  body.start(t);
+  body.stop(t + decay + 0.05);
+  body.connect(this.env(t, 0.34 * intensity, 0.002, decay));
+
+  // The skin: a lowpassed noise click. Enough to say "something connected",
+  // not enough to read as a separate sound.
+  var lp = this.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(1800, t);
+  lp.frequency.exponentialRampToValueAtTime(420, t + 0.07);
+  lp.connect(this.env(t, 0.13 * intensity, 0.001, 0.055));
+  this.noise(t, t + 0.08).connect(lp);
+};
+
+// 3. ENEMY DEATH -- a small explosion: a swept noise envelope over a pitched
+// body that rises to a peak and then falls away.
+//
+// STACKING IS THE POINT HERE, and it is why this one does not use the plain
+// throttle. A wave clearing is several bodies dying inside one step, and a
+// rate limit would report that as a single kill. Up to three land together,
+// each quieter and detuned from the last, and the fourth onwards is dropped --
+// which is the honest reading of a crowd, and keeps the compressor from having
+// to swallow eight explosions at once.
+SoundSynthesizer.prototype.playEnemyDeath = function () {
+  if (!this.ready()) return;
+
+  var t = this.now();
+  var recent = [];
+  for (var i = 0; i < this.deathBurst.length; i++) {
+    if (t - this.deathBurst[i] < 0.09) recent.push(this.deathBurst[i]);
+  }
+  if (recent.length >= 3) { this.deathBurst = recent; return; }
+  recent.push(t);
+  this.deathBurst = recent;
+
+  if (!this.claimVoices(3, 0.75)) return;
+
+  var stacked = recent.length - 1;              // 0, 1 or 2
+  var level = 1 / (1 + stacked * 0.8);
+  var detune = 1 + stacked * 0.13;              // siblings sit apart in pitch
+
+  var base = (400 + Math.random() * 200) * detune;
+  var dur = 0.52 + Math.random() * 0.16;
+
+  // The body. Up to a peak a fifth above in the first 70 ms, then all the way
+  // down -- the rise is what makes it read as an explosion rather than as a
+  // falling tone, and it is short enough that the ear takes it as a transient.
+  var body = this.ctx.createOscillator();
+  body.type = "sawtooth";
+  body.frequency.setValueAtTime(base, t);
+  body.frequency.exponentialRampToValueAtTime(base * 1.45, t + 0.07);
+  body.frequency.exponentialRampToValueAtTime(base * 0.16, t + dur);
+  body.start(t);
+  body.stop(t + dur + 0.05);
+
+  var bodyLp = this.ctx.createBiquadFilter();
+  bodyLp.type = "lowpass";
+  bodyLp.frequency.setValueAtTime(2600, t);
+  bodyLp.frequency.exponentialRampToValueAtTime(500, t + dur);
+  bodyLp.connect(this.env(t, 0.26 * level, 0.006, dur));
+  body.connect(bodyLp);
+
+  // A harmonic a fifth up, decaying faster: richness without a second event.
+  var harm = this.osc("triangle", base * 1.5, t, t + dur * 0.6);
+  harm.frequency.exponentialRampToValueAtTime(base * 0.4, t + dur * 0.55);
+  harm.connect(this.env(t, 0.10 * level, 0.004, dur * 0.5));
+
+  // The blast: noise through a bandpass sweeping down out of the top of the
+  // spectrum. The sweep is what stops it being a hiss.
+  var bp = this.ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime(2800 * detune, t);
+  bp.frequency.exponentialRampToValueAtTime(220, t + dur);
+  bp.Q.value = 1.1;
+  bp.connect(this.env(t, 0.22 * level, 0.008, dur * 0.95));
+  this.noise(t, t + dur + 0.05).connect(bp);
+};
+
+// 4. WAVE START -- an orchestral swell on a major triad, three octaves deep.
+//
+// Built out of silence and returned to it: a 0.55 s fade in, a short hold, a
+// 0.55 s fade out, with a lowpass opening and closing across the whole gesture.
+// The filter is what makes it a SWELL rather than a chord that gets louder --
+// a fade on its own reads as a volume knob, while a filter opening reads as
+// something arriving.
+//
+// Two detuned layers per note (+/-6 cents' worth) for chorus width, and a sub
+// an octave below the root for the weight the announcement wants.
+SoundSynthesizer.prototype.playWaveStart = function () {
+  if (!this.ready() || !this.throttle("wave", 0.6)) return;
+  if (!this.claimVoices(8, 1.45)) return;
+
+  var t = this.now();
+  var IN = 0.55, HOLD = 0.28, OUT = 0.55;
+  var total = IN + HOLD + OUT;
+
+  // C major, an authored key rather than a random one: the wave banner lands
+  // on the same chord every time, so the player learns the sound.
+  var root = 130.81;                         // C3
+  var chord = [root, root * 1.26, root * 1.5];        // root, major 3rd, 5th
+
+  // The one filter every voice passes through, so the swell is a single
+  // gesture instead of six independent ones drifting apart.
+  var lp = this.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.Q.value = 0.8;
+  lp.frequency.setValueAtTime(240, t);
+  lp.frequency.exponentialRampToValueAtTime(2800, t + IN + HOLD * 0.5);
+  lp.frequency.exponentialRampToValueAtTime(360, t + total);
+
+  var swell = this.ctx.createGain();
+  swell.gain.setValueAtTime(0.0001, t);
+  swell.gain.linearRampToValueAtTime(0.72, t + IN);
+  swell.gain.setValueAtTime(0.72, t + IN + HOLD);
+  swell.gain.exponentialRampToValueAtTime(0.0001, t + total);
+  swell.gain.setValueAtTime(0, t + total + 0.01);
+  lp.connect(swell);
+  swell.connect(this.sfxBus);
+
+  for (var i = 0; i < chord.length; i++) {
+    // Sawtooth low, triangle high: the low octave carries the body and the
+    // upper one only has to carry the brightness, and a saw up there under an
+    // opening filter turns into a buzz.
+    var low = this.osc("sawtooth", chord[i], t, t + total + 0.05);
+    low.detune.value = -6;
+    low.connect(this.gainInto(0.085, lp));
+
+    var high = this.osc("triangle", chord[i] * 2, t, t + total + 0.05);
+    high.detune.value = 6;
+    high.connect(this.gainInto(0.055, lp));
+  }
+
+  // The sub. Sine, an octave under the root, and quiet -- it is felt more than
+  // heard, which is exactly the job.
+  this.osc("sine", root * 0.5, t, t + total + 0.05)
+      .connect(this.gainInto(0.13, lp));
+};
+
+// A plain fixed-gain node. Used where the envelope belongs to a shared bus
+// (the wave swell) rather than to the individual voice.
+SoundSynthesizer.prototype.gainInto = function (value, destination) {
+  var g = this.ctx.createGain();
+  g.gain.value = value;
+  g.connect(destination);
+  return g;
+};
+
+// 5. LOW HEALTH ALERT -- a klaxon alternating between two pitches.
+//
+// Four pulses, 0.3 s on and 0.2 s off, alternating 620 Hz and 440 Hz. Each
+// pulse fades in and out over 40 ms rather than switching, because a square
+// wave gated instantly is a pair of clicks with a tone between them.
+//
+// IT CANNOT STACK. The whole sequence is scheduled in one go, `alertUntil`
+// records when it ends, and a call arriving before then is dropped -- so
+// update() may call this every step while the base is in danger and still get
+// one alarm. stopAlert() exists for the two moments the alarm must not outlive
+// its cause: a restart, and leaving the run.
+SoundSynthesizer.prototype.playLowHealthAlert = function () {
+  if (!this.ready()) return;
+  var t = this.now();
+  if (t < this.alertUntil) return;              // already sounding
+  if (!this.claimVoices(2, 2.1)) return;
+
+  var PULSES = 4;
+  var ON = 0.3, OFF = 0.2;
+  var total = PULSES * (ON + OFF);
+  this.alertUntil = t + total;
+
+  // One oscillator pair for the whole sequence, with the pitch STEPPED between
+  // pulses while it is silent. Two pitches out of one voice, and no clicks:
+  // the jump happens where the gain is already zero.
+  var body = this.ctx.createOscillator();
+  body.type = "square";
+  var edge = this.ctx.createOscillator();       // a fifth up, thin, for bite
+  edge.type = "triangle";
+
+  var gate = this.ctx.createGain();
+  gate.gain.setValueAtTime(0, t);
+
+  // A lowpass takes the top off the square. An unfiltered square at 620 Hz is
+  // a smoke detector; this is a warning the player can sit next to.
+  var lp = this.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 2200;
+  lp.Q.value = 0.7;
+
+  gate.connect(lp);
+  lp.connect(this.sfxBus);
+  body.connect(gate);
+
+  var edgeGain = this.ctx.createGain();
+  edgeGain.gain.value = 0.35;
+  edge.connect(edgeGain);
+  edgeGain.connect(gate);
+
+  for (var i = 0; i < PULSES; i++) {
+    var at = t + i * (ON + OFF);
+    var hz = (i % 2 === 0) ? 620 : 440;
+    body.frequency.setValueAtTime(hz, at);
+    edge.frequency.setValueAtTime(hz * 1.5, at);
+
+    gate.gain.setValueAtTime(0.0001, at);
+    gate.gain.linearRampToValueAtTime(0.13, at + 0.04);
+    gate.gain.setValueAtTime(0.13, at + ON - 0.06);
+    gate.gain.linearRampToValueAtTime(0.0001, at + ON);
+    gate.gain.setValueAtTime(0, at + ON + 0.005);
+  }
+
+  body.start(t); body.stop(t + total + 0.05);
+  edge.start(t); edge.stop(t + total + 0.05);
+
+  this.alertNodes = { gate: gate, body: body, edge: edge, ends: t + total };
+};
+
+// Cut the alarm short. Ramped over 60 ms rather than stopped dead, for the
+// same reason the pulses fade: an oscillator killed mid-cycle is a click.
+SoundSynthesizer.prototype.stopAlert = function () {
+  if (!this.ctx || !this.alertNodes) return;
+  var t = this.now();
+  var n = this.alertNodes;
+  try {
+    n.gate.gain.cancelScheduledValues(t);
+    n.gate.gain.setValueAtTime(Math.max(0.0001, n.gate.gain.value), t);
+    n.gate.gain.linearRampToValueAtTime(0, t + 0.06);
+    n.body.stop(t + 0.08);
+    n.edge.stop(t + 0.08);
+  } catch (e) { /* already stopped; nothing to cut */ }
+  this.alertNodes = null;
+  this.alertUntil = 0;
+};
+
+// 6. GAME OVER -- a deep resonant fall, 200 Hz down to 80 Hz, into a tail.
+//
+// The tail is a real feedback delay (140 ms, lowpassed, fed back at 0.42)
+// rather than a set of scheduled echoes. Both would work; the delay line is
+// one node instead of six and it decays on its own, which is what makes the
+// end of the run sound like a room going quiet rather than like a sound
+// stopping. The wet gain is taken to zero at 1.4 s so a loop with rounding on
+// its side cannot ring forever.
+SoundSynthesizer.prototype.playGameOver = function () {
+  if (!this.ready() || !this.throttle("over", 1.5)) return;
+  this.stopAlert();                    // the run is over; the warning is moot
+  if (!this.claimVoices(4, 1.3)) return;
+
+  var t = this.now();
+  var FALL = 0.8;
+
+  var lp = this.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(1400, t);
+  lp.frequency.exponentialRampToValueAtTime(280, t + FALL);
+  lp.Q.value = 1.4;
+
+  var out = this.env(t, 0.85, 0.02, 1.05);
+  lp.connect(out);
+
+  var delay = this.ctx.createDelay(0.5);
+  delay.delayTime.value = 0.14;
+  var feedback = this.ctx.createGain();
+  feedback.gain.value = 0.42;
+  var damp = this.ctx.createBiquadFilter();
+  damp.type = "lowpass";
+  damp.frequency.value = 1200;        // each repeat is darker than the last,
+                                       // which is what a room does
+  var wet = this.ctx.createGain();
+  wet.gain.setValueAtTime(0.4, t);
+  wet.gain.setValueAtTime(0.4, t + 1.0);
+  wet.gain.linearRampToValueAtTime(0, t + 1.4);
+
+  lp.connect(delay);
+  delay.connect(damp);
+  damp.connect(feedback);
+  feedback.connect(delay);
+  damp.connect(wet);
+  wet.connect(this.sfxBus);
+
+  // The fall itself, plus two harmonics that decay faster. The harmonics are
+  // what make it resonant rather than a sine slide; taking them away leaves a
+  // sound that could be a UI transition.
+  var partials = [
+    { type: "sawtooth", mul: 1,   level: 0.42, decay: 1.0 },
+    { type: "sine",     mul: 2,   level: 0.16, decay: 0.55 },
+    { type: "sine",     mul: 3,   level: 0.07, decay: 0.34 }
+  ];
+  for (var i = 0; i < partials.length; i++) {
+    var p = partials[i];
+    var o = this.ctx.createOscillator();
+    o.type = p.type;
+    o.frequency.setValueAtTime(200 * p.mul, t);
+    o.frequency.exponentialRampToValueAtTime(80 * p.mul, t + FALL);
+    o.start(t);
+    o.stop(t + p.decay + 0.1);
+    o.connect(this.env(t, p.level, 0.012, p.decay, lp));
+  }
+};
+
+// 7. UI CLICK -- short, bright, and out of the way.
+//
+// 800-1000 Hz, 90 ms end to end, with a highpassed noise tick under the front
+// of it. Deliberately the quietest sound in the game: it fires more often than
+// anything else and a click that competes with the battlefield is a click the
+// player turns the volume down to escape.
+SoundSynthesizer.prototype.playUIClick = function () {
+  if (!this.ready() || !this.throttle("ui", 0.04)) return;
+  if (!this.claimVoices(2, 0.12)) return;
+
+  var t = this.now();
+  var f = 800 + Math.random() * 200;
+
+  var o = this.osc("triangle", f, t, t + 0.11);
+  o.frequency.exponentialRampToValueAtTime(f * 0.82, t + 0.07);
+  o.connect(this.env(t, 0.16, 0.002, 0.07));
+
+  var hp = this.ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 2600;
+  hp.connect(this.env(t, 0.05, 0.001, 0.02));
+  this.noise(t, t + 0.04).connect(hp);
+};
+
+// 8. TOWER FIRE -- an energy discharge, pitched by what fired it.
+//
+// The quietest thing here after the UI click, and heavily rate limited: five
+// towers at three times speed is a lot of shots per second, and this sound
+// exists to sit UNDER the hits rather than to announce itself. If it ever
+// competes with playEnemyHit, turn it down rather than shortening it -- the
+// impact is the information, the shot is only the texture.
+var SOUND_FIRE_KINDS = {
+  light:  { pitch: 1.0,  level: 0.11, dur: 0.20 },   // Rifleman and friends
+  heavy:  { pitch: 0.62, level: 0.15, dur: 0.28 },   // Warbringer
+  pierce: { pitch: 1.45, level: 0.10, dur: 0.24 },   // Arcane Sniper
+  blub:   { pitch: 1.22, level: 0.09, dur: 0.18 }    // a Summoner's blubs
+};
+
+SoundSynthesizer.prototype.playTowerFire = function (kind) {
+  if (!this.ready() || !this.throttle("fire", 0.07)) return;
+  if (!this.claimVoices(2, 0.32)) return;
+
+  var spec = SOUND_FIRE_KINDS[kind] || SOUND_FIRE_KINDS.light;
+  var t = this.now();
+  var wobble = 0.94 + Math.random() * 0.12;
+  var dur = spec.dur;
+
+  // The whoosh: a bandpass climbing and then falling across the burst. One
+  // filter moving is the whole difference between air and hiss.
+  var bp = this.ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.Q.value = 1.6;
+  bp.frequency.setValueAtTime(700 * spec.pitch * wobble, t);
+  bp.frequency.exponentialRampToValueAtTime(2400 * spec.pitch * wobble, t + dur * 0.35);
+  bp.frequency.exponentialRampToValueAtTime(600 * spec.pitch * wobble, t + dur);
+  bp.connect(this.env(t, spec.level, 0.006, dur));
+  this.noise(t, t + dur + 0.05).connect(bp);
+
+  // A pitched tail under it, so a discharge has a body and not only air.
+  var o = this.osc("sawtooth", 360 * spec.pitch * wobble, t, t + dur * 0.7);
+  o.frequency.exponentialRampToValueAtTime(130 * spec.pitch, t + dur * 0.6);
+  o.connect(this.env(t, spec.level * 0.55, 0.004, dur * 0.55));
+};
+
+
+// --- Mixer state ------------------------------------------------------------
+//
+// Every setter ramps rather than assigns. A gain jumped from 0.7 to 0 while
+// something is sounding is a click, and "mute in the middle of an explosion"
+// is one of the things this had to get right.
+
+SoundSynthesizer.prototype.rampGain = function (node, value) {
+  if (!node) return;
+  var t = this.now();
+  node.gain.cancelScheduledValues(t);
+  node.gain.setValueAtTime(node.gain.value, t);
+  node.gain.linearRampToValueAtTime(value, t + 0.03);
+};
+
+SoundSynthesizer.prototype.setMasterVolume = function (v) {
+  this.masterVolume = Math.max(0, Math.min(1, v));
+  if (!this.muted) this.rampGain(this.master, this.masterVolume);
+};
+
+SoundSynthesizer.prototype.setSfxVolume = function (v) {
+  this.sfxVolume = Math.max(0, Math.min(1, v));
+  this.rampGain(this.sfxBus, this.sfxVolume);
+};
+
+SoundSynthesizer.prototype.setMusicVolume = function (v) {
+  this.musicVolume = Math.max(0, Math.min(1, v));
+  this.rampGain(this.musicBus, this.musicVolume);
+};
+
+SoundSynthesizer.prototype.setMuted = function (on) {
+  this.muted = !!on;
+  this.rampGain(this.master, this.muted ? 0 : this.masterVolume);
+  // The alarm is the one sound long enough to survive a mute and come back
+  // out the other side, which would be a klaxon starting from nowhere.
+  if (this.muted) this.stopAlert();
+};
+
+SoundSynthesizer.prototype.toggleMute = function () {
+  this.setMuted(!this.muted);
+  return this.muted;
+};
+
+// Three points on the master fader, so a player who does not want to aim at a
+// slider still gets a choice. They set the MASTER only: the SFX and music
+// faders are a balance between buses and a preset that reset them would throw
+// away a mix the player had already made.
+var SOUND_PRESETS = { quiet: 0.3, normal: 0.7, loud: 1.0 };
+
+SoundSynthesizer.prototype.applyPreset = function (name) {
+  var v = SOUND_PRESETS[name];
+  if (v === undefined) return;
+  if (this.muted) this.setMuted(false);
+  this.setMasterVolume(v);
+};
+
+// Which preset the current master volume corresponds to, or null. Read by the
+// panel so the preset buttons light up rather than being three dead labels.
+SoundSynthesizer.prototype.currentPreset = function () {
+  for (var name in SOUND_PRESETS) {
+    if (Math.abs(SOUND_PRESETS[name] - this.masterVolume) < 0.005) return name;
+  }
+  return null;
+};
+
+// Run state, cleared when the run is. Volumes are NOT run state and survive --
+// they are a preference the player set once, and resetting them on every
+// restart would be the audio equivalent of resetting the camera zoom.
+SoundSynthesizer.prototype.reset = function () {
+  this.stopAlert();
+  this.deathBurst = [];
+  this.lastAt = {};
+};
+
+// Which fire sound a projectile deserves. Read off the BULLET rather than
+// asked of the tower, because update() has the new bullet in its hand and
+// would otherwise need a back-reference the simulation does not keep.
+//
+// Duck-typed first (`pierce` is PierceBullet's own field), constructor name
+// second. THE CONSTRUCTOR NAMES ARE THE OLD ONES: `Smasher` is the tower the
+// player calls the Warbringer, and the file is still js/smasher.js -- see the
+// "Tower names" section of AGENTS.md for why the code kept them. There is no
+// build step in this project, so a constructor's name survives to runtime.
+//
+// An unrecognised bullet gets the light shot, which is the right failure: a
+// new tower type is audible on the day it is added, at a plausible pitch,
+// without anyone having to remember this function exists.
+function fireKindOf(bullet) {
+  if (!bullet) return "light";
+  if (bullet.pierce !== undefined) return "pierce";
+  var owner = bullet.owner;
+  var name = owner && owner.constructor && owner.constructor.name;
+  if (name === "BlubTower") return "blub";
+  if (name === "Smasher") return "heavy";
+  return "light";
+}
+
+// The one instance. Constructed at load time because nothing in the
+// constructor touches Web Audio; the context itself waits for a gesture.
+var Sound = new SoundSynthesizer();
+
+
+// --- The audio panel --------------------------------------------------------
+//
+// Interface chrome, drawn on the game canvas like every other control in this
+// project rather than as DOM over it. That is not stylistic: the canvas is
+// letterboxed and scaled by CSS (see index.html), so a DOM slider would need
+// its own copy of that mapping to stay where it was put, and toGameCoords
+// already solves the problem for everything drawn here. A canvas panel also
+// inherits the 1280x720 layout the rest of the HUD is authored against.
+//
+// It lives in the bottom-right chrome row with the speed and auto-wave
+// buttons, for the reason stated at speedButtonRect: that corner is the one
+// region of the viewport nothing else claims. Opening it does NOT pause the
+// game -- the ask was explicitly for controls reachable mid-run, and a mixer
+// that stopped the world would be a mixer nobody could balance against what
+// they were listening to.
+//
+// The button's position is fixed relative to the speed button and does NOT
+// close up when the wave controls go away at the end of the schedule. A
+// control that moves is a control the player has to find again.
+
+var AUDIO_BUTTON_W = 44;
+var AUDIO_PANEL_W = 268;
+var AUDIO_PANEL_H = 216;
+
+// Open state and the live slider drag. Both are UI, not run state, so a
+// restart leaves them alone -- the panel you opened stays open.
+var audioPanelOpen = false;
+var audioDrag = null;          // "master" | "sfx" | "music" while dragging
+
+function audioButtonRect() {
+  // Anchored off the auto-wave button's rectangle, which exists whether or not
+  // that button is drawn (see autoSkipButtonRect). Deriving the x from the
+  // same source keeps one number describing the row's spacing.
+  var auto = autoSkipButtonRect();
+  return { x: auto.x - 8 - AUDIO_BUTTON_W, y: auto.y, w: AUDIO_BUTTON_W, h: auto.h };
+}
+
+function audioPanelRect() {
+  var speed = speedButtonRect();
+  return {
+    x: VIEW_WIDTH - 24 - AUDIO_PANEL_W,
+    y: speed.y - 10 - AUDIO_PANEL_H,
+    w: AUDIO_PANEL_W,
+    h: AUDIO_PANEL_H
+  };
+}
+
+// Every rectangle in the panel, from one function -- so what is drawn and what
+// is clickable can never disagree. Same arrangement slotRect and
+// inspectionLayout use, and for the same reason.
+function audioPanelLayout() {
+  var p = audioPanelRect();
+  var inner = p.x + 14;
+  var innerW = p.w - 28;
+
+  function track(top) {
+    return { x: inner, y: p.y + top + 16, w: 178, h: 6 };
+  }
+
+  return {
+    panel: p,
+    close: { x: p.x + p.w - 34, y: p.y + 10, w: 24, h: 24 },
+    mute: { x: inner, y: p.y + 34, w: innerW, h: 30 },
+    sliders: [
+      { key: "master", label: "MASTER", labelY: p.y + 74,  track: track(74) },
+      { key: "sfx",    label: "EFFECTS", labelY: p.y + 108, track: track(108) },
+      { key: "music",  label: "MUSIC",  labelY: p.y + 142, track: track(142),
+        note: "none yet" }
+    ],
+    presets: [
+      { key: "quiet",  label: "Quiet",  x: inner,       y: p.y + 178, w: 76, h: 24 },
+      { key: "normal", label: "Normal", x: inner + 82,  y: p.y + 178, w: 76, h: 24 },
+      { key: "loud",   label: "Loud",   x: inner + 164, y: p.y + 178, w: 76, h: 24 }
+    ]
+  };
+}
+
+function audioVolumeOf(key) {
+  if (key === "sfx") return Sound.sfxVolume;
+  if (key === "music") return Sound.musicVolume;
+  return Sound.masterVolume;
+}
+
+function setAudioVolume(key, value) {
+  if (key === "sfx") Sound.setSfxVolume(value);
+  else if (key === "music") Sound.setMusicVolume(value);
+  else Sound.setMasterVolume(value);
+}
+
+// Which slider is under a point, or null. The vertical slop is deliberate and
+// generous: the track is six pixels tall and nobody can hit six pixels.
+function audioSliderAt(x, y) {
+  if (!audioPanelOpen) return null;
+  var L = audioPanelLayout();
+  for (var i = 0; i < L.sliders.length; i++) {
+    var t = L.sliders[i].track;
+    if (x >= t.x - 9 && x <= t.x + t.w + 9 &&
+        y >= t.y - 11 && y <= t.y + t.h + 11) {
+      return L.sliders[i].key;
+    }
+  }
+  return null;
+}
+
+// Set a slider from a cursor position. Used by both the press and the drag, so
+// grabbing the handle and clicking somewhere on the track are one code path.
+function dragAudioSliderTo(key, x) {
+  var L = audioPanelLayout();
+  for (var i = 0; i < L.sliders.length; i++) {
+    if (L.sliders[i].key !== key) continue;
+    var t = L.sliders[i].track;
+    setAudioVolume(key, (x - t.x) / t.w);
+    return;
+  }
+}
+
+// Did this press start a slider drag? Called from onMouseDown, ABOVE the 3D
+// early-return there, because a mixer has to work on the board the game
+// actually ships with.
+function audioPanelMouseDown(x, y) {
+  var key = audioSliderAt(x, y);
+  if (!key) return false;
+  audioDrag = key;
+  dragAudioSliderTo(key, x);
+  Sound.unlock();
+  return true;
+}
+
+// Did this click land on the audio button or inside the panel? Returns true
+// when it was consumed, which is the same contract runPanelAction has.
+function audioPanelClick(x, y) {
+  if (pointInRect(x, y, audioButtonRect())) {
+    audioPanelOpen = !audioPanelOpen;
+    Sound.playUIClick();
+    return true;
+  }
+  if (!audioPanelOpen) return false;
+
+  var L = audioPanelLayout();
+  if (!pointInRect(x, y, L.panel)) return false;
+
+  if (pointInRect(x, y, L.close)) {
+    audioPanelOpen = false;
+    Sound.playUIClick();
+    return true;
+  }
+
+  if (pointInRect(x, y, L.mute)) {
+    var nowMuted = Sound.toggleMute();
+    // The click that UNMUTES gets to be heard; the one that mutes does not,
+    // which is the honest confirmation in each direction.
+    if (!nowMuted) Sound.playUIClick();
+    return true;
+  }
+
+  for (var i = 0; i < L.presets.length; i++) {
+    if (!pointInRect(x, y, L.presets[i])) continue;
+    Sound.applyPreset(L.presets[i].key);
+    Sound.playUIClick();          // at the new level, so it doubles as a demo
+    return true;
+  }
+
+  // A slider press was already handled on mousedown. Everything else inside
+  // the panel is dead space that must still EAT the click -- anything drawn
+  // over the map has to, or the player builds a tower underneath the mixer.
+  return true;
+}
+
+function drawAudioButton() {
+  var r = audioButtonRect();
+  var hot = pointInRect(mouse.x, mouse.y, r);
+  var muted = Sound.muted || Sound.masterVolume <= 0;
+
+  ctx.fillStyle = audioPanelOpen ? "rgba(140,179,230,0.20)" : "rgba(28,30,38,0.85)";
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = audioPanelOpen
+    ? "rgba(140,179,230,0.95)"
+    : (hot ? "rgba(199,209,224,0.55)" : "rgba(199,209,224,0.30)");
+  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+  var colour = muted ? "#e0736e" : (audioPanelOpen ? "#8cb3e6" : "rgba(199,209,224,0.80)");
+  var cx = r.x + 15;
+  var cy = r.y + r.h / 2;
+
+  // A speaker cone, drawn rather than typed: a glyph would depend on the
+  // system font having it, and this HUD is otherwise all shapes.
+  ctx.fillStyle = colour;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5, cy - 3);
+  ctx.lineTo(cx - 1, cy - 3);
+  ctx.lineTo(cx + 4, cy - 8);
+  ctx.lineTo(cx + 4, cy + 8);
+  ctx.lineTo(cx - 1, cy + 3);
+  ctx.lineTo(cx - 5, cy + 3);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 1.6;
+  if (muted) {
+    // The slash. Two strokes so it reads at a glance from across the screen,
+    // which is the whole point of a mute indicator.
+    ctx.beginPath();
+    ctx.moveTo(cx + 9, cy - 6);
+    ctx.lineTo(cx + 19, cy + 6);
+    ctx.moveTo(cx + 19, cy - 6);
+    ctx.lineTo(cx + 9, cy + 6);
+    ctx.stroke();
+  } else {
+    // Two arcs, and how many are lit is the volume. The reading is the same
+    // idea as the chevrons on the speed button beside it.
+    var arcs = Sound.masterVolume > 0.55 ? 2 : 1;
+    for (var i = 0; i < arcs; i++) {
+      ctx.beginPath();
+      ctx.arc(cx + 4, cy, 7 + i * 5, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawAudioPanel() {
+  if (!audioPanelOpen) return;
+  var L = audioPanelLayout();
+  var p = L.panel;
+
+  ctx.fillStyle = "rgba(18,19,26,0.94)";
+  ctx.fillRect(p.x, p.y, p.w, p.h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(140,179,230,0.45)";
+  ctx.strokeRect(p.x + 0.5, p.y + 0.5, p.w - 1, p.h - 1);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#8cb3e6";
+  ctx.font = "600 13px system-ui, sans-serif";
+  ctx.fillText("AUDIO", p.x + 14, p.y + 12);
+
+  // Close.
+  var closeHot = pointInRect(mouse.x, mouse.y, L.close);
+  ctx.strokeStyle = closeHot ? "#ffffff" : "rgba(199,209,224,0.55)";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(L.close.x + 7, L.close.y + 7);
+  ctx.lineTo(L.close.x + 17, L.close.y + 17);
+  ctx.moveTo(L.close.x + 17, L.close.y + 7);
+  ctx.lineTo(L.close.x + 7, L.close.y + 17);
+  ctx.stroke();
+
+  // Mute.
+  var m = L.mute;
+  var muteHot = pointInRect(mouse.x, mouse.y, m);
+  ctx.fillStyle = Sound.muted ? "rgba(224,115,110,0.20)" : "rgba(140,230,157,0.14)";
+  ctx.fillRect(m.x, m.y, m.w, m.h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = Sound.muted
+    ? "rgba(224,115,110,0.90)"
+    : (muteHot ? "rgba(140,230,157,0.90)" : "rgba(140,230,157,0.55)");
+  ctx.strokeRect(m.x + 0.5, m.y + 0.5, m.w - 1, m.h - 1);
+
+  ctx.beginPath();
+  ctx.arc(m.x + 16, m.y + m.h / 2, 5, 0, Math.PI * 2);
+  ctx.fillStyle = Sound.muted ? "#e0736e" : "#8ce69d";
+  ctx.fill();
+
+  ctx.font = "600 12px system-ui, sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = Sound.muted ? "#e0736e" : "#8ce69d";
+  ctx.fillText(Sound.muted ? "MUTED" : "SOUND ON", m.x + 28, m.y + m.h / 2);
+
+  ctx.textAlign = "right";
+  ctx.font = "10px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(199,209,224,0.45)";
+  ctx.fillText("M", m.x + m.w - 10, m.y + m.h / 2);
+  ctx.textAlign = "left";
+
+  // Sliders.
+  for (var i = 0; i < L.sliders.length; i++) {
+    var s = L.sliders[i];
+    var value = audioVolumeOf(s.key);
+    var t = s.track;
+    var live = !Sound.muted;
+
+    ctx.textBaseline = "top";
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.fillStyle = live ? "rgba(199,209,224,0.80)" : "rgba(199,209,224,0.35)";
+    ctx.fillText(s.label, t.x, s.labelY);
+
+    if (s.note) {
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.30)";
+      ctx.fillText("(" + s.note + ")", t.x + 48, s.labelY + 1);
+    }
+
+    ctx.textAlign = "right";
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.fillStyle = live ? "#8cb3e6" : "rgba(199,209,224,0.35)";
+    ctx.fillText(Math.round(value * 100) + "%", p.x + p.w - 14, s.labelY);
+    ctx.textAlign = "left";
+
+    // Track, then the filled part, then the handle. Drawn as three rectangles
+    // rather than one gradient so the level is readable at a glance in the
+    // corner of the eye, which is where this panel will actually be looked at.
+    ctx.fillStyle = "rgba(199,209,224,0.16)";
+    ctx.fillRect(t.x, t.y, t.w, t.h);
+
+    ctx.fillStyle = live ? "rgba(140,179,230,0.85)" : "rgba(199,209,224,0.25)";
+    ctx.fillRect(t.x, t.y, t.w * value, t.h);
+
+    var hx = t.x + t.w * value;
+    var grabbed = (audioDrag === s.key);
+    ctx.beginPath();
+    ctx.arc(hx, t.y + t.h / 2, grabbed ? 8 : 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = live ? (grabbed ? "#ffffff" : "#8cb3e6") : "rgba(199,209,224,0.35)";
+    ctx.fill();
+  }
+
+  // Presets. The active one is lit, so the three buttons read as a setting
+  // rather than as three things to press.
+  var active = Sound.currentPreset();
+  for (var k = 0; k < L.presets.length; k++) {
+    var b = L.presets[k];
+    var on = (active === b.key) && !Sound.muted;
+    var hot = pointInRect(mouse.x, mouse.y, b);
+
+    ctx.fillStyle = on ? "rgba(255,215,110,0.16)" : "rgba(28,30,38,0.85)";
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = on
+      ? "rgba(255,215,110,0.85)"
+      : (hot ? "rgba(199,209,224,0.55)" : "rgba(199,209,224,0.25)");
+    ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.fillStyle = on ? "#ffd76e" : "rgba(199,209,224,0.75)";
+    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2);
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}

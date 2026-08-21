@@ -169,7 +169,7 @@ var EnemyWreck = (function () {
       rec.y = e.pos.y;
       rec.radius = radius;
       if (heading) rec.yaw = Math.atan2(heading.y, heading.x);
-      rec.lift = api.flightLift ? api.flightLift(e, radius) : radius * 3.45;
+      rec.lift = api.bodyLift ? api.bodyLift(e, radius) : radius * 3.45;
       rec.seen = now;
     }
 
