@@ -4,9 +4,10 @@
 //
 //     MIDDLE drag    orbit -- horizontal spins around the point you are
 //                    looking at, vertical raises and lowers the eye
-//     OPTION drag    orbit, for the trackpad -- a MacBook has no middle button
-//                    at all, so on that hardware the mouse binding above is not
-//                    awkward, it is unreachable
+//     SHIFT drag     orbit, for the trackpad -- a MacBook has no middle button
+//     OPTION drag    at all, so on that hardware the mouse binding above is not
+//                    awkward, it is unreachable. Shift is the one that is
+//                    guaranteed to arrive; see the note in pointerdown.
 //     RIGHT drag     pan across the ground
 //     TWO FINGERS    pan, grabbing the ground under the fingers
 //     PINCH          zoom, toward whatever is under the cursor
@@ -344,12 +345,26 @@ OrbitCamera.prototype._bindInput = function () {
 
   canvas.addEventListener("pointerdown", function (e) {
     if (!self.enabled) return;
-    // OPTION+LEFT IS THE TRACKPAD'S MIDDLE BUTTON. A MacBook trackpad reports
-    // exactly two buttons, so `e.button === 1` can never arrive from one and
-    // the orbit had no binding at all on that hardware -- not an uncomfortable
-    // one, none. Option is the modifier Blender, Figma and Maya all put the
-    // orbit on, and unlike Control it is not aliased to a right-click by macOS.
-    var mode = (e.button === 0 && e.altKey) ? "orbit"
+    // A MODIFIED LEFT DRAG IS THE TRACKPAD'S MIDDLE BUTTON. A MacBook trackpad
+    // reports exactly two buttons, so `e.button === 1` can never arrive from
+    // one and the orbit had no binding at all on that hardware -- not an
+    // uncomfortable one, none.
+    //
+    // SHIFT IS THE ONE THAT SURVIVES THE TRIP. Option was the obvious pick --
+    // Blender, Figma and Maya all put the orbit there -- and on Diego's Mac it
+    // never reached the page at all: something upstream of the browser claims
+    // Option and zooms instead, and whatever claims it, `preventDefault` is
+    // downstream of the theft and cannot help. Control is not an option either,
+    // because macOS aliases Control+click to a right-click, which is this
+    // game's cancel. Shift is left, nothing on the platform wants it, and
+    // nothing in the game reads a modifier at all -- verified by grep across
+    // js/, where these are the only four modifier reads in the codebase.
+    //
+    // Option is KEPT as a second binding rather than replaced. Where it is not
+    // stolen it is the more familiar gesture, and a binding that silently does
+    // not fire costs nothing next to one that does.
+    var modified = e.button === 0 && (e.shiftKey || e.altKey);
+    var mode = modified ? "orbit"
              : e.button === 1 ? "orbit"
              : (e.button === 2 ? "pan" : null);
     if (!mode) return;
@@ -568,7 +583,7 @@ OrbitCamera.prototype._bindInput = function () {
   // so it lands before the event reaches the canvas at all, which makes it
   // independent of who happened to register their listener first.
   function swallowOrbitClick(e) {
-    if (!self.enabled || !e.altKey) return;
+    if (!self.enabled || !(e.shiftKey || e.altKey)) return;
     if (e.target !== canvas && e.target !== self.canvas) return;
     e.stopPropagation();
   }
