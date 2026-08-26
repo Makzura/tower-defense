@@ -1468,11 +1468,13 @@ var allWavesDeployed = false;
 var runKills = 0;
 
 // Meta coins are paid out once per run, at the moment it ends. `runAwarded`
-// is the latch that guarantees the once; `lastRunCoins` is what the overlay
+// is the latch that guarantees the once; `lastRunAward` is what the overlay
 // shows. Both are RUN state -- restartGame() clears them -- even though the
 // coins themselves outlive the run in js/meta.js.
 var runAwarded = false;
-var lastRunCoins = 0;
+// The whole award, not just its total -- see MetaProgress.awardRun. Null until
+// a run has ended; restartGame() clears it with the rest of the run state.
+var lastRunAward = null;
 
 // `waveIndex` is the wave IN PLAY, or the next wave during a transition. Once
 // every wave has been through, waveIndex equals WAVES.length.
@@ -1853,7 +1855,7 @@ function restartGame() {
   allWavesDeployed = false;
   runKills = 0;
   runAwarded = false;
-  lastRunCoins = 0;
+  lastRunAward = null;
   pendingBounty = 0;
   pendingBountyWave = 0;
 
@@ -3297,7 +3299,18 @@ function update(dt) {
   // clears it.
   if ((gameOver || victory) && !runAwarded) {
     runAwarded = true;
-    lastRunCoins = MetaProgress.awardRun(reachedWave(), victory);
+    // STRUCTURED SINCE 2026-08-26: the result screen shows where every coin
+    // came from and must never re-derive it, so what comes back is the list of
+    // sources and a total summed FROM them. The map is named as well as
+    // identified because the first-clear bonus is keyed on the ID -- a rename
+    // must not pay twice -- while the label the player reads is the name.
+    lastRunAward = MetaProgress.awardRun({
+      wavesCompleted: wavesCompleted(),
+      waveReached: reachedWave(),
+      victory: victory,
+      mapId: Maps.currentId ? Maps.currentId() : (currentMap && currentMap.id),
+      mapName: currentMap && currentMap.name
+    });
   }
 
   // Cosmetic timers advance on the same fixed step as the world they
@@ -4999,6 +5012,24 @@ function reachedWave() {
   return Math.max(1, waveIndex);
 }
 
+// HOW MANY WAVES ARE ACTUALLY FINISHED, which is what the reward ladder counts
+// and is NOT `reachedWave()`. The two differ by one exactly when a wave is in
+// play, and that is the whole off-by-one the ladder could have been built on.
+//
+// `waveIndex` is the 0-BASED cursor and it is the answer in both states, which
+// is why this is one line rather than a branch: mid-wave the cursor still
+// points at the unfinished wave, so waves 1..waveIndex are done; between waves
+// the cursor has already stepped past the one that ended, so waves
+// 1..waveIndex are done. Clamped at the schedule length so a victory reports
+// 35 rather than a cursor that has run off the end.
+//
+//   in play on wave 11   waveIndex 10   reached 11   completed 10
+//   between 5 and 6      waveIndex  5   reached  5   completed  5
+//   victory              waveIndex 35   reached 35   completed 35
+function wavesCompleted() {
+  return Math.max(0, Math.min(WAVES.length, waveIndex));
+}
+
 function drawGameOver() {
   if (!gameOver) return;
 
@@ -5045,7 +5076,8 @@ function drawRunOverlay(spec) {
   // "spend this in the armoury".
   ctx.fillStyle = "#ffd76e";
   ctx.font = "600 17px system-ui, sans-serif";
-  ctx.fillText("+" + lastRunCoins + " ⬡   ·   " + MetaProgress.coins() + " meta coins banked",
+  ctx.fillText("+" + (lastRunAward ? lastRunAward.total : 0) + " ⬡   ·   " +
+    MetaProgress.coins() + " meta coins banked",
     VIEW_WIDTH / 2, VIEW_HEIGHT / 2 + 24);
 
   drawOverlayButton(restartButtonRect(),

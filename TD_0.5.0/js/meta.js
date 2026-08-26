@@ -63,11 +63,18 @@ var MetaProgress = (function () {
   // silently: `sanitise` keeps only ids it can find in this catalogue, which is
   // exactly the behaviour that makes removing a tower safe.
   var CATALOGUE = [
+    // NO LONGER IN THE OPENING HAND (2026-08-26). A fresh profile owns the
+    // Rifleman and nothing else; this is the first thing a player buys, and it
+    // is priced so that the wave-11 milestone pays for it outright -- reaching
+    // the Midboss for the first time banks exactly 10 coins, so the run that
+    // shows you the wall also hands you the answer to it. Losing to the
+    // Midboss still counts: the gate is the wave REACHED, not the kill.
     {
       id: "smasher",
       global: "Smasher",
-      price: 0,
-      starter: true,
+      price: 10,
+      starter: false,
+      requiresWave: 11,
       blurb: "Melee wedge, 12 damage a swing. Cuts through 5 flat armor."
     },
     {
@@ -134,7 +141,25 @@ var MetaProgress = (function () {
   function starterProfile() {
     var owned = CATALOGUE.filter(function (t) { return t.starter; })
       .map(function (t) { return t.id; });
-    return { coins: 0, owned: owned, equipped: defaultLoadout(owned), runs: 0 };
+    return {
+      coins: 0,
+      owned: owned,
+      equipped: defaultLoadout(owned),
+      runs: 0,
+      // THE THREE FIELDS THE 2026-08-26 REWARD REWRITE ADDED.
+      //
+      // `bestWave` is the high-water mark across every run on the profile, and
+      // it is what gates the Warbringer -- not the wave of the run that just
+      // ended, or a player would lose the unlock by dying early afterwards.
+      //
+      // `milestones` and `routesWon` are CLAIMED LEDGERS, not counters: an
+      // objective pays once for the life of the save, so what has to persist
+      // is which ones have been paid, and the only safe way to write that is
+      // the list itself. A count would re-pay the moment the ladder changed.
+      bestWave: 0,
+      milestones: [],
+      routesWon: []
+    };
   }
 
   // Owned towers land in catalogue order, one per slot, remaining slots empty.
@@ -203,13 +228,55 @@ var MetaProgress = (function () {
     if (cheapest > startingCash()) equipped = defaultLoadout(owned);
 
     return {
-      coins: (typeof raw.coins === "number" && isFinite(raw.coins) && raw.coins >= 0)
-        ? Math.floor(raw.coins) : 0,
+      coins: wholeAtLeastZero(raw.coins),
       owned: owned,
       equipped: equipped,
-      runs: (typeof raw.runs === "number" && isFinite(raw.runs) && raw.runs >= 0)
-        ? Math.floor(raw.runs) : 0
+      runs: wholeAtLeastZero(raw.runs),
+      // MISSING IS NOT CORRUPT. A profile written before 2026-08-26 has none
+      // of these three, and the safe default for all of them is "nothing
+      // claimed yet" -- which costs an old save nothing it had and hands it
+      // every milestone still ahead of it. It does NOT retroactively pay for
+      // waves already reached: those runs are over and were paid under the
+      // rules of their day.
+      bestWave: wholeAtLeastZero(raw.bestWave),
+      milestones: knownIdList(raw.milestones, MILESTONE_IDS),
+      // Route ids are OPEN: a map can be added, and a save naming one this
+      // build does not have must load rather than throw. Unknown ids are kept
+      // out of the ledger but never crash it -- see the note on Maps ids.
+      routesWon: cleanStringList(raw.routesWon)
     };
+  }
+
+  // Every number off disk goes through here: negatives, NaN, Infinity, strings
+  // and undefined all become 0, and a fractional value is floored rather than
+  // rejected. Written once because there are five of them now.
+  function wholeAtLeastZero(v) {
+    return (typeof v === "number" && isFinite(v) && v >= 0) ? Math.floor(v) : 0;
+  }
+
+  // A list of ids, deduplicated, with anything not in `allowed` dropped.
+  function knownIdList(raw, allowed) {
+    var out = [];
+    if (!raw || !raw.length) return out;
+    for (var i = 0; i < raw.length; i++) {
+      var id = raw[i];
+      if (typeof id !== "string") continue;
+      if (allowed.indexOf(id) === -1) continue;
+      if (out.indexOf(id) === -1) out.push(id);
+    }
+    return out;
+  }
+
+  // The same, with no allow-list: used for route ids, which this file cannot
+  // enumerate without depending on Maps.
+  function cleanStringList(raw) {
+    var out = [];
+    if (!raw || !raw.length) return out;
+    for (var i = 0; i < raw.length; i++) {
+      var id = raw[i];
+      if (typeof id === "string" && id && out.indexOf(id) === -1) out.push(id);
+    }
+    return out;
   }
 
   function load() {
@@ -277,28 +344,128 @@ var MetaProgress = (function () {
 
   function coins() { return ensure().coins; }
 
-  // The award. Deliberately a pure function of what the run achieved, so the
-  // store screen can PROMISE a number before the run and the loss screen can
-  // show the same one after it, without either re-deriving the rule.
+  // --- what a run pays -----------------------------------------------------
   //
-  // Two per wave reached, sixty for a clear. Tuned against the store: a first
-  // run dies somewhere around wave 17 (measured -- see AGENTS.md), which pays
-  // 32, so the Longshot's 40 is two runs away and is the purchase that makes
-  // the campaign winnable at all. The Siphon's 150 is a longer project.
-  function coinsForRun(waveReached, victory) {
-    var cleared = Math.max(0, (waveReached || 0) - 1);
-    return cleared * 2 + (victory ? 60 : 0);
+  // REWRITTEN 2026-08-26. The old rule was two coins per wave cleared plus
+  // sixty for a win, which paid a smooth trickle for grinding the opening and
+  // made a clear worth about the same as two ordinary losses. The new one is a
+  // LADDER on waves actually FINISHED, so the reward is for getting further
+  // rather than for playing longer, and a full clear is worth exactly twice
+  // what dying on the last wave is.
+  //
+  // WAVE COUNTING, ONCE, HERE, because this is where the off-by-one lives.
+  // `waveIndex` is a 0-BASED cursor; `reachedWave()` is 1-BASED. A wave that
+  // is in play has NOT been completed. So the count of finished waves is the
+  // cursor itself in both states -- mid-wave the cursor still points at the
+  // unfinished one, and between waves it has already stepped past the one that
+  // ended. game.js passes it rather than deriving it a second time here.
+  var REPEATABLE_TIERS = [
+    { atLeast: 30, coins: 40 },
+    { atLeast: 25, coins: 28 },
+    { atLeast: 20, coins: 18 },
+    { atLeast: 15, coins: 10 },
+    { atLeast: 10, coins: 5 }
+  ];
+  var VICTORY_COINS = 80;
+
+  // A CLEAR REPLACES THE TIER, it does not stack on it. 34 waves finished and
+  // a loss pays 40; 35 and a win pays 80, which is the doubling the ladder is
+  // built around -- not 120.
+  function repeatableCoins(wavesCompleted, victory) {
+    if (victory) return VICTORY_COINS;
+    var done = (typeof wavesCompleted === "number" && isFinite(wavesCompleted))
+      ? Math.max(0, Math.floor(wavesCompleted)) : 0;
+    for (var i = 0; i < REPEATABLE_TIERS.length; i++) {
+      if (done >= REPEATABLE_TIERS[i].atLeast) return REPEATABLE_TIERS[i].coins;
+    }
+    return 0;
   }
 
-  // Bank a finished run. Returns what was awarded so the overlay can show it.
-  function awardRun(waveReached, victory) {
-    var earned = coinsForRun(waveReached, victory);
+  // --- one-time objectives -------------------------------------------------
+  //
+  // The first implementation of the quest system. Each pays ONCE for the life
+  // of the save, which is why the profile stores the claimed ids rather than a
+  // count: the ladder can grow, and a count would re-pay everything under it.
+  //
+  // Gated on the wave REACHED, not on the wave completed and not on a kill --
+  // meeting the Midboss is the achievement, and losing to it still counts.
+  var WAVE_MILESTONES = [
+    { id: "reach_11", wave: 11, coins: 10, label: "Reached wave 11" },
+    { id: "reach_20", wave: 20, coins: 15, label: "Reached wave 20" },
+    { id: "reach_25", wave: 25, coins: 20, label: "Reached wave 25" },
+    { id: "reach_30", wave: 30, coins: 25, label: "Reached wave 30" }
+  ];
+  var MILESTONE_IDS = WAVE_MILESTONES.map(function (m) { return m.id; });
+
+  var FIRST_WIN_COINS = 25;
+
+  // Keyed on the ROUTE ID, never on its display name: a rename must not hand
+  // the bonus out twice, and two routes must never collide because their names
+  // happen to match.
+  function firstWinId(mapId) { return "first_win:" + mapId; }
+
+  // --- banking a finished run ----------------------------------------------
+  //
+  // Returns a STRUCTURED result rather than a number, because the result
+  // screen has to show where the coins came from and must never re-derive
+  // them. Every source carries a stable id, a printable label and an amount;
+  // `total` is summed FROM the sources, so the screen and the bank cannot
+  // disagree. `bounties` is empty and present on purpose -- it is the slot the
+  // rotating objectives will land in, and giving it a shape now means the
+  // screen does not have to change when they arrive.
+  //
+  // `run` is { wavesCompleted, waveReached, victory, mapId }.
+  function awardRun(run) {
+    run = run || {};
     var s = ensure();
-    s.coins += earned;
+    var victory = !!run.victory;
+    var completed = Math.max(0, Math.floor(run.wavesCompleted || 0));
+    var reached = Math.max(0, Math.floor(run.waveReached || 0));
+
+    var repeatable = repeatableCoins(completed, victory);
+    var objectives = [];
+
+    WAVE_MILESTONES.forEach(function (m) {
+      if (reached < m.wave) return;
+      if (s.milestones.indexOf(m.id) !== -1) return;
+      s.milestones.push(m.id);
+      objectives.push({ id: m.id, label: m.label, amount: m.coins });
+    });
+
+    if (victory && run.mapId) {
+      var id = firstWinId(run.mapId);
+      if (s.routesWon.indexOf(run.mapId) === -1) {
+        s.routesWon.push(run.mapId);
+        objectives.push({
+          id: id,
+          label: "First clear of " + (run.mapName || run.mapId),
+          amount: FIRST_WIN_COINS
+        });
+      }
+    }
+
+    var bounties = [];
+    var total = repeatable;
+    objectives.forEach(function (o) { total += o.amount; });
+    bounties.forEach(function (b) { total += b.amount; });
+
+    // The high-water mark, which is what the store gates on. It only ever goes
+    // up -- a later, shorter run must not take an unlock away.
+    if (reached > s.bestWave) s.bestWave = reached;
+
+    s.coins += total;
     s.runs += 1;
     save();
-    return earned;
+
+    return {
+      repeatable: repeatable,
+      objectives: objectives,
+      bounties: bounties,
+      total: total
+    };
   }
+
+  function bestWave() { return ensure().bestWave; }
 
   // --- owning and equipping ------------------------------------------------
 
@@ -312,6 +479,22 @@ var MetaProgress = (function () {
     var found = entry(id);
     if (!found) return { ok: false, reason: "no such tower" };
     if (owns(id)) return { ok: false, reason: "already owned" };
+
+    // THE GATE IS ENFORCED HERE, not in the store's drawing code. A greyed-out
+    // button is a courtesy; this is the rule. A hand-edited save or a direct
+    // MetaProgress.buy("smasher") has to hit the same wall the button does,
+    // and the reason is returned as a sentence because the store prints it
+    // verbatim -- same arrangement whyCannotBuild has with the build preview.
+    if (typeof found.requiresWave === "number" && s.bestWave < found.requiresWave) {
+      return {
+        ok: false,
+        locked: true,
+        requiresWave: found.requiresWave,
+        progress: s.bestWave,
+        reason: "reach wave " + found.requiresWave + " to unlock (best: " + s.bestWave + ")"
+      };
+    }
+
     if (s.coins < found.price) {
       return { ok: false, reason: "needs " + (found.price - s.coins) + " more coins" };
     }
@@ -438,7 +621,11 @@ var MetaProgress = (function () {
   // Read-only view, for tests and the screens.
   function snapshot() {
     var s = ensure();
-    return { coins: s.coins, owned: s.owned.slice(), equipped: s.equipped.slice(), runs: s.runs };
+    return {
+      coins: s.coins, owned: s.owned.slice(), equipped: s.equipped.slice(),
+      runs: s.runs, bestWave: s.bestWave,
+      milestones: s.milestones.slice(), routesWon: s.routesWon.slice()
+    };
   }
 
   return {
@@ -448,8 +635,18 @@ var MetaProgress = (function () {
     entry: entry,
     constructorOf: constructorOf,
     coins: coins,
-    coinsForRun: coinsForRun,
+    // `coinsForRun` is GONE (2026-08-26). It took (waveReached, victory) and
+    // returned a bare number, and both halves of that signature were wrong
+    // under the ladder: the ladder counts waves FINISHED, and a run now pays
+    // from several sources at once. Callers use `repeatableCoins` for the
+    // promise a store screen wants to make, and `awardRun` for the banking.
+    repeatableCoins: repeatableCoins,
     awardRun: awardRun,
+    bestWave: bestWave,
+    milestoneTable: function () { return WAVE_MILESTONES.slice(); },
+    firstWinCoins: function () { return FIRST_WIN_COINS; },
+    repeatableTiers: function () { return REPEATABLE_TIERS.slice(); },
+    victoryCoins: function () { return VICTORY_COINS; },
     owns: owns,
     buy: buy,
     equipped: equipped,

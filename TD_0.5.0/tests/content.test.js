@@ -55,26 +55,45 @@ function Targeting_MODES(h) {
 // straddle the swing and the blast" below checks every relationship these
 // tests depend on. If the scale moves again, THAT test fails, with a message
 // saying which mark drifted -- and the rest keep testing the AoE.
+// RE-SOLVED 2026-08-26, when the base range went 31.25 -> 37.5 u.l. The old
+// marks (+10 / +24 / +36) were chosen against a 31.25 wedge, and the wider
+// swing swallowed IN_BLAST: the guard test below is what said so, by name.
+//
+// Solved rather than scaled. The three have to satisfy six relations at once
+// and the blast radius did NOT move with the range, so multiplying by 1.2 does
+// not preserve them. Measured on the live geometry: the bare swing now covers
+// out to SMASH_AT+30 and the blast is 19.5 px, which pins IN_BLAST between +31
+// and IN_ZONE+19. These sit in the middle of every constraint rather than on
+// the edge of one -- d(victim, bystander) 15 against a 19.5 blast, d(victim,
+// beyond) 25 against it, d(bystander, beyond) 10.
 var SMASH_AT = 300;              // where the smasher stands, beside the road
-var IN_ZONE = SMASH_AT + 10;     // inside the swing
-var IN_BLAST = SMASH_AT + 24;    // outside a BARE swing, inside the victim's blast
-var BEYOND = SMASH_AT + 36;      // outside a bare swing and outside that blast
+var IN_ZONE = SMASH_AT + 20;     // inside the swing
+var IN_BLAST = SMASH_AT + 35;    // outside a BARE swing, inside the victim's blast
+var BEYOND = SMASH_AT + 45;      // outside a bare swing and outside that blast
 
 // The chain marks, added 2026-07-30 with the chaining blast. A separate ladder
-// from the three above because they were chosen against a 31.25 u.l. wedge and
-// a B4 Warbringer's is 56.25 -- see the note above the B4 group.
+// from the three above because they are measured against a B4 wedge, not a bare
+// one -- see the note above the B4 group.
 //
-// Each is within the 18.75 u.l. blast radius of the one before it (16 px, then
-// 12 px where the road bends), and CHAIN_4 onward sit outside a B4 swing
-// entirely, so only a chain can reach them. CHAIN_CONTROL is 58 px past the
-// last link, well beyond any blast. Measured against the real path geometry,
+// RE-SOLVED 2026-08-26 WITH THE THREE ABOVE, and for a reason that is easy to
+// get wrong: path B's range is `rangeBonusUl`, which is ADDITIVE ON THE BASE,
+// not a `rangeUl` the longest-value rule would absorb. So the base going
+// 31.25 -> 37.5 carried the whole B path up with it and a B4 Warbringer now
+// reaches 62.5 u.l. against 56.25 -- covering out to SMASH_AT+42 where it used
+// to stop short of +58. CHAIN_4 was inside the swing, and "only a chain can
+// reach them" quietly stopped being true.
+//
+// Each link is 12 px from the one before it, inside the 19.5 px blast; CHAIN_1
+// to CHAIN_3 sit inside a B4 swing and CHAIN_4 onward outside it, so only a
+// chain can reach those two. CHAIN_CONTROL is 58 px past the last link, 54 px
+// from it and well beyond any blast. Measured against the real path geometry,
 // not estimated; if a rescale moves them, the chain test is where it shows.
-var CHAIN_1 = SMASH_AT + 10;
-var CHAIN_2 = SMASH_AT + 26;
-var CHAIN_3 = SMASH_AT + 42;
-var CHAIN_4 = SMASH_AT + 58;
-var CHAIN_5 = SMASH_AT + 72;
-var CHAIN_CONTROL = SMASH_AT + 130;
+var CHAIN_1 = SMASH_AT + 8;
+var CHAIN_2 = SMASH_AT + 20;
+var CHAIN_3 = SMASH_AT + 32;
+var CHAIN_4 = SMASH_AT + 44;
+var CHAIN_5 = SMASH_AT + 56;
+var CHAIN_CONTROL = SMASH_AT + 114;
 
 function placeSmasherBeside(h, progress) {
   return placeBeside(h, progress, "Smasher");
@@ -2304,15 +2323,15 @@ test("a base smasher matches the agreed numbers", function (t) {
   h.run("cash = 100000");
   var s = h.placeSmasher(600, 500);
 
-  t.eq(h.game.Smasher.COST, 700, "cost");
+  t.eq(h.game.Smasher.COST, 600, "cost");
   t.eq(s.damage, 12, "damage");
-  t.eq(s.cooldownSeconds, 4.0, "hit speed");
-  t.eq(s.rangeUl, 31.25, "range");
+  t.eq(s.cooldownSeconds, 3.5, "hit speed");
+  t.eq(s.rangeUl, 37.5, "range");
   t.eq(s.arcDegrees, 120, "arc");
   t.eq(s.fullCircle, false, "not a full circle");
   t.eq(s.slow, null, "no slow");
   t.eq(s.explodesOnKill, false, "no explosion");
-  t.eq(h.game.cash, 100000 - 700, "cash deducted");
+  t.eq(h.game.cash, 100000 - 600, "cash deducted");
 });
 
 test("it shares the gunner footprint, so spacing rules are identical", function (t) {
@@ -2431,7 +2450,7 @@ test("it holds its swing until something is in the zone", function (t) {
   t.eq(dealt, 12, "and lands when the swing finishes");
   // The wind-up is taken out of the cooldown that follows, so the RATE is
   // unchanged: a full cycle is still cooldownSeconds.
-  t.near(s.cooldown, 4.0 - s.swingSeconds(), 0.001,
+  t.near(s.cooldown, 3.5 - s.swingSeconds(), 0.001,
     "the cooldown that follows is short by the swing");
 });
 
@@ -2486,9 +2505,9 @@ test("damage is additive across every owned upgrade", function (t) {
   ["A1", "A2", "A3", "A4", "A5"].forEach(function (id) {
     t.eq(h.run("buyUpgrade(towers[0], '" + id + "')"), null, "bought " + id);
   });
-  t.eq(s.damage, 52, "full path A: 12+4+5+7+10+14");
+  t.eq(s.damage, 61, "full path A: 12+4+5+9+13+18");
   t.eq(s.rangeUl, 62.5, "range from the highest A owned");
-  t.eq(s.cooldownSeconds, 4.0, "path A does not change hit speed");
+  t.eq(s.cooldownSeconds, 3.5, "path A does not change hit speed");
   t.eq(s.fullCircle, true, "full circle from A4");
   t.eq(s.slow, null, "path A has no slow");
 });
@@ -2524,8 +2543,8 @@ test("full path B with no A upgrades totals 30", function (t) {
   });
   t.eq(s.damage, 30, "12+0+0+4+6+8");
   // 2026-07-30: path B DOES extend range now -- B2 +15, B4 +10, B5 +15, all
-  // additive on the 31.25 base. It used to grant none at all.
-  t.eq(s.rangeUl, 71.25, "31.25 + 15 (B2) + 10 (B4) + 15 (B5)");
+  // additive on the 37.5 base. It used to grant none at all.
+  t.eq(s.rangeUl, 77.5, "37.5 + 15 (B2) + 10 (B4) + 15 (B5)");
   t.eq(s.cooldownSeconds, 2.2, "hit speed");
   t.eq(s.hasQuake, true, "and B5 grants the earthquake");
 });
@@ -2537,18 +2556,18 @@ test("path B's range bonuses land on the tiers that were asked for", function (t
   h.run("cash = 100000");
   var s = h.placeSmasher(600, 500);
 
-  t.eq(s.rangeUl, 31.25, "base");
+  t.eq(s.rangeUl, 37.5, "base");
   h.run("buyUpgrade(towers[0], 'B1')");
-  t.eq(s.rangeUl, 31.25, "B1 grants none");
+  t.eq(s.rangeUl, 37.5, "B1 grants none");
   h.run("buyUpgrade(towers[0], 'B2')");
-  t.eq(s.rangeUl, 46.25, "B2 grants +15");
+  t.eq(s.rangeUl, 52.5, "B2 grants +15");
   h.run("buyUpgrade(towers[0], 'B3')");
-  t.eq(s.rangeUl, 46.25, "B3 grants none");
+  t.eq(s.rangeUl, 52.5, "B3 grants none");
   h.run("buyUpgrade(towers[0], 'B4')");
-  t.eq(s.rangeUl, 56.25, "B4 grants +10");
+  t.eq(s.rangeUl, 62.5, "B4 grants +10");
   t.eq(s.hasQuake, false, "and B4 does NOT grant the earthquake");
   h.run("buyUpgrade(towers[0], 'B5')");
-  t.eq(s.rangeUl, 71.25, "B5 grants +15");
+  t.eq(s.rangeUl, 77.5, "B5 grants +15");
 });
 
 // Path A is absolute and was NOT touched. This is the guard on the other side
@@ -2579,7 +2598,7 @@ test("stats are folded from flags, so the order they were set in cannot matter",
   t.eq(a.damage, b.damage, "same damage");
   t.eq(a.rangeUl, b.rangeUl, "same range");
   t.eq(a.cooldownSeconds, b.cooldownSeconds, "same hit speed");
-  t.eq(a.damage, 28, "12+4+5+7");
+  t.eq(a.damage, 30, "12+4+5+9");
 });
 
 test("upgrades must be bought in tier order", function (t) {
@@ -2591,7 +2610,7 @@ test("upgrades must be bought in tier order", function (t) {
   t.eq(h.run("buyUpgrade(towers[0], 'A5')"), "needs A4", "A5 straight away");
   t.eq(h.run("buyUpgrade(towers[0], 'B3')"), "needs B2", "B3 before B2");
   t.eq(s.upgradeCount, 0, "nothing was granted");
-  t.eq(h.game.cash, 100000 - 700, "and nothing was charged");
+  t.eq(h.game.cash, 100000 - 600, "and nothing was charged");
 
   t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 is available from the start");
   t.eq(h.run("buyUpgrade(towers[0], 'A2')"), null, "A2 once A1 is owned");
@@ -2650,13 +2669,13 @@ test("upgrades cost money and are refused when unaffordable", function (t) {
   // witness that can actually change.
   h.run("cash = " + (700 + 250));
   var s = h.placeSmasher(600, 500);      // leaves 250
-  t.eq(h.game.cash, 250, "cash after building");
+  t.eq(h.game.cash, 350, "cash after building");
 
   t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 affordable at 200");
-  t.eq(h.game.cash, 50, "cash after A1");
+  t.eq(h.game.cash, 150, "cash after A1");
   t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough cash", "A2 refused at 350");
   t.eq(s.hasA2, false, "and not granted");
-  t.eq(h.game.cash, 50, "no cash taken for a refused upgrade");
+  t.eq(h.game.cash, 150, "no cash taken for a refused upgrade");
 
   t.eq(h.run("buyUpgrade(towers[0], 'A1')"), "already owned", "cannot buy twice");
   t.eq(h.run("buyUpgrade(towers[0], 'Z9')"), "no such upgrade", "unknown id");
@@ -2674,13 +2693,13 @@ test("selling refunds half of everything invested, upgrades included", function 
   var h = harness.boot();
   h.run("cash = 100000");
   var s = h.placeSmasher(600, 500);
-  t.eq(h.run("sellValue(towers[0])"), 350, "half of the 700 build cost");
+  t.eq(h.run("sellValue(towers[0])"), 300, "half of the 600 build cost");
 
   h.run("buyUpgrade(towers[0], 'A1')");
-  // A1 is $200 since the 2026-08-01 retune, so the investment is 700 + 200.
-  t.eq(s.totalSpent, 900, "700 + 200 invested");
-  t.eq(s.cost, 700, "and the build price itself never moved");
-  t.eq(h.run("sellValue(towers[0])"), 450, "half of everything invested");
+  // A1 is $200 since the 2026-08-01 retune, so the investment is 600 + 200.
+  t.eq(s.totalSpent, 800, "600 + 200 invested");
+  t.eq(s.cost, 600, "and the build price itself never moved");
+  t.eq(h.run("sellValue(towers[0])"), 400, "half of everything invested");
 });
 
 group("smasher: slow");
@@ -3169,8 +3188,8 @@ test("an upgrade preview shows the DPS it would buy", function (t) {
   var a1 = s.previewUpgrade("A1").changes
     .filter(function (c) { return c.label === "DPS"; })[0];
   t.ok(a1, "A1 has a DPS row");
-  t.eq(a1.from + " → " + a1.to, "3.0 → 4.0", "damage up, rate flat");
-  t.eq(a1.delta, "+1", "the gain");
+  t.eq(a1.from + " → " + a1.to, "3.4 → 4.6", "damage up, rate flat");
+  t.eq(a1.delta, "+1.14", "the gain");
 
   // B1 buys the same DPS from the other side -- same 12 damage, swung every
   // 3 s instead of 4. Two upgrades that read completely differently on the
@@ -3178,14 +3197,14 @@ test("an upgrade preview shows the DPS it would buy", function (t) {
   // place that is visible.
   var b1 = s.previewUpgrade("B1").changes
     .filter(function (c) { return c.label === "DPS"; })[0];
-  t.eq(b1.from + " → " + b1.to, "3.0 → 4.0", "rate up, damage flat");
+  t.eq(b1.from + " → " + b1.to, "3.4 → 4.0", "rate up, damage flat");
 
   // And it is measured, not read off the table: after A1 the same B1 is worth
   // more, because it is now speeding up a heavier hammer.
   h.run("buyUpgrade(towers[0], 'A1')");
   var after = s.previewUpgrade("B1").changes
     .filter(function (c) { return c.label === "DPS"; })[0];
-  t.eq(after.from + " → " + after.to, "4.0 → 5.3", "crosspathing included");
+  t.eq(after.from + " → " + after.to, "4.6 → 5.3", "crosspathing included");
 });
 
 test("the panel offers the next tier on each branch, with its price", function (t) {
@@ -3241,7 +3260,7 @@ test("buttons walk a whole branch, then that branch reads MAXED", function (t) {
     var b = h.run("inspectionLayout(inspected).upgrades[0]");
     h.click(b.x + b.w / 2, b.y + b.h / 2);
   }
-  t.eq(s.damage, 52, "full path A bought through the panel");
+  t.eq(s.damage, 61, "full path A bought through the panel");
   t.eq(s.ownedUpgradeIds().join(""), "A1A2A3A4A5", "in tier order");
 
   // A is finished. Its button stays, greyed, reading MAXED -- it does not
@@ -3264,7 +3283,7 @@ test("buttons walk a whole branch, then that branch reads MAXED", function (t) {
   t.eq(buttons.length, 2, "still two");
   t.eq(buttons[1].id, "B3", "B3 shown, shut out by path A");
   t.eq(buttons[1].enabled, false, "greyed, not live");
-  t.eq(s.damage, 52, "B1 and B2 add no damage");
+  t.eq(s.damage, 61, "B1 and B2 add no damage");
   t.eq(s.cooldownSeconds, 2.2, "but they do speed it up");
 });
 
@@ -3361,17 +3380,19 @@ test("each button spells out what the upgrade does", function (t) {
   // the panel, not the panel changing how it spells things.
   t.eq(buttons[0].label, "Path A → A1", "which tier");
   t.eq(buttons[0].detail, "$200", "what it costs");
-  t.eq(buttons[0].effects, "+4 dmg, +6.25 u.l. range, +30 HP", "A1 effects");
+  t.eq(buttons[0].effects, "+4 dmg, +30 HP",
+    "A1 effects -- no range line since 2026-08-26: the base IS its 37.5");
 
   // Spelled by the SAME formatter the config-driven towers use, in the same
   // unit every tower's panel now reports its rate in. It used to read "-1.0 s"
   // -- a different quantity, in a different direction, under a different name.
   // B1 still moves nothing but the swing rate, and now the hit points.
-  t.eq(buttons[1].effects, "+0.08 atk/s, +35 HP", "B1 changes attack speed and HP");
+  t.eq(buttons[1].effects, "+0.05 atk/s, +35 HP",
+    "B1 changes attack speed and HP -- +0.05 now the base cooldown is 3.5, not 4.0");
 
   ["A1", "A2"].forEach(function (id) { h.run("buyUpgrade(inspected, '" + id + "')"); });
   buttons = h.run("inspectionLayout(inspected).upgrades");
-  t.eq(buttons[0].effects, "+7 dmg, +6.25 u.l. range, +70 HP", "A3 effects");
+  t.eq(buttons[0].effects, "+9 dmg, +6.25 u.l. range, +70 HP", "A3 effects");
 });
 
 test("effects are diffed against this tower, not read off the table", function (t) {
@@ -3476,7 +3497,14 @@ test("hovering a button opens a card with the whole story", function (t) {
   t.eq(byLabel.Damage.from, "12", "damage before");
   t.eq(byLabel.Damage.to, "16", "damage after");
   t.eq(byLabel.Damage.delta, "+4", "and the delta");
-  t.eq(byLabel.Range.to, "37.5 u.l.", "range in u.l., after");
+
+  // NO RANGE ROW SINCE 2026-08-26, and its absence is the assertion. A1 grants
+  // `rangeUl: 37.50` and the base range was raised to exactly that, so under
+  // the longest-value-wins rule A1 no longer moves the range at all -- and the
+  // card is right to say nothing rather than to print "37.5 -> 37.5". This
+  // used to read `byLabel.Range.to === "37.5 u.l."`, which is now a TypeError
+  // rather than a failure, so it is written as a presence check.
+  t.eq(byLabel.Range, undefined, "and no range row, because A1 no longer moves it");
 });
 
 test("the card measures against this tower, and names the abilities it grants", function (t) {
@@ -3576,7 +3604,7 @@ test("an unaffordable button is shown dead and cannot be clicked through", funct
   var b = h.run("inspectionLayout(inspected).upgrades[0]");
   t.eq(b.label, "Path A → A1", "still shows what it would buy");
   t.eq(b.detail, "$200", "and what that would cost");
-  t.eq(b.effects, "+4 dmg, +6.25 u.l. range, +30 HP", "and what it would do");
+  t.eq(b.effects, "+4 dmg, +30 HP", "and what it would do");
   t.eq(b.enabled, false, "but is not live at $60");
 
   h.click(b.x + b.w / 2, b.y + b.h / 2);
@@ -3620,7 +3648,7 @@ test("the sell button still works with the upgrade row present", function (t) {
   h.run("buyUpgrade(inspected, 'A1')");
 
   var refund = h.run("sellValue(inspected)");
-  t.eq(refund, 450, "half of 700 + 200");
+  t.eq(refund, 400, "half of 600 + 200");
 
   var b = h.run("inspectionLayout(inspected).sell");
   var before = h.game.cash;
@@ -4637,12 +4665,13 @@ test("a fresh profile owns the starter kit and nothing else", function (t) {
   h.run("MetaProgress.reset(); rebuildBuildBar()");
 
   var profile = h.run("MetaProgress.snapshot()");
-  // The gunner was DELETED from the catalogue on 2026-07-30, so the starter kit
-  // is two towers rather than three. These are typed on purpose: this test's
-  // subject IS the starter kit, so reading it from MetaProgress would only
-  // assert that the kit equals itself and would pass whatever it became.
-  t.deep(profile.owned, ["smasher", "soldier"],
-    "the Smasher and the Soldier to start");
+  // ONE TOWER SINCE 2026-08-26. The gunner was deleted from the catalogue on
+  // 2026-07-30 and the Warbringer left the opening hand on 2026-08-26 -- it is
+  // a 10-coin purchase gated on reaching wave 11 now. These are typed on
+  // purpose: this test's subject IS the starter kit, so reading it from
+  // MetaProgress would only assert that the kit equals itself and would pass
+  // whatever it became.
+  t.deep(profile.owned, ["soldier"], "the Rifleman alone to start");
   t.eq(profile.coins, 0, "no coins");
 
   // The Soldier is LAST in the catalogue, which is what puts it in the fifth
@@ -4652,7 +4681,7 @@ test("a fresh profile owns the starter kit and nothing else", function (t) {
   var bar = h.run("BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; })");
   // Display names, so they carry the 2026-07-30 reskin; the ids above are the
   // persistence format and are deliberately unchanged.
-  t.deep(bar, ["Warbringer", "Rifleman", null, null, null],
+  t.deep(bar, ["Rifleman", null, null, null, null],
     "and a bar to match");
 
   // The bar's LENGTH is the one thing that must never move: its geometry is
@@ -4666,10 +4695,22 @@ test("the payout is a pure function of how far the run got", function (t) {
   var h = harness.boot();
   var Meta = h.game.MetaProgress;
 
-  t.eq(Meta.coinsForRun(1, false), 0, "dying on wave 1 pays nothing");
-  t.eq(Meta.coinsForRun(17, false), 32, "wave 17 pays 2 a wave cleared");
-  t.eq(Meta.coinsForRun(17, true), 92, "a clear adds 60");
-  t.ok(Meta.coinsForRun(25, false) > Meta.coinsForRun(17, false), "further is worth more");
+  // THE LADDER, at every boundary it has (2026-08-26). It replaced "two per
+  // wave cleared plus sixty for a clear", which paid a smooth trickle for
+  // grinding the opening; this pays for getting FURTHER, and it counts waves
+  // FINISHED rather than the wave reached.
+  [[0, 0], [9, 0], [10, 5], [14, 5], [15, 10], [19, 10], [20, 18], [24, 18],
+   [25, 28], [29, 28], [30, 40], [34, 40]].forEach(function (pair) {
+    t.eq(Meta.repeatableCoins(pair[0], false), pair[1],
+      pair[0] + " waves finished pays " + pair[1]);
+  });
+  t.eq(Meta.repeatableCoins(35, true), 80, "a clear pays 80");
+  // The doubling the ladder is built around: a clear is worth exactly twice
+  // dying on the last wave, and is NOT that plus eighty.
+  t.eq(Meta.repeatableCoins(35, true), 2 * Meta.repeatableCoins(34, false),
+    "exactly twice the last losing tier");
+  t.ok(Meta.repeatableCoins(35, true) !== 120, "a clear REPLACES the tier, it does not stack");
+  t.ok(Meta.repeatableCoins(25, false) > Meta.repeatableCoins(17, false), "further is worth more");
 });
 
 test("a run banks its coins exactly once", function (t) {
@@ -4683,7 +4724,7 @@ test("a run banks its coins exactly once", function (t) {
   t.eq(h.game.gameOver, true, "the run ended");
 
   var after = h.run("MetaProgress.coins()");
-  t.ok(after > before || h.run("lastRunCoins") === 0, "coins were banked");
+  t.ok(after > before || h.run("lastRunAward ? lastRunAward.total : 0") === 0, "coins were banked");
   t.eq(h.run("runAwarded"), true, "and the latch is set");
 
   // The sandbox un-loses a run by putting base HP back; a second award on the
@@ -4694,7 +4735,7 @@ test("a run banks its coins exactly once", function (t) {
 
   h.run("restartGame()");
   t.eq(h.run("runAwarded"), false, "a restart re-arms it");
-  t.eq(h.run("lastRunCoins"), 0, "and clears the readout");
+  t.eq(h.run("lastRunAward"), null, "and clears the readout");
 });
 
 test("buying a tower spends coins and puts it in the bar", function (t) {
@@ -4715,8 +4756,17 @@ test("buying a tower spends coins and puts it in the bar", function (t) {
   h.run("Store.onClick(" + (action.x + 10) + ", " + (action.y + 10) + ")");
   t.eq(h.run("MetaProgress.owns('longshot')"), false, "cannot buy what you cannot afford");
 
-  h.run("MetaProgress.awardRun(17, false); MetaProgress.awardRun(17, false)");
-  t.eq(h.run("MetaProgress.coins()"), 64, "two runs' worth");
+  // Two losing runs deep enough to pay, under the 2026-08-26 ladder: 20 waves
+  // finished is the 18-coin tier, so two of them is 36 and the Longshot's 40
+  // is still out of reach -- which is what the next click proves. A third
+  // clears it.
+  h.run("MetaProgress.awardRun({ wavesCompleted: 20, waveReached: 21 });" +
+        "MetaProgress.awardRun({ wavesCompleted: 20, waveReached: 21 });" +
+        "MetaProgress.awardRun({ wavesCompleted: 20, waveReached: 21 })");
+  // 79, not 3 x 18: the FIRST of those runs also crossed wave 11 and wave 20
+  // for the first time on this profile, and those milestones pay 10 and 15
+  // once each. 18 + 25, then 18, then 18.
+  t.eq(h.run("MetaProgress.coins()"), 79, "three runs, plus two first-time milestones");
 
   h.run("Store.onClick(" + (action.x + 10) + ", " + (action.y + 10) + ")");
   t.eq(h.run("MetaProgress.owns('longshot')"), true, "now it is owned");
@@ -4724,12 +4774,12 @@ test("buying a tower spends coins and puts it in the bar", function (t) {
   // from the catalogue: what this line is for is that buying CHARGES, and an
   // expectation computed from the same price the purchase used would hold even
   // if nothing were deducted at all.
-  t.eq(h.run("MetaProgress.coins()"), 24, "and paid for");
+  t.eq(h.run("MetaProgress.coins()"), 39, "and paid for");
 
   // Into the first FREE slot, which is the third now that the gunner is gone
   // from in front of the two starters.
   var bar = h.run("BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; })");
-  t.deep(bar, ["Warbringer", "Rifleman", "Arcane Sniper", null, null],
+  t.deep(bar, ["Rifleman", "Arcane Sniper", null, null, null],
     "a purchase goes straight into the bar");
 });
 
@@ -5905,7 +5955,7 @@ test("adding the Soldier moved nothing on the towers that already existed", func
   t.eq(h.game.Tower.BASE_FIRE_RATE, 1, "gunner fire rate");
   t.eq(h.game.Tower.BASE_HP, 60, "gunner hit points");
   t.eq(h.game.Tower.BASE_RANGE_UL, 100, "gunner range");
-  t.eq(h.game.Smasher.COST, 700, "smasher cost");
+  t.eq(h.game.Smasher.COST, 600, "smasher cost");
   t.eq(h.game.Smasher.BASE_DAMAGE, 12, "smasher damage");
 
   // A gunner's bullet carries no pierce, so it mitigates exactly as it always

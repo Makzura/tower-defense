@@ -5374,11 +5374,11 @@ prefers a summon — clicking the fused pair opens the monster.
 | T0 | < 500 | 150 | 1.0 | — | 25 |
 | T1 | 500–999 | 175 | 1.25 | 3 | 30 |
 | T2 | 1000–3499 | 200 | 1.5 | 8 | 35 |
-| T3 | ≥ 3500 | global | 2.5 | 15 | 50 |
+| T3 | ≥ 4500 | global | 2.5 | 15 | 50 |
 | T4 | **exactly 6666** | global | 5.0 | global | 100 |
 
 **Tier 4 is an exact threshold and is tested FIRST.** 6 665 and 6 667 are tier
-3; 6 666 is not. Ordering the check ahead of tier 3's `>= 3500` is the only
+3; 7 777 is not. Ordering the check ahead of tier 3's `>= 4500` is the only
 thing that makes that true, so it is written as an explicit first case rather
 than as a range.
 
@@ -6665,7 +6665,7 @@ no mechanic was moved to match the description.
 | Mechablub MK2 | on death it hops to the nearest enemy and detonates for a fixed 250 in 25 u.l. | `BlubTower.UNITS.mecha2` |
 | Coagulation | 300 s; merges every living blub's CURRENT charges and raw damage into one monster blub. T0-T2 stands beside the tower, as near the road as it can get **without leaving the tower's range**; T3+ stands ON it | `BlubTower.prototype.coagulate`, `findRoadSpot` |
 | Panel shortcuts | while a panel is open: **X** sells, **O** buys the next path A tier, **P** the next path B tier. Delete/Backspace still sell. None is a camera key; all go through the real button | `onKeyDown`, `pressUpgradeButton`, `drawKeyHint` |
-| Monster tiers | T0 <500, T1 500, T2 1000, T3 3500 (fuses the tower, targetable, +1/kill), T4 **exactly 6666** (stun-immune) | `BlubTower.MONSTER_TIERS` |
+| Monster tiers | T0 <500, T1 500, T2 1000, T3 4500 (fuses the tower, targetable, +1/kill), T4 **exactly 7777** (stun-immune) | `BlubTower.MONSTER_TIERS` |
 | Summons and enemies | never targeted (`isSummon`), but a LEAP's shockwave still stuns them | `Enemy.attackCandidates`, `Enemy.resolveAttack` |
 | Destroyed footprint | released the instant HP hits zero, before the sweep — one rule for every tower | `whyCannotBuild`, `BlubTower.spotIsFree` |
 | Blub rail | one grey box per summon line beside the panel: a bar that fills to the next spawn, the seconds, and how many of that type are alive. LIT while producing, DIM when not | `BlubTower.railLines`, `inspectionLayout` `.rail`, `drawBlubRail` |

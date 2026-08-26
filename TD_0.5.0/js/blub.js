@@ -298,24 +298,28 @@ BlubTower.upgradeById = function (id) {
 //
 // What Coagulation produces. Its tier is decided ONCE, by the pooled HP at the
 // moment of the merge, and never moves again -- a tier 3 monster that eats its
-// way up past 6 666 does not become a tier 4, because the brief makes the tier
+// way up past 7 777 does not become a tier 4, because the brief makes the tier
 // a property of the fusion rather than of the number.
 //
 // TIER 4 IS AN EXACT THRESHOLD and is tested FIRST, which is the whole joke:
-// 6 665 and 6 667 are tier 3 and 6 666 is not. Ordering the check before tier
-// 3's `>= 3500` is the only thing that makes that true, so it is written as an
+// 7 776 and 7 778 are tier 3 and 7 777 is not. Ordering the check before tier
+// 3's `>= 4500` is the only thing that makes that true, so it is written as an
 // explicit first case rather than as a range.
+//
+// RAISED 2026-08-26, from 3 500 and 6 666. Only the two thresholds moved: T0,
+// T1 and T2 keep their own, and nothing else about a monster -- rate, splash,
+// footprint, jump, targetability -- changed on any tier.
 BlubTower.MONSTER_TIERS = [
   { tier: 0, minHp: 0, rangeUl: 150, rate: 1.0, splashUl: 0, footprintUl: 25 },
   { tier: 1, minHp: 500, rangeUl: 175, rate: 1.25, splashUl: 3, footprintUl: 30 },
   { tier: 2, minHp: 1000, rangeUl: 200, rate: 1.5, splashUl: 8, footprintUl: 35,
     jump: { every: 15, damageMultiplier: 1, stunSeconds: 2, hpCost: 20,
       animSeconds: 0.5 } },
-  { tier: 3, minHp: 3500, global: true, rate: 2.5, splashUl: 15, footprintUl: 50,
+  { tier: 3, minHp: 4500, global: true, rate: 2.5, splashUl: 15, footprintUl: 50,
     fused: true, enemyTargetable: true, killsFeedIt: true,
     jump: { every: 15, damageMultiplier: 3, stunSeconds: 3, hpCost: 1,
       animSeconds: 0.5, global: true } },
-  { tier: 4, exactHp: 6666, global: true, rate: 5.0, splashGlobal: true,
+  { tier: 4, exactHp: 7777, global: true, rate: 5.0, splashGlobal: true,
     footprintUl: 100, fused: true, enemyTargetable: true, killsFeedIt: true,
     stunImmune: true,
     jump: { every: 4, damageMultiplier: 10, stunSeconds: 2, hpCost: 0,
@@ -1394,7 +1398,7 @@ BlubTower.prototype.panelActions = function () {
         ],
         abilities: UpgradeEffects.abilities(["coagulation"], null),
         note: "Permanent. The merge uses CURRENT charges, so a spent fleet " +
-          "merges smaller. Tier 4 needs exactly 6666."
+          "merges smaller. Tier 4 needs exactly 7777."
       })
     });
   }

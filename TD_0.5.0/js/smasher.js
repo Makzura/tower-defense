@@ -117,11 +117,25 @@ function Smasher(x, y, path) {
 // Cosmetic only -- see the note at the top of this file for why the id and the
 // constructor name did NOT follow it.
 Smasher.DISPLAY_NAME = "Warbringer";
-Smasher.COST = 700;
+// $600 SINCE 2026-08-26, from $700, and the three lines under it moved with it.
+// The Warbringer stopped being in the opening hand in the same change -- it is
+// a 10-coin store purchase gated on reaching wave 11 -- so the body has to be
+// worth buying on the run you unlock it, not merely worth owning. Cheaper to
+// place, quicker to swing, and it reaches the road from further back.
+Smasher.COST = 600;
 
-Smasher.BASE_DAMAGE = 12;
-Smasher.BASE_COOLDOWN = 4.0;         // seconds between swings
-Smasher.BASE_RANGE_UL = 31.25;   // 2.5 m under the old scale
+Smasher.BASE_DAMAGE = 12;            // unchanged: the swing itself is not the problem
+Smasher.BASE_COOLDOWN = 3.5;         // seconds between swings; 4.0 until 2026-08-26
+// 37.5 u.l. since 2026-08-26, from 31.25.
+//
+// THIS IS THE SAME NUMBER A1 ALREADY GRANTED, and that is a real consequence
+// rather than an oversight: `rangeUl` is resolved as "the LONGEST owned value
+// wins", so A1 no longer moves the range at all and now sells its damage and
+// its hit points alone. A1 was not re-priced here because the owner's
+// instruction was the base range and the path A damage deltas, and nothing
+// else. If A1 should be re-costed for what it now carries, that is a separate
+// decision with its own measurement.
+Smasher.BASE_RANGE_UL = 37.50;
 Smasher.BASE_ARC_DEGREES = 120;
 
 // Same as the gunner's on purpose -- see the constructor.
@@ -254,9 +268,13 @@ Smasher.QUAKE_COOLDOWN_SECONDS = 45;
 Smasher.UPGRADES = [
   { id: "A1", branch: "A", cost: 200, damage: 4,  hp: 30,  rangeUl: 37.50 },
   { id: "A2", branch: "A", cost: 350, damage: 5,  hp: 45,  rangeUl: 43.75, requires: "A1" },
-  { id: "A3", branch: "A", cost: 600, damage: 7,  hp: 70,  rangeUl: 50.00, requires: "A2", locksPath: true },
-  { id: "A4", branch: "A", cost: 1400, damage: 10, hp: 110, rangeUl: 56.25, requires: "A3", locksPath: true, fullCircle: true },
-  { id: "A5", branch: "A", cost: 1950, damage: 14, hp: 170, rangeUl: 62.50, requires: "A4", locksPath: true, fullCircle: true },
+  // A3/A4/A5 DAMAGE RAISED 2026-08-26: 7 -> 9, 10 -> 13, 14 -> 18. A1 and A2
+  // are untouched, so the path's shape is the same and only its back half pays
+  // more. Nothing else on path A moved -- not a cost, not a range, not the
+  // arc, not the hit points.
+  { id: "A3", branch: "A", cost: 600, damage: 9,  hp: 70,  rangeUl: 50.00, requires: "A2", locksPath: true },
+  { id: "A4", branch: "A", cost: 1400, damage: 13, hp: 110, rangeUl: 56.25, requires: "A3", locksPath: true, fullCircle: true },
+  { id: "A5", branch: "A", cost: 1950, damage: 18, hp: 170, rangeUl: 62.50, requires: "A4", locksPath: true, fullCircle: true },
 
   { id: "B1", branch: "B", cost: 200, damage: 0,  hp: 35,  cooldown: 3.0 },
   { id: "B2", branch: "B", cost: 400, damage: 0,  hp: 55,  cooldown: 2.2, requires: "B1", rangeBonusUl: 15 },

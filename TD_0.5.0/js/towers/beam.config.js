@@ -184,7 +184,16 @@ TowerConfigs.beam = {
         statDeltas: { ad: 1, range: 20, hp: 2000, maxTargets: 40 },
         mechanics: ["death_denial"],
         setParams: {
-          death_denial: { knockbackUl: 500, restoreBaseHpTo: 1 }
+          death_denial: { knockbackUl: 500, restoreBaseHpTo: 1 },
+          // 30% SINCE 2026-08-26, and written out rather than inherited.
+          //
+          // B5 carried no `lifesteal` key at all, so it silently kept B4's
+          // 0.20 -- which reads as "the last tier does not touch the drain"
+          // when what was meant is "the last tier drains hardest". `setParams`
+          // REPLACES, exactly as B4 replaces B3's 0.10, so this is 30% and
+          // never 20 + 30: the resolver takes the highest owned tier's value
+          // for a param and does not sum them.
+          lifesteal: { ratio: 0.30 }
         },
         // Checked by the upgrade validation layer, not just greyed out in
         // the UI. The unique key is GLOBAL -- one per game, not one per

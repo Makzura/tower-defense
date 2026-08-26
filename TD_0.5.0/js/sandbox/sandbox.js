@@ -585,7 +585,7 @@
       gameOver = false;
       runKills = 0;
       runAwarded = false;
-      lastRunCoins = 0;
+      lastRunAward = null;
       waveIndex = autoWaves ? 0 : WAVES.length;
       if (typeof Effects !== "undefined") Effects.reset();
     }

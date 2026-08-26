@@ -378,6 +378,31 @@ test("B4 replaces B3's lifesteal ratio", function (t) {
   t.near(resolved(0, 4).mechanics.lifesteal.ratio, 0.20, 1e-9, "B4 is 10:2");
 });
 
+// B5 CARRIED NO RATIO AT ALL UNTIL 2026-08-26, so it silently kept B4's 0.20 --
+// the last tier of the drain path did not touch the drain. It now names 0.30,
+// and the assertion that matters is the one below it: `setParams` REPLACES, so
+// the answer is 30% and never 20 + 30. A resolver that summed them would give
+// 0.50 and this test is what would say so.
+test("B5 replaces the ratio again, and does not stack on B4's", function (t) {
+  t.near(resolved(0, 5).mechanics.lifesteal.ratio, 0.30, 1e-9, "B5 is 10:3");
+  t.ok(resolved(0, 5).mechanics.lifesteal.ratio !== 0.50,
+    "not 20% + 30% -- the tiers replace, they do not sum");
+  t.ok(resolved(0, 5).mechanics.lifesteal.ratio >
+       resolved(0, 4).mechanics.lifesteal.ratio,
+    "and it is strictly the hardest drain on the path");
+});
+
+// The rest of B5 is deliberately UNTOUCHED by that change, and these are the
+// four numbers a retune of the ratio would be most likely to disturb.
+test("B5's reach, gate, price and uniqueness did not move with the ratio", function (t) {
+  var b5 = CONFIG.paths.B[4];
+  t.eq(resolved(0, 5).maxTargets, 50, "still up to 50 targets");
+  t.eq(b5.cost, 5000, "still 5000");
+  t.eq(b5.unlockCondition.totalHealedAtLeast, 5000, "still gated on 5000 healed");
+  t.eq(b5.unlockCondition.globalUniqueKey, "death_denial",
+    "still one per GAME, not one per tower");
+});
+
 test("120 damage on a tick at B4 is 24 base HP", function (t) {
   var ratio = resolved(0, 4).mechanics.lifesteal.ratio;
   t.near(120 * ratio, 24, 1e-9, "the spec's worked example");

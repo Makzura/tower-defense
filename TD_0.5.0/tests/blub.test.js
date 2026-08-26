@@ -529,25 +529,25 @@ test("21  the same hundred after six shots each pool 600, which is tier 1", func
   t.eq(tower.monster.currentHp, 600, "the monster carries the spent pool");
 });
 
-test("22  6666 is tier 4 exactly; 6665 and 6667 are tier 3", function (t) {
+test("22  7777 is tier 4 exactly; 7776 and 7778 are tier 3", function (t) {
   var h = boot();
   var tiers = h.game.BlubTower;
 
-  t.eq(tiers.monsterTierFor(6666).tier, 4, "6666");
-  t.eq(tiers.monsterTierFor(6665).tier, 3, "6665");
-  t.eq(tiers.monsterTierFor(6667).tier, 3, "6667");
-  t.eq(tiers.monsterTierFor(3500).tier, 3, "3500 is the tier 3 floor");
-  t.eq(tiers.monsterTierFor(3499).tier, 2, "3499 is not");
+  t.eq(tiers.monsterTierFor(7777).tier, 4, "7777");
+  t.eq(tiers.monsterTierFor(7776).tier, 3, "7776");
+  t.eq(tiers.monsterTierFor(7778).tier, 3, "7778");
+  t.eq(tiers.monsterTierFor(4500).tier, 3, "4500 is the tier 3 floor");
+  t.eq(tiers.monsterTierFor(4499).tier, 2, "4499 is not");
   t.eq(tiers.monsterTierFor(999).tier, 1, "999");
   t.eq(tiers.monsterTierFor(499).tier, 0, "499");
 
   // And through the real merge, not just the classifier.
   var tower = summoner(h, FULL_A);
   var blub = plant(h, tower, "blub3", tower.x + 500, tower.y);
-  blub.maxHp = 6666;
-  blub.currentHp = 6666;
+  blub.maxHp = 7777;
+  blub.currentHp = 7777;
   tower.coagulate();
-  t.eq(tower.monster.monsterTier, 4, "a 6666 pool merges to tier 4");
+  t.eq(tower.monster.monsterTier, 4, "a 7777 pool merges to tier 4");
 });
 
 test("20b  below tier 3 the monster stands beside the tower, near the track", function (t) {
@@ -584,8 +584,8 @@ test("23  tier 3 fuses the tower, becomes targetable, and grows on every kill", 
   var h = boot();
   var tower = summoner(h, FULL_A);
   var blub = plant(h, tower, "blub3", tower.x + 500, tower.y);
-  blub.maxHp = 4000;
-  blub.currentHp = 4000;
+  blub.maxHp = 5000;
+  blub.currentHp = 5000;
   tower.coagulate();
 
   var monster = tower.monster;
@@ -687,8 +687,8 @@ test("24  a tier 4 monster ignores every stun", function (t) {
   var h = boot();
   var tower = summoner(h, FULL_A);
   var blub = plant(h, tower, "blub3", tower.x + 500, tower.y);
-  blub.maxHp = 6666;
-  blub.currentHp = 6666;
+  blub.maxHp = 7777;
+  blub.currentHp = 7777;
   tower.coagulate();
 
   var monster = tower.monster;
@@ -702,8 +702,8 @@ test("24  a tier 4 monster ignores every stun", function (t) {
   var h2 = boot();
   var t2 = summoner(h2, FULL_A);
   var b2 = plant(h2, t2, "blub3", t2.x + 500, t2.y);
-  b2.maxHp = 4000;
-  b2.currentHp = 4000;
+  b2.maxHp = 5000;
+  b2.currentHp = 5000;
   t2.coagulate();
   h2.game.TowerHealth.stun(t2.monster, 3);
   t.ok(h2.game.TowerHealth.isStunned(t2.monster), "a tier 3 monster is stunnable");
@@ -732,8 +732,8 @@ test("26  a monster at zero returns the tower to A4 and summoning resumes", func
   var h = boot();
   var tower = summoner(h, FULL_A);
   var blub = plant(h, tower, "blub3", tower.x + 500, tower.y);
-  blub.maxHp = 4000;
-  blub.currentHp = 4000;
+  blub.maxHp = 5000;
+  blub.currentHp = 5000;
   tower.coagulate();
   t.ok(tower.summoningHalted, "fused");
 
@@ -837,8 +837,8 @@ test("28b  a monster blub is selectable and sellable exactly like the rest", fun
   var h = boot();
   var tower = summoner(h, FULL_A);
   var blub = plant(h, tower, "blub3", tower.x + 500, tower.y);
-  blub.maxHp = 6666;
-  blub.currentHp = 6666;
+  blub.maxHp = 7777;
+  blub.currentHp = 7777;
   tower.coagulate();
 
   var monster = tower.monster;
@@ -1054,8 +1054,8 @@ test("a fused tower has no rail, and gets it back when the monster dies", functi
   t.eq(h.run("inspectionLayout(inspected)").rail.length, 3, "three lines running");
 
   var blub = plant(h, tower, "blub3", tower.x + 500, tower.y);
-  blub.maxHp = 4000;
-  blub.currentHp = 4000;
+  blub.maxHp = 5000;
+  blub.currentHp = 5000;
   tower.coagulate();
 
   t.eq(h.run("inspectionLayout(inspected)").rail.length, 0,
