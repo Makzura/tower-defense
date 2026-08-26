@@ -255,6 +255,10 @@ var World3D = (function () {
       // that have never had a rock on them are byte identical.
       rock: hex(t.rock, t.metal || "#263f4c"),
       rockDark: hex(t.rockDark, t.panel || "#123848"),
+      // Distant hills. Default to the old near-black so nothing that has not
+      // asked for a horizon changes.
+      ridge: hex(t.ridge, t.metalDark || "#132733"),
+      ridgeDark: hex(t.ridgeDark, t.metalDark || "#132733"),
       roadTop: hex(t.roadInner, "#274553"),
       roadSide: hex(t.roadOuter, "#0a1922"),
       accent: triple(t.accent, "#4FE3D2"),

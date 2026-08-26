@@ -70,7 +70,13 @@ function OrbitCamera(canvas, options) {
   // Limits. Pitch stops short of both the horizon and straight-down: at the
   // horizon the ground ray stops meeting the plane at all and the pan breaks;
   // at 90 the yaw becomes meaningless and the orbit gimbals.
-  this.minPitch = (options.minPitchDeg === undefined ? 12 : options.minPitchDeg) * Math.PI / 180;
+  this.minPitch = (options.minPitchDeg === undefined ? 9 : options.minPitchDeg) * Math.PI / 180;
+  // NINE, not the twelve it was. THE SKY IS ONLY EVER A SLIVER on this
+  // camera and the arithmetic is unforgiving: the field of view is 32 degrees,
+  // so the top of the frame sits at (fov/2 - pitch) above the horizon, and at
+  // 12 degrees of pitch that is four degrees of sky. Nine degrees of pitch buys
+  // seven, which is the difference between "there is a horizon" and "I still
+  // cannot see the sky". Lower than this and the eye drops into the canopy.
   this.maxPitch = (options.maxPitchDeg === undefined ? 85 : options.maxPitchDeg) * Math.PI / 180;
   this.minDistance = options.minDistance === undefined ? 160 : options.minDistance;
   this.maxDistance = options.maxDistance === undefined ? 3200 : options.maxDistance;

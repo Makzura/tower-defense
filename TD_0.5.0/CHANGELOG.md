@@ -13,6 +13,37 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — Ironwood Frontier: five invisible rocks, and a sky that was
+there all along.**
+
+**The rocks vanished, and the hitboxes stayed** — which is the shape of a
+winding bug. `skin` wound its side faces top-left, top-right, bottom-right,
+bottom-left; `frustum`, which works, winds them the other way round.
+CULL_FACE/BACK ate every side face on every blocker, so what was left was the
+cap and a view straight through the middle to the dirt. One line.
+
+**And the stone and haze colours were on the WRONG THEME for a commit.** They
+went onto the map above Ironwood in the file, which has neither a rock nor a
+hill on it, so every lookup fell back to the machine colours and nothing I had
+written about light tops and pale hills was doing anything at all.
+
+**The sky.** Three rounds of "make the ground bigger" never produced one, and
+the reason is arithmetic rather than art: the field of view is 32 degrees, so
+the top of the frame sits at `fov/2 - pitch` above the horizon. At the old
+12-degree pitch floor that is four degrees of sky, and at the default 34-degree
+pitch the whole frame points downward and there is no horizon at any distance.
+The hills were 1800 units tall at 2600 out — twenty degrees — so they filled
+that band and then some, in near-black.
+
+The floor is 9 degrees now, which buys seven degrees of sky. The hills are a
+quarter of the size, topping out around two degrees, drawn in a pale haze
+between the fog and the sky. The outermost tree belts came down 14 to 38 per
+cent so the treeline sits under the hills rather than through them. There is a
+horizon on this board for the first time.
+
+Nothing measurable moved: Ironwood 0.792, the other seven unchanged, wave
+compositions identical, suites 167 / 238 / 74 / 47 / 53, 0 failing.
+
 **2026-08-27 — Ironwood Frontier: elevation, and the end of a rock being two
 objects.**
 

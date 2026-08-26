@@ -525,13 +525,18 @@ var GLGeometry = (function () {
   // A stack of rings, each a ring of [x, y, z], skinned with quads and capped.
   // Written here rather than reusing lumpyMass because that one is built around
   // a fixed profile and this needs the BASE ring to be exact.
+  // WOUND THE WAY `frustum` WINDS: bottom-left, bottom-right, top-right,
+  // top-left. It was the reverse of that for one commit and CULL_FACE/BACK ate
+  // every side face on every rock -- what was left was the cap and a view
+  // straight through the middle to the dirt, which is why five rocks with live
+  // hitboxes could not be seen at all.
   function skin(builder, rings, side, top) {
     var i, k;
     for (i = 0; i < rings.length - 1; i++) {
       var lo = rings[i], hi = rings[i + 1];
       for (k = 0; k < lo.length; k++) {
         var k2 = (k + 1) % lo.length;
-        builder.quad(hi[k], hi[k2], lo[k2], lo[k], side);
+        builder.quad(lo[k], lo[k2], hi[k2], hi[k], side);
       }
     }
     var cap = rings[rings.length - 1];
@@ -866,6 +871,11 @@ var GLGeometry = (function () {
         // blocks with a wobbling profile, so the skyline is a jagged line
         // rather than a dome. Cheap: these are built once, never animated, and
         // there are twenty-two of them on the whole board.
+        // PALE, not black. A hill drawn in the near-black machine colour is a
+        // hole cut in the sky, and the one thing a far-off ridge has to say is
+        // "distance" -- so it is drawn in the theme's own haze colour, between
+        // the fog and the sky, and the fog then takes it the rest of the way.
+        var rgFar = P.ridge || dark, rgNear = P.ridgeDark || dark;
         var rgH = size * (0.30 + wobble(cx, cy, 900) * 0.34);
         for (var mr = 0; mr < 3; mr++) {
           var mrA = rot + mr * 1.1 + wobble(cx, cy, 910 + mr) * 0.7;
@@ -879,7 +889,8 @@ var GLGeometry = (function () {
             boxAt(builder, mx2, my2,
               size * (1.05 - t4 * 0.72) * wob2,
               size * (0.62 - t4 * 0.42) * wob2,
-              mrH / slices * 1.7, dark, mrH * t4 * 0.86, mrA);
+              mrH / slices * 1.7, mr === 0 ? rgFar : rgNear,
+              mrH * t4 * 0.86, mrA);
           }
         }
         break;

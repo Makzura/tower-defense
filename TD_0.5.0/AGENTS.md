@@ -2041,6 +2041,20 @@ forest is ten belts running to three thousand, each taller and tighter packed
 than the last, with two lines of hills beyond all of them and ground beyond
 those. Fly out as far as the camera allows and you are still in trees.
 
+**THE SKY IS ONLY EVER A SLIVER, and the arithmetic decides it, not the art.**
+The field of view is 32 degrees, so the top of the frame sits at
+`fov/2 - pitch` above the horizon: at the old 12-degree floor that is four
+degrees of sky, and at the default 34-degree pitch the entire frame points
+DOWNWARD and no horizon exists at any distance. The floor is 9 degrees now,
+which buys seven. Anything that tops out above that fills the band completely —
+the hills were 1800 units tall at 2600 units out, which is twenty degrees, and
+that is why three rounds of "make the ground bigger" never produced a sky.
+
+So the hills are LOW: they top out around two degrees, just clear of the
+treeline, drawn in the theme's own `ridge` haze rather than the near-black
+machine colour. A hill drawn in `metalDark` against a light sky is a hole cut in
+the world; everything far away goes toward the haze, not away from it.
+
 Two halves to that, and the split matters. Out to 1800 the stems stay MODEST,
 because that band is where the eye can actually be and a canopy the size of a
 house at fifty units is a black screen — which is exactly what the first attempt
