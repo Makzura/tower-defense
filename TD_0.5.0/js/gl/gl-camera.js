@@ -371,7 +371,18 @@ OrbitCamera.prototype._bindInput = function () {
     e.preventDefault();
     // Capture, so a drag that leaves the canvas -- or the window -- still
     // tracks and still gets its pointerup.
-    if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    //
+    // GUARDED, because it THROWS rather than returning false. `NotFoundError:
+    // No active pointer with the given id` is what comes back when the pointer
+    // is already gone by the time this runs, and an exception here abandons the
+    // rest of the handler -- so the drag is never armed and the whole gesture is
+    // silently lost, which reads as "the camera does not respond" rather than as
+    // an error. The release side has been wrapped since it was written; this is
+    // the same guard on the half that was missing it. Losing the capture only
+    // costs tracking outside the canvas; losing the handler costs the gesture.
+    try {
+      if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    } catch (err) { /* no active pointer -- drag on without capture */ }
 
     var drag = { mode: mode, id: e.pointerId, x: e.clientX, y: e.clientY,
                  downX: e.clientX, downY: e.clientY };
