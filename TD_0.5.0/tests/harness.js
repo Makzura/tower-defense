@@ -289,25 +289,35 @@ function boot(mapId) {
       }
     },
 
-    // Hold the between-wave break at `seconds` for this boot.
+    // Hold the gap between waves at `seconds` for this boot.
     //
-    // The shipping break is 90 s (WAVE_BREAK), and every throughput test in
-    // the suite measures what a board does over a FIXED window of simulated
-    // time -- 120 s of gunners, 70 s of one route against another. At 90 s
-    // those windows contain one wave and a long silence, so they stop
-    // measuring the thing they are named after: the four routes all scored an
-    // identical 95 the day the break was lengthened, because none of them got
-    // as far as wave 2.
+    // A NO-OP SINCE THE TIMELINE SCHEDULER (2026-08-25), and kept as a named
+    // no-op rather than deleted from its six call sites (all in run.js:
+    // 133, 140, 3057, 3062, 4195, 4205), because what it was FOR still needs
+    // saying at each of them.
     //
-    // Pinning it at the old 5 s is not the tests dodging the change. Wave
-    // spacing is a PACING choice the player makes with the skip button, and it
-    // is orthogonal to everything these tests are about -- income is a fixed
-    // bounty per kill and nothing per second, so the economy is
-    // identical either way. Holding the pacing fixed is what leaves the route,
-    // the tower count or the unit length as the only variable, and it keeps
-    // these figures comparable with the ones recorded before 2026-07-29.
+    // It used to write `WAVE_BREAK`, the 90 s ceiling on the pause between two
+    // waves. Every throughput test in the suite measures what a board does over
+    // a FIXED window of simulated time -- 120 s of gunners, 70 s of one route
+    // against another -- and at 90 s those windows contained one wave and a
+    // long silence: the four routes all scored an identical 95 the day the
+    // break was lengthened, because none of them reached wave 2. Pinning it at
+    // the old 5 s put the waves back.
+    //
+    // There is no such number any more. A wave now ends on its own `duration`
+    // or on being wiped out, and the gap after it is 5 s (or 3 with auto-send)
+    // and nothing else -- so a board that is killing things already runs at the
+    // cadence these tests were pinning it to, and a board that is not is being
+    // measured on exactly the thing it is bad at. Nothing left to hold still.
+    //
+    // The argument for pinning was never that the tests were dodging the
+    // change: wave spacing is a PACING choice, income is a fixed bounty per
+    // kill and nothing per second, so the economy is identical either way, and
+    // holding the pacing still is what leaves the route or the tower count as
+    // the only variable. That argument is now satisfied by the scheduler
+    // itself.
     pinWaveBreak: function (seconds) {
-      sandbox.WAVE_BREAK = seconds;
+      return seconds;
     },
 
     draw: function () { sandbox.draw(); },
@@ -441,16 +451,30 @@ function boot(mapId) {
     // re-prove a pause that two tests can prove directly.
     //
     // Same trade as pinWaveBreak: the harness holds the run's PACING still so
-    // the tests can be about its content. It is the game's own scheduler
-    // function, not a fake -- this is the exact line restartGame() ran until
-    // the pause was added.
+    // the tests can be about its content.
+    //
+    // It goes through the game's own scheduler and not through a fake. This
+    // read `waveCountdown = spawnScheduledEnemy()` until the timeline rewrite,
+    // when spawning stopped returning the delay to the next body -- there is no
+    // such number on a timeline, only a clock. Zeroing the transition and
+    // stepping the scheduler by ZERO seconds is the same instant expressed the
+    // way the new scheduler expresses it: the opening pause expires, wave 1
+    // starts, its clock reads 0.00, and every event the wave authors at `at: 0`
+    // is on the road. Nothing else in the world moves, because no other system
+    // is stepped.
+    //
+    // updateWaves rather than update: a zero-length update() would also pulse
+    // every enemy, tower and effect on the board, and a harness that quietly
+    // ran one extra half-frame of the world is exactly the sort of thing that
+    // makes a timing test unreproducible.
     //
     // A test that wants the REAL opening asks for the chooser and clicks
     // through it itself, which touches none of this:
     //
     //     var h = harness.boot(null);
     //     h.chooseMap(h.game.Maps.DEFAULT_ID);   // waveCountdown === 10
-    sandbox.waveCountdown = sandbox.spawnScheduledEnemy();
+    sandbox.waveCountdown = 0;
+    sandbox.updateWaves(0);
   }
 
   return api;

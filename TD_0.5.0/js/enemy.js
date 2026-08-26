@@ -43,6 +43,32 @@ function Enemy(path, health, typeId, overrides) {
 
   this.path = path;
   this.routeId = overrides && overrides.routeId ? overrides.routeId : "main";
+
+  // WHICH SCHEDULED WAVE THIS BODY BELONGS TO. 1-based, matching the number the
+  // player is shown; 0 means "no wave put it here" -- a sandbox spawn, a codex
+  // sprite, a test fixture.
+  //
+  // This is what ends a wave (see waveStillOnTheRoad in js/game.js), so it has
+  // to reach every body a wave is ultimately responsible for, not just the ones
+  // the scheduler itself constructs. THREE PLACES IN THIS FILE MAKE AN ENEMY
+  // OUT OF ANOTHER ENEMY -- spawnMinions (a Hive's brood), splitOnDeath (a
+  // Fractal Slime's four children) and summon (the wave-35 boss's roar) -- and
+  // each one copies this field across, which is why origin is INHERITED here
+  // rather than read from a global.
+  //
+  // Reading a global "current wave" in the child would be actively wrong, not
+  // merely indirect: a T5 slime leaves 84 descendants across five generations
+  // and a Hive drops five hatchlings every seven seconds, so those bodies
+  // routinely outlive the wave that scheduled their ancestor. They belong to
+  // that ancestor's wave, however many waves later they are born, and that is
+  // the difference between "the wave you beat is over" and a wave that can
+  // never be closed because the next one keeps re-parenting its leftovers.
+  //
+  // A Revenant needs no code at all: it gets back up as the SAME object, so it
+  // keeps the origin it was born with for free. That is worth knowing before
+  // anyone goes looking for the branch that handles it.
+  this.waveId = (overrides && overrides.waveId) || 0;
+
   this.type = type;
   this.typeId = type.id;
   // A fractal's tier is instance state: every generation is still the SAME
@@ -1596,7 +1622,12 @@ Enemy.prototype.spawnMinions = function (dt) {
     noBounty: spec.noBounty,
     armor: spec.armor,
     defense: spec.defense,
-    routeId: this.routeId
+    routeId: this.routeId,
+    // The brood belongs to whatever wave brought the Hive in, and it has to,
+    // or a Hive left alive across a break would keep minting bodies that
+    // belong to nothing and the wave that scheduled it would already have been
+    // declared over with its hatchlings still walking.
+    waveId: this.waveId
   };
 
   var brood = [];
@@ -1649,6 +1680,10 @@ Enemy.prototype.splitOnDeath = function () {
     var child = new Enemy(this.path, undefined, this.typeId, {
       tier: childTier,
       routeId: this.routeId,
+      // Five generations deep, the last T0 is still the wave-25 slime's doing.
+      // Inheriting rather than re-reading the schedule is what keeps that true
+      // for a cascade that takes longer to finish than the wave it came from.
+      waveId: this.waveId,
       // Preserve a per-spawn $0 rule if a future summon creates a fractal.
       noBounty: this.noBounty
     });
@@ -2619,7 +2654,11 @@ Enemy.prototype.summon = function (spec) {
     var group = spec.groups[g];
     for (var i = 0; i < group.count; i++) {
       var e = new Enemy(this.path, group.health, group.type, {
-        routeId: this.routeId
+        routeId: this.routeId,
+        // A summon is a wave that arrives from the middle of the map, but it is
+        // NOT a wave of its own: the bodies the wave-35 boss roars in are part
+        // of wave 35, and the run is not won until they are dealt with.
+        waveId: this.waveId
       });
       // The whole point of a summoned body: it runs. A multiplier on
       // `speedScale` rather than a different type, so a summoned Fast is a
@@ -2645,9 +2684,19 @@ Enemy.prototype.summon = function (spec) {
 // rather than lucky: it comes back exactly where it fell, and it fell because
 // something shot it there -- so a tower already covers that spot. The one way
 // to strand one is to sell or lose that tower afterwards, and the answer to
-// that is to build within reach of it, which the player can always do. Waves
-// are unaffected either way: a break still ends on the 90 s ceiling whether or
-// not the board is clear.
+// that is to build within reach of it, which the player can always do.
+//
+// THE SCHEDULE IS UNAFFECTED EITHER WAY, but the reason changed with the
+// timeline (2026-08-26) and the old one -- "a break still ends on its 90 s
+// ceiling whether or not the board is clear" -- named a break that no longer
+// exists. The rule now: a rooted revenant wears the origin of the wave that
+// brought it in (waveId, above), so that wave can never be closed by
+// ELIMINATION again -- but it is still closed by its own `duration`, and by
+// Send the moment the wave has finished arriving. Only the last wave has
+// neither, and no wave 35 group and no phase of the boss's roar calls a
+// revenant in, so the one gate that cannot be forced is also the one gate a
+// revenant can never reach. What a stranded body does keep is the WIN: victory
+// asks for an empty road, and it always has.
 Enemy.prototype.tryRevive = function () {
   if (this.revivesLeft <= 0) return false;
 
