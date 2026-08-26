@@ -882,7 +882,17 @@ OrbitCamera.prototype.fitBounds = function (minX, minY, maxX, maxY, margin) {
   this.target = keptTarget;
   this._recomputeBasis();
 
-  this.maxDistance = Math.max(this.maxDistance, d * 1.5);
+  // HOW FAR OUT THE PLAYER MAY PULL, and it is deliberately tight.
+  //
+  // At 1.5x the framing distance the board shrank to a lit patch in the middle
+  // of the screen with most of the frame given to apron forest -- the owner's
+  // words were that the ground was "just a bigger rectangle". A board you can
+  // pull away from until it is a stamp is a board with no sense of place.
+  //
+  // 1.18 lets the player back off enough to see both ends of the route at once
+  // and no further, so the forest stays a wall around the clearing rather than
+  // becoming the subject.
+  this.maxDistance = Math.max(d * 1.05, d * 1.18);
   this.frame(cx, cy, d);
   return d;
 };

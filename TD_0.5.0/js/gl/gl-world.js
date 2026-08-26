@@ -62,7 +62,7 @@ var World3D = (function () {
   var heightField = null;
   var HEIGHT_CELL = 6;
 
-  function buildHeightField(minX, minY, maxX, maxY, env, routePaths, roadWidth) {
+  function buildHeightField(minX, minY, maxX, maxY, env, routePaths, roadWidth, map) {
     var w = Math.max(1, Math.ceil((maxX - minX) / HEIGHT_CELL));
     var h = Math.max(1, Math.ceil((maxY - minY) / HEIGHT_CELL));
     var data = new Float32Array(w * h);          // 0 = bare floor
@@ -104,6 +104,34 @@ var World3D = (function () {
                 cx + zw / 2 + 3.5, cy + zd / 2 + 3.5, top - 0.6);   // the rim
       stampRect(cx - zw / 2, cy - zd / 2, cx + zw / 2, cy + zd / 2, top);
     });
+
+    // THE BUILDABLE STUMPS, stamped as discs so a tower placed on one stands on
+    // its cut face instead of inside the trunk.
+    //
+    // This is where "towers sink into the stumps" came from: the prop had a
+    // height and the height field did not know about it, so an actor's feet
+    // were solved against bare ground while the geometry drew a trunk around
+    // them. Both read the SAME authored number now -- see the platforms table
+    // in js/maps.js.
+    if (typeof Maps !== "undefined" && Maps.geometryOf && map) {
+      Maps.geometryOf(map).platforms.forEach(function (pf) {
+        var top = pf.height;
+        var i0 = Math.max(0, Math.floor((pf.x - pf.radius - minX) / HEIGHT_CELL));
+        var i1 = Math.min(w - 1, Math.ceil((pf.x + pf.radius - minX) / HEIGHT_CELL));
+        var j0 = Math.max(0, Math.floor((pf.y - pf.radius - minY) / HEIGHT_CELL));
+        var j1 = Math.min(h - 1, Math.ceil((pf.y + pf.radius - minY) / HEIGHT_CELL));
+        for (var j = j0; j <= j1; j++) {
+          for (var i = i0; i <= i1; i++) {
+            var px = minX + (i + 0.5) * HEIGHT_CELL;
+            var py = minY + (j + 0.5) * HEIGHT_CELL;
+            var dx = px - pf.x, dy = py - pf.y;
+            if (dx * dx + dy * dy > pf.radius * pf.radius) continue;
+            var k = j * w + i;
+            if (top > data[k]) data[k] = top;
+          }
+        }
+      });
+    }
 
     // The road, stamped as a real band rather than a bounding box, or every
     // corner would raise a square of open floor beside it.
@@ -376,8 +404,10 @@ var World3D = (function () {
       // copy that passes through every authored point; nothing downstream ever
       // sees it, so pathing, clearance and the difficulty measurement are all
       // still measured against the polyline the map authored.
-      GLGeometry.road(g, roadRibbon(p.points), roadWidth, ROAD_LIFT,
-        P.roadTop, P.roadSide);
+      // `p.points` IS the curve -- loadMap builds the walked path from the same
+      // spline -- so the ribbon is drawn along exactly the line the enemies
+      // walk. Smoothing again here is what made the two diverge.
+      GLGeometry.road(g, p.points, roadWidth, ROAD_LIFT, P.roadTop, P.roadSide);
     });
 
     // The authored scenery. Each map names nine props and until now the 3D
@@ -390,9 +420,15 @@ var World3D = (function () {
     // sits where maps.js says it does relative to the deck it belongs to.
     ((env && env.models) || []).forEach(function (m) {
       if (!m || !m.kind) return;
+      // The model is handed through as well, with anything it authored in
+      // PIXELS converted here -- the same single conversion `size` gets. A prop
+      // that needs more than a size and a rotation (a stump declares its own
+      // height, so the height field and the geometry agree) reads it off this.
       GLGeometry.scenery(g, m.kind,
         ul(m.x / AUTHORED_PX_PER_UL), ul(m.y / AUTHORED_PX_PER_UL),
-        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P);
+        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P,
+        { heightPx: typeof m.height === "number"
+            ? ul(m.height / AUTHORED_PX_PER_UL) : undefined });
     });
 
     // THE PLAY AREA, not the ground. `bounds` is what the camera frames and
@@ -400,7 +436,7 @@ var World3D = (function () {
     // orbit out over empty forest and would open the run zoomed to a speck.
     bounds = { minX: playMinX, minY: playMinY, maxX: playMaxX, maxY: playMaxY };
     heightField = buildHeightField(playMinX, playMinY, playMaxX, playMaxY, env,
-      routePaths, roadWidth);
+      routePaths, roadWidth, map);
     return g.build(renderer);
   }
 

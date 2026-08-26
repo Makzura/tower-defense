@@ -373,7 +373,7 @@ var GLGeometry = (function () {
     // forest above it: those are bare snapped stems on black dirt and these are
     // a living wood, a settlement and a machine. Two boards that share prop
     // kinds read as one location with the lights changed.
-    ironwood: 1, deadfall: 1, fern: 1, mossrock: 1,
+    ironwood: 1, deadfall: 1, fern: 1, mossrock: 1, ridge: 1,
     boulder: 1, outcrop: 1, trunk: 1, platform: 1,
     house: 1, townhall: 1, storehouse: 1, workshop: 1,
     gate: 1, palisade: 1, lantern: 1,
@@ -491,7 +491,15 @@ var GLGeometry = (function () {
     }
   }
 
-  function scenery(builder, kind, cx, cy, size, rot, P) {
+  // A length the CALLER has already converted to world units, or a fallback.
+  // Everything reaching this file is world space -- the map's pixel authoring
+  // is converted once, in gl-world's model loop, exactly like `size` is.
+  function worldOr(value, fallback) {
+    return (typeof value === "number" && value > 0) ? value : fallback;
+  }
+
+  function scenery(builder, kind, cx, cy, size, rot, P, model) {
+    model = model || {};
     var r = size / 2;
     var dark = P.metalDark, body = P.metal, trim = P.panel, ley = P.accent;
 
@@ -652,6 +660,36 @@ var GLGeometry = (function () {
         break;
       }
 
+      case "ridge": {
+        // A HILL ON THE HORIZON. Not a mountain in any detailed sense -- it is
+        // hundreds of units away, behind four rings of trees and most of the
+        // haze, and all it has to do is give the forest something to END
+        // against. Without one the board reads as a bigger rectangle however
+        // far the ground runs.
+        //
+        // Three overlapping ridges of different heights, each a low ring of
+        // blocks with a wobbling profile, so the skyline is a jagged line
+        // rather than a dome. Cheap: these are built once, never animated, and
+        // there are twenty-two of them on the whole board.
+        var rgH = size * (0.30 + wobble(cx, cy, 900) * 0.34);
+        for (var mr = 0; mr < 3; mr++) {
+          var mrA = rot + mr * 1.1 + wobble(cx, cy, 910 + mr) * 0.7;
+          var mrD = size * (0.10 + mr * 0.16);
+          var mrH = rgH * (1 - mr * 0.22);
+          var mx2 = cx + Math.cos(mrA) * mrD, my2 = cy + Math.sin(mrA) * mrD;
+          var slices = 5;
+          for (var sl2 = 0; sl2 < slices; sl2++) {
+            var t4 = sl2 / (slices - 1);
+            var wob2 = 0.72 + wobble(cx, cy, 920 + mr * 8 + sl2) * 0.42;
+            boxAt(builder, mx2, my2,
+              size * (1.05 - t4 * 0.72) * wob2,
+              size * (0.62 - t4 * 0.42) * wob2,
+              mrH / slices * 1.7, dark, mrH * t4 * 0.86, mrA);
+          }
+        }
+        break;
+      }
+
       case "deadfall": {
         // Storm-thrown: a leaning snapped trunk with its root plate torn up
         // out of the ground. The plate is what stops this reading as a log.
@@ -739,35 +777,70 @@ var GLGeometry = (function () {
       }
 
       case "platform": {
-        // A BUILDABLE STUMP, and the flattest, cleanest top on the board --
-        // because that is the signal. Wide cut face, a bark rim a shade
-        // darker, and roots reaching out into the dirt so it is grown rather
-        // than dropped.
-        // TALLER, AND A DIFFERENT HEIGHT ON EVERY STUMP. At 0.30 these read as
-        // discs painted on the floor -- the board had six flat rings on it and
-        // nothing said "you may stand up here". A stump is a cut TRUNK: it has
-        // a body you can see the side of, and six identical ones look stamped.
-        var pfH = size * (0.72 + wobble(cx, cy, 405) * 0.55);
-        lumpyMass(builder, cx, cy, r * 0.94, pfH, dark, 0, 3, 0.92, 400);
-        // Bark shoulders, so the side of the trunk is not a smooth wall.
-        for (var pb = 0; pb < 3; pb++) {
-          var pbA = pb * 2.1 + wobble(cx, cy, 420 + pb) * 1.5;
-          boxAt(builder, cx + Math.cos(pbA) * r * 0.78, cy + Math.sin(pbA) * r * 0.78,
-            r * 0.30, r * 0.24, pfH * (0.55 + wobble(cx, cy, 430 + pb) * 0.35),
-            dark, 0, pbA);
+        // A CUT TRUNK, and it has to survive being orbited: the camera goes all
+        // the way round, so there is no "front" to hide a bad side on.
+        //
+        // The first version used the boulder's lumpy-mass helper and came out a
+        // brown blob -- the owner's words were that it looked like the Summoner
+        // wearing a different colour, which is exactly what a stack of jittered
+        // rings looks like. A stump is not a rock: it is a CYLINDER with bark
+        // on it, standing on roots, cut flat across the top. So it is built
+        // that way -- a straight tapered barrel, vertical bark ridges around
+        // it, a level cut face, and roots that flare out and DOWN into the
+        // dirt so it is grown rather than dropped.
+        //
+        // HEIGHT COMES FROM THE MAP, never from `size`. The height field that
+        // decides where a tower's feet go reads the same authored number, and
+        // when this invented its own the two disagreed and every tower placed
+        // on a stump sank into it.
+        var pfH = worldOr(model.heightPx, size * 0.30);
+        var pfR = r * 0.94;
+
+        // Roots first: they flare from under the barrel and reach the ground,
+        // which is what stops the trunk looking pushed into the floor.
+        var roots = 6 + Math.floor(wobble(cx, cy, 401) * 3);
+        for (var pr2 = 0; pr2 < roots; pr2++) {
+          var prA = pr2 * (Math.PI * 2 / roots) + wobble(cx, cy, 410 + pr2) * 0.5;
+          var reach = pfR * (1.18 + wobble(cx, cy, 420 + pr2) * 0.45);
+          segment(builder,
+            cx + Math.cos(prA) * pfR * 0.80, cy + Math.sin(prA) * pfR * 0.80,
+            pfH * 0.34,
+            cx + Math.cos(prA) * reach, cy + Math.sin(prA) * reach, 0,
+            pfR * (0.13 + wobble(cx, cy, 430 + pr2) * 0.06), dark);
         }
-        // The cut face: one clean disc, level, sitting just proud of the rim.
-        frustum(builder, cx, cy, r * 0.84, r * 0.82, size * 0.045, trim, pfH, 12);
-        // Growth rings, as two shallow inset discs.
-        frustum(builder, cx, cy, r * 0.52, r * 0.50, size * 0.012, dark, pfH + size * 0.045, 12);
-        frustum(builder, cx, cy, r * 0.22, r * 0.20, size * 0.010, trim, pfH + size * 0.055, 10);
-        for (var pr2 = 0; pr2 < 6; pr2++) {
-          var prA = pr2 * (Math.PI * 2 / 6) + wobble(cx, cy, 410 + pr2) * 0.6;
-          segment(builder, cx + Math.cos(prA) * r * 0.70, cy + Math.sin(prA) * r * 0.70,
-            size * 0.08,
-            cx + Math.cos(prA) * r * 1.25, cy + Math.sin(prA) * r * 1.25, 0,
-            r * 0.10, dark);
+
+        // The barrel: a straight taper, wider at the base, in one piece. A
+        // cylinder reads as a stump the moment it has bark and a cut face on
+        // it; a stack of wobbling rings never does.
+        frustum(builder, cx, cy, pfR * 1.10, pfR, pfH, dark, 0, 11);
+
+        // Bark: vertical ridges standing proud of the barrel, uneven in width
+        // and depth, so the side catches light from every direction.
+        var ridges = 9;
+        for (var rg = 0; rg < ridges; rg++) {
+          var rgA = rg * (Math.PI * 2 / ridges) + wobble(cx, cy, 440 + rg) * 0.30;
+          var rgD = pfR * (0.97 + wobble(cx, cy, 450 + rg) * 0.10);
+          var rgH = pfH * (0.62 + wobble(cx, cy, 460 + rg) * 0.36);
+          boxAt(builder, cx + Math.cos(rgA) * rgD, cy + Math.sin(rgA) * rgD,
+            pfR * (0.14 + wobble(cx, cy, 470 + rg) * 0.10), pfR * 0.16, rgH,
+            dark, pfH * wobble(cx, cy, 480 + rg) * 0.20, rgA);
         }
+
+        // THE CUT FACE, and it is PALE WOOD, not the theme's trim.
+        //
+        // Trim on this board is a mossy green, which made every stump top look
+        // like a lily pad -- the one surface that has to read as "sawn timber
+        // you may stand on" was reading as more undergrowth. Fresh heartwood is
+        // its own colour and does not belong to the palette, the same way the
+        // depot's door light does not.
+        var cut = hex("#b9a074");
+        var ring = hex("#8a734d");
+        frustum(builder, cx, cy, pfR * 0.99, pfR * 0.97, pfH * 0.06, cut, pfH, 14);
+        // Growth rings, and a saw scar across them.
+        frustum(builder, cx, cy, pfR * 0.62, pfR * 0.60, pfH * 0.012, ring,
+          pfH + pfH * 0.06, 14);
+        frustum(builder, cx, cy, pfR * 0.30, pfR * 0.28, pfH * 0.010, cut,
+          pfH + pfH * 0.07, 12);
         break;
       }
 
@@ -1187,7 +1260,7 @@ var GLGeometry = (function () {
                     "barricade", "spikes", "sandbags", "watchtower", "wreck",
                     "barrel", "fence",
                     // Ironwood Frontier's own set -- see the WILD table.
-                    "ironwood", "deadfall", "fern", "mossrock",
+                    "ironwood", "deadfall", "fern", "mossrock", "ridge",
                     "boulder", "outcrop", "trunk", "platform",
                     "house", "townhall", "storehouse", "workshop",
                     "gate", "palisade", "lantern",

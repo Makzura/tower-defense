@@ -170,6 +170,31 @@ Maps.LIST = [
 // their historical `points` field and normalize to one route here; generated
 // maps write `routes` directly. That keeps old content and tests compatible
 // while making the runtime structurally multi-route.
+// THE WALKED ROUTE IS THE DRAWN ROUTE.
+//
+// It was not, and the owner caught it: the ribbon was smoothed for presentation
+// only, so enemies cut every corner the picture had rounded and visibly walked
+// beside their own road. A road you can see and a road that is walked being
+// different lines is the same lie as a rock you can see and a rock you collide
+// with being different shapes.
+//
+// So the spline is applied ONCE, here, and everything downstream -- pathing,
+// build clearance, the difficulty sampler, both renderers -- measures the same
+// line. The authored points are still the source: the curve passes through
+// every one of them, and the sharp corners among them stay sharp.
+// OPT-IN PER MAP, and that is not a nicety. The first version curved EVERY
+// route, which includes Rune Circuit -- the reference map, whose length fixes
+// the u.l. scale for the entire game. Its route grew, the reference length grew
+// with it, and a hundred and two tests went red at once because every balance
+// figure in the campaign is measured against that number.
+//
+// The six older boards are decks inside facilities and their roads are supposed
+// to be ruled lines. A map asks for a curved road by saying so.
+Maps.walkablePoints = function (map, points) {
+  if (!map || !map.curvedRoad) return points;
+  return Maps.smoothRoad(points, 6);
+};
+
 Maps.routesOf = function (map) {
   if (map.routes && map.routes.length) return map.routes;
   return [{ id: "main", points: map.points }];
@@ -382,6 +407,10 @@ Maps.LIST.push({
 Maps.LIST.push({
   id: "ironwood-frontier",
   name: "Ironwood Frontier",
+  // A LOGGING TRACK BENDS. The authored points are the shape; the walked and
+  // drawn line is a spline through them that keeps the four hairpins sharp --
+  // see Maps.smoothRoad and SHARP_CORNER_DEG.
+  curvedRoad: true,
   blurb: ["A logging road through old ironwood.",
           "The depot rolled in overnight."],
 
@@ -446,13 +475,22 @@ Maps.LIST.push({
   // Radii are the STUMP TOP, and every tower in the game fits centred on the
   // smallest of them -- see the platform test in tests/run.js, which measures
   // it against the live catalogue rather than trusting this comment.
+  // `height` IS DECLARED HERE, not derived in the renderer, and that is what
+  // makes a tower stand ON a stump instead of inside it. The 3D prop and the
+  // height field that decides where an actor's feet go both read this number;
+  // when the renderer invented its own, the two disagreed and every tower sank.
+  //
+  // Radii and heights are all different on purpose. Six stumps of one size and
+  // one height read as stamped-out furniture; a wood has big old cuts and small
+  // young ones. The smallest is still 29, which every tower fits on -- a test
+  // measures that against the live catalogue rather than trusting this note.
   platforms: [
-    { id: "stump-p1", x: 560,  y: 250, radius: 38 },
-    { id: "stump-p2", x: 640,  y: 410, radius: 34 },
-    { id: "stump-p3", x: 820,  y: 430, radius: 34 },
-    { id: "stump-p4", x: 920,  y: 300, radius: 30 },
-    { id: "stump-p5", x: 1000, y: 230, radius: 29 },
-    { id: "stump-p6", x: 320,  y: 330, radius: 30 }
+    { id: "stump-p1", x: 560,  y: 250, radius: 40, height: 20 },
+    { id: "stump-p2", x: 640,  y: 410, radius: 33, height: 13 },
+    { id: "stump-p3", x: 820,  y: 430, radius: 36, height: 25 },
+    { id: "stump-p4", x: 920,  y: 300, radius: 30, height: 11 },
+    { id: "stump-p5", x: 1000, y: 230, radius: 29, height: 17 },
+    { id: "stump-p6", x: 320,  y: 330, radius: 34, height: 15 }
   ],
 
   blockers: [
@@ -552,7 +590,10 @@ Maps.geometryOf = function (map) {
       id: pf.id,
       x: ul(pf.x / AUTHORED_AT_PX_PER_UL),
       y: ul(pf.y / AUTHORED_AT_PX_PER_UL),
-      radius: ul(pf.radius / AUTHORED_AT_PX_PER_UL)
+      radius: ul(pf.radius / AUTHORED_AT_PX_PER_UL),
+      // The top surface, in world units. One number, read by the prop that
+      // draws the stump and by the height field that stands actors on it.
+      height: ul((pf.height || 16) / AUTHORED_AT_PX_PER_UL)
     };
   });
 
@@ -596,21 +637,55 @@ Maps.resetGeometry = function () { geometryCache = null; };
 Maps.smoothRoad = function (points, perSegment) {
   if (!points || points.length < 3) return points;
   var steps = perSegment || 8;
-  var pts = points.slice();
-  // Phantom control points at each end, mirrored, so segment 0 and segment n-1
-  // are as curved as the ones in the middle.
-  var first = { x: pts[0].x * 2 - pts[1].x, y: pts[0].y * 2 - pts[1].y };
-  var lastI = pts.length - 1;
-  var last = { x: pts[lastI].x * 2 - pts[lastI - 1].x,
-               y: pts[lastI].y * 2 - pts[lastI - 1].y };
-  pts.unshift(first);
-  pts.push(last);
+  // The TURN angle, not the interior angle. `dot` of the two segment directions
+  // is cos(turn): a straight run is 1, a right-angle turn is 0, a hairpin is
+  // negative. So a turn sharper than the threshold is a dot BELOW cos(threshold).
+  //
+  // Written as cos(180 - threshold) at first, which is the interior angle -- it
+  // put the cut at -0.37 and classified nothing on this board as a corner, so
+  // every hairpin was rounded off and the test that checks one survives caught
+  // it at 35 degrees.
+  var sharp = Math.cos(Maps.SHARP_CORNER_DEG * Math.PI / 180);
 
-  var out = [];
-  for (var i = 1; i < pts.length - 2; i++) {
-    var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
-    for (var s = 0; s < steps; s++) {
-      var t = s / steps, t2 = t * t, t3 = t2 * t;
+  // WHICH VERTICES ARE CORNERS. A vertex whose turn is sharper than
+  // SHARP_CORNER_DEG stays a corner: the control point is DUPLICATED there,
+  // which is what makes a Catmull-Rom pass through it with an edge instead of
+  // rounding it off.
+  //
+  // Rounding every one of them was the first version and it was wrong for the
+  // reason the owner gave: the goal was a track that BENDS, not a track with no
+  // angles in it at all. A logging road has both -- long easy curves and a
+  // hairpin where it had to get round something.
+  var corner = [];
+  var i;
+  for (i = 0; i < points.length; i++) {
+    if (i === 0 || i === points.length - 1) { corner.push(true); continue; }
+    var a = points[i - 1], b = points[i], c = points[i + 1];
+    var ax = b.x - a.x, ay = b.y - a.y;
+    var bx = c.x - b.x, by = c.y - b.y;
+    var la = Math.hypot(ax, ay) || 1, lb = Math.hypot(bx, by) || 1;
+    var dot = (ax * bx + ay * by) / (la * lb);
+    corner.push(dot <= sharp);
+  }
+
+  function ctrl(i) {
+    var j = Math.max(0, Math.min(points.length - 1, i));
+    return points[j];
+  }
+
+  var out = [points[0]];
+  for (i = 0; i < points.length - 1; i++) {
+    // At a corner, the neighbouring control collapses onto the vertex, so the
+    // curve leaves and arrives along the straight segments and the angle
+    // survives.
+    var p0 = corner[i] ? points[i] : ctrl(i - 1);
+    var p1 = points[i];
+    var p2 = points[i + 1];
+    var p3 = corner[i + 1] ? points[i + 1] : ctrl(i + 2);
+    var flat = corner[i] && corner[i + 1];
+    var n = flat ? 1 : steps;                 // both ends hard: keep it straight
+    for (var sIdx = 1; sIdx <= n; sIdx++) {
+      var t = sIdx / n, t2 = t * t, t3 = t2 * t;
       out.push({
         x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t +
              (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
@@ -621,9 +696,13 @@ Maps.smoothRoad = function (points, perSegment) {
       });
     }
   }
-  out.push({ x: pts[pts.length - 2].x, y: pts[pts.length - 2].y });
   return out;
 };
+
+// Turn sharper than this and the road keeps its angle. 68 leaves the four
+// hairpins on Ironwood Frontier hard -- 86, 90, 80 and 71 degrees -- and rounds
+// the eleven gentler bends into curves.
+Maps.SHARP_CORNER_DEG = 68;
 
 // The platform under a point, or null. The snap rule lives here so the build
 // ghost and the click that follows it cannot disagree -- they call this.
@@ -966,104 +1045,212 @@ Maps.ENVIRONMENTS = {
       { kind: "ironwood", x: 21, y: 608, size: 42, rotation: 0.94 },
       { kind: "ironwood", x: 19, y: 608, size: 32, rotation: 2.64 },
 
-      // THE DEEP TREELINE, out on the 900-unit apron. It exists so the ground
-      // never ENDS on screen: the board is a clearing in a wood that carries on
-      // past the camera, and four receding rings of bigger, hazier stems is what
-      // sells that. All of it is outside the play area, so none of it can ever
-      // hide a tower, an enemy or a build spot -- which is the one place a
-      // forest is allowed to be this dense.
-      { kind: "ironwood", x: -195, y: -177, size: 45, rotation: 4.28 },
-      { kind: "ironwood", x: 88, y: -182, size: 56, rotation: 2.08 },
-      { kind: "ironwood", x: 310, y: -239, size: 45, rotation: 3.51 },
-      { kind: "ironwood", x: 486, y: -139, size: 46, rotation: 3.87 },
-      { kind: "ironwood", x: 692, y: -133, size: 57, rotation: 0.95 },
-      { kind: "ironwood", x: 823, y: -200, size: 60, rotation: 4.78 },
-      { kind: "ironwood", x: 889, y: -150, size: 50, rotation: 3.16 },
-      { kind: "ironwood", x: 1255, y: -194, size: 52, rotation: 4.44 },
-      { kind: "ironwood", x: 1232, y: -174, size: 62, rotation: 0.32 },
-      { kind: "ironwood", x: 1530, y: -215, size: 47, rotation: 3.04 },
-      { kind: "ironwood", x: 1410, y: 34, size: 56, rotation: 0.78 },
-      { kind: "ironwood", x: 1427, y: 240, size: 58, rotation: 0.89 },
-      { kind: "ironwood", x: 1479, y: 412, size: 56, rotation: 2.73 },
-      { kind: "ironwood", x: 1433, y: 594, size: 61, rotation: 6.20 },
-      { kind: "ironwood", x: 1439, y: 829, size: 49, rotation: 4.52 },
-      { kind: "ironwood", x: 1462, y: 922, size: 44, rotation: 5.37 },
-      { kind: "ironwood", x: 1195, y: 889, size: 55, rotation: 2.88 },
-      { kind: "ironwood", x: 1007, y: 900, size: 62, rotation: 4.37 },
-      { kind: "ironwood", x: 773, y: 906, size: 53, rotation: 1.83 },
-      { kind: "ironwood", x: 626, y: 854, size: 45, rotation: 0.77 },
-      { kind: "ironwood", x: 482, y: 866, size: 46, rotation: 1.10 },
-      { kind: "ironwood", x: 373, y: 964, size: 52, rotation: 4.53 },
-      { kind: "ironwood", x: 59, y: 898, size: 57, rotation: 1.20 },
-      { kind: "ironwood", x: -65, y: 868, size: 52, rotation: 0.20 },
-      { kind: "ironwood", x: -200, y: 894, size: 59, rotation: 1.57 },
-      { kind: "ironwood", x: -208, y: 565, size: 51, rotation: 4.94 },
-      { kind: "ironwood", x: -200, y: 392, size: 44, rotation: 1.89 },
-      { kind: "ironwood", x: -166, y: 314, size: 46, rotation: 1.78 },
-      { kind: "ironwood", x: -207, y: 111, size: 57, rotation: 0.62 },
-      { kind: "ironwood", x: -202, y: -108, size: 57, rotation: 3.80 },
-      { kind: "ironwood", x: -192, y: -407, size: 56, rotation: 3.09 },
-      { kind: "ironwood", x: 148, y: -376, size: 65, rotation: 4.80 },
-      { kind: "ironwood", x: 440, y: -414, size: 60, rotation: 6.23 },
-      { kind: "ironwood", x: 688, y: -359, size: 66, rotation: 1.53 },
-      { kind: "ironwood", x: 846, y: -353, size: 61, rotation: 3.06 },
-      { kind: "ironwood", x: 1174, y: -316, size: 51, rotation: 1.49 },
-      { kind: "ironwood", x: 1470, y: -335, size: 53, rotation: 2.45 },
-      { kind: "ironwood", x: 1660, y: -394, size: 66, rotation: 2.86 },
-      { kind: "ironwood", x: 1613, y: -116, size: 68, rotation: 1.87 },
-      { kind: "ironwood", x: 1698, y: 129, size: 55, rotation: 6.11 },
-      { kind: "ironwood", x: 1608, y: 407, size: 53, rotation: 4.92 },
-      { kind: "ironwood", x: 1588, y: 840, size: 58, rotation: 0.06 },
-      { kind: "ironwood", x: 1643, y: 938, size: 50, rotation: 2.63 },
-      { kind: "ironwood", x: 1546, y: 1050, size: 65, rotation: 5.31 },
-      { kind: "ironwood", x: 1214, y: 1078, size: 58, rotation: 3.95 },
-      { kind: "ironwood", x: 956, y: 1028, size: 48, rotation: 2.71 },
-      { kind: "ironwood", x: 700, y: 1084, size: 61, rotation: 1.06 },
-      { kind: "ironwood", x: 384, y: 1051, size: 67, rotation: 4.56 },
-      { kind: "ironwood", x: 125, y: 1048, size: 53, rotation: 0.99 },
-      { kind: "ironwood", x: -154, y: 1054, size: 59, rotation: 6.17 },
-      { kind: "ironwood", x: -219, y: 1055, size: 63, rotation: 2.55 },
-      { kind: "ironwood", x: -369, y: 660, size: 65, rotation: 6.26 },
-      { kind: "ironwood", x: -338, y: 475, size: 55, rotation: 3.51 },
-      { kind: "ironwood", x: -348, y: 287, size: 59, rotation: 4.78 },
-      { kind: "ironwood", x: -305, y: 125, size: 56, rotation: 1.31 },
-      { kind: "ironwood", x: -384, y: -209, size: 52, rotation: 5.12 },
-      { kind: "ironwood", x: -458, y: -584, size: 55, rotation: 4.56 },
-      { kind: "ironwood", x: 290, y: -526, size: 68, rotation: 1.52 },
-      { kind: "ironwood", x: 293, y: -613, size: 68, rotation: 3.60 },
-      { kind: "ironwood", x: 1183, y: -556, size: 71, rotation: 5.34 },
-      { kind: "ironwood", x: 1181, y: -517, size: 71, rotation: 0.25 },
-      { kind: "ironwood", x: 1647, y: -543, size: 70, rotation: 2.58 },
-      { kind: "ironwood", x: 1806, y: -315, size: 59, rotation: 0.59 },
-      { kind: "ironwood", x: 1786, y: 266, size: 66, rotation: 3.83 },
-      { kind: "ironwood", x: 1828, y: 638, size: 71, rotation: 2.51 },
-      { kind: "ironwood", x: 1799, y: 1119, size: 72, rotation: 2.66 },
-      { kind: "ironwood", x: 1470, y: 1224, size: 65, rotation: 2.16 },
-      { kind: "ironwood", x: 1158, y: 1297, size: 62, rotation: 2.76 },
-      { kind: "ironwood", x: 534, y: 1241, size: 72, rotation: 5.92 },
-      { kind: "ironwood", x: 304, y: 1252, size: 65, rotation: 1.56 },
-      { kind: "ironwood", x: -90, y: 1330, size: 56, rotation: 2.21 },
-      { kind: "ironwood", x: -620, y: 1201, size: 70, rotation: 3.69 },
-      { kind: "ironwood", x: -510, y: 843, size: 72, rotation: 3.66 },
-      { kind: "ironwood", x: -582, y: 433, size: 55, rotation: 0.31 },
-      { kind: "ironwood", x: -533, y: 270, size: 52, rotation: 2.19 },
-      { kind: "ironwood", x: -504, y: -396, size: 66, rotation: 3.70 },
-      { kind: "ironwood", x: -490, y: -764, size: 64, rotation: 3.68 },
-      { kind: "ironwood", x: -56, y: -815, size: 62, rotation: 0.27 },
-      { kind: "ironwood", x: 527, y: -798, size: 78, rotation: 0.35 },
-      { kind: "ironwood", x: 1358, y: -771, size: 74, rotation: 0.07 },
-      { kind: "ironwood", x: 2008, y: -810, size: 76, rotation: 0.29 },
-      { kind: "ironwood", x: 2119, y: 67, size: 72, rotation: 5.09 },
-      { kind: "ironwood", x: 2094, y: 239, size: 78, rotation: 2.81 },
-      { kind: "ironwood", x: 2071, y: 1294, size: 68, rotation: 4.64 },
-      { kind: "ironwood", x: 1877, y: 1508, size: 74, rotation: 5.84 },
-      { kind: "ironwood", x: 1019, y: 1553, size: 65, rotation: 0.43 },
-      { kind: "ironwood", x: 468, y: 1466, size: 76, rotation: 5.33 },
-      { kind: "ironwood", x: -295, y: 1447, size: 75, rotation: 2.71 },
-      { kind: "ironwood", x: -708, y: 1513, size: 68, rotation: 3.66 },
-      { kind: "ironwood", x: -738, y: 615, size: 67, rotation: 1.66 },
-      { kind: "ironwood", x: -815, y: 433, size: 68, rotation: 6.00 },
-      { kind: "ironwood", x: -735, y: -644, size: 66, rotation: 1.39 },
+      // THE TREELINE GETS BIGGER AND THICKER AS IT GOES OUT, which is the
+      // trick that gives an open board a horizon without a skybox: the wood
+      // does not simply continue, it CLOSES, and the eye reads that as
+      // distance. Four rings, each denser than the last and each carrying
+      // taller stems, then a ridge line of hills beyond all of them.
+      //
+      // Every one of these is outside the play area, on the apron, where a prop
+      // can never hide a tower, an enemy or a build spot -- which is the one
+      // place a forest is allowed to be this dense.
+      { kind: "ironwood", x: -136, y: -179, size: 59, rotation: 0.01 },
+      { kind: "ironwood", x: 40, y: -188, size: 54, rotation: 1.15 },
+      { kind: "ironwood", x: 178, y: -230, size: 47, rotation: 2.90 },
+      { kind: "ironwood", x: 486, y: -168, size: 59, rotation: 5.58 },
+      { kind: "ironwood", x: 592, y: -231, size: 55, rotation: 3.98 },
+      { kind: "ironwood", x: 672, y: -150, size: 56, rotation: 1.15 },
+      { kind: "ironwood", x: 919, y: -153, size: 50, rotation: 4.74 },
+      { kind: "ironwood", x: 1103, y: -168, size: 60, rotation: 2.43 },
+      { kind: "ironwood", x: 1250, y: -190, size: 61, rotation: 2.68 },
+      { kind: "ironwood", x: 1390, y: -198, size: 53, rotation: 0.02 },
+      { kind: "ironwood", x: 1488, y: -130, size: 60, rotation: 4.17 },
+      { kind: "ironwood", x: 1442, y: 25, size: 53, rotation: 5.70 },
+      { kind: "ironwood", x: 1465, y: 180, size: 61, rotation: 5.19 },
+      { kind: "ironwood", x: 1443, y: 350, size: 60, rotation: 3.18 },
+      { kind: "ironwood", x: 1470, y: 425, size: 47, rotation: 0.22 },
+      { kind: "ironwood", x: 1494, y: 673, size: 52, rotation: 2.37 },
+      { kind: "ironwood", x: 1449, y: 772, size: 53, rotation: 4.83 },
+      { kind: "ironwood", x: 1402, y: 902, size: 56, rotation: 5.14 },
+      { kind: "ironwood", x: 1251, y: 896, size: 47, rotation: 5.89 },
+      { kind: "ironwood", x: 1059, y: 886, size: 49, rotation: 5.73 },
+      { kind: "ironwood", x: 896, y: 929, size: 62, rotation: 5.68 },
+      { kind: "ironwood", x: 747, y: 885, size: 50, rotation: 5.87 },
+      { kind: "ironwood", x: 597, y: 886, size: 53, rotation: 1.95 },
+      { kind: "ironwood", x: 362, y: 885, size: 49, rotation: 3.80 },
+      { kind: "ironwood", x: 224, y: 931, size: 46, rotation: 5.49 },
+      { kind: "ironwood", x: 67, y: 893, size: 59, rotation: 2.91 },
+      { kind: "ironwood", x: -85, y: 866, size: 51, rotation: 5.06 },
+      { kind: "ironwood", x: -166, y: 953, size: 51, rotation: 5.50 },
+      { kind: "ironwood", x: -173, y: 624, size: 62, rotation: 4.93 },
+      { kind: "ironwood", x: -169, y: 460, size: 62, rotation: 2.87 },
+      { kind: "ironwood", x: -209, y: 269, size: 55, rotation: 1.88 },
+      { kind: "ironwood", x: -167, y: 262, size: 53, rotation: 2.19 },
+      { kind: "ironwood", x: -146, y: -49, size: 61, rotation: 3.49 },
+      { kind: "ironwood", x: -181, y: -20, size: 60, rotation: 2.82 },
+      { kind: "ironwood", x: -190, y: -298, size: 68, rotation: 4.29 },
+      { kind: "ironwood", x: 18, y: -325, size: 74, rotation: 4.22 },
+      { kind: "ironwood", x: 12, y: -361, size: 74, rotation: 4.86 },
+      { kind: "ironwood", x: 314, y: -305, size: 59, rotation: 0.85 },
+      { kind: "ironwood", x: 497, y: -306, size: 61, rotation: 3.82 },
+      { kind: "ironwood", x: 594, y: -315, size: 56, rotation: 2.68 },
+      { kind: "ironwood", x: 655, y: -333, size: 60, rotation: 3.56 },
+      { kind: "ironwood", x: 1004, y: -307, size: 73, rotation: 5.74 },
+      { kind: "ironwood", x: 1146, y: -366, size: 56, rotation: 1.81 },
+      { kind: "ironwood", x: 1261, y: -313, size: 76, rotation: 6.02 },
+      { kind: "ironwood", x: 1339, y: -307, size: 65, rotation: 3.64 },
+      { kind: "ironwood", x: 1508, y: -337, size: 66, rotation: 4.26 },
+      { kind: "ironwood", x: 1620, y: -263, size: 67, rotation: 2.70 },
+      { kind: "ironwood", x: 1593, y: 57, size: 65, rotation: 0.01 },
+      { kind: "ironwood", x: 1602, y: 159, size: 76, rotation: 3.83 },
+      { kind: "ironwood", x: 1579, y: 216, size: 76, rotation: 4.03 },
+      { kind: "ironwood", x: 1623, y: 463, size: 72, rotation: 0.70 },
+      { kind: "ironwood", x: 1609, y: 643, size: 61, rotation: 4.06 },
+      { kind: "ironwood", x: 1597, y: 831, size: 59, rotation: 1.46 },
+      { kind: "ironwood", x: 1651, y: 979, size: 64, rotation: 4.13 },
+      { kind: "ironwood", x: 1608, y: 1037, size: 60, rotation: 5.89 },
+      { kind: "ironwood", x: 1308, y: 1018, size: 72, rotation: 4.64 },
+      { kind: "ironwood", x: 1277, y: 1088, size: 62, rotation: 1.67 },
+      { kind: "ironwood", x: 977, y: 1032, size: 66, rotation: 4.46 },
+      { kind: "ironwood", x: 831, y: 1087, size: 69, rotation: 3.01 },
+      { kind: "ironwood", x: 704, y: 1018, size: 69, rotation: 2.28 },
+      { kind: "ironwood", x: 421, y: 1083, size: 76, rotation: 3.52 },
+      { kind: "ironwood", x: 442, y: 1090, size: 64, rotation: 0.66 },
+      { kind: "ironwood", x: 265, y: 1040, size: 74, rotation: 0.05 },
+      { kind: "ironwood", x: 95, y: 1018, size: 74, rotation: 1.93 },
+      { kind: "ironwood", x: -149, y: 1093, size: 66, rotation: 3.56 },
+      { kind: "ironwood", x: -314, y: 1084, size: 70, rotation: 5.96 },
+      { kind: "ironwood", x: -301, y: 848, size: 60, rotation: 4.95 },
+      { kind: "ironwood", x: -329, y: 780, size: 56, rotation: 0.66 },
+      { kind: "ironwood", x: -310, y: 577, size: 66, rotation: 5.85 },
+      { kind: "ironwood", x: -328, y: 318, size: 56, rotation: 3.55 },
+      { kind: "ironwood", x: -356, y: 333, size: 64, rotation: 5.92 },
+      { kind: "ironwood", x: -385, y: -29, size: 68, rotation: 3.11 },
+      { kind: "ironwood", x: -352, y: -150, size: 60, rotation: 6.06 },
+      { kind: "ironwood", x: -356, y: -181, size: 66, rotation: 3.04 },
+      { kind: "ironwood", x: -501, y: -505, size: 79, rotation: 2.17 },
+      { kind: "ironwood", x: -220, y: -467, size: 70, rotation: 0.41 },
+      { kind: "ironwood", x: -119, y: -515, size: 85, rotation: 4.89 },
+      { kind: "ironwood", x: 158, y: -457, size: 68, rotation: 0.20 },
+      { kind: "ironwood", x: 222, y: -480, size: 91, rotation: 5.61 },
+      { kind: "ironwood", x: 486, y: -540, size: 86, rotation: 5.16 },
+      { kind: "ironwood", x: 602, y: -525, size: 92, rotation: 0.99 },
+      { kind: "ironwood", x: 741, y: -527, size: 91, rotation: 0.77 },
+      { kind: "ironwood", x: 1036, y: -498, size: 74, rotation: 3.94 },
+      { kind: "ironwood", x: 1116, y: -473, size: 69, rotation: 2.45 },
+      { kind: "ironwood", x: 1412, y: -541, size: 80, rotation: 0.22 },
+      { kind: "ironwood", x: 1445, y: -492, size: 69, rotation: 5.37 },
+      { kind: "ironwood", x: 1711, y: -544, size: 91, rotation: 0.83 },
+      { kind: "ironwood", x: 1770, y: -405, size: 69, rotation: 1.03 },
+      { kind: "ironwood", x: 1764, y: -375, size: 92, rotation: 1.27 },
+      { kind: "ironwood", x: 1771, y: -113, size: 80, rotation: 5.78 },
+      { kind: "ironwood", x: 1765, y: 105, size: 73, rotation: 1.29 },
+      { kind: "ironwood", x: 1816, y: 375, size: 81, rotation: 4.56 },
+      { kind: "ironwood", x: 1756, y: 488, size: 90, rotation: 4.09 },
+      { kind: "ironwood", x: 1748, y: 597, size: 88, rotation: 6.11 },
+      { kind: "ironwood", x: 1759, y: 742, size: 73, rotation: 0.37 },
+      { kind: "ironwood", x: 1749, y: 948, size: 79, rotation: 0.51 },
+      { kind: "ironwood", x: 1818, y: 1156, size: 76, rotation: 3.98 },
+      { kind: "ironwood", x: 1730, y: 1259, size: 73, rotation: 2.97 },
+      { kind: "ironwood", x: 1625, y: 1198, size: 73, rotation: 1.86 },
+      { kind: "ironwood", x: 1312, y: 1200, size: 87, rotation: 0.65 },
+      { kind: "ironwood", x: 1156, y: 1251, size: 84, rotation: 4.21 },
+      { kind: "ironwood", x: 913, y: 1226, size: 69, rotation: 5.41 },
+      { kind: "ironwood", x: 781, y: 1223, size: 70, rotation: 0.43 },
+      { kind: "ironwood", x: 590, y: 1186, size: 81, rotation: 2.64 },
+      { kind: "ironwood", x: 438, y: 1232, size: 84, rotation: 3.15 },
+      { kind: "ironwood", x: 271, y: 1191, size: 72, rotation: 1.45 },
+      { kind: "ironwood", x: 239, y: 1240, size: 92, rotation: 2.64 },
+      { kind: "ironwood", x: 55, y: 1234, size: 74, rotation: 1.71 },
+      { kind: "ironwood", x: -258, y: 1214, size: 81, rotation: 2.31 },
+      { kind: "ironwood", x: -338, y: 1192, size: 88, rotation: 3.79 },
+      { kind: "ironwood", x: -526, y: 1203, size: 87, rotation: 2.85 },
+      { kind: "ironwood", x: -486, y: 952, size: 76, rotation: 0.17 },
+      { kind: "ironwood", x: -489, y: 776, size: 73, rotation: 5.71 },
+      { kind: "ironwood", x: -524, y: 662, size: 70, rotation: 5.33 },
+      { kind: "ironwood", x: -518, y: 422, size: 91, rotation: 1.22 },
+      { kind: "ironwood", x: -456, y: 269, size: 70, rotation: 2.84 },
+      { kind: "ironwood", x: -490, y: 94, size: 89, rotation: 4.38 },
+      { kind: "ironwood", x: -539, y: 29, size: 72, rotation: 3.42 },
+      { kind: "ironwood", x: -483, y: -249, size: 87, rotation: 3.59 },
+      { kind: "ironwood", x: -496, y: -340, size: 77, rotation: 0.15 },
+      { kind: "ironwood", x: -538, y: -689, size: 112, rotation: 2.74 },
+      { kind: "ironwood", x: -470, y: -649, size: 103, rotation: 4.40 },
+      { kind: "ironwood", x: -186, y: -640, size: 86, rotation: 6.12 },
+      { kind: "ironwood", x: 63, y: -647, size: 112, rotation: 4.96 },
+      { kind: "ironwood", x: 107, y: -698, size: 110, rotation: 3.20 },
+      { kind: "ironwood", x: 415, y: -634, size: 111, rotation: 2.06 },
+      { kind: "ironwood", x: 655, y: -702, size: 106, rotation: 1.16 },
+      { kind: "ironwood", x: 678, y: -633, size: 94, rotation: 2.07 },
+      { kind: "ironwood", x: 1002, y: -657, size: 90, rotation: 3.23 },
+      { kind: "ironwood", x: 1087, y: -697, size: 112, rotation: 2.76 },
+      { kind: "ironwood", x: 1223, y: -662, size: 86, rotation: 5.82 },
+      { kind: "ironwood", x: 1415, y: -672, size: 83, rotation: 1.93 },
+      { kind: "ironwood", x: 1634, y: -688, size: 82, rotation: 1.33 },
+      { kind: "ironwood", x: 1884, y: -631, size: 111, rotation: 5.98 },
+      { kind: "ironwood", x: 1949, y: -687, size: 104, rotation: 0.17 },
+      { kind: "ironwood", x: 1953, y: -443, size: 102, rotation: 6.24 },
+      { kind: "ironwood", x: 1932, y: -153, size: 103, rotation: 4.53 },
+      { kind: "ironwood", x: 1922, y: 94, size: 104, rotation: 5.14 },
+      { kind: "ironwood", x: 1962, y: 97, size: 107, rotation: 2.21 },
+      { kind: "ironwood", x: 1947, y: 239, size: 103, rotation: 4.34 },
+      { kind: "ironwood", x: 1988, y: 646, size: 82, rotation: 4.17 },
+      { kind: "ironwood", x: 1919, y: 786, size: 89, rotation: 2.36 },
+      { kind: "ironwood", x: 1977, y: 921, size: 96, rotation: 1.33 },
+      { kind: "ironwood", x: 1924, y: 1125, size: 87, rotation: 3.22 },
+      { kind: "ironwood", x: 1978, y: 1333, size: 108, rotation: 0.12 },
+      { kind: "ironwood", x: 1862, y: 1421, size: 93, rotation: 0.31 },
+      { kind: "ironwood", x: 1749, y: 1384, size: 101, rotation: 6.20 },
+      { kind: "ironwood", x: 1560, y: 1368, size: 95, rotation: 0.75 },
+      { kind: "ironwood", x: 1304, y: 1400, size: 93, rotation: 0.60 },
+      { kind: "ironwood", x: 1085, y: 1384, size: 106, rotation: 3.01 },
+      { kind: "ironwood", x: 861, y: 1387, size: 92, rotation: 4.76 },
+      { kind: "ironwood", x: 805, y: 1383, size: 105, rotation: 0.68 },
+      { kind: "ironwood", x: 633, y: 1354, size: 85, rotation: 1.10 },
+      { kind: "ironwood", x: 414, y: 1428, size: 84, rotation: 4.24 },
+      { kind: "ironwood", x: 194, y: 1385, size: 86, rotation: 3.18 },
+      { kind: "ironwood", x: 65, y: 1387, size: 103, rotation: 2.98 },
+      { kind: "ironwood", x: -213, y: 1422, size: 95, rotation: 2.00 },
+      { kind: "ironwood", x: -288, y: 1363, size: 107, rotation: 2.57 },
+      { kind: "ironwood", x: -562, y: 1395, size: 99, rotation: 4.27 },
+      { kind: "ironwood", x: -626, y: 1175, size: 110, rotation: 2.65 },
+      { kind: "ironwood", x: -673, y: 1080, size: 92, rotation: 2.23 },
+      { kind: "ironwood", x: -701, y: 921, size: 97, rotation: 1.54 },
+      { kind: "ironwood", x: -644, y: 814, size: 111, rotation: 0.40 },
+      { kind: "ironwood", x: -707, y: 459, size: 91, rotation: 0.16 },
+      { kind: "ironwood", x: -713, y: 325, size: 99, rotation: 1.10 },
+      { kind: "ironwood", x: -709, y: 108, size: 95, rotation: 0.77 },
+      { kind: "ironwood", x: -650, y: 10, size: 84, rotation: 5.56 },
+      { kind: "ironwood", x: -631, y: -174, size: 92, rotation: 0.73 },
+      { kind: "ironwood", x: -690, y: -343, size: 90, rotation: 1.84 },
+      { kind: "ironwood", x: -704, y: -641, size: 103, rotation: 5.19 },
+
+      // THE HORIZON ITSELF: low hills right out at the edge of the ground, big
+      // enough to sit above the treeline and hazy enough to read as far away.
+      // They are what the board is missing when it reads as "a bigger
+      // rectangle" -- there has to be something the forest ENDS against.
+      { kind: "ridge", x: -768, y: -860, size: 348, rotation: 1.45 },
+      { kind: "ridge", x: -122, y: -860, size: 423, rotation: 2.93 },
+      { kind: "ridge", x: 232, y: -860, size: 510, rotation: 5.67 },
+      { kind: "ridge", x: 883, y: -860, size: 507, rotation: 3.13 },
+      { kind: "ridge", x: 1315, y: -860, size: 513, rotation: 1.26 },
+      { kind: "ridge", x: 1719, y: -860, size: 483, rotation: 1.43 },
+      { kind: "ridge", x: 2140, y: -801, size: 424, rotation: 5.91 },
+      { kind: "ridge", x: 2140, y: -340, size: 497, rotation: 3.66 },
+      { kind: "ridge", x: 2140, y: 249, size: 465, rotation: 2.04 },
+      { kind: "ridge", x: 2140, y: 624, size: 391, rotation: 5.99 },
+      { kind: "ridge", x: 2140, y: 1113, size: 446, rotation: 4.17 },
+      { kind: "ridge", x: 2066, y: 1580, size: 316, rotation: 2.77 },
+      { kind: "ridge", x: 1642, y: 1580, size: 393, rotation: 6.07 },
+      { kind: "ridge", x: 964, y: 1580, size: 444, rotation: 1.20 },
+      { kind: "ridge", x: 605, y: 1580, size: 481, rotation: 2.21 },
+      { kind: "ridge", x: 37, y: 1580, size: 518, rotation: 6.04 },
+      { kind: "ridge", x: -365, y: 1580, size: 400, rotation: 4.10 },
+      { kind: "ridge", x: -860, y: 1566, size: 436, rotation: 2.14 },
+      { kind: "ridge", x: -860, y: 1000, size: 329, rotation: 4.40 },
+      { kind: "ridge", x: -860, y: 441, size: 390, rotation: 2.03 },
+      { kind: "ridge", x: -860, y: 65, size: 514, rotation: 5.70 },
+      { kind: "ridge", x: -860, y: -376, size: 413, rotation: 2.64 },
 
       // Inner groves, kept off the road and off the stumps.
       { kind: "ironwood", x: 688, y: 105, size: 27, rotation: 4.26 },
@@ -1116,12 +1303,12 @@ Maps.ENVIRONMENTS = {
 
       // The six buildable stumps. Flat-topped and cut clean, which is what
       // makes them read as a place to stand rather than as more litter.
-      { kind: "platform", x: 560,  y: 250, size: 38, rotation: 0.4, platformId: "stump-p1" },
-      { kind: "platform", x: 640,  y: 410, size: 34, rotation: 2.1, platformId: "stump-p2" },
-      { kind: "platform", x: 820,  y: 430, size: 34, rotation: 3.8, platformId: "stump-p3" },
-      { kind: "platform", x: 920,  y: 300, size: 30, rotation: 1.5, platformId: "stump-p4" },
-      { kind: "platform", x: 1000, y: 230, size: 29, rotation: 5.0, platformId: "stump-p5" },
-      { kind: "platform", x: 320,  y: 330, size: 30, rotation: 0.9, platformId: "stump-p6" },
+      { kind: "platform", x: 560, y: 250, size: 80, height: 20, rotation: 0.4, platformId: "stump-p1" },
+      { kind: "platform", x: 640, y: 410, size: 66, height: 13, rotation: 2.1, platformId: "stump-p2" },
+      { kind: "platform", x: 820, y: 430, size: 72, height: 25, rotation: 3.8, platformId: "stump-p3" },
+      { kind: "platform", x: 920, y: 300, size: 60, height: 11, rotation: 1.5, platformId: "stump-p4" },
+      { kind: "platform", x: 1000, y: 230, size: 58, height: 17, rotation: 5.0, platformId: "stump-p5" },
+      { kind: "platform", x: 320, y: 330, size: 68, height: 15, rotation: 0.9, platformId: "stump-p6" },
 
       // --- the settlement ---------------------------------------------------
       { kind: "townhall",   x: 150, y: 362, size: 66, rotation: 0,    propId: "townhall" },
@@ -1973,6 +2160,21 @@ function drawModel(ctx, model, theme) {
       ctx.lineTo(post, size * 0.15);
       ctx.stroke();
     }
+  } else if (model.kind === "ridge") {
+    // Horizon hills. In 2D they sit outside the 1280x720 canvas and are never
+    // seen -- this exists so the kind is not a silent hole if one is ever
+    // authored inside the view.
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.5, size * 0.16);
+    for (i = 0; i <= 6; i++) {
+      var mrx = -size * 0.5 + size * i / 6;
+      ctx.lineTo(mrx, -size * (0.12 + Math.sin(i * 1.7 + model.x * 0.05) * 0.10));
+    }
+    ctx.lineTo(size * 0.5, size * 0.16);
+    ctx.closePath();
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+
   } else if (model.kind === "ironwood") {
     // A LIVING BROADLEAF, and deliberately nothing like the dead forest board's
     // bare stems. Three overlapping canopy lobes of different sizes, a trunk
@@ -2235,7 +2437,9 @@ function drawModel(ctx, model, theme) {
     // The cut face and its growth rings -- the "you may stand here" signal.
     ctx.beginPath();
     ctx.ellipse(0, -size * 0.05, size * 0.38, size * 0.32, 0, 0, Math.PI * 2);
-    ctx.fillStyle = theme.panel;
+    // Pale heartwood, not the theme's mossy trim -- see the same note on the
+    // 3D case. The cut face is the "you may stand here" signal.
+    ctx.fillStyle = "#b9a074";
     ctx.fill();
     ctx.lineWidth = 1.1;
     ctx.strokeStyle = themeRgba(theme, "accent", 0.30);
@@ -2787,8 +2991,12 @@ Maps.analyse = function (map) {
   if (map.analysis) return map.analysis;
 
   var definitions = Maps.routesOf(map);
+  // THE SAME LINE THE GAME LOADS. A map with a curved road is measured along
+  // the curve, because that is what the enemies walk and what the towers are
+  // near -- analysing the authored polyline instead reported a route 42 u.l.
+  // shorter than the one being played, and a test caught the two disagreeing.
   var gamePaths = definitions.map(function (route) {
-    return new GamePath(Maps.toWorld(route.points));
+    return new GamePath(Maps.toWorld(Maps.walkablePoints(map, route.points)));
   });
   var Reference = Maps.REFERENCE_TOWER();
   var rangePx = ul(Reference.BASE_RANGE_UL);

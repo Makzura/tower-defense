@@ -5017,27 +5017,64 @@ test("4b  a tower may be ON a stump or beside it, never half on the rim", functi
     "clear of it entirely is fine again");
 });
 
-test("4c  the road is DRAWN curved and WALKED straight", function (t) {
+test("4c  the road is one curve, walked and drawn, with its hairpins intact",
+function (t) {
   var h = ironwood();
   var map = h.game.Maps.byId("ironwood-frontier");
   var authored = map.points;
-  var ribbon = h.game.Maps.smoothRoad(authored, 10);
+  var walked = h.game.Maps.walkablePoints(map, authored);
 
-  t.ok(ribbon.length > authored.length * 5, "the drawn ribbon is subdivided");
-  // It passes THROUGH every authored point, so the curve never wanders off the
-  // line the enemies actually walk.
+  // ONE LINE, NOT TWO. Smoothing only the picture made enemies cut every
+  // rounded corner and visibly walk beside their own road, so the spline is
+  // applied once and the walked path is built from it.
+  t.ok(walked.length > authored.length * 4, "the walked line is subdivided");
+  t.eq(h.game.path.points.length, walked.length,
+    "and the loaded path IS that line, not the authored polyline");
+
+  // It passes through every authored point, so the curve never wanders off the
+  // shape the map drew.
   authored.forEach(function (p, i) {
     var nearest = Infinity;
-    ribbon.forEach(function (q) {
+    walked.forEach(function (q) {
       var d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < nearest) nearest = d;
     });
-    t.ok(nearest < 0.001, "authored point " + i + " is on the ribbon");
+    t.ok(nearest < 0.001, "authored point " + i + " is on the curve");
   });
-  // And nothing downstream ever sees it: the path is built from the authored
-  // points, so pathing and clearance are unchanged.
-  t.eq(h.game.path.points.length, authored.length,
-    "the walked path still has exactly the authored points");
+
+  // AND THE SHARP CORNERS SURVIVE. Rounding all eighteen was the first attempt
+  // and it was wrong: a logging road has long easy bends AND hairpins where it
+  // had to get round something. Four of Ironwood's vertices turn harder than
+  // SHARP_CORNER_DEG and they stay hard.
+  function turnAt(pts, i) {
+    var a = pts[i - 1], b = pts[i], c = pts[i + 1];
+    var t1 = Math.atan2(b.y - a.y, b.x - a.x);
+    var t2 = Math.atan2(c.y - b.y, c.x - b.x);
+    var d = t2 - t1;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return Math.abs(d) * 180 / Math.PI;
+  }
+  var hard = 0;
+  for (var i = 1; i < authored.length - 1; i++) {
+    if (turnAt(authored, i) > h.game.Maps.SHARP_CORNER_DEG) hard++;
+  }
+  t.ok(hard >= 3, "the authored route has hairpins to preserve (" + hard + ")");
+
+  var sharpestOnCurve = 0;
+  for (i = 1; i < walked.length - 1; i++) {
+    var turn = turnAt(walked, i);
+    if (turn > sharpestOnCurve) sharpestOnCurve = turn;
+  }
+  t.ok(sharpestOnCurve > h.game.Maps.SHARP_CORNER_DEG,
+    "and at least one is still a corner on the curve (" +
+    Math.round(sharpestOnCurve) + " deg)");
+
+  // The boards that did NOT ask for a curve are untouched -- Rune Circuit is
+  // the reference map and its length fixes the u.l. scale for the whole game.
+  var plain = h.game.Maps.byId("rune-circuit");
+  t.eq(h.game.Maps.walkablePoints(plain, plain.points).length, plain.points.length,
+    "a map without curvedRoad keeps its authored polyline exactly");
 });
 
 test("4d  the route ends OUTSIDE the settlement, at the gate", function (t) {

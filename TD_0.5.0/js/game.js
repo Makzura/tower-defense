@@ -1798,7 +1798,10 @@ function loadMap(map) {
   // note on Maps.geometryOf.
   Maps.resetGeometry();
   paths = Maps.routesOf(map).map(function (route) {
-    var gamePath = new GamePath(Maps.toWorld(route.points));
+    // Walked and drawn are the SAME line -- see Maps.walkablePoints. Smoothing
+    // only the picture made enemies cut every rounded corner and walk beside
+    // their own road.
+    var gamePath = new GamePath(Maps.toWorld(Maps.walkablePoints(map, route.points)));
     gamePath.id = route.id;
     return gamePath;
   });
@@ -4620,19 +4623,14 @@ function draw() {
 // The result is cached on the path object: this is called five times per frame,
 // once per road layer, and the spline is the same every time.
 function tracePath(routePath) {
+  // No smoothing here any more: `routePath.points` IS the curve, because the
+  // walked path and the drawn path are built from the same spline in loadMap.
+  // Two smoothings -- one for the picture and one for the walk -- is how they
+  // came apart in the first place.
   var pts = routePath.points;
-  if (typeof Maps !== "undefined" && Maps.smoothRoad) {
-    if (routePath._ribbon === undefined || routePath._ribbonFor !== pts) {
-      routePath._ribbon = Maps.smoothRoad(pts, 10);
-      routePath._ribbonFor = pts;
-    }
-    pts = routePath._ribbon;
-  }
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
-  for (var i = 1; i < pts.length; i++) {
-    ctx.lineTo(pts[i].x, pts[i].y);
-  }
+  for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
 }
 
 // The fallback theme, for a build with no Maps module loaded (the bare-engine
