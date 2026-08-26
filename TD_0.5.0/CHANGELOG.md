@@ -13,6 +13,43 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-26 — Ironwood Frontier: the flagship board, and the first map whose
+scenery is also solid.** A logging road through old ironwood, from a mobile enemy
+depot in the east to a fortified settlement in the west. Default map; every older
+board stays selectable and unchanged, and no tower, enemy, wave, economy or meta
+value moved.
+
+`js/systems/map-geometry.js` is new and is the only place that knows what a shape
+is. Circle, capsule, polygon; contains-with-footprint and first-crossing-along-a
+segment; tangency counts as contact everywhere. Node-safe, no globals.
+
+The map carries `blockers`, `landmarks` and `platforms` — solid rocks, the depot
+and settlement, and six buildable stumps. Decorative foliage is in none of them.
+Authored in pixels, converted once, cached per (map, UNIT_LENGTH); boards without
+geometry share one frozen empty object and pay nothing.
+
+One resolver serves the ghost, the block reason and the click, so a preview that
+snaps to a stump and a click that builds beside it cannot happen. Sight is
+injected into RangeFilter and reaches the classic towers through Targeting.pick.
+Bullets sweep the segment they are about to fly: homing rounds die at the contact
+point and release their claim, and a pierce shot resolves everything in front of
+a rock before stopping at it. Three intentional exceptions: the B5 ritual is
+global, the Warbringer's blast reaches behind cover it could not have acquired
+through, and stumps grant no stats.
+
+The difficulty measurement now rejects spots inside terrain and discounts road a
+tower cannot see. The six bare boards score exactly what they always did;
+Ironwood measures 0.804, normal, inside the 0.78–0.90 band without moving an
+authored coordinate.
+
+Twenty regression tests, self-tested by mutation. Four defects found by looking
+at the live board rather than by running them: every prop rendered as a grey cube
+because `scenery` had no case for the new kinds; the first fix framed the camera
+on 900 units of apron and put the clearing in the far distance; raw "#rrggbb"
+strings handed to the builder do not throw and rendered the depot's wheels bright
+cyan; and the board was a lit rectangle in a void until the ground ran past what
+the camera can see and the clear colour moved onto the mist.
+
 **2026-08-26 — The balance pass, the meta rewrite, and a real result screen.**
 Four coordinated changes at the owner's instruction, none of which touches the
 wave schedule: every wave's composition is byte-identical afterwards (35 waves,

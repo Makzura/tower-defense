@@ -1879,6 +1879,79 @@ u.l., named `*_UL` or `*_ULPS`.
 
 ---
 
+## A map may have SOLID scenery, and Ironwood Frontier is the first that does
+
+Every other route in this game is a polyline on an empty floor: the scenery is a
+picture, and the same route would score identically on bare ground. Ironwood
+Frontier (2026-08-26) is the flagship board and the exception, so anything that
+asks a question about a battlefield has to go through `js/systems/map-geometry.js`.
+
+**Three lists on the map, and they answer different questions.**
+
+| list | refuses building | blocks sight | stops bullets |
+|---|---|---|---|
+| `blockers` | yes | yes | yes |
+| `landmarks` | yes | only if `blocksSight` | only if `blocksSight` |
+| `platforms` | no — they are the BEST ground | no | no |
+
+**Decorative foliage is in none of them, and that separation is the design.** The
+forest border is dense on purpose; if its canopies decided what could be built or
+seen, the board would be unplayable and unpredictable in the same stroke, and a
+player cannot read a placement rule off a tree. Gameplay geometry is authored,
+listed, and DRAWN TO MATCH — the picture follows the rule, never the reverse.
+
+The settlement's fence is a landmark with `blocksSight: false`, deliberately: it
+is mesh and wire, and a rifle shoots through mesh. You cannot build inside it and
+you can shoot across it.
+
+**MapGeometry answers exactly two questions** — does this point grown by a
+footprint touch this shape, and where does this segment FIRST reach it. Circle,
+capsule, polygon. **Tangency counts as contact everywhere**: every comparison is
+`<=`, because the alternative is a band one float wide where the answer depends
+on rounding. "Where first" is the half that stops a 14 000 u.l./s rail shot at
+the near face of a rock instead of behind it.
+
+**Authored in pixels, converted ONCE**, in `Maps.geometryOf`, which compiles and
+caches per (map, UNIT_LENGTH). A map with no geometry gets a shared frozen empty
+object — which is what makes the other seven boards pay nothing: every consumer
+opens with a length test that is false on it.
+
+**Line of sight is INJECTED, never imported.** `RangeFilter.setOcclusion` takes a
+predicate when a map loads and `clearOcclusion` takes it away. That module's
+value is that it answers "within reach" for anything with an `{x, y}`, in Node,
+with no game booted, and a `currentMap` global would end that. Sight is tested
+LAST, after range, cone and detection have thrown most candidates away.
+
+Both halves of the game reach it through one hook: the config-driven towers ask
+`RangeFilter`, and the Rifleman, the Summoner's creatures and every recruit come
+through `Targeting.pick`, which asks `Targeting.hasSightTo`.
+
+**Three intentional exceptions, and they are exceptions on purpose.** The Arcane
+Sniper's B5 ritual selects globally and ignores cover, because global means
+global. The Warbringer's blast reaches behind cover it could not have ACQUIRED
+through — `covers()` is about the zone and `canSee()` is about the line, and they
+are two functions so that stays visible. Stump elevation grants nothing: a tower
+on a stump has exactly the range, damage and accuracy it has on dirt.
+
+**The difficulty measurement sees the terrain.** Candidate spots inside it are
+rejected with the same footprint inflation `whyCannotBuild` uses, and road a
+tower cannot SEE does not count as coverage. The six bare boards are byte
+identical — 0.826, 0.566, 0.886, 1.061, 0.909, 0.863 — and a test pins that.
+Ironwood Frontier measures 0.804, normal.
+
+**It is the default map and Rune Circuit is still the REFERENCE.** Those are
+different jobs: the reference fixes the u.l. scale and moving that flag would
+silently rescale the campaign. They were the same board for as long as there was
+one obvious main route, which made it look like a rule.
+
+**The suites do NOT follow `Maps.DEFAULT_ID`.** `tests/harness.js` pins Rune
+Circuit, exactly as `pinWaveBreak` pins the pacing: around a hundred and forty
+tests are about towers, not about the default board, and following the default
+moved all of them onto a board with rocks and broke thirty-two at once. A test
+that wants the shipping default asks for it by name.
+
+---
+
 ## Placement rules are derived, not hand-picked
 
 Both build constraints come from geometry, so they stay correct when the map
