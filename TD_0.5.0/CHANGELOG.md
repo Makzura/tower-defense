@@ -13,6 +13,85 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-26 — Ironwood Frontier, playtest round three.** Three reports, and one
+of them was a rule I had invented on my own.
+
+**A tower is built where you clicked.** Placement used to SNAP to the middle of a
+stump, so six of the board's best firing positions had exactly one pose each and
+a click on a forty-pixel top landed somewhere the cursor was not. Nothing snaps
+now: `resolveBuildPoint` answers which stump the footprint is standing on and
+moves nothing. The rim is the only refusal — entirely on, or entirely off. The
+"one tower per stump" limit went with it: if two footprints fit side by side on a
+top, they fit, which is the answer open dirt already gave.
+
+**A red wash under the ghost, and it means one sentence: if your footprint
+touches red, the tower cannot go there.** Painted at the obstacles' true size —
+the road at its own half-width, the blockers and both structures at theirs, the
+ground other towers have taken, and every stump rim as a line, because on it and
+off it are both legal and only crossing is not. A test samples three thousand
+spots and asserts the wash and `whyCannotBuild` say the same thing.
+
+Finding that also turned up a feature that has never once been on screen: the
+sight shadows, asked for two rounds ago and written and tested then, were called
+from two flat-only branches, so on the 3D board — which is every board — they
+drew nothing. Both are drawn from one function called by both renderers now.
+
+**The road's hard corners are authored, not guessed.** The previous round
+classified corners by turn angle, which put four hard angles back into a track
+the owner had already accepted as natural: "the path changed and now has weird
+angles sometimes; the goal was not to change the path". The shape of a road is a
+decision. A vertex marked `sharp: true` keeps its angle and every other vertex is
+rounded; Ironwood marks none, and the capability stays for the boards that will.
+Chords are capped by length rather than a flat count per span, so a long sweep is
+subdivided as finely as a tight bend.
+
+**And the sky is gone, which took a bigger world than 25%.** The ground and the
+hills went out as asked, and it was not enough: at the flattest pitch and full
+zoom-out the eye reaches about nineteen hundred units past the clearing, which
+was beyond the whole treeline and in among the hills — the board went black
+behind one seen from two hundred units away. The forest runs to three thousand
+now, in ten belts, with the hills beyond all of them. Modest stems out to 1800,
+where the camera can be, and enormous ones from 2300 out, where it cannot; 289k
+triangles in one draw call, and the 2D fallback culls nine hundred of the
+thousand props it can never show.
+
+Ironwood measures 0.789, normal. Wave compositions identical. Suites 163 / 238 /
+74 / 47 / 53, 0 failing.
+
+**2026-08-26 — Ironwood Frontier, playtest round two.** Six defects the owner
+found by playing the board, and one of them was mine twice.
+
+The stumps were built from the boulder's lumpy-mass helper, and a stack of
+jittered rings is a blob whatever colour it is — "they look like the blub model
+but brown". A stump is a cylinder with bark on it, standing on roots, cut flat
+across the top, and it is built that way now: a tapered barrel, nine uneven bark
+ridges, a level cut face and roots that flare out and DOWN into the dirt. It has
+to survive being orbited, so there is no good side. The cut face is pale
+heartwood, not the theme's mossy trim, which had made every top read as a lily
+pad.
+
+Towers sank into them because the prop invented its own height and the height
+field did not know. `height` is declared per platform in the map now and both
+read it. Radii and heights are all different — 29 to 40 wide, 11 to 25 tall;
+six identical stumps read as stamped-out furniture.
+
+Zoom-out went from 1.5× the framing distance to 1.18: at 1.5 the board was a lit
+patch in a field of apron forest. And the horizon arrived — four rings of trees
+that get bigger and denser going out, then a ridge line of low jagged hills
+beyond them.
+
+The road was drawn curved and WALKED straight, so enemies cut every corner the
+picture had rounded. That was mine: I read "do not change the pathing
+coordinates" as "smooth only the picture", which is the same lie as a rock you
+can see not being the rock you collide with. The spline is applied once and
+everything downstream reads it. Two bugs inside that fix, both mine — smoothing
+every map lengthened Rune Circuit, the reference map whose length fixes the u.l.
+scale, and a hundred and two tests went red at once (curving is opt-in per map
+now); and the corner threshold compared against the interior angle, so nothing
+qualified.
+
+Suites 162 / 238 / 74 / 47 / 53, 0 failing.
+
 **2026-08-26 — Ironwood Frontier: the flagship board, and the first map whose
 scenery is also solid.** A logging road through old ironwood, from a mobile enemy
 depot in the east to a fortified settlement in the west. Default map; every older

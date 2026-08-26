@@ -2876,84 +2876,60 @@ function nearestPathTo(x, y) {
 // Returns null if a tower of this type can be placed here, else a short reason.
 // WHERE A TOWER WOULD ACTUALLY GO, given where the cursor is.
 //
+// IT GOES WHERE YOU CLICKED. That is the whole of the rule now, and it is a
+// correction: this used to SNAP a tower to the middle of a stump, so six of the
+// board's best firing positions had exactly one pose each and clicking anywhere
+// on a forty-pixel top put the tower in the same place. The owner caught it in
+// one sentence -- "you can place almost anywhere on the stamp and it always
+// gets placed at the same place, in the middle, it shouldn't".
+//
+// So this no longer moves anything. It answers the other question the callers
+// need, which is WHICH STUMP this footprint is standing on:
+//
+//   platform  -- the footprint fits ENTIRELY on that stump top
+//   straddles -- the footprint crosses a stump rim, which is not a pose
+//   neither   -- ordinary dirt
+//
 // ONE FUNCTION, THREE CALLERS: the build ghost, the block-reason readout and
-// the click that places the tower. They have to agree exactly -- a ghost that
-// snaps to a stump and a click that builds beside it is the worst kind of
-// placement bug, because it looks like the game ignored you. So none of them
-// works out a position; they all ask this.
+// the click that places the tower. They have to agree exactly.
 //
-// Snapping happens only when the cursor is genuinely over a stump AND the
-// selected tower fits on it. A tower too wide for the stump top is not snapped
-// and not refused -- it simply builds on the dirt like anywhere else, which is
-// the honest answer to "that does not fit up there".
-//
-// Returns the SAME OBJECT SHAPE either way so callers never branch on null.
+// Tangency is legal at both ends, the same `<=` MapGeometry uses everywhere:
+// a footprint exactly touching the rim from inside is on, from outside is off.
 function resolveBuildPoint(x, y, type) {
-  var platform = Maps.platformAt(currentMap, x, y);
-  if (!platform) return { x: x, y: y, platform: null };
-  if (type && ul(type.FOOTPRINT_RADIUS_UL) > platform.radius) {
-    // Too wide for the top. Not snapped and not silently dropped on the dirt
-    // beside it either -- see straddlesPlatform, which refuses it outright.
-    return { x: x, y: y, platform: null, tooBig: true };
-  }
-  return { x: platform.x, y: platform.y, platform: platform };
-}
-
-// IS THIS FOOTPRINT HALF ON A STUMP?
-//
-// A stump is a raised surface with a hard edge. A tower is either standing ON
-// that surface -- centred, which is what the snap does -- or on the dirt beside
-// it. There is no third pose: a footprint overlapping the rim has one side on
-// wood two feet up and the other on the ground, and the model has one ground
-// plane, so it renders half buried or half floating. That is exactly what the
-// board looked like before this existed.
-//
-// The snap catches this whenever the CURSOR is over the stump. This catches the
-// other half of the case, which the snap cannot: a cursor on the dirt whose
-// tower is wide enough to reach onto the stump anyway.
-function straddlesPlatform(x, y, type) {
+  var spot = { x: x, y: y, platform: null, straddles: null };
   var geo = Maps.geometryOf(currentMap);
-  if (!geo.any || !geo.platforms.length || !type) return false;
-  var reach = ul(type.FOOTPRINT_RADIUS_UL);
+  if (!geo.any || !geo.platforms.length) return spot;
+  var reach = type ? ul(type.FOOTPRINT_RADIUS_UL) : 0;
   for (var i = 0; i < geo.platforms.length; i++) {
     var pf = geo.platforms[i];
     var dx = x - pf.x, dy = y - pf.y;
     var d = Math.sqrt(dx * dx + dy * dy);
-    if (d <= 1e-6) continue;                 // dead centre: that is the snap
-    if (d < pf.radius + reach) return true;  // rim overlapped, either way
+    if (d + reach <= pf.radius) { spot.platform = pf; return spot; }
+    // A STUMP IS A RAISED SURFACE WITH A HARD EDGE. A tower is either standing
+    // ON it or on the dirt beside it; a footprint overlapping the rim has one
+    // side on wood two feet up and the other on the ground, and the model has
+    // one ground plane, so it renders half buried or half floating.
+    if (d - reach < pf.radius) { spot.straddles = pf; return spot; }
   }
-  return false;
-}
-
-// Is there already a tower standing on this stump? One per stump: the top is a
-// single flat surface and two towers on it would interpenetrate whatever the
-// footprint rule said, because both are snapped to the same centre.
-function platformOccupied(platform) {
-  if (!platform) return false;
-  for (var i = 0; i < towers.length; i++) {
-    if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
-    var dx = towers[i].x - platform.x, dy = towers[i].y - platform.y;
-    if (dx * dx + dy * dy <= platform.radius * platform.radius) return true;
-  }
-  return false;
+  return spot;
 }
 
 function whyCannotBuild(x, y, type) {
-  // Snap FIRST, then judge the snapped point. Testing the cursor and building
-  // at the stump centre would let a player be refused for standing on the road
-  // while the tower would have gone somewhere legal, and vice versa.
+  // THE STUMPS. Standing fully on one is legal and standing clear of one is
+  // legal; crossing the rim is neither. A tower simply too wide for the top is
+  // told so rather than being given the generic answer, because the two have
+  // different fixes: move the cursor, or bring a smaller tower.
+  //
+  // "One tower per stump" used to live here as a rule of its own. It does not
+  // any more: with free placement the honest answer is the same one the rest of
+  // the board gives -- if two footprints fit side by side without overlapping,
+  // they fit, and if they do not, "overlaps another tower" below says so. A
+  // hard-coded limit would have painted half of a big stump red with visible
+  // room on it, which is exactly the kind of refusal that reads as a bug.
   var spot = resolveBuildPoint(x, y, type);
-  if (spot.platform) {
-    if (platformOccupied(spot.platform)) return "occupied platform";
-    x = spot.x;
-    y = spot.y;
-  } else if (spot.tooBig) {
-    // Over a stump it cannot stand on. Refused rather than quietly built on the
-    // dirt under the cursor, which is what "I clicked the platform and it went
-    // somewhere else" looks like.
-    return "too big for this platform";
-  } else if (straddlesPlatform(x, y, type)) {
-    return "half on the platform";
+  if (spot.straddles) {
+    return ul(type.FOOTPRINT_RADIUS_UL) > spot.straddles.radius
+      ? "too big for this stump" : "half on the stump";
   }
 
   // TERRAIN. Blockers and landmarks refuse the tower's whole FOOTPRINT, not
@@ -4543,6 +4519,8 @@ function draw() {
   // and stay readable over every body regardless of depth order.
   for (i = 0; i < towers.length; i++) drawTowerHealth(towers[i]);
 
+  // The red wash and the blind spots, under the ghost that reads them.
+  drawPlacementFeedback();
   drawBuildPreview();
   drawAimPreview();
 
@@ -4571,7 +4549,10 @@ function draw() {
   // here in SCREEN space, positioned by asking the camera where a world point
   // landed. They are interface, so they must not shrink with distance or tilt
   // with the board.
-  if (world3D) World3D.drawOverlays(ctx, worldRenderState());
+  if (world3D) {
+    drawPlacementFeedback();
+    World3D.drawOverlays(ctx, worldRenderState());
+  }
 
   ctx.restore();
 
@@ -4614,14 +4595,12 @@ function draw() {
 
 // The stroke every road layer is painted along.
 //
-// DRAWN CURVED, WALKED STRAIGHT. `Maps.smoothRoad` returns a presentation copy
-// that passes through every authored point, and it is used HERE and in the 3D
-// ribbon and nowhere else -- enemies, build clearance and the difficulty
-// sampler all still measure against the polyline the map authored. A forest
-// track that turns in eighteen hard corners reads as an electrical circuit.
-//
-// The result is cached on the path object: this is called five times per frame,
-// once per road layer, and the spline is the same every time.
+// ONE LINE FOR EVERYTHING. `routePath.points` is already the smoothed curve --
+// loadMap builds it once, through Maps.walkablePoints -- so the road that is
+// painted, the road that is walked, the line build clearance is measured from
+// and the line the difficulty sampler samples are all the same set of points.
+// Smoothing a second time here for the picture is what made the enemies walk
+// beside their own road.
 function tracePath(routePath) {
   // No smoothing here any more: `routePath.points` IS the curve, because the
   // walked path and the drawn path are built from the same spline in loadMap.
@@ -4775,28 +4754,227 @@ function drawTowerStun(tower) {
 // the angles it covers. Sampling the shape's outline rather than assuming a
 // circle is what makes it correct for the fallen trunk and the two rock
 // outcrops as well as for the round boulders.
-function sightShadowFor(shape, tx, ty, rangePx) {
-  var pts = [];
-  var i;
+// THE OUTLINE OF A MAP SHAPE, as a ring of world [x, y] points.
+//
+// Wound in order and closed, because two very different things read it: the
+// sight-shadow maths, which only wants the extreme angles and does not care,
+// and the red no-build wash, which FILLS it and cares a great deal. The capsule
+// used to be built by walking A and B in lockstep, which is fine for measuring
+// angles and draws a self-intersecting star -- so it is a proper stadium now:
+// the far half-circle around one end, the far half-circle around the other.
+function shapeRing(shape) {
+  var pts = [], i, a;
+  if (!shape) return null;
   if (shape.shape === "circle") {
-    for (i = 0; i < 12; i++) {
-      var a = i * Math.PI * 2 / 12;
+    for (i = 0; i < 24; i++) {
+      a = i * Math.PI * 2 / 24;
       pts.push([shape.x + Math.cos(a) * shape.radius,
                 shape.y + Math.sin(a) * shape.radius]);
     }
-  } else if (shape.shape === "polygon") {
-    pts = shape.points;
-  } else if (shape.shape === "capsule") {
-    for (i = 0; i < 8; i++) {
-      var ca = i * Math.PI * 2 / 8;
-      pts.push([shape.a.x + Math.cos(ca) * shape.radius,
-                shape.a.y + Math.sin(ca) * shape.radius]);
-      pts.push([shape.b.x + Math.cos(ca) * shape.radius,
-                shape.b.y + Math.sin(ca) * shape.radius]);
-    }
-  } else {
-    return null;
+    return pts;
   }
+  if (shape.shape === "polygon") return shape.points;
+  if (shape.shape === "capsule") {
+    var axis = Math.atan2(shape.b.y - shape.a.y, shape.b.x - shape.a.x);
+    for (i = 0; i <= 12; i++) {
+      a = axis + Math.PI / 2 + i * Math.PI / 12;
+      pts.push([shape.a.x + Math.cos(a) * shape.radius,
+                shape.a.y + Math.sin(a) * shape.radius]);
+    }
+    for (i = 0; i <= 12; i++) {
+      a = axis - Math.PI / 2 + i * Math.PI / 12;
+      pts.push([shape.b.x + Math.cos(a) * shape.radius,
+                shape.b.y + Math.sin(a) * shape.radius]);
+    }
+    return pts;
+  }
+  return null;
+}
+
+// A circle as a ring, for the things that are circles without being map shapes:
+// tower footprints and stump rims.
+function circleRing(cx, cy, radius, steps) {
+  var pts = [], n = steps || 24;
+  for (var i = 0; i < n; i++) {
+    var a = i * Math.PI * 2 / n;
+    pts.push([cx + Math.cos(a) * radius, cy + Math.sin(a) * radius]);
+  }
+  return pts;
+}
+
+// The road as a filled BAND of the given half-width, rather than a stroked
+// line. A stroke of constant screen width is a lie on a tilted board -- the far
+// end of the road would be painted as wide as the near end -- and the width is
+// the entire information here, because the rule the band stands for is measured
+// in world units.
+//
+// Every point gets the normal of its own neighbourhood, which is safe at this
+// subdivision: the tightest bend on the curve has a radius of about twenty-five
+// pixels against an eleven pixel half-width, so the inner edge never folds.
+function roadBandRing(points, half) {
+  var left = [], right = [], i;
+  for (i = 0; i < points.length; i++) {
+    var a = points[Math.max(0, i - 1)];
+    var b = points[Math.min(points.length - 1, i + 1)];
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = -dy / len * half, ny = dx / len * half;
+    left.push([points[i].x + nx, points[i].y + ny]);
+    right.push([points[i].x - nx, points[i].y - ny]);
+  }
+  right.reverse();
+  return left.concat(right);
+}
+
+// EVERYTHING THAT WOULD REFUSE THIS TOWER'S FOOTPRINT, as world rings.
+//
+// The contract is one sentence, and it is the one the owner asked for: while
+// you are placing, if the footprint ring touches red the tower cannot go there.
+// So every shape here is the obstacle ITSELF at its true size -- not the
+// obstacle inflated by the footprint. A rock painted twelve pixels fatter than
+// the rock would be exact and unreadable; "my circle is touching that rock" is
+// something a player can see.
+//
+// The four rules that are about SPACE are all here and nothing else is. Money
+// and the map edge are not obstacles, they are not painted, and the ghost still
+// turns red and says which one it was.
+function noBuildRings(type) {
+  var rings = [];
+  if (!type) return rings;
+  var i;
+
+  // The road, at its own half-width. `buildClearancePx` is that half-width plus
+  // the footprint, so a footprint touching the band is exactly a centre inside
+  // the clearance -- the painted rule and the enforced rule are one derivation.
+  var half = ul(ROAD_WIDTH_UL / 2);
+  for (i = 0; i < paths.length; i++) {
+    if (paths[i].points && paths[i].points.length > 1) {
+      rings.push(roadBandRing(paths[i].points, half));
+    }
+  }
+
+  // Blockers, the depot and the settlement.
+  var geo = Maps.geometryOf(currentMap);
+  if (geo.any) {
+    for (i = 0; i < geo.noBuild.length; i++) {
+      var ring = shapeRing(geo.noBuild[i]);
+      if (ring) rings.push(ring);
+    }
+  }
+
+  // The ground other towers have already taken. A destroyed tower has released
+  // its ground, so it is not painted -- the same sweep whyCannotBuild skips.
+  for (i = 0; i < towers.length; i++) {
+    if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
+    rings.push(circleRing(towers[i].x, towers[i].y,
+      ul(towers[i].footprintRadiusUl), 16));
+  }
+  return rings;
+}
+
+// A world ring projected to screen, or null if any of it is behind the eye.
+function projectRing(ring, cam) {
+  var out = [], i;
+  for (i = 0; i < ring.length; i++) {
+    var x = ring[i][0], y = ring[i][1];
+    if (cam) {
+      var p = cam.worldToScreen(x, y, 0);
+      if (!p) return null;
+      x = p.x; y = p.y;
+    }
+    out.push([x, y]);
+  }
+  return out;
+}
+
+// THE RED WASH, drawn while a tower is armed and never otherwise.
+//
+// One path and one fill for every ring, with the default nonzero winding: the
+// road crosses its own band at the hairpins and a tower footprint sits on the
+// verge, and filling them separately would stack alpha and paint those overlaps
+// a different, brighter red than the rest -- which reads as a rule that is not
+// there. Outlines come after, in their own pass, so every shape keeps its edge.
+function drawNoBuildOverlay(type) {
+  var rings = noBuildRings(type);
+  if (!rings.length) return;
+  var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
+             World3D.camera) ? World3D.camera() : null;
+
+  var screened = [], i, k;
+  for (i = 0; i < rings.length; i++) {
+    var r = projectRing(rings[i], cam);
+    if (r && r.length > 2) screened.push(r);
+  }
+  if (!screened.length) return;
+
+  ctx.save();
+  ctx.beginPath();
+  for (i = 0; i < screened.length; i++) {
+    ctx.moveTo(screened[i][0][0], screened[i][0][1]);
+    for (k = 1; k < screened[i].length; k++) {
+      ctx.lineTo(screened[i][k][0], screened[i][k][1]);
+    }
+    ctx.closePath();
+  }
+  // Light enough that the board underneath is still readable -- this covers the
+  // road, both structures and five blockers at once, and at the sight shadow's
+  // 0.34 the whole clearing went pink.
+  ctx.fillStyle = "rgba(226,58,48,0.20)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,120,104,0.72)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // THE STUMP RIMS, which are lines rather than areas: a tower is legal fully
+  // on a stump and legal fully off it, and the only thing it may not do is
+  // cross the edge. So the edge is what is painted, and "footprint touching the
+  // red line" is precisely the refusal.
+  var geo = Maps.geometryOf(currentMap);
+  if (geo.any && geo.platforms.length) {
+    ctx.beginPath();
+    for (i = 0; i < geo.platforms.length; i++) {
+      var rim = projectRing(circleRing(geo.platforms[i].x, geo.platforms[i].y,
+        geo.platforms[i].radius, 28), cam);
+      if (!rim) continue;
+      ctx.moveTo(rim[0][0], rim[0][1]);
+      for (k = 1; k < rim.length; k++) ctx.lineTo(rim[k][0], rim[k][1]);
+      ctx.closePath();
+    }
+    ctx.strokeStyle = "rgba(255,120,104,0.80)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// EVERYTHING THE PLAYER IS OWED ABOUT A PLACEMENT, in one call.
+//
+// Called from BOTH renderers, which is the point. The sight shadows lived in
+// two flat-only branches and so were never drawn on the 3D board at all -- the
+// feature was asked for, written, tested in Node and invisible in the game.
+// They project through the camera themselves, so the only thing the two callers
+// differ on is where in the frame they sit.
+function drawPlacementFeedback() {
+  var type = selectedType();
+  if (type && worldMouse && mouse.x >= -100 &&
+      !overInterfaceChrome(mouse.x, mouse.y)) {
+    drawNoBuildOverlay(type);
+    drawSightShadows(worldMouse.x, worldMouse.y, ul(type.BASE_RANGE_UL));
+    return;
+  }
+  // Not placing: the inspected tower's own blind spots, so a player can ask an
+  // already-built tower what it cannot see.
+  var t = inspected || aimingTower;
+  if (t && !(t.isDestroyed && t.isDestroyed())) {
+    drawSightShadows(t.x, t.y, t.rangePx);
+  }
+}
+
+function sightShadowFor(shape, tx, ty, rangePx) {
+  var pts = [];
+  var i;
+  pts = shapeRing(shape);
+  if (!pts) return null;
 
   // Angles are measured RELATIVE to the direction of the shape, so a blocker
   // straddling the -pi/pi seam does not come back as a span of nearly a full
@@ -4902,18 +5080,12 @@ function drawBuildPreview() {
   var previewRangePx = ul(type.BASE_RANGE_UL);
   var footprintPx = ul(type.FOOTPRINT_RADIUS_UL);
 
-  // DRAWN WHERE IT WOULD BUILD, not under the cursor. Over a stump the ghost
-  // jumps to the stump centre, which is the whole feedback the snap gives --
-  // the player sees the tower take the platform before committing.
-  var spot = resolveBuildPoint(worldMouse.x, worldMouse.y, type);
-  var ghostX = spot.x, ghostY = spot.y;
+  // UNDER THE CURSOR, because that is where it builds. This used to ask
+  // resolveBuildPoint for a snapped position; nothing snaps any more.
+  var ghostX = worldMouse.x, ghostY = worldMouse.y;
 
   var ok = blockReason === null;
   var c = ok ? "108,230,133" : "230,90,90";
-
-  // The cover this tower would be standing behind, before its range ring is
-  // drawn -- so the red sits under the green rather than over it.
-  drawSightShadows(ghostX, ghostY, previewRangePx);
 
   // Range
   ctx.beginPath();
@@ -6244,8 +6416,6 @@ function drawInspection() {
     ctx.strokeStyle = "rgba(255,215,110,0.9)";
     ctx.stroke();
 
-    ctx.beginPath();
-    drawSightShadows(t.x, t.y, t.rangePx);
     ctx.beginPath();
     ctx.arc(t.x, t.y, t.rangePx, 0, Math.PI * 2);
     ctx.strokeStyle = "rgba(255,215,110,0.35)";

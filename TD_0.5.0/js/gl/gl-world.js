@@ -296,15 +296,6 @@ var World3D = (function () {
 
   // --- map geometry --------------------------------------------------------
 
-  // The road as it is DRAWN. See Maps.smoothRoad -- and note the fallback: a
-  // page that somehow loaded an older maps.js draws the hard-cornered ribbon
-  // rather than throwing, because a missing curve is a cosmetic loss and a
-  // missing road is not.
-  function roadRibbon(points) {
-    return (typeof Maps !== "undefined" && Maps.smoothRoad)
-      ? Maps.smoothRoad(points, 10) : points;
-  }
-
   function buildMapMesh(map, routePaths) {
     var P = paletteFor(map);
     mapPalette = P;
@@ -400,13 +391,9 @@ var World3D = (function () {
 
     var roadWidth = ul(ROAD_WIDTH_UL);
     routePaths.forEach(function (p) {
-      // DRAWN CURVED, WALKED STRAIGHT. Maps.smoothRoad returns a presentation
-      // copy that passes through every authored point; nothing downstream ever
-      // sees it, so pathing, clearance and the difficulty measurement are all
-      // still measured against the polyline the map authored.
-      // `p.points` IS the curve -- loadMap builds the walked path from the same
-      // spline -- so the ribbon is drawn along exactly the line the enemies
-      // walk. Smoothing again here is what made the two diverge.
+      // `p.points` IS the curve -- loadMap builds the walked path from the
+      // same spline -- so the ribbon is drawn along exactly the line the
+      // enemies walk. Smoothing again here is what made the two diverge.
       GLGeometry.road(g, p.points, roadWidth, ROAD_LIFT, P.roadTop, P.roadSide);
     });
 

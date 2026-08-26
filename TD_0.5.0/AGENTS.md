@@ -1937,7 +1937,76 @@ on a stump has exactly the range, damage and accuracy it has on dirt.
 rejected with the same footprint inflation `whyCannotBuild` uses, and road a
 tower cannot SEE does not count as coverage. The six bare boards are byte
 identical — 0.826, 0.566, 0.886, 1.061, 0.909, 0.863 — and a test pins that.
-Ironwood Frontier measures 0.804, normal.
+Ironwood Frontier measures 0.789, normal, on the curve it is actually walked.
+
+**A tower goes WHERE YOU CLICKED, on a stump exactly as on dirt.** This is a
+rule, not an implementation detail: `resolveBuildPoint` moves nothing. It answers
+which stump the footprint is standing on, and there are three answers — entirely
+on one, crossing a rim, or ordinary ground. Crossing a rim is the only refusal,
+because a stump is a raised surface with a hard edge and a footprint overlapping
+it has one side on wood and the other on dirt, which the model has no pose for.
+
+It used to SNAP to the stump's centre, and that was wrong twice over: six of the
+board's best firing positions had one pose each, and the click landed somewhere
+the cursor was not. **There is no "one tower per stump" rule either.** If two
+footprints fit side by side on a top without overlapping, they fit — the same
+answer open dirt gives. A hard limit would paint half a wide stump red with
+visible room on it, which reads as a bug rather than as a rule.
+
+**Stump HEIGHT is declared in the map data and read by both the prop and the
+height field.** Two systems inventing the same number is what put towers waist
+deep in the wood the first time.
+
+**The red wash means one sentence: if the ghost's footprint touches red, the
+tower cannot go there.** `noBuildRings` paints the obstacle ITSELF at its true
+size — the road at its own half-width, the blockers and both structures at
+theirs, the ground other towers have taken, and each stump rim as a LINE, because
+on it and off it are both legal and only crossing is not. Not the obstacle
+inflated by the footprint: that would be exact and unreadable. Every rule that is
+about SPACE is painted and nothing else is; money and the map edge are not
+obstacles, and the ghost still names them. Test 4e samples three thousand spots
+and asserts that the wash and `whyCannotBuild` are the same sentence, so the
+picture cannot drift from the rule it depicts.
+
+**Placement feedback is drawn from ONE function for both renderers.** The sight
+shadows were written, tested in Node, and called only from two flat-only branches
+— so on the 3D board, which is every board, they never drew at all. Anything that
+paints a placement rule goes in `drawPlacementFeedback`, which is called from the
+2D world block and from the 3D overlay pass.
+
+**A curved road is one line, and its hard corners are AUTHORED.** `curvedRoad:
+true` opts a map in; `Maps.walkablePoints` applies the spline ONCE and everything
+downstream — pathing, clearance, the difficulty sampler and both renderers —
+reads that. Smoothing only the picture made enemies cut every rounded corner and
+walk beside their own road. Curving is opt-in because Rune Circuit is the
+reference map whose length fixes the u.l. scale, and curving it turned a hundred
+and two tests red at once.
+
+A vertex marked `sharp: true` keeps its angle; every other vertex is rounded.
+Classifying corners by turn angle was tried and taken back out: the shape of a
+road is a decision, and a threshold put four hard angles back into a track the
+owner had already accepted. `Maps.ROAD_CHORD_PX` caps how long a drawn chord may
+be, so a long sweep is subdivided as finely as a tight bend.
+
+**A board with no skybox takes its horizon from its own scenery, and the scenery
+has to run PAST the camera.** At the flattest pitch and full zoom-out the eye
+ends up about nineteen hundred units outside the play rectangle. Ironwood's
+forest is ten belts running to three thousand, each taller and tighter packed
+than the last, with two lines of hills beyond all of them and ground beyond
+those. Fly out as far as the camera allows and you are still in trees.
+
+Two halves to that, and the split matters. Out to 1800 the stems stay MODEST,
+because that band is where the eye can actually be and a canopy the size of a
+house at fifty units is a black screen — which is exactly what the first attempt
+gave. From 2300 out they are enormous, and they can be, because nothing can get
+in among them: something far away and big reads as distance and the camera never
+gets to check. The hills use the same trick and are simply further.
+
+The periphery is GENERATED from a fixed seed, not hand-placed and never
+randomised at load — a forest that reshuffles every run is not a place. And the
+2D fallback culls it: that renderer only ever shows the 1280×720 board, so nine
+hundred of the thousand props are skipped rather than painted where no camera can
+see them.
 
 **It is the default map and Rune Circuit is still the REFERENCE.** Those are
 different jobs: the reference fixes the u.l. scale and moving that flag would

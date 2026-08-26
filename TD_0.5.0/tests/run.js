@@ -4972,33 +4972,41 @@ function ironwood() {
 // UNIT_LENGTH moved, which is the whole point of test 19 below.
 function px(h, v) { return h.game.ul(v / h.game.AUTHORED_AT_PX_PER_UL); }
 
-test("4  the ghost and the click resolve to the same stump centre", function (t) {
+test("4  a tower is built WHERE YOU CLICKED, not in the middle of the stump",
+function (t) {
   var h = ironwood();
   var geo = h.game.Maps.geometryOf(h.game.currentMap);
   var stump = geo.platforms[0];
 
-  // A cursor NEAR the stump, not on its centre.
+  // OFF CENTRE, and far enough off that a snap would be unmistakable.
   var cursorX = stump.x + stump.radius * 0.5;
   var cursorY = stump.y - stump.radius * 0.4;
 
   var ghost = h.game.resolveBuildPoint(cursorX, cursorY, h.game.Soldier);
-  t.eq(ghost.platform && ghost.platform.id, "stump-p1", "the ghost takes the stump");
-  t.near(ghost.x, stump.x, 1e-9, "and snaps to its centre in x");
-  t.near(ghost.y, stump.y, 1e-9, "and in y");
+  t.eq(ghost.platform && ghost.platform.id, "stump-p1", "the ghost knows the stump");
+  t.near(ghost.x, cursorX, 1e-9, "and does not move the tower in x");
+  t.near(ghost.y, cursorY, 1e-9, "or in y");
 
-  // The click goes through the real handler at the same cursor position.
+  // The click goes through the real handler at the same cursor position. This
+  // is the regression: it used to land on the stump's centre, so six of the
+  // board's best firing positions had exactly one pose each.
   h.run("selectedSlot = 0; refreshBlockReason();");
   h.click(cursorX, cursorY);
   t.eq(h.game.towers.length, 1, "a tower was built");
-  t.near(h.game.towers[0].x, stump.x, 1e-9, "at the stump's centre, not the cursor");
-  t.near(h.game.towers[0].y, stump.y, 1e-9, "in both axes");
+  t.near(h.game.towers[0].x, cursorX, 1e-9, "under the cursor, in x");
+  t.near(h.game.towers[0].y, cursorY, 1e-9, "and in y");
 
-  // One tower per stump.
-  t.eq(h.game.whyCannotBuild(cursorX, cursorY, h.game.Soldier), "occupied platform",
-    "and the stump is taken");
+  // Two small towers DO fit on a big stump. There is no "one per platform"
+  // rule any more: the footprints decide, exactly as they do on open dirt.
+  var far = h.game.whyCannotBuild(stump.x - stump.radius * 0.5,
+    stump.y + stump.radius * 0.4, h.game.Soldier);
+  t.eq(far, null, "a second tower fits on the far side of a wide stump");
+  t.eq(h.game.whyCannotBuild(cursorX + 2, cursorY, h.game.Soldier),
+    "overlaps another tower", "but not on top of the first one");
 });
 
-test("4b  a tower may be ON a stump or beside it, never half on the rim", function (t) {
+test("4b  a tower may be ON a stump or beside it, never half on the rim",
+function (t) {
   var h = ironwood();
   var geo = h.game.Maps.geometryOf(h.game.currentMap);
   var pf = geo.platforms[0];
@@ -5009,15 +5017,52 @@ test("4b  a tower may be ON a stump or beside it, never half on the rim", functi
   // and the other on the dirt, and the model has one ground plane -- which is
   // what "towers placed in the air" looked like before this rule existed.
   t.eq(h.game.whyCannotBuild(pf.x, pf.y, h.game.Soldier), null, "dead centre is fine");
-  t.eq(h.game.whyCannotBuild(pf.x + pf.radius * 0.3, pf.y, h.game.Soldier), null,
-    "and anywhere the snap can reach, because it lands on the centre");
+  t.eq(h.game.whyCannotBuild(pf.x + (pf.radius - fp) * 0.98, pf.y, h.game.Soldier),
+    null, "and right out to the edge, while the whole footprint is still on");
+  t.eq(h.game.whyCannotBuild(pf.x + pf.radius, pf.y, h.game.Soldier),
+    "half on the stump", "a centre ON the rim is refused");
   t.eq(h.game.whyCannotBuild(pf.x + pf.radius + fp * 0.5, pf.y, h.game.Soldier),
-    "half on the platform", "straddling the rim is refused");
+    "half on the stump", "and so is anything still overlapping it");
   t.eq(h.game.whyCannotBuild(pf.x + pf.radius + fp * 1.2, pf.y, h.game.Soldier), null,
     "clear of it entirely is fine again");
+
+  // A tower simply too wide for the top gets its own answer, because the fix
+  // is different: not "move the cursor" but "bring a smaller tower".
+  //
+  // No tower in the game is that wide on THIS board -- the narrowest stump is
+  // 29 and the widest footprint is the Blub's 26 -- and that is a fact about
+  // Ironwood's numbers, not a rule. So the branch is exercised with a type that
+  // is, which is what stops it rotting before the map that needs it exists.
+  var small = geo.platforms[4];                    // stump-p5, the narrowest
+  var widest = 0;
+  [h.game.Soldier, h.game.Smasher, h.game.BlubTower].forEach(function (ty) {
+    widest = Math.max(widest, h.game.ul(ty.FOOTPRINT_RADIUS_UL));
+  });
+  t.ok(widest <= small.radius,
+    "every real tower fits on every stump on this board");
+  var Wide = { FOOTPRINT_RADIUS_UL: small.radius / h.game.UNIT_LENGTH + 4,
+               COST: 0, BASE_RANGE_UL: 100 };
+  t.eq(h.game.whyCannotBuild(small.x, small.y, Wide),
+    "too big for this stump", "a wider one is told so, dead centre");
+
+  // TANGENCY IS ON, not half-on, which is the `<=` MapGeometry uses for every
+  // other shape on the board. It is a measure-zero case in floating point --
+  // radius minus footprint plus footprint is usually a bit short of radius --
+  // so it is asserted with numbers chosen to land on it exactly.
+  // 0.390625 is 25/64: it survives the multiply by UNIT_LENGTH and the add and
+  // subtract of the stump's own x with no rounding at all, which is the only
+  // reason this point lands exactly on the rim instead of a hair either side.
+  var Exact = { FOOTPRINT_RADIUS_UL: 0.390625, COST: 0, BASE_RANGE_UL: 100 };
+  var reach = h.game.ul(Exact.FOOTPRINT_RADIUS_UL);
+  var probeX = pf.x + (pf.radius - reach);
+  t.eq(Math.abs(probeX - pf.x) + reach, pf.radius, "the test point really is tangent");
+  var tangent = h.game.resolveBuildPoint(probeX, pf.y, Exact);
+  t.eq(tangent.platform && tangent.platform.id, "stump-p1",
+    "a footprint touching the rim from inside is ON the stump");
+  t.eq(tangent.straddles, null, "and is not reported as straddling it");
 });
 
-test("4c  the road is one curve, walked and drawn, with its hairpins intact",
+test("4c  the road is one curve, and its hard corners are AUTHORED, not guessed",
 function (t) {
   var h = ironwood();
   var map = h.game.Maps.byId("ironwood-frontier");
@@ -5042,10 +5087,6 @@ function (t) {
     t.ok(nearest < 0.001, "authored point " + i + " is on the curve");
   });
 
-  // AND THE SHARP CORNERS SURVIVE. Rounding all eighteen was the first attempt
-  // and it was wrong: a logging road has long easy bends AND hairpins where it
-  // had to get round something. Four of Ironwood's vertices turn harder than
-  // SHARP_CORNER_DEG and they stay hard.
   function turnAt(pts, i) {
     var a = pts[i - 1], b = pts[i], c = pts[i + 1];
     var t1 = Math.atan2(b.y - a.y, b.x - a.x);
@@ -5055,26 +5096,118 @@ function (t) {
     while (d < -Math.PI) d += Math.PI * 2;
     return Math.abs(d) * 180 / Math.PI;
   }
-  var hard = 0;
-  for (var i = 1; i < authored.length - 1; i++) {
-    if (turnAt(authored, i) > h.game.Maps.SHARP_CORNER_DEG) hard++;
-  }
-  t.ok(hard >= 3, "the authored route has hairpins to preserve (" + hard + ")");
 
-  var sharpestOnCurve = 0;
-  for (i = 1; i < walked.length - 1; i++) {
-    var turn = turnAt(walked, i);
-    if (turn > sharpestOnCurve) sharpestOnCurve = turn;
+  // IRONWOOD MARKS NOTHING SHARP, so nothing on its curve is a corner. The
+  // first version classified by turn angle and put four hard angles back into a
+  // track the owner had already accepted -- "the path changed and now has weird
+  // angles sometimes" -- which is a decision, not a measurement.
+  var sharpest = 0;
+  for (var i = 1; i < walked.length - 1; i++) {
+    sharpest = Math.max(sharpest, turnAt(walked, i));
   }
-  t.ok(sharpestOnCurve > h.game.Maps.SHARP_CORNER_DEG,
-    "and at least one is still a corner on the curve (" +
-    Math.round(sharpestOnCurve) + " deg)");
+  t.ok(sharpest < 20, "the whole route bends, nothing kinks (" +
+    Math.round(sharpest) + " deg worst)");
+  var hardAuthored = 0;
+  for (i = 1; i < authored.length - 1; i++) {
+    if (turnAt(authored, i) > 60) hardAuthored++;
+  }
+  t.ok(hardAuthored >= 3,
+    "even though the authored polyline has hairpins in it (" + hardAuthored + ")");
+
+  // BUT THE CAPABILITY IS STILL THERE, which is the other half of the brief:
+  // a board that wants an angle asks for one, on the vertex it wants it on.
+  var marked = authored.map(function (p, i) {
+    return i === 9 ? { x: p.x, y: p.y, sharp: true } : { x: p.x, y: p.y };
+  });
+  var withCorner = h.game.Maps.smoothRoad(marked, 12);
+  var keptIt = false;
+  for (i = 1; i < withCorner.length - 1; i++) {
+    if (Math.hypot(withCorner[i].x - authored[9].x,
+                   withCorner[i].y - authored[9].y) < 0.001) {
+      keptIt = turnAt(withCorner, i) > 60;
+    }
+  }
+  t.ok(keptIt, "a vertex marked sharp keeps its angle on the curve");
 
   // The boards that did NOT ask for a curve are untouched -- Rune Circuit is
   // the reference map and its length fixes the u.l. scale for the whole game.
   var plain = h.game.Maps.byId("rune-circuit");
   t.eq(h.game.Maps.walkablePoints(plain, plain.points).length, plain.points.length,
     "a map without curvedRoad keeps its authored polyline exactly");
+});
+
+test("4e  if the footprint touches red, the tower cannot go there", function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var type = g.Soldier;
+  var fp = g.ul(type.FOOTPRINT_RADIUS_UL);
+
+  // WITH A TOWER ALREADY ON THE BOARD, because the ground a tower has taken is
+  // painted too and leaving it out is a red wash that lies by omission.
+  h.run("selectedSlot = 0; refreshBlockReason();");
+  h.click(760, 300);
+  t.eq(g.towers.length, 1, "a tower is standing");
+
+  var rings = g.noBuildRings(type);
+  t.ok(rings.length >= 9,
+    "the wash covers the road, both structures, five blockers and the tower");
+
+  var geo = g.Maps.geometryOf(g.currentMap);
+
+  // Distance from a point to a closed ring: zero inside it, else the nearest
+  // edge. This is what the player's eye does with the painted shape.
+  function ringDistance(ring, x, y) {
+    var inside = false, best = Infinity;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var ax = ring[i][0], ay = ring[i][1], bx = ring[j][0], by = ring[j][1];
+      if ((ay > y) !== (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax) {
+        inside = !inside;
+      }
+      var dx = bx - ax, dy = by - ay;
+      var len2 = dx * dx + dy * dy;
+      var u = len2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len2)) : 0;
+      best = Math.min(best, Math.hypot(x - (ax + dx * u), y - (ay + dy * u)));
+    }
+    return inside ? 0 : best;
+  }
+  function nearestRed(x, y) {
+    var best = Infinity, i;
+    for (i = 0; i < rings.length; i++) {
+      best = Math.min(best, ringDistance(rings[i], x, y));
+    }
+    // The stump rims are painted as LINES, not areas: on the stump is legal and
+    // off it is legal, and only crossing the edge is not.
+    for (i = 0; i < geo.platforms.length; i++) {
+      var pf = geo.platforms[i];
+      best = Math.min(best, Math.abs(Math.hypot(x - pf.x, y - pf.y) - pf.radius));
+    }
+    return best;
+  }
+
+  var SPATIAL = { "too close to the path": 1, "blocked by terrain": 1,
+                  "overlaps another tower": 1, "half on the stump": 1,
+                  "too big for this stump": 1 };
+  var checked = 0, skipped = 0;
+  for (var x = 20; x < 1280; x += 17) {
+    for (var y = 20; y < 720; y += 17) {
+      var d = nearestRed(x, y);
+      // The painted circles and capsules are 24-gons, so within a pixel of an
+      // edge the drawing and the true shape can disagree by the sagitta. Those
+      // points are skipped rather than asserted, and there are few of them.
+      if (Math.abs(d - fp) < 1.2) { skipped++; continue; }
+      var reason = g.whyCannotBuild(x, y, type);
+      var blocked = !!SPATIAL[reason];
+      checked++;
+      if (blocked !== (d <= fp)) {
+        t.eq((d <= fp) ? "touching red" : "clear of red",
+          blocked ? "touching red" : "clear of red",
+          "at " + x + "," + y + " the game says " + (reason || "buildable"));
+        return;
+      }
+    }
+  }
+  t.ok(checked > 2500, "checked " + checked + " spots (" + skipped + " on an edge)");
+  t.ok(skipped < checked * 0.1, "and almost none of them were ambiguous");
 });
 
 test("4d  the route ends OUTSIDE the settlement, at the gate", function (t) {
