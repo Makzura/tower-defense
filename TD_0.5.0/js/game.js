@@ -2287,7 +2287,14 @@ function onClick(event) {
     // a tower is the entire permitted action, and it mutates nothing but which
     // tower the panel is describing.
     if (resultMinimised) {
-      var pick = towerAt(p.x, p.y);
+      // THROUGH screenToWorld, exactly as the live picker does. `towerAt` takes
+      // WORLD coordinates, and in 3D the click arrives in screen pixels -- so
+      // passing `p` straight in silently picked nothing at all, which reads as
+      // "selection is broken" rather than as a coordinate-space mistake. Found
+      // by clicking it in a browser; every unit test passed with it wrong,
+      // because the harness's stub camera makes the two spaces identical.
+      var w = screenToWorld(p.x, p.y);
+      var pick = towerAt(w.x, w.y);
       if (pick) { Sound.playUIClick(); inspected = pick; }
       return;
     }
@@ -7270,30 +7277,40 @@ function resultButtonAt(x, y) {
 // healing to report simply has no healing row. That is the rule: NO INVENTED
 // ZEROES. A blank where a stat does not apply is information; a "0" is a lie
 // about a stat the tower does not keep.
+// WHICH STAT ROWS ARE RUN TOTALS, as opposed to the tower's current numbers.
+//
+// `statLines()` mixes the two deliberately -- the in-game panel wants both --
+// so this cannot just take everything. "Damage dealt" is what the tower did
+// over the run; "Damage" is what one of its shots hits for, and printing that
+// beside a kill count reads as a total and is not one. The first draft of this
+// screen showed "4210 dmg · 63 kills · damage dealt 4210 · kills 63 · damage 1"
+// for a Rifleman, which is the same two numbers three times and a per-shot stat
+// wearing their clothes.
+//
+// An ALLOW-LIST rather than a deny-list, because the failure modes are not
+// symmetric: a total this misses is a missing line, and a current-value this
+// lets through is a lie. A tower that keeps a total nothing else keeps adds its
+// label here; a tower that keeps none simply has no rows, which is the rule
+// this screen is built on -- no invented zeroes.
+var RESULT_TOTAL_LABELS = [
+  "Damage dealt", "Kills", "Healed", "Healing done",
+  "Gold made", "Gold generated", "Blubs summoned", "Recruits sent"
+];
+
 function resultTowerRows() {
   var rows = [];
   for (var i = 0; i < towers.length; i++) {
     var tw = towers[i];
     var lines = (typeof tw.statLines === "function") ? tw.statLines() : [];
-    var picked = [];
+    var totals = [];
     for (var j = 0; j < lines.length; j++) {
-      var label = lines[j][0];
-      // The totals a player wants after a run, in the order they read best.
-      // Anything a tower does not keep is simply absent from its statLines and
-      // therefore absent here.
-      if (label === "Damage" || label === "Damage dealt" || label === "Kills" ||
-          label === "Healed" || label === "Gold made" || label === "Gold" ||
-          label === "Blubs" || label === "Fleet HP") {
-        picked.push(lines[j]);
-      }
+      if (RESULT_TOTAL_LABELS.indexOf(lines[j][0]) !== -1) totals.push(lines[j]);
     }
     rows.push({
       name: (typeof tw.displayName === "function" ? tw.displayName()
              : (tw.constructor && tw.constructor.DISPLAY_NAME) || "Tower"),
       spent: typeof tw.totalSpent === "number" ? tw.totalSpent : null,
-      damage: typeof tw.damageDealt === "number" ? Math.round(tw.damageDealt) : null,
-      kills: typeof tw.kills === "number" ? tw.kills : null,
-      extra: picked
+      totals: totals
     });
   }
   return rows;
@@ -7360,10 +7377,8 @@ function drawResultScreen() {
     var r = rows[ri];
     var bits = [];
     if (r.spent !== null) bits.push("$" + r.spent);
-    if (r.damage !== null) bits.push(r.damage + " dmg");
-    if (r.kills !== null) bits.push(r.kills + " kills");
-    for (var ei = 0; ei < r.extra.length; ei++) {
-      bits.push(r.extra[ei][0].toLowerCase() + " " + r.extra[ei][1]);
+    for (var ei = 0; ei < r.totals.length; ei++) {
+      bits.push(r.totals[ei][1] + " " + r.totals[ei][0].toLowerCase());
     }
     ctx.fillStyle = "rgba(199,209,224,0.80)";
     ctx.fillText(r.name + "   " + bits.join("  ·  "), VIEW_WIDTH / 2, y);
