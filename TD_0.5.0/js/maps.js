@@ -409,9 +409,19 @@ Maps.LIST.push({
     { x: 665,  y: 515 }, { x: 560,  y: 445 }, { x: 575,  y: 335 },
     { x: 655,  y: 270 }, { x: 610,  y: 190 }, { x: 480,  y: 175 },
     { x: 375,  y: 235 }, { x: 395,  y: 345 }, { x: 470,  y: 415 },
-    { x: 410,  y: 480 }, { x: 320,  y: 465 }, { x: 265,  y: 400 },
-    { x: 280,  y: 360 }
+    { x: 410,  y: 480 }, { x: 320,  y: 465 }, { x: 300,  y: 410 },
+    { x: 288,  y: 362 }
   ],
+  // THE LAST TWO POINTS MOVED, and this is the only place the authored spec was
+  // departed from. It asked for (265, 400) then (280, 360) -- and both of those
+  // are INSIDE the settlement's octagon, whose east wall stands at x = 285. The
+  // road therefore ran THROUGH the village and stopped behind the gate, so
+  // enemies walked past the houses to attack the door from the wrong side.
+  //
+  // (300, 410) and (288, 362) approach the same gate from OUTSIDE and stop on
+  // its outer face, inside the authored 330-390 opening. Twelve and twenty
+  // authored pixels of movement, which is inside the tolerance the brief allows,
+  // and the composition is unchanged: same switchback, same final approach.
 
   landmarks: [
     {
@@ -567,6 +577,53 @@ Maps.geometryOf = function (map) {
 // Drop the cache. Called when a run loads a map, so switching routes cannot
 // leave the previous map's rocks standing on the new one.
 Maps.resetGeometry = function () { geometryCache = null; };
+
+// A DRAWN road, curved, from an authored one that is not.
+//
+// PRESENTATION ONLY, and that is the whole contract. Enemies walk the authored
+// polyline, towers measure distance to the authored polyline, the difficulty
+// sampler samples the authored polyline, and build clearance is measured
+// against it. Nothing here is ever handed to any of them -- this exists because
+// a forest track that turns in eighteen hard corners reads as an electrical
+// circuit, which is precisely what the brief says it must not.
+//
+// Centripetal Catmull-Rom through the authored points: it passes exactly
+// THROUGH each one, so the curve never wanders away from the line the enemies
+// actually walk, and it cannot overshoot into a corner the way a uniform spline
+// does on a tight switchback. The ends are extended by reflecting the first and
+// last segments, so the road does not straighten out just before the depot ramp
+// and the settlement gate.
+Maps.smoothRoad = function (points, perSegment) {
+  if (!points || points.length < 3) return points;
+  var steps = perSegment || 8;
+  var pts = points.slice();
+  // Phantom control points at each end, mirrored, so segment 0 and segment n-1
+  // are as curved as the ones in the middle.
+  var first = { x: pts[0].x * 2 - pts[1].x, y: pts[0].y * 2 - pts[1].y };
+  var lastI = pts.length - 1;
+  var last = { x: pts[lastI].x * 2 - pts[lastI - 1].x,
+               y: pts[lastI].y * 2 - pts[lastI - 1].y };
+  pts.unshift(first);
+  pts.push(last);
+
+  var out = [];
+  for (var i = 1; i < pts.length - 2; i++) {
+    var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+    for (var s = 0; s < steps; s++) {
+      var t = s / steps, t2 = t * t, t3 = t2 * t;
+      out.push({
+        x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t +
+             (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+             (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t +
+             (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+             (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+      });
+    }
+  }
+  out.push({ x: pts[pts.length - 2].x, y: pts[pts.length - 2].y });
+  return out;
+};
 
 // The platform under a point, or null. The snap rule lives here so the build
 // ghost and the click that follows it cannot disagree -- they call this.
@@ -794,13 +851,28 @@ Maps.ENVIRONMENTS = {
       // the moment it was orbited.
       apron: 900,
       horizon: true,
+      // PLACEHOLDER SKY. The board had no horizon at all -- the ground faded
+      // into a near-black void, which reads as a tray however much forest is on
+      // it. A daylight blue is deliberately a stand-in: it is here to prove the
+      // horizon works and to be replaced by real sky art.
+      sky: "#8fb4cf",
       // Thinner than the dead forest's: this board is at dusk rather than in
       // fog, and the depth cue wanted is distance, not weather. Raised from
       // 0.00015 once the ground ran further -- the extra distance is what the
       // haze is FOR. Backed off again from 0.00042, which fogged the CLEARING
       // as well as the treeline and turned the playable half of the board into
       // flat green: the mist has to eat the horizon and leave the fight alone.
-      fog: { color: "#31392a", density: 0.00020, height: 96 }
+      // The mist is pulled toward the sky rather than toward the floor, so the
+      // far treeline dissolves INTO the horizon instead of stopping against it.
+      //
+      // DENSITY IS THE HARD PART AND IT HAS BEEN WRONG IN BOTH DIRECTIONS. At
+      // 0.00026 against a sky-coloured mist the whole board went blue-grey --
+      // the clearing, the road and the settlement all fogged, which is not
+      // weather, it is a wash. At 0.00015 the far treeline stayed sharp and the
+      // horizon drew a line again. 0.00009 with the mist LOW to the ground puts
+      // the haze where distance is and leaves the fight in front of the camera
+      // alone: the dirt reads as dirt and the far stems still dissolve.
+      fog: { color: "#7d99ad", density: 0.00009, height: 46 }
     },
     // Bare-earth clearings at floor height -- scraped ground where the road has
     // been worked and where the fighting happens. They are PATCHES, not decks:
@@ -1060,11 +1132,20 @@ Maps.ENVIRONMENTS = {
       { kind: "storehouse", x: 178, y: 458, size: 52, rotation: 0.05, propId: "storehouse-south" },
       { kind: "workshop",   x: 232, y: 300, size: 40, rotation: -0.1, propId: "workshop-east" },
       { kind: "gate",       x: 285, y: 360, size: 46, rotation: 0,    propId: "settlement-gate" },
-      { kind: "palisade",   x: 152, y: 227, size: 150, rotation: 0 },
-      { kind: "palisade",   x: 152, y: 503, size: 150, rotation: 0 },
-      { kind: "palisade",   x: 22,  y: 362, size: 140, rotation: 1.5708 },
-      { kind: "palisade",   x: 258, y: 268, size: 60, rotation: 2.356 },
-      { kind: "palisade",   x: 258, y: 452, size: 60, rotation: 0.785 },
+      // THE WALL IS GENERATED FROM THE OCTAGON, one segment per edge, with the
+      // east edge split around the gate's 330-390 opening. It used to be five
+      // hand-placed runs that did not follow the footprint at all: the
+      // settlement read as buildings standing among scattered walls rather than
+      // as a fortified enclosure, which is what it is supposed to be.
+      { kind: "palisade", x: 145, y: 225, size: 150, rotation: 0.0000 },
+      { kind: "palisade", x: 252, y: 258, size: 92, rotation: 0.7854 },
+      { kind: "palisade", x: 285, y: 310, size: 40, rotation: 1.5708 },
+      { kind: "palisade", x: 285, y: 410, size: 40, rotation: 1.5708 },
+      { kind: "palisade", x: 252, y: 468, size: 99, rotation: 2.2849 },
+      { kind: "palisade", x: 145, y: 505, size: 150, rotation: 3.1416 },
+      { kind: "palisade", x: 45, y: 468, size: 90, rotation: -2.1588 },
+      { kind: "palisade", x: 20, y: 360, size: 140, rotation: -1.5708 },
+      { kind: "palisade", x: 45, y: 258, size: 82, rotation: -0.9151 },
       { kind: "lantern",    x: 258, y: 322, size: 16, rotation: 0 },
       { kind: "lantern",    x: 258, y: 398, size: 16, rotation: 0 },
       { kind: "lantern",    x: 110, y: 318, size: 14, rotation: 0 },

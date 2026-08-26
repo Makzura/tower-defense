@@ -2889,9 +2889,37 @@ function resolveBuildPoint(x, y, type) {
   var platform = Maps.platformAt(currentMap, x, y);
   if (!platform) return { x: x, y: y, platform: null };
   if (type && ul(type.FOOTPRINT_RADIUS_UL) > platform.radius) {
-    return { x: x, y: y, platform: null };
+    // Too wide for the top. Not snapped and not silently dropped on the dirt
+    // beside it either -- see straddlesPlatform, which refuses it outright.
+    return { x: x, y: y, platform: null, tooBig: true };
   }
   return { x: platform.x, y: platform.y, platform: platform };
+}
+
+// IS THIS FOOTPRINT HALF ON A STUMP?
+//
+// A stump is a raised surface with a hard edge. A tower is either standing ON
+// that surface -- centred, which is what the snap does -- or on the dirt beside
+// it. There is no third pose: a footprint overlapping the rim has one side on
+// wood two feet up and the other on the ground, and the model has one ground
+// plane, so it renders half buried or half floating. That is exactly what the
+// board looked like before this existed.
+//
+// The snap catches this whenever the CURSOR is over the stump. This catches the
+// other half of the case, which the snap cannot: a cursor on the dirt whose
+// tower is wide enough to reach onto the stump anyway.
+function straddlesPlatform(x, y, type) {
+  var geo = Maps.geometryOf(currentMap);
+  if (!geo.any || !geo.platforms.length || !type) return false;
+  var reach = ul(type.FOOTPRINT_RADIUS_UL);
+  for (var i = 0; i < geo.platforms.length; i++) {
+    var pf = geo.platforms[i];
+    var dx = x - pf.x, dy = y - pf.y;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= 1e-6) continue;                 // dead centre: that is the snap
+    if (d < pf.radius + reach) return true;  // rim overlapped, either way
+  }
+  return false;
 }
 
 // Is there already a tower standing on this stump? One per stump: the top is a
@@ -2916,6 +2944,13 @@ function whyCannotBuild(x, y, type) {
     if (platformOccupied(spot.platform)) return "occupied platform";
     x = spot.x;
     y = spot.y;
+  } else if (spot.tooBig) {
+    // Over a stump it cannot stand on. Refused rather than quietly built on the
+    // dirt under the cursor, which is what "I clicked the platform and it went
+    // somewhere else" looks like.
+    return "too big for this platform";
+  } else if (straddlesPlatform(x, y, type)) {
+    return "half on the platform";
   }
 
   // TERRAIN. Blockers and landmarks refuse the tower's whole FOOTPRINT, not
@@ -4574,11 +4609,29 @@ function draw() {
   if (typeof DeathDenial !== "undefined") DeathDenial.drawRewind(ctx);
 }
 
+// The stroke every road layer is painted along.
+//
+// DRAWN CURVED, WALKED STRAIGHT. `Maps.smoothRoad` returns a presentation copy
+// that passes through every authored point, and it is used HERE and in the 3D
+// ribbon and nowhere else -- enemies, build clearance and the difficulty
+// sampler all still measure against the polyline the map authored. A forest
+// track that turns in eighteen hard corners reads as an electrical circuit.
+//
+// The result is cached on the path object: this is called five times per frame,
+// once per road layer, and the spline is the same every time.
 function tracePath(routePath) {
+  var pts = routePath.points;
+  if (typeof Maps !== "undefined" && Maps.smoothRoad) {
+    if (routePath._ribbon === undefined || routePath._ribbonFor !== pts) {
+      routePath._ribbon = Maps.smoothRoad(pts, 10);
+      routePath._ribbonFor = pts;
+    }
+    pts = routePath._ribbon;
+  }
   ctx.beginPath();
-  ctx.moveTo(routePath.points[0].x, routePath.points[0].y);
-  for (var i = 1; i < routePath.points.length; i++) {
-    ctx.lineTo(routePath.points[i].x, routePath.points[i].y);
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (var i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i].x, pts[i].y);
   }
 }
 
@@ -4708,6 +4761,137 @@ function drawTowerStun(tower) {
   ctx.fill();
 }
 
+// WHERE THIS TOWER CANNOT SHOOT, painted red on the ground.
+//
+// The board has rocks that stop bullets, and until this existed there was no
+// way to know that except by building a tower and watching it not fire. A
+// player cannot plan around cover they cannot see, so the cover's SHADOW is
+// drawn -- the wedge behind each blocker, out to the tower's own range.
+//
+// Shown while placing and while a tower is selected, which are exactly the two
+// moments the question "can it reach that stretch of road" is being asked.
+//
+// The shadow is the angular span the blocker occupies as seen FROM THE TOWER,
+// swept from the blocker's near face to the range edge. That is what an
+// occluder actually removes: everything behind it, at every distance, inside
+// the angles it covers. Sampling the shape's outline rather than assuming a
+// circle is what makes it correct for the fallen trunk and the two rock
+// outcrops as well as for the round boulders.
+function sightShadowFor(shape, tx, ty, rangePx) {
+  var pts = [];
+  var i;
+  if (shape.shape === "circle") {
+    for (i = 0; i < 12; i++) {
+      var a = i * Math.PI * 2 / 12;
+      pts.push([shape.x + Math.cos(a) * shape.radius,
+                shape.y + Math.sin(a) * shape.radius]);
+    }
+  } else if (shape.shape === "polygon") {
+    pts = shape.points;
+  } else if (shape.shape === "capsule") {
+    for (i = 0; i < 8; i++) {
+      var ca = i * Math.PI * 2 / 8;
+      pts.push([shape.a.x + Math.cos(ca) * shape.radius,
+                shape.a.y + Math.sin(ca) * shape.radius]);
+      pts.push([shape.b.x + Math.cos(ca) * shape.radius,
+                shape.b.y + Math.sin(ca) * shape.radius]);
+    }
+  } else {
+    return null;
+  }
+
+  // Angles are measured RELATIVE to the direction of the shape, so a blocker
+  // straddling the -pi/pi seam does not come back as a span of nearly a full
+  // turn. Every blocker on this board subtends far less than half a turn from
+  // any legal tower position, which is what makes that safe.
+  var cx = 0, cy = 0;
+  for (i = 0; i < pts.length; i++) { cx += pts[i][0]; cy += pts[i][1]; }
+  cx /= pts.length; cy /= pts.length;
+  var base = Math.atan2(cy - ty, cx - tx);
+
+  var lo = Infinity, hi = -Infinity, near = Infinity;
+  for (i = 0; i < pts.length; i++) {
+    var dx = pts[i][0] - tx, dy = pts[i][1] - ty;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d < near) near = d;
+    var rel = Math.atan2(dy, dx) - base;
+    while (rel > Math.PI) rel -= Math.PI * 2;
+    while (rel < -Math.PI) rel += Math.PI * 2;
+    if (rel < lo) lo = rel;
+    if (rel > hi) hi = rel;
+  }
+  // Entirely out of reach: it casts no shadow the tower could have used.
+  if (near >= rangePx) return null;
+  return { from: base + lo, to: base + hi, near: near };
+}
+
+// The wedge as a ring of WORLD points, near arc out to far arc.
+//
+// Built as world coordinates rather than stroked directly, because the board is
+// usually a 3D one: a shape painted flat on the overlay canvas sits at the
+// wrong place and the wrong shape the moment the camera is tilted or turned.
+// Every point here goes through the same projection the range ring does, which
+// is what keeps the red patch ON the ground the tower cannot see.
+function sightShadowRing(sh, tx, ty, rangePx) {
+  var ring = [];
+  var steps = 10;
+  var span = sh.to - sh.from;
+  var i, a;
+  for (i = 0; i <= steps; i++) {
+    a = sh.from + span * i / steps;
+    ring.push([tx + Math.cos(a) * rangePx, ty + Math.sin(a) * rangePx]);
+  }
+  for (i = steps; i >= 0; i--) {
+    a = sh.from + span * i / steps;
+    ring.push([tx + Math.cos(a) * sh.near, ty + Math.sin(a) * sh.near]);
+  }
+  return ring;
+}
+
+function drawSightShadows(tx, ty, rangePx) {
+  var geo = Maps.geometryOf(currentMap);
+  if (!geo.any || !geo.sightBlockers.length) return;
+
+  // The camera when the board is 3D, and null when it is the flat fallback --
+  // in which case world coordinates ARE screen coordinates and the projection
+  // is the identity.
+  var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
+             World3D.camera) ? World3D.camera() : null;
+
+  ctx.save();
+  // STRONG ENOUGH TO READ ON A DARK BOARD. At 0.20 over forest floor this was
+  // there and invisible, which is the same as not being there: the whole point
+  // is that a player can see the cover before they spend $900 shooting into it.
+  // Filled AND outlined, because a soft wash on dark ground loses its edge and
+  // the edge is where the information is.
+  ctx.fillStyle = "rgba(232,64,52,0.34)";
+  ctx.strokeStyle = "rgba(255,118,102,0.55)";
+  ctx.lineWidth = 1.5;
+  for (var i = 0; i < geo.sightBlockers.length; i++) {
+    var sh = sightShadowFor(geo.sightBlockers[i], tx, ty, rangePx);
+    if (!sh) continue;
+    var ring = sightShadowRing(sh, tx, ty, rangePx);
+
+    ctx.beginPath();
+    var started = false, broke = false;
+    for (var k = 0; k < ring.length; k++) {
+      var sx = ring[k][0], sy = ring[k][1];
+      if (cam) {
+        var p = cam.worldToScreen(sx, sy, 0);
+        if (!p) { broke = true; break; }   // behind the eye: not drawable
+        sx = p.x; sy = p.y;
+      }
+      if (!started) { ctx.moveTo(sx, sy); started = true; }
+      else ctx.lineTo(sx, sy);
+    }
+    if (broke || !started) continue;
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawBuildPreview() {
   var type = selectedType();
   if (!type) return;                       // nothing armed, nothing to preview
@@ -4728,6 +4912,10 @@ function drawBuildPreview() {
 
   var ok = blockReason === null;
   var c = ok ? "108,230,133" : "230,90,90";
+
+  // The cover this tower would be standing behind, before its range ring is
+  // drawn -- so the red sits under the green rather than over it.
+  drawSightShadows(ghostX, ghostY, previewRangePx);
 
   // Range
   ctx.beginPath();
@@ -6058,6 +6246,8 @@ function drawInspection() {
     ctx.strokeStyle = "rgba(255,215,110,0.9)";
     ctx.stroke();
 
+    ctx.beginPath();
+    drawSightShadows(t.x, t.y, t.rangePx);
     ctx.beginPath();
     ctx.arc(t.x, t.y, t.rangePx, 0, Math.PI * 2);
     ctx.strokeStyle = "rgba(255,215,110,0.35)";

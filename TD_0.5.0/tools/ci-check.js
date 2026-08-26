@@ -285,7 +285,15 @@ var BASELINE = [
     // from PierceBullet goes red on 14 and 15; dropping the sight test from
     // Targeting.pick goes red on 8; returning the cursor instead of the stump
     // centre from resolveBuildPoint goes red on 4.
-    file: "tests/run.js", pass: 159, fail: 0,
+    // 162 on 2026-08-26, from 159: THREE tests ADDED after the owner playtested
+    // Ironwood Frontier and found six defects none of the other 159 could see --
+    // no horizon, flat stumps, incoherent placement, a settlement whose walls
+    // did not enclose it, a road drawn as a broken line, and no way to tell
+    // where a tower cannot shoot. Three of the six are now pinned: a tower is
+    // ON a stump or beside it and never half on the rim; the road is drawn
+    // curved and walked straight; and the route ends OUTSIDE the settlement,
+    // inside the gate's opening, rather than behind the gate.
+    file: "tests/run.js", pass: 162, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

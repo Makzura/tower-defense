@@ -743,8 +743,19 @@ var GLGeometry = (function () {
         // because that is the signal. Wide cut face, a bark rim a shade
         // darker, and roots reaching out into the dirt so it is grown rather
         // than dropped.
-        var pfH = size * 0.30;
-        lumpyMass(builder, cx, cy, r * 0.92, pfH, dark, 0, 2, 0.9, 400);
+        // TALLER, AND A DIFFERENT HEIGHT ON EVERY STUMP. At 0.30 these read as
+        // discs painted on the floor -- the board had six flat rings on it and
+        // nothing said "you may stand up here". A stump is a cut TRUNK: it has
+        // a body you can see the side of, and six identical ones look stamped.
+        var pfH = size * (0.72 + wobble(cx, cy, 405) * 0.55);
+        lumpyMass(builder, cx, cy, r * 0.94, pfH, dark, 0, 3, 0.92, 400);
+        // Bark shoulders, so the side of the trunk is not a smooth wall.
+        for (var pb = 0; pb < 3; pb++) {
+          var pbA = pb * 2.1 + wobble(cx, cy, 420 + pb) * 1.5;
+          boxAt(builder, cx + Math.cos(pbA) * r * 0.78, cy + Math.sin(pbA) * r * 0.78,
+            r * 0.30, r * 0.24, pfH * (0.55 + wobble(cx, cy, 430 + pb) * 0.35),
+            dark, 0, pbA);
+        }
         // The cut face: one clean disc, level, sitting just proud of the rim.
         frustum(builder, cx, cy, r * 0.84, r * 0.82, size * 0.045, trim, pfH, 12);
         // Growth rings, as two shallow inset discs.

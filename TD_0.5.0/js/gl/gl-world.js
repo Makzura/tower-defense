@@ -246,8 +246,12 @@ var World3D = (function () {
       // at the far edge and the boundary disappears into haze.
       fog: t.fog ? {
         color: hex(t.fog.color, t.background || "#07090c"),
-        clear: displayHex(t.horizon ? t.fog.color : (t.background || t.fog.color),
-                          "#07090c"),
+        // With a horizon the void becomes SKY: the clear colour is the theme's
+        // own sky if it names one, and the mist otherwise. Either way ground,
+        // fog and sky meet at the same value at the far edge and the boundary
+        // disappears instead of drawing a rectangle in mid-air.
+        clear: displayHex(t.horizon ? (t.sky || t.fog.color)
+                                    : (t.background || t.fog.color), "#07090c"),
         density: t.fog.density || 0,
         height: t.fog.height || 0
       } : null,
@@ -263,6 +267,15 @@ var World3D = (function () {
   }
 
   // --- map geometry --------------------------------------------------------
+
+  // The road as it is DRAWN. See Maps.smoothRoad -- and note the fallback: a
+  // page that somehow loaded an older maps.js draws the hard-cornered ribbon
+  // rather than throwing, because a missing curve is a cosmetic loss and a
+  // missing road is not.
+  function roadRibbon(points) {
+    return (typeof Maps !== "undefined" && Maps.smoothRoad)
+      ? Maps.smoothRoad(points, 10) : points;
+  }
 
   function buildMapMesh(map, routePaths) {
     var P = paletteFor(map);
@@ -359,7 +372,12 @@ var World3D = (function () {
 
     var roadWidth = ul(ROAD_WIDTH_UL);
     routePaths.forEach(function (p) {
-      GLGeometry.road(g, p.points, roadWidth, ROAD_LIFT, P.roadTop, P.roadSide);
+      // DRAWN CURVED, WALKED STRAIGHT. Maps.smoothRoad returns a presentation
+      // copy that passes through every authored point; nothing downstream ever
+      // sees it, so pathing, clearance and the difficulty measurement are all
+      // still measured against the polyline the map authored.
+      GLGeometry.road(g, roadRibbon(p.points), roadWidth, ROAD_LIFT,
+        P.roadTop, P.roadSide);
     });
 
     // The authored scenery. Each map names nine props and until now the 3D

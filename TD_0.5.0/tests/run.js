@@ -4998,6 +4998,66 @@ test("4  the ghost and the click resolve to the same stump centre", function (t)
     "and the stump is taken");
 });
 
+test("4b  a tower may be ON a stump or beside it, never half on the rim", function (t) {
+  var h = ironwood();
+  var geo = h.game.Maps.geometryOf(h.game.currentMap);
+  var pf = geo.platforms[0];
+  var fp = h.game.ul(h.game.Soldier.FOOTPRINT_RADIUS_UL);
+
+  // A stump is a raised surface with a hard edge, so there are only two legal
+  // poses. A footprint overlapping the rim puts one side on wood two feet up
+  // and the other on the dirt, and the model has one ground plane -- which is
+  // what "towers placed in the air" looked like before this rule existed.
+  t.eq(h.game.whyCannotBuild(pf.x, pf.y, h.game.Soldier), null, "dead centre is fine");
+  t.eq(h.game.whyCannotBuild(pf.x + pf.radius * 0.3, pf.y, h.game.Soldier), null,
+    "and anywhere the snap can reach, because it lands on the centre");
+  t.eq(h.game.whyCannotBuild(pf.x + pf.radius + fp * 0.5, pf.y, h.game.Soldier),
+    "half on the platform", "straddling the rim is refused");
+  t.eq(h.game.whyCannotBuild(pf.x + pf.radius + fp * 1.2, pf.y, h.game.Soldier), null,
+    "clear of it entirely is fine again");
+});
+
+test("4c  the road is DRAWN curved and WALKED straight", function (t) {
+  var h = ironwood();
+  var map = h.game.Maps.byId("ironwood-frontier");
+  var authored = map.points;
+  var ribbon = h.game.Maps.smoothRoad(authored, 10);
+
+  t.ok(ribbon.length > authored.length * 5, "the drawn ribbon is subdivided");
+  // It passes THROUGH every authored point, so the curve never wanders off the
+  // line the enemies actually walk.
+  authored.forEach(function (p, i) {
+    var nearest = Infinity;
+    ribbon.forEach(function (q) {
+      var d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < nearest) nearest = d;
+    });
+    t.ok(nearest < 0.001, "authored point " + i + " is on the ribbon");
+  });
+  // And nothing downstream ever sees it: the path is built from the authored
+  // points, so pathing and clearance are unchanged.
+  t.eq(h.game.path.points.length, authored.length,
+    "the walked path still has exactly the authored points");
+});
+
+test("4d  the route ends OUTSIDE the settlement, at the gate", function (t) {
+  var h = ironwood();
+  var map = h.game.Maps.byId("ironwood-frontier");
+  var oct = map.landmarks.filter(function (l) { return l.id === "human-settlement"; })[0];
+  var shape = { shape: "polygon", points: oct.points };
+  var pts = map.points;
+
+  // The authored spec put the last two points inside the octagon, so enemies
+  // walked through the village and attacked the gate from the wrong side.
+  var last = pts[pts.length - 1], prev = pts[pts.length - 2];
+  t.eq(MapGeom.contains(shape, last.x, last.y), false,
+    "the last point is outside the walls");
+  t.eq(MapGeom.contains(shape, prev.x, prev.y), false,
+    "and so is the one before it");
+  t.ok(last.y >= 330 && last.y <= 390,
+    "and it lands inside the gate's 330-390 opening (y = " + last.y + ")");
+});
+
 test("5  ordinary ground is still freely buildable", function (t) {
   var h = ironwood();
   // This is not a fixed-slot map: clear dirt away from the road takes a tower
