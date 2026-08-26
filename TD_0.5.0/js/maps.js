@@ -787,10 +787,20 @@ Maps.ENVIRONMENTS = {
       roadOuter: "#221a10", roadInner: "#4a3520",
       roadEdge: "120,94,58", roadCenter: "156,124,78",
       wild: true,
+      // THE GROUND RUNS PAST ANYTHING THE CAMERA CAN SEE, and the far edge
+      // dissolves into the mist rather than ending on a line. Without both of
+      // these the board reads as a lit rectangle floating in a void -- a tray
+      // with a forest printed on it, which is what the first pass looked like
+      // the moment it was orbited.
+      apron: 900,
+      horizon: true,
       // Thinner than the dead forest's: this board is at dusk rather than in
-      // fog, and the depth cue wanted is distance, not weather. Measured across
-      // the same ~3 000 unit view depth.
-      fog: { color: "#232a1d", density: 0.00015, height: 58 }
+      // fog, and the depth cue wanted is distance, not weather. Raised from
+      // 0.00015 once the ground ran further -- the extra distance is what the
+      // haze is FOR. Backed off again from 0.00042, which fogged the CLEARING
+      // as well as the treeline and turned the playable half of the board into
+      // flat green: the mist has to eat the horizon and leave the fight alone.
+      fog: { color: "#31392a", density: 0.00020, height: 96 }
     },
     // Bare-earth clearings at floor height -- scraped ground where the road has
     // been worked and where the fighting happens. They are PATCHES, not decks:
@@ -807,112 +817,218 @@ Maps.ENVIRONMENTS = {
       // never hide a tower, an enemy or a build spot. Sizes, rotations and
       // positions are all scattered -- a forest of identical trees on a grid is
       // the single fastest way to make a board look like a debug scene.
-      { kind: "tree", x: -139, y: 88, size: 53, rotation: 0.46 },
-      { kind: "tree", x: -94, y: 122, size: 42, rotation: 0.73 },
-      { kind: "tree", x: -43, y: 89, size: 53, rotation: 0.28 },
-      { kind: "tree", x: -45, y: 96, size: 49, rotation: 2.50 },
-      { kind: "tree", x: -67, y: 102, size: 53, rotation: 6.25 },
-      { kind: "tree", x: -136, y: 369, size: 48, rotation: 0.77 },
-      { kind: "tree", x: -30, y: 325, size: 38, rotation: 3.99 },
-      { kind: "tree", x: -66, y: 439, size: 46, rotation: 1.61 },
-      { kind: "tree", x: 17, y: 376, size: 50, rotation: 3.38 },
-      { kind: "tree", x: -5, y: 420, size: 40, rotation: 1.83 },
-      { kind: "tree", x: -108, y: 697, size: 47, rotation: 2.34 },
-      { kind: "tree", x: -49, y: 689, size: 42, rotation: 2.68 },
-      { kind: "tree", x: -66, y: 629, size: 46, rotation: 2.22 },
-      { kind: "tree", x: -40, y: 659, size: 46, rotation: 5.96 },
-      { kind: "tree", x: 226, y: -149, size: 50, rotation: 0.79 },
-      { kind: "tree", x: 169, y: -115, size: 43, rotation: 4.53 },
-      { kind: "tree", x: 204, y: -126, size: 46, rotation: 5.28 },
-      { kind: "tree", x: 130, y: -51, size: 52, rotation: 5.13 },
-      { kind: "tree", x: 209, y: -60, size: 43, rotation: 4.48 },
-      { kind: "tree", x: 148, y: -54, size: 49, rotation: 5.11 },
-      { kind: "tree", x: 625, y: -161, size: 49, rotation: 5.45 },
-      { kind: "tree", x: 490, y: -23, size: 42, rotation: 3.79 },
-      { kind: "tree", x: 689, y: -142, size: 39, rotation: 3.23 },
-      { kind: "tree", x: 651, y: -55, size: 42, rotation: 4.12 },
-      { kind: "tree", x: 663, y: -53, size: 45, rotation: 3.52 },
-      { kind: "tree", x: 570, y: 23, size: 52, rotation: 0.88 },
-      { kind: "tree", x: 935, y: -114, size: 53, rotation: 0.18 },
-      { kind: "tree", x: 975, y: -84, size: 50, rotation: 6.24 },
-      { kind: "tree", x: 1061, y: -56, size: 53, rotation: 6.13 },
-      { kind: "tree", x: 953, y: -18, size: 47, rotation: 5.03 },
-      { kind: "tree", x: 954, y: -131, size: 53, rotation: 1.17 },
-      { kind: "tree", x: 1291, y: 201, size: 41, rotation: 4.28 },
-      { kind: "tree", x: 1374, y: 238, size: 44, rotation: 1.22 },
-      { kind: "tree", x: 1323, y: 271, size: 45, rotation: 0.14 },
-      { kind: "tree", x: 1273, y: 222, size: 43, rotation: 1.52 },
-      { kind: "tree", x: 1327, y: 151, size: 42, rotation: 3.12 },
-      { kind: "tree", x: 1380, y: 541, size: 45, rotation: 4.59 },
-      { kind: "tree", x: 1364, y: 617, size: 39, rotation: 4.64 },
-      { kind: "tree", x: 1388, y: 566, size: 42, rotation: 0.72 },
-      { kind: "tree", x: 1356, y: 555, size: 39, rotation: 5.02 },
-      { kind: "tree", x: 166, y: 773, size: 50, rotation: 3.81 },
-      { kind: "tree", x: 390, y: 750, size: 53, rotation: 2.35 },
-      { kind: "tree", x: 241, y: 828, size: 54, rotation: 0.91 },
-      { kind: "tree", x: 245, y: 747, size: 42, rotation: 0.67 },
-      { kind: "tree", x: 185, y: 684, size: 52, rotation: 5.67 },
-      { kind: "tree", x: 124, y: 818, size: 41, rotation: 0.98 },
-      { kind: "tree", x: 712, y: 719, size: 41, rotation: 0.55 },
-      { kind: "tree", x: 615, y: 771, size: 44, rotation: 3.78 },
-      { kind: "tree", x: 775, y: 736, size: 45, rotation: 3.67 },
-      { kind: "tree", x: 781, y: 827, size: 51, rotation: 4.38 },
-      { kind: "tree", x: 792, y: 720, size: 52, rotation: 5.65 },
-      { kind: "tree", x: 719, y: 692, size: 46, rotation: 0.96 },
-      { kind: "tree", x: 1063, y: 748, size: 42, rotation: 5.07 },
-      { kind: "tree", x: 1091, y: 735, size: 49, rotation: 1.58 },
-      { kind: "tree", x: 1149, y: 714, size: 46, rotation: 1.05 },
-      { kind: "tree", x: 1064, y: 743, size: 41, rotation: 1.24 },
-      { kind: "tree", x: 1073, y: 768, size: 52, rotation: 0.69 },
-      { kind: "tree", x: 156, y: 82, size: 38, rotation: 6.25 },
-      { kind: "tree", x: 170, y: 93, size: 30, rotation: 6.21 },
-      { kind: "tree", x: 95, y: 91, size: 30, rotation: 4.63 },
-      { kind: "tree", x: 86, y: 61, size: 38, rotation: 1.99 },
-      { kind: "tree", x: 1139, y: 626, size: 34, rotation: 1.94 },
-      { kind: "tree", x: 1155, y: 609, size: 43, rotation: 0.83 },
-      { kind: "tree", x: 1152, y: 588, size: 37, rotation: 4.04 },
-      { kind: "tree", x: 1187, y: 660, size: 41, rotation: 2.83 },
-      { kind: "tree", x: 73, y: 659, size: 41, rotation: 3.77 },
-      { kind: "tree", x: 10, y: 647, size: 40, rotation: 2.49 },
-      { kind: "tree", x: 21, y: 608, size: 42, rotation: 0.94 },
-      { kind: "tree", x: 19, y: 608, size: 32, rotation: 2.64 },
+      //
+      // ITS OWN SPECIES, AND THAT IS THE POINT. This board does not reuse the
+      // dead-forest vocabulary from the other wild map: those are bare snapped
+      // stems on black dirt, and Ironwood is a LIVING wood -- buttressed
+      // trunks, layered canopies, ferns and moss-capped rock. Sharing prop
+      // kinds would have made the two boards read as one location with the
+      // lights changed, which is the failure the flagship brief names first.
+      { kind: "ironwood", x: -139, y: 88, size: 53, rotation: 0.46 },
+      { kind: "ironwood", x: -94, y: 122, size: 42, rotation: 0.73 },
+      { kind: "ironwood", x: -43, y: 89, size: 53, rotation: 0.28 },
+      { kind: "ironwood", x: -45, y: 96, size: 49, rotation: 2.50 },
+      { kind: "ironwood", x: -67, y: 102, size: 53, rotation: 6.25 },
+      { kind: "ironwood", x: -136, y: 369, size: 48, rotation: 0.77 },
+      { kind: "ironwood", x: -30, y: 325, size: 38, rotation: 3.99 },
+      { kind: "ironwood", x: -66, y: 439, size: 46, rotation: 1.61 },
+      { kind: "ironwood", x: 17, y: 376, size: 50, rotation: 3.38 },
+      { kind: "ironwood", x: -5, y: 420, size: 40, rotation: 1.83 },
+      { kind: "ironwood", x: -108, y: 697, size: 47, rotation: 2.34 },
+      { kind: "ironwood", x: -49, y: 689, size: 42, rotation: 2.68 },
+      { kind: "ironwood", x: -66, y: 629, size: 46, rotation: 2.22 },
+      { kind: "ironwood", x: -40, y: 659, size: 46, rotation: 5.96 },
+      { kind: "ironwood", x: 226, y: -149, size: 50, rotation: 0.79 },
+      { kind: "ironwood", x: 169, y: -115, size: 43, rotation: 4.53 },
+      { kind: "ironwood", x: 204, y: -126, size: 46, rotation: 5.28 },
+      { kind: "ironwood", x: 130, y: -51, size: 52, rotation: 5.13 },
+      { kind: "ironwood", x: 209, y: -60, size: 43, rotation: 4.48 },
+      { kind: "ironwood", x: 148, y: -54, size: 49, rotation: 5.11 },
+      { kind: "ironwood", x: 625, y: -161, size: 49, rotation: 5.45 },
+      { kind: "ironwood", x: 490, y: -23, size: 42, rotation: 3.79 },
+      { kind: "ironwood", x: 689, y: -142, size: 39, rotation: 3.23 },
+      { kind: "ironwood", x: 651, y: -55, size: 42, rotation: 4.12 },
+      { kind: "ironwood", x: 663, y: -53, size: 45, rotation: 3.52 },
+      { kind: "ironwood", x: 570, y: 23, size: 52, rotation: 0.88 },
+      { kind: "ironwood", x: 935, y: -114, size: 53, rotation: 0.18 },
+      { kind: "ironwood", x: 975, y: -84, size: 50, rotation: 6.24 },
+      { kind: "ironwood", x: 1061, y: -56, size: 53, rotation: 6.13 },
+      { kind: "ironwood", x: 953, y: -18, size: 47, rotation: 5.03 },
+      { kind: "ironwood", x: 954, y: -131, size: 53, rotation: 1.17 },
+      { kind: "ironwood", x: 1291, y: 201, size: 41, rotation: 4.28 },
+      { kind: "ironwood", x: 1374, y: 238, size: 44, rotation: 1.22 },
+      { kind: "ironwood", x: 1323, y: 271, size: 45, rotation: 0.14 },
+      { kind: "ironwood", x: 1273, y: 222, size: 43, rotation: 1.52 },
+      { kind: "ironwood", x: 1327, y: 151, size: 42, rotation: 3.12 },
+      { kind: "ironwood", x: 1380, y: 541, size: 45, rotation: 4.59 },
+      { kind: "ironwood", x: 1364, y: 617, size: 39, rotation: 4.64 },
+      { kind: "ironwood", x: 1388, y: 566, size: 42, rotation: 0.72 },
+      { kind: "ironwood", x: 1356, y: 555, size: 39, rotation: 5.02 },
+      { kind: "ironwood", x: 166, y: 773, size: 50, rotation: 3.81 },
+      { kind: "ironwood", x: 390, y: 750, size: 53, rotation: 2.35 },
+      { kind: "ironwood", x: 241, y: 828, size: 54, rotation: 0.91 },
+      { kind: "ironwood", x: 245, y: 747, size: 42, rotation: 0.67 },
+      { kind: "ironwood", x: 185, y: 684, size: 52, rotation: 5.67 },
+      { kind: "ironwood", x: 124, y: 818, size: 41, rotation: 0.98 },
+      { kind: "ironwood", x: 712, y: 719, size: 41, rotation: 0.55 },
+      { kind: "ironwood", x: 615, y: 771, size: 44, rotation: 3.78 },
+      { kind: "ironwood", x: 775, y: 736, size: 45, rotation: 3.67 },
+      { kind: "ironwood", x: 781, y: 827, size: 51, rotation: 4.38 },
+      { kind: "ironwood", x: 792, y: 720, size: 52, rotation: 5.65 },
+      { kind: "ironwood", x: 719, y: 692, size: 46, rotation: 0.96 },
+      { kind: "ironwood", x: 1063, y: 748, size: 42, rotation: 5.07 },
+      { kind: "ironwood", x: 1091, y: 735, size: 49, rotation: 1.58 },
+      { kind: "ironwood", x: 1149, y: 714, size: 46, rotation: 1.05 },
+      { kind: "ironwood", x: 1064, y: 743, size: 41, rotation: 1.24 },
+      { kind: "ironwood", x: 1073, y: 768, size: 52, rotation: 0.69 },
+      { kind: "ironwood", x: 156, y: 82, size: 38, rotation: 6.25 },
+      { kind: "ironwood", x: 170, y: 93, size: 30, rotation: 6.21 },
+      { kind: "ironwood", x: 95, y: 91, size: 30, rotation: 4.63 },
+      { kind: "ironwood", x: 86, y: 61, size: 38, rotation: 1.99 },
+      { kind: "ironwood", x: 1139, y: 626, size: 34, rotation: 1.94 },
+      { kind: "ironwood", x: 1155, y: 609, size: 43, rotation: 0.83 },
+      { kind: "ironwood", x: 1152, y: 588, size: 37, rotation: 4.04 },
+      { kind: "ironwood", x: 1187, y: 660, size: 41, rotation: 2.83 },
+      { kind: "ironwood", x: 73, y: 659, size: 41, rotation: 3.77 },
+      { kind: "ironwood", x: 10, y: 647, size: 40, rotation: 2.49 },
+      { kind: "ironwood", x: 21, y: 608, size: 42, rotation: 0.94 },
+      { kind: "ironwood", x: 19, y: 608, size: 32, rotation: 2.64 },
+
+      // THE DEEP TREELINE, out on the 900-unit apron. It exists so the ground
+      // never ENDS on screen: the board is a clearing in a wood that carries on
+      // past the camera, and four receding rings of bigger, hazier stems is what
+      // sells that. All of it is outside the play area, so none of it can ever
+      // hide a tower, an enemy or a build spot -- which is the one place a
+      // forest is allowed to be this dense.
+      { kind: "ironwood", x: -195, y: -177, size: 45, rotation: 4.28 },
+      { kind: "ironwood", x: 88, y: -182, size: 56, rotation: 2.08 },
+      { kind: "ironwood", x: 310, y: -239, size: 45, rotation: 3.51 },
+      { kind: "ironwood", x: 486, y: -139, size: 46, rotation: 3.87 },
+      { kind: "ironwood", x: 692, y: -133, size: 57, rotation: 0.95 },
+      { kind: "ironwood", x: 823, y: -200, size: 60, rotation: 4.78 },
+      { kind: "ironwood", x: 889, y: -150, size: 50, rotation: 3.16 },
+      { kind: "ironwood", x: 1255, y: -194, size: 52, rotation: 4.44 },
+      { kind: "ironwood", x: 1232, y: -174, size: 62, rotation: 0.32 },
+      { kind: "ironwood", x: 1530, y: -215, size: 47, rotation: 3.04 },
+      { kind: "ironwood", x: 1410, y: 34, size: 56, rotation: 0.78 },
+      { kind: "ironwood", x: 1427, y: 240, size: 58, rotation: 0.89 },
+      { kind: "ironwood", x: 1479, y: 412, size: 56, rotation: 2.73 },
+      { kind: "ironwood", x: 1433, y: 594, size: 61, rotation: 6.20 },
+      { kind: "ironwood", x: 1439, y: 829, size: 49, rotation: 4.52 },
+      { kind: "ironwood", x: 1462, y: 922, size: 44, rotation: 5.37 },
+      { kind: "ironwood", x: 1195, y: 889, size: 55, rotation: 2.88 },
+      { kind: "ironwood", x: 1007, y: 900, size: 62, rotation: 4.37 },
+      { kind: "ironwood", x: 773, y: 906, size: 53, rotation: 1.83 },
+      { kind: "ironwood", x: 626, y: 854, size: 45, rotation: 0.77 },
+      { kind: "ironwood", x: 482, y: 866, size: 46, rotation: 1.10 },
+      { kind: "ironwood", x: 373, y: 964, size: 52, rotation: 4.53 },
+      { kind: "ironwood", x: 59, y: 898, size: 57, rotation: 1.20 },
+      { kind: "ironwood", x: -65, y: 868, size: 52, rotation: 0.20 },
+      { kind: "ironwood", x: -200, y: 894, size: 59, rotation: 1.57 },
+      { kind: "ironwood", x: -208, y: 565, size: 51, rotation: 4.94 },
+      { kind: "ironwood", x: -200, y: 392, size: 44, rotation: 1.89 },
+      { kind: "ironwood", x: -166, y: 314, size: 46, rotation: 1.78 },
+      { kind: "ironwood", x: -207, y: 111, size: 57, rotation: 0.62 },
+      { kind: "ironwood", x: -202, y: -108, size: 57, rotation: 3.80 },
+      { kind: "ironwood", x: -192, y: -407, size: 56, rotation: 3.09 },
+      { kind: "ironwood", x: 148, y: -376, size: 65, rotation: 4.80 },
+      { kind: "ironwood", x: 440, y: -414, size: 60, rotation: 6.23 },
+      { kind: "ironwood", x: 688, y: -359, size: 66, rotation: 1.53 },
+      { kind: "ironwood", x: 846, y: -353, size: 61, rotation: 3.06 },
+      { kind: "ironwood", x: 1174, y: -316, size: 51, rotation: 1.49 },
+      { kind: "ironwood", x: 1470, y: -335, size: 53, rotation: 2.45 },
+      { kind: "ironwood", x: 1660, y: -394, size: 66, rotation: 2.86 },
+      { kind: "ironwood", x: 1613, y: -116, size: 68, rotation: 1.87 },
+      { kind: "ironwood", x: 1698, y: 129, size: 55, rotation: 6.11 },
+      { kind: "ironwood", x: 1608, y: 407, size: 53, rotation: 4.92 },
+      { kind: "ironwood", x: 1588, y: 840, size: 58, rotation: 0.06 },
+      { kind: "ironwood", x: 1643, y: 938, size: 50, rotation: 2.63 },
+      { kind: "ironwood", x: 1546, y: 1050, size: 65, rotation: 5.31 },
+      { kind: "ironwood", x: 1214, y: 1078, size: 58, rotation: 3.95 },
+      { kind: "ironwood", x: 956, y: 1028, size: 48, rotation: 2.71 },
+      { kind: "ironwood", x: 700, y: 1084, size: 61, rotation: 1.06 },
+      { kind: "ironwood", x: 384, y: 1051, size: 67, rotation: 4.56 },
+      { kind: "ironwood", x: 125, y: 1048, size: 53, rotation: 0.99 },
+      { kind: "ironwood", x: -154, y: 1054, size: 59, rotation: 6.17 },
+      { kind: "ironwood", x: -219, y: 1055, size: 63, rotation: 2.55 },
+      { kind: "ironwood", x: -369, y: 660, size: 65, rotation: 6.26 },
+      { kind: "ironwood", x: -338, y: 475, size: 55, rotation: 3.51 },
+      { kind: "ironwood", x: -348, y: 287, size: 59, rotation: 4.78 },
+      { kind: "ironwood", x: -305, y: 125, size: 56, rotation: 1.31 },
+      { kind: "ironwood", x: -384, y: -209, size: 52, rotation: 5.12 },
+      { kind: "ironwood", x: -458, y: -584, size: 55, rotation: 4.56 },
+      { kind: "ironwood", x: 290, y: -526, size: 68, rotation: 1.52 },
+      { kind: "ironwood", x: 293, y: -613, size: 68, rotation: 3.60 },
+      { kind: "ironwood", x: 1183, y: -556, size: 71, rotation: 5.34 },
+      { kind: "ironwood", x: 1181, y: -517, size: 71, rotation: 0.25 },
+      { kind: "ironwood", x: 1647, y: -543, size: 70, rotation: 2.58 },
+      { kind: "ironwood", x: 1806, y: -315, size: 59, rotation: 0.59 },
+      { kind: "ironwood", x: 1786, y: 266, size: 66, rotation: 3.83 },
+      { kind: "ironwood", x: 1828, y: 638, size: 71, rotation: 2.51 },
+      { kind: "ironwood", x: 1799, y: 1119, size: 72, rotation: 2.66 },
+      { kind: "ironwood", x: 1470, y: 1224, size: 65, rotation: 2.16 },
+      { kind: "ironwood", x: 1158, y: 1297, size: 62, rotation: 2.76 },
+      { kind: "ironwood", x: 534, y: 1241, size: 72, rotation: 5.92 },
+      { kind: "ironwood", x: 304, y: 1252, size: 65, rotation: 1.56 },
+      { kind: "ironwood", x: -90, y: 1330, size: 56, rotation: 2.21 },
+      { kind: "ironwood", x: -620, y: 1201, size: 70, rotation: 3.69 },
+      { kind: "ironwood", x: -510, y: 843, size: 72, rotation: 3.66 },
+      { kind: "ironwood", x: -582, y: 433, size: 55, rotation: 0.31 },
+      { kind: "ironwood", x: -533, y: 270, size: 52, rotation: 2.19 },
+      { kind: "ironwood", x: -504, y: -396, size: 66, rotation: 3.70 },
+      { kind: "ironwood", x: -490, y: -764, size: 64, rotation: 3.68 },
+      { kind: "ironwood", x: -56, y: -815, size: 62, rotation: 0.27 },
+      { kind: "ironwood", x: 527, y: -798, size: 78, rotation: 0.35 },
+      { kind: "ironwood", x: 1358, y: -771, size: 74, rotation: 0.07 },
+      { kind: "ironwood", x: 2008, y: -810, size: 76, rotation: 0.29 },
+      { kind: "ironwood", x: 2119, y: 67, size: 72, rotation: 5.09 },
+      { kind: "ironwood", x: 2094, y: 239, size: 78, rotation: 2.81 },
+      { kind: "ironwood", x: 2071, y: 1294, size: 68, rotation: 4.64 },
+      { kind: "ironwood", x: 1877, y: 1508, size: 74, rotation: 5.84 },
+      { kind: "ironwood", x: 1019, y: 1553, size: 65, rotation: 0.43 },
+      { kind: "ironwood", x: 468, y: 1466, size: 76, rotation: 5.33 },
+      { kind: "ironwood", x: -295, y: 1447, size: 75, rotation: 2.71 },
+      { kind: "ironwood", x: -708, y: 1513, size: 68, rotation: 3.66 },
+      { kind: "ironwood", x: -738, y: 615, size: 67, rotation: 1.66 },
+      { kind: "ironwood", x: -815, y: 433, size: 68, rotation: 6.00 },
+      { kind: "ironwood", x: -735, y: -644, size: 66, rotation: 1.39 },
 
       // Inner groves, kept off the road and off the stumps.
-      { kind: "tree", x: 688, y: 105, size: 27, rotation: 4.26 },
-      { kind: "tree", x: 672, y: 103, size: 31, rotation: 3.12 },
-      { kind: "tree", x: 736, y: 104, size: 33, rotation: 5.97 },
-      { kind: "tree", x: 933, y: 626, size: 30, rotation: 3.75 },
-      { kind: "tree", x: 990, y: 642, size: 35, rotation: 1.54 },
-      { kind: "tree", x: 923, y: 632, size: 34, rotation: 1.49 },
-      { kind: "tree", x: 137, y: 585, size: 31, rotation: 5.21 },
-      { kind: "tree", x: 206, y: 604, size: 37, rotation: 6.23 },
-      { kind: "tree", x: 178, y: 571, size: 33, rotation: 2.73 },
-      { kind: "tree", x: 523, y: 647, size: 26, rotation: 5.59 },
-      { kind: "tree", x: 492, y: 593, size: 33, rotation: 3.12 },
-      { kind: "tree", x: 512, y: 599, size: 31, rotation: 0.07 },
-      { kind: "tree", x: 1097, y: 456, size: 37, rotation: 1.41 },
-      { kind: "tree", x: 1116, y: 481, size: 34, rotation: 3.25 },
-      { kind: "tree", x: 1133, y: 453, size: 38, rotation: 2.20 },
-      { kind: "tree", x: 271, y: 129, size: 26, rotation: 4.84 },
-      { kind: "tree", x: 245, y: 161, size: 35, rotation: 5.48 },
-      { kind: "tree", x: 280, y: 139, size: 31, rotation: 0.61 },
+      { kind: "ironwood", x: 688, y: 105, size: 27, rotation: 4.26 },
+      { kind: "ironwood", x: 672, y: 103, size: 31, rotation: 3.12 },
+      { kind: "ironwood", x: 736, y: 104, size: 33, rotation: 5.97 },
+      { kind: "ironwood", x: 933, y: 626, size: 30, rotation: 3.75 },
+      { kind: "ironwood", x: 990, y: 642, size: 35, rotation: 1.54 },
+      { kind: "ironwood", x: 923, y: 632, size: 34, rotation: 1.49 },
+      { kind: "ironwood", x: 137, y: 585, size: 31, rotation: 5.21 },
+      { kind: "ironwood", x: 206, y: 604, size: 37, rotation: 6.23 },
+      { kind: "ironwood", x: 178, y: 571, size: 33, rotation: 2.73 },
+      { kind: "ironwood", x: 523, y: 647, size: 26, rotation: 5.59 },
+      { kind: "ironwood", x: 492, y: 593, size: 33, rotation: 3.12 },
+      { kind: "ironwood", x: 512, y: 599, size: 31, rotation: 0.07 },
+      { kind: "ironwood", x: 1097, y: 456, size: 37, rotation: 1.41 },
+      { kind: "ironwood", x: 1116, y: 481, size: 34, rotation: 3.25 },
+      { kind: "ironwood", x: 1133, y: 453, size: 38, rotation: 2.20 },
+      { kind: "ironwood", x: 271, y: 129, size: 26, rotation: 4.84 },
+      { kind: "ironwood", x: 245, y: 161, size: 35, rotation: 5.48 },
+      { kind: "ironwood", x: 280, y: 139, size: 31, rotation: 0.61 },
 
       // Ground litter in the clearings: knee-high only, so nothing here stands
       // between the camera and a tower.
-      { kind: "stump", x: 505, y: 330, size: 22, rotation: 0.6 },
-      { kind: "stump", x: 745, y: 470, size: 20, rotation: 2.4 },
-      { kind: "stump", x: 895, y: 175, size: 21, rotation: 4.1 },
-      { kind: "stump", x: 240, y: 250, size: 19, rotation: 1.3 },
-      { kind: "log", x: 610, y: 585, size: 32, rotation: 0.35 },
-      { kind: "log", x: 1105, y: 545, size: 28, rotation: 2.1 },
-      { kind: "log", x: 175, y: 545, size: 30, rotation: 1.7 },
-      { kind: "brush", x: 520, y: 500, size: 24, rotation: 1.1 },
-      { kind: "brush", x: 860, y: 585, size: 26, rotation: 0.4 },
-      { kind: "brush", x: 300, y: 560, size: 22, rotation: 2.7 },
-      { kind: "brush", x: 1060, y: 150, size: 24, rotation: 3.3 },
-      { kind: "brush", x: 690, y: 330, size: 20, rotation: 1.9 },
-      { kind: "snag", x: 455, y: 130, size: 30, rotation: 0.8 },
-      { kind: "snag", x: 1090, y: 400, size: 28, rotation: 2.9 },
+      { kind: "mossrock", x: 505, y: 330, size: 22, rotation: 0.6 },
+      { kind: "mossrock", x: 745, y: 470, size: 20, rotation: 2.4 },
+      { kind: "mossrock", x: 895, y: 175, size: 21, rotation: 4.1 },
+      { kind: "mossrock", x: 240, y: 250, size: 19, rotation: 1.3 },
+      { kind: "deadfall", x: 610, y: 585, size: 32, rotation: 0.35 },
+      { kind: "deadfall", x: 1105, y: 545, size: 28, rotation: 2.1 },
+      { kind: "deadfall", x: 175, y: 545, size: 30, rotation: 1.7 },
+      { kind: "fern", x: 520, y: 500, size: 24, rotation: 1.1 },
+      { kind: "fern", x: 860, y: 585, size: 26, rotation: 0.4 },
+      { kind: "fern", x: 300, y: 560, size: 22, rotation: 2.7 },
+      { kind: "fern", x: 1060, y: 150, size: 24, rotation: 3.3 },
+      { kind: "fern", x: 690, y: 330, size: 20, rotation: 1.9 },
+      { kind: "deadfall", x: 455, y: 130, size: 30, rotation: 0.8 },
+      { kind: "deadfall", x: 1090, y: 400, size: 28, rotation: 2.9 },
 
       // --- gameplay geometry, drawn to match --------------------------------
       //
@@ -1776,6 +1892,522 @@ function drawModel(ctx, model, theme) {
       ctx.lineTo(post, size * 0.15);
       ctx.stroke();
     }
+  } else if (model.kind === "ironwood") {
+    // A LIVING BROADLEAF, and deliberately nothing like the dead forest board's
+    // bare stems. Three overlapping canopy lobes of different sizes, a trunk
+    // with buttress roots, and every dimension jittered off the tree's own
+    // position -- so no two of the eighty-odd on this board share a silhouette,
+    // and each keeps the same one every frame.
+    var jx = Math.sin(model.x * 0.077 + model.y * 0.041);
+    var jy = Math.cos(model.x * 0.053 - model.y * 0.089);
+    var canopy = size * (0.52 + jx * 0.10);
+
+    // Buttress roots first, so the canopy sits over them.
+    ctx.strokeStyle = theme.metalDark;
+    ctx.lineWidth = size * 0.055;
+    ctx.lineCap = "round";
+    for (i = 0; i < 4; i++) {
+      var rootA = i * Math.PI / 2 + 0.5 + jy;
+      ctx.beginPath();
+      ctx.moveTo(0, size * 0.04);
+      ctx.lineTo(Math.cos(rootA) * size * 0.20,
+                 size * 0.04 + Math.sin(rootA) * size * 0.14);
+      ctx.stroke();
+    }
+    ctx.fillStyle = theme.metalDark;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * 0.11, size * 0.085, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Three canopy lobes, offset from each other and from centre.
+    var lobeSpec = [[0.00, -0.06, 1.00], [-0.34, 0.12, 0.72], [0.31, 0.16, 0.66]];
+    for (i = 0; i < 3; i++) {
+      var lo = lobeSpec[i];
+      ctx.beginPath();
+      for (var k = 0; k <= 9; k++) {
+        var ca = k * Math.PI * 2 / 9;
+        var cw = 1 + Math.sin(model.x * 0.06 + i * 3.1 + k * 1.9) * 0.13;
+        var cxp = lo[0] * canopy + Math.cos(ca) * canopy * lo[2] * cw;
+        var cyp = lo[1] * canopy + Math.sin(ca) * canopy * lo[2] * 0.80 * cw;
+        if (k === 0) ctx.moveTo(cxp, cyp); else ctx.lineTo(cxp, cyp);
+      }
+      ctx.closePath();
+      ctx.fillStyle = themeRgba(theme, "accent2", i === 0 ? 0.30 : 0.22);
+      ctx.fill();
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+      ctx.stroke();
+    }
+
+  } else if (model.kind === "deadfall") {
+    // Storm-thrown: a leaning snapped trunk with its root plate torn up, not a
+    // tidy log lying flat.
+    ctx.save();
+    ctx.rotate(Math.sin(model.x * 0.05) * 0.4);
+    ctx.strokeStyle = theme.metalDark;
+    ctx.lineCap = "round";
+    ctx.lineWidth = size * 0.20;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.46, size * 0.10);
+    ctx.lineTo(size * 0.40, -size * 0.18);
+    ctx.stroke();
+    ctx.lineWidth = size * 0.05;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+    ctx.stroke();
+    // The root plate, standing on end where it tore out.
+    ctx.beginPath();
+    for (i = 0; i <= 7; i++) {
+      var pa2 = i * Math.PI * 2 / 7;
+      var pr = size * (0.22 + Math.sin(i * 2.7 + model.y * 0.06) * 0.07);
+      var ppx = -size * 0.50 + Math.cos(pa2) * pr * 0.7;
+      var ppy = size * 0.10 + Math.sin(pa2) * pr;
+      if (i === 0) ctx.moveTo(ppx, ppy); else ctx.lineTo(ppx, ppy);
+    }
+    ctx.closePath();
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.7);
+    ctx.stroke();
+    // Snapped branches off the upper side.
+    ctx.lineWidth = size * 0.045;
+    ctx.strokeStyle = theme.metalDark;
+    for (i = 0; i < 3; i++) {
+      var bt = -0.2 + i * 0.3;
+      var bxp = -size * 0.46 + (size * 0.86) * (0.3 + i * 0.25);
+      var byp = size * 0.10 - (size * 0.28) * (0.3 + i * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(bxp, byp);
+      ctx.lineTo(bxp + Math.cos(bt - 1.2) * size * 0.22,
+                 byp + Math.sin(bt - 1.2) * size * 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+  } else if (model.kind === "fern") {
+    // Low ground cover. Fronds, not sticks -- each one a curved spine with
+    // leaflets, fanned from a single crown.
+    var fronds = 6;
+    for (i = 0; i < fronds; i++) {
+      var fa2 = -Math.PI * 0.9 + i * (Math.PI * 1.8 / (fronds - 1));
+      var flen = size * (0.42 + Math.sin(model.x * 0.09 + i) * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(0, size * 0.06);
+      ctx.quadraticCurveTo(Math.cos(fa2) * flen * 0.6, size * 0.06 + Math.sin(fa2) * flen * 0.5,
+                           Math.cos(fa2) * flen, size * 0.06 + Math.sin(fa2) * flen * 0.72);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = themeRgba(theme, "accent2", 0.55);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = themeRgba(theme, "accent2", 0.32);
+      for (var lf = 1; lf <= 3; lf++) {
+        var t2 = lf / 4;
+        var lx = Math.cos(fa2) * flen * t2;
+        var ly = size * 0.06 + Math.sin(fa2) * flen * 0.72 * t2;
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(lx + Math.cos(fa2 + 1.3) * size * 0.10,
+                   ly + Math.sin(fa2 + 1.3) * size * 0.08);
+        ctx.stroke();
+      }
+    }
+
+  } else if (model.kind === "mossrock") {
+    // A moss-capped stone the size of a crouching man. Ground detail, and the
+    // only thing on this floor that is neither wood nor dirt.
+    ctx.beginPath();
+    for (i = 0; i <= 8; i++) {
+      var ma = i * Math.PI * 2 / 8;
+      var mr = size * (0.38 + Math.sin(model.y * 0.11 + i * 2.3) * 0.10);
+      var mxp = Math.cos(ma) * mr, myp = Math.sin(ma) * mr * 0.72;
+      if (i === 0) ctx.moveTo(mxp, myp); else ctx.lineTo(mxp, myp);
+    }
+    ctx.closePath();
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.05, -size * 0.12, size * 0.24, size * 0.13, 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = themeRgba(theme, "accent2", 0.34);
+    ctx.fill();
+
+  } else if (model.kind === "boulder" || model.kind === "outcrop") {
+    // NO PERFECT CIRCLES. A rock drawn as an arc reads as a debug shape, and on
+    // a board where rocks are the one thing you must be able to see and build
+    // around, that is the difference between a landmark and a placeholder.
+    //
+    // The outline is a jittered ring, and the jitter is SEEDED FROM THE POSITION
+    // rather than random: every boulder on the board has a different profile and
+    // the same boulder has the same profile every frame. A rock that shimmers is
+    // worse than a circle.
+    var lobes = model.kind === "boulder" ? 9 : 7;
+    var seedX = model.x, seedY = model.y;
+    ctx.beginPath();
+    for (i = 0; i <= lobes; i++) {
+      var ra = i * Math.PI * 2 / lobes;
+      var wob = Math.sin(seedX * 0.13 + i * 2.1) * 0.16 +
+                Math.cos(seedY * 0.11 + i * 1.7) * 0.12;
+      var rr = size * (0.46 + wob);
+      var rx = Math.cos(ra) * rr, ry = Math.sin(ra) * rr * 0.82;
+      if (i === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
+    }
+    ctx.closePath();
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.stroke();
+    // Fracture lines and a moss cap, so the mass reads as stone rather than as
+    // a filled shape.
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = themeRgba(theme, "accent2", 0.30);
+    for (i = 0; i < 3; i++) {
+      var fa = 0.6 + i * 1.9 + seedX * 0.01;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(fa) * size * 0.34, Math.sin(fa) * size * 0.26);
+      ctx.lineTo(Math.cos(fa + 2.2) * size * 0.30, Math.sin(fa + 2.2) * size * 0.24);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.10, -size * 0.16, size * 0.20, size * 0.12, 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = themeRgba(theme, "accent2", 0.22);
+    ctx.fill();
+
+  } else if (model.kind === "trunk") {
+    // A FALLEN TRUNK, not a capsule. It has a taper, a broken end, bark texture
+    // and two branch stubs, because the gameplay shape underneath it is a
+    // capsule and the drawing is the only thing telling the player it is wood.
+    var half = size * 0.52;
+    ctx.beginPath();
+    ctx.moveTo(-half, -size * 0.13);
+    ctx.lineTo(half * 0.86, -size * 0.10);
+    ctx.lineTo(half, size * 0.02);
+    ctx.lineTo(half * 0.80, size * 0.11);
+    ctx.lineTo(-half, size * 0.14);
+    ctx.closePath();
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+    ctx.stroke();
+    // Bark: lengthwise splits, uneven.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.45);
+    for (i = 0; i < 4; i++) {
+      var by = -size * 0.09 + i * size * 0.06;
+      ctx.beginPath();
+      ctx.moveTo(-half * 0.88, by);
+      ctx.lineTo(half * (0.5 + (i % 2) * 0.3), by + size * 0.012);
+      ctx.stroke();
+    }
+    // The broken end, and the rings in it.
+    ctx.beginPath();
+    ctx.ellipse(-half, 0, size * 0.055, size * 0.14, 0, 0, Math.PI * 2);
+    ctx.fillStyle = theme.panel;
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.stroke();
+    // Two snapped branches, so the silhouette is not a smooth sausage.
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = theme.metalDark;
+    ctx.beginPath();
+    ctx.moveTo(-half * 0.2, -size * 0.11);
+    ctx.lineTo(-half * 0.05, -size * 0.30);
+    ctx.moveTo(half * 0.42, size * 0.12);
+    ctx.lineTo(half * 0.56, size * 0.29);
+    ctx.stroke();
+
+  } else if (model.kind === "platform") {
+    // A BUILDABLE STUMP. Deliberately the most readable object on the floor:
+    // it is where the player wants to put things, so it gets the cleanest
+    // silhouette on the board -- a wide cut face, a rim, and roots reaching out
+    // of it into the dirt.
+    ctx.beginPath();
+    for (i = 0; i <= 10; i++) {
+      var pa = i * Math.PI * 2 / 10;
+      var pw = 1 + Math.sin(model.x * 0.09 + i * 2.3) * 0.06;
+      var pxr = Math.cos(pa) * size * 0.50 * pw;
+      var pyr = Math.sin(pa) * size * 0.44 * pw;
+      if (i === 0) ctx.moveTo(pxr, pyr); else ctx.lineTo(pxr, pyr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.95);
+    ctx.stroke();
+    // Roots, out past the rim and into the ground.
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = theme.metalDark;
+    for (i = 0; i < 5; i++) {
+      var rt = i * Math.PI * 2 / 5 + 0.4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(rt) * size * 0.40, Math.sin(rt) * size * 0.34);
+      ctx.lineTo(Math.cos(rt) * size * 0.70, Math.sin(rt) * size * 0.58);
+      ctx.stroke();
+    }
+    // The cut face and its growth rings -- the "you may stand here" signal.
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.05, size * 0.38, size * 0.32, 0, 0, Math.PI * 2);
+    ctx.fillStyle = theme.panel;
+    ctx.fill();
+    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = themeRgba(theme, "accent", 0.30);
+    for (i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(0, -size * 0.05, size * 0.38 * (i / 4), size * 0.32 * (i / 4),
+        0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+  } else if (model.kind === "house" || model.kind === "townhall" ||
+             model.kind === "storehouse" || model.kind === "workshop") {
+    // INHABITED, NOT A BOX. Each building gets a body, a pitched roof drawn as
+    // a separate mass, a door and lit windows -- and the town hall gets a
+    // second storey and a tower so it is the one you find first.
+    var big = model.kind === "townhall";
+    var wide = size * (big ? 0.62 : (model.kind === "storehouse" ? 0.58 : 0.46));
+    var deep = size * (big ? 0.50 : 0.40);
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(-wide, -deep * 0.35, wide * 2, deep * 1.35);
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.strokeRect(-wide, -deep * 0.35, wide * 2, deep * 1.35);
+    // Roof, offset up-left so the building has a readable third dimension.
+    ctx.beginPath();
+    ctx.moveTo(-wide * 1.10, -deep * 0.35);
+    ctx.lineTo(0, -deep * (big ? 1.15 : 0.95));
+    ctx.lineTo(wide * 1.10, -deep * 0.35);
+    ctx.closePath();
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.95);
+    ctx.stroke();
+    // Lit windows. Amber, and the only warm light on this half of the board.
+    ctx.fillStyle = themeRgba(theme, "accent", 0.70);
+    var panes = big ? 3 : 2;
+    for (i = 0; i < panes; i++) {
+      var wx = -wide * 0.55 + i * (wide * 1.1 / Math.max(1, panes - 1));
+      ctx.fillRect(wx - size * 0.05, -deep * 0.10, size * 0.10, size * 0.11);
+    }
+    if (big) {
+      // The hall's bell tower: the settlement's landmark silhouette.
+      ctx.fillStyle = theme.metalDark;
+      ctx.fillRect(-size * 0.10, -deep * 1.85, size * 0.20, deep * 0.80);
+      ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+      ctx.strokeRect(-size * 0.10, -deep * 1.85, size * 0.20, deep * 0.80);
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.16, -deep * 1.85);
+      ctx.lineTo(0, -deep * 2.35);
+      ctx.lineTo(size * 0.16, -deep * 1.85);
+      ctx.closePath();
+      ctx.fillStyle = theme.metal;
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -deep * 1.50, size * 0.05, 0, Math.PI * 2);
+      ctx.fillStyle = themeRgba(theme, "accent", 0.85);
+      ctx.fill();
+    }
+
+  } else if (model.kind === "palisade") {
+    // Metal mesh on posts, with wire along the top. It refuses building and
+    // deliberately does NOT block sight -- see the landmark's blocksSight flag.
+    var run2 = size;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+    for (i = 0; i <= 12; i++) {
+      var mx = -run2 / 2 + run2 * i / 12;
+      ctx.beginPath();
+      ctx.moveTo(mx, -size * 0.09);
+      ctx.lineTo(mx, size * 0.09);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-run2 / 2, -size * 0.09);
+    ctx.lineTo(run2 / 2, -size * 0.09);
+    ctx.moveTo(-run2 / 2, size * 0.09);
+    ctx.lineTo(run2 / 2, size * 0.09);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = theme.metal;
+    ctx.stroke();
+    // Posts, and the barbed line above them.
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = theme.metalDark;
+    for (i = 0; i <= 4; i++) {
+      var postX = -run2 / 2 + run2 * i / 4;
+      ctx.beginPath();
+      ctx.moveTo(postX, -size * 0.14);
+      ctx.lineTo(postX, size * 0.12);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.8);
+    ctx.beginPath();
+    for (i = 0; i <= 20; i++) {
+      var bx = -run2 / 2 + run2 * i / 20;
+      var byy = -size * 0.17 + (i % 2) * size * 0.04;
+      if (i === 0) ctx.moveTo(bx, byy); else ctx.lineTo(bx, byy);
+    }
+    ctx.stroke();
+
+  } else if (model.kind === "gate") {
+    // CLOSED, because leaked enemies are hammering on it. Two leaves, a heavy
+    // brace and a bar across the middle.
+    ctx.fillStyle = theme.metal;
+    ctx.fillRect(-size * 0.13, -size * 0.62, size * 0.26, size * 1.24);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.95);
+    ctx.strokeRect(-size * 0.13, -size * 0.62, size * 0.26, size * 1.24);
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = theme.metalDark;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.13, 0);
+    ctx.lineTo(size * 0.13, 0);
+    ctx.moveTo(-size * 0.11, -size * 0.55);
+    ctx.lineTo(size * 0.11, -size * 0.06);
+    ctx.moveTo(-size * 0.11, size * 0.55);
+    ctx.lineTo(size * 0.11, size * 0.06);
+    ctx.stroke();
+
+  } else if (model.kind === "lantern") {
+    ctx.strokeStyle = theme.metalDark;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.6);
+    ctx.lineTo(0, -size * 0.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.55, size * 0.30, 0, Math.PI * 2);
+    ctx.fillStyle = themeRgba(theme, "accent", 0.85);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.55, size * 0.85, 0, Math.PI * 2);
+    ctx.fillStyle = themeRgba(theme, "accent", 0.13);
+    ctx.fill();
+
+  } else if (model.kind === "depot") {
+    // THE MOBILE WAREHOUSE. Drawn as a hull with a chamfered nose, a ribbed
+    // roof, a freight door opening WEST and a lit interior behind it -- the
+    // enemies walk out of that light, which is why the door is the brightest
+    // thing on this half of the board.
+    var hw = size * 0.62, hh = size * 0.46;
+    ctx.beginPath();
+    ctx.moveTo(-hw, -hh * 0.62);
+    ctx.lineTo(-hw * 0.72, -hh);
+    ctx.lineTo(hw * 0.86, -hh * 0.92);
+    ctx.lineTo(hw, -hh * 0.42);
+    ctx.lineTo(hw, hh * 0.60);
+    ctx.lineTo(hw * 0.68, hh);
+    ctx.lineTo(-hw * 0.70, hh * 0.94);
+    ctx.lineTo(-hw, hh * 0.40);
+    ctx.closePath();
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.95);
+    ctx.stroke();
+    // Ribs across the roof.
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.45);
+    for (i = 1; i < 6; i++) {
+      var rib = -hw * 0.7 + (hw * 1.5) * i / 6;
+      ctx.beginPath();
+      ctx.moveTo(rib, -hh * 0.88);
+      ctx.lineTo(rib, hh * 0.88);
+      ctx.stroke();
+    }
+    // The freight door: a dark bay with a hot interior behind it.
+    ctx.fillStyle = "rgba(6,5,4,0.92)";
+    ctx.fillRect(-hw * 1.02, -hh * 0.40, size * 0.13, hh * 0.80);
+    ctx.fillStyle = themeRgba(theme, "accent", 0.55);
+    ctx.fillRect(-hw * 0.99, -hh * 0.32, size * 0.06, hh * 0.64);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = themeRgba(theme, "accent", 0.85);
+    ctx.strokeRect(-hw * 1.02, -hh * 0.40, size * 0.13, hh * 0.80);
+
+  } else if (model.kind === "depot-ramp") {
+    // The plate the enemies walk down. Wider at the bottom, plated, and it
+    // meets the road's first point.
+    ctx.beginPath();
+    ctx.moveTo(size * 0.5, -size * 0.30);
+    ctx.lineTo(-size * 0.5, -size * 0.46);
+    ctx.lineTo(-size * 0.5, size * 0.46);
+    ctx.lineTo(size * 0.5, size * 0.30);
+    ctx.closePath();
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+    ctx.stroke();
+    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.45);
+    for (i = 1; i < 5; i++) {
+      var plate = -size * 0.5 + size * i / 5;
+      ctx.beginPath();
+      ctx.moveTo(plate, -size * (0.46 - 0.16 * (i / 5)));
+      ctx.lineTo(plate, size * (0.46 - 0.16 * (i / 5)));
+      ctx.stroke();
+    }
+
+  } else if (model.kind === "wheel") {
+    // Running gear. It is what says the depot ARRIVED rather than was built.
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * 0.46, size * 0.34, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#14110d";
+    ctx.fill();
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * 0.20, size * 0.15, 0, 0, Math.PI * 2);
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.6);
+    for (i = 0; i < 6; i++) {
+      var sp = i * Math.PI / 3;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(sp) * size * 0.18, Math.sin(sp) * size * 0.13);
+      ctx.lineTo(Math.cos(sp) * size * 0.42, Math.sin(sp) * size * 0.31);
+      ctx.stroke();
+    }
+
+  } else if (model.kind === "exhaust") {
+    ctx.fillStyle = theme.metal;
+    ctx.fillRect(-size * 0.16, -size * 0.55, size * 0.32, size * 1.1);
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+    ctx.strokeRect(-size * 0.16, -size * 0.55, size * 0.32, size * 1.1);
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.55, size * 0.20, size * 0.09, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#0d0b08";
+    ctx.fill();
+
+  } else if (model.kind === "floodlight") {
+    // COLD AND HOSTILE, against the settlement's amber. Same fixture, opposite
+    // colour, which is the whole read of the board in one prop.
+    ctx.strokeStyle = theme.metalDark;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.7);
+    ctx.lineTo(0, -size * 0.4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.5, size * 0.32, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,92,64,0.85)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.5, size * 1.05, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,92,64,0.12)";
+    ctx.fill();
+
   } else if (model.kind === "spikes") {
     ctx.strokeStyle = theme.metal;
     ctx.lineWidth = 2.4;

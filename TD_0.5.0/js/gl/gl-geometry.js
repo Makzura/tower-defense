@@ -368,8 +368,78 @@ var GLGeometry = (function () {
   var WILD = {
     tree: 1, snag: 1, stump: 1, log: 1, brush: 1,
     barricade: 1, spikes: 1, sandbags: 1, watchtower: 1, wreck: 1,
-    barrel: 1, fence: 1
+    barrel: 1, fence: 1,
+    // Ironwood Frontier's own vocabulary. NOTHING here is shared with the dead
+    // forest above it: those are bare snapped stems on black dirt and these are
+    // a living wood, a settlement and a machine. Two boards that share prop
+    // kinds read as one location with the lights changed.
+    ironwood: 1, deadfall: 1, fern: 1, mossrock: 1,
+    boulder: 1, outcrop: 1, trunk: 1, platform: 1,
+    house: 1, townhall: 1, storehouse: 1, workshop: 1,
+    gate: 1, palisade: 1, lantern: 1,
+    depot: 1, "depot-ramp": 1, wheel: 1, exhaust: 1, floodlight: 1
   };
+
+  // A CLOSED IRREGULAR MASS, which is what a rock is and what a cylinder is not.
+  //
+  // Built as stacked rings whose radius wobbles per ring AND per vertex, all
+  // seeded from the prop's own position -- so every boulder on the board has a
+  // different profile, the same boulder has the same one every frame, and none
+  // of them reads as "a cylinder". The top ring is pulled in so the silhouette
+  // closes instead of ending in a flat lid.
+  function lumpyMass(builder, cx, cy, r, h, color, z0, rings, squash, seed) {
+    var prev = null;
+    for (var ring = 0; ring <= rings; ring++) {
+      var t = ring / rings;
+      // Fattest a third of the way up, like a stone settled into dirt.
+      var profile = Math.sin((0.25 + t * 0.72) * Math.PI);
+      var rr = r * profile * (0.86 + wobble(cx, cy, seed + ring) * 0.28);
+      var z = z0 + h * t;
+      if (prev !== null) {
+        // Each band is its own frustum, so the sides step and catch light
+        // rather than sweeping smoothly.
+        frustum(builder, cx, cy, prev.r, rr, z - prev.z, color, prev.z,
+          6 + (ring % 2));
+      }
+      prev = { r: rr, z: z };
+    }
+    // Two shoulder blocks, off-centre, so no silhouette is symmetrical.
+    for (var b = 0; b < 2; b++) {
+      var ba = wobble(cx, cy, seed + 40 + b) * Math.PI * 2;
+      var bd = r * (0.34 + wobble(cx, cy, seed + 50 + b) * 0.26);
+      boxAt(builder, cx + Math.cos(ba) * bd, cy + Math.sin(ba) * bd * squash,
+        r * 0.52, r * 0.44, h * (0.28 + wobble(cx, cy, seed + 60 + b) * 0.24),
+        color, z0 + h * (0.12 + wobble(cx, cy, seed + 70 + b) * 0.30), ba);
+    }
+  }
+
+  // A PITCHED-ROOF BUILDING, assembled rather than extruded: a body, a roof
+  // made of two leaning slabs, a ridge, a door and lit windows. The roof is the
+  // whole point -- a box with a texture on it still reads as a box, and a
+  // settlement of boxes is the failure the brief names.
+  function cabin(builder, cx, cy, w, d, wallH, roofH, wall, roof, warm, rot) {
+    boxAt(builder, cx, cy, w, d, wallH, wall, 0, rot);
+    var pitch = 5;
+    for (var i = 0; i < pitch; i++) {
+      var t = i / (pitch - 1);
+      var half = (w / 2) * (1 - t) * 1.08;
+      boxAt(builder, cx, cy, half * 2, d * 1.10, roofH / pitch * 1.6, roof,
+        wallH + roofH * t * 0.92, rot);
+    }
+    // The ridge beam, proud of the roof so the top edge is a line and not a
+    // fade.
+    boxAt(builder, cx, cy, w * 0.10, d * 1.14, roofH * 0.10, wall,
+      wallH + roofH * 0.96, rot);
+    // Door, and two lit windows either side of it.
+    boxAt(builder, cx + Math.cos(rot) * (d / 2), cy + Math.sin(rot) * (d / 2),
+      w * 0.22, d * 0.08, wallH * 0.62, roof, 0, rot);
+    for (var q = -1; q <= 1; q += 2) {
+      boxAt(builder,
+        cx + Math.cos(rot + Math.PI / 2) * (w * 0.28) * q + Math.cos(rot) * (d / 2),
+        cy + Math.sin(rot + Math.PI / 2) * (w * 0.28) * q + Math.sin(rot) * (d / 2),
+        w * 0.16, d * 0.06, wallH * 0.26, warm, wallH * 0.42, rot, 2.4);
+    }
+  }
 
   // Deterministic per-prop variation, from the prop's own position.
   //
@@ -535,6 +605,332 @@ var GLGeometry = (function () {
       // the whole difference between this board and the other six: on a ley
       // line the light comes out of the scenery, and in the forest the scenery
       // is what is left when the light went out.
+
+      // --- Ironwood Frontier ------------------------------------------
+      //
+      // A LIVING WOOD, a settlement and a machine. Every case below builds a
+      // LAYERED silhouette on purpose: no important object on this board may
+      // read as "a box", "a cylinder" or "three spheres", which is the bar the
+      // flagship brief sets and the bar the first pass failed -- every prop
+      // came out a grey cube because none of these cases existed.
+
+      case "ironwood": {
+        // Buttressed trunk, forking limbs, three canopy masses at different
+        // heights. The fork angle, the lean, the canopy offsets and the ring
+        // sizes are all drawn from the tree's own position, so eighty-odd of
+        // them share no silhouette and none of them flickers.
+        var iwLean = (wobble(cx, cy, 11) - 0.5) * 0.24;
+        var iwH = size * (1.55 + wobble(cx, cy, 12) * 0.75);
+        var forkZ = iwH * 0.52;
+        var topX = cx + iwLean * iwH, topY = cy + iwLean * iwH * 0.6;
+
+        // Buttress roots: four flares that meet the dirt square.
+        for (var bu = 0; bu < 4; bu++) {
+          var buA = bu * Math.PI / 2 + wobble(cx, cy, 13 + bu) * 1.2;
+          segment(builder,
+            cx + Math.cos(buA) * r * 0.42, cy + Math.sin(buA) * r * 0.42, 0,
+            cx, cy, size * 0.30, r * 0.13, dark);
+        }
+        segment(builder, cx, cy, 0, topX * 0.5 + cx * 0.5, topY * 0.5 + cy * 0.5,
+          forkZ, r * 0.22, dark);
+
+        // Two limbs off the fork, each carrying its own canopy.
+        var canopyColour = P.accent2 ? P.accent2 : trim;
+        for (var lb = 0; lb < 2; lb++) {
+          var lbA = rot + lb * Math.PI + wobble(cx, cy, 20 + lb) * 1.6;
+          var lbR = size * (0.34 + wobble(cx, cy, 24 + lb) * 0.26);
+          var lbX = topX + Math.cos(lbA) * lbR;
+          var lbY = topY + Math.sin(lbA) * lbR;
+          var lbZ = forkZ + iwH * (0.28 + wobble(cx, cy, 28 + lb) * 0.22);
+          segment(builder, topX, topY, forkZ, lbX, lbY, lbZ, r * 0.10, dark);
+          sphere(builder, lbX, lbY, size * (0.36 + wobble(cx, cy, 32 + lb) * 0.16),
+            canopyColour, lbZ, 7, 5);
+        }
+        // The crown, largest and highest, sat over the fork.
+        sphere(builder, topX, topY, size * (0.50 + wobble(cx, cy, 36) * 0.18),
+          canopyColour, forkZ + iwH * 0.46, 8, 6);
+        break;
+      }
+
+      case "deadfall": {
+        // Storm-thrown: a leaning snapped trunk with its root plate torn up
+        // out of the ground. The plate is what stops this reading as a log.
+        var dfA = rot + wobble(cx, cy, 5) * 1.4;
+        var dfLen = size * (0.9 + wobble(cx, cy, 6) * 0.5);
+        var bx2 = cx + Math.cos(dfA) * dfLen, by2 = cy + Math.sin(dfA) * dfLen;
+        segment(builder, cx, cy, size * 0.30, bx2, by2, size * 0.10, r * 0.20, dark);
+        // Root plate, on end.
+        lumpyMass(builder, cx, cy, r * 0.62, size * 0.66, dark, 0, 3, 0.75, 90);
+        for (var dfb = 0; dfb < 3; dfb++) {
+          var t3 = 0.3 + dfb * 0.25;
+          var bxx = cx + (bx2 - cx) * t3, byy = cy + (by2 - cy) * t3;
+          var bz = size * 0.30 + (size * 0.10 - size * 0.30) * t3;
+          var brA = dfA + (dfb % 2 ? 1.4 : -1.4);
+          segment(builder, bxx, byy, bz,
+            bxx + Math.cos(brA) * size * 0.30, byy + Math.sin(brA) * size * 0.30,
+            bz + size * 0.22, r * 0.055, dark);
+        }
+        break;
+      }
+
+      case "fern":
+        // Low fronds fanned from one crown. Thin segments leaning outward and
+        // up, so the mass is airy rather than a dome.
+        for (var fr = 0; fr < 7; fr++) {
+          var frA = rot + fr * (Math.PI * 2 / 7) + wobble(cx, cy, 60 + fr) * 0.5;
+          var frL = size * (0.34 + wobble(cx, cy, 70 + fr) * 0.20);
+          segment(builder, cx, cy, size * 0.04,
+            cx + Math.cos(frA) * frL, cy + Math.sin(frA) * frL,
+            size * (0.26 + wobble(cx, cy, 80 + fr) * 0.16),
+            r * 0.045, P.accent2 ? P.accent2 : trim);
+        }
+        break;
+
+      case "mossrock":
+        lumpyMass(builder, cx, cy, r * 0.80, size * 0.42, body, 0, 3, 0.78, 100);
+        // The moss cap: a low, flat lens on the sunward shoulder.
+        sphere(builder, cx - r * 0.10, cy - r * 0.12, r * 0.36,
+          P.accent2 ? P.accent2 : trim, size * 0.30, 7, 4);
+        break;
+
+      case "boulder":
+        // A GAMEPLAY BLOCKER, so it has to read as solid from any camera angle
+        // and at any zoom. Tall enough to be a horizon, lumpy enough not to be
+        // a cylinder, with a fractured cap and moss where water sits.
+        lumpyMass(builder, cx, cy, r * 0.92, size * 0.86, body, 0, 4, 0.82, 200);
+        boxAt(builder, cx + r * 0.18, cy - r * 0.14, r * 0.70, r * 0.58, size * 0.22,
+          body, size * 0.66, rot + 0.6);
+        sphere(builder, cx - r * 0.20, cy + r * 0.16, r * 0.30,
+          P.accent2 ? P.accent2 : trim, size * 0.72, 6, 4);
+        break;
+
+      case "outcrop":
+        // Bedrock breaking the surface: three tilted slabs rather than one
+        // mass, so the silhouette has edges and the shadow has structure.
+        for (var sl = 0; sl < 3; sl++) {
+          var slA = rot + sl * 1.9 + wobble(cx, cy, 210 + sl) * 0.8;
+          var slD = r * (0.20 + sl * 0.18);
+          boxAt(builder, cx + Math.cos(slA) * slD, cy + Math.sin(slA) * slD * 0.8,
+            r * (1.05 - sl * 0.20), r * (0.80 - sl * 0.14),
+            size * (0.72 - sl * 0.16), body, 0, slA);
+        }
+        lumpyMass(builder, cx, cy, r * 0.60, size * 0.40, body, size * 0.40, 3, 0.8, 220);
+        break;
+
+      case "trunk": {
+        // THE FALLEN TRUNK BLOCKER. Tapered, barked, with a torn end, two
+        // branch stubs and a shallow lean -- resting ON the ground rather than
+        // sunk into it, which is what a bare capsule always looks like.
+        var tkLen = size * 0.92;
+        var ax2 = cx - Math.cos(rot) * tkLen / 2, ay2 = cy - Math.sin(rot) * tkLen / 2;
+        var bx3 = cx + Math.cos(rot) * tkLen / 2, by3 = cy + Math.sin(rot) * tkLen / 2;
+        segment(builder, ax2, ay2, size * 0.19, bx3, by3, size * 0.15, r * 0.19, dark);
+        // The torn end, splintered rather than cut.
+        lumpyMass(builder, ax2, ay2, r * 0.26, size * 0.30, trim, size * 0.05, 2, 0.9, 300);
+        for (var tb = 0; tb < 2; tb++) {
+          var tbT = 0.34 + tb * 0.34;
+          var tbX = ax2 + (bx3 - ax2) * tbT, tbY = ay2 + (by3 - ay2) * tbT;
+          var tbA = rot + (tb ? 1.5 : -1.5);
+          segment(builder, tbX, tbY, size * 0.17,
+            tbX + Math.cos(tbA) * size * 0.26, tbY + Math.sin(tbA) * size * 0.26,
+            size * 0.30, r * 0.06, dark);
+        }
+        break;
+      }
+
+      case "platform": {
+        // A BUILDABLE STUMP, and the flattest, cleanest top on the board --
+        // because that is the signal. Wide cut face, a bark rim a shade
+        // darker, and roots reaching out into the dirt so it is grown rather
+        // than dropped.
+        var pfH = size * 0.30;
+        lumpyMass(builder, cx, cy, r * 0.92, pfH, dark, 0, 2, 0.9, 400);
+        // The cut face: one clean disc, level, sitting just proud of the rim.
+        frustum(builder, cx, cy, r * 0.84, r * 0.82, size * 0.045, trim, pfH, 12);
+        // Growth rings, as two shallow inset discs.
+        frustum(builder, cx, cy, r * 0.52, r * 0.50, size * 0.012, dark, pfH + size * 0.045, 12);
+        frustum(builder, cx, cy, r * 0.22, r * 0.20, size * 0.010, trim, pfH + size * 0.055, 10);
+        for (var pr2 = 0; pr2 < 6; pr2++) {
+          var prA = pr2 * (Math.PI * 2 / 6) + wobble(cx, cy, 410 + pr2) * 0.6;
+          segment(builder, cx + Math.cos(prA) * r * 0.70, cy + Math.sin(prA) * r * 0.70,
+            size * 0.08,
+            cx + Math.cos(prA) * r * 1.25, cy + Math.sin(prA) * r * 1.25, 0,
+            r * 0.10, dark);
+        }
+        break;
+      }
+
+      case "house":
+        cabin(builder, cx, cy, size * 0.92, size * 0.72, size * 0.52, size * 0.42,
+          dark, body, ley, rot);
+        break;
+
+      case "workshop":
+        cabin(builder, cx, cy, size * 0.86, size * 0.86, size * 0.46, size * 0.34,
+          dark, body, ley, rot);
+        // A lean-to and a chimney, so it is not the same house again.
+        boxAt(builder, cx + Math.cos(rot + 1.6) * size * 0.52,
+          cy + Math.sin(rot + 1.6) * size * 0.52,
+          size * 0.34, size * 0.52, size * 0.30, body, 0, rot);
+        boxAt(builder, cx - size * 0.26, cy - size * 0.20,
+          size * 0.13, size * 0.13, size * 0.62, trim, size * 0.46, rot);
+        break;
+
+      case "storehouse":
+        cabin(builder, cx, cy, size * 1.24, size * 0.70, size * 0.58, size * 0.34,
+          dark, body, ley, rot);
+        // Barrels and crates stacked along the long wall.
+        for (var st = 0; st < 3; st++) {
+          frustum(builder, cx + (st - 1) * size * 0.34,
+            cy + Math.sin(rot) * size * 0.44 + size * 0.46,
+            size * 0.09, size * 0.09, size * 0.20, trim, 0, 8);
+        }
+        break;
+
+      case "townhall": {
+        // THE SETTLEMENT'S LANDMARK. Two storeys, a wider ground floor, a
+        // pitched roof and a bell tower over it -- the tallest thing west of
+        // the road, and the silhouette a player navigates by.
+        cabin(builder, cx, cy, size * 1.30, size * 1.00, size * 0.66, size * 0.46,
+          dark, body, ley, rot);
+        boxAt(builder, cx, cy, size * 0.98, size * 0.76, size * 0.42, dark,
+          size * 1.12, rot);
+        for (var th = 0; th < 4; th++) {
+          boxAt(builder, cx, cy, size * (0.94 - th * 0.20), size * (0.72 - th * 0.15),
+            size * 0.14, body, size * 1.54 + th * size * 0.12, rot);
+        }
+        // The bell tower and its lantern.
+        boxAt(builder, cx, cy, size * 0.30, size * 0.30, size * 0.62, dark,
+          size * 2.02, rot + 0.4);
+        sphere(builder, cx, cy, size * 0.13, ley, size * 2.52, 8, 6, EMI);
+        // A porch on the road side.
+        for (var pc = -1; pc <= 1; pc += 2) {
+          segment(builder, cx + Math.cos(rot) * size * 0.62 + pc * size * 0.34,
+            cy + Math.sin(rot) * size * 0.62, 0,
+            cx + Math.cos(rot) * size * 0.62 + pc * size * 0.34,
+            cy + Math.sin(rot) * size * 0.62, size * 0.52, size * 0.045, trim);
+        }
+        break;
+      }
+
+      case "palisade": {
+        // Mesh on posts with wire above. It refuses building and deliberately
+        // does NOT block sight -- a rifle shoots through mesh.
+        var plHalf = size / 2;
+        var plA = rot, plC = Math.cos(plA), plS = Math.sin(plA);
+        for (var po = 0; po <= 6; po++) {
+          var pt = -plHalf + size * po / 6;
+          segment(builder, cx + plC * pt, cy + plS * pt, 0,
+            cx + plC * pt, cy + plS * pt, size * 0.20, size * 0.016, dark);
+        }
+        // Two rails and the wire, thin so the fence reads as see-through.
+        for (var ra2 = 0; ra2 < 3; ra2++) {
+          segment(builder, cx - plC * plHalf, cy - plS * plHalf, size * (0.06 + ra2 * 0.07),
+            cx + plC * plHalf, cy + plS * plHalf, size * (0.06 + ra2 * 0.07),
+            size * 0.010, ra2 === 2 ? trim : body);
+        }
+        break;
+      }
+
+      case "gate":
+        // Closed, because leaked enemies are hammering on it. Two leaves, a
+        // frame and a brace.
+        for (var gl = -1; gl <= 1; gl += 2) {
+          boxAt(builder, cx, cy + gl * size * 0.30, size * 0.14, size * 0.56,
+            size * 0.62, body, 0, rot);
+        }
+        boxAt(builder, cx, cy, size * 0.20, size * 0.18, size * 0.78, dark, 0, rot);
+        for (var gp = -1; gp <= 1; gp += 2) {
+          boxAt(builder, cx, cy + gp * size * 0.62, size * 0.22, size * 0.22,
+            size * 0.86, dark, 0, rot);
+        }
+        break;
+
+      case "lantern":
+        segment(builder, cx, cy, 0, cx, cy, size * 1.5, size * 0.10, dark);
+        boxAt(builder, cx, cy, size * 0.44, size * 0.44, size * 0.40, body,
+          size * 1.5, rot);
+        sphere(builder, cx, cy, size * 0.22, ley, size * 1.70, 8, 6, EMI);
+        break;
+
+      case "depot": {
+        // THE MOBILE WAREHOUSE. Not a box: a hull with a chamfered nose, a
+        // ribbed roof, a stepped upper deck, a stack and a freight door with a
+        // lit interior behind it. The door is the brightest thing on this half
+        // of the board because that is where the enemies come from.
+        var dw = size * 0.62, dd = size * 0.46, dh = size * 0.52;
+        boxAt(builder, cx, cy, dw * 2, dd * 2, dh, dark, 0, rot);
+        // Chamfered nose, west-facing, built from two shrinking blocks.
+        for (var no = 0; no < 2; no++) {
+          boxAt(builder, cx - dw * (0.92 + no * 0.16), cy,
+            dw * 0.30, dd * (1.7 - no * 0.5), dh * (0.92 - no * 0.18), dark,
+            dh * (0.04 + no * 0.08), rot);
+        }
+        // Ribbed roof.
+        for (var rb = 0; rb < 7; rb++) {
+          boxAt(builder, cx - dw + (dw * 2) * (rb + 0.5) / 7, cy,
+            dw * 0.10, dd * 2.06, dh * 0.10, body, dh, rot);
+        }
+        // Stepped upper deck and a cab at the back.
+        boxAt(builder, cx + dw * 0.30, cy, dw * 0.90, dd * 1.30, dh * 0.42, dark,
+          dh * 1.06, rot);
+        boxAt(builder, cx + dw * 0.86, cy, dw * 0.34, dd * 0.80, dh * 0.34, body,
+          dh * 1.48, rot);
+        // THE FREIGHT DOOR: a recess in the west face, lit from inside.
+        boxAt(builder, cx - dw * 1.02, cy, dw * 0.10, dd * 0.86, dh * 0.72,
+          hex("#0a0806"), dh * 0.02, rot);
+        boxAt(builder, cx - dw * 0.96, cy, dw * 0.04, dd * 0.70, dh * 0.58,
+          ley, dh * 0.06, rot, EMI);
+        break;
+      }
+
+      case "depot-ramp": {
+        // The plate the enemies walk down, in three shallow steps so it meets
+        // the dirt instead of ending in mid-air.
+        for (var rp = 0; rp < 3; rp++) {
+          boxAt(builder, cx - size * (0.30 - rp * 0.30), cy,
+            size * 0.34, size * (0.86 + rp * 0.10), size * 0.10, body,
+            size * (0.26 - rp * 0.09), rot);
+        }
+        break;
+      }
+
+      case "wheel":
+        // COLOURS GO THROUGH hex(). Everything the builder is handed is a
+        // PARSED LINEAR TRIPLE, not a "#rrggbb" string -- the palette values
+        // this switch normally uses (dark, body, trim, ley) are already parsed.
+        // A raw string does not throw: it is read as an array-like, comes out
+        // as garbage, and these wheels rendered bright cyan on a black machine
+        // until it was spotted on screen.
+        //
+        // Running gear: a rim, a hub and spokes, lying in the wheel's plane.
+        frustum(builder, cx, cy, r * 0.96, r * 0.96, size * 0.34, hex("#141109"),
+          size * 0.02, 12);
+        frustum(builder, cx, cy, r * 0.42, r * 0.42, size * 0.40, body, 0, 10);
+        for (var sk = 0; sk < 6; sk++) {
+          var skA = sk * Math.PI / 3 + rot;
+          segment(builder, cx, cy, size * 0.20,
+            cx + Math.cos(skA) * r * 0.80, cy + Math.sin(skA) * r * 0.80,
+            size * 0.20, r * 0.07, body);
+        }
+        break;
+
+      case "exhaust":
+        frustum(builder, cx, cy, r * 0.44, r * 0.34, size * 1.5, body, 0, 8);
+        frustum(builder, cx, cy, r * 0.52, r * 0.52, size * 0.14, dark, size * 1.5, 8);
+        frustum(builder, cx, cy, r * 0.34, r * 0.34, size * 0.06, hex("#0b0906"),
+          size * 1.62, 8);
+        break;
+
+      case "floodlight":
+        // COLD AND HOSTILE, against the settlement's amber lanterns. Same
+        // fixture, opposite colour: the whole read of the board in one prop.
+        segment(builder, cx, cy, 0, cx, cy, size * 1.8, size * 0.09, dark);
+        boxAt(builder, cx, cy, size * 0.50, size * 0.34, size * 0.34, body,
+          size * 1.8, rot);
+        sphere(builder, cx - size * 0.22, cy, size * 0.18, hex("#ff5c40"),
+          size * 1.96, 8, 6, EMI);
+        break;
 
       case "tree":
         deadStem(builder, cx, cy, size, rot, dark, 2.1);
@@ -752,6 +1148,12 @@ var GLGeometry = (function () {
                     // reader of this list wants "what can a map ask for".
                     "tree", "snag", "stump", "log", "brush",
                     "barricade", "spikes", "sandbags", "watchtower", "wreck",
-                    "barrel", "fence"]
+                    "barrel", "fence",
+                    // Ironwood Frontier's own set -- see the WILD table.
+                    "ironwood", "deadfall", "fern", "mossrock",
+                    "boulder", "outcrop", "trunk", "platform",
+                    "house", "townhall", "storehouse", "workshop",
+                    "gate", "palisade", "lantern",
+                    "depot", "depot-ramp", "wheel", "exhaust", "floodlight"]
   };
 })();

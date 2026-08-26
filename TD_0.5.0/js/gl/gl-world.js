@@ -234,12 +234,28 @@ var World3D = (function () {
       // `gl.clearColor` writes straight into the framebuffer and never passes
       // through the shader's sRGB conversion -- handing it a linear triple
       // paints the void several stops darker than everything in front of it.
+      // `clear` is normally the background, which on the facility boards is
+      // the void OUTSIDE a deck floating in space -- correct there, because
+      // that is what those boards are.
+      //
+      // A BOARD WITH A HORIZON WANTS THE OPPOSITE. On an outdoor map the edge
+      // of the ground is not the edge of the world, it is distance, and a floor
+      // that fades toward one colour against a void of another draws a hard
+      // rectangle in mid-air: the board reads as a tray. Setting `horizon` puts
+      // the clear colour ON the mist, so ground, fog and sky are the same value
+      // at the far edge and the boundary disappears into haze.
       fog: t.fog ? {
         color: hex(t.fog.color, t.background || "#07090c"),
-        clear: displayHex(t.background || t.fog.color, "#07090c"),
+        clear: displayHex(t.horizon ? t.fog.color : (t.background || t.fog.color),
+                          "#07090c"),
         density: t.fog.density || 0,
         height: t.fog.height || 0
       } : null,
+      // How far past the play area the ground runs. The facility boards stop
+      // just outside it because their floor genuinely ends; an outdoor board
+      // has to run past anything the camera can see at any legal zoom, or the
+      // player orbits and finds the world's corner.
+      apron: typeof t.apron === "number" ? t.apron : 120,
       // A board that is not a facility does not get the facility's floor
       // seams. See where the grid is laid, below.
       wild: !!t.wild
@@ -260,10 +276,25 @@ var World3D = (function () {
     });
     // The board is the VIEW, not just the route: towers are placed all over it
     // and the 2D game has always drawn the full canvas rectangle.
-    minX = Math.min(minX - 120, 0);
-    minY = Math.min(minY - 120, 0);
-    maxX = Math.max(maxX + 120, typeof VIEW_WIDTH === "number" ? VIEW_WIDTH : 1280);
-    maxY = Math.max(maxY + 120, typeof VIEW_HEIGHT === "number" ? VIEW_HEIGHT : 720);
+    // THE PLAY AREA, which is what the camera frames and what the player may
+    // build on. Kept separate from the ground below, because the two answer
+    // different questions and conflating them is what put the whole board in
+    // the far distance the first time this was tried: the camera framed nine
+    // hundred units of empty apron and the clearing became a speck.
+    var playMinX = Math.min(minX - 120, 0);
+    var playMinY = Math.min(minY - 120, 0);
+    var playMaxX = Math.max(maxX + 120,
+      typeof VIEW_WIDTH === "number" ? VIEW_WIDTH : 1280);
+    var playMaxY = Math.max(maxY + 120,
+      typeof VIEW_HEIGHT === "number" ? VIEW_HEIGHT : 720);
+
+    // THE GROUND, which only has to run past anything the camera can see. It is
+    // scenery, never a bound: nothing is placed on it and nothing frames to it.
+    var apron = ul((P.apron || 120) / AUTHORED_PX_PER_UL);
+    minX = playMinX - apron;
+    minY = playMinY - apron;
+    maxX = playMaxX + apron;
+    maxY = playMaxY + apron;
 
     var g = new GLGeometry.Builder();
     GLGeometry.ground(g, minX, minY, maxX, maxY, 0, P.terrain);
@@ -346,9 +377,12 @@ var World3D = (function () {
         ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P);
     });
 
-    bounds = { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
-    heightField = buildHeightField(minX, minY, maxX, maxY, env, routePaths,
-      roadWidth);
+    // THE PLAY AREA, not the ground. `bounds` is what the camera frames and
+    // what it clamps panning to, so handing it the apron would let the player
+    // orbit out over empty forest and would open the run zoomed to a speck.
+    bounds = { minX: playMinX, minY: playMinY, maxX: playMaxX, maxY: playMaxY };
+    heightField = buildHeightField(playMinX, playMinY, playMaxX, playMaxY, env,
+      routePaths, roadWidth);
     return g.build(renderer);
   }
 
