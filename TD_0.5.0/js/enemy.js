@@ -113,6 +113,66 @@ function Enemy(path, health, typeId, overrides) {
   // gl-world.js::enemyModel swaps the mesh off both.
   this.shieldBroken = false;
 
+  // IS THE SHIELD DOWN RIGHT NOW, which is the OTHER question, and the two are
+  // not interchangeable in either direction.
+  //
+  // `shieldBroken` is one-way and permanent -- "this body has stood without its
+  // shield", the fact the Bulwark's stripped mesh depicts, and it stays true
+  // forever because what the Bulwark lost is not coming back. `shieldOut` goes
+  // false again the moment anything hands this body a shield, because the
+  // Vanguard's IS coming back: it shields ITSELF every seven seconds
+  // (`support.pick === "self"`), so its shield is a rhythm rather than an
+  // event, and a mesh swap keyed on the permanent flag would leave the fast
+  // boss in its wreckage for the rest of the run.
+  //
+  // NOT `shield <= 0` EITHER, and that is the trap on the other side. A body
+  // that has never been given a shield has an empty pool too -- the Vanguard
+  // spawns with `shieldMax` 0 and waits out its first seven seconds -- and it
+  // has not been broken, it has not arrived yet. Reading the pool would walk
+  // the boss onto the board already in pieces.
+  this.shieldOut = false;
+
+  // HOW LONG THE CURRENT GAP LASTS, captured when the shield goes, and it is a
+  // captured VALUE rather than a countdown of its own so that nothing has to
+  // tick it. `supportTimer` is already counting toward the pulse that will
+  // refill the pool; recording what it read at the break gives both ends of the
+  // window, and `shieldReformProgress` is then a division rather than a second
+  // clock that could drift from the first. Zero for every body that does not
+  // bring its own shield back.
+  this.shieldGapSeconds = 0;
+
+  // WHERE THE BOARD WAS WHEN IT WENT. Presentation reads this and the
+  // simulation never does: the shards a broken shield throws land on the ROAD
+  // and are left behind by a boss that does not stop, so the renderer needs the
+  // point they were thrown from and cannot reconstruct it from a body that has
+  // since run 500 u.l. down the map. Null until the first break.
+  this.shieldBreakAt = null;
+
+  // A BODY THAT SHIELDS ITSELF ARRIVES WITH IT UP (2026-08-26, at the owner's
+  // instruction: "he should also spawn in with his shield").
+  //
+  // `supportTimer` starts at a full interval, so a self-shielding type used to
+  // walk on bare and stand there for seven seconds before its own first pulse
+  // -- which reads as a boss that has forgotten its defining mechanic, and on
+  // the Vanguard it is worse than that: the opening sprint is 400 u.l. and at
+  // 175 u.l./s that is most of the window, so the ONE stretch of road where
+  // the shield matters most was the stretch it did not have one.
+  //
+  // THROUGH `grantShield`, NOT BY ASSIGNMENT, so the non-stacking rule and the
+  // `shieldMax` bookkeeping have exactly one implementation. The flash is put
+  // back to zero straight after: `shieldFlash` means "this body JUST gained a
+  // shield", and a body that arrived with one did not gain it in front of the
+  // player.
+  //
+  // ONLY FOR `pick: "self"`. A Shieldbearer's pulse is aimed at other bodies
+  // and hands out nothing at spawn; reading `support.shield` alone would have
+  // armoured every supporter with the plate it exists to give away.
+  var ownShield = type.support;
+  if (ownShield && ownShield.pick === "self" && ownShield.shield > 0) {
+    this.grantShield(ownShield.shield, ownShield.stacks !== false);
+    this.shieldFlash = 0;
+  }
+
   // What happens when that shield empties, if anything. Read off the instance
   // rather than the type for the same reason: a shield that came from a spawn
   // has no type row to look it up in.
@@ -983,31 +1043,35 @@ Enemy.TYPES = {
     outlineWidth: 4.5,
     sizeScale: 1.45,
     laneSpread: 0.25,
-    // IT DOES NOT WALK, AND THAT IS A PICTURE, NOT A RULE.
+    // IT FLIES (2026-08-26, at the owner's instruction: "make the healer a
+    // flying unit"), AND THAT IS A TARGETING FACT BEFORE IT IS A HEIGHT.
     //
-    // `hover` lifts the body off the road and hands its animation a CLOCK
-    // instead of the distance every walker's cycle is driven by. Both boards
-    // read `liftRadii` -- see Enemy.prototype.visualBodyLift, which is the one
-    // place the number is turned into pixels -- and the 3D board reads
-    // `animHz` for the drift rate, because a thing with nothing planted on the
-    // road has to keep turning while it is slowed, while a Warbringer stun
-    // holds it still, and while it hangs in the sandbox with no path at all.
+    // This row carried a `hover` block and an explicit argument for why it was
+    // NOT `isFlying`: hover is only a picture, every ground tower could still
+    // shoot a Healer, and killing it first was the whole lesson of wave 32.
+    // That ruling is REVERSED, not qualified. `isFlying` is read by
+    // Targeting.sees and by RangeFilter, both of which fail closed, so the
+    // Healer is now answerable only by a tower with air reach -- the Arcane
+    // Sniper, which has it at base, and the Warbringer once its beam path buys
+    // it. The lesson of wave 32 becomes the Aether Wisp's lesson applied to a
+    // body that heals: bring air reach or watch it undo your damage.
     //
-    // IT IS NOT `isFlying`, AND THE TWO MUST NEVER BE CONFLATED. `isFlying` is
-    // a TARGETING fact -- Targeting.sees and RangeFilter both fail closed on it,
-    // so a tower without air reach cannot touch a flier -- and the height is
-    // merely how that fact is drawn. This is only the height. A Healer is a
-    // ground target, every tower can shoot it, and killing it first is the
-    // whole lesson of wave 32; a body that floated its way out of half the
-    // board's reach would be a different enemy entirely.
+    // THE `hover` BLOCK IS DELETED RATHER THAN LEFT BESIDE IT. Every reader
+    // takes the flying branch FIRST -- `visualBodyLift` here,
+    // `bodyLift` and `clockRate` in gl-world.js -- so a surviving `hover` would
+    // have been a declaration nothing reads, sitting next to a comment
+    // explaining why the thing it declares is deliberately not the other thing.
+    // Height now comes from `Enemy.FLIGHT_LIFT_RADII` and the drift rate from
+    // the flier's own `HOVER_HZ`, which is the same pair the Wisp uses.
     //
-    // 1.25 radii is 20 px of clearance under a 16 px radius, a little over a
-    // quarter of the body's own 65 px height. The Wisp's 3.45 is air; this is a
-    // thing drifting a foot above the tarmac, which is what "floats slightly"
-    // asks for. 0.32 Hz turns its rings once every three seconds -- slow enough
-    // to read as drifting rather than spinning, and deliberately nothing like
-    // the Wisp's 2.6 Hz wingbeat.
-    hover: { liftRadii: 1.25, animHz: 0.32 },
+    // `tools/check-gait-slip.js` needs no edit: `enemy-healer` is on its
+    // `HOVERS` table already, and that table is about "this body's frames are
+    // clock-driven", which is as true of a flier as it was of a hoverer.
+    //
+    // (The deleted block was `{ liftRadii: 1.25, animHz: 0.32 }` -- 20 px of
+    // clearance under a 16 px radius, "a thing drifting a foot above the
+    // tarmac". It now rides the Wisp's 3.45 radii, which is air.)
+    isFlying: true,
     support: {
       intervalSeconds: 8,
       targets: 3,
@@ -1705,6 +1769,24 @@ Enemy.prototype.supportCandidates = function (spec, enemies) {
     // shielding it would be the same wasted work as a bullet landing on a
     // corpse.
     if (e.dead || e.leaked) continue;
+    // A SUPPORTER DOES NOT PICK ITSELF (2026-08-26, at the owner's
+    // instruction: "the shieldbearer should not shield himself").
+    //
+    // It used to, and on the Shieldbearer it did so reliably rather than
+    // occasionally: `pick: "strongest"` sorts on life still standing, the
+    // beacon has 60 HP against a swarm's 1 and a normal's 4, and its own
+    // stacking plate makes it the strongest body on the board by a wider
+    // margin after every pulse it fires. So one of its ten plates went on
+    // itself every ten seconds, compounding, and the support type designed to
+    // make everything ELSE expensive was quietly the hardest thing to remove.
+    //
+    // THIS IS THE `supportCandidates` PATH ONLY, WHICH IS THE WHOLE OF WHAT
+    // "does not shield himself" CAN MEAN HERE. `pick: "self"` does not come
+    // through this function at all -- `supportAllies` short-circuits to
+    // `[this]` -- so the Vanguard, whose entire mechanic is shielding itself,
+    // is untouched. A supporter aimed at others now never lands on itself, and
+    // one aimed at itself still does.
+    if (e === this) continue;
     if (reachPx !== Infinity) {
       var dx = e.pos.x - this.pos.x;
       var dy = e.pos.y - this.pos.y;
@@ -1803,6 +1885,11 @@ Enemy.prototype.grantShield = function (amount, stacks) {
     if (this.shield < amount) this.shield = amount;
   }
   this.shieldFlash = 1;
+  // THE GAP IS OVER, whoever closed it. A Shieldbearer's plate ends a
+  // Vanguard's reform exactly as its own pulse does -- the body has a shield
+  // again, which is the whole of what this flag claims. `shieldBroken` is
+  // deliberately NOT cleared here; see the field for why the two differ.
+  this.shieldOut = false;
 };
 
 // Put regeneration on this enemy: `perSecond` HP for `seconds`, ticked by its
@@ -2426,16 +2513,47 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
     effective *= DamageAmp.multiplier(this);
   }
 
-  // The shield soaks first, and a hit bigger than what is left SPILLS THROUGH
-  // into health. Stopping the spill at the shell would waste the overflow of
-  // every heavy weapon, which is the same "bullets landing on corpses" waste
-  // target claiming exists to prevent -- see AGENTS.md.
+  // A SHIELD ABSORBS THE WHOLE BLOW. NOTHING SPILLS THROUGH.
+  //
+  // 2026-08-26, at the owner's instruction: *"for any shielded enemy, the
+  // shield should absorb all damage, for example if a enemy has 100 HP and 10
+  // shield and gets hit for 200 damage, the shield breaks because it is
+  // inferior to 200 but nothing happens to the health."* One hit takes at most
+  // one layer: it empties the shield, and the overflow is DISCARDED.
+  //
+  // THIS REVERSES A RULE, and the rule it reverses had a real argument behind
+  // it that is worth keeping written down: stopping the spill at the shell
+  // wastes the overflow of every heavy weapon, which is the same "bullets
+  // landing on corpses" waste that target claiming exists to prevent. That is
+  // still true. It is now the POINT -- a shield is worth a whole shot rather
+  // than its own thickness, so the answer to a shielded wave is many cheap hits
+  // and not one expensive one, and the heaviest single-target weapon on the
+  // board is the worst tool for it.
+  //
+  // WHAT IT DOES *NOT* CHANGE, and each of these is a thing a reader will
+  // assume moved with it:
+  //
+  //   * A SHIELD STILL PAYS NOTHING. `soaked` is reported in
+  //     `lastDamageTaken` (the scoreboard measures work performed) and never
+  //     in `dealt` (what reward mechanics read). Unchanged, and see the
+  //     "A SHIELD PAYS NOTHING, EVER" section in AGENTS.md.
+  //   * EFFECTIVE HP IS UNCHANGED. `waveEffectiveHealth` counts a shield as
+  //     health the player must remove, and it still must be removed -- what
+  //     changed is how many shots that takes, not how many points it is.
+  //   * IT IS NOT A DAMAGE CAP. A body with no shield takes the full blow, and
+  //     a body whose shield emptied on an earlier hit takes the next one in
+  //     full. Only the hit that BREAKS the shell is absorbed by it.
+  //
+  // `breakShield` still fires on the same frame, so the Bulwark still doubles
+  // its speed and the Vanguard still throws its fragments onto the road at the
+  // moment the pool empties.
   var incoming = effective;
   var soaked = 0;
   if (this.shield > 0) {
     soaked = Math.min(this.shield, incoming);
     this.shield -= soaked;
-    incoming -= soaked;
+    // The whole blow stops here, whatever was left of it.
+    incoming = 0;
     if (this.shield <= 0) {
       this.shield = 0;
       this.breakShield();
@@ -2508,6 +2626,26 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
 // this function.
 Enemy.prototype.breakShield = function () {
   this.shieldFlash = 1;
+  // THE GAP OPENS HERE, and both of its ends are recorded in one place so they
+  // cannot describe different windows. `supportTimer` is the time left until
+  // this body's own pulse, so it IS the length of the gap -- for a body that
+  // shields itself. For anything else the gap has no end this class knows
+  // about (a Bulwark's shield never returns unless a Shieldbearer decides so),
+  // and a zero says exactly that rather than inviting a division.
+  this.shieldOut = true;
+  var own = this.type.support;
+  this.shieldGapSeconds =
+    (own && own.pick === "self" && own.shield > 0) ? this.supportTimer : 0;
+  // The heading, not the path, for the reason Enemy.prototype.draw's wake
+  // gives: the index screen parks a body at a card position with `progress`
+  // still 0, and anything derived from the path there is a line running off to
+  // the mouth of the road. A body with no path at all breaks facing +x.
+  var heading = (this.path && this.path.tangentAt)
+    ? this.path.tangentAt(this.progress) : null;
+  this.shieldBreakAt = {
+    x: this.pos.x, y: this.pos.y,
+    yaw: heading ? Math.atan2(heading.y, heading.x) : 0
+  };
   // BEFORE the early return below, and outside it: "this body has stood without
   // its shield" is true of every shielded body whose pool has emptied, not only
   // of the ones whose type has something to say about it. A Hive's brood breaks
@@ -2516,6 +2654,30 @@ Enemy.prototype.breakShield = function () {
   var onBreak = this.shieldOnBreak;
   if (!onBreak) return;
   if (onBreak.speedMultiplier) this.speedScale *= onBreak.speedMultiplier;
+};
+
+// HOW FAR THROUGH ITS SHIELD'S ABSENCE THIS BODY IS, as 0 -> 1, or -1 when
+// there is no absence to be through.
+//
+// PRESENTATION ONLY. Nothing in the simulation reads it and nothing should:
+// the shield is back when `supportAllies` says so, and this is the renderer's
+// way of asking how close that is without knowing anything about support
+// timers. The Vanguard's shattered mesh throws its shield fragments onto the
+// road, lets them lie, and pulls them home again, and all three phases are
+// shares of THIS number -- so the fragments cannot finish reassembling early or
+// late, whatever the gap turns out to be. (The owner's brief is written against
+// the full seven: "stay there for 3 seconds, then in the last 4 seconds, they
+// start flying back". A break two seconds before the pulse gets the same
+// picture in two seconds rather than a picture that lies about when the shield
+// returns.)
+//
+// -1 AND NOT NULL, BECAUSE 0 IS A REAL ANSWER -- it is the frame the shield
+// went -- and a caller writing `if (!t)` on a null would have thrown that frame
+// away along with the nothing-to-draw case.
+Enemy.prototype.shieldReformProgress = function () {
+  if (!this.shieldOut || !(this.shieldGapSeconds > 0)) return -1;
+  var left = Math.max(0, Math.min(this.shieldGapSeconds, this.supportTimer));
+  return 1 - left / this.shieldGapSeconds;
 };
 
 // Has this enemy crossed a health threshold that changes what it is?

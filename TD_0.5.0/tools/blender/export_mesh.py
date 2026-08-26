@@ -622,12 +622,28 @@ TARGETS = [
     # sealed cage was not widened. Six legs are an alternating tripod, which is
     # TWO antiphase groups, so `animate_walk_grouped` carried it unchanged.
     ("enemy-colossus", "enemy-colossus.js", _build_enemy("enemy_dray")),
-    # THE FIRST BODY WHOSE SWING ANGLE IS SOLVED RATHER THAN AUTHORED. The
-    # Vanguard runs `gait_solve` at build time against its own leg length, so
-    # its planted foot travels the stride instead of inheriting the chassis's
-    # fixed 28 degrees. Its build therefore prints two gait lines; that output
-    # is the record of the solve and is not noise.
-    ("enemy-boss_fast", "enemy-boss_fast.js", _build_enemy("enemy_vanguard")),
+    # enemy-boss_fast IS NOT EXPORTED FROM HERE ANY MORE (2026-08-26), the SIXTH
+    # time this trap has been disarmed -- the Skimmer, the Tender, the Tun, the
+    # Tyrant, the Courier, and now the Vanguard. The fast boss is
+    # `vanguard.glb`, imported by `tools/glb_to_model.py --rig vanguard`, and
+    # this row used to build the chassis Vanguard into the same filename:
+    # identical id, identical filename, identical contract, so whichever ran
+    # last would have won in silence. That is the rule in the block above the
+    # Tyrant's, sprung once more.
+    #
+    # `enemy_vanguard.py` is KEPT, and for a reason that has nothing to do with
+    # this row. It was THE FIRST BODY WHOSE SWING ANGLE WAS SOLVED RATHER THAN
+    # AUTHORED -- it runs `gait_solve` at build time against its own leg length
+    # -- and `check_group_gait.py`'s notes are written against exactly that.
+    # It no longer owns a shipped file.
+    #
+    # AND THE PREFIX HAZARD IS BACK, IN THE OTHER DIRECTION. `enemy-boss_fast`
+    # is now a prefix of the imported `enemy-boss_fast-shattered`. Neither has a
+    # row here, so `_requested()` cannot be the thing that goes wrong -- but a
+    # future `--only=enemy-boss_fast` typed at glb_to_model.py, or any batch
+    # tool that grows a prefix match, has two files to hit and must name the one
+    # it means. The importer takes an exact `--name` and no prefix at all, which
+    # is why this is a note and not a defect.
     # THE TYRANT, the wave-35 boss the whole campaign ends on. A container with
     # legs: no head, no face, no lens, a rank of THREE ordinary cargo cages,
     # and two big triangular plates apex DOWN -- the Vanguard's blade inverted,

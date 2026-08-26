@@ -82,7 +82,16 @@ var BASELINE = [
     // repaired, because Normal and Hard were deleted as unfinished placeholders.
     // A suite getting SMALLER reads as loss on a totals diff, so it is written
     // down here as a deliberate removal.
-    file: "tests/run.js", pass: 108, fail: 0,
+    // 112 on 2026-08-26, from 108: FOUR tests added with the Vanguard's import.
+    // Each one pins a failure that draws a plausible picture rather than
+    // throwing -- a band that is never selected (the boss walks, in the wrong
+    // gait), a variant flag that latches (the boss stays in pieces for the rest
+    // of the run), a reform that finishes at the wrong moment, and a shield
+    // fragment welded into the torso. Self-tested by mutation: emptying
+    // `ENEMY_GAIT_BAND` and dropping the `shieldOut = false` line in
+    // `grantShield` turns three of them red; dropping `model.positions` in
+    // gl-models turns the fourth red. Green again on restore.
+    file: "tests/run.js", pass: 112, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
@@ -107,6 +116,21 @@ var BASELINE = [
     //     12 s interval.
     //   - the stunned tower passed spawnAt a converted PIXEL value where it
     //     takes a path progress, parking the enemy 307 px from a 104 px reach.
+    //
+    // 219/0 on 2026-08-26: +2 for the forest board. One pins the board's own
+    // contract -- that it declares weather and wildness, that every camp prop
+    // it names is a kind the geometry can actually build (a rename in the
+    // scenery switch would otherwise turn every barricade into the default
+    // block, silently), and that its ground patches are the flat kind rather
+    // than slabs, which is the only thing on that board that could reach
+    // gameplay. The other covers the half of the chooser's new layout that
+    // nothing else does: rows that hold different numbers of cards, each
+    // centred on its own contents, must not land on top of one another. The
+    // seventh map's row running off the bottom of the canvas was already
+    // caught by the hit-test check next door -- self-tested by restoring the
+    // fixed-size grid, which goes red on card 6 in BOTH -- so this one pins
+    // overlap and the room left for the line under the grid, and does not
+    // repeat the fit.
     //
     // 217/0 on 2026-08-20: +1 for the Fractal Slime's tier ladder reaching the
     // schedule. The campaign sent one rung of the six while the index printed
@@ -157,7 +181,7 @@ var BASELINE = [
     //     `inspected` instead of the `tower` it is handed, so the two callers
     //     that never set the global indexed with -1 and handed `buyUpgrade`
     //     an undefined tower. It now upgrades its own argument.
-    file: "tests/content.test.js", pass: 217, fail: 0,
+    file: "tests/content.test.js", pass: 219, fail: 0,
     failing: []
   },
   {

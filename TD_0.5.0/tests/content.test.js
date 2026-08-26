@@ -435,16 +435,19 @@ test("the Shieldbearer stacks 20 of shield onto the ten strongest", function (t)
   // The timer starts FULL -- no free pulse the instant it walks in.
   t.eq(bearer.supportAllies(9.9, board), null, "nothing before the ten seconds");
 
-  // The bearer itself is the biggest body on that board, so it is one of the
-  // ten -- support is not aimed at "somebody else", it is aimed at the
-  // strongest, and it happens to be one of them.
+  // IT NEVER PICKS ITSELF (2026-08-26). It is the biggest body on that board
+  // by a distance -- 60 HP against a normal's 50 -- so "the ten strongest"
+  // would put a plate on it every pulse, compounding, and the type that exists
+  // to make everything ELSE expensive would be the hardest thing to remove.
   var helped = bearer.supportAllies(0.2, board);
   t.eq(helped.length, 10, "then exactly ten are shielded");
-  t.eq(helped[0], bearer, "itself first, being the toughest thing there");
+  t.ok(helped.indexOf(bearer) === -1, "and the bearer is not one of them");
+  t.eq(bearer.shield, 0, "it carries none of its own");
   t.eq(board[1].shield, 20, "the strongest normal gets 20");
   t.eq(board[1].shieldMax, 20, "and the bar grows to match");
-  t.eq(board[9].shield, 20, "so does the tenth pick");
-  t.eq(board[10].shield, 0, "the eleventh gets nothing");
+  t.eq(board[10].shield, 20,
+    "the tenth pick now reaches one body further down the board");
+  t.eq(board[11].shield, 0, "the eleventh gets nothing");
   t.eq(board[12].shield, 0, "nor the weakest");
 
   // STACKING, at the owner's request. The second pulse adds rather than
@@ -455,6 +458,8 @@ test("the Shieldbearer stacks 20 of shield onto the ten strongest", function (t)
   t.eq(board[1].shieldMax, 40, "bar and all");
 
   // And every point of it is free work for the player.
+  // ONE HIT PER LAYER since 2026-08-26: 40 empties the shell and stops there,
+  // so it takes a SECOND blow to reach the body underneath.
   t.eq(board[1].takeDamage(40), 0, "chewing all forty of it pays nothing");
   t.eq(board[1].health, 50, "with the body untouched underneath");
 });
@@ -604,42 +609,44 @@ test("the Shieldbearer throws a bowed cord and a stream of plates at each " +
   t.ok(mob[0].shield > 0, "while the shield they delivered stays");
 });
 
-test("the Healer hovers, and hovering is a height and not a targeting rule", function (t) {
+test("the Healer FLIES, which is a targeting rule and not just a height", function (t) {
   var h = harness.boot();
   var Enemy = h.game.Enemy;
   var healer = new Enemy(h.game.path, undefined, "healer");
   var walker = new Enemy(h.game.path, undefined, "normal");
   var flier = new Enemy(h.game.path, undefined, "flying");
 
-  // THE THREE HEIGHTS, in the order they must be in: a walker is lifted just
-  // off its own shadow, the Healer drifts above the road, and the Wisp is in
-  // the air. All three come out of one function so the 2D board, the 3D board,
-  // the wreck and the shots cannot disagree about where a body is.
+  // TWO HEIGHTS NOW, NOT THREE. The Healer carried a `hover` block and rode
+  // 1.25 radii until 2026-08-26; it is a flier, so it rides the Wisp's lift
+  // out of the same constant, and there is no third number.
   t.near(walker.visualBodyLift(),
     walker.radiusPx() * Enemy.GROUND_LIFT_RADII, 1e-9, "a walker rides its ground lift");
-  t.near(healer.visualBodyLift(), healer.radiusPx() * 1.25, 1e-9,
-    "the Healer rides its type's own hover");
+  t.near(healer.visualBodyLift(),
+    healer.radiusPx() * Enemy.FLIGHT_LIFT_RADII, 1e-9, "the Healer rides the flight lift");
   t.near(flier.visualBodyLift(),
-    flier.radiusPx() * Enemy.FLIGHT_LIFT_RADII, 1e-9, "and the Wisp its flight lift");
+    flier.radiusPx() * Enemy.FLIGHT_LIFT_RADII, 1e-9, "and so does the Wisp");
   t.ok(healer.visualBodyLift() > walker.visualBodyLift(),
-    "the Healer is off the road");
-  t.ok(healer.visualBodyLift() < flier.visualBodyLift(),
-    "and nowhere near as high as the thing that flies");
+    "both are well off the road");
 
-  // AND THE ASSERTION THE WHOLE DISTINCTION EXISTS FOR. A hovering body is a
-  // GROUND target: every tower can shoot it, and a board with no air reach
-  // still answers wave 32. Conflating the two would have quietly given the
-  // Healer the Wisp's immunity, which nothing on screen would have shown.
-  t.eq(healer.isFlying, false, "hovering is not flying");
+  // AND THE ASSERTION THAT IS THE WHOLE OF THE CHANGE. This test asserted the
+  // OPPOSITE until 2026-08-26 -- "a tower without air reach can shoot it" --
+  // and the reversal is the owner's: "make the healer a flying unit". A board
+  // with no air reach can no longer answer wave 32 at all.
+  t.eq(healer.isFlying, true, "the Healer flies");
   var Targeting = h.game.Targeting;
   var ground = { seesFlying: false, rangePx: 10000, x: healer.pos.x, y: healer.pos.y,
     stats: { seesFlying: false } };
-  t.eq(Targeting.sees(ground, healer), true, "a tower without air reach can shoot it");
-  t.eq(Targeting.sees(ground, flier), false, "and still cannot shoot the Wisp");
+  t.eq(Targeting.sees(ground, healer), false,
+    "so a tower without air reach cannot touch it");
+  t.eq(Targeting.sees(ground, flier), false, "any more than it can the Wisp");
+  var air = { seesFlying: true, rangePx: 10000, x: healer.pos.x, y: healer.pos.y,
+    stats: { seesFlying: true } };
+  t.eq(Targeting.sees(air, healer), true, "and one with air reach still can");
 
-  // The drift rate is the type's, and it is nothing like a wingbeat.
-  t.eq(Enemy.typeOf("healer").hover.animHz, 0.32, "its rings turn once every ~3 s");
-  t.eq(Enemy.typeOf("normal").hover, undefined, "and a walker authors no hover at all");
+  // THE DEAD DECLARATION IS GONE, not left beside the flag that overrides it.
+  t.eq(Enemy.typeOf("healer").hover, undefined,
+    "the hover block was deleted, since every reader takes the flying branch first");
+  t.eq(Enemy.typeOf("normal").hover, undefined, "and a walker authors none either");
 });
 
 test("the fast boss sprints the first 400 u.l. and reshields without stacking", function (t) {
@@ -714,7 +721,8 @@ test("the support hook runs from the real main loop", function (t) {
   t.eq(mark.shield, 0, "unshielded before the pulse");
   h.step(0.2);
   t.eq(mark.shield, 20, "the loop pulsed the Shieldbearer");
-  t.ok(bearer.shield > 0, "and it shielded itself too, being one of the strongest");
+  t.eq(bearer.shield, 0,
+    "and kept none of it -- a supporter aimed at others never picks itself");
 });
 
 
@@ -1272,16 +1280,31 @@ test("a shield is sized off the enemy's OWN health, and soaks before it", functi
   t.eq(stock.shield, 14, "and comes off the shield");
   t.eq(stock.health, 12, "health untouched");
 
-  // A hit bigger than what is left SPILLS THROUGH. Stopping at the shell would
-  // waste the overflow of every heavy weapon. Only the part that reaches
-  // health pays: fourteen of the twenty is shield, six is health, so six.
-  t.eq(stock.takeDamage(20), 6, "a twenty spills through and pays only the six");
+  // A HIT BIGGER THAN WHAT IS LEFT IS ABSORBED WHOLE, AND THIS TEST ASSERTED
+  // THE OPPOSITE UNTIL 2026-08-26. The owner's rule: "if a enemy has 100 HP and
+  // 10 shield and gets hit for 200 damage, the shield breaks because it is
+  // inferior to 200 but nothing happens to the health." So a twenty against
+  // fourteen of shell empties the shell and stops there -- it does not pay,
+  // because a shield never pays, and it does not reach the body either.
+  t.eq(stock.takeDamage(20), 0, "a twenty empties the shell and pays nothing");
   t.eq(stock.shield, 0, "shield gone");
-  t.eq(stock.health, 6, "and six came off health");
+  t.eq(stock.health, 12, "and the body is untouched -- nothing spilled through");
 
-  // Overkill still does not pay: 6 left, hit for 50, paid 6.
-  t.eq(stock.takeDamage(50), 6, "overkill pays only what was there");
+  // ONE HIT PER LAYER, NOT A DAMAGE CAP. The shell is gone now, so the NEXT
+  // blow lands in full.
+  t.eq(stock.takeDamage(5), 5, "the next blow reaches health");
+  t.eq(stock.health, 7, "which is now seven");
+
+  // Overkill still does not pay: 7 left, hit for 50, paid 7.
+  t.eq(stock.takeDamage(50), 7, "overkill pays only what was there");
   t.eq(stock.dead, true, "and it is dead");
+
+  // AND THE OWNER'S OWN EXAMPLE, spelled out on a body with his figures.
+  var quoted = new Enemy(h.game.path, 100, "normal");
+  quoted.grantShield(10, false);
+  t.eq(quoted.takeDamage(200), 0, "200 into 10 of shield pays nothing");
+  t.eq(quoted.shield, 0, "the shield breaks, being inferior to 200");
+  t.eq(quoted.health, 100, "and nothing happens to the health");
 });
 
 test("breaking a Bulwark's shield doubles its speed", function (t) {
@@ -6027,7 +6050,80 @@ test("every map carries and renders a full non-gameplay sci-fi environment", fun
       map.id + " scenery never mutates its routes");
   });
   t.eq(h.game.environmentDraws, h.game.Maps.LIST.length,
-    "the gameplay renderer paints the full environment on all six maps");
+    "the gameplay renderer paints the full environment on all seven maps");
+});
+
+test("the forest board is scenery, not gameplay, and its patches stay flat", function (t) {
+  var h = harness.boot();
+  var Maps = h.game.Maps;
+  var forest = Maps.byId("test");
+
+  // The theme is where the whole board's difference lives, so it is the thing
+  // that has to be there. `wild` turns off the manufactured floor -- the panel
+  // grid and the circuit trunks -- in BOTH renderers, and `fog` is read by the
+  // 3D board and washed over the 2D one.
+  t.eq(forest.theme.wild, true, "the forest declares itself wild");
+  t.ok(forest.theme.fog && forest.theme.fog.density > 0,
+    "and it declares weather with a real density");
+  t.ok(forest.theme.fog.height > 0,
+    "with a bank height, so the mist lies on the floor rather than filling the air");
+
+  // The camp is the point of the board, so it is worth pinning that it is
+  // actually on it -- a rename in gl-geometry's scenery switch would otherwise
+  // silently turn every barricade into the default block.
+  var kinds = {};
+  forest.models.forEach(function (m) { kinds[m.kind] = (kinds[m.kind] || 0) + 1; });
+  ["tree", "barricade", "spikes", "sandbags", "watchtower", "barrel"]
+    .forEach(function (kind) {
+      t.ok(kinds[kind] > 0, "the forest has at least one " + kind);
+      t.ok(h.game.GLGeometry.SCENERY_KINDS.indexOf(kind) >= 0,
+        kind + " is a kind the geometry knows how to build");
+    });
+  t.ok(kinds.tree >= 20, "and a treeline rather than a few specimens: " + kinds.tree);
+
+  // THE ONE THING ON THIS BOARD THAT COULD REACH GAMEPLAY. Every other zone
+  // kind is a raised slab, and `World3D.levelUnder` refuses a tower that
+  // straddles a slab edge -- so a `dirt` patch built as a slab would be an
+  // invisible no-build ring in the middle of open ground. It is authored at
+  // height zero for exactly that reason.
+  t.ok(forest.zones.filter(function (z) { return z.kind === "dirt"; }).length > 0,
+    "the forest uses flat ground patches");
+
+  // And the same guarantee the other six get: scenery never touches the route.
+  var before = JSON.stringify(Maps.routesOf(forest));
+  h.run("startRun(Maps.byId('test'))");
+  h.draw();
+  t.eq(JSON.stringify(Maps.routesOf(forest)), before,
+    "the forest's scenery never mutates its route");
+  t.eq(h.game.paths.length, 1, "one entrance");
+});
+
+test("the map grid fits its canvas and no two cards overlap", function (t) {
+  var h = harness.boot(null);
+  var rects = [];
+
+  // The per-card fit is already pinned next door, by the hit-test check. What
+  // is NOT covered there is what the seventh route introduced: rows that hold
+  // different numbers of cards, each centred on its own contents. Get that
+  // arithmetic wrong and the short row lands ON the row above it -- both cards
+  // still inside the canvas, both hit tests still agreeing with themselves,
+  // and two routes stacked on one another.
+  for (var i = 0; i < h.game.Maps.LIST.length; i++) {
+    var r = h.game.mapCardRect(i);
+    for (var j = 0; j < rects.length; j++) {
+      var q = rects[j];
+      t.ok(r.x >= q.x + q.w || q.x >= r.x + r.w ||
+           r.y >= q.y + q.h || q.y >= r.y + r.h,
+        "card " + i + " clears card " + j);
+    }
+    rects.push(r);
+  }
+
+  // The "click a route or press 1 - N" line hangs off the bottom of the grid,
+  // so the grid has to leave room for it -- and the grid is the thing that
+  // grows when a route is added.
+  t.ok(h.game.mapGridBottom() + 24 < h.game.VIEW_HEIGHT,
+    "the grid leaves room for the line under it");
 });
 
 test("the title screen renders its command deck and four dedicated controls", function (t) {

@@ -131,6 +131,29 @@ var GLModels = (function () {
       ? GLParts.split(model.name, model, arrays) : 0;
     arrays.hasEmissive = maxEmit > 0;
     model.expanded = arrays;
+    // THE VERTEX POSITIONS, ON THE MODEL, WHERE EVERY READER ALREADY LOOKS FOR
+    // THEM -- and they were not there.
+    //
+    // `get()` hands back this object, and two callers in gl-world.js read
+    // `m.positions` off it: `bodyExtentRadii`, which sizes the translucent
+    // shield shell, and the Vanguard's `shardsOf`, which measures where each
+    // loose shield fragment sits. The field never existed. `expand` built the
+    // array, stored it under `expanded`, and nulled `raw` -- so `m.positions`
+    // was `undefined` on every model in the library.
+    //
+    // IT FAILED IN THE TWO OPPOSITE WAYS ONE MISSING FIELD CAN. `bodyExtentRadii`
+    // guards with `if (!m.positions) return null` and its caller has a
+    // fallback, so every shield bubble in the game has been drawn at the
+    // stand-in size meant for bodies with NO MESH AT ALL -- 1.0 plan radii and
+    // 2.2 top -- while thirty lines of comment beside it explain how the
+    // measurement is cached per model. Nothing threw, nothing was reported, and
+    // the sphere-sized bubble on a Bulwark looked deliberate. `shardsOf` has no
+    // fallback and threw on the first frame, which is the only reason this was
+    // found at all.
+    //
+    // Assigned here rather than at `register` because the array does not exist
+    // until `expand` runs, and `get()` always runs it.
+    model.positions = arrays.positions;
     // The compact source is dead weight once expanded, and these are the
     // largest objects on the page.
     model.raw = null;

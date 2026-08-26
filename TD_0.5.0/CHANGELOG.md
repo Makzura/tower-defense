@@ -13,6 +13,550 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-26 — A seventh map, `test`: a dead forest on black dirt, with fog,
+and a human camp dug in at the end of the road.**
+
+At the owner's instruction: *"add a map. this map will be called test for now.
+it is an eerie apocalyptic forest with black dirt and tree stems, add some fog
+aswell ... the end goal is the start to a human camp, meaning add some barriers
+to make it look as if the humans were defending. think along the lines of the
+walking dead."*
+
+The route is authored, six right-angle turns, 2 154 u.l., and measures out at
+0.79 — normal, which nobody typed: it is what `Maps.analyse` says about the
+geometry. Nothing about the forest is read by the measurement. The camp is a
+picture, and the same route drawn across bare floor would score the same.
+
+**THE THREE THINGS THIS BOARD NEEDED THAT THE ENGINE DID NOT HAVE.**
+
+*Fog.* There was no fog anywhere in the renderer. It is now two uniforms in the
+one shader, mixed **in linear light before the sRGB conversion** — mist is light
+scattered on the way to the eye, not paint on the surface, and mixing it after
+the curve washes the dark end out exactly the way multiplying an sRGB colour by
+a light term did (the same mistake this project already made once, and the
+reason the shader converts where it does). Depth comes from `gl_Position.w`,
+which a perspective projection has already computed, so it costs a varying and
+no matrix. A second term thins the fog with height over an e-fold, so the bank
+buries a barricade and the tops of the stems stand out of it — which is what
+makes it read as weather rather than as a dimmer.
+
+Density 0 is clear air, it is what `GLRenderer.begin` restores every frame, and
+it is what every other board runs at. Rune Circuit was re-rendered after the
+change and is unchanged.
+
+**The density is MEASURED, and the first number was wrong by a factor of two
+and a half.** 0.00048 looked plausible and produced a board reading (41,43,37)
+against a (43,46,39) mist — eighty-eight per cent fogged, which is not weather,
+it is a white sheet with a road printed on it. The view depth across this board
+is about 3 000 units; 0.00019 puts the near edge near a fifth fogged and the far
+edge near a third. Read off the framebuffer with `readPixels`, not judged from a
+screenshot — per the rule at the top of AGENTS.md.
+
+The same measurement killed the first version of the clear colour. It cleared to
+the FOG's colour, on the theory that the far edge fades to fog and the void
+should meet it. It does not: at a playable density the far edge only travels a
+third of the way to the mist, so clearing to the mist put a band of BRIGHT sky
+around a dark board. The theme's own `background` is the answer, and was all
+along.
+
+*A shape.* `frustum` stands upright and `boxAt` only turns about z, so between
+them there was no way to draw a leaning trunk, a branch reaching up and out, a
+stake driven in at an angle or a brace holding a wall off the ground. `segment`
+is a square prism between two points in space. Wound outward — checked, and it
+was inside out on the first pass; `tools/check-winding.js` now audits it in
+three orientations, because it picks its reference vector from the direction it
+is given and the near-vertical case takes the other branch. A winding correct
+only for leaning trunks would have left every fence post in the camp hollow.
+
+*Ground that is not a platform.* The board wants bare earth scraped through the
+litter, and every zone kind was a raised slab. That is not a cosmetic
+difference: `World3D.levelUnder` refuses a tower that straddles a slab edge, so
+a patch of mud built as a slab would quietly have become a no-build ring in the
+middle of open ground. `dirt` has height 0, which now means a PATCH — a colour
+painted at the floor's own height, no rim, no height stamp, and no way to move a
+build spot.
+
+**WHAT IS ACTUALLY ON THE BOARD.** Twelve new prop kinds beside the ten machine
+kinds: `tree`, `snag`, `stump`, `log`, `brush`, and the camp's `barricade`,
+`spikes`, `sandbags`, `watchtower`, `wreck`, `barrel`, `fence`. The wild kinds
+skip the milled footing every machine stands on, because a dead tree does not
+stand on a plinth. Each stem leans, and the lean grows with the square of the
+height so the base still meets the dirt square; the limbs reach up as well as
+out, because a branch drawn flat reads as a plank nailed to the trunk. The
+variation is hashed from the prop's own position, so the same tree is the same
+tree on every machine and every restart — the mesh is built once per map, and a
+prop that moved between builds would be a prop that moved when the player
+restarted.
+
+**Half the treeline stands OUTSIDE the play area.** The board is built 120 units
+proud of the 1280x720 view on every side, so there is real ground out there — and
+a prop out there can never hide a tower, an enemy or a build spot, because none
+of those can be there. It is the one place a forest can be dense. Inside the
+route's pockets everything is knee-high, for the opposite reason.
+
+The only lit things on the board are the fire in the two barrels and the lamp on
+the watchtower, and that is the whole reason the theme's accent is an ember
+rather than a ley line. The barrel flame is driven at half the board's emission:
+at full it clips through orange to a white-yellow cone and the drum under it
+disappears, which is a flare, not a fire in a barrel.
+
+**THE CHOOSER HAD TO LEARN A FOURTH COLUMN, and this is the part that was a real
+bug rather than new content.** Its grid took the column count and the card size
+as constants and simply stacked more rows. At six routes that was two rows; at
+SEVEN it is three, which ends 902 px down a 720 px canvas — the bottom row
+entirely off screen and unclickable. `mapGrid` now derives the layout: up to six
+routes it returns three columns at the full authored 372x240, byte for byte what
+it did before, and past six it opens a fourth column and fits the card to the
+viewport, taking the height from the width at 16:9 (the render's shape is not
+negotiable, so the card is the thing that gives). Rows are centred on the cards
+they actually hold, so the short last row sits under the middle.
+
+The narrower card exposed a second fault underneath: the stat rows fitted the
+LABEL first and gave the value what was left, so "2153.8 u.l." clipped to
+"215...". A truncated label is still legible from its column; a truncated number
+is not a number. The value now reserves its width first.
+
+Two tests added. One pins the board's own contract — that it declares weather
+and wildness, that every camp prop it names is a kind the geometry can actually
+build (a rename in the scenery switch would otherwise turn every barricade into
+the default block, silently), and that its ground patches are the flat kind. The
+other pins that the chooser's rows never overlap and that the grid leaves room
+for the line under it. `tools/ci-check.js` baseline tightened 217 -> 219 in this
+same change, as that file asks.
+
+**2026-08-26 — The Vanguard is imported, in two bodies and two gaits: it
+dashes, then bounds, and its shield is thrown onto the road and pulled back
+every seven seconds.**
+
+At the owner's instruction: *"using the vanguard models, model the animate the
+vanguard enemy ... in the shattered model, the fragments of shield you see must
+be modeled as to be shooting outwards, and then drop to the floor from the
+shields that are broken in the shielded model. they will stay there for 3
+seconds, then in the last 4 seconds, they start flying back to the vanguard, as
+if attracted to him magnetically and form the shield again, to complete the 7
+second cooldown."* And for the movement: *"an explosive burst of speed, a dash,
+with his arms swept back, body leaning forward, energy trails emphasizing the
+acceleration ... then transition to a bouncing attack run at normal speed where
+the Vanguard bounds forward in elastic hops, with aggressive arm swipes and claw
+motions synchronized to each bounce. The body should coil and twist with
+predatory intent."*
+
+`glb/vanguard.glb` and `glb/vanguard-shattered.glb` become `enemy-boss_fast`
+and `enemy-boss_fast-shattered`, both through the new `--rig vanguard` in
+`tools/glb_to_model.py`. 5 035 and 5 218 triangles, next to the Tyrant's 4 568.
+The chassis-built Vanguard is retired — see the TARGETS note below.
+
+**THE TWO STATES ARE TWO BANDS, NOT TWO FILES, AND THAT IS THE OPPOSITE OF THE
+BULWARK.** The Bulwark's pair of GLBs are two gaits because its shield break is
+permanent: the body before it and the body after it never move the same way
+again. The Vanguard's two states are not before-and-after anything — it dashes
+the opening 400 u.l. (`Enemy.TYPES.boss_fast.sprint`) and bounds the rest of the
+road, and it does both whether or not its shield is up. So one rig, two cycles,
+concatenated into one frame list with a declared `bands` pair, and BOTH files
+carry both. `enemyModel` picks the file off the shield; `gaitBand` picks the
+band off the sprint; neither has to know about the other.
+
+`glb_to_model.py` grew `bands` for this, and it is the same contract
+`export_mesh.py` already emits: absent means "this rig declared no layout", and
+every single-cycle import reproduces byte-identical across the change (checked
+on `enemy-shielded`, `enemy-shielded-broken` and `enemy-flying`).
+
+**BAND 0 IS THE SKATE AND BAND 1 IS THE DASH, in that order on purpose.** Band 0
+is what every reader that does not know about bands falls back to, and the
+skate is the gait this body spends all but the first 400 u.l. of its life in. A
+fallback should be the common case.
+
+**BAND 0 WAS A BOUNDING ATTACK RUN FOR THE FIRST HALF OF THE DAY.** The owner
+replaced it the same day: *"make the vanguard slide as if he has roller skates
+after his initial dash."* The bound is DELETED -- phase table, duty, rise,
+crouch, pitch and all -- rather than left unreachable, because a zeroed gait
+draws a flawless-looking body standing still and reports nothing. No
+`VANGUARD_BOUND_` constant survives.
+
+**THE SKATE IS THE FIRST GAIT IN THE FILE THAT IS NOT A SOLVE, AND THAT IS THE
+POINT OF IT.** Every walker in `glb_to_model.py` exists to keep a planted sole
+on ONE patch of road; a skate is the opposite claim, because the wheels roll and
+the contact travels forward with the machine. So there is no plant window, no
+swing lift and no `leg_series` in it -- the legs are authored, splayed out to
+the side and driven by one `stroke` term that also drives the sway, the roll,
+the dip, the coil and the arm rake, so none of them can come apart from the
+others. The one thing it borrows from the walkers is `set_down`, extracted from
+`plant_leg` (which is now written in terms of it, byte-identically), and that
+keeps the wheels ON the road while they slide along it.
+
+**SO IT SCORES THE WORST GAIT ERROR IN THE LIBRARY AND MUST.** A = 53.7 px on
+band 0. `check-gait-slip.js` grows a `GLIDES` table for it, keyed **per band**
+(`enemy-boss_fast#0`, `enemy-boss_fast-shattered#0`) and not per model --
+exempting the mesh would have stopped grading the dash, which still plants and
+still reads 0.000. The band is still walked, still measured and still printed,
+with a note saying why the number is the animation.
+
+**AND THE HEALTH-BAR MARGIN CAME BACK.** The bound's 0.135 of rise had left
+1.3 px of clearance against the 10 px pad, the thinnest in the library after the
+Tyrant; the skate's only vertical is a 0.022 dip, and the margins are 6.3 and
+5.8 px.
+
+**IT SPAWNS WITH ITS SHIELD UP** (*"he should also spawn in with his shield"*).
+`supportTimer` starts at a full interval, so a self-shielding type used to walk
+on bare and stand there for seven seconds -- and on this body that is worse than
+untidy: the opening sprint is 400 u.l. at 175 u.l./s, so the one stretch of road
+where the shield matters most was the stretch it did not have one. Granted
+through `grantShield` rather than by assignment, so the non-stacking rule has
+one implementation, with `shieldFlash` put straight back to zero: a body that
+ARRIVED with a shield did not gain one in front of the player. Only for
+`pick: "self"` -- a Shieldbearer's plate exists to be given away, and reading
+`support.shield` alone would have armoured every supporter with it.
+
+**FOUR CHANNELS WERE ADDED TO `biped_cycle` AND THREE OF THEM ARE THE BRIEF'S
+OWN WORDS.** `arm_set` is a posture where `arm` was only ever a motion — the
+dash holds the arms 0.95 rad back and pumps them 0.20, and scaling a swing can
+only ever pump less about the same hanging rest pose. `swipe` is the claw raking
+across the chest; `twist` is the coil through the waist; `arm_flare` holds the
+arms clear of the ribs. **All three moving ones are driven off the SOLVED LEG
+ANGLE, normalised to -1..+1, and never off a sine of their own** — the file
+already carries that argument for the arm swing, and a fourth channel should not
+have had to re-derive it: a phase-authored gesture keeps its timing when a duty
+is retuned and silently stops landing on the footfalls.
+
+**BOTH GAITS SOLVE CLEAN, AND `check-gait-slip.js` HAD TO BE TAUGHT TO LOOK.**
+It read band 0 and only band 0 — which on a library where every banded body had
+one gait was a full sweep, and on this one would have been grading the bound
+twice and calling it a check on both. It now walks every declared band and
+prints one row per band (`--band N` grades one); band 0's row is bit-identical
+to what it printed before. All four Vanguard rows read A = 0.000 px.
+
+**THE SHIELD FRAGMENTS ARE DRIVEN AT DRAW TIME, NOT BAKED, and the reason is
+that this boss does not stop.** A baked frame is a pose in the MODEL's space, so
+a fragment baked onto the floor travels down the road with the body — and at
+175 u.l./s the three seconds the brief asks them to lie still is 525 u.l. of
+road. `Enemy.prototype.breakShield` records the position and heading it broke
+on; `shardPose` in gl-world.js converts that fixed world point back into the
+body's current model space every frame and composes a matrix per shard, over the
+top of the baked gait (the mechanism the Hedger's strike already uses). Nothing
+is integrated and nothing accumulates.
+
+**THE THREE PHASES ARE SHARES OF THE GAP, NOT SECONDS.**
+`Enemy.prototype.shieldReformProgress` is 0 on the frame the shield went and 1
+on the frame it comes back, so the reassembly lands exactly on the pulse that
+refills the pool. At the full seven-second cadence the shares ARE the brief's
+0.9 / 3 / 4. A shield broken two seconds before its own pulse gets the same
+picture in two seconds rather than one that finishes after the shield is already
+back.
+
+**`shieldOut` IS A THIRD FLAG AND IT IS NEITHER OF THE OTHER TWO.** This is the
+third time the distinction has had to be drawn on `ENEMY_VARIANT` and the second
+time it has gone the other way:
+
+- `shieldBroken` is one-way and permanent — the Bulwark's, because what a
+  Bulwark loses is not coming back. Used here it would leave the fast boss in
+  its wreckage for the rest of the run.
+- `shield <= 0` is true of a body that has never been shielded AT ALL, and the
+  Vanguard spawns exactly that way and waits out its first seven seconds. Used
+  here it would walk the boss onto the board already in pieces.
+- `shieldOut` is "the pool has emptied and nothing has refilled it yet". Set in
+  `breakShield`, cleared in `grantShield` — by ANY grant, so a Shieldbearer's
+  plate ends a Vanguard's reform exactly as its own pulse does.
+
+**A LATENT BUG WAS FOUND BY THE ONLY CALLER WITH NO FALLBACK.** `GLModels.get()`
+never exposed `positions`: `expand` built the array, filed it under `expanded`
+and nulled `raw`, so `m.positions` was `undefined` on every model in the
+library. `bodyExtentRadii` guards on it and returns null, so **every shield
+bubble in the game has been drawn at the stand-in size meant for bodies with no
+mesh at all** — 1.0 plan radii and 2.2 top — while thirty lines of comment
+beside it explain how the measurement is cached per model. Nothing threw and
+nothing was reported. `shardsOf` has no fallback, threw on the first frame, and
+is the only reason this surfaced. One line in `gl-models.js` fixes it. **This
+changes how every shielded body's bubble is sized** — the Bulwark's now hugs
+its own hull instead of floating around it — and that is the behaviour the code
+already claimed.
+
+**THE SPRINT WAKE IS ON THE 3D BOARD NOW.** The 2D board has drawn one behind a
+body with a `sprint` block since the type existed, for a reason that is teaching
+rather than decoration — the player has to be able to SEE where the burst ends,
+or "it arrived early" is the only evidence they ever get. The 3D board drew
+nothing, so the one state change the Vanguard announces about itself was
+invisible on the board the game ships. Three lanes rather than the 2D board's
+one flat stroke, and 78 u.l. rather than 26: a world-space length is
+foreshortened to roughly half of itself under an elevated camera, and the near
+half of it is behind a machine 78 board px tall. Keyed on `isSprinting()` and
+naming no type, so a second sprinting body gets it with no edit.
+
+**FOUR PANES AND SIXTEEN NODES ARE DROPPED ON THE COMMAND LINE, and that is the
+Bulwark's `--exclude Integrated_Kinetic_Field` rule holding rather than
+bending.** This format has no translucency: a palette row is `[r, g, b,
+emission]` and there is no fourth channel for an alpha. The intact file's eight
+`bulwark_pane_*` are the shield's energy fill at alpha 0.16 and would ship as
+eight opaque navy slabs walling the machine in from every angle; the shattered
+file's `field_remnant` is a 1 560-triangle dome at alpha 0.05. Both go, and
+gl-world's own translucent shell — which the fix above finally sizes correctly —
+draws the field the artist authored in the renderer that can actually blend it.
+The opaque frame-and-node octagon stays, and it is what reads as the barrier.
+
+**`enemy-boss_fast` LEAVES `export_mesh.py::TARGETS`, THE SIXTH TIME THIS TRAP
+HAS BEEN DISARMED** — the Skimmer, the Tender, the Tun, the Tyrant, the Courier
+and now the Vanguard. A `.glb` import and a Blender target must never name the
+same output; whichever runs last wins, in silence. `enemy_vanguard.py` is KEPT
+for a reason unrelated to the row: it was the first body whose swing angle was
+SOLVED rather than authored, and `check_group_gait.py`'s notes are written
+against exactly that. **And the prefix hazard is back in the other direction** —
+`enemy-boss_fast` is now a prefix of `enemy-boss_fast-shattered`. Neither has a
+TARGETS row, and the importer takes an exact `--name` with no prefix matching at
+all, so it is a note rather than a defect.
+
+**MEASURED, NOT ASSERTED.** `check-model-top`: 1.298 and 1.302 rest, 1.441 and
+1.442 posed, both `ok` — but at 1.3 and 1.5 px of margin against the 10 px pad,
+which is the thinnest in the library after the Tyrant's 7.3. That is the
+bound's 0.135 rise being spent, and it is the number to move first if the health
+bar ever needs room. `check-gait-slip`: A = 0.000 px on both legs of both bands
+of both bodies. `ci-check`: 112/217/72/45/53 and the manifest clean.
+
+
+**2026-08-26 — Three rulings reversed: the Healer flies, the Shieldbearer stops
+shielding itself, and a shield now absorbs the WHOLE blow. Every other menu is
+the Ash Waste.**
+
+Four owner instructions in one message, and three of them overturn a rule this
+document argues for at length elsewhere. Each is recorded as a REVERSAL rather
+than as a tweak, because the old argument is still on disk and a reader who
+finds it should know it was decided against rather than forgotten.
+
+**THE HEALER IS `isFlying` NOW** (*"make the healer a flying unit"*). Its row
+carried a `hover` block and an explicit paragraph on why it was NOT flying:
+hover is only a picture, every ground tower could still shoot a Healer, and
+killing it first was the whole lesson of wave 32. That is reversed.
+`Targeting.sees` and `RangeFilter` both fail closed on `isFlying`, so the Healer
+is answerable only by a tower with air reach -- the Arcane Sniper, which has it
+at base, and the Warbringer once its beam path buys it. **A board with no air
+reach can no longer answer wave 32 at all**, which is the Aether Wisp's lesson
+applied to a body that heals.
+
+The `hover` block is DELETED, not left beside the flag. Every reader takes the
+flying branch first -- `visualBodyLift`, and `bodyLift` / `clockRate` in
+gl-world.js -- so it would have been a declaration nothing reads sitting next to
+a comment explaining why the thing it declares is deliberately not the other
+thing. Height comes from `Enemy.FLIGHT_LIFT_RADII` (20 px of clearance becomes
+55) and the drift rate from the flier's `HOVER_HZ`. `check-gait-slip.js` needed
+no edit: `enemy-healer` is on its `HOVERS` table already, and that table is
+about "this body's frames are clock-driven", which is as true of a flier as of a
+hoverer.
+
+**A SUPPORTER NO LONGER PICKS ITSELF** (*"the shieldbearer should not shield
+himself"*). It used to, and on the Shieldbearer it did so RELIABLY rather than
+occasionally: `pick: "strongest"` sorts on life still standing, the beacon has
+60 HP against a normal's 4, and its own stacking plate made it the strongest
+body on the board by a wider margin after every pulse. One of its ten plates
+went on itself every ten seconds, compounding, so the type that exists to make
+everything else expensive was quietly the hardest thing to remove. Its tenth
+pick now reaches one body further down the board.
+
+**ONE LINE, IN `supportCandidates`, WHICH IS THE WHOLE OF WHAT THE INSTRUCTION
+CAN MEAN.** `pick: "self"` never comes through that function -- `supportAllies`
+short-circuits to `[this]` -- so the Vanguard, whose entire mechanic is
+shielding itself, is untouched. A supporter aimed at others never lands on
+itself; one aimed at itself still does.
+
+**A SHIELD ABSORBS THE WHOLE BLOW** (*"if a enemy has 100 HP and 10 shield and
+gets hit for 200 damage, the shield breaks because it is inferior to 200 but
+nothing happens to the health"*). Damage used to SPILL from an emptied shield
+into health, and the argument for that is still true and is now the point:
+stopping the spill wastes the overflow of every heavy weapon, which is the same
+"bullets landing on corpses" waste target claiming exists to prevent. A shield
+is therefore worth a whole SHOT rather than its own thickness, and the answer to
+a shielded wave becomes many cheap hits instead of one expensive one -- the
+heaviest single-target weapon on the board is now the worst tool for it.
+
+Three things a reader will assume moved with it and which did not: **a shield
+still pays nothing** (`soaked` is reported in `lastDamageTaken` and never in
+`dealt`); **effective HP is unchanged** (`waveEffectiveHealth` counts a shield
+as health that must be removed, and it still must -- what changed is how many
+shots that takes); and **it is not a damage cap** -- only the hit that BREAKS
+the shell is absorbed by it, and the next one lands in full. `breakShield` still
+fires on the same frame, so the Bulwark still doubles its speed and the Vanguard
+still throws its fragments onto the road.
+
+**THIS IS A REAL DIFFICULTY CHANGE AND IT IS NOT MEASURED HERE.** Every shielded
+body on the board -- the Bulwark, a Hive's brood, anything a Shieldbearer has
+touched, the Vanguard on its seven-second cadence -- now costs at least one more
+shot than it did, and the schedule's authored figures cannot see that because
+they count points and not shots. The owner asked for the rule; the retune, if
+one is wanted, is its own piece of work.
+
+**FOUR FIXTURES TURNED RED AND ALL FOUR WERE DESCRIBING THE OLD RULES**, which
+is the outcome to want: `the Shieldbearer stacks 20 of shield onto the ten
+strongest` (asserted "itself first, being the toughest thing there"), `the
+Healer hovers, and hovering is a height and not a targeting rule` (asserted "a
+tower without air reach can shoot it"), `the support hook runs from the real
+main loop` (asserted "and it shielded itself too"), and `a shield is sized off
+the enemy's OWN health, and soaks before it` (asserted "a twenty spills through
+and pays only the six"). Each now asserts the reversal, and the last one also
+spells out the owner's own 100/10/200 example on a body carrying his figures.
+
+**THE OTHER MENUS ARE THE ASH WASTE** (*"arrange the other Menu UI's to match
+the main menu theme"*). The title screen became the Ash Waste on 2026-08-25 and
+the chooser, index, armoury, pause menu and run-over overlays were explicitly
+deferred; this is that pass. The game had been opening on a burnt sky and then
+cutting to a blue sci-fi grid the moment anything was clicked.
+
+**IT IS SMALL BECAUSE THE SCREENS ALREADY SHARED TWO FUNCTIONS.**
+`drawSelectBackdrop` and `drawBackButton` are called by the chooser, by
+js/codex.js and by js/store.js, so re-cutting those two re-cut all three, and
+nothing in the index's or the armoury's own layout had to move for the theme to
+reach it.
+
+**AN INTERIOR KEEPS THE THEME'S SURFACE AND DROPS ITS SUBJECT.** The title
+screen is a composition -- a fractured pylon, a downed relay, a rift, four
+controls between them. These screens are dense: six route cards, an enemy list
+with a live 3D viewer, a shop grid. A scene behind that is not atmosphere, it is
+noise competing with the content for the same pixels. So `drawAshInterior` is
+the burnt sky, the horizon heat, the ground, the ash, the vignette and the
+corner frame, and no pylon, wreck, rift or skyline. It is baked through the same
+`drawMenuLayer` machinery the title screen measured at 72 ms a frame and fixed;
+only the falling ash reads the clock.
+
+New shared pieces, in game.js so all three files can reach them: `ASH_EMBER` /
+`ASH_LEY` / `ASH_BONE` / `ASH_DUST` / `ASH_IRON`, `drawAshInterior`,
+`drawAshFrame`, `drawAshHeading`, `drawAshPlate` and `drawAshControl`. **The
+plate is `menuPlatePath`'s, the title screen's own two sheared corners**, so the
+interiors and the title screen are the same piece of hull rather than two
+designs that resemble each other.
+
+**THE HEADING'S SUB-LINE GOES ABOVE THE TITLE WHEN A SCREEN HAS TABS**, and that
+is a collision rather than a taste: the index and the armoury put their tab row
+at y = 78, and a centred sub-line landed on it. Two screens of four wanted it
+above, so it is an argument in one function instead of two hand-placed y values
+that would come apart the first time a tab row moves.
+
+**THE REST WAS A COLOUR SWEEP, DELIBERATELY.** The index and the armoury carry
+dozens of ink and panel-fill literals from the old screen. Re-cutting each panel
+by hand would have been a week and a redesign; mapping the palette -- `#cfe3ff`
+to bone, the `140,179,230` structural blue to ember, `#ffd76e` to ember, the
+"good" green to ley-teal, and the cool-grey panel fills to ash-brown at the same
+alphas -- moves every one of them and touches **no rectangle, font size or
+layout number**. `TIER_COLOURS` is re-cut too, and the new set is also an ORDER
+(ley-teal easy, bone normal, ember hard) where the old teal/yellow/pink was not.
+
+**TWO COLOURS OUTSIDE ANY PALETTE SURVIVED UNTIL LAST**: the run-over overlay's
+red loss and green win. Both are now in-theme -- a loss burns, a win holds the
+ley -- and the endings stay as distinguishable as they were.
+
+
+**2026-08-25 — The title screen is a post-apocalyptic fantasy-tech world now,
+and it moves. Every control is a salvaged plate; the type is Impact and
+monospace instead of system UI.**
+
+At the owner's instruction: *"change the menu themes entirely. for the main
+menu, add an animated background of a post apocalyptic fantasy tech world, and
+remodel all the buttons to fit that theme, along with the button fonts."* Only
+the main menu — the chooser, index, armoury and pause menu are untouched and
+were explicitly deferred.
+
+**WHAT WENT.** The 2026-08-18 command deck in full: `drawMenuHex`,
+`drawMenuReactor`, `drawMenuComms`, the grid, the recessed bays, the signal
+trunks, the cyan-and-gold rule, and the 700-weight `system-ui` every label on
+the screen was set in. "Entirely" was the word used, so nothing was kept for
+continuity's sake.
+
+**WHAT REPLACED IT.** A burnt sky over a dead skyline; a colossal fractured
+ley-pylon leaning in the left bay with its core still burning and glyph rings
+turning around it; a sky-relay that came down in the right bay, its dish
+thrown clear and its feed horn still sweeping; rock torn off the ground and
+left hanging with shards in orbit; rifts in the upper air on two different
+strike periods; ash falling, embers rising, dust rolling along the horizon,
+fissures with ley-fire in them.
+
+**THE SCREEN ANIMATES, AND THAT IS THE POINT OF THE CHANGE.** `draw()` has
+always run every frame on the menu — the old screen spent that on one
+breathing halo around PLAY and nothing else. There is no new loop, no state
+kept between frames and no timer: every animated value is a function of
+`performance.now()` and an index.
+
+**NOTHING ANIMATED MOVES A HIT TARGET.** The four rectangle functions are
+untouched and still the single source for both drawing and hit testing; not
+one of them reads the clock. Motion only ever reaches a colour, an alpha, or a
+decoration's own position.
+
+**MEASURED, NOT EYEBALLED**, per the visual-testing rule in `AGENTS.md`. The
+pane throttles `requestAnimationFrame` when it is not being captured, so
+`__frames` came back 0 and the naive "sample, wait, sample again" probe proved
+nothing — which is exactly the limit-condition-read-as-data trap that file
+warns about, and it reported "no animation" on a screen that animates. The
+real measurement drives `draw()` directly against a stubbed `performance.now`:
+the pylon's core reads `[56,85,80]`, `[50,66,65]`, `[54,78,75]` at t = 0, 1.7
+and 4.3 s, and **the hover states were diffed at ONE fixed time** so the
+difference could not be the clock — PLAY's left edge goes `[24,18,20]` →
+`[36,27,28]` and its bloom `[58,28,23]` → `[69,34,25]`. The palette rule is
+readable off the same probe: the sky at (640,470) is `[232,211,189]` and the
+ground `[31,22,20]`, both warm, while the pylon core at (196,372) is
+`[47,64,62]` — green over red, because arcane energy is the only cool thing on
+the screen.
+
+**THE FONTS ARE `MENU_DISPLAY_FONT` AND `MENU_TECH_FONT`, AND THERE IS NO
+WEBFONT.** The game runs from a double-clicked `file://` page, so a downloaded
+face would need either a server — which this project does not have and does
+not want — or a megabyte of base64 in `index.html`. Impact ships on both
+macOS and Windows, is condensed, heavy and all-caps, and reads as stencilled
+salvage rather than as system UI, which is the job `700 15px system-ui` was
+failing at. Tracking is done by hand in `drawMenuText` rather than through
+`ctx.letterSpacing`: that property is recent enough that a browser without it
+would silently draw every line on the screen too tight, and a silent
+wrong-looking fallback is worse than none.
+
+**THE BUTTONS ARE PLATES, NOT PANELS.** `menuPlatePath` shears the top-left
+and bottom-right corners — two cuts rather than four, because four corners
+rounded off reads as a sci-fi pill and two reads as a piece of hull cut to
+fit. The iron under all four is identical (mill lines, rust streaks, rivets,
+hazard chevrons in the sheared corner); only the accent differs, so they read
+as parts off one wreck rather than as four unrelated controls. Hover fills the
+plate's foot with ley-light and runs a charge up its left flank; PLAY breathes
+on its own. `drawMenuButton(r, label, key, rgb, primary)` keeps its signature,
+because the title-screen test counts calls through it.
+
+**TWO THINGS WERE DRAWN TWICE BEFORE THEY WERE RIGHT, and both were the same
+mistake.** The floating islands were first a symmetrical wedge over a glowing
+ellipse, and read unmistakably as a flying saucer; narrowing the ellipse to a
+rune band at the rock's waist did not help, because it still projected in
+front of and behind the silhouette. What fixed it was deleting the ring
+outright and letting loose shards orbit instead — the same statement (this
+rock is not obeying gravity) in a shape that cannot be mistaken for a hull.
+The skyline had the matching problem: a row of intact rectangles is a city at
+dusk, not a city that lost, so three of its four cases are now snapped,
+collapsed or leaning and the whole building is the minority.
+
+**IT SHIPPED AT 14 FPS FIRST, AND THE FIX IS THE MOST IMPORTANT LINE IN THIS
+ENTRY.** Once the picture was right, the frame was timed properly — Canvas2D
+queues its commands, so timing `draw()` on its own measures submission and not
+rasterisation, and one `getImageData` after the loop is what forces the queue
+to flush and makes the number honest. It came back at **72.73 ms a frame**
+against a 2560×1440 backing store. Per-function timing put **51 ms of it in
+two places**: `drawMenuSky` at 14.3 ms and `drawMenuAtmosphere` at 36.7 ms —
+full-screen alpha gradient passes and 144 scanlines, none of which read the
+clock. They were being re-rasterised sixty times a second for a picture that
+never changed.
+
+`drawMenuSkyBase` and `drawMenuVeil` are now baked once into offscreen
+canvases at the backing store's own resolution and blitted: **1.8 ms a frame**,
+sky 14.34 → 0.69, atmosphere 36.67 → 0.59. The cache is keyed on the backing
+store's size, which is not a nicety — the canvas is still 300×150 for the
+first frames after load, and without the key the whole screen would have been
+blitted from a thumbnail. The sun lost its 0.7 Hz breath to this, deliberately:
+it was the only thing keeping that layer out of the cache, and the scene has no
+shortage of motion without it. **Anything time-dependent added to either baked
+function from here will simply freeze** — that belongs in `drawMenuSkyBands`
+or in `drawMenuAtmosphere`'s live tail.
+
+**`menuLinear` and `menuRadial` fall back to a flat colour.** Not defensive
+habit: the harness's canvas stub answers every unknown method with a function
+returning `undefined`, so `createLinearGradient(...).addColorStop` throws
+there. A flat colour in a suite that never looks at pixels costs nothing; a
+crash costs the file. `menuNoise(i)` is a pure hash rather than a generator
+for the same kind of reason — the scene carries hundreds of authored details
+without storing one of them between frames, and looks identical on every boot.
+
+All six suites re-run and unchanged: 108 / 217 / 72 / 45 / 53 pass, 0 fail,
+plus the sandbox smoke test. (`AGENTS.md`'s "How to run and test" table still
+prints the older 107 / 207 + 5 figures; that drift predates this change and is
+not touched here.)
+
 **2026-08-20 — The Bulwark is TWO imported bodies, and breaking its shield
 swaps one for the other. `glb_to_model.py` grows a pair of rigs: a jog with a
 suspension in it, and a bound that hops one leg at a time.**

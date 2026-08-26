@@ -112,20 +112,9 @@ var Store = (function () {
     ["Store", "Inventory"].forEach(function (label, i) {
       var r = tabRect(i);
       var active = (i === 0) === (tab === "store");
-      var hot = pointInRect(mouse.x, mouse.y, r);
 
-      ctx.fillStyle = active ? "rgba(255,215,110,0.16)"
-        : (hot ? "rgba(28,30,38,0.95)" : "rgba(28,30,38,0.85)");
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.lineWidth = active ? 2 : 1;
-      ctx.strokeStyle = active ? "rgba(255,215,110,0.95)" : "rgba(140,179,230,0.35)";
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "600 15px system-ui, sans-serif";
-      ctx.fillStyle = active ? "#ffd76e" : "rgba(199,209,224,0.6)";
-      ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
+      // Same control the index's tabs and the Back button are cut from.
+      drawAshControl(r, label.toUpperCase(), { active: active });
     });
   }
 
@@ -163,12 +152,11 @@ var Store = (function () {
       var active = picked === item.id;
       var hot = pointInRect(mouse.x, mouse.y, r);
 
-      ctx.fillStyle = active ? "rgba(255,215,110,0.10)"
-        : (hot ? "rgba(32,38,52,0.95)" : "rgba(22,25,34,0.9)");
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.lineWidth = active ? 2 : 1;
-      ctx.strokeStyle = active ? "rgba(255,215,110,0.85)" : "rgba(140,179,230,0.3)";
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      // Salvaged plate, the same one the tabs and the route cards are cut
+      // from. `live` carries selection AND hover on one channel, which is the
+      // whole reason the plate takes a number there rather than two booleans.
+      drawAshPlate(r, { accent: ASH_EMBER,
+        live: active ? 0.9 : (hot ? 0.45 : 0), cut: 12 });
 
       var Type = MetaProgress.constructorOf(item.id);
 
@@ -190,34 +178,36 @@ var Store = (function () {
 
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.font = "600 16px system-ui, sans-serif";
-      ctx.fillStyle = owned ? "#cfe3ff" : "rgba(199,209,224,0.6)";
+      ctx.font = "17px " + MENU_DISPLAY_FONT;
+      ctx.fillStyle = owned ? "#ecdece" : "rgba(186,158,140,0.65)";
       ctx.fillText(Type ? Type.DISPLAY_NAME : item.id, r.x + 80, r.y + 26);
 
       // Clipped short of the right-hand column (price / OWNED, and the in-run
       // cost under it), not just short of the card edge -- at full card width
       // a long blurb ran straight through "$200 in a run".
-      ctx.font = "12px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.6)";
+      ctx.font = "11px " + MENU_TECH_FONT;
+      ctx.fillStyle = "rgba(186,158,140,0.62)";
       ctx.fillText(fitText(ctx, item.blurb, r.w - 80 - 110), r.x + 80, r.y + 50);
 
       ctx.textAlign = "right";
-      ctx.font = "600 13px system-ui, sans-serif";
+      ctx.font = "12px " + MENU_TECH_FONT;
       if (owned) {
         var inBar = MetaProgress.isEquipped(item.id);
-        ctx.fillStyle = inBar ? "rgba(108,230,133,0.95)" : "rgba(199,209,224,0.55)";
+        // Ley-teal for "this one is loaded", which is the only arcane claim on
+        // the screen and therefore the only place the cool accent is allowed.
+        ctx.fillStyle = inBar ? "rgba(116,240,214,0.95)" : "rgba(186,158,140,0.6)";
         ctx.fillText(inBar ? "IN BAR" : "OWNED", r.x + r.w - 14, r.y + 26);
       } else {
-        ctx.fillStyle = "rgba(255,215,110,0.9)";
-        ctx.fillText(item.price + " ⬡", r.x + r.w - 14, r.y + 26);
+        ctx.fillStyle = "rgba(240,150,78,0.92)";
+        ctx.fillText(item.price + " \u2b21", r.x + r.w - 14, r.y + 26);
       }
 
       // In-game price, so the two currencies never get confused: coins unlock
       // a tower for good, dollars buy one instance during a run.
       if (Type) {
-        ctx.font = "12px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(199,209,224,0.45)";
-        ctx.fillText("$" + Type.COST + " in a run", r.x + r.w - 14, r.y + 50);
+        ctx.font = "10px " + MENU_TECH_FONT;
+        ctx.fillStyle = "rgba(186,158,140,0.45)";
+        ctx.fillText("$" + Type.COST + " IN A RUN", r.x + r.w - 14, r.y + 50);
       }
       ctx.textAlign = "left";
     });
@@ -227,8 +217,8 @@ var Store = (function () {
   function drawDetail(ctx) {
     if (!picked) {
       ctx.textAlign = "left";
-      ctx.font = "14px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.45)";
+      ctx.font = "12px " + MENU_TECH_FONT;
+      ctx.fillStyle = "rgba(186,158,140,0.5)";
       ctx.fillText(tab === "store" ? "Pick a tower to see what it does."
         : "Pick a tower to put it in the bar, or click a slot to empty it.",
         600, 158);
@@ -241,8 +231,8 @@ var Store = (function () {
 
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.font = "600 22px system-ui, sans-serif";
-    ctx.fillStyle = "#cfe3ff";
+    ctx.font = "24px " + MENU_DISPLAY_FONT;
+    ctx.fillStyle = "#f6d9b4";
     ctx.fillText(Type.DISPLAY_NAME, 600, 150);
 
     // A throwaway instance parked off-screen, never in `towers` and never
@@ -254,17 +244,17 @@ var Store = (function () {
     rows.forEach(function (row, i) {
       var ry = 192 + i * 22;
       ctx.font = "13px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.65)";
+      ctx.fillStyle = "rgba(186,158,140,0.65)";
       ctx.fillText(row[0], 600, ry);
       ctx.textAlign = "right";
       ctx.font = "600 13px system-ui, sans-serif";
-      ctx.fillStyle = "#e6eefc";
+      ctx.fillStyle = "#ecdece";
       ctx.fillText(String(row[1]), 900, ry);
       ctx.textAlign = "left";
     });
 
     ctx.font = "13px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.7)";
+    ctx.fillStyle = "rgba(186,158,140,0.7)";
     var blurbTop = 192 + rows.length * 22 + 16;
     wrapText(ctx, item.blurb, 300, 4).forEach(function (line, i) {
       ctx.fillText(line, 600, blurbTop + i * 18);
@@ -275,22 +265,22 @@ var Store = (function () {
     var r = actionRect();
     var hot = pointInRect(mouse.x, mouse.y, r) && action.enabled;
 
-    ctx.fillStyle = !action.enabled ? "rgba(28,30,38,0.7)"
+    ctx.fillStyle = !action.enabled ? "rgba(28,21,25,0.7)"
       : (hot ? "rgba(255,215,110,0.28)" : "rgba(255,215,110,0.14)");
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = action.enabled ? "rgba(255,215,110,0.9)" : "rgba(140,179,230,0.25)";
+    ctx.strokeStyle = action.enabled ? "rgba(255,215,110,0.9)" : "rgba(240,150,78,0.25)";
     ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "600 16px system-ui, sans-serif";
-    ctx.fillStyle = action.enabled ? "#ffd76e" : "rgba(199,209,224,0.45)";
+    ctx.fillStyle = action.enabled ? "#f0a45c" : "rgba(186,158,140,0.45)";
     ctx.fillText(action.label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 
     if (action.note) {
       ctx.font = "12px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.5)";
+      ctx.fillStyle = "rgba(186,158,140,0.5)";
       ctx.fillText(action.note, r.x + r.w / 2, r.y + r.h + 16);
     }
     ctx.textAlign = "left";
@@ -305,17 +295,17 @@ var Store = (function () {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.font = "600 13px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.6)";
+    ctx.fillStyle = "rgba(186,158,140,0.6)";
     ctx.fillText("YOUR BUILD BAR — click a slot to empty it", VIEW_WIDTH / 2, 532);
 
     loadout.forEach(function (id, i) {
       var r = loadoutSlotRect(i);
       var hot = pointInRect(mouse.x, mouse.y, r) && id !== null;
 
-      ctx.fillStyle = hot ? "rgba(32,38,52,0.95)" : "rgba(22,25,34,0.9)";
+      ctx.fillStyle = hot ? "rgba(36,26,30,0.95)" : "rgba(24,18,22,0.9)";
       ctx.fillRect(r.x, r.y, r.w, r.h);
       ctx.lineWidth = 1;
-      ctx.strokeStyle = id === null ? "rgba(140,179,230,0.2)" : "rgba(140,179,230,0.5)";
+      ctx.strokeStyle = id === null ? "rgba(240,150,78,0.2)" : "rgba(240,150,78,0.5)";
       ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
       var Type = id === null ? null : MetaProgress.constructorOf(id);
@@ -331,11 +321,11 @@ var Store = (function () {
           Type.drawIcon(ctx, r.x + r.w / 2, r.y + 30, 46);
         }
         ctx.font = "11px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(199,209,224,0.75)";
+        ctx.fillStyle = "rgba(186,158,140,0.75)";
         ctx.fillText(fitText(ctx, Type.DISPLAY_NAME, r.w - 8), r.x + r.w / 2, r.y + 56);
       } else {
         ctx.font = "12px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(199,209,224,0.3)";
+        ctx.fillStyle = "rgba(186,158,140,0.3)";
         ctx.fillText("empty", r.x + r.w / 2, r.y + 34);
       }
 
@@ -350,21 +340,19 @@ var Store = (function () {
     drawSelectBackdrop();
     drawBackButton();
 
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "#cfe3ff";
-    ctx.font = "700 30px system-ui, sans-serif";
-    ctx.fillText("ARMOURY", VIEW_WIDTH / 2, 28);
+    drawAshHeading("ARMOURY", "SALVAGE & LOADOUT", 18, true);
 
     // The purse, top right, on every tab -- the number every decision here is
-    // measured against.
+    // measured against. Ember, because it is the screen's live figure and
+    // ember is what this theme lights.
     ctx.textAlign = "right";
-    ctx.font = "600 20px system-ui, sans-serif";
-    ctx.fillStyle = "#ffd76e";
-    ctx.fillText(MetaProgress.coins() + " ⬡", VIEW_WIDTH - 32, 34);
-    ctx.font = "12px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.5)";
-    ctx.fillText("meta coins", VIEW_WIDTH - 32, 60);
+    ctx.textBaseline = "top";
+    ctx.font = "24px " + MENU_DISPLAY_FONT;
+    ctx.fillStyle = "#f0a45c";
+    drawMenuText(MetaProgress.coins() + " \u2b21", VIEW_WIDTH - 32, 34, 2);
+    ctx.font = "9px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(186,158,140,0.6)";
+    drawMenuText("META COINS", VIEW_WIDTH - 32, 62, 1.4);
 
     drawTabs(ctx);
     drawCards(ctx);
@@ -374,7 +362,7 @@ var Store = (function () {
     if (flash) {
       ctx.textAlign = "center";
       ctx.font = "600 13px system-ui, sans-serif";
-      ctx.fillStyle = flash.tone === "good" ? "rgba(108,230,133,0.95)" : "rgba(230,120,120,0.95)";
+      ctx.fillStyle = flash.tone === "good" ? "rgba(116,240,214,0.95)" : "rgba(230,120,120,0.95)";
       ctx.fillText(flash.text, VIEW_WIDTH / 2, 700);
     }
 

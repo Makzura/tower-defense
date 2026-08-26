@@ -71,6 +71,62 @@
 # command, and it is what makes the two the same size rather than merely the
 # same height -- see the `bulwark_overdrive` rig entry. Re-run them as a pair.
 #
+# THE VANGUARD IS TWO FILES AND ONE MACHINE TOO, and its pair reads the same
+# way -- the second command carries the first's measured span:
+#
+#   python3 tools/glb_to_model.py ../glb/vanguard.glb \
+#       --rig vanguard --name enemy-boss_fast --glow sum --emit-cap 1.6 \
+#       --frames 16 --cell 0.09 --floor 120 \
+#       --exclude bulwark_pane_0 --exclude bulwark_pane_1 \
+#       --exclude bulwark_pane_2 --exclude bulwark_pane_3 \
+#       --exclude bulwark_pane_4 --exclude bulwark_pane_5 \
+#       --exclude bulwark_pane_6 --exclude bulwark_pane_7
+#
+#   python3 tools/glb_to_model.py ../glb/vanguard-shattered.glb \
+#       --rig vanguard --name enemy-boss_fast-shattered --glow sum \
+#       --emit-cap 1.6 --frames 16 --cell 0.09 --floor 120 \
+#       --height 1.298 --span 4.3500 \
+#       --exclude field_remnant \
+#       --exclude reforming_pane_0 --exclude reforming_pane_3 \
+#       --exclude reforming_pane_6 \
+#       --exclude regen_stream_0 --exclude regen_stream_1 \
+#       --exclude regen_stream_2 --exclude regen_stream_3 \
+#       --exclude regen_stream_4 --exclude regen_stream_5 \
+#       --exclude regen_mote_0 --exclude regen_mote_1 --exclude regen_mote_2 \
+#       --exclude regen_mote_3 --exclude regen_mote_4 --exclude regen_mote_5
+#
+# `--span 4.3500` IS THE FIRST FILE'S MEASURED SPAN, exactly as the Bulwark's
+# is: the two files are 4.3500 and 4.3700 source units tall, so fitting each to
+# 1.298 would make the shattered body 0.5% larger and the Vanguard would grow at
+# the instant its shield popped. Re-run them as a pair.
+#
+# `--cell 0.09 --floor 120` IS A REAL DECIMATION AND THE DEFAULTS ARE NOT. These
+# two files arrive at 20 096 and 22 012 triangles, three times the heaviest body
+# the game ships; at the default `--cell 0.018 --floor 300` NOTHING is touched,
+# because every part here is a lathed primitive under 300 triangles and the
+# floor exempts it. The floor at 120 lets the ring, the ankle balls and the
+# pauldrons through -- which is precisely where the count is -- and the cell is
+# in SOURCE units on a body 4.35 of them tall, so 0.09 is the same proportion of
+# it that 0.018 is of a 1.19 zombie. Both land near 5 000, which is the Tyrant's
+# 4 568 and the budget a boss is worth.
+#
+# `--emit-cap 1.6` ON BOTH, AND IT IS A NO-OP ON THE FIRST ONE BY DESIGN. The
+# shattered file carries `regen_flow` at 2.6 and `core_overload` at 2.4, which
+# is a route to white and not to bright (see `material_entry`): those are the
+# chest cracks and the reactor, the two things a reader looks at on a broken
+# machine. 1.6 is where the shipped imports already live -- the Wisp's lantern
+# and the Healer's core are both 1.6. The intact file's hottest material is
+# `core_cyan` at 1.5 and the flag changes nothing on it; it is passed anyway so
+# the two commands cannot drift, and so a hotter material added to that file
+# later lands inside the same ceiling rather than outside it.
+#
+# UNLIKE THE BULWARK'S PAIR, BOTH VANGUARD FILES USE THE SAME RIG. The Bulwark
+# needed two because its two bodies MOVE differently -- a jog before the shield
+# goes, a bound after. The Vanguard's two states are not before-and-after a
+# swap: it dashes for the first 400 u.l. and SKATES for the rest of the road,
+# and it does both whether or not its shield is up. So the pair of gaits lives
+# in the MODEL, as two bands, and both files carry both. See `VANGUARD_DASH`.
+#
 # `--exclude Integrated_Kinetic_Field` DROPS A TRANSLUCENT PART BECAUSE THIS
 # FORMAT HAS NO TRANSLUCENCY. That node is the shield's own energy plane: a
 # 100-triangle slab filling the halo, authored at baseColor alpha 0.075, spanning
@@ -996,10 +1052,26 @@ def plant_leg(points, joint, series, lift, frame, follow=0.0):
     transform, and passes it only on swing frames. Zero by default: a walker's
     body neither leaves the ground nor pitches far enough for its hips to move.
     """
-    placed = turn_about(joint, mat_rotate("y", series[frame]))
+    return set_down(points, joint, mat_rotate("y", series[frame]),
+                    lift.get(frame, 0.0) + follow)
+
+
+def set_down(points, joint, local, raise_by=0.0):
+    """Pose a limb about its joint and put its LOWEST POINT back on the road.
+
+    The half of `plant_leg` that is not about a solved angle, pulled out
+    because a skate needs it and has no solved angle at all -- see
+    `vanguard_skate_cycle`. `plant_leg` is written in terms of it and its
+    arithmetic is unchanged, which the byte-identity check on the seven
+    single-cycle imports is what proves.
+
+    A translation along z cannot undo a rotation's travel in x, so this cannot
+    fight whatever put the limb where it is: it only ever answers "and now sit
+    it on the ground".
+    """
+    placed = turn_about(joint, local)
     low = min(mat_apply(placed, p)[2] for p in points)
-    return mat_multiply(
-        mat_translate([0.0, 0.0, -low + lift.get(frame, 0.0) + follow]), placed)
+    return mat_multiply(mat_translate([0.0, 0.0, -low + raise_by]), placed)
 
 
 def walk_cycle(groups, frames, geometry, joints):
@@ -2487,6 +2559,32 @@ def biped_cycle(groups, frames, geometry, joints, gait):
         angles[name] = leg_series(geometry[name], joints[name], frames,
                                   windows[name], gait["lift"], gait["reach"])
 
+    # WHERE IN ITS OWN SWEEP EACH LEG IS, NORMALISED TO -1..+1, and it is the
+    # only drive the cross-body channels below are allowed to read.
+    #
+    # `swipe` and `twist` (see the Vanguard's two gaits) both have to land ON a
+    # footfall, and the file already carries the argument for why: a sine of
+    # their own would keep its phase while a retuned duty moved the feet, and
+    # nothing announces when the two come apart. The solved leg angle is the
+    # footfall, so a channel taken off it cannot drift from one -- the same
+    # relationship `arm` has had since `walk_cycle`, expressed once so a third
+    # channel does not have to re-derive it.
+    #
+    # -1..+1 rather than radians because these are ANGLES ON OTHER AXES: a
+    # swipe across the chest is not the same size as the leg sweep that times
+    # it, and multiplying a gait's own amplitude by a unit drive keeps the two
+    # decisions apart. `half` cannot be zero for a solved leg -- a leg that
+    # never moves has no plant -- but a rig with a degenerate window would
+    # divide by it, so it falls back to 1.
+    sweep = {}
+    for name in names:
+        series = angles[name][0]
+        lo = min(series.values())
+        hi = max(series.values())
+        mid = (lo + hi) / 2.0
+        half = (hi - lo) / 2.0 or 1.0
+        sweep[name] = [(series[f] - mid) / half for f in range(frames)]
+
     rise = bulwark_body_rise(frames, windows, gait["rise"],
                              gait.get("crouch", 0.0))
     # Central difference on a cycle that wraps, normalised by its own largest
@@ -2506,11 +2604,22 @@ def biped_cycle(groups, frames, geometry, joints, gait):
         # forward lean is positive and a nose-up pitch is subtracted from it.
         pitch = (gait["lean"] + gait.get("sway", 0.0) * math.sin(fast)
                  - gait.get("pitch", 0.0) * slope[f] / peak)
+        # THE COIL. A body yaw about the hip line, driven by the DIFFERENCE
+        # between the two legs' sweeps -- so the torso turns toward whichever
+        # leg is forward and squares up at the crossover, which is what a
+        # running animal's hips actually do. Zero on both existing gaits, and
+        # zero for any rig with fewer than two legs.
+        twist = 0.0
+        if gait.get("twist") and len(names) == 2:
+            twist = gait["twist"] * (sweep[names[0]][f] - sweep[names[1]][f]) / 2.0
         carry = IDENTITY
         if hip:
+            local = mat_rotate("y", pitch)
+            if twist:
+                local = mat_multiply(mat_rotate("z", twist), local)
             carry = mat_multiply(
                 mat_translate([0.0, 0.0, rise[f]]),
-                turn_about(hip, mat_rotate("y", pitch)))
+                turn_about(hip, local))
         pose = []
         for name, _offset in groups:
             if not name:
@@ -2529,7 +2638,53 @@ def biped_cycle(groups, frames, geometry, joints, gait):
                 leg = "leg_l" if name == "arm_l" else "leg_r"
                 swing = (-gait["arm"] * angles[leg][0][f]) if leg in angles \
                     else 0.0
-                placed = turn_about(joint, mat_rotate("y", swing))
+                # `arm_set` IS A POSTURE AND `arm` IS A MOTION, and the Vanguard
+                # is why they are two numbers. Its dash wants the arms held
+                # SWEPT BACK and barely pumping -- a constant plus a small
+                # swing -- and scaling the swing alone can only ever make them
+                # pump less about the same hanging rest pose. Positive is
+                # backward: `plant_leg`'s note applies to any limb that hangs,
+                # an increasing rotation about +y carries its far end to -x.
+                local = mat_rotate("y", swing + gait.get("arm_set", 0.0))
+                # ACROSS THE BODY, on the arm's own side. A rotation about +x
+                # takes a hanging limb toward +y, and `leg_l`/`arm_l` are the
+                # +y side (see `vanguard_group_of`), so `+side` is OUTWARD for
+                # the left arm and inward is the negative of it. `flare` is the
+                # constant part (a sprinter holds the arms clear of the ribs)
+                # and `swipe` is the moving part, raking IN as that side's own
+                # leg comes forward.
+                side = 1.0 if name == "arm_l" else -1.0
+                across = side * (gait.get("arm_flare", 0.0) -
+                                 gait.get("swipe", 0.0) *
+                                 (sweep[leg][f] if leg in sweep else 0.0))
+                if across:
+                    local = mat_multiply(local, mat_rotate("x", across))
+                placed = turn_about(joint, local)
+                ride = True
+            elif name.startswith("shard_"):
+                # A LOOSE FRAGMENT IS NOT PART OF ANY GAIT, AND ITS BAKED POSE
+                # IS DELIBERATELY THE IDENTITY.
+                #
+                # These groups are driven at DRAW time -- gl-world.js composes
+                # a matrix per shard per frame from the body's own shield
+                # timeline, because where a dropped shard is depends on where
+                # the road was when it fell, which no baked frame can know. An
+                # override is applied in its group's own space (see drawActor),
+                # so leaving the baked pose at identity is what makes that
+                # space the model's own rather than the torso's.
+                #
+                # It is also the honest fallback: a shattered body drawn with
+                # no override at all wears its shards exactly where the artist
+                # scattered them, static, rather than somewhere arbitrary.
+                placed = IDENTITY
+            elif name == "barrier":
+                # HELD LEVEL AGAINST THE BODY CARRYING IT, the same argument the
+                # head makes one branch down. The ring is bolted to the
+                # shoulders and hips, so it rides the machine -- but it is a
+                # field emitter, and a barrier that tips nose-down through every
+                # leap reads as a hoop somebody hung on the boss rather than as
+                # the thing that stops shots.
+                placed = turn_about(joint, mat_rotate("y", -pitch))
                 ride = True
             elif name == "head":
                 # Held LEVEL against the body that is carrying it -- the whole
@@ -2572,6 +2727,356 @@ def sprint_cycle(groups, frames, geometry, joints):
 def bound_cycle(groups, frames, geometry, joints):
     """The stripped Bulwark: a spring, one leg at a time."""
     return biped_cycle(groups, frames, geometry, joints, BOUND_GAIT)
+
+
+# --- the Vanguard, which is one machine in TWO GAITS -------------------------
+#
+# `vanguard.glb` and `vanguard-shattered.glb` are the fast boss with its bulwark
+# up and with it blown off, and both import through THIS rig. That is the
+# opposite arrangement to the Bulwark's pair next door, and the difference is
+# worth stating because the two look alike from a directory listing:
+#
+#   THE BULWARK'S TWO FILES ARE TWO GAITS. Its shield break is one-way and
+#   permanent, so the body before the break and the body after it never move
+#   the same way again; two rigs, one cycle each.
+#
+#   THE VANGUARD'S TWO FILES ARE ONE GAIT PAIR EACH. Its states are not
+#   before-and-after anything: it DASHES for the opening 400 u.l. and SKATES
+#   for the rest of the road (`Enemy.TYPES.boss_fast.sprint`), and it does both
+#   whether or not its shield is up -- the shield comes back every seven
+#   seconds. So the two cycles belong to the MODEL, as two bands, and each file
+#   carries both. `enemyModel` picks the file off the shield, `gaitBand` picks
+#   the band off the sprint, and neither has to know about the other.
+#
+# THE HIERARCHY IS THE RIG, as in every import here, and this one is the
+# cleanest of the set: `Vanguard > leg_1 | leg_-1 | upper_body > arm_1 | arm_-1`
+# with the barrier a fourth child. Nothing has to be matched on a keyword.
+#
+# `_1` IS THE LEFT SIDE AND `_-1` IS THE RIGHT, and it is measured rather than
+# assumed. Every `_1` part sits at source x > 0 (`foot_1` spans 0.130..0.550)
+# and every `_-1` part at x < 0. This file is Y-UP and faces +Z, so `build`'s
+# remap sends source +x to game +y -- and game +y is the LEFT of a body facing
+# +x. Getting it backwards would not draw anything wrong on its own; it would
+# pair each arm with the wrong leg and swing them together instead of against
+# each other.
+#
+# TWO NODES CARRY A SIDE TOKEN AND ARE NOT LIMBS: `crest_horn_left` and
+# `crest_horn_right` are helmet horns, and they are claimed by the head list
+# below before any side test could reach them. The head is matched on its own
+# names because the artist left it flat under `upper_body` rather than under a
+# `head` node -- the one place in these two files where a name has to be read.
+VANGUARD_HEAD_PARTS = (
+    "neck", "helm", "helm_brow", "helm_gash", "visor", "jaw",
+    "crest_fin", "crest_horn_left", "crest_horn_right",
+)
+
+
+def vanguard_group_of(part, options):
+    """Which animated group a mesh belongs to, from its ancestry.
+
+    Six groups on the intact body -- two legs, two arms, the head, the barrier
+    ring, and the torso that carries the rest -- and TEN MORE on the shattered
+    one, because every loose shield fragment is driven separately at draw time
+    and a group is the only thing this format can drive.
+
+    A SHARD IS ITS OWN GROUP AND EVERYTHING ELSE UNDER `barrier_shattered` IS
+    NOT. The three part-reformed ring segments (`reforming_frame_*`,
+    `reforming_node_*`) are the stub of the barrier growing back and belong to
+    the ring; the ten `shard_*` are the pieces in flight. Both live under the
+    same parent node, so the parent cannot separate them and the name does.
+    """
+    chain = part["chain"]
+    name = part["name"].lower()
+    limb = (chain[1] if len(chain) > 1 else name).lower()
+    # The arms hang off `upper_body`, one level deeper than the legs.
+    sub = (chain[2] if len(chain) > 2 else "").lower()
+
+    if limb == "leg_1":
+        return "leg_l"
+    if limb == "leg_-1":
+        return "leg_r"
+    if sub == "arm_1":
+        return "arm_l"
+    if sub == "arm_-1":
+        return "arm_r"
+    if limb == "barrier":
+        return "barrier"
+    if limb == "barrier_shattered":
+        return name if name.startswith("shard_") else "barrier"
+    if name in VANGUARD_HEAD_PARTS:
+        return "head"
+    return options.body_group
+
+
+def vanguard_pivot_of(name, points, refs):
+    """Where a group turns: the humanoid's answer, plus two this rig adds.
+
+    A LOOSE SHARD TURNS ABOUT ITS OWN CENTRE, which is the only point on it
+    that means anything -- it is tumbling, not hinged, and gl-world.js rotates
+    it about exactly this point when it throws it and again when it draws it
+    back in. The centroid of its own vertices, so a shard the artist moves
+    moves its pivot with it.
+
+    THE BARRIER TURNS ABOUT THE BODY'S AXIS AND NOT ABOUT ITS OWN MASS. It is a
+    ring, so its centroid is on the axis in x and y already; what has to be
+    said is the HEIGHT, and it is the ring's own mid-height rather than its
+    lowest point, because a hoop held level pivots through its middle.
+    """
+    if name.startswith("shard_"):
+        return [sum(p[k] for p in points) / len(points) for k in range(3)]
+    if name == "barrier":
+        zs = [p[2] for p in points]
+        return [0.0, 0.0, (min(zs) + max(zs)) / 2.0]
+    return humanoid_pivot_of(name, points, refs)
+
+
+# THE DASH: the opening 400 u.l., and the brief is an EXPLOSION rather than a
+# fast walk (the owner, 2026-08-26: "the unit explodes forward with an explosive
+# burst of speed, a dash, with his arms swept back, body leaning forward").
+#
+# WHAT MAKES IT READ AS ACCELERATION IS THE DUTY, NOT THE RATE. The cycle is
+# distance-driven like every other body's -- one cycle per 0.899281 model units
+# whatever the speed -- so the sprint plays this twice as fast for free and no
+# number here is allowed to be about "faster". What IS about the dash is that
+# the machine is barely on the road: at 0.22 duty, seven of sixteen frames have
+# nothing down, in two long suspensions, which is shorter contact than the
+# hound's gallop and by some way the shortest in this file.
+VANGUARD_DASH_PHASE = {"leg_l": 0.75, "leg_r": 0.25}
+VANGUARD_DASH_DUTY = 0.22
+# Picks the boots up hard and throws them a long way forward in the air. A
+# 3-frame contact buys a very short plant arc, and `leg_series` pays it back as
+# protraction -- the same trade the hound's 0.85 makes, and affordable here for
+# the reason the Bulwark's bound could not afford it: this body's legs are
+# jointed thigh-shin-ankle-foot with the foot a tenth of its height, not one
+# rigid slab a third of it.
+VANGUARD_DASH_LIFT = 0.085
+VANGUARD_DASH_REACH = 0.80
+# Small. A dash is FLAT -- the body is being thrown forward, not upward, and
+# every unit of rise here is a unit of bounce, and the other gait does not
+# bounce at all -- it glides. See `vanguard_skate_cycle`.
+VANGUARD_DASH_RISE = 0.030
+VANGUARD_DASH_CROUCH = 0.018
+# 0.32 RAD OF PERMANENT FORWARD LEAN -- three times the zombie's stoop and the
+# largest constant in the file. This is the whole silhouette of the state: mass
+# ahead of the feet, which is what a body accelerating actually looks like and
+# what a body at constant speed cannot look like without falling over.
+VANGUARD_DASH_LEAN = 0.32
+VANGUARD_DASH_PITCH = 0.10
+# THE ARMS ARE A POSTURE HERE AND A MOTION IN THE OTHER GAIT. 0.95 rad swept
+# back and held, against a swing of 0.20 -- they trail, they do not pump. See
+# `arm_set` in `biped_cycle` for why that needs a second number.
+VANGUARD_DASH_ARM = 0.20
+VANGUARD_DASH_ARM_SET = 0.95
+VANGUARD_DASH_ARM_FLARE = 0.30
+# Head down into the run and almost still: a body at 175 u.l./s is not looking
+# around.
+VANGUARD_DASH_HEAD_LEAD = 0.22
+VANGUARD_DASH_HEAD_NOD = 0.020
+
+
+# THE SKATE: everything after the sprint is spent.
+#
+# The owner, 2026-08-26, replacing the bounding attack run authored earlier the
+# same day: *"make the vanguard slide as if he has roller skates after his
+# initial dash."*
+#
+# THE BOUND IS DELETED RATHER THAN LEFT UNREACHABLE. Its phase table, duty,
+# rise, crouch and pitch are gone, not commented out and not zeroed -- a zeroed
+# gait draws a flawless-looking body standing still, passes every gate, and
+# reports nothing. No `VANGUARD_BOUND_` constant survives anywhere in this
+# file, because nothing should be able to half-restore one.
+#
+# THIS IS THE FIRST GAIT IN THE FILE THAT IS NOT A SOLVE, AND THAT IS THE WHOLE
+# POINT OF IT. Every walker here exists to keep a planted sole on ONE patch of
+# road: `solve_hip_angles` inverts the hip rotation frame by frame so the
+# contact travels backward by exactly the ground the body covers, and
+# `check-gait-slip.js` grades the result at zero. A skate is the precise
+# opposite claim. The wheels roll, so the contact moves FORWARD with the
+# machine at the machine's own speed, and a foot that stayed put would be a
+# foot that had stopped rolling. So there is no plant window, no swing lift, no
+# `leg_series` and no `airborne_lift` in here at all -- what the legs do is
+# authored, and the only thing borrowed from the walkers is `set_down`, which
+# keeps the wheels ON the road while they slide along it.
+#
+# The consequence is that this band scores the largest gait error in the
+# library and MUST. `check-gait-slip.js` carries a per-band `GLIDES` exemption
+# naming exactly `enemy-boss_fast#0` and `enemy-boss_fast-shattered#0`; band 1,
+# the dash, still plants and still reads 0.000. Read that table before treating
+# either number as a fault.
+#
+# WHAT MAKES IT READ AS SKATING RATHER THAN AS A BODY BEING DRAGGED:
+#
+#   THE LEGS GO OUT TO THE SIDE, NOT FORE AND AFT. A run is a rotation about
+#   +y; a skate is mostly a rotation about +x, one leg pushing out into the
+#   stroke while the other rides in under the body. That is the silhouette
+#   difference, and it is why `arm_flare`'s axis is the one this gait spends
+#   its amplitude on.
+#
+#   THE WEIGHT TRANSFERS, ONCE PER STROKE. The body slides sideways over the
+#   riding skate and rolls into it, so the two are in phase and driven by the
+#   same term -- a skater leaning the wrong way is a skater falling over.
+#
+#   IT NEVER LEAVES THE GROUND. The only vertical is a shallow dip on each
+#   push. That is also what buys back the health-bar margin the bound was
+#   spending: 0.135 of rise against 0.022 of dip.
+VANGUARD_SKATE_SPLAY = 0.20     # rad, how far the wheels sit outside the hips
+VANGUARD_SKATE_PUSH = 0.34      # rad, added to the leg driving the stroke
+# Small. A skate DOES swing fore and aft -- the pushing leg trails behind the
+# body and the recovering one comes back under it -- but it is a fraction of
+# what a stride does, and overspending it turns the glide back into a walk.
+VANGUARD_SKATE_REACH = 0.16
+# How far the machine slides across its own centre line, in model units, and
+# how far it rolls into that slide. One stroke each way per cycle.
+VANGUARD_SKATE_SWAY = 0.055
+VANGUARD_SKATE_ROLL = 0.10
+# The dip on each push -- twice a cycle, because both legs push -- and it is
+# the ONLY vertical this gait has.
+VANGUARD_SKATE_DIP = 0.022
+# Pitched forward and held there. A skater's lean is a constant, not a
+# consequence of a leap, so this is authored where the dash's is authored and
+# the bound's came out of its own vertical velocity.
+VANGUARD_SKATE_LEAN = 0.22
+# The arms still work, and they still work AGAINST the legs -- which on a skate
+# means across the body rather than fore and aft. `swipe` is the claw rake the
+# earlier brief asked for, kept and re-timed: it now lands on each PUSH instead
+# of on each bounce, because that is the beat this gait has.
+VANGUARD_SKATE_ARM = 0.35
+VANGUARD_SKATE_SWIPE = 0.62
+VANGUARD_SKATE_ARM_FLARE = 0.22
+VANGUARD_SKATE_ARM_SET = 0.30
+# The coil, kept from the bound and now driven by the stroke: the torso turns
+# toward whichever skate is carrying, which is what a skater's shoulders do.
+VANGUARD_SKATE_TWIST = 0.18
+VANGUARD_SKATE_HEAD_LEAD = 0.10
+
+
+def vanguard_skate_cycle(groups, frames, geometry, joints):
+    """BAND 0: a long, low glide -- wheels down, weight rolling side to side.
+
+    Authored throughout. See the block above for why a solve would be the wrong
+    answer here rather than a more accurate one.
+
+    ONE STROKE PER LEG PER CYCLE, half a cycle apart, and every channel below is
+    a function of the same `stroke` term -- so the sway, the roll, the dip, the
+    coil, the arm swing and the rake cannot come apart from the legs or from
+    each other. That is the property `biped_cycle` gets from its plant windows
+    and this gait has to get from having a single drive.
+    """
+    legs = [n for n in ("leg_l", "leg_r") if n in geometry]
+    hip = joints.get("hip")
+
+    # +1 for the +y side. `vanguard_group_of`'s header measures which that is:
+    # source `_1` parts sit at x > 0, and the y-up remap sends source +x to
+    # game +y, which is the LEFT of a body facing +x.
+    side = {"leg_l": 1.0, "leg_r": -1.0}
+
+    poses = []
+    for f in range(frames):
+        t = f / float(frames)
+        cycle = t * 2 * math.pi
+
+        # How far through its own stroke each skate is: +1 at full push, -1
+        # fully gathered under the body.
+        stroke = {}
+        for name in legs:
+            stroke[name] = math.sin(cycle + (0.0 if side[name] > 0 else math.pi))
+
+        # WHICH SKATE IS CARRYING, as -1..+1. The body slides toward it and
+        # rolls into it, and the shoulders turn with it.
+        carry_to = 0.0
+        if len(legs) == 2:
+            carry_to = (stroke[legs[1]] - stroke[legs[0]]) / 2.0
+
+        # The dip is on the PUSH, so it is twice a cycle whatever the legs are
+        # called -- and it is taken off the strokes themselves rather than from
+        # a doubled sine, so a retimed stroke takes it along.
+        push = max(abs(stroke[n]) for n in legs) if legs else 0.0
+        drop = -VANGUARD_SKATE_DIP * push
+
+        local = mat_rotate("y", VANGUARD_SKATE_LEAN)
+        local = mat_multiply(mat_rotate("z", VANGUARD_SKATE_TWIST * carry_to),
+                             local)
+        local = mat_multiply(mat_rotate("x", VANGUARD_SKATE_ROLL * carry_to),
+                             local)
+        carry = IDENTITY
+        if hip:
+            carry = mat_multiply(
+                mat_translate([0.0, VANGUARD_SKATE_SWAY * carry_to, drop]),
+                turn_about(hip, local))
+
+        pose = []
+        for name, _offset in groups:
+            if not name:
+                pose.append(None)
+                continue
+            joint = joints[name]
+            ride = False
+            if name in stroke:
+                # OUT TO THE SIDE, always, and further on the push. The splay
+                # is what keeps the wheels outside the hips through the whole
+                # cycle; a leg that came back under the body every stroke would
+                # be stepping.
+                out = side[name] * (VANGUARD_SKATE_SPLAY + VANGUARD_SKATE_PUSH
+                                    * max(0.0, stroke[name]))
+                fore = VANGUARD_SKATE_REACH * stroke[name]
+                limb = mat_multiply(mat_rotate("y", fore),
+                                    mat_rotate("x", out))
+                # THE WHEELS STAY ON THE ROAD, AND DO NOT FOLLOW THE DIP.
+                # `plant_leg`'s rule, and it is load-bearing for the same
+                # reason: a hip that sinks 0.022 while the wheel stays put IS
+                # the leg compressing, which is the thing being drawn. Passing
+                # `drop` here instead of zero sinks the wheels into the tarmac
+                # by exactly the amount the body dropped -- measured at
+                # contactZ -0.0220 on the first build of this gait.
+                placed = set_down(geometry[name], joint, limb, 0.0)
+            elif name in ("arm_l", "arm_r"):
+                leg = "leg_l" if name == "arm_l" else "leg_r"
+                drive = stroke.get(leg, 0.0)
+                arm_side = 1.0 if name == "arm_l" else -1.0
+                limb = mat_rotate("y", VANGUARD_SKATE_ARM_SET
+                                  - VANGUARD_SKATE_ARM * drive)
+                across = arm_side * (VANGUARD_SKATE_ARM_FLARE
+                                     - VANGUARD_SKATE_SWIPE * drive)
+                limb = mat_multiply(limb, mat_rotate("x", across))
+                placed = turn_about(joint, limb)
+                ride = True
+            elif name == "head":
+                # Level against the body carrying it, exactly as `biped_cycle`
+                # holds it: the lean and the roll are both subtracted before
+                # the head's own lead is added, so the eyes stay on the road
+                # through every weight transfer.
+                placed = turn_about(joint, mat_multiply(
+                    mat_rotate("y", VANGUARD_SKATE_HEAD_LEAD
+                               - VANGUARD_SKATE_LEAN),
+                    mat_rotate("x", -VANGUARD_SKATE_ROLL * carry_to)))
+                ride = True
+            elif name.startswith("shard_"):
+                # Driven at draw time. See `biped_cycle` for the whole of why.
+                placed = IDENTITY
+            elif name == "barrier":
+                placed = turn_about(joint,
+                                    mat_rotate("y", -VANGUARD_SKATE_LEAN))
+                ride = True
+            else:
+                placed = carry
+            pose.append(mat_multiply(carry, placed) if ride else placed)
+        poses.append(pose)
+    return poses
+
+
+VANGUARD_DASH_GAIT = {
+    "phase": VANGUARD_DASH_PHASE, "duty": VANGUARD_DASH_DUTY,
+    "lift": VANGUARD_DASH_LIFT, "reach": VANGUARD_DASH_REACH,
+    "rise": VANGUARD_DASH_RISE, "crouch": VANGUARD_DASH_CROUCH,
+    "lean": VANGUARD_DASH_LEAN, "pitch": VANGUARD_DASH_PITCH,
+    "arm": VANGUARD_DASH_ARM, "arm_set": VANGUARD_DASH_ARM_SET,
+    "arm_flare": VANGUARD_DASH_ARM_FLARE,
+    "head_lead": VANGUARD_DASH_HEAD_LEAD, "head_nod": VANGUARD_DASH_HEAD_NOD,
+}
+
+def vanguard_dash_cycle(groups, frames, geometry, joints):
+    """BAND 1: the opening burst -- swept back, leant over, barely down."""
+    return biped_cycle(groups, frames, geometry, joints, VANGUARD_DASH_GAIT)
 
 
 # --- the rigs, and what each one is a set of --------------------------------
@@ -2782,6 +3287,36 @@ RIGS = {
         # together -- and it is the shielded body's number rather than a second
         # one so that a bare re-run cannot silently resize half of a pair.
         "default_size": 1.354,
+        "legs": ("leg_l", "leg_r"),
+        "origin_pivot": True,
+    },
+    # ONE RIG FOR BOTH VANGUARD FILES, AND TWO CYCLES INSIDE IT. See the block
+    # above `VANGUARD_HEAD_PARTS` for why that is the opposite arrangement to
+    # the Bulwark's pair and still the right one.
+    #
+    # Y-UP AND FACING +Z, which is the glTF convention and the default here, so
+    # neither `source_up` nor `source_forward` appears. Measured rather than
+    # assumed: feet on y = 0 and the crest tip at y 4.35, `visor` at z
+    # 0.230..0.290 and `toe_claw_1` at z 0.360..0.560 against `back_plate` at
+    # z -0.400..-0.240. Both files agree.
+    "vanguard": {
+        "group_of": vanguard_group_of,
+        "pivot_of": vanguard_pivot_of,
+        # BAND 0 IS THE SKATE AND BAND 1 IS THE DASH, in that order and not the
+        # other one. Band 0 is what every reader that does not know about bands
+        # falls back to (`walkBand` in gl-world.js, and the exporter's own
+        # contract note), and the skate is the gait this body spends all but the
+        # first 400 u.l. of its life in. A fallback should be the common case.
+        "cycles": (vanguard_skate_cycle, vanguard_dash_cycle),
+        "fit_axis": 1,                  # glTF Y: sole to crest tip
+        "fit_name": "height",
+        # 1.298, WHICH IS THE BODY THIS ONE REPLACES AND NOT THIS MESH'S OWN
+        # PROPORTIONS -- `tools/check-model-top.js` reads exactly 1.298 off the
+        # chassis-built enemy-boss_fast, and at the type's sizeScale of 1.9 that
+        # is the 78.4 board px every wave the Vanguard appears in was balanced
+        # to read. Same argument as the plodder's 0.979, the Tyrant's 1.076, the
+        # beacon's 1.40 and the Bulwark's 1.354.
+        "default_size": 1.298,
         "legs": ("leg_l", "leg_r"),
         "origin_pivot": True,
     },
@@ -3047,7 +3582,27 @@ def build(gltf, options):
         out_groups.append({"name": name, "first": first,
                            "count": len(colour_index) * 3 - first})
 
-    frames = rig["cycle"](groups, options.frames, emitted, joints)
+    # ONE CYCLE OR SEVERAL, AND SEVERAL ARE DECLARED AS `bands` RATHER THAN
+    # COUNTED BY A READER.
+    #
+    # A rig with more than one gait concatenates them into the single frame list
+    # the format has and says where each one starts and how long it is. That
+    # pair is the whole contract -- `export_mesh.py` emits the same field for
+    # the same reason, and gl-world.js's `walkBand` exists because every
+    # off-by-one it replaced came from a reader dividing `frames.length` by
+    # something. A reader must never divide.
+    #
+    # ABSENT MEANS "THIS RIG DID NOT DECLARE A LAYOUT", which is what every
+    # import before this one wants: one cycle, and the whole list is it. That is
+    # also what keeps those seven models byte-identical across this change --
+    # the single-cycle path runs exactly the call it used to.
+    cycles = rig.get("cycles") or (rig["cycle"],)
+    frames = []
+    bands = []
+    for cycle in cycles:
+        block = cycle(groups, options.frames, emitted, joints)
+        bands.append([len(frames), len(block)])
+        frames.extend(block)
     frames = [[None if m is None else
                [round(m[r][c], 5) for c in range(4) for r in range(4)]
                for m in pose] for pose in frames]
@@ -3055,7 +3610,8 @@ def build(gltf, options):
     return {"name": options.name, "triangles": len(colour_index),
             "palette": palette, "positions": positions, "normals": normals,
             "colourIndex": colour_index, "groups": out_groups,
-            "frames": frames, "before": before, "after": after,
+            "frames": frames, "bands": bands if len(cycles) > 1 else None,
+            "before": before, "after": after,
             "scale": scale, "span": span}
 
 
@@ -3079,6 +3635,13 @@ def write_js(model, filename, source):
         "  triangles: %d," % model["triangles"],
         "  palette: %s," % json.dumps(model["palette"]),
         "  groups: %s," % json.dumps(model["groups"]),
+    ] + ([
+        # Emitted ONLY by a rig that declared more than one cycle. An absent
+        # `bands` is not "no bands" and not "one band" -- it means this model
+        # never declared a layout, and every reader falls back to treating the
+        # whole list as one cycle. See `build`.
+        "  bands: %s," % json.dumps(model["bands"]),
+    ] if model.get("bands") else []) + [
         "  frames: %s," % json.dumps(model["frames"]),
         "  positions: %s," % arr(model["positions"]),
         "  normals: %s," % arr(model["normals"]),
@@ -3543,6 +4106,9 @@ def main():
           % (args.rig, fit, args.size, model["span"], model["scale"]))
     if args.exclude:
         print("   dropped: %s" % ", ".join(args.exclude))
+    if model.get("bands"):
+        print("   bands: %s" % ", ".join(
+            "[%d, %d]" % (b[0], b[1]) for b in model["bands"]))
     for g in model["groups"]:
         print("   %-16s %6d tris" % (g["name"] or "(thorax)", g["count"] // 3))
 
