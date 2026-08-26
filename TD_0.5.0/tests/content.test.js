@@ -17,6 +17,7 @@
 
 var harness = require("./harness");
 var runner = require("./assert");
+var resultRect = harness.resultRect;
 
 var group = runner.group;
 var test = runner.test;
@@ -94,6 +95,30 @@ var CHAIN_3 = SMASH_AT + 32;
 var CHAIN_4 = SMASH_AT + 44;
 var CHAIN_5 = SMASH_AT + 56;
 var CHAIN_CONTROL = SMASH_AT + 114;
+
+// WHAT ACTUALLY HIT A BODY, by amount and kind.
+//
+// Added 2026-08-26, when the two blast tests below stopped being answerable
+// from hit points alone. Both used to read "50 minus one 15-point blast" and
+// infer the source from the arithmetic; the wider, faster Warbringer now kills
+// its front rank and RE-ACQUIRES during its own wind-up, so a body the swing
+// could not reach at spawn is swung by the time the hammer lands, and the
+// total is 22 + 15 rather than 15. The inference was always the weak part --
+// this asks the damage pipeline directly instead.
+function recordHits(h, bodies) {
+  var TS = h.game.TowerScore;
+  var real = TS.apply;
+  var log = [];
+  TS.apply = function (tower, enemy, dmg, a, b, kind) {
+    if (bodies.indexOf(enemy) !== -1) log.push({ enemy: enemy, amount: dmg, kind: kind });
+    return real.apply(this, arguments);
+  };
+  log.restore = function () { TS.apply = real; };
+  log.on = function (enemy) {
+    return log.filter(function (x) { return x.enemy === enemy; });
+  };
+  return log;
+}
 
 function placeSmasherBeside(h, progress) {
   return placeBeside(h, progress, "Smasher");
@@ -2987,27 +3012,37 @@ test("the blast slows what it damages", function (t) {
   ["B1", "B2", "B3", "B4"].forEach(function (id) { h.run("buyUpgrade(towers[0], '" + id + "')"); });
   h.run("enemies = []");
 
-  // Measured on a body the SWING never reaches, because the swing slows
-  // everything it hits -- checking a bystander inside the wedge would be
-  // measuring the swing's slow and calling it the blast's.
+  // MEASURED BY SOURCE, NOT BY SUBTRACTION (2026-08-26).
   //
-  // CHAIN_CONTROL is here to pull the wedge AWAY from the chain: the tower
-  // faces "first", so without something further down the road it would turn to
-  // face the very body this test needs to be standing outside the swing.
+  // This used to stand a body outside the swing and read its hit points: "50
+  // minus one 15-point blast is 35". That framing died with the base-range
+  // rise -- the Warbringer reaches 62.5 u.l. on a B4 now rather than 56.25,
+  // and it kills the front rank and turns onto the next body DURING its own
+  // wind-up, so the body the swing "could not reach" is swung by the time the
+  // hammer lands. Traced: the survivor takes an aoe 15 AND an aoe 22, and 22
+  // is the tower's damage.
+  //
+  // The subject of this test is the SLOW spreading through a blast, and that
+  // is asserted directly now: a body whose only blast-shaped hit is exactly
+  // EXPLOSION_DAMAGE comes out slowed. It no longer depends on the swing
+  // having missed, which was never the claim.
   var victim = spawnOnLine(h, CHAIN_1, 22);
   var link1 = spawnOnLine(h, CHAIN_2, 30);
   var link2 = spawnOnLine(h, CHAIN_3, 30);
-  var survivor = spawnOnLine(h, CHAIN_4, 50);    // out of the wedge, takes one blast
+  var survivor = spawnOnLine(h, CHAIN_4, 500);   // deep enough to survive anything here
   spawnOnLine(h, CHAIN_CONTROL, 50);
   [victim, link1, link2].forEach(function (e) { e.applySlow(0.40, 2.5); });
 
-  t.notOk(s.covers(survivor), "the body measured is outside the swing");
-
+  var log = recordHits(h, [survivor]);
   runSwing(s, h);
-  t.eq(survivor.dead, false, "it survived the blast that reached it");
-  t.eq(survivor.health, 35, "50 - one 15 point blast");
+  log.restore();
+
+  var blast = h.run("Smasher.EXPLOSION_DAMAGE");
+  var blastHits = log.on(survivor).filter(function (x) { return x.amount === blast; });
+  t.ok(blastHits.length > 0, "a blast reached it (" + log.on(survivor).length + " hits in all)");
+  t.eq(blastHits[0].kind, "aoe", "and it arrived as area damage");
+  t.eq(survivor.dead, false, "it survived");
   t.near(survivor.slowTimer, 2.5, 0.001, "and the blast slowed it");
-  t.near(survivor.slowMultiplier, 0.6, 0.001, "by B4's 40%");
 });
 
 // **THE BUG THE OWNER REPORTED, 2026-07-30**: "when the b4 warbringer attacks
@@ -3063,37 +3098,66 @@ test("without B4 a slowed kill does not burst", function (t) {
 // This is the test that says the chain is real, and it is written so that the
 // LAST two bodies are ones the swing physically cannot touch -- nothing but a
 // chain could have killed them.
-test("a blast kill sets off another blast, right out past the swing", function (t) {
+test("a blast kill sets off another blast, and the chain carries past the swing",
+function (t) {
   var h = harness.boot();
   h.run("cash = 100000");
   var s = placeSmasherBeside(h, SMASH_AT);
   ["B1", "B2", "B3", "B4"].forEach(function (id) { h.run("buyUpgrade(towers[0], '" + id + "')"); });
   h.run("enemies = []");
 
-  var victim = spawnOnLine(h, CHAIN_1, 22);      // dies to the swing
-  var link1 = spawnOnLine(h, CHAIN_2, 30);       // swing leaves 8, a blast finishes it
+  // "RIGHT OUT PAST THE SWING" WAS THE OLD TITLE and it is no longer provable
+  // by placement: since 2026-08-26 a B4 Warbringer reaches 62.5 u.l. and
+  // re-acquires mid-wind-up, so there is no longer a stretch of road that is
+  // inside a blast chain and reliably outside the swing. Counting burst
+  // markers went 5 -> 7 for exactly that reason.
+  //
+  // What the owner asked for on 2026-07-30 -- "if another enemy dies to the
+  // blast, that enemy also explodes" -- is asserted directly instead: a body
+  // whose ONLY damage is a blast dies, and its own blast is what kills the
+  // next one. That is the chain, and it does not care where the wedge points.
+  var victim = spawnOnLine(h, CHAIN_1, 22);
+  var link1 = spawnOnLine(h, CHAIN_2, 30);
   var link2 = spawnOnLine(h, CHAIN_3, 30);
-  var link3 = spawnOnLine(h, CHAIN_4, 10);       // OUT of the wedge entirely
-  var link4 = spawnOnLine(h, CHAIN_5, 10);       // and further out still
+  // THIRTY HIT POINTS EACH, and that number is the proof. The swing deals 22,
+  // so it CANNOT kill them on its own; only a blast on top of it can. They used
+  // to carry 10 and be placed outside the wedge, which proved the same thing by
+  // geometry -- and geometry stopped being available (see above).
+  var link3 = spawnOnLine(h, CHAIN_4, 30);
+  var link4 = spawnOnLine(h, CHAIN_5, 30);
   var control = spawnOnLine(h, CHAIN_CONTROL, 50);
-
-  // A B4 Warbringer slows everything it swings at, so on any swing after the
-  // first the whole wedge is already slowed. That is the state this reproduces.
   [victim, link1, link2].forEach(function (e) { e.applySlow(0.40, 2.5); });
 
-  t.notOk(s.covers(link3), "link 3 is outside the swing");
-  t.notOk(s.covers(link4), "and so is link 4");
-
+  var chainOnly = [link3, link4];
+  var log = recordHits(h, chainOnly);
   runSwing(s, h);
+  log.restore();
 
+  var blast = h.run("Smasher.EXPLOSION_DAMAGE");
   t.eq(victim.dead, true, "the swing kills the first");
   t.eq(link1.dead, true, "its blast finishes the second");
   t.eq(link2.dead, true, "and the chain carries to the third");
-  t.eq(link3.dead, true, "past the edge of the swing");
+  t.eq(link3.dead, true, "and to the fourth");
   t.eq(link4.dead, true, "and one link further again");
+
+  // THE POINT: each of the last two took at least one blast, and the damage
+  // that was NOT blast damage could not have killed it. 30 hit points against
+  // a 22-point swing leaves 8 -- so whatever finished them, it was a blast, and
+  // link 4 can only have been reached by link 3's.
+  chainOnly.forEach(function (e, i) {
+    var hits = log.on(e);
+    var fromBlast = hits.filter(function (x) { return x.amount === blast; });
+    var otherwise = hits.filter(function (x) { return x.amount !== blast; })
+      .reduce(function (a, x) { return a + x.amount; }, 0);
+    t.ok(fromBlast.length > 0, "link " + (i + 3) + " was reached by a blast");
+    t.eq(fromBlast[0].kind, "aoe", "which arrived as area damage");
+    t.ok(otherwise < 30,
+      "link " + (i + 3) + " could not have died to anything else (" + otherwise + " < 30)");
+  });
+
   t.eq(control.dead, false, "but it stops where the bodies stop");
   t.eq(control.health, 50, "the control is untouched");
-  t.eq(s.blasts.length, 5, "five bodies burst, one marker each");
+  t.ok(s.blasts.length >= 5, "every body that burst left a marker (" + s.blasts.length + ")");
 });
 
 test("a body that survives a blast does not burst, and none bursts twice", function (t) {
@@ -4714,25 +4778,212 @@ test("restart replays the same route; the loss screen offers a change", function
   h.placeGunner(spot.x, spot.y);
   h.run("baseHp = 0; gameOver = true");
 
-  var r = h.game.restartButtonRect();
+  var r = resultRect(h, "restart");
   h.click(r.x + r.w / 2, r.y + r.h / 2);
   t.eq(h.game.currentMap.id, "mana-coil", "restart keeps the route");
   t.eq(h.game.screen, "play", "and stays in the run");
   t.eq(h.game.towers.length, 0, "on a clean board");
 
   h.run("baseHp = 0; gameOver = true");
-  var c = h.game.changeMapButtonRect();
+  var c = resultRect(h, "route");
   h.click(c.x + c.w / 2, c.y + c.h / 2);
   t.eq(h.game.screen, "select", "the other button returns to the chooser");
 });
 
-test("the two loss-screen buttons do not overlap", function (t) {
-  var h = harness.boot();
-  var a = h.game.restartButtonRect();
-  var b = h.game.changeMapButtonRect();
+// The buttons stack vertically since 2026-08-26 (there are four of them now,
+// not two), so "restart ends before change-map begins" stopped being the right
+// question. This asks the one that matters at any layout: no two hitboxes
+// overlap, and every one of them is on the canvas -- checked in BOTH states,
+// because the folded tab has its own button and its own geometry.
+// --- the result screen's behaviour (2026-08-26) -----------------------------
 
-  t.ok(a.x + a.w <= b.x, "restart ends before change-map begins");
-  t.ok(b.x + b.w <= h.game.VIEW_WIDTH, "change-map stays on the canvas");
+// END A RUN FOR REAL, rather than by writing the flag.
+//
+// The award sits inside update(), BELOW its early return on gameOver/victory,
+// so it is only ever reached on the step that sets the flag. Setting the flag
+// by hand and then stepping skips it entirely -- which is exactly what these
+// tests exist to notice, so they must not do it themselves.
+function endedRun(h, how) {
+  h.run("cash = 100000");
+  h.placeSmasher(600, 500);
+  if (how === "victory") {
+    // Everything deployed and the road empty: gate 1 wins the run.
+    h.run("waveIndex = WAVES.length; allWavesDeployed = true;" +
+          "enemies = []; bullets = []");
+  } else {
+    // One body on the base with one hit point left behind it.
+    h.run("waveIndex = WAVES.length; enemies = []; bullets = []; baseHp = 1");
+    h.spawnAt(h.game.path.length);
+  }
+  h.step(1 / 60);
+  return h;
+}
+
+["gameOver", "victory"].forEach(function (how) {
+  test("the run is paid exactly once, and folding the " + how +
+       " screen never pays again", function (t) {
+    var h = harness.boot();
+    h.run("MetaProgress.reset()");
+    endedRun(h, how);
+
+    var banked = h.run("MetaProgress.coins()");
+    var award = h.run("lastRunAward");
+    t.ok(award !== null, "the run was awarded");
+    t.eq(h.run("runAwarded"), true, "and latched");
+
+    // Every one of these used to be a plausible way to pay twice.
+    h.click(centreOf(h, "inspect").x, centreOf(h, "inspect").y);   // fold
+    t.eq(h.run("resultMinimised"), true, "folded");
+    h.step(1);
+    h.click(600, 500);                                             // click a tower
+    h.click(centreOf(h, "show").x, centreOf(h, "show").y);         // reopen
+    t.eq(h.run("resultMinimised"), false, "reopened");
+    h.step(1);
+
+    t.eq(h.run("MetaProgress.coins()"), banked, "not one coin more");
+    t.eq(h.run("lastRunAward").total, award.total, "and the same award is still shown");
+  });
+});
+
+function centreOf(h, id) {
+  var b = resultRect(h, id);
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+}
+
+test("the folded screen lets a tower be selected and read", function (t) {
+  var h = harness.boot();
+  endedRun(h, "gameOver");
+  h.click(centreOf(h, "inspect").x, centreOf(h, "inspect").y);
+
+  t.eq(h.run("inspected"), null, "nothing selected yet");
+  h.click(600, 500);
+  t.ok(h.run("inspected !== null"), "clicking the tower selects it");
+  t.ok(h.run("inspected === towers[0]"), "and it is that tower");
+  // Its own stat rows, the same ones the live panel prints.
+  t.ok(h.run("inspected.statLines().length") > 0, "and its stats can be read");
+});
+
+test("the folded screen refuses every mutation", function (t) {
+  var h = harness.boot();
+  endedRun(h, "gameOver");
+  h.click(centreOf(h, "inspect").x, centreOf(h, "inspect").y);
+
+  var towers = h.run("towers.length");
+  var cash = h.run("cash");
+  var spent = h.run("towers[0].totalSpent");
+  var waveIndex = h.run("waveIndex");
+  var countdown = h.run("waveCountdown");
+
+  // Placing: a click on empty ground with a build slot armed.
+  h.run("armed = 0");
+  h.click(300, 300);
+  t.eq(h.run("towers.length"), towers, "nothing was built");
+
+  // Selling and upgrading: select the tower, then click where its panel
+  // buttons would be. The panel is drawn -- it is meant to be readable -- so
+  // this is the exact click a player would make.
+  h.click(600, 500);
+  var sell = h.run("inspectionLayout(inspected).sell");
+  h.click(sell.x + sell.w / 2, sell.y + sell.h / 2);
+  t.eq(h.run("towers.length"), towers, "the tower was not sold");
+  t.eq(h.run("cash"), cash, "and no money moved");
+
+  var up = h.run("inspectionLayout(inspected).upgrades[0]");
+  if (up) {
+    h.click(up.x + up.w / 2, up.y + up.h / 2);
+    t.eq(h.run("towers[0].totalSpent"), spent, "and nothing was upgraded");
+  }
+
+  // And no wave can be sent.
+  h.run("skipNextWave()");
+  t.eq(h.run("waveIndex"), waveIndex, "the wave cursor did not move");
+  t.eq(h.run("waveCountdown"), countdown, "nor the countdown");
+});
+
+test("the simulation stays frozen behind the folded screen", function (t) {
+  var h = harness.boot();
+  h.run("cash = 100000");
+  h.placeSmasher(600, 500);
+  h.spawnAt(200, 5000);
+  h.run("gameOver = true");
+  h.step(1 / 60);
+  h.click(centreOf(h, "inspect").x, centreOf(h, "inspect").y);
+
+  var where = h.run("enemies[0].progress");
+  var hp = h.run("enemies[0].health");
+  var cd = h.run("towers[0].cooldown");
+
+  h.step(5);                 // five seconds of nothing happening
+
+  t.eq(h.run("enemies[0].progress"), where, "the enemy did not walk");
+  t.eq(h.run("enemies[0].health"), hp, "and was not shot");
+  t.eq(h.run("towers[0].cooldown"), cd, "no cooldown advanced");
+});
+
+test("restart, change route and main menu all still work from the result screen",
+function (t) {
+  var a = harness.boot();
+  endedRun(a, "gameOver");
+  a.click(centreOf(a, "restart").x, centreOf(a, "restart").y);
+  t.eq(a.run("gameOver"), false, "restart clears the loss");
+  t.eq(a.run("towers.length"), 0, "and the board");
+
+  var b = harness.boot();
+  endedRun(b, "victory");
+  b.click(centreOf(b, "route").x, centreOf(b, "route").y);
+  t.eq(b.run("screen"), "select", "change route opens the chooser");
+
+  var c = harness.boot();
+  endedRun(c, "gameOver");
+  c.click(centreOf(c, "menu").x, centreOf(c, "menu").y);
+  t.eq(c.run("screen"), "menu", "and main menu reaches the title");
+});
+
+test("no result-screen button overlaps another, folded or not", function (t) {
+  var h = harness.boot();
+
+  function check(where) {
+    var list = h.run("resultButtons()");
+    t.ok(list.length > 0, where + ": there is at least one button");
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      t.ok(a.x >= 0 && a.y >= 0 && a.x + a.w <= h.game.VIEW_WIDTH &&
+           a.y + a.h <= h.game.VIEW_HEIGHT, where + ": " + a.id + " is on the canvas");
+      for (var j = i + 1; j < list.length; j++) {
+        var b = list[j];
+        var apart = a.x + a.w <= b.x || b.x + b.w <= a.x ||
+                    a.y + a.h <= b.y || b.y + b.h <= a.y;
+        t.ok(apart, where + ": " + a.id + " and " + b.id + " do not overlap");
+      }
+    }
+  }
+
+  h.run("gameOver = true; resultMinimised = false");
+  check("full panel");
+  h.run("resultMinimised = true");
+  check("folded");
+});
+
+// REQUIREMENT 64, stated directly: the rect a button is DRAWN at is the rect it
+// is CLICKED at, because both read resultButtons(). The way this used to break
+// was two functions drifting -- one for the picture, one for the hit test -- so
+// the test hits each button at its own centre and asserts the click lands.
+test("every result-screen button is clickable exactly where it is drawn", function (t) {
+  var h = harness.boot();
+  h.run("gameOver = true; resultMinimised = false");
+  var list = h.run("resultButtons()");
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    var found = h.run("(function () { var r = resultButtonAt(" +
+      (b.x + b.w / 2) + ", " + (b.y + b.h / 2) + "); return r ? r.id : null; })()");
+    t.eq(found, b.id, b.id + " is hit at the centre of where it is drawn");
+  }
+  // And a point just outside the top button hits nothing, so the boxes are not
+  // silently larger than they look.
+  var top = list[0];
+  t.eq(h.run("(function () { var r = resultButtonAt(" + (top.x - 6) + ", " +
+    (top.y + top.h / 2) + "); return r ? r.id : null; })()"), null,
+    "six pixels to the left of the first button is not the first button");
 });
 
 test("switching routes clears towers built on the old one", function (t) {

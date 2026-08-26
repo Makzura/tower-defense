@@ -509,4 +509,19 @@ function w(h, value) {
 }
 
 
-module.exports = { boot: boot, gameScripts: gameScripts, w: w };
+// WHERE A RESULT-SCREEN BUTTON ACTUALLY IS, asked of the game rather than
+// typed. Since 2026-08-26 `resultButtons()` is the single source of both the
+// drawing and the hit test, and which buttons exist depends on whether the
+// panel is folded -- so a test that wants to click one has to ask, exactly as
+// onClick does. Typing a rect here is how a suite ends up clicking a button
+// that has moved and reporting the move as a behaviour change.
+function resultRect(h, id) {
+  var list = h.run("resultButtons()");
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === id) return list[i];
+  }
+  throw new Error("harness: no result button '" + id + "' (folded: " +
+    h.run("resultMinimised") + ")");
+}
+
+module.exports = { boot: boot, gameScripts: gameScripts, w: w, resultRect: resultRect };

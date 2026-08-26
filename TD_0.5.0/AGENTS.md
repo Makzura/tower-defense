@@ -2578,8 +2578,31 @@ identically and is forgotten afterwards — playable, honest, never a crash.
 profile from what it recognises and drops the rest: unknown tower ids, negative
 coins, equipping something you do not own, a bar of the wrong length.
 
-**The payout is a pure function**, `coinsForRun(waveReached, victory)` = two
-per wave cleared, plus sixty for a clear. Pure so the armoury can promise a
+**The payout is a LADDER on waves FINISHED** (2026-08-26). `coinsForRun` is
+gone: it took the wave REACHED and returned a bare number, and both halves were
+wrong under the ladder. `MetaProgress.repeatableCoins(wavesCompleted, victory)`
+is the promise a store screen can make, and `awardRun(run)` is the banking.
+
+| waves finished | 0–9 | 10–14 | 15–19 | 20–24 | 25–29 | 30–34 | cleared |
+|---|---|---|---|---|---|---|---|
+| coins | 0 | 5 | 10 | 18 | 28 | 40 | **80** |
+
+A clear REPLACES the tier rather than adding to it, so a win is worth exactly
+twice dying on wave 34 and never 120. On top of that sit one-time objectives:
+reaching waves 11/20/25/30 pays 10/15/20/25 once per save, and a first clear of
+each route pays 25, keyed on the route ID. A first full clear on a fresh
+profile and a new route is **175**.
+
+**`awardRun` returns sources, not a number** — `{ repeatable, objectives,
+bounties, total }`, each source carrying a stable id, a printable label and an
+amount, with the total summed FROM them. The result screen prints that list and
+never re-derives it. `bounties` is empty and present on purpose: it is the shape
+the rotating objectives will land in.
+
+**Six fields persist now**, not three: coins, owned, equipped, runs, the
+high-water `bestWave`, and the claimed `milestones` / `routesWon` ledgers. An
+old save keeps everything it had and starts every objective unclaimed; nothing
+is paid retroactively. It was pure so the armoury could promise a
 number before the run and the overlay can show the same one after, without
 either re-deriving the rule. It is banked **exactly once**, latched by
 `runAwarded` — the sandbox un-loses a run by restoring base HP, and a second
@@ -2593,11 +2616,17 @@ written there. `BUILD_SLOTS.length` and `MetaProgress.SLOT_COUNT` must stay the
 same number — the bar's geometry is computed from it once at load — and a test
 pins that.
 
-**The starting kit is the Smasher and the Soldier** — the two catalogue entries
-priced at 0 coins, which is what `MetaProgress.reset()` leaves owned. (The
-Soldier joined it 2026-07-29, at the owner's request. The gunner was in this
-sentence until 2026-08-12 and has not been in the catalogue since 2026-07-30.)
-The Longshot costs 40 coins, the Siphon 150 and the Summoner 90. That is tuned against the payout and it is the whole
+**The starting kit is the Soldier alone** (2026-08-26) — the one catalogue
+entry priced at 0 coins, which is what `MetaProgress.reset()` leaves owned, and
+it lands in slot 1 with the rest of the bar empty. (The Soldier joined the kit
+2026-07-29; the gunner left the catalogue 2026-07-30; the **Smasher left the kit
+2026-08-26** and is now a 10-coin purchase **gated on having reached wave 11**.
+That gate is enforced in `MetaProgress.buy()`, not in the store's drawing code,
+so a hand-edited save hits the same wall — the store asks through `buy(id,
+{ dryRun: true })` rather than re-deriving the condition.) Reaching wave 11 for
+the first time pays exactly 10 coins, so the run that shows you the Midboss
+hands you the answer to it, and **losing to it still counts** — the gate is the
+wave reached. The Longshot costs 40 coins, the Siphon 150 and the Summoner 90. That is tuned against the payout and it is the whole
 progression loop, measured:
 
 > A first run on a fresh profile **loses on every route** and pays 30–56 coins.
@@ -4503,8 +4532,9 @@ reachable enemy to shoot. `js/systems/range-filter.js` (`RangeFilter`) answers
 They were both called `Targeting` on the two branches; the merge kept the name
 for the first and renamed the second.
 
-**The smasher (`js/smasher.js`).** Melee AoE: a 120° wedge, 31.25 u.l., 12
-damage every 4 s, $700. It **holds its swing** until something is in the zone
+**The smasher (`js/smasher.js`).** Melee AoE: a 120° wedge, 37.5 u.l., 12
+damage every 3.5 s, $600 (retuned 2026-08-26 from 31.25 / 4.0 s / $700, in the
+same change that took it out of the opening hand). It **holds its swing** until something is in the zone
 rather than swinging on a fixed rhythm — the zone is narrow enough that a
 fixed rhythm would miss most enemies. Two five-tier branches under the same
 crosspath rule as the Longshot (tier 3 locks the other branch at 2), bought
@@ -4544,8 +4574,12 @@ can burst at all slows everything it swings at.
 Four things were asked for in one instruction, and all four are on branch B.
 
 **Range on B2 (+15 u.l.), B4 (+10) and B5 (+15).** Path B granted none at all
-before; a full B Warbringer now reaches **71.25 u.l.** against the 31.25 it
-used to, and A2+full-B crosspaths to 83.75.
+before; a full B Warbringer now reaches **77.5 u.l.** against the 37.5 base, and
+A2+full-B crosspaths to 83.75. **These are ADDITIVE on the base**, unlike path
+A's `rangeUl` where the longest owned value wins — so the 2026-08-26 base rise
+carried the whole B column up with it (71.25 → 77.5, and 56.25 → 62.5 at B4)
+without a line of path B moving. That is also why A1 no longer sells range at
+all: it grants `rangeUl: 37.50`, which the base now equals.
 
 **They live in a SECOND, ADDITIVE column** (`rangeBonusUl`) beside the existing
 absolute one, and that is the load-bearing detail. Path A's `rangeUl` figures
@@ -5616,8 +5650,12 @@ Details that are load-bearing:
 - **Readiness is the ability's own business.** `triggerActiveAbility` already
   refuses while the tower is stunned, and `recruitsReady()` already checks the
   cooldown, so the auto path asks rather than re-deriving. The Sniper's cadence is
-  therefore its stun length, which is the only gate its config defines (its
-  `cooldownSeconds` is `null` on purpose — see the ActiveAbility header).
+  therefore its stun length **and its cooldown**: `cooldownSeconds` was `null`
+  with a TODO against it until 2026-08-26 and is **60 s** now, started at
+  ACTIVATION rather than after the ten seconds of channel and exhaustion — those
+  are already the price, and charging after them would charge twice. A refused
+  press never spends it, and the auto path inherits all three refusals because
+  it goes through the same `performAction`.
 
 ### Where the button is, and why it is not a row
 
@@ -6592,7 +6630,7 @@ no mechanic was moved to match the description.
 | Enemy lane offsets | a 32-bit hash of the spawn index, ±7 u.l. | `Enemy.laneOffsetFor`, `Enemy.LANE_SPREAD_UL` |
 | Tower HP | Rifleman 80 (145 with B1+B2), Warbringer 150, Arcane Sniper / Siphon from their stat tables (the deleted gunner was 60) | `Soldier.BASE_HP`, `Smasher.BASE_HP`, `config.base.hp` |
 | Angry attack | 20 damage, 47.5 u.l. reach, every 2.5 s, nearest tower only | `Enemy.TYPES.angry.attack` |
-| Meta payout | 2 per wave cleared, +60 for a clear | `MetaProgress.coinsForRun` |
+| Meta payout | ladder on waves FINISHED: 10/15/20/25/30 → 5/10/18/28/40, a clear **replaces** it with 80; plus one-time 11/20/25/30 → 10/15/20/25 and 25 per first route clear | `MetaProgress.repeatableCoins`, `awardRun` |
 | Store prices | Arcane Sniper 40 coins, **Summoner 90**, Siphon 150; Warbringer and Rifleman are the starting kit | `CATALOGUE` in js/meta.js |
 | Save key | `towerDefense.meta.v1` in localStorage | `MetaProgress.STORAGE_KEY` |
 | Default enemy HP | 4 | `Enemy.BASE_HEALTH` |
@@ -6607,7 +6645,7 @@ no mechanic was moved to match the description.
 | Shared footprint | 11.25 u.l. radius — Warbringer and Rifleman both take it from here | `Tower.FOOTPRINT_RADIUS_UL` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |
 | Pierce hit radius | 12 u.l. | `PierceBullet.HIT_RADIUS_UL` |
-| Warbringer range | 31.25 u.l. base, 62.5 at A5, **71.25 at full B** (B2 +15, B4 +10, B5 +15, additive) | `Smasher.BASE_RANGE_UL`, `rangeBonusUl` in `Smasher.UPGRADES` |
+| Warbringer range | 37.5 u.l. base, 62.5 at A5, **77.5 at full B** (B2 +15, B4 +10, B5 +15, additive on the base) | `Smasher.BASE_RANGE_UL`, `rangeBonusUl` in `Smasher.UPGRADES` |
 | Warbringer blast | 18.75 u.l. radius, **15 damage, CHAINS, and applies the tower's slow**; fires on ANY kill by the swing (B4) | `Smasher.EXPLOSION_RADIUS_UL`, `Smasher.EXPLOSION_DAMAGE`, `explode()` |
 | Warbringer swing order | slow FIRST, then damage, then the burst — a one-shot kill still bursts | `Smasher.prototype.swing` |
 | Warbringer earthquake (B5) | map-wide: 3 s movement stun, then 60% slow for 5 s, **45 s cooldown**, no damage; 0.75 s world shake and 2.4 s floor fissures | `Smasher.QUAKE_*`, `triggerQuake`, `Effects.earthquake` |

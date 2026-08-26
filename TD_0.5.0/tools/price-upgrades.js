@@ -26,8 +26,10 @@
 //   pierce (A2+)      extra enemies hit per shot, with A3+ falloff applied.
 //                     Capped at CLUSTER enemies -- pierce is worth nothing
 //                     against a target that is alone.
-//   kill stacks (A5)  +1% fire rate per kill, 5s each, 200 max. Assumed to
-//                     sit at STACKS on average, NOT at the 200 cap.
+//   kill stacks (A5)  +1% fire rate per kill, 4s each, 75 max since
+//                     2026-08-26 (was 5s and 200). Assumed to sit at STACKS
+//                     on average, NOT at the 75 cap -- the cap is a ceiling on
+//                     a self-amplifying loop, not a steady state.
 //
 // THE TWO ASSUMPTIONS WORTH CHALLENGING are CLUSTER and STACKS. Both flatter
 // path A. Halve them and A4/A5 get cheaper; that is a balance call, not a
@@ -42,7 +44,7 @@ var CONFIG = CONFIGS.longRangeDPS;
 
 var DOLLARS_PER_DPS = 15;   // the gunner: $15 for 1 DPS
 var CLUSTER = 4;            // enemies a piercing shot can realistically line up
-var STACKS = 25;            // average live kill-stacks at A5, not the 200 cap
+var STACKS = 25;            // average live kill-stacks at A5, not the 75 cap
 
 // Damage dealt to the 2nd and later enemy of a pierce is worth less than
 // damage to the first: it only exists when enemies happen to be lined up,

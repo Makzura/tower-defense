@@ -14,6 +14,7 @@
 
 var harness = require("./harness");
 var runner = require("./assert");
+var resultRect = harness.resultRect;
 
 var group = runner.group;
 var test = runner.test;
@@ -2019,7 +2020,7 @@ test("clearing every scheduled wave wins; the manual wave-off idiom does not", f
   h.draw();                                  // the victory overlay must draw
 
   // And the overlay's restart button starts a clean run.
-  var r = h.game.restartButtonRect();
+  var r = resultRect(h, "restart");
   h.click(r.x + r.w / 2, r.y + r.h / 2);
   t.eq(h.game.victory, false, "restart clears the win");
   t.eq(h.game.enemies.length, 0, "the road is empty -- a run opens on a pause");
@@ -2198,7 +2199,7 @@ test("both endings offer a way back to the main menu", function (t) {
     h.run(ending + " = true");
     h.draw();                               // the button must draw, not just exist
 
-    var r = h.run("mainMenuButtonRect()");
+    var r = resultRect(h, "menu");
     h.click(r.x + r.w / 2, r.y + r.h / 2);
 
     t.eq(h.game.screen, "menu", "the " + ending + " overlay reaches the title menu");
@@ -2222,14 +2223,14 @@ test("Escape leaves a finished run, and the other two buttons still work", funct
   // The two older buttons are untouched by the third.
   var a = harness.boot();
   a.run("gameOver = true");
-  var restart = a.run("restartButtonRect()");
+  var restart = resultRect(a, "restart");
   a.click(restart.x + restart.w / 2, restart.y + restart.h / 2);
   t.eq(a.game.gameOver, false, "Restart still restarts");
   t.eq(a.game.screen, "play", "and stays in the run");
 
   var b = harness.boot();
   b.run("gameOver = true");
-  var route = b.run("changeMapButtonRect()");
+  var route = resultRect(b, "route");
   b.click(route.x + route.w / 2, route.y + route.h / 2);
   t.eq(b.game.screen, "select", "Choose another route still reaches the chooser");
 });
@@ -2239,9 +2240,9 @@ test("Escape leaves a finished run, and the other two buttons still work", funct
 test("the three run-over buttons do not overlap", function (t) {
   var h = harness.boot();
   var rects = [
-    h.run("restartButtonRect()"),
-    h.run("changeMapButtonRect()"),
-    h.run("mainMenuButtonRect()")
+    resultRect(h, "restart"),
+    resultRect(h, "route"),
+    resultRect(h, "menu")
   ];
 
   for (var i = 0; i < rects.length; i++) {
@@ -2290,7 +2291,7 @@ test("the restart button restores a clean run", function (t) {
   h.step(1 / 60);
   t.eq(h.game.gameOver, true, "lost before restart");
 
-  var r = h.game.restartButtonRect();
+  var r = resultRect(h, "restart");
   h.click(r.x + r.w / 2, r.y + r.h / 2);
 
   t.eq(h.game.gameOver, false, "loss cleared");
@@ -3618,10 +3619,10 @@ test("the Arcane Sniper B5 ability counts its landed damage and kills", function
   t.ok(resolveB5Channel(h, sniper, [tank, small]),
     "the ritual resolved rather than still channelling");
 
-  t.eq(tank.health, 5000, "25,000 B5 damage landed on the surviving target");
+  t.eq(tank.health, 12000, "18,000 B5 damage landed on the surviving target");
   t.eq(small.dead, true, "the second target was killed by the blast");
-  t.eq(sniper.damageDealt, 25010,
-    "the counter includes the ability and excludes 24,990 overkill");
+  t.eq(sniper.damageDealt, 18010,
+    "the counter includes the ability and excludes the overkill on the other body");
   t.eq(sniper.kills, 1, "the ability kill belongs to the Sniper too");
 });
 
@@ -3668,8 +3669,8 @@ test("Warbringer swings and Arcane Sniper B5 both respect slime AoE resistance",
   sniper.performAction("ability", { enemies: [blastTarget] });
   t.ok(resolveB5Channel(h, sniper, [blastTarget]),
     "the ritual resolved rather than still channelling");
-  t.eq(blastTarget.health, 37500, "B5's 25,000-damage blast removes 12,500 HP");
-  t.eq(sniper.damageDealt, 12500, "the Sniper counter receives that reduced amount");
+  t.eq(blastTarget.health, 41000, "B5's 18,000-damage blast removes 9,000 HP");
+  t.eq(sniper.damageDealt, 9000, "the Sniper counter receives that reduced amount");
 });
 
 

@@ -13,6 +13,91 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-26 — The balance pass, the meta rewrite, and a real result screen.**
+Four coordinated changes at the owner's instruction, none of which touches the
+wave schedule: every wave's composition is byte-identical afterwards (35 waves,
+830 bodies, 25 939 effective HP, $2 594 clear, $22 321 kill), re-verified against
+a snapshot taken before the work began.
+
+**WARBRINGER** $700 → $600, 4.0 s → 3.5 s, 31.25 → 37.5 u.l., and A3/A4/A5
+damage 7/10/14 → 9/13/18. A1, A2 and the whole of path B untouched. Two
+consequences the brief did not name and that are real: the base range now EQUALS
+what A1 granted, so under longest-value-wins A1 sells no range at all and the
+upgrade card correctly stops advertising it; and path B's `rangeBonusUl` is
+ADDITIVE on the base, so a full B reaches 77.5 u.l. rather than 71.25, and 62.5
+rather than 56.25 at B4, without a line of path B moving.
+
+**MONSTER TIERS** T3 floor 3 500 → 4 500, T4's exact threshold 6 666 → 7 777.
+The easter egg still holds by equality alone (7 776 and 7 778 are T3) and the
+tier is still fixed at the merge. T0–T2 untouched.
+
+**SIPHON B5** now names `lifesteal: 0.30`. It carried no ratio and silently
+inherited B4's 0.20 — the last tier of the drain path did not touch the drain.
+`setParams` replaces rather than sums, asserted directly: 30%, never 20 + 30.
+
+**ARCANE SNIPER** A5 damage 350 → 275, fireRate −0.15 → −0.05, cost 13 900 →
+10 500, kill stacks 200/5 s → 75/4 s. The stacks were the problem rather than the
+damage: a cone that kills faster stacks faster, and +200% attack speed is a loop
+a dense wave could reach and hold. A1's fireRate delta fell +0.25 → +0.15, which
+is the one dial both finished builds share — A5 hands the ten hundredths back, so
+A5+B2 is untouched at 455/0.60, while the B5, which never buys A5, slows to
+exactly 0.20. B5 costs 18 000 rather than 23 300; its own numbers are unchanged.
+Measured: A5+B2 455/0.60 with infinite pierce and a 24° cone, B5+A2 1590/0.20 at
+25%/325% and pierce 1, pure B5 1575/0.05 and positive. The B5 out-damages the A5
+single-target even at the 75-stack ceiling, which is the identity the two paths
+are supposed to have.
+
+**THE ABILITY HAD NO COOLDOWN.** `cooldownSeconds` was `null` with a TODO against
+it, so the strongest button in the game was gated on its own stun and nothing
+else. 60 s now, started AT ACTIVATION: the three seconds of ritual and seven of
+exhaustion are already the price, and charging afterwards would charge twice for
+the same ten. It ticks in `update()`, which is what makes pause, 3× speed and the
+victory/defeat freeze carry it for free — no second clock, no wall time. Damage
+25 000 → 18 000, still clearing the ~8 700 of fire the lockout costs. A refused
+press spends nothing, and auto-ability inherits all three refusals because it
+goes through the same `performAction` — proved by pressing it every frame for
+thirty seconds and getting exactly one cast.
+
+**THE META LOOP.** A fresh profile owns the Rifleman and nothing else. The
+Warbringer is `starter: false`, 10 coins, gated on having reached wave 11 — and
+the gate is enforced in `buy()`, which the store asks through a dry run rather
+than re-deriving. Losing to the Midboss still unlocks it; the gate is the wave
+reached. The payout ladder replaces "two a wave plus sixty": waves FINISHED
+10/15/20/25/30 pay 5/10/18/28/40 and a clear pays 80, REPLACING the tier, so a
+win is worth exactly twice dying on 34. One-time objectives pay 10/15/20/25 for
+first reaching 11/20/25/30 and 25 for a first clear of each route, keyed on the
+route ID. A first full clear on a fresh save and a new route is 175, measured.
+`awardRun` returns sources rather than a number so the result screen can never
+re-derive the award. The off-by-one that ladder could have been built on is
+settled in one place: `wavesCompleted()` is the 0-based cursor in both states.
+
+**MIGRATION.** Three fields join the save. Absent is not corrupt: an old profile
+keeps its coins, towers, loadout and runs, keeps the Warbringer if it had it, and
+starts every objective unclaimed. Nothing is paid retroactively. One number guard
+and two list guards handle everything off disk; route ids are deliberately open,
+so a save naming a map this build lacks loads rather than throws.
+
+**THE RESULT SCREEN** replaces two overlays that had the same bones and drifting
+copy. One panel for both endings, showing the route, the wave reached and
+finished, base HP, cash, kills, the coins and where every one of them came from,
+and the final stats of every tower still standing — read from each tower's own
+`statLines()`, so a tower that keeps no healing simply has no healing row. No
+invented zeroes. `Inspect battlefield` folds it to a tab; the board behind it is
+as frozen as it was behind the panel, and the only permitted action is selecting
+a tower to read it. Every button's geometry and hitbox come from one
+`resultButtons()`.
+
+**TWO WARBRINGER BLAST TESTS WERE REWRITTEN**, not weakened. They inferred the
+damage source from hit points — "50 minus one 15-point blast" — and the wider,
+faster Warbringer kills its front rank and re-acquires during its own wind-up, so
+the body the swing "could not reach" is swung by the time the hammer lands.
+Traced: the survivor takes an aoe 15 AND an aoe 22, and 22 is the tower's damage.
+They ask the damage pipeline directly now, and the chain is proved by survival
+arithmetic — 30 hit points against a 22-point swing means only a blast can have
+finished them.
+
+Suites 135 / 236 / 74 / 47 / 53, 0 failing, MANIFEST OK.
+
 **2026-08-26 — Two clocks in the new scheduler were step-size dependent, and
 its own suite could not see either.** Adversarial review of the timeline rewrite,
 five readers each on one angle. Composition, wave identity and the diff came back

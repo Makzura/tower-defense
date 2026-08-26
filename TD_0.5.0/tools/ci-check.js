@@ -315,7 +315,38 @@ var BASELINE = [
     //     `inspected` instead of the `tower` it is handed, so the two callers
     //     that never set the global indexed with -1 and handed `buyUpgrade`
     //     an undefined tower. It now upgrades its own argument.
-    file: "tests/content.test.js", pass: 217, fail: 0,
+    // 236 on 2026-08-26, from 217: NINETEEN tests ADDED across the balance and
+    // meta pass, and none removed.
+    //
+    // Five cover the B5 ability's new cooldown -- it was `null` with a TODO
+    // against it, so the strongest button in the game had none: that it is 60 s
+    // and starts at ACTIVATION, that it runs through the channel and the
+    // exhaustion rather than after them, that a refused press never spends it,
+    // that it is simulation time, and that auto-ability cannot outrun it.
+    // Self-tested by moving the tick below the channel's early return, which
+    // silently adds ten seconds and goes red on the "fifty remain" assertion.
+    //
+    // Six cover the meta rewrite: the Warbringer's wave-11 gate enforced in
+    // buy() rather than in the store, that losing to the Midboss still unlocks
+    // it, that the high-water mark never falls, that an old save keeps its
+    // coins, towers, loadout and runs, that a hostile save cannot mint or
+    // crash, that every reward source carries an id, a label and an amount
+    // summing to the total, and that two routes each pay their first clear once.
+    //
+    // Eight cover the result screen: paid exactly once on either ending and
+    // never again through folding, reopening or clicking a tower; the folded
+    // panel selects a tower and refuses every mutation; the simulation stays
+    // frozen behind it; restart, change route and main menu all still work; no
+    // button overlaps another in either state; and every button is clickable
+    // exactly where it is drawn.
+    //
+    // Two existing Warbringer blast tests were REWRITTEN rather than added to.
+    // They inferred the damage source from hit points -- "50 minus one 15-point
+    // blast" -- and the wider, faster Warbringer now kills its front rank and
+    // re-acquires during its own wind-up, so the body the swing "could not
+    // reach" is swung by the time the hammer lands. They ask the damage
+    // pipeline directly now, which is what they were always about.
+    file: "tests/content.test.js", pass: 236, fail: 0,
     failing: []
   },
   {
@@ -325,10 +356,19 @@ var BASELINE = [
     // ability could have been retuned to any value with every suite still
     // green. The new test pins the owner's stated intent instead: channel plus
     // stun still costs ten seconds between them.
-    file: "tests/long-range-dps.test.js", pass: 72, fail: 0,
+    // 74 on 2026-08-26, from 72: two ADDED. The kill-stack ceiling and window
+    // and the retuned prices and ability numbers were pinned nowhere -- the
+    // existing stack test builds a TimedStackTracker from literals, so it would
+    // have kept passing whatever the config said.
+    file: "tests/long-range-dps.test.js", pass: 74, fail: 0,
     failing: []
   },
-  { file: "tests/beam.test.js", pass: 45, fail: 0, failing: [] },
+  // 47 on 2026-08-26, from 45: two ADDED with the B5 lifesteal. It carried no
+  // ratio at all and silently inherited B4's 0.20, so the last tier of the
+  // drain path did not touch the drain. One proves it is 30% and never 20 + 30;
+  // the other pins the four numbers a ratio retune would be most likely to
+  // disturb -- reach, gate, price and global uniqueness.
+  { file: "tests/beam.test.js", pass: 47, fail: 0, failing: [] },
   { file: "tests/blub.test.js", pass: 53, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its

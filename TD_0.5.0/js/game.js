@@ -1476,6 +1476,18 @@ var runAwarded = false;
 // a run has ended; restartGame() clears it with the rest of the run state.
 var lastRunAward = null;
 
+// IS THE RESULT SCREEN FOLDED AWAY? The run is over either way -- this only
+// decides whether the full panel is covering the board or a small tab is
+// sitting in the corner while the player reads their towers.
+//
+// It changes NOTHING about the simulation. update() still returns early on
+// gameOver/victory, so the board behind the tab is as frozen as the board
+// behind the panel: no movement, no shots, no abilities, no cooldowns, no
+// wave. Folding the panel is a change of what is DRAWN and what CLICKS do,
+// and deliberately nothing else -- see onClick, where the minimised state
+// handles its own clicks rather than falling through to the live handler.
+var resultMinimised = false;
+
 // `waveIndex` is the wave IN PLAY, or the next wave during a transition. Once
 // every wave has been through, waveIndex equals WAVES.length.
 //
@@ -1856,6 +1868,7 @@ function restartGame() {
   runKills = 0;
   runAwarded = false;
   lastRunAward = null;
+  resultMinimised = false;
   pendingBounty = 0;
   pendingBountyWave = 0;
 
@@ -2249,12 +2262,36 @@ function onClick(event) {
   // its buttons consume clicks until a new run begins -- same two buttons,
   // same geometry, on either outcome.
   if (gameOver || victory) {
-    if (pointInRect(p.x, p.y, restartButtonRect())) { Sound.playUIClick(); restartGame(); }
-    else if (pointInRect(p.x, p.y, changeMapButtonRect())) { Sound.playUIClick(); openMapSelect(); }
-    // Through leaveRun(), not openMenu() directly -- that seam is what lets
-    // the sandbox, which has no menu screen to switch to, send this button
-    // back to index.html instead. See the Screens section of AGENTS.md.
-    else if (pointInRect(p.x, p.y, mainMenuButtonRect())) { Sound.playUIClick(); leaveRun(); }
+    // The buttons first, and their rects come from the SAME resultButtons()
+    // the drawing reads -- so a button cannot be drawn anywhere its hitbox is
+    // not. Which buttons exist depends on whether the panel is folded, and
+    // that is the one place that decision is made.
+    var hit = resultButtonAt(p.x, p.y);
+    if (hit) {
+      Sound.playUIClick();
+      if (hit.id === "inspect") resultMinimised = true;
+      else if (hit.id === "show") resultMinimised = false;
+      else if (hit.id === "restart") restartGame();
+      else if (hit.id === "route") openMapSelect();
+      // Through leaveRun(), not openMenu() directly -- that seam is what lets
+      // the sandbox, which has no menu screen to switch to, send this button
+      // back to index.html instead. See the Screens section of AGENTS.md.
+      else if (hit.id === "menu") leaveRun();
+      return;
+    }
+
+    // FOLDED: the board is readable and NOTHING ELSE. This deliberately does
+    // not fall through to the live click handler, which would happily sell a
+    // tower, buy an upgrade or place a body on a board whose run is over --
+    // the freeze is not something to route around for convenience. Selecting
+    // a tower is the entire permitted action, and it mutates nothing but which
+    // tower the panel is describing.
+    if (resultMinimised) {
+      var pick = towerAt(p.x, p.y);
+      if (pick) { Sound.playUIClick(); inspected = pick; }
+      return;
+    }
+
     return;
   }
 
@@ -4417,8 +4454,11 @@ function draw() {
     drawAudioButton();
     drawAudioPanel();
   }
-  drawGameOver();
-  drawVictory();
+  // ONE SCREEN FOR BOTH ENDINGS since 2026-08-26. drawGameOver() and
+  // drawVictory() were two overlays with the same bones and drifting copy;
+  // "what do I do next" has the same answer either way, and so does "how did
+  // that go". The outcome is a colour and a word inside one panel now.
+  drawResultScreen();
   drawPauseMenu();
 
   // Full-screen effects sit above even the interface.
@@ -7187,6 +7227,185 @@ function mainMenuButtonRect() {
 
 // Shared by both loss-screen buttons so they cannot drift apart. Assumes the
 // caller has already centred the text baseline, as drawGameOver does.
+// --- the result screen (2026-08-26) -----------------------------------------
+//
+// ONE FUNCTION OWNS EVERY BUTTON'S GEOMETRY, and both the drawing and the
+// hit-testing read it. The overlay used to hold three rects in three separate
+// functions and test them in a fourth place, which is how a button ends up
+// drawn somewhere its hitbox is not -- the class of bug you only find by
+// clicking. Anything that wants to know where a result button is asks here.
+function resultButtons() {
+  var minimised = resultMinimised;
+  if (minimised) {
+    // The folded tab. Bottom-LEFT on purpose: the inspection panel is anchored
+    // to the right-hand column, and a tab over it would cover the very thing
+    // the fold exists to let the player read.
+    return [{ id: "show", label: "Show results", x: 16, y: VIEW_HEIGHT - 128, w: 168, h: 34 }];
+  }
+  var w = 216, h = 44, gap = 12;
+  var x = VIEW_WIDTH / 2 - w / 2;
+  var top = VIEW_HEIGHT - 214;
+  return [
+    { id: "inspect", label: "Inspect battlefield", x: x, y: top, w: w, h: h },
+    { id: "restart", label: "Restart " + (currentMap ? currentMap.name : ""),
+      x: x, y: top + (h + gap), w: w, h: h },
+    { id: "route", label: "Change route", x: x, y: top + 2 * (h + gap), w: w, h: h },
+    { id: "menu", label: "Main menu", x: x, y: top + 3 * (h + gap), w: w, h: h }
+  ];
+}
+
+function resultButtonAt(x, y) {
+  var list = resultButtons();
+  for (var i = 0; i < list.length; i++) {
+    if (pointInRect(x, y, list[i])) return list[i];
+  }
+  return null;
+}
+
+// The stat block for one tower still standing when the run ended.
+//
+// Read from the tower's OWN `statLines()` -- the same rows the in-game
+// inspection panel prints -- so a tower that counts something unusual shows it
+// here without this function knowing the tower exists, and a tower that has no
+// healing to report simply has no healing row. That is the rule: NO INVENTED
+// ZEROES. A blank where a stat does not apply is information; a "0" is a lie
+// about a stat the tower does not keep.
+function resultTowerRows() {
+  var rows = [];
+  for (var i = 0; i < towers.length; i++) {
+    var tw = towers[i];
+    var lines = (typeof tw.statLines === "function") ? tw.statLines() : [];
+    var picked = [];
+    for (var j = 0; j < lines.length; j++) {
+      var label = lines[j][0];
+      // The totals a player wants after a run, in the order they read best.
+      // Anything a tower does not keep is simply absent from its statLines and
+      // therefore absent here.
+      if (label === "Damage" || label === "Damage dealt" || label === "Kills" ||
+          label === "Healed" || label === "Gold made" || label === "Gold" ||
+          label === "Blubs" || label === "Fleet HP") {
+        picked.push(lines[j]);
+      }
+    }
+    rows.push({
+      name: (typeof tw.displayName === "function" ? tw.displayName()
+             : (tw.constructor && tw.constructor.DISPLAY_NAME) || "Tower"),
+      spent: typeof tw.totalSpent === "number" ? tw.totalSpent : null,
+      damage: typeof tw.damageDealt === "number" ? Math.round(tw.damageDealt) : null,
+      kills: typeof tw.kills === "number" ? tw.kills : null,
+      extra: picked
+    });
+  }
+  return rows;
+}
+
+function drawResultScreen() {
+  if (!gameOver && !victory) return;
+  if (resultMinimised) { drawResultTab(); return; }
+
+  var won = !!victory;
+  ctx.fillStyle = "rgba(10,11,16,0.88)";
+  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = won ? "#8ce69d" : "#e0736e";
+  ctx.font = "700 46px system-ui, sans-serif";
+  ctx.fillText(won ? "VICTORY" : "DEFEAT", VIEW_WIDTH / 2, 64);
+
+  ctx.fillStyle = "#c7d1e0";
+  ctx.font = "16px system-ui, sans-serif";
+  ctx.fillText((currentMap ? currentMap.name : "—") +
+    "   ·   wave " + reachedWave() + " of " + WAVES.length +
+    "   ·   " + wavesCompleted() + " finished" +
+    "   ·   base " + Math.max(0, Math.round(baseHp)) + " HP" +
+    "   ·   $" + Math.round(cash) +
+    "   ·   " + runKills + " destroyed", VIEW_WIDTH / 2, 98);
+
+  // WHERE THE COINS CAME FROM, read straight off the award. This panel never
+  // re-derives a number: MetaProgress.awardRun banked these and handed back the
+  // list, and a screen that recomputed them could disagree with the bank.
+  var award = lastRunAward || { repeatable: 0, objectives: [], bounties: [], total: 0 };
+  var y = 134;
+  ctx.fillStyle = "#ffd76e";
+  ctx.font = "600 20px system-ui, sans-serif";
+  ctx.fillText("+" + award.total + " ⬡   ·   " + MetaProgress.coins() + " banked",
+    VIEW_WIDTH / 2, y);
+
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(199,209,224,0.85)";
+  y += 24;
+  var sources = [{ label: won ? "Cleared the route" : "Reached wave " + reachedWave(),
+                   amount: award.repeatable }]
+    .concat(award.objectives || []).concat(award.bounties || []);
+  for (var si = 0; si < sources.length; si++) {
+    if (!sources[si].amount) continue;
+    ctx.fillText(sources[si].label + "   +" + sources[si].amount + " ⬡", VIEW_WIDTH / 2, y);
+    y += 18;
+  }
+
+  // The board as it stood. Trimmed to what fits above the buttons rather than
+  // scrolled: the full breakdown is one click away behind Inspect battlefield,
+  // which is the whole reason that button exists.
+  var rows = resultTowerRows();
+  y += 10;
+  ctx.font = "600 13px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(199,209,224,0.55)";
+  ctx.fillText(rows.length + (rows.length === 1 ? " tower standing" : " towers standing"),
+    VIEW_WIDTH / 2, y);
+  y += 20;
+  ctx.font = "13px system-ui, sans-serif";
+  var limit = resultButtons()[0].y - 26;
+  for (var ri = 0; ri < rows.length && y < limit; ri++) {
+    var r = rows[ri];
+    var bits = [];
+    if (r.spent !== null) bits.push("$" + r.spent);
+    if (r.damage !== null) bits.push(r.damage + " dmg");
+    if (r.kills !== null) bits.push(r.kills + " kills");
+    for (var ei = 0; ei < r.extra.length; ei++) {
+      bits.push(r.extra[ei][0].toLowerCase() + " " + r.extra[ei][1]);
+    }
+    ctx.fillStyle = "rgba(199,209,224,0.80)";
+    ctx.fillText(r.name + "   " + bits.join("  ·  "), VIEW_WIDTH / 2, y);
+    y += 17;
+  }
+
+  var buttons = resultButtons();
+  for (var bi = 0; bi < buttons.length; bi++) {
+    drawOverlayButton(buttons[bi], buttons[bi].label);
+  }
+
+  ctx.fillStyle = "rgba(199,209,224,0.55)";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText("R restart   ·   M another route   ·   Escape menu",
+    VIEW_WIDTH / 2, VIEW_HEIGHT - 18);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
+// The folded state: one small tab, and the board readable behind it.
+function drawResultTab() {
+  var won = !!victory;
+  var b = resultButtons()[0];
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = won ? "rgba(140,230,157,0.16)" : "rgba(224,115,110,0.16)";
+  ctx.fillRect(b.x - 8, b.y - 30, b.w + 16, 26);
+  ctx.fillStyle = won ? "#8ce69d" : "#e0736e";
+  ctx.font = "700 15px system-ui, sans-serif";
+  ctx.fillText(won ? "VICTORY" : "DEFEAT", b.x + b.w / 2, b.y - 17);
+
+  drawOverlayButton(b, b.label);
+
+  ctx.fillStyle = "rgba(199,209,224,0.55)";
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillText("click a tower to read it", b.x + b.w / 2, b.y + b.h + 12);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
 function drawOverlayButton(r, label) {
   var hovering = pointInRect(mouse.x, mouse.y, r);
 
