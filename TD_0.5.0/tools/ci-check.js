@@ -61,6 +61,149 @@ var FAIL_LINE = /^[ \t]+FAIL[ \t]+(.+?)[ \t]*$/;
 
 var BASELINE = [
   {
+    // 133 on 2026-08-26, from 127: SIX tests ADDED covering the timeline
+    // scheduler, in the same change that earned them. Nothing was removed, one
+    // name was CORRECTED (see below), and no product code moved -- every one of
+    // the six passed against the shipping js/ the day it was written, and each
+    // was self-tested by mutating that file and putting it back.
+    //
+    //   "the timeline rewrite moved when bodies arrive and changed nothing
+    //     else" -- the composition gate. The rewrite edited roughly a hundred
+    //     and thirty group literals, so "the content is unchanged" is not a
+    //     claim a diff can carry. It holds the pre-rewrite snapshot of all 35
+    //     waves -- bodies, effective HP, clear bounty, kill bounty and the
+    //     AUTHORED SIGNATURE of every group, with absence of `health`/`tier`
+    //     distinguished from any value -- plus the roster rules the schedule is
+    //     built around. Self-tested by writing `Enemy.TYPES.normal.health` onto
+    //     wave 1's group, which changes no aggregate anywhere: red here.
+    //   "wave 22 runs three groups at once, and wave 30 opens two on the same
+    //     frame" -- the three-group overlap, and the pair of groups sharing an
+    //     `at`. Both are sentences the sequential scheduler could not say. The
+    //     wave-12 test next to it is the two-group case.
+    //   "wave 35's Tyrant walks in at thirteen seconds and its T5 slime at
+    //     twenty-eight" -- the finale's two authored landmarks, on the clock.
+    //     Before `at` existed neither was a number anyone could read off the
+    //     file. Self-tested by deleting `tier: 5`: red.
+    //   "a wave's clock starts when the wave opens, never when it finishes
+    //     arriving" -- wave 1's ceiling fires at 32.0 s and not at 35.2 s, and
+    //     wave 11 is recorded as the one wave where "the wave opened" and "its
+    //     first body landed" are four seconds apart.
+    //   "the whole campaign runs itself dry, with every authored arrival
+    //     emitted once" -- thirty-seven simulated minutes with NO input at all,
+    //     wrapping emitWaveEvent to record every arrival by (wave, group,
+    //     body). A dropped or doubled arrival is invisible to every other count
+    //     in the suite, because they all read the DATA rather than the run.
+    //     Self-tested both ways: red on skipping one arrival per wave, red on
+    //     emitting one twice.
+    //   "a second road mirrors the whole timeline, and is still one wave and
+    //     one reward" -- Twin Confluence deploys all 88 bodies of wave 12 down
+    //     each road, in the same order, off ONE cursor, and pays one reward.
+    //
+    // RENAMED, assertions untouched: "the skip button only exists during a
+    // break" -> "the skip button does not exist while a wave is still
+    // arriving". The old name became false on 2026-08-25 -- there is no break,
+    // and the button is live for the tail of every deployed wave -- while what
+    // the test measures never moved. A green test carrying a false claim is
+    // worse than a red one. The count is unaffected: one name out, one in.
+    //
+    // ---- the previous entry, kept ------------------------------------------
+    // 127 on 2026-08-26, from 125: TWO tests ADDED with the wave-identity
+    // audit. Nothing was removed and no existing name changed its mind -- the
+    // three inheritance sites were already correct, and these two cover the
+    // gap between "the number is copied" and "the number is load-bearing".
+    //
+    //   "a wave stays open while a body it never scheduled is still walking"
+    //     -- the behavioural half. The other identity tests read waveId off a
+    //     descendant; this one leaves a wave-25 cascade as the ONLY thing
+    //     alive and watches the wave refuse to close for four generations. A
+    //     splitOnDeath that stamped its children correctly while
+    //     waveStillOnTheRoad scanned something else would pass every other
+    //     test in the section and fail this one.
+    //   "every place in js/ that builds an enemy from another one passes the
+    //     origin on" -- the SOURCE scan, because the failure mode here is a
+    //     site nobody remembered rather than a site that got it wrong. A
+    //     fourth creation site added tomorrow without the field mints bodies
+    //     wearing waveId 0: they hold nothing open and close their parent's
+    //     wave over their heads, and nothing on the road looks wrong. js/codex.js
+    //     is exempt (parked sprites, never in `enemies`) and the exemption is
+    //     itself asserted to still have a call site behind it.
+    //
+    // Self-tested by two mutations, restored after each: deleting
+    // `waveId: this.waveId` from splitOnDeath goes red on both new names AND on
+    // the older cascade test; appending a `new Enemy(...)` with no waveId to
+    // js/systems/execute.js goes red on the source scan alone, which is the
+    // proof that the scan reaches past js/enemy.js into every subdirectory.
+    //
+    // 125 on 2026-08-25, from 118, with the TIMELINE SCHEDULER. Net +7 across
+    // eight added and one removed, and the removal is a merge rather than a
+    // loss:
+    //
+    // ADDED (+8)
+    //   "the same wave deploys identically at any step size" -- the property
+    //     the whole scheduler exists for. Same wave, 720 steps / 72 steps / one
+    //     step, byte-identical deployment.
+    //   "a long frame loses no time on either side of a transition" -- the
+    //     overshoot is handed to the wave that starts, not discarded.
+    //   "auto-send ends a deployed wave three seconds out, and never sooner"
+    //     -- it may end a wave that has finished arriving and may never touch
+    //     one that is still arriving.
+    //   "the final wave has no ceiling and no Send, and the run ends on an
+    //     empty road".
+    //   "the ten-second opening pause sits outside wave 1's own clock".
+    //   "a wave whose ceiling falls before its own tail is rejected" -- the
+    //     load-time validator, which catches the one authoring mistake the
+    //     timeline makes easy and that nothing else would see.
+    //   "a wave resolves into one interleaved timeline of arrivals" -- the
+    //     expansion, the tie-break and absence-copied-as-absence.
+    //   "a wave re-run from the top owes its reward again" -- the sandbox's own
+    //     idiom, which restarts onto the SAME wave by hand and left the reward
+    //     latch set. Found by driving it, not reasoned about.
+    //
+    // REMOVED (-1) "a mixed wave deploys its groups in order, each at its own
+    // spacing". It PASSED and it was TRUE; it is deleted rather than repaired
+    // because what it asserted has been deleted -- groups no longer deploy in
+    // order, `lead` is not a field, and waveGroupAt is gone. Its subject is
+    // wave 12, and wave 12 is what the interleaved-timeline test above walks.
+    //
+    // RENAMED, not added or removed (so the count does not move): five
+    // scheduler tests kept their subject and lost the ninety-second break from
+    // their names and their bodies -- "wave 1 deploys five enemies, then wave 2
+    // waits out the ninety-second break" is now "a wave deploys on its own
+    // clock and its ceiling hands over to the next", and so on. Each is listed
+    // in CHANGELOG.md against what it used to claim.
+    //
+    // Self-tested by deleting the `waveElapsed = -waveCountdown` line that
+    // carries a frame's overshoot across a transition: red on the long-frame
+    // test and on nothing else, which is the point of writing it.
+    //
+    // 118 on 2026-08-25, from 112: SIX tests ADDED with the wave HUD. Four are
+    // the readout, which had nothing on it before -- the wave clock, the
+    // transition countdown, the final wave's missing timer, and the line's own
+    // shape -- and none of them could have existed earlier, because there was
+    // no clock to read and no state to be in. One is the Send button's
+    // rectangle, SWEPT rather than reasoned about: 344 points, in three
+    // scheduler states, asked the game's own overInterfaceChrome and then
+    // actually built a tower there. One is waveSummary's key, which is now
+    // (type, health, tier) and not the display name. Nothing was removed and no
+    // existing name changed its mind. Self-tested by three mutations, restored
+    // after each: dropping the `waveElapsed += dt` line goes red on both clock
+    // tests (32 s left forever, elapsed 0); widening the chrome test back to
+    // `waveControlsShown()` goes red with all 344 mid-wave points claiming a
+    // click; keying the summary on the name alone goes red on the health and
+    // tier cases, printing "8 × Fast" and "8 × Fractal Slime" for salvos 4 HP
+    // and 1020 HP apart.
+    //
+    // 112 on 2026-08-25, from 108: FOUR tests ADDED with wave identity, one per
+    // hop the number takes -- minted by the scheduler, inherited by broods,
+    // splits and summons, used to close a wave, and deliberately NOT used to
+    // win the run. Nothing was removed and no existing name changed its mind;
+    // one existing test ("wave 1 deploys five enemies...") had to root a wave-2
+    // body instead of relying on a wave-1 one, because relying on it was the
+    // bug. Self-tested by dropping the waveId out of splitOnDeath: red on the
+    // cascade assertion with 84 descendants still counted correctly, which is
+    // the whole reason the origin gets its own test rather than riding on the
+    // tier one.
+    //
     // 108 on 2026-08-19, from 107: one test ADDED with the camo model mapping.
     // `camo_fast` and `camo_heavy` had no mesh under their own ids and drew the
     // fallback sphere, and no suite asserted that a camo type draws a body at
@@ -82,7 +225,22 @@ var BASELINE = [
     // repaired, because Normal and Hard were deleted as unfinished placeholders.
     // A suite getting SMALLER reads as loss on a totals diff, so it is written
     // down here as a deliberate removal.
-    file: "tests/run.js", pass: 108, fail: 0,
+    // 135 on 2026-08-26, from 133: TWO tests ADDED, both regressions on clocks
+    // the timeline rewrite got wrong and its own suite could not see. The
+    // existing step-size test deploys each wave IN ISOLATION -- cursor moved by
+    // assignment, no gate ever fires -- so it proved the emission independent of
+    // dt and said nothing about the ceiling or the transition. Both were wrong:
+    // `waveElapsed >= duration` carried no float tolerance while the emission
+    // beside it carries SPAWN_EPSILON, so all 34 ceilings closed one frame late
+    // at 1/60 (1920 steps reach 31.999999999999464, not 32); and endWave()
+    // discarded the overshoot of the crossing frame, costing 0.217 s over
+    // thirteen ceilings at 1/60 against 0.007 s at 1 ms. Nothing was removed and
+    // no existing name changed its mind. Self-tested by mutation, restored
+    // after each: dropping SPAWN_EPSILON from the ceiling goes red on all three
+    // step sizes; dropping the overshoot handover goes red on the spread; moving
+    // auto-send back above the countdown block goes red at dt = 0.1.
+    //
+    file: "tests/run.js", pass: 135, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

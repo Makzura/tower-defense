@@ -807,8 +807,16 @@
     // startRun() above ran BEFORE installHooks() wrapped restartGame, so it
     // went through the real one and announced wave 1 on its way past. Clear
     // that here for the same reason the wrapper does: the banner would say
-    // "Wave 1 / 31" while the status line correctly says every wave is
-    // deployed.
+    // "Wave 1 / 35" over a page whose whole point is that the schedule is off.
+    //
+    // THE CORNER READOUT IS STILL APPROXIMATE HERE and deliberately left so.
+    // `waveIndex = WAVES.length` is this file's way of switching spawning off,
+    // and waveStatusText() reads that state as "the schedule is spent" -- so
+    // the sandbox corner says "Final wave · N still walking" about bodies the
+    // roster put there by hand. It is the honest reading of the only state the
+    // game has for "nothing left to deploy", and inventing a sandbox-only
+    // branch in the shipping readout to say something nicer on a debug page
+    // would put a state on the screen that no run can ever reach.
     if (typeof Effects !== "undefined") Effects.reset();
 
     log("sandbox ready — infinite cash, waves off, base " +

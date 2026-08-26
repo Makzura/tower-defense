@@ -36,9 +36,10 @@ persist between runs and buy towers in an armoury; a title menu (with an Escape
 pause menu mid-run); an index screen documenting every tower, upgrade and
 enemy; and player-controlled pacing — a 1×/2×/3× speed toggle (the sandbox
 extends the same ladder to 5×, 10× and 20×), a ten-second
-pause before wave 1 with a Start button on it, and a between-wave break that
-arrives three seconds after you call it in, five after you clear the board, and
-ninety if you do neither. See the change log.
+pause before wave 1 with a Start button on it, and waves that own their own
+window — each one runs until it is wiped out or its `duration` expires, and the
+next is announced three seconds later if you sent it in, five if it ended on
+its own. See the change log.
 
 **Do not retune the schedule by simulation.** The owner asked for that to stop
 on 2026-07-29; its totals are authored to a stated figure. See the note at the
@@ -119,18 +120,34 @@ suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
 Where this file says "the five unit suites" it means these six minus the smoke
 test, and that is a correct count, not a stale one. Name the set a count counts
 before repairing it. These are the current measured results, **re-run
-2026-08-14 after the wave 12/13/16 retune landed** (`6ec794a`):
+2026-08-26 after the timeline scheduler landed**, through
+`node tools/ci-check.js`, which is the gate and holds these same numbers as its
+baseline:
 
 ```
-node tests/run.js                 107 pass / 0 fail   core game and schedule
-node tests/content.test.js        207 pass / 5 fail   content, visuals and index
+node tests/run.js                 133 pass / 0 fail   core game and schedule
+node tests/content.test.js        217 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js  72 pass / 0 fail   the Longshot spec
 node tests/beam.test.js            45 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
 node tests/sandbox.smoke.js       passed              sandbox integration
 ```
 
-**The five content failures, by name**, so nobody has to re-derive them: "the
+`run.js` was 107 on 2026-08-14 and is 133 now. **Do not re-derive the steps
+from this document** — every one of them is itemised, by test name and with its
+self-test, in the baseline comment at the top of `tools/ci-check.js`: 108 → 112
+wave identity, → 118 the wave HUD, → 125 the timeline scheduler (eight added,
+one merged away), → 127 the identity audit, → 133 the schedule's composition
+and timing gates. Each raise landed in the change that earned it, which is what
+that file asks for.
+
+**The paragraph below is HISTORY, not a live failure list.** The five content
+names it records were failing on 2026-08-14; all five pass today. It is kept
+because the lesson in it — diff the failure NAMES, never the totals — is the
+thing that found the second bug in it.
+
+**The five content failures of 2026-08-14, by name**, so nobody has to
+re-derive them: "the
 Tyrant's numbers are the ones that were asked for", "the roar shields it, speeds
 it up, and calls the wave back", "after the roar it alternates shot and leap,
 and still attacks rarely", "B4 pierces DEFENCE in flat percentage points, never
@@ -267,21 +284,29 @@ Things to know if a test misleads you:
   `pathProgress`, so a tower placed earlier along the road lands in the middle
   of it. A `null` back almost always means the tower was unaffordable — most
   fixtures need `h.run("cash = 100000")` *before* placing anything but a gunner.
-- **Throughput measurements must call `h.pinWaveBreak(5)` first.** The shipping
-  break is 90 s (see Waves below), so a 120 s window otherwise contains one wave
-  and a minute and a half of empty road. Wave spacing is a pacing choice the
-  player makes and is orthogonal to what those tests measure; pinning it keeps
-  their figures comparable with everything recorded before 2026-07-29.
-  `h.stepCallingWaves()` is the other tool — it calls every break in, for tests
-  that need to *reach* the end of the schedule rather than measure a rate. Note
-  that since v0.4.7 a called break is 3 s rather than one frame, so a fixed
+- **`h.pinWaveBreak(5)` IS A NO-OP SINCE 2026-08-25, and it is kept as a named
+  one.** It used to write `WAVE_BREAK`, the 90 s ceiling on the gap between two
+  waves, which otherwise left a 120 s throughput window containing one wave and
+  a minute and a half of empty road — the four routes all scored an identical 95
+  the day the break was lengthened, because none of them reached wave 2. There
+  is no such number any more: a wave ends on its own `duration` or on being
+  wiped out, and the gap after it is 5 s (3 with auto-send) and nothing else, so
+  the cadence these tests were pinning is what the scheduler now does by itself.
+  The twenty call sites stay because what they were FOR still needs saying at
+  each of them. **Figures measured through those windows before 2026-08-25 are
+  not comparable with today's** — the waves inside them arrive on different
+  seconds now.
+  `h.stepCallingWaves()` is the other tool — it sends every wave the frame it
+  can, for tests that need to *reach* the end of the schedule rather than
+  measure a rate. A called transition is 3 s rather than one frame, so a fixed
   second budget for "play the whole campaign" is fragile; loop until victory
   with a generous cap instead (the victory test does).
-- **An empty board now calls the next wave in** (v0.4.7). Any fixture that
-  wants to sit in a 90 s break needs something still on the board, or the wave
-  arrives five seconds later (three, until 2026-07-31). Rooting one enemy
-  (`enemies[0].rooted = true`, the same flag a revived Revenant sets) is the
-  cheapest way to hold it.
+- **A wave that is wiped out calls the next one in five seconds later** (gate 1
+  below). Any fixture that wants to sit in a long gap needs something carrying
+  *that wave's* number still on the board — a survivor of an earlier wave will
+  not do it any more. Rooting one enemy (`enemies[0].rooted = true`, the same
+  flag a revived Revenant sets) is the cheapest way to hold it, and holding it
+  only lasts until the wave's own `duration` expires.
 - **`boot(mapId)` starts the run for you, skipping the ten-second opening
   pause** (2026-07-31 — see "A run opens on a pause" under Waves). So `t=0` in a
   test still means "wave 1's first body is on the road", which is what every
@@ -702,11 +727,56 @@ historical.** Three selectable difficulties existed between 2026-07-30 and
 collaborator added in a few seconds and the owner had forgotten existed; the
 schedule below is the only one that ever meant anything. See the change log.
 
-Each wave entry supplies `count`, `interval`, and optionally a `type` (a row of
-`Enemy.TYPES`; missing means a stock normal) and a `health` override. A wave's
-first enemy spawns immediately; `interval` is the delay between later enemies
-in that wave. When a wave's last enemy spawns, the `WAVE_BREAK` countdown
-begins. The next wave starts when that countdown reaches zero.
+**A WAVE IS A TIMELINE** (2026-08-25; what it replaced is described under *A
+wave ends at a gate* below):
+
+```
+{ duration, groups: [ { at, count, interval, type?, health?, tier? } ] }
+```
+
+`at` is seconds from the START OF THE WAVE, absolute — not a pause measured
+from the group above it. The Nth body of a group arrives at `at + N ×
+interval`, N counting from 0. `type` is a row of `Enemy.TYPES` and a missing
+one means a stock normal; `health` overrides that type's number for that group
+only; `tier` is the Fractal Slime's rung. **A MISSING FIELD IS DATA**: never
+materialise a default into a group. `Enemy.healthOf` resolves the absence,
+`waveSummary` keys on it and the composition gate in `tests/run.js` compares
+it, so writing `health: 4` onto a group of stock normals changes no aggregate
+anywhere and is still a different authored thing.
+
+`duration` is a CEILING ON THE WAVE, measured from the moment the wave opens —
+not a gap after its last body. When it expires the wave is over, its survivors
+keep walking and the next wave is announced. Across the schedule it runs from
+30 s to 125 s, and it clears the wave's own last arrival by at least 26.02 s
+(wave 7, the tightest). A `duration` that fell before its own tail is rejected
+at load time by `validateWaveTimelines`, which is the one authoring mistake the
+timeline makes easy. **Wave 35 authors no `duration` at all**, and
+that absence is the data saying there is nothing after it.
+
+**GROUPS ARE INDEPENDENT AND ROUTINELY OVERLAP.** Measured on the shipping
+schedule: 134 groups over 35 waves, and **18 of the 35 have at least one pair
+of groups whose windows cross** — wave 22 runs three at once, wave 30 opens two
+on the same frame. Reading the list top to bottom reads the WAVE; it is not the
+order of arrivals and there is no queue. At an equal timestamp the order is (1)
+the group's index in the array, (2) the body's index in the group — stable, and
+the only thing that decides a tie.
+
+**Deploying, in play, and a transition are three different states**, and
+conflating them is how the old vocabulary misleads:
+
+- **deploying** — the wave still has events left on its cursor. `waveSpawned`
+  against `waveEventCount()`; the readout prints it as `12 / 22 deployed`.
+- **in play** — this wave is the one on the clock. It starts when the wave
+  opens and lasts until a gate closes it, so a wave can be **fully deployed and
+  still in play for a minute**, with its Send button live and its ceiling
+  ticking. `waveElapsed` is that clock and `duration` is what it is measured
+  against.
+- **a transition** — no wave is on the clock and `waveCountdown` is counting
+  the next one in. 5 s, 3 s, or the 10 s opening pause; never a wait to be sat
+  out and never long enough to be one.
+
+An empty road proves nothing about any of the three. See *A wave ends at a
+gate* below.
 
 **The schedule, measured 2026-08-20** by summing `waveCount` and
 `waveEffectiveHealth` over `WAVES`:
@@ -726,11 +796,12 @@ scheduled because `waveEffectiveHealth` multiplies each body by its shield
 ratio and revive count — what must actually be removed, not what is declared.
 
 **Authoring a wave: `health` and `count` pay for themselves, `interval` and
-`lead` do not.** A wave's `health` override scales income — `Enemy.bountyOf`
+`at` do not.** A group's `health` override scales income — `Enemy.bountyOf`
 prices a body at `type.bounty × health / type.health`, so raising health raises
 its bounty in the same proportion — and more bodies means more bounties.
-Tightening an interval or a lead adds neither, which makes compression the
-cheapest pressure available in this file. (This sentence used to end "they do
+Tightening an interval, or pulling an `at` back so two groups land on top of
+each other, adds neither, which makes compression the cheapest pressure
+available in this file. (This sentence used to end "they do
 not simply pay for their own answer through damage income"; it was right, for a
 mechanism retired on 2026-07-31.)
 
@@ -751,13 +822,70 @@ The active `WAVES` reference survives `restartGame()`: Restart means replay this
 route. Nothing about the schedule is saved to `MetaProgress`.
 
 **A wave may be MIXED** (2026-07-29, v0.4.7, at the owner's request — "make the
-wave a bit more chaotic, still deterministic but with more than 1 type"). In
-place of the flat fields a wave may carry `groups: [...]`, a list of groups
-each with its own `count`/`interval`/`type`/`health` and an optional `lead` —
-the pause before that group's first body, used instead of its `interval` — plus
-an optional `tier` on a fractal type (six groups author one; see the tier
-ladder below). The groups deploy in order, so a wave reads top to bottom as the
-thing the player watches arrive.
+wave a bit more chaotic, still deterministic but with more than 1 type"):
+several groups, several types, deliberately on top of each other rather than
+one after another. Six groups carry a `tier` on a fractal type (see the tier
+ladder below).
+
+**Mixed is about the ROSTER, never about the group count.** Every wave carries
+`groups` now, so counting them says nothing: wave 24 is three salvos of Aether
+Wisps and is as single-type as it ever was, while wave 13's twenty Angries are
+five groups of four. A single-type wave is a question with one answer and those
+are what teach the game; a mixed wave asks two at once, which is what makes the
+back half feel chaotic rather than merely bigger.
+
+### What guards the schedule in the suite, and what the guards cannot see
+
+Added 2026-08-26 with the timeline scheduler's test pass. Six names in
+`tests/run.js` carry the load; know which one to read before changing the
+schedule, because they fail for very different reasons.
+
+**`the timeline rewrite moved when bodies arrive and changed nothing else` is
+the composition gate, and it is the one a retune trips.** It holds a snapshot
+of all 35 waves taken BEFORE the rewrite — bodies, effective HP, clear bounty,
+kill bounty, and the AUTHORED SIGNATURE of every group — plus the roster rules
+(one Midboss, in 11; one Tyrant, in 35; Vanguard only in 34; Colossus only in
+29; flight introduced at 24; 14, 18 and 28 camo end to end; the six fractal
+rungs at 16/17/22/25/33/35). **Absence is part of the signature**: a group with
+no `health` is a different authored thing from one that writes the type's own
+number, and materialising a default while splitting a group is the mistake the
+rewrite made easy — every aggregate in the game still balances afterwards, so
+nothing else in any suite would notice. If you deliberately retune a wave, this
+test is what you update, in the same change, with the reason.
+
+**The kill column in that table is priced off the TYPE ROW and ignores `tier`,
+so it is not `waveKillBounty`.** Over the whole campaign the two read $22 321
+and $22 987; the gap is the six Fractal Slimes, whose tiers only
+`Enemy.bountyOf` can see. Both totals are pinned, deliberately: a group that
+loses its tier moves one of them and not the other.
+
+**`the whole campaign runs itself dry, with every authored arrival emitted
+once` is the only test in the repo that watches the RUN rather than the data.**
+It plays all thirty-five waves with no Send, no auto-send and no click — every
+wave closing on elimination or on its own ceiling — and wraps `emitWaveEvent`
+to record each arrival as (wave, group, body). A dropped arrival and a doubled
+one are both invisible to every count in the suite, because the counts read
+`WAVES`: a wave whose ceiling cut its own tail still says 88 bodies and still
+pays for 88. It costs about three seconds of CPU and is worth them.
+
+**`a wave's clock starts when the wave opens, never when it finishes arriving`
+records an ARBITRATION, not just a behaviour.** `at` and `duration` share one
+origin — the moment the wave opens — so wave 1's 32 s ceiling fires at 32.0 s
+and not at 35.2 s. The requirement was phrased "the timer starts at the first
+spawn", and for 34 of the 35 waves that is the same instant, because their
+first group is at `at: 0`. **Wave 11 is the exception**: its Midboss is at
+`at: 4`, so four seconds of its 60 s window are empty road. If the other
+reading was meant, that test is where it fails and wave 11 is the only wave
+that moves.
+
+The other three are `wave 22 runs three groups at once, and wave 30 opens two
+on the same frame` (overlap and the same-frame tie-break, on the shipping
+schedule rather than on a fixture built to have one), `wave 35's Tyrant walks
+in at thirteen seconds and its T5 slime at twenty-eight` (the finale's two
+authored landmarks, on the clock — neither was a readable number before `at`
+existed), and `a second road mirrors the whole timeline, and is still one wave
+and one reward` (Twin Confluence deploys all 88 bodies of wave 12 down each
+road, off ONE cursor, and pays one reward).
 
 ### The Fractal Slime's tier ladder is SCHEDULED, one rung per wave
 
@@ -820,8 +948,10 @@ meter because upgrade paths heal it, so leaks were counted directly):
   and the cascade never puts them all on the road at once anyway.
 
 **T0 is in 16 and not in 12 on purpose.** Wave 12 is the suite's mixed-wave
-fixture (`tests/run.js`, "a mixed wave deploys its groups in order"); a fixture
-that changes shape whenever content lands stops testing the scheduler.
+fixture — "a wave resolves into one interleaved timeline of arrivals" and "a
+second road mirrors the whole timeline" both walk it, and it was "a mixed wave
+deploys its groups in order" that walked it before 2026-08-25. A fixture that
+changes shape whenever content lands stops testing the scheduler.
 
 **NEVER give a fractal group a `health` override.** `Enemy.healthOf` takes the
 tier branch and discards it, so it is a no-op on the body and a lie in
@@ -832,25 +962,29 @@ highest campaign HP and the campaign-waves list in `js/codex.js` are read off
 the schedule and the type's own `fractal` block, so scheduling a rung moves the
 guide with no edit — which is the property the test pins.
 
-**The flat form is not legacy, it is the single-group case**, and half the
-schedule still uses it deliberately: a wave of one type is a question with one
-answer, and those are what teach the game. `waveGroups(wave)` is the ONE place
-the two forms are reconciled — it returns `wave.groups` or `[wave]` — and
-nothing else in the game reads `wave.count` or `wave.type` directly.
-`waveCount`, `waveGroupAt` and `waveSummary` are built on it, and so is the
-index screen's per-type "appears in waves N, M" list.
+**THE FLAT FORM IS GONE (2026-08-25).** Until the timeline rewrite a wave could
+be a bare group object — `count`, `interval` and `type` on the wave itself, no
+`groups` array at all — and `waveGroups(wave)` reconciled the two shapes with
+`return wave.groups || [wave]`. Nineteen of the thirty-five waves used the bare
+form, so a hand-rolled walk over `wave.groups` saw **58 groups against the true
+77** and silently dropped a quarter of the schedule, reporting a type as
+appearing *nowhere* when it was scheduled in plain sight (the midboss, wave 11).
+Every wave now carries `groups`; the fallback is deleted, and `waveGroups`
+THROWS a named error on a wave without one rather than handing back an
+`undefined` that only fails four frames later inside `waveCount`. A fixture that
+hands the game a flat wave gets that error, and it says which shape to write.
 
-**IF YOU ARE AUDITING THE SCHEDULE, CALL IT — NEVER WALK `wave.groups`
-YOURSELF.** The shape is mixed: measured at runtime 2026-08-13, **19 of the 35
-Easy waves are bare group objects and only 16 carry `groups: [...]`**, so a
-hand-rolled walk over `wave.groups` sees **58 groups against the true 77** and
-silently drops a quarter of the schedule — front-loaded, because the bare form
-clusters early. The failure does not look like a failure: it reports a type as
-appearing *nowhere* when it is scheduled in plain sight (the midboss, wave 11),
-which reads as a finding rather than as a broken query. **The whole normalizer is
-`function waveGroups(wave) { return wave.groups || [wave]; }` at
-`js/game.js:509` — the `|| [wave]` fallback IS the function.** Reimplementing it
-means re-deriving that fallback, and the version that omits it still runs.
+**IF YOU ARE AUDITING THE SCHEDULE, STILL CALL `waveGroups()` — and
+`waveTimeline(wave)` if what you want is arrivals rather than authorship.** The
+old undercount cannot recur, but the same mistake has a new form: walking
+`wave.groups` by hand gives you the AUTHORED list in AUTHORED ORDER, which is no
+longer the order anything reaches the road in. `waveTimeline` is the one
+expansion of `at + N × interval` into `{time, groupIndex, bodyIndex, ...}`
+events, sorted, and the scheduler emits from that list and nothing else.
+`waveCount`, `waveEffectiveHealth` and `waveSummary` are built on `waveGroups`,
+and so is the index screen's per-type "appears in waves N, M" list. The schedule
+is **134 groups over 35 waves** today, against 82 before the rewrite cut long
+groups into salvos (19 of those 35 waves were a single flat group) — the bodies did not move, the group count did.
 
 **CAMO WAVES ARE NEVER MIXED, and that is a rule about the Smasher.** Its swing
 damages whatever it physically reaches, camo included; it simply will not
@@ -859,40 +993,162 @@ one visible enemy in a camo wave a detectionless Smasher starts swinging and
 takes the camo down as collateral, and the whole buy-detection check the
 schedule is built around quietly evaporates. A test pins it.
 
-**The break is 90 seconds, and three things end it** (2026-07-29; it was 5 s,
-then 90 s with an instant skip). Ninety seconds is thinking room — long enough
-to walk the board, read a panel, compare two upgrades on their hover cards,
-which is where the game is actually played. Ending it:
+### A wave ends at a gate, and there are three
 
-- the **90 s running out**, which spawns the wave on the spot;
-- the **Send next wave** button under the wave readout;
-- **the board going empty** — every enemy from the last wave dead or gone.
+**What this replaced (2026-08-25).** Until the timeline scheduler the gap
+between two waves was `WAVE_BREAK`, a **90 s ceiling** on the pause between one
+wave's LAST SPAWN and the next wave's first, ended early by the Send button or
+by the board going empty. `WAVE_BREAK` no longer exists. The ceiling moved onto
+the wave itself as `duration`, so the thinking room the 90 bought is now bought
+by the part of a wave's own window that nothing is walking in, and what is left
+between two waves is a transition of 5 s or 3 s.
 
-The last two do not spawn immediately, and **since 2026-07-31 they no longer
-put the same number on the clock**, both through `callNextWave(delay)`:
+**`endWave(delay)` is the ONE exit a wave has.** All three gates go through it,
+which is what makes *the reward is paid exactly once* a property of a single
+function rather than of three call sites agreeing with each other:
 
-| ending the break | delay | why that number |
+| gate | what closes the wave | transition | survivors |
+|---|---|---|---|
+| **1 — eliminated** | every scheduled body emitted **and** nothing carrying that wave's number still alive, descendants included | `WAVE_CLEAR_DELAY` = 5 s | none, by definition |
+| **2 — ceiling** | `waveElapsed` reaches the wave's `duration` | `WAVE_CLEAR_DELAY` = 5 s | keep walking, keep their own wave's number |
+| **3 — Send** | the button, or auto-send, once every scheduled body is out | `WAVE_CALL_DELAY` = 3 s | keep walking |
+
+**SURVIVORS ARE NEVER TOUCHED BY A TRANSITION.** Gates 2 and 3 both close a wave
+that still has bodies on the road. Those bodies keep walking, keep their origin,
+stay fully dangerous, and — this is the half that is easy to get wrong — cannot
+hold the NEXT wave open either, because gate 1 asks about one wave's number and
+never about the road. See *Every enemy knows which wave it came from* below.
+
+**Gate 1 needs the whole wave emitted first, and that is not the same as an
+empty road.** Wave 13 sends five salvos of Angries 4.5 s apart and a good board
+empties the road between every pair of them; `lastDeployedWave()` answers `0`
+until the event cursor is spent, so those silences are not clears.
+
+**Gate 3 is a real transfer of power, and it did not exist before.** Under the
+sequential scheduler a wave ended on its own last body, so a Send could only
+ever shorten the pause afterwards — nothing a patient player would not have got
+anyway. Now the button goes live the moment the wave has finished arriving, and
+it can cut fifty seconds off a wave's window with twelve enemies still walking.
+The label stays **Send next wave** rather than becoming *End wave*: what it
+honestly promises is that the next wave lands in three seconds, and the closing
+of the current one is bookkeeping the player never sees.
+
+**Why three and why five** (2026-07-31, unchanged by the rewrite): a wave that
+appeared on the frame of the click gave the player no moment to look up from
+what they were reading, and the five is the owner's *"once all the enemies of a
+wave have been killed, if not on auto skip, leave a 5 seconds delay until the
+next wave"* — the only pause a *winning* player gets, and nobody asked for it,
+which is why it is the longer of the two. The opening pause is the third number:
+`RUN_START_DELAY` = 10, brought in at **0** by the Start button, because a
+button that says Start starts and there is no board to look up from yet.
+
+**"If not on auto skip" still needs no branch anywhere.** Auto-send goes through
+the same `skipNextWave()` the button does, so on a deployed wave it takes gate
+3's three seconds; inside a transition `callNextWave` uses `Math.min`, and three
+is closer than five. A call may only ever bring the next wave CLOSER — with two
+seconds left, calling it in must not push it back out. So the toggle keeps its
+three-second cadence through a cleared board without the clear path knowing the
+toggle exists.
+
+**Auto-send never touches a wave's internal timing.** It ends waves; it cannot
+compress an `interval`, move an `at` or drop an arrival, which would be
+rewriting the schedule rather than its pacing. A test pins it.
+
+**NO GATE OPENS A TRANSITION FOR WAVE 35**, because there is nothing to
+transition to. Gate 2 cannot fire — it authors no `duration`. Gate 3 is refused
+by index as well as by deployment, and the button is not drawn. Gate 1 still
+fires, on its own branch in `update()`: it pays the last bounty and stops
+there, with no `waveIndex++` and no countdown. The cursor is retired instead by
+`emitDueSpawns()` on the last body of the last wave — the only place
+`allWavesDeployed` is set — and the run then ends on the whole-road victory
+test, which is a question about the map rather than about wave 35.
+
+**What is deliberately gone is the FLOOR under a losing board.** The 90 s break
+was a wait nobody could lose: with something still walking, the player got as
+long as they needed. A wave that is not being killed now ends on its own ceiling
+and the next one is announced on top of the survivors. That is the change the
+rewrite is FOR rather than a side effect of it, and it is the one thing in this
+rewrite that moved difficulty. **Nobody has re-measured the campaign against a
+real tower board since** — retuning by simulation is out of bounds in this
+repo — so if the back half turns out to be unfair, this paragraph is where to
+start looking, not the wave data. Measured consequence on a board that clears
+everything, unchanged from before: a winning run takes about 730 s of wall clock
+instead of about 3100 s.
+
+### Every enemy knows which wave it came from
+
+2026-08-25. Every body on the road carries `waveId` — the 1-based number of the
+wave that scheduled it, matching the number the player is shown. `0` means *no
+wave put this here*: sandbox spawns, codex sprites, test fixtures.
+
+**A wave is over when its own bodies are gone, not when the road is empty.**
+`waveStillOnTheRoad(n)` in `game.js` scans for `waveId === n`, and the clear
+branch in `update()` asks it about `lastDeployedWave()`. What this fixed: a
+survivor of an *earlier* wave — the stragglers a wave's `duration` ceiling leaves behind, a
+Fractal Slime cascade still unwinding two waves later — used to hold the
+current wave's clear open under the old `enemies.length === 0` test. Beating
+wave 30 outright paid nothing and called nothing in while one wave-29 Brute was
+still walking, and nothing on screen told the player which body was doing it.
+Survivors of a previous wave stay fully active and dangerous; they simply no
+longer gate the wave in front of them.
+
+**`lastDeployedWave()` answers "which wave has finished arriving", or `0`.**
+Corrected 2026-08-26: it returns **`waveIndex + 1`** — the wave *on the clock*,
+once its event cursor is spent — and not `waveIndex`, which is what it meant
+under the sequential scheduler where `waveIndex` had already moved on by the
+time the last body was out. It returns `0` during a transition (`waveCountdown
+> 0`: there is no wave arriving), `0` while the wave on the clock is still
+arriving, and `WAVES.length` once the schedule is spent and `allWavesDeployed`
+is set. A partly deployed wave can therefore never be read as beaten, which is
+what stops a road that goes momentarily empty between two of its groups — wave
+13 sends five salvos of Angries 4.5 s apart — from closing the wave early.
+
+**The identity is INHERITED, never re-derived.** There are exactly five
+`new Enemy` call sites in the project and four of them are on the board:
+
+| site | what it makes | how it gets the wave |
 |---|---|---|
-| Send next wave (button, auto-send) | `WAVE_CALL_DELAY` = 3 | a wave that appeared on the frame of the click gave the player no moment to look up from what they were reading |
-| the board going empty | `WAVE_CLEAR_DELAY` = 5 | the owner's *"once all the enemies of a wave have been killed, if not on auto skip, leave a 5 seconds delay until the next wave"* — the only pause a *winning* player gets, and nobody asked for it, which is why it is the longer of the two |
-| **Start wave 1** (the opening pause only) | 0 | a button that says Start starts; there is no board to look up from yet |
+| `spawnEnemy` (game.js) | the scheduled body | **minted** — `waveIndex + 1`, the only place an identity is created |
+| `spawnMinions` (enemy.js) | a Hive's brood | `waveId` on the `born` overrides |
+| `splitOnDeath` (enemy.js) | a Fractal Slime's four children | `waveId` on the child overrides |
+| `summon` (enemy.js) | the Tyrant's roar | `waveId` on the summoned overrides |
 
-**"If not on auto skip" needs no branch anywhere**, and that is the point of
-the `Math.min`: auto-send calls every break in at three, three is closer than
-five, and a call may only ever bring the next wave CLOSER. So the toggle keeps
-its three-second cadence through a cleared board without the clear path knowing
-the toggle exists.
+(The fifth is `codex.js`, a parked sprite that never joins `enemies`.) A
+**Revenant needs no code at all**: it gets back up as the same object, so it
+keeps the origin it was born with. A phase's roar reaches the board through
+`pendingSpawns`, which `spawnMinions()` drains — one door for the brood and the
+roar both, so there is no sixth site hiding behind the summon.
 
-**`callNextWave` uses `Math.min`, never assignment.** A call may only ever
-bring the next wave CLOSER; with two seconds left, calling it in must not push
-it back out.
+**A sixth site is what this fails on, so a test reads the source.** "every place
+in js/ that builds an enemy from another one passes the origin on"
+(`tests/run.js`) scans every `.js` under `js/` and requires the function around
+each `new Enemy(` to mention `waveId`; `js/codex.js` is the one exemption, and
+the exemption is itself checked to still have a call site behind it. The rule is
+coarse deliberately — `spawnMinions` passes an object built ten lines earlier
+while the other two pass literals — but a new site that never says the word
+cannot be silent. Its companion, "a wave stays open while a body it never
+scheduled is still walking", leaves a wave-25 cascade as the only thing alive
+and watches the wave refuse to close for four generations: inheriting the number
+and being *held open* by it are two different facts, and only the second one is
+the feature.
 
-**What the board-clear trigger does to the 90 s break is worth being explicit
-about.** On a board that is killing everything, almost every break is now five
-seconds. The long break has become a floor under a board that is *losing* —
-with something still walking you get as long as you need — rather than a
-standing pause. That is the trade the owner asked for. Measured consequence: a
-winning run takes about 730 s of wall clock instead of about 3100 s.
+Reading a global *current wave* inside a child would be actively wrong, not
+merely indirect. A T5 slime leaves 1 364 descendants across five generations
+and a Hive drops five hatchlings every seven seconds; those bodies routinely
+outlive the wave that scheduled their ancestor, and they belong to that wave
+however many waves later they are born. Re-parenting them onto the current wave
+would make a wave that can never be closed.
+
+**Victory is the one place that still asks about the whole road,** and the
+asymmetry is deliberate. A wave transition is a question about one wave; winning
+the run is a question about the map. `allWavesDeployed && enemies.length === 0`
+stays as it is, so a stray wave-33 Brute still walking during wave 35 keeps the
+victory screen away — `waveStillOnTheRoad(35)` would hand the player the win
+over its head.
+
+Four tests in `tests/run.js` pin this, one per hop: the scheduler minting it,
+broods/splits/summons inheriting it, a straggler failing to hold the next wave
+open, and the win still waiting for the road.
 
 ### A run opens on a pause, not on a body
 
@@ -908,21 +1164,23 @@ already walking and a player still reading the board.
 
 **Wave 1 is now an ordinary wave, and that is the whole design.** The opening is
 a plain countdown handed to the ordinary scheduler, not a fifth screen state or
-a "not started yet" mode, so it inherits everything a break already has: the
+a "not started yet" mode, so it inherits everything a transition already has: the
 readout counts it down (*"Wave 1 in 10 s"*), the Send button is up, auto-send
 sends it, the pause key pauses it, and towers can be placed the whole time. Two
 consequences that had to be handled explicitly:
 
 - **`betweenWaves()` lost its `waveIndex > 0` guard.** That guard existed only
   because a run used to start with `waveCountdown` at 0 and wave 1 already
-  spawning, so there was no break there to describe. Now there is. `beforeFirstWave()`
+  spawning, so there was no transition there to describe. Now there is. `beforeFirstWave()`
   is the new predicate, and it is needed in exactly two places: the button's
   label, and the zero delay.
-- **The board-clear trigger needs `!beforeFirstWave()`.** An empty road is
-  precisely what a run starts with, so without it the clear branch reads the
-  untouched map as a wave the player just beat and cuts the ten seconds to five
-  on the first step. A wave has to have *happened* for clearing the board to
-  mean anything.
+- **The wave-clear trigger needs a wave to have happened.** An empty road is
+  precisely what a run starts with, so without a guard the clear branch reads
+  the untouched map as a wave the player just beat and cuts the ten seconds to
+  five on the first step. The guard was `!beforeFirstWave()` until 2026-08-25
+  and is now `lastDeployedWave() > 0`, which is the stronger form of the same
+  statement: 0 is also the identity worn by sandbox and codex bodies, so those
+  cannot drive the schedule either.
 
 **The Start button is the Send button.** Same rectangle, same handler, same
 thing — bring the next wave in early — and the only honest difference is that
@@ -934,57 +1192,78 @@ hit-test, draw and hide in order to say what that one already says.
 one in order to wait on it. `js/sandbox/sandbox.js` zeroes the countdown in both
 of its restart paths, deliberately.
 
-**The test harness does not inherit it either**, for the same reason it pins the
-90 s break: `boot(mapId)` runs the game's own `spawnScheduledEnemy()` once, so
-every test written against "t=0 is wave 1 on the road" still measures what it
-was written to measure. A test that wants the real opening takes the genuine
-path — `boot(null)` then `chooseMap(...)` — which four of them do.
+**The test harness does not inherit it either**, for the same reason it used to
+pin the break: every test written against "t=0 is wave 1 on the road" should
+still measure what it was written to measure. `boot(mapId)` used to run the
+game's own `spawnScheduledEnemy()` once; on a timeline there is no "delay to the
+next body" for that to return, so it now writes `waveCountdown = 0` and steps
+`updateWaves(0)`. That is the same instant said the new way — the opening pause
+expires, wave 1 opens, its clock reads 0.00 and every event it authors at
+`at: 0` is on the road — and it is `updateWaves` rather than `update` on
+purpose, because a zero-length `update()` would also pulse every enemy, tower
+and effect on the board. A test that wants the real opening takes the genuine
+path — `boot(null)` then `chooseMap(...)` — which four tests in `run.js` do,
+including the campaign run-dry test: it wraps `emitWaveEvent` to count arrivals,
+and through `boot(mapId)` wave 1's first body is already out before the wrapper
+exists, so the count would read 829 against an authored 830.
 
 `skipNextWave()` is kept as the button's name for `callNextWave()`, because the
 button, the auto-send toggle and several tests all speak in terms of skipping.
 
 **`autoSkipWaves` is the standing version of that button** (also 2026-07-29, at
 the owner's request): with it on, `updateWaves` calls `skipNextWave()` every
-step, so each break is called in the frame it opens and the campaign runs
-unattended. Since v0.4.7 that means a three-second break rather than a
-one-frame one, which is deliberate — it goes through the same `callNextWave()`
-the button does, and that shared path is the point. Two things about the wiring:
+step, so every wave is sent the frame it becomes sendable and the campaign runs
+unattended. That means a three-second transition rather than a one-frame one,
+which is deliberate — it goes through the same `skipNextWave()` the button does,
+and that shared path is the point. Two things about the wiring:
 
 - **It goes through `skipNextWave()`, not through its own countdown poke.** So
-  it inherits the "only ever ends a break" guard, and in particular it can
-  never compress the `interval` *within* a wave — that would be rewriting the
-  schedule rather than its pacing. A test pins it.
+  it inherits gate 3's guard — a wave that is still arriving cannot be sent —
+  and in particular it can never compress the `interval` *within* a wave or
+  pull an `at` forward, which would be rewriting the schedule rather than its
+  pacing. A test pins it.
 - **Its toggle lives in the bottom-right corner beside the speed button, not
-  beside the skip.** With auto-send on a break lasts three seconds, so a toggle
-  drawn only during breaks would be a control the player has three seconds at a
+  beside the skip.** With auto-send on a transition lasts three seconds, so a
+  toggle drawn only between waves would be a control the player has three seconds at a
   time to find. It has to be on screen all run, and a permanently live button
   means a permanently dead patch of map under it, so it goes in the corner where
   this game already keeps that cost. It also belongs with the speed control on
   the merits: both are "how fast does my run go", both outlive a restart,
   neither is run state.
 
-**Lengthening the break costs nothing, which is why the ceiling is 90 and not
-15.** Income is a fixed bounty paid once per kill and never a trickle
-per second, so idle seconds earn exactly nothing: the break cannot be farmed,
-only used or skipped, and no number in Balance math is a function of wall-clock
-time.
+**A generous `duration` costs nothing to give, which is why the ceilings run to
+125 s.** Income is a fixed bounty paid once per kill and never a trickle per
+second, so idle seconds earn exactly nothing: a wave's window cannot be farmed,
+only used or ended early, and no number in Balance math is a function of
+wall-clock time.
 
 Three rules keep the call honest:
 
-- **`betweenWaves()` is the one condition**, read by the click handler, the
-  drawing, the board-clear check and `callNextWave()` alike. The button
-  therefore cannot be drawn where it is not clickable, or — the nastier
-  direction — sit live over open ground all run swallowing clicks meant to
-  place a tower there.
+- **`waveSendAvailable()` is the one condition** behind the button — read by the
+  click handler, the drawing and `overInterfaceChrome()` alike. (`betweenWaves()`
+  is now the condition behind `callNextWave()` and nothing else; gate 1 asks
+  `lastDeployedWave()` and `waveStillOnTheRoad()`, which are questions about a
+  wave rather than about a countdown.) The button therefore cannot be drawn
+  where it is not clickable, or —
+  the nastier direction — sit live over open ground all run swallowing clicks
+  meant to place a tower there. Until 2026-08-25 all three call sites spelled
+  the conjunction out for themselves and one of the three had already dropped a
+  term; see *The wave readout and the Send button* below.
 - **`callNextWave()` shortens the countdown; it does not spawn.**
   `updateWaves()` stays the only thing that ever deploys an enemy, so there is
   no second path for `allWavesDeployed` or the wave banner to get wrong.
-- **It only ever ends a break.** Called mid-wave it does nothing, or a player
-  could pile the whole schedule onto the board at once.
+- **`callNextWave()` only ever shortens a TRANSITION.** Called while a wave is
+  on the clock it returns false and changes nothing — a countdown that is not
+  running has nothing to shorten. Ending a wave early is a different operation
+  with a different function (`endWave`, gate 3), reachable only once every
+  scheduled body is out; without that split a player could pile the whole
+  schedule onto the board at once.
 
-The board-clear check lives in `update()` immediately after the dead/leaked
-filter, because that is the one moment the enemy list is authoritative:
-everything that died this step is out of it and nothing new has spawned.
+Gate 1's check lives in `update()` immediately after the dead/leaked filter,
+because that is the one moment the enemy list is authoritative: everything that
+died this step is out of it and nothing new has spawned, and `updateWaves()`
+already ran at the top of the step so a body emitted this frame is in the list
+and cannot be missed by the scan.
 
 Note that calling waves in back-to-back is *harder* than letting them space
 out — the same enemies arrive in one clump, and a tower that shoots one at a
@@ -1052,8 +1331,13 @@ loudly.
 **The v0.4.4 twenty-wave spine is still in there, in order.** Those waves were
 never replaced: v0.4.5 inserted eleven between them, and v0.4.7 gave some of
 them a second group behind their opening and turned their `health` overrides
-up. Each still OPENS a wave with its exact count, interval and type, and a test
-in `tests/run.js` pins that plus "no old wave was made weaker". This is not
+up. **The invariant weakened on 2026-08-25 and it is worth knowing exactly
+how**: each tagged wave used to OPEN with the old wave's exact count, interval
+and type, and now it CONTAINS that type and that total count. Old 2 is still
+eight stock Normals, but they arrive as 4 + 4 rather than as one group of eight
+at 1 s, so no single group carries the old row any more. What is pinned in
+`tests/run.js` is the aggregate composition per wave, plus "no old wave was made
+weaker". This is not
 tidiness. A schedule rebuilt from scratch put the first swarm at wave 5, when
 three towers are on the board, and `null-meridian` could not survive it —
 measured, twice. The old escalation curve is load-bearing; keep the spine or
@@ -1167,13 +1451,16 @@ an inconsistency: the run is already over, so there is nothing left to cancel
 and nothing left to lose by backing out of it.
 
 **The run can be won** (2026-07-28). `victory` is set when `allWavesDeployed`
-is true and the enemy list empties with the base standing, and freezes the
+is true and the enemy list empties — the WHOLE list, descendants and
+earlier-wave stragglers included, deliberately unlike the per-wave clear test —
+with the base standing, and freezes the
 simulation exactly as a loss does, under a mirror-image overlay
 (`drawVictory` / `drawGameOver`, both through `drawRunOverlay` — same
-buttons, same keys). `allWavesDeployed` is set in **exactly one place**: the
-scheduler naturally running dry in `spawnScheduledEnemy`. Tests and the
-sandbox disable spawning with `waveIndex = WAVES.length`, and that idiom must
-never read as a win — do not add a second assignment or derive the flag from
+buttons, same keys). `allWavesDeployed` is set in **exactly one place**: `emitDueSpawns()`, on the
+last body of the last wave, which is also where the cursor is retired — wave 35
+has no gate to retire it. (It was `spawnScheduledEnemy` until 2026-08-25.) Tests
+and the sandbox disable spawning with `waveIndex = WAVES.length`, and that idiom
+must never read as a win — do not add a second assignment or derive the flag from
 `waveIndex`. The loss check runs before the victory check so a final enemy
 that both empties the board and zeroes the base reads as the defeat it is.
 
@@ -1182,6 +1469,115 @@ really is destroyed — the loss path is reachable in ordinary play, not just
 by tests. Both outcomes are pinned: the loss freeze by the original tests,
 the victory path (and the manual-idiom non-victory) by
 "clearing every scheduled wave wins" in `tests/run.js`.
+
+### The wave readout and the Send button
+
+*(2026-08-25, with the timeline rewrite.)* One line of text in the top-left
+corner says where the run is, and one rectangle under it sends the next wave.
+Everything below is **display**, in the sense the hard constraints mean it:
+`update()` touches no DOM, the whole HUD is canvas, and every string is built by
+a **named function** rather than inside a `ctx.fillText` — the test harness's
+stub canvas records nothing, so a string composed inside `draw()` is a string no
+suite can read, and a readout no suite reads drifts from what it describes
+within a release.
+
+**`waveStatusText()` has four states, and they are four different questions.**
+
+| state | line | the question it answers |
+|---|---|---|
+| a wave is on the road | `Wave 7 / 35  ·  12 / 22 deployed  ·  38 s left` | which wave, how much of it is out, how long it has |
+| a transition | `Wave 8 in 3 s` | when does the next one land |
+| the final wave, on the road | `Wave 35 / 35  ·  3 / 49 deployed  ·  FINAL WAVE` | which wave, how much of it is out, **and that there is no next one** |
+| the schedule is spent | `Final wave  ·  6 still walking` | how many are left to kill |
+
+**One transition state, three delays.** The 10 s opening pause, the 5 s a
+wiped-out wave buys and the 3 s a Send or auto-send buys all print the same
+line, because to a player they are the same moment and only the number differs.
+It reads `waveCountdown` and not a per-gate constant, so the corner cannot claim
+three seconds while the scheduler is running five — whichever gate opened the
+transition already wrote its own delay there.
+
+**The final wave shows a STATE where the timer goes, never a number.** Wave 35
+authors no `duration`, and that absence is the data saying *there is nothing
+after this*. `waveTimeRemaining()` returns **null**, not 0 and not a default, and
+the readout puts `FINAL WAVE` in the slot — a `0 s left` or a materialised
+ceiling would be a countdown to a wave 36 that does not exist. This is the same
+never-materialise-a-default rule the wave data follows; here the cost of
+breaking it is a lie on screen.
+
+**`waveElapsed` is the wave clock, and it starts when the WAVE OPENS** — the
+frame the transition in front of it expires, which is also the frame `at: 0`
+fires. `at` and `duration` are measured from that one origin, so a wave called
+in early has exactly the same seconds as one that waited its transition out.
+**For 34 of the 35 waves that instant is also the first arrival**, because their
+first group is at `at: 0`; wave 11 is the exception, its Midboss is at `at: 4`,
+and four seconds of its 60 s window are empty road. That is an ARBITRATION —
+the requirement was phrased "the timer starts at the first spawn" — and it is
+recorded in the test `a wave's clock starts when the wave opens, never when it
+finishes arriving`, which is where it fails if the other reading was meant.
+It advances in `updateWaves()` beside the
+countdown — not in a draw function — because the timeline scheduler wants the
+same clock to *enforce* the limit the readout *shows*, and two clocks would be
+two things to disagree. `tests/run.js` pins that it advances, so a rewrite of
+`updateWaves` that drops the line goes red instead of freezing the corner at the
+wave's full duration forever.
+
+**The Send button is live once every scheduled body of the wave in play is on
+the road, and never one instant before.** It says nothing about whether the road
+is *empty*: survivors of a deployed wave are the player's problem and do not
+withhold the button. `waveSendAvailable()` is the single predicate — the
+drawing, the click handler and `overInterfaceChrome()` all ask it and none of
+them spells out its own conjunction. **The failure this shape rules out is not
+"invisible and dead", it is INVISIBLE AND LIVE**: a 168×30 rectangle of open map
+at (22, 100), near the top-left where a player builds early, silently eating the
+click meant to put a tower there. `tests/run.js` does not reason about the
+predicate for this — it sweeps all 344 points of the rectangle in **four**
+scheduler states, asks the game's own `overInterfaceChrome()`, and then actually
+builds through the click handler in two of them.
+
+**The state that sweep exists for is the final wave, on the road.** It is the
+only one where the two halves of the wave chrome disagree: `waveControlsShown()`
+is true — the index has not passed the end, so the AUTO toggle is still drawn —
+while the Send button is down, because there is no wave 36 to send. Every other
+negative has *both* halves off, where a live rectangle would have to be live for
+no reason at all; this one has a live half to be dragged along by, and it lasts
+the minutes wave 35 takes on a board the player is still building on.
+
+`waveSendReady()` refuses the last wave by index as well as by deployment, and
+**that guard is unreachable from a running game**: `emitDueSpawns()` retires the
+cursor on the last body of the last wave, so `waveIndex` is already past the end
+by the time anything could ask. It is pinned by a fixture-held state anyway — an
+untested rule inside a predicate three call sites read is a rule that gets
+simplified away.
+
+**The deployment count is what explains the button.** `12 / 22 deployed` reading
+`22 / 22` with thirty seconds still on the clock is a sentence the sequential
+scheduler could not produce — a wave used to end on its last body — and it is
+the only thing on screen that says why a Send button just appeared over the map.
+That is why the count keeps its space in the line instead of being dropped for a
+tidier one.
+
+**Wave summaries aggregate identical salvos, keyed on `(type, health, tier)`.**
+The timeline cut a wave into salvos, so wave 13 sends its twenty Angries as five
+groups of four; printing one entry per *group* would give the banner
+`4 × Angry + 4 × Angry + 4 × Angry + 4 × Angry + 4 × Angry`, which buries the
+one fact a banner exists for. The cut is a **timing** decision and the banner is
+a **roster**. But the key is all three fields and **not the display name**:
+`Enemy.typeOf` maps every rung of the Fractal ladder onto one row, so a name-only
+key would print a T1 salvo and a T5 salvo — 4 HP and 1024 HP — as one
+`8 × Fractal Slime`. No wave in the schedule splits a type across two `health`
+values or two tiers today (checked wave by wave, all 35), so the strict key
+prints exactly what the loose one printed; it is strict anyway because the
+banner is the only place a player can see the difference.
+
+**Every banner is checked against `waveCount()`, per wave, across the whole
+campaign.** A summing bug here is the kind that hides: a dropped salvo or a
+double-counted one still prints a line that reads exactly like a wave, and only
+two of the thirty-five banners are pinned as literal strings. So the suite sums
+the numbers the banner printed and compares them with the number of bodies the
+scheduler will put on the road — per wave and not on the 830-body total, because
+two waves wrong in opposite directions is not a state anyone should have to
+reason about.
 
 ---
 
@@ -1273,12 +1669,18 @@ half of that same edit: see LEAP above. Any test asserting the old interval is
 asserting a number the owner has now moved twice, deliberately, in the same
 direction.
 
-**It arrives in the MIDDLE of wave 35** — the second of four groups, about
-sixteen seconds into a thirty-five second deployment. A boss at the head of a
-wave is a duel; a boss in the middle of one is a wave you have to keep
-answering with a boss in the way. Its group carries a **six second `lead`**,
-the longest silence in the schedule, because at ordinary spacing it is just the
-next thing out of the gate rather than an entrance.
+**It arrives in the MIDDLE of wave 35** — `at: 13`, against a deployment whose
+last body is at 28 s, so it walks in at 46% of the wave, dead on the halfway
+mark. A boss at the head of a wave is a duel; a boss in the middle of one is a
+wave you have to keep answering with a boss in the way. Seven Angries from 15 s
+and four Bulwarks from 17 s arrive behind it while it is still crossing, and the
+T5 slime closes the wave at 28.
+
+**13 IS AN ABSOLUTE TIME, AND THAT IS WHY IT LANDS.** Until 2026-08-25 the
+entrance was `lead: 6` — six seconds appended to however long the groups above
+it happened to take — so the boss's moment drifted every time any earlier group
+was re-timed, and "mid-wave" was an accident that happened to hold. It is now a
+number someone chose, and `tests/run.js` pins it against the deploy length.
 
 **Everything the roar does is the `phases` block**, and nothing about the fight
 is special-cased anywhere. Phases fire in order and once — `phasesEntered` is a
@@ -1337,24 +1739,41 @@ the wave, so basically at the start of the countdown to the next wave if the
 wave was skipped."* The first version paid on deployment, which is not the same
 thing at all — it paid you for a wave that was still walking.
 
-`spawnScheduledEnemy` sets `pendingBounty` / `pendingBountyWave`, and
-`payWaveBounty()` settles it from **whichever of three moments comes first**:
+The reward is written down — `pendingBounty` / `pendingBountyWave` — on the
+frame the wave finishes deploying, and `payWaveBounty()` settles it from
+**whichever of these comes first**:
 
-1. **the board going empty** — the wave was defeated, the honest case;
-2. **`callNextWave()` succeeding** — the player skipped, so the countdown to the
-   next wave has started, which is the owner's second clause exactly;
-3. **the next wave's first spawn** — the 90 s ran out with stragglers still
-   walking; the wave is over regardless.
+1. **`endWave()`** — all three gates, which is the ordinary path and covers the
+   wave being wiped out (gate 1), its `duration` expiring with stragglers still
+   walking (gate 2) and the player sending the next one (gate 3). Since
+   2026-08-25 gate 1 is per-wave rather than per-board: a straggler from an
+   EARLIER wave no longer suppresses this payout;
+2. **`callNextWave()` succeeding** — shortening a transition. By the time a
+   transition exists the gate that opened it has already paid, so this is
+   ordinarily a no-op; it is kept because a countdown moved by hand (the
+   sandbox, a fixture) has no gate behind it;
+3. **`beginWave()`** — the same safety net from the other end, for a cursor that
+   was moved without going through a gate;
+4. **the last-wave branch in `update()`** — wave 35 has no next wave and no
+   transition, so its payout is the whole of closing it.
 
-**The latch is `pendingBounty` itself**, zeroed before the payout, so none of
-the three can pay twice even if two fire on the same step. Each route has its
-own test, because paying twice is the whole risk in a design with three doors.
+**The latch is `pendingBounty` itself**, zeroed before the payout, so no two of
+them can pay twice even if both fire on the same step, and `waveRewardLatched`
+is what stops the reward being OWED twice while a fully deployed wave is still
+being fought. Each route has its own test, because paying twice is the whole
+risk in a design with four doors. The strongest of them is not a unit test at
+all: the campaign run-dry test plays all thirty-five waves with nothing on the
+board that can kill, and asserts the cash earned equals the sum of the
+thirty-five `waveReward`s exactly.
 
 **Wave 35 has no next wave and no break, so only route 1 can reach it** — which
-is correct: the last bounty is paid for actually clearing the board, and that is
-the same step that sets `victory`. A test pins it.
+is correct: the last bounty is paid for actually removing wave 35, descendants
+included. On a road with nothing else left on it that is also the step that sets
+`victory`; the two conditions are not the same test, though (route 1 asks about
+wave 35's bodies, `victory` asks about the whole road), so an earlier wave's
+straggler can separate them by however long it lives. A test pins the payout.
 
-It lands when the break opens and the player is about to read a panel, which is
+It lands as the wave closes and the player is about to read a panel, which is
 part of the point — kill bounties arrive one body at a time, at whatever each
 body is authored to pay, so the wallet is almost never on a round number at the
 moment a decision is being made. (This used to say "damage income arrives in a
@@ -1908,10 +2327,13 @@ must slot into that same ordering, not run alongside it.
 
 The three buttons sit at the top only because they are the cheapest tests; none
 of these rectangles overlap, so the order among them cannot matter. The wave
-skip is additionally gated on `betweenWaves()`, so outside a break its
-rectangle is ordinary map and builds on as usual, and both wave controls are
-gated on `waveControlsShown()` so they disappear together once the last wave
-has deployed.
+skip is additionally gated on `waveSendAvailable()` — `betweenWaves()` alone
+until 2026-08-25, which was one term short of what the click handler asked —
+so whenever the button is not drawn its rectangle is ordinary map and builds on
+as usual. Both wave controls are gated on `waveControlsShown()`, so they
+disappear together once the last wave has deployed; the two halves DISAGREE for
+the length of wave 35, where the AUTO toggle is still drawn and the Send button
+is not.
 
 **A button over the map is a lie unless the build preview knows about it.**
 `overInterfaceChrome(x, y)` is the single list of screen-space rectangles that
@@ -2666,7 +3088,7 @@ density, counter costs, and base HP.
 
 What DID move sharply is wall-clock time: the same winning run takes ~730 s
 instead of ~3100 s, because a board that clears its waves never waits out a
-90 s break. `null-meridian` staying unwinnable for this policy is not a v0.4.7
+wave's full window — it closes each one on gate 1, five seconds out. `null-meridian` staying unwinnable for this policy is not a v0.4.7
 regression — it was already unwinnable for it, and the v0.4.5 table above used
 a hand-tuned line this crude policy does not reproduce.
 
@@ -2733,8 +3155,10 @@ and temporary map fissures. The rules that keep it safe:
   the battlefield in `beginWorld`'s shake transform, so the HUD never moves.
   All three remain under interface chrome and reset in `restartGame()`.
 - The event hooks live in `update()`'s end-of-life sweep (the one place an
-  enemy's fate is decided exactly once) and in `spawnScheduledEnemy` (a
-  wave's first spawn announces it). `Smasher.triggerQuake` tells Effects where
+  enemy's fate is decided exactly once) and in `beginWave()` (the wave
+  announces itself when it OPENS, not on its first body — wave 11's Midboss is
+  at `at: 4`, and four seconds of held breath is the wave doing its job rather
+  than the banner being late). `Smasher.triggerQuake` tells Effects where
   the landing happened; it does not read the shake or cracks back. The gunner's
   muzzle flash is not in this file at all: it is DERIVED in `Tower.draw` from
   the cooldown, so it needed no state and no hook.
@@ -2960,7 +3384,7 @@ The eight, with the events they are hooked to:
 | `playTowerPlace` | `onClick`, after `addTower` | inharmonic struck-bar partials, ±10% pitch. In the click handler and NOT in `addTower`, because a Summoner's blubs go through `addTower` too and a mechanic placing a body is not the player placing a tower |
 | `playEnemyHit(damage)` | `Enemy.prototype.takeDamage` (js/enemy.js) | the ONE line of audio outside `game.js`, and it is there because that function is the single door every damage source comes through — the same property that makes mitigation global. Scales with damage; **silent on a killing blow**, which the death sound covers |
 | `playEnemyDeath` | `update()`'s end-of-life sweep, beside `Effects.enemyKilled` | the one place a fate is decided exactly once. Up to **3 stack** within 90 ms, each quieter and detuned; the rest are dropped |
-| `playWaveStart` | `spawnScheduledEnemy`, beside `Effects.announce` | major triad over three octaves, ~1.4 s. Once per wave, not once per entrance |
+| `playWaveStart` | `beginWave`, beside `Effects.announce` | major triad over three octaves, ~1.4 s. Once per wave, on the frame the wave OPENS — not once per entrance, and not on the first body |
 | `playLowHealthAlert` | `updateLowHealthAlert` | four pulses alternating 620/440 Hz. Cannot stack: a call arriving while one is sounding is dropped |
 | `playGameOver` | `update()`, on the step `baseHp` reaches 0 | 200 → 80 Hz into a feedback-delay tail |
 | `playUIClick` | every button branch in `onClick`, plus `onKeyDown` where it acts | see the note below about the armoury and the index |
@@ -3407,8 +3831,10 @@ than lucky:** it comes back exactly where it fell, and it fell because
 something shot it there — so a tower already covers that spot. The only way to
 strand one is to sell or lose that tower afterwards, and the answer to that is
 to build within reach of it, which the player can always do. Waves are
-unaffected either way: a break still ends on the 90 s ceiling whether or not
-the board is clear. Do not "fix" this with a decay timer; it would delete the
+unaffected either way: a wave still ends on its own `duration` whether or not
+the board is clear, so a rooted Revenant delays a wave at most until that
+ceiling (it does keep its wave from ever being ELIMINATED, and it keeps the
+victory screen away, since victory asks about the whole road). Do not "fix" this with a decay timer; it would delete the
 mechanic to protect against a case the player already controls.
 
 **Spawners (v0.4.7).**
@@ -6102,20 +6528,27 @@ no mechanic was moved to match the description.
 | The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
 | Tyrant roar | +1000 shield, ×1.35 speed, intervals ×0.75 (12 s → 9 s), leap unlocked, and 40 bodies / 2780 HP called in at 1.5× — the running mob plus 2 Hives, 3 Shieldbearers, 3 Healers, 2 Colossi | `Enemy.TYPES.boss.phases[0]` |
 | Tyrant leap | 90 u.l. jump, 120 u.l. shockwave, 80 damage + 3 s stun to everything it reaches, commits within 220 u.l., 1.5 s wind-up | `phases[0].addAttack` |
-| Wave bonus timing | owed on deploy; paid on board-clear, on a skip, or when the next wave arrives | `pendingBounty`, `payWaveBounty` |
+| Wave bonus timing | owed on the frame the wave finishes deploying; paid once, by whichever gate closes the wave (`endWave`), with `callNextWave` and `beginWave` as latched safety nets | `pendingBounty`, `waveRewardLatched`, `payWaveBounty` |
 | Tower stun | longest wins; no update, cooldown, aim tracking or live Siphon beam presentation while stunned | `TowerHealth.stun / isStunned / tickStun`, `BeamTower.visibleLocks` |
 | Waves 1-11 | the introduction, single-type, pinned exactly | `WAVES.slice(0, 11)` — deep-equal test in run.js |
-| Mixed waves | `groups: [...]`, each with its own count/interval/type/health/lead, plus `tier` on a fractal (wave 25 only) | `waveGroups`, `waveCount`, `waveGroupAt`, `waveSummary` |
-| Wave break | 90 s ceiling; 3 s once called in; 5 s once the board is cleared | `WAVE_BREAK`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave` in game.js |
+| Wave shape | `{ duration, groups: [ { at, count, interval, type?, health?, tier? } ] }`. `at` is absolute, from the wave's own start; body N lands at `at + N × interval`; groups overlap freely and tie on (group index, body index). No flat form, no `lead`, no wave-level count | `waveGroups`, `waveTimeline`, `waveCount`, `waveSummary` (`waveGroupAt` and the `|| [wave]` fallback were deleted with the sequential scheduler) |
+| Wave `duration` | ceiling on the WAVE, from the frame it opens — 30 s to 125 s, at least 26.02 s clear of the wave's own last arrival; expiring keeps the survivors and announces the next wave. Wave 35 has none | `duration` in `EASY_WAVES`, `waveTimeRemaining`, `validateWaveTimelines` in game.js |
+| Wave summary key | `(type, health, tier)` — identical salvos sum, unlike ones stay apart; NOT the display name, which merges the whole Fractal ladder | `waveSummary` in game.js |
+| Wave gates | three, one exit: eliminated (5 s), `duration` expired (5 s, survivors stay), Send/auto-send once fully deployed (3 s, survivors stay). Wave 35 has none of them | `endWave`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave`, `waveSendReady` in game.js |
+| Transition | the gap between two waves — 3 s, 5 s or the 10 s opening pause; never a wait to be sat out. `WAVE_BREAK` is GONE (was 90 s, after the last spawn) | `waveCountdown`, `betweenWaves` in game.js |
+| Wave identity | every body carries the 1-based number of the wave that scheduled it; descendants inherit it; 0 = no wave | `waveId` on Enemy, `waveStillOnTheRoad`, `lastDeployedWave` in game.js |
 | Run opening | 10 s before wave 1, or the Start button; 0 with auto-send | `RUN_START_DELAY`, `beforeFirstWave`, `waveSkipButtonLabel` in game.js |
-| Wave call triggers | the Send button, an empty board, or the 90 s running out | `callNextWave` in game.js |
-| Auto-send waves | off by default; calls every break in the frame it opens | `autoSkipWaves`, `toggleAutoSkipWaves` in game.js |
+| Wave call triggers | inside a transition: the Send button or auto-send, shortening it and never lengthening it. A wave on the clock is ended instead, never shortened | `callNextWave`, `skipNextWave`, `endWave` in game.js |
+| Send button availability | live once every scheduled body of the wave in play is out, never before, and never at all on wave 35; ONE predicate read by the drawing, the click and the build preview's chrome test | `waveSendAvailable`, `waveSkipButtonRect`, `overInterfaceChrome` in game.js |
+| Wave readout | four states: wave on the road (number / deployed / `s left`), transition (`Wave 8 in 3 s`), final wave (`FINAL WAVE` where the timer goes — wave 35 has no `duration`), schedule spent (survivor count) | `waveStatusText`, `waveTimeRemaining`, `countdownSeconds` in game.js |
+| Wave clock | `waveElapsed`, seconds since the wave OPENED (same origin as `at`; for 34 of 35 waves that is also the first arrival — wave 11 opens 4 s before its Midboss); 0 when no wave is in play; the opening pause is not part of wave 1 | `waveElapsed`, `waveInPlay`, `waveFullyDeployed` in game.js |
+| Auto-send waves | off by default; sends every wave the frame it becomes sendable (fully deployed), and shortens every transition to 3 s. Never touches an `at`, an `interval` or an arrival | `autoSkipWaves`, `toggleAutoSkipWaves` in game.js |
 | Boss banner | a named bar at the top for any type flagged `showHealthBanner` | `drawBossBar`, `bossBarEnemies` in game.js |
 | Game speed | 1x / 2x / 3x in the game, **1/2/3/5/10/20 in the sandbox**, cycled from the bottom-right button, not run state. The sandbox APPENDS to the same array rather than replacing the button, so speed stays applied in exactly one place | `GAME_SPEEDS`, `gameSpeed`, `cycleGameSpeed` in game.js; `installSpeeds` in sandbox.js |
 | Speed button chevrons | capped at 3; the NUMBER is the precise statement, so 10x reads as three chevrons and "10×" rather than a bar of arrowheads | `drawSpeedButton` |
 | Sandbox base HP | **100 000**, against the game's 100, so a leak is a reading rather than an ending. Moves `BASE_MAX_HP`, so it survives every restart | `installBase` in js/sandbox/sandbox.js |
 | Run-over buttons | Restart (R/Enter), Choose another route (M), Main menu (Escape) | `restartButtonRect`, `changeMapButtonRect`, `mainMenuButtonRect` |
-| Victory | all waves naturally deployed + board clear + base standing | `allWavesDeployed`, `victory` in game.js |
+| Victory | all waves naturally deployed + the WHOLE road clear, descendants and earlier-wave stragglers included + base standing | `allWavesDeployed`, `victory` in game.js |
 | Wave banner | 2.4 s, on each wave's first spawn | `BANNER_SECONDS` in js/effects.js |
 | Sound | 8 synthesized effects, no files, no fetch; created on the first user gesture | `SoundSynthesizer`, `Sound` in js/game.js |
 | Default mix | master 0.7, effects 1.0, music 0.8 (fed by nothing), not muted, not saved | `SoundSynthesizer` constructor |
