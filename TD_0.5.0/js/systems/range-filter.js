@@ -42,6 +42,24 @@ var RangeFilter = (function () {
   // the constant still takes effect immediately.
   var toWorld = (typeof ul === "function") ? ul : require("../units.js").ul;
 
+  // --- line of sight -------------------------------------------------------
+  //
+  // INJECTED, NOT IMPORTED. This module knows nothing about maps, and it must
+  // not start: its whole value is that it answers "is this enemy within reach"
+  // for anything with an {x, y}, in Node, with no game loaded. Reaching for a
+  // `currentMap` global here would make every one of its pure tests depend on a
+  // battlefield being booted.
+  //
+  // So the game hands it a predicate when a map loads, and takes it away when
+  // one unloads. The default is "everything is visible", which is exactly what
+  // the six mapless boards and every existing test want -- and it is a null
+  // check per query, not a shape loop.
+  var occlusion = null;
+
+  // fn(ax, ay, bx, by) -> true when the straight line is CLEAR.
+  function setOcclusion(fn) { occlusion = (typeof fn === "function") ? fn : null; }
+  function clearOcclusion() { occlusion = null; }
+
   function normalizeAngle(rad) {
     var twoPi = Math.PI * 2;
     var a = rad % twoPi;
@@ -73,11 +91,25 @@ var RangeFilter = (function () {
       var halfArcRad = (stats.coneArcDeg * Math.PI / 180) / 2;
       var angleToEnemy = Math.atan2(dy, dx);
       var diff = Math.abs(angleDiff(angleToEnemy, aimRad));
-      return diff <= halfArcRad;
+      if (diff > halfArcRad) return false;
+      return sightClear(towerPos, enemy);
     }
 
     // circle mode: deadzone applies.
-    return distance >= toWorld(stats.deadzone);
+    if (distance < toWorld(stats.deadzone)) return false;
+
+    // SIGHT LAST, because it is the most expensive test on the list and every
+    // cheap one above it has already thrown most candidates away. An enemy that
+    // is out of range, behind the cone or the wrong kind never reaches a shape
+    // loop at all.
+    return sightClear(towerPos, enemy);
+  }
+
+  // Broken out because the cone branch above returns before the deadzone line,
+  // and both branches need it.
+  function sightClear(towerPos, enemy) {
+    if (!occlusion) return true;
+    return occlusion(towerPos.x, towerPos.y, enemy.x, enemy.y);
   }
 
   function getValidTargets(stats, towerPos, aimRad, enemies) {
@@ -89,6 +121,12 @@ var RangeFilter = (function () {
   return {
     canTarget: canTarget,
     getValidTargets: getValidTargets,
+    setOcclusion: setOcclusion,
+    clearOcclusion: clearOcclusion,
+    // Exposed so an attacker that does its own reach maths -- the Siphon's lock
+    // check, the Warbringer's acquisition -- asks the same question rather than
+    // writing a second one.
+    sightClear: sightClear,
     normalizeAngle: normalizeAngle,
     angleDiff: angleDiff
   };

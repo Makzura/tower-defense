@@ -352,6 +352,234 @@ Maps.LIST.push({
   ]
 });
 
+// --- Ironwood Frontier -----------------------------------------------------
+//
+// THE FIRST MAP WITH GAMEPLAY GEOMETRY OF ITS OWN. Every other route in this
+// file is a polyline drawn across an empty floor: the scenery is a picture, and
+// the same route would score identically on bare ground. This one has rocks you
+// cannot build on and cannot shoot through, stumps that are the best ground on
+// the board, and two landmarks that are solid objects rather than backdrops.
+//
+// Three lists, kept apart because they answer different questions:
+//
+//   landmarks   big solid objects -- the depot and the settlement. Non-buildable
+//               and sight-blocking, and they are where the route begins and ends.
+//   platforms   raised stumps. Premium PLACEMENT, never a stat: a tower on a
+//               stump has exactly the range, damage and accuracy it has on dirt.
+//               What it buys is a clean spot in a forest that has few of them.
+//   blockers    rocks, a fallen trunk, two old tree clusters. They stop building,
+//               they stop sight, and they stop bullets.
+//
+// DECORATIVE FOLIAGE IS NOT IN ANY OF THEM, and that separation is the whole
+// design. The forest border is dense on purpose, and if its sprites decided
+// what could be built or seen, the map would be unplayable and unpredictable in
+// the same stroke -- a player cannot read a placement rule off a tree canopy.
+// Gameplay geometry is authored, listed here, and drawn to match. The picture
+// follows the rule, never the other way round.
+//
+// Authored in the same 1280x720 pixel space as every other map and converted
+// through AUTHORED_AT_PX_PER_UL exactly once, in Maps.geometryOf below.
+Maps.LIST.push({
+  id: "ironwood-frontier",
+  name: "Ironwood Frontier",
+  blurb: ["A logging road through old ironwood.",
+          "The depot rolled in overnight."],
+
+  // Fine-detail decals, the last pass over the floor. On the sci-fi boards
+  // these are runes and sigils; here they are what a working forest leaves
+  // behind -- pollen in the light shafts, a deer skull at the treeline, the
+  // husk of a stump that rotted out years before the road was cut.
+  decorations: [
+    { kind: "motes", x: 520, y: 300, size: 30, color: "196,214,150" },
+    { kind: "motes", x: 880, y: 470, size: 26, color: "196,214,150" },
+    { kind: "husk",  x: 300, y: 190, size: 24, color: "94,84,60" },
+    { kind: "husk",  x: 1060, y: 520, size: 26, color: "94,84,60" },
+    { kind: "bones", x: 690, y: 610, size: 18, color: "168,162,142" },
+    { kind: "motes", x: 210, y: 430, size: 22, color: "255,186,110" },
+    { kind: "bones", x: 1140, y: 350, size: 16, color: "168,162,142" }
+  ],
+
+  // East to west: out of the depot's freight door, three switchbacks through
+  // the trees, and in at the settlement gate. The first and last points are not
+  // arbitrary -- they are the door and the gate, and the landmarks are placed
+  // around them rather than the other way round.
+  points: [
+    { x: 1110, y: 180 }, { x: 980,  y: 180 }, { x: 870,  y: 245 },
+    { x: 840,  y: 350 }, { x: 910,  y: 440 }, { x: 820,  y: 520 },
+    { x: 665,  y: 515 }, { x: 560,  y: 445 }, { x: 575,  y: 335 },
+    { x: 655,  y: 270 }, { x: 610,  y: 190 }, { x: 480,  y: 175 },
+    { x: 375,  y: 235 }, { x: 395,  y: 345 }, { x: 470,  y: 415 },
+    { x: 410,  y: 480 }, { x: 320,  y: 465 }, { x: 265,  y: 400 },
+    { x: 280,  y: 360 }
+  ],
+
+  landmarks: [
+    {
+      id: "enemy-depot",
+      shape: "polygon",
+      blocksSight: true,
+      points: [[1080, 70], [1235, 88], [1270, 132], [1270, 250],
+               [1228, 280], [1110, 285], [1045, 235], [1045, 135]]
+    },
+    {
+      id: "human-settlement",
+      shape: "polygon",
+      // THE FENCE DOES NOT BLOCK SIGHT. It is mesh and wire, and a rifle shoots
+      // through mesh -- so the settlement refuses building without also making
+      // its own defenders blind, which is what a solid hull here would do.
+      blocksSight: false,
+      points: [[70, 225], [220, 225], [285, 290], [285, 430],
+               [220, 505], [70, 505], [20, 430], [20, 290]]
+    }
+  ],
+
+  // Radii are the STUMP TOP, and every tower in the game fits centred on the
+  // smallest of them -- see the platform test in tests/run.js, which measures
+  // it against the live catalogue rather than trusting this comment.
+  platforms: [
+    { id: "stump-p1", x: 560,  y: 250, radius: 38 },
+    { id: "stump-p2", x: 640,  y: 410, radius: 34 },
+    { id: "stump-p3", x: 820,  y: 430, radius: 34 },
+    { id: "stump-p4", x: 920,  y: 300, radius: 30 },
+    { id: "stump-p5", x: 1000, y: 230, radius: 29 },
+    { id: "stump-p6", x: 320,  y: 330, radius: 30 }
+  ],
+
+  blockers: [
+    { id: "blocker-o1", shape: "circle", x: 365, y: 405, radius: 48 },
+    { id: "blocker-o2", shape: "polygon",
+      points: [[428, 280], [455, 260], [495, 274],
+               [512, 310], [482, 335], [440, 323]] },
+    { id: "blocker-o3", shape: "capsule",
+      a: { x: 686, y: 402 }, b: { x: 794, y: 368 }, radius: 14 },
+    { id: "blocker-o4", shape: "circle", x: 1010, y: 340, radius: 46 },
+    { id: "blocker-o5", shape: "polygon",
+      points: [[725, 245], [744, 216], [780, 218],
+               [798, 247], [780, 278], [743, 282], [720, 262]] }
+  ],
+
+  // Stable ids for the settlement's buildings. Destruction is a LATER task and
+  // deliberately not implemented here -- what this list buys now is that when
+  // it arrives, it has something to address. A prop that has to be given an id
+  // at the same time it is given hit points is a prop whose id ends up being
+  // its array index.
+  settlementProps: [
+    { id: "settlement-gate",   x: 285, y: 360, w: 14, h: 60, kind: "gate" },
+    { id: "townhall",          x: 150, y: 362, w: 78, h: 62, kind: "townhall" },
+    { id: "house-northwest",   x: 78,  y: 268, w: 52, h: 40, kind: "house" },
+    { id: "house-north",       x: 160, y: 258, w: 58, h: 38, kind: "house" },
+    { id: "house-west",        x: 52,  y: 350, w: 44, h: 46, kind: "house" },
+    { id: "house-southwest",   x: 82,  y: 448, w: 56, h: 40, kind: "house" },
+    { id: "storehouse-south",  x: 178, y: 458, w: 68, h: 44, kind: "storehouse" },
+    { id: "workshop-east",     x: 232, y: 300, w: 46, h: 44, kind: "workshop" }
+  ]
+});
+
+// --- compiled map geometry -------------------------------------------------
+//
+// The authored lists above are in PIXELS. Everything that asks a question about
+// them -- placement, sight, bullets, the difficulty sampler, both renderers --
+// works in WORLD coordinates, and the conversion has to happen exactly once or
+// the map quietly changes size depending on who asked.
+//
+// So it happens here, on first use, and the result is cached. The cache key
+// carries UNIT_LENGTH as well as the map id, because retuning the unit rescales
+// the whole board and a stale cache would leave the rocks behind while the road
+// moved -- which is precisely the class of bug the u.l. system exists to stop.
+//
+// A MAP WITH NO GEOMETRY GETS THE SAME FROZEN EMPTY OBJECT every time. Six of
+// the seven maps are in that case, and it is what makes them pay nothing: every
+// consumer starts with a `.length` test that is false on a shared empty array,
+// so there is no per-frame allocation and no per-shape loop for them at all.
+var EMPTY_GEOMETRY = {
+  blockers: [], sightBlockers: [], noBuild: [], platforms: [], any: false
+};
+
+var geometryCache = null;
+
+function scalePoint(p) {
+  return { x: ul(p.x / AUTHORED_AT_PX_PER_UL), y: ul(p.y / AUTHORED_AT_PX_PER_UL) };
+}
+
+function scaleShape(shape) {
+  var out = { id: shape.id, shape: shape.shape };
+  if (shape.shape === "circle") {
+    out.x = ul(shape.x / AUTHORED_AT_PX_PER_UL);
+    out.y = ul(shape.y / AUTHORED_AT_PX_PER_UL);
+    out.radius = ul(shape.radius / AUTHORED_AT_PX_PER_UL);
+  } else if (shape.shape === "capsule") {
+    out.a = scalePoint(shape.a);
+    out.b = scalePoint(shape.b);
+    out.radius = ul(shape.radius / AUTHORED_AT_PX_PER_UL);
+  } else if (shape.shape === "polygon") {
+    out.points = shape.points.map(function (pt) {
+      return [ul(pt[0] / AUTHORED_AT_PX_PER_UL), ul(pt[1] / AUTHORED_AT_PX_PER_UL)];
+    });
+  }
+  return out;
+}
+
+// The world-space geometry for a map, built once and kept.
+Maps.geometryOf = function (map) {
+  if (!map) return EMPTY_GEOMETRY;
+  var hasAny = (map.blockers && map.blockers.length) ||
+               (map.landmarks && map.landmarks.length) ||
+               (map.platforms && map.platforms.length);
+  if (!hasAny) return EMPTY_GEOMETRY;
+
+  var key = map.id + "@" + UNIT_LENGTH;
+  if (geometryCache && geometryCache.key === key) return geometryCache.value;
+
+  var blockers = (map.blockers || []).map(scaleShape);
+  var landmarks = (map.landmarks || []).map(function (l) {
+    var scaled = scaleShape(l);
+    scaled.blocksSight = !!l.blocksSight;
+    scaled.landmark = true;
+    return scaled;
+  });
+  var platforms = (map.platforms || []).map(function (pf) {
+    return {
+      id: pf.id,
+      x: ul(pf.x / AUTHORED_AT_PX_PER_UL),
+      y: ul(pf.y / AUTHORED_AT_PX_PER_UL),
+      radius: ul(pf.radius / AUTHORED_AT_PX_PER_UL)
+    };
+  });
+
+  var value = {
+    blockers: blockers,
+    // What stops a sight line: every blocker, plus the landmarks that are solid.
+    // The settlement fence is mesh and is deliberately absent.
+    sightBlockers: blockers.concat(landmarks.filter(function (l) {
+      return l.blocksSight;
+    })),
+    // What refuses a tower: every blocker AND every landmark, sight or no sight.
+    // You cannot build inside the settlement even though you can shoot across it.
+    noBuild: blockers.concat(landmarks),
+    platforms: platforms,
+    any: true
+  };
+
+  geometryCache = { key: key, value: value };
+  return value;
+};
+
+// Drop the cache. Called when a run loads a map, so switching routes cannot
+// leave the previous map's rocks standing on the new one.
+Maps.resetGeometry = function () { geometryCache = null; };
+
+// The platform under a point, or null. The snap rule lives here so the build
+// ghost and the click that follows it cannot disagree -- they call this.
+Maps.platformAt = function (map, x, y) {
+  var geo = Maps.geometryOf(map);
+  for (var i = 0; i < geo.platforms.length; i++) {
+    var pf = geo.platforms[i];
+    var dx = x - pf.x, dy = y - pf.y;
+    if (dx * dx + dy * dy <= pf.radius * pf.radius) return pf;
+  }
+  return null;
+};
+
 // --- sci-fi environments --------------------------------------------------
 //
 // Routes decide gameplay; environments decide presentation. Keeping the two
@@ -536,6 +764,216 @@ Maps.ENVIRONMENTS = {
   // one. Its height is the reason the fog reads as WEATHER rather than as a
   // dimmer: at 52 the mist buries a barricade and lets the tops of the stems
   // stand out of it, which is the whole picture the board is after.
+  // --- Ironwood Frontier ---------------------------------------------------
+  //
+  // The other six boards are lit from inside: a ley line, a reactor, a bank of
+  // servers. This one has no light of its own. What it has is a clearing at
+  // dusk, one warm settlement at the west end and one cold machine at the east,
+  // and the whole read of the map is that those two things do not belong to the
+  // same world.
+  //
+  // COLOUR CARRIES THE STORY, NOT THE GAMEPLAY. The road is packed earth, the
+  // floor is moss over dirt, the depot is oxidised steel under red work lamps
+  // and the settlement is timber under amber ones. Nothing on this board is
+  // painted a gameplay colour: the rocks are rock-coloured and the stumps are
+  // wood-coloured, and they are readable because of where they sit and how they
+  // are lit, not because they are magenta. See the blockers list on the map
+  // itself for what is actually solid.
+  "ironwood-frontier": {
+    theme: {
+      background: "#080a07", floor: "#1b2416", panel: "#26301c",
+      panelDark: "#141c10", panelLine: "78,96,58", accent: "255,150,64",
+      accent2: "150,196,120", metal: "#4b4535", metalDark: "#1e1a12",
+      roadOuter: "#221a10", roadInner: "#4a3520",
+      roadEdge: "120,94,58", roadCenter: "156,124,78",
+      wild: true,
+      // Thinner than the dead forest's: this board is at dusk rather than in
+      // fog, and the depth cue wanted is distance, not weather. Measured across
+      // the same ~3 000 unit view depth.
+      fog: { color: "#232a1d", density: 0.00015, height: 58 }
+    },
+    // Bare-earth clearings at floor height -- scraped ground where the road has
+    // been worked and where the fighting happens. They are PATCHES, not decks:
+    // no height, so they can never become an invisible no-build ring.
+    zones: [
+      { kind: "dirt", x: 470, y: 210, w: 320, h: 190 },
+      { kind: "dirt", x: 600, y: 390, w: 340, h: 200 },
+      { kind: "dirt", x: 880, y: 200, w: 260, h: 200 },
+      { kind: "dirt", x: 250, y: 330, w: 220, h: 210 }
+    ],
+    models: [
+      // THE TREELINE IS THE FRAME. Most of it stands outside the 1280x720 play
+      // area, on the 120-unit apron the 3D board is built with, where a stem can
+      // never hide a tower, an enemy or a build spot. Sizes, rotations and
+      // positions are all scattered -- a forest of identical trees on a grid is
+      // the single fastest way to make a board look like a debug scene.
+      { kind: "tree", x: -139, y: 88, size: 53, rotation: 0.46 },
+      { kind: "tree", x: -94, y: 122, size: 42, rotation: 0.73 },
+      { kind: "tree", x: -43, y: 89, size: 53, rotation: 0.28 },
+      { kind: "tree", x: -45, y: 96, size: 49, rotation: 2.50 },
+      { kind: "tree", x: -67, y: 102, size: 53, rotation: 6.25 },
+      { kind: "tree", x: -136, y: 369, size: 48, rotation: 0.77 },
+      { kind: "tree", x: -30, y: 325, size: 38, rotation: 3.99 },
+      { kind: "tree", x: -66, y: 439, size: 46, rotation: 1.61 },
+      { kind: "tree", x: 17, y: 376, size: 50, rotation: 3.38 },
+      { kind: "tree", x: -5, y: 420, size: 40, rotation: 1.83 },
+      { kind: "tree", x: -108, y: 697, size: 47, rotation: 2.34 },
+      { kind: "tree", x: -49, y: 689, size: 42, rotation: 2.68 },
+      { kind: "tree", x: -66, y: 629, size: 46, rotation: 2.22 },
+      { kind: "tree", x: -40, y: 659, size: 46, rotation: 5.96 },
+      { kind: "tree", x: 226, y: -149, size: 50, rotation: 0.79 },
+      { kind: "tree", x: 169, y: -115, size: 43, rotation: 4.53 },
+      { kind: "tree", x: 204, y: -126, size: 46, rotation: 5.28 },
+      { kind: "tree", x: 130, y: -51, size: 52, rotation: 5.13 },
+      { kind: "tree", x: 209, y: -60, size: 43, rotation: 4.48 },
+      { kind: "tree", x: 148, y: -54, size: 49, rotation: 5.11 },
+      { kind: "tree", x: 625, y: -161, size: 49, rotation: 5.45 },
+      { kind: "tree", x: 490, y: -23, size: 42, rotation: 3.79 },
+      { kind: "tree", x: 689, y: -142, size: 39, rotation: 3.23 },
+      { kind: "tree", x: 651, y: -55, size: 42, rotation: 4.12 },
+      { kind: "tree", x: 663, y: -53, size: 45, rotation: 3.52 },
+      { kind: "tree", x: 570, y: 23, size: 52, rotation: 0.88 },
+      { kind: "tree", x: 935, y: -114, size: 53, rotation: 0.18 },
+      { kind: "tree", x: 975, y: -84, size: 50, rotation: 6.24 },
+      { kind: "tree", x: 1061, y: -56, size: 53, rotation: 6.13 },
+      { kind: "tree", x: 953, y: -18, size: 47, rotation: 5.03 },
+      { kind: "tree", x: 954, y: -131, size: 53, rotation: 1.17 },
+      { kind: "tree", x: 1291, y: 201, size: 41, rotation: 4.28 },
+      { kind: "tree", x: 1374, y: 238, size: 44, rotation: 1.22 },
+      { kind: "tree", x: 1323, y: 271, size: 45, rotation: 0.14 },
+      { kind: "tree", x: 1273, y: 222, size: 43, rotation: 1.52 },
+      { kind: "tree", x: 1327, y: 151, size: 42, rotation: 3.12 },
+      { kind: "tree", x: 1380, y: 541, size: 45, rotation: 4.59 },
+      { kind: "tree", x: 1364, y: 617, size: 39, rotation: 4.64 },
+      { kind: "tree", x: 1388, y: 566, size: 42, rotation: 0.72 },
+      { kind: "tree", x: 1356, y: 555, size: 39, rotation: 5.02 },
+      { kind: "tree", x: 166, y: 773, size: 50, rotation: 3.81 },
+      { kind: "tree", x: 390, y: 750, size: 53, rotation: 2.35 },
+      { kind: "tree", x: 241, y: 828, size: 54, rotation: 0.91 },
+      { kind: "tree", x: 245, y: 747, size: 42, rotation: 0.67 },
+      { kind: "tree", x: 185, y: 684, size: 52, rotation: 5.67 },
+      { kind: "tree", x: 124, y: 818, size: 41, rotation: 0.98 },
+      { kind: "tree", x: 712, y: 719, size: 41, rotation: 0.55 },
+      { kind: "tree", x: 615, y: 771, size: 44, rotation: 3.78 },
+      { kind: "tree", x: 775, y: 736, size: 45, rotation: 3.67 },
+      { kind: "tree", x: 781, y: 827, size: 51, rotation: 4.38 },
+      { kind: "tree", x: 792, y: 720, size: 52, rotation: 5.65 },
+      { kind: "tree", x: 719, y: 692, size: 46, rotation: 0.96 },
+      { kind: "tree", x: 1063, y: 748, size: 42, rotation: 5.07 },
+      { kind: "tree", x: 1091, y: 735, size: 49, rotation: 1.58 },
+      { kind: "tree", x: 1149, y: 714, size: 46, rotation: 1.05 },
+      { kind: "tree", x: 1064, y: 743, size: 41, rotation: 1.24 },
+      { kind: "tree", x: 1073, y: 768, size: 52, rotation: 0.69 },
+      { kind: "tree", x: 156, y: 82, size: 38, rotation: 6.25 },
+      { kind: "tree", x: 170, y: 93, size: 30, rotation: 6.21 },
+      { kind: "tree", x: 95, y: 91, size: 30, rotation: 4.63 },
+      { kind: "tree", x: 86, y: 61, size: 38, rotation: 1.99 },
+      { kind: "tree", x: 1139, y: 626, size: 34, rotation: 1.94 },
+      { kind: "tree", x: 1155, y: 609, size: 43, rotation: 0.83 },
+      { kind: "tree", x: 1152, y: 588, size: 37, rotation: 4.04 },
+      { kind: "tree", x: 1187, y: 660, size: 41, rotation: 2.83 },
+      { kind: "tree", x: 73, y: 659, size: 41, rotation: 3.77 },
+      { kind: "tree", x: 10, y: 647, size: 40, rotation: 2.49 },
+      { kind: "tree", x: 21, y: 608, size: 42, rotation: 0.94 },
+      { kind: "tree", x: 19, y: 608, size: 32, rotation: 2.64 },
+
+      // Inner groves, kept off the road and off the stumps.
+      { kind: "tree", x: 688, y: 105, size: 27, rotation: 4.26 },
+      { kind: "tree", x: 672, y: 103, size: 31, rotation: 3.12 },
+      { kind: "tree", x: 736, y: 104, size: 33, rotation: 5.97 },
+      { kind: "tree", x: 933, y: 626, size: 30, rotation: 3.75 },
+      { kind: "tree", x: 990, y: 642, size: 35, rotation: 1.54 },
+      { kind: "tree", x: 923, y: 632, size: 34, rotation: 1.49 },
+      { kind: "tree", x: 137, y: 585, size: 31, rotation: 5.21 },
+      { kind: "tree", x: 206, y: 604, size: 37, rotation: 6.23 },
+      { kind: "tree", x: 178, y: 571, size: 33, rotation: 2.73 },
+      { kind: "tree", x: 523, y: 647, size: 26, rotation: 5.59 },
+      { kind: "tree", x: 492, y: 593, size: 33, rotation: 3.12 },
+      { kind: "tree", x: 512, y: 599, size: 31, rotation: 0.07 },
+      { kind: "tree", x: 1097, y: 456, size: 37, rotation: 1.41 },
+      { kind: "tree", x: 1116, y: 481, size: 34, rotation: 3.25 },
+      { kind: "tree", x: 1133, y: 453, size: 38, rotation: 2.20 },
+      { kind: "tree", x: 271, y: 129, size: 26, rotation: 4.84 },
+      { kind: "tree", x: 245, y: 161, size: 35, rotation: 5.48 },
+      { kind: "tree", x: 280, y: 139, size: 31, rotation: 0.61 },
+
+      // Ground litter in the clearings: knee-high only, so nothing here stands
+      // between the camera and a tower.
+      { kind: "stump", x: 505, y: 330, size: 22, rotation: 0.6 },
+      { kind: "stump", x: 745, y: 470, size: 20, rotation: 2.4 },
+      { kind: "stump", x: 895, y: 175, size: 21, rotation: 4.1 },
+      { kind: "stump", x: 240, y: 250, size: 19, rotation: 1.3 },
+      { kind: "log", x: 610, y: 585, size: 32, rotation: 0.35 },
+      { kind: "log", x: 1105, y: 545, size: 28, rotation: 2.1 },
+      { kind: "log", x: 175, y: 545, size: 30, rotation: 1.7 },
+      { kind: "brush", x: 520, y: 500, size: 24, rotation: 1.1 },
+      { kind: "brush", x: 860, y: 585, size: 26, rotation: 0.4 },
+      { kind: "brush", x: 300, y: 560, size: 22, rotation: 2.7 },
+      { kind: "brush", x: 1060, y: 150, size: 24, rotation: 3.3 },
+      { kind: "brush", x: 690, y: 330, size: 20, rotation: 1.9 },
+      { kind: "snag", x: 455, y: 130, size: 30, rotation: 0.8 },
+      { kind: "snag", x: 1090, y: 400, size: 28, rotation: 2.9 },
+
+      // --- gameplay geometry, drawn to match --------------------------------
+      //
+      // These five are the ONLY props on this board that are also solid. Each
+      // one is drawn at the position and size the blocker list authors, because
+      // a rock you can see and a rock you collide with being different objects
+      // is the oldest lie in level design.
+      { kind: "boulder", x: 365, y: 405, size: 48, rotation: 0.7, blockerId: "blocker-o1" },
+      { kind: "outcrop", x: 470, y: 297, size: 46, rotation: 2.2, blockerId: "blocker-o2" },
+      { kind: "trunk",   x: 740, y: 385, size: 58, rotation: -0.30, blockerId: "blocker-o3" },
+      { kind: "boulder", x: 1010, y: 340, size: 46, rotation: 3.5, blockerId: "blocker-o4" },
+      { kind: "outcrop", x: 759, y: 249, size: 42, rotation: 1.1, blockerId: "blocker-o5" },
+
+      // The six buildable stumps. Flat-topped and cut clean, which is what
+      // makes them read as a place to stand rather than as more litter.
+      { kind: "platform", x: 560,  y: 250, size: 38, rotation: 0.4, platformId: "stump-p1" },
+      { kind: "platform", x: 640,  y: 410, size: 34, rotation: 2.1, platformId: "stump-p2" },
+      { kind: "platform", x: 820,  y: 430, size: 34, rotation: 3.8, platformId: "stump-p3" },
+      { kind: "platform", x: 920,  y: 300, size: 30, rotation: 1.5, platformId: "stump-p4" },
+      { kind: "platform", x: 1000, y: 230, size: 29, rotation: 5.0, platformId: "stump-p5" },
+      { kind: "platform", x: 320,  y: 330, size: 30, rotation: 0.9, platformId: "stump-p6" },
+
+      // --- the settlement ---------------------------------------------------
+      { kind: "townhall",   x: 150, y: 362, size: 66, rotation: 0,    propId: "townhall" },
+      { kind: "house",      x: 78,  y: 268, size: 44, rotation: 0.12, propId: "house-northwest" },
+      { kind: "house",      x: 160, y: 258, size: 46, rotation: -0.08, propId: "house-north" },
+      { kind: "house",      x: 52,  y: 350, size: 42, rotation: 0.2,  propId: "house-west" },
+      { kind: "house",      x: 82,  y: 448, size: 45, rotation: -0.15, propId: "house-southwest" },
+      { kind: "storehouse", x: 178, y: 458, size: 52, rotation: 0.05, propId: "storehouse-south" },
+      { kind: "workshop",   x: 232, y: 300, size: 40, rotation: -0.1, propId: "workshop-east" },
+      { kind: "gate",       x: 285, y: 360, size: 46, rotation: 0,    propId: "settlement-gate" },
+      { kind: "palisade",   x: 152, y: 227, size: 150, rotation: 0 },
+      { kind: "palisade",   x: 152, y: 503, size: 150, rotation: 0 },
+      { kind: "palisade",   x: 22,  y: 362, size: 140, rotation: 1.5708 },
+      { kind: "palisade",   x: 258, y: 268, size: 60, rotation: 2.356 },
+      { kind: "palisade",   x: 258, y: 452, size: 60, rotation: 0.785 },
+      { kind: "lantern",    x: 258, y: 322, size: 16, rotation: 0 },
+      { kind: "lantern",    x: 258, y: 398, size: 16, rotation: 0 },
+      { kind: "lantern",    x: 110, y: 318, size: 14, rotation: 0 },
+      { kind: "barrel",     x: 208, y: 392, size: 15, rotation: 0.6 },
+      { kind: "barrel",     x: 216, y: 408, size: 14, rotation: 2.2 },
+
+      // --- the depot --------------------------------------------------------
+      //
+      // One object, built from several: the hull, the freight door facing west,
+      // the ramp that meets the road's first point, and the running gear that
+      // says it arrived rather than was built here.
+      { kind: "depot",      x: 1158, y: 178, size: 120, rotation: 0, propId: "enemy-depot" },
+      { kind: "depot-ramp", x: 1088, y: 180, size: 46,  rotation: 0 },
+      { kind: "wheel",      x: 1092, y: 262, size: 26, rotation: 0 },
+      { kind: "wheel",      x: 1178, y: 276, size: 28, rotation: 0 },
+      { kind: "wheel",      x: 1252, y: 254, size: 24, rotation: 0 },
+      { kind: "wheel",      x: 1096, y: 108, size: 24, rotation: 0 },
+      { kind: "wheel",      x: 1196, y: 96,  size: 26, rotation: 0 },
+      { kind: "exhaust",    x: 1236, y: 116, size: 22, rotation: 0 },
+      { kind: "exhaust",    x: 1256, y: 148, size: 19, rotation: 0 },
+      { kind: "floodlight", x: 1082, y: 132, size: 15, rotation: 0 },
+      { kind: "floodlight", x: 1082, y: 232, size: 15, rotation: 0 }
+    ]
+  },
+
   "test": {
     theme: {
       background: "#0a0b09", floor: "#1a1913", panel: "#2f2a1c",
@@ -673,7 +1111,7 @@ for (var environmentIndex = 0; environmentIndex < Maps.LIST.length;
   environmentMap.models = environment.models;
 }
 
-Maps.DEFAULT_ID = "rune-circuit";
+Maps.DEFAULT_ID = "ironwood-frontier";
 
 // Throws on an unknown id rather than falling back to the default: the only way
 // to get one is a typo in code, and silently handing back another map would
@@ -1645,6 +2083,22 @@ Maps.analyse = function (map) {
   var roadStepPx = ul(Maps.ROAD_STEP_UL);
   var spotEvery = Math.max(1, Math.round(Maps.SPOT_STEP_UL / Maps.ROAD_STEP_UL));
 
+  // THE MAP'S OWN GEOMETRY, if it has any.
+  //
+  // Until 2026-08-26 this measurement assumed every board was a polyline on an
+  // empty floor, and for six of the seven it still is: `geo.any` is false for
+  // them, every test below short-circuits, and their scores and tiers are
+  // byte-identical to what they were. A test pins that, because a silent drift
+  // in the old numbers would rewrite the difficulty labels on maps nobody
+  // touched.
+  //
+  // Where a board DOES have geometry, the measurement has to see it or it is
+  // measuring a map that does not exist -- counting spots inside a boulder and
+  // crediting road the tower cannot see.
+  var geo = Maps.geometryOf(map);
+  var footprintPx = ul(Reference.FOOTPRINT_RADIUS_UL);
+  var sight = geo.any && geo.sightBlockers.length ? geo.sightBlockers : null;
+
   // Sample every route once and reuse the union for every spot. Coverage over
   // that union is exactly what makes a tower beside the confluence valuable.
   var samples = [];
@@ -1680,12 +2134,17 @@ Maps.analyse = function (map) {
         var x = along[i].x + (-ty / tlen) * side * offset;
         var y = along[i].y + (tx / tlen) * side * offset;
         if (!Maps.buildableSpot(gamePaths, x, y, clearancePx)) continue;
+        // A spot inside a rock is not a spot. Inflated by the reference
+        // tower's footprint, exactly as whyCannotBuild inflates it, so the
+        // measurement and the game agree about what can be built.
+        if (geo.any &&
+            MapGeometry.containsAny(geo.noBuild, x, y, footprintPx)) continue;
         spots.push({
           x: x,
           y: y,
           routeIndex: routeIndex,
           progress: along[i].progress,
-          coverageUl: Maps.coverageAt(samples, x, y, rangePx)
+          coverageUl: Maps.coverageAt(samples, x, y, rangePx, sight)
         });
       }
     }
@@ -1748,14 +2207,24 @@ Maps.analyse = function (map) {
   return map.analysis;
 };
 
-// u.l. of road within rangePx of (x, y).
-Maps.coverageAt = function (samples, x, y, rangePx) {
+// u.l. of road within rangePx of (x, y) THAT THE TOWER CAN ACTUALLY SEE.
+//
+// `sight` is the map's sight-blocking shapes, or null. Null is the old
+// behaviour exactly -- a range test and nothing else -- which is what keeps the
+// six mapless boards' numbers where they were.
+//
+// The distance test runs FIRST and the sight test only on what survives it.
+// This function is called once per candidate spot against every road sample on
+// the board, so the cheap test has to be the one that runs on everything.
+Maps.coverageAt = function (samples, x, y, rangePx, sight) {
   var rangeSq = rangePx * rangePx;
   var hits = 0;
   for (var i = 0; i < samples.length; i++) {
     var dx = samples[i].x - x;
     var dy = samples[i].y - y;
-    if (dx * dx + dy * dy <= rangeSq) hits++;
+    if (dx * dx + dy * dy > rangeSq) continue;
+    if (sight && !MapGeometry.clearLine(sight, x, y, samples[i].x, samples[i].y)) continue;
+    hits++;
   }
   return hits * Maps.ROAD_STEP_UL;
 };

@@ -1793,12 +1793,55 @@ function init() {
 // size on every route.
 function loadMap(map) {
   currentMap = map;
+  // COMPILED ONCE, HERE. The previous map's rocks must not survive into this
+  // one, and the world-space conversion must not happen per query -- see the
+  // note on Maps.geometryOf.
+  Maps.resetGeometry();
   paths = Maps.routesOf(map).map(function (route) {
     var gamePath = new GamePath(Maps.toWorld(route.points));
     gamePath.id = route.id;
     return gamePath;
   });
   path = paths[0];
+  applyMapOcclusion();
+}
+
+// Hand the active map's sight-blocking shapes to everything that needs to ask
+// about them, or take them away when the map has none.
+//
+// ONE PREDICATE, BUILT ONCE PER MAP, closed over the compiled shape list. The
+// alternative -- every attacker reaching for `currentMap` and recompiling -- is
+// what the brief calls scattering globals through every system, and it is also
+// how the shapes end up being rebuilt inside a per-target loop.
+//
+// A map with no geometry clears the hook entirely rather than installing a
+// predicate that always says yes, so the six older boards go back to the exact
+// code path they had before any of this existed: a null check, no call.
+function applyMapOcclusion() {
+  var geo = Maps.geometryOf(currentMap);
+  if (!geo.any || !geo.sightBlockers.length) {
+    RangeFilter.clearOcclusion();
+    mapSightBlockers = null;
+    return;
+  }
+  var shapes = geo.sightBlockers;
+  mapSightBlockers = shapes;
+  RangeFilter.setOcclusion(function (ax, ay, bx, by) {
+    return MapGeometry.clearLine(shapes, ax, ay, bx, by);
+  });
+}
+
+// The same list, for the two callers that need the CONTACT POINT rather than a
+// yes/no: bullets, which have to stop at the near face and leave a mark there.
+// Null when the map has none, so a bullet's hot path is a null check.
+var mapSightBlockers = null;
+
+// Where a shot from A to B first meets terrain, or null. Used by both bullet
+// families; kept here rather than in bullet.js so there is one place that knows
+// which list terrain lives in.
+function terrainHit(ax, ay, bx, by) {
+  if (!mapSightBlockers) return null;
+  return MapGeometry.firstHit(mapSightBlockers, ax, ay, bx, by, 0);
 }
 
 function startRun(map) {
@@ -2389,8 +2432,11 @@ function onClick(event) {
 
   var type = selectedType();
   if (type && whyCannotBuild(w.x, w.y, type) === null) {
-    var route = nearestPathTo(w.x, w.y);
-    var built = new type(w.x, w.y, route.path);
+    // The same resolver the ghost drew through, so the tower lands where the
+    // preview promised it would.
+    var spot = resolveBuildPoint(w.x, w.y, type);
+    var route = nearestPathTo(spot.x, spot.y);
+    var built = new type(spot.x, spot.y, route.path);
     built.routeId = route.path.id;
     // Comparable across routes: scale completion on the nearest route onto the
     // primary route used by the target-claiming update order.
@@ -2825,7 +2871,63 @@ function nearestPathTo(x, y) {
 }
 
 // Returns null if a tower of this type can be placed here, else a short reason.
+// WHERE A TOWER WOULD ACTUALLY GO, given where the cursor is.
+//
+// ONE FUNCTION, THREE CALLERS: the build ghost, the block-reason readout and
+// the click that places the tower. They have to agree exactly -- a ghost that
+// snaps to a stump and a click that builds beside it is the worst kind of
+// placement bug, because it looks like the game ignored you. So none of them
+// works out a position; they all ask this.
+//
+// Snapping happens only when the cursor is genuinely over a stump AND the
+// selected tower fits on it. A tower too wide for the stump top is not snapped
+// and not refused -- it simply builds on the dirt like anywhere else, which is
+// the honest answer to "that does not fit up there".
+//
+// Returns the SAME OBJECT SHAPE either way so callers never branch on null.
+function resolveBuildPoint(x, y, type) {
+  var platform = Maps.platformAt(currentMap, x, y);
+  if (!platform) return { x: x, y: y, platform: null };
+  if (type && ul(type.FOOTPRINT_RADIUS_UL) > platform.radius) {
+    return { x: x, y: y, platform: null };
+  }
+  return { x: platform.x, y: platform.y, platform: platform };
+}
+
+// Is there already a tower standing on this stump? One per stump: the top is a
+// single flat surface and two towers on it would interpenetrate whatever the
+// footprint rule said, because both are snapped to the same centre.
+function platformOccupied(platform) {
+  if (!platform) return false;
+  for (var i = 0; i < towers.length; i++) {
+    if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
+    var dx = towers[i].x - platform.x, dy = towers[i].y - platform.y;
+    if (dx * dx + dy * dy <= platform.radius * platform.radius) return true;
+  }
+  return false;
+}
+
 function whyCannotBuild(x, y, type) {
+  // Snap FIRST, then judge the snapped point. Testing the cursor and building
+  // at the stump centre would let a player be refused for standing on the road
+  // while the tower would have gone somewhere legal, and vice versa.
+  var spot = resolveBuildPoint(x, y, type);
+  if (spot.platform) {
+    if (platformOccupied(spot.platform)) return "occupied platform";
+    x = spot.x;
+    y = spot.y;
+  }
+
+  // TERRAIN. Blockers and landmarks refuse the tower's whole FOOTPRINT, not
+  // its centre -- a Summoner whose skirt overlaps a boulder is inside the
+  // boulder. `MapGeometry.containsAny` returns on a length test for the six
+  // maps that have no geometry at all, so they pay nothing for this.
+  var geo = Maps.geometryOf(currentMap);
+  if (geo.any && type &&
+      MapGeometry.containsAny(geo.noBuild, x, y, ul(type.FOOTPRINT_RADIUS_UL))) {
+    return "blocked by terrain";
+  }
+
   for (var routeIndex = 0; routeIndex < paths.length; routeIndex++) {
     if (paths[routeIndex].distanceToPoint(x, y) < buildClearancePx(type)) {
       return "too close to the path";
@@ -4618,12 +4720,18 @@ function drawBuildPreview() {
   var previewRangePx = ul(type.BASE_RANGE_UL);
   var footprintPx = ul(type.FOOTPRINT_RADIUS_UL);
 
+  // DRAWN WHERE IT WOULD BUILD, not under the cursor. Over a stump the ghost
+  // jumps to the stump centre, which is the whole feedback the snap gives --
+  // the player sees the tower take the platform before committing.
+  var spot = resolveBuildPoint(worldMouse.x, worldMouse.y, type);
+  var ghostX = spot.x, ghostY = spot.y;
+
   var ok = blockReason === null;
   var c = ok ? "108,230,133" : "230,90,90";
 
   // Range
   ctx.beginPath();
-  ctx.arc(worldMouse.x, worldMouse.y, previewRangePx, 0, Math.PI * 2);
+  ctx.arc(ghostX, ghostY, previewRangePx, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(" + c + ",0.09)";
   ctx.fill();
   ctx.lineWidth = 2;
@@ -4632,7 +4740,7 @@ function drawBuildPreview() {
 
   // Footprint -- the space this tower would physically occupy
   ctx.beginPath();
-  ctx.arc(worldMouse.x, worldMouse.y, footprintPx, 0, Math.PI * 2);
+  ctx.arc(ghostX, ghostY, footprintPx, 0, Math.PI * 2);
   ctx.strokeStyle = "rgba(" + c + ",0.85)";
   ctx.lineWidth = 2;
   ctx.stroke();
@@ -4642,8 +4750,7 @@ function drawBuildPreview() {
     ctx.font = "13px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText(blockReason, worldMouse.x,
-      worldMouse.y + footprintPx + 8);
+    ctx.fillText(blockReason, ghostX, ghostY + footprintPx + 8);
     ctx.textAlign = "left";
   }
 }

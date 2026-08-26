@@ -37,6 +37,18 @@
 // and always have: a gunner claims 1 on a brute even though armor eats all of
 // it. Making pierce the one source that claimed post-mitigation damage would
 // give it a different meaning on one tower than on the other four.
+// WHERE A SHOT MEETS THE MAP, or null when it does not -- and null instantly on
+// the six boards that have no terrain, which is a function-exists check rather
+// than a shape loop.
+//
+// Routed through the game's own `terrainHit` rather than reaching for the map
+// here: bullet.js has never known what a map is, and the one place that knows
+// which list terrain lives in should stay one place.
+function terrain(ax, ay, bx, by) {
+  if (typeof terrainHit !== "function") return null;
+  return terrainHit(ax, ay, bx, by);
+}
+
 function Bullet(x, y, target, damage, onHit, owner, defenseFlatPierce) {
   this.x = x;
   this.y = y;
@@ -94,8 +106,30 @@ Bullet.prototype.update = function (dt) {
     return dealt;
   }
 
-  this.x += (dx / distance) * step;
-  this.y += (dy / distance) * step;
+  // TERRAIN, ON THE SEGMENT ABOUT TO BE FLOWN, not on the point about to be
+  // landed on. A homing round at 900 u.l./s covers fifteen units in a step; a
+  // point test would sample either side of a boulder and never inside it.
+  //
+  // The claim is released on the way out. A claim is a reservation on damage
+  // that has not landed, and this one never will -- leaving it held would make
+  // the tower think that enemy is already spoken for and refuse to shoot it
+  // again, which reads as the tower going quiet for no reason.
+  var nx = this.x + (dx / distance) * step;
+  var ny = this.y + (dy / distance) * step;
+  var hit = terrain(this.x, this.y, nx, ny);
+  if (hit) {
+    this.x = hit.x;
+    this.y = hit.y;
+    this.dead = true;
+    this.release();
+    if (typeof Effects !== "undefined" && Effects.terrainImpact) {
+      Effects.terrainImpact(hit.x, hit.y);
+    }
+    return 0;
+  }
+
+  this.x = nx;
+  this.y = ny;
   return 0;
 };
 
@@ -272,6 +306,18 @@ PierceBullet.prototype.update = function (dt, enemies) {
   var hitRadius = ul(PierceBullet.HIT_RADIUS_UL);
   var segLen2 = step * step;
 
+  // TERRAIN IS SWEPT ON THE SAME SEGMENT, FOR THE SAME REASON THE ENEMIES ARE.
+  //
+  // A rail shot at 14 000 u.l./s covers about 240 px in a step. Testing the
+  // endpoint against a rock would sample one side of it and then the other and
+  // report a clean flight both times -- the shot tunnels. Piercing does not
+  // mean piercing terrain: the round goes through bodies and stops at the rock.
+  //
+  // `stopT` is where along THIS step the rock is, in the same parameter the
+  // enemy candidates below are measured in, so the comparison is direct.
+  var obstacle = terrain(fromX, fromY, this.x, this.y);
+  var stopT = obstacle ? obstacle.t : 1;
+
   // Gather first, then apply IN ORDER ALONG THE SHOT. Array order is spawn
   // order, which is meaningless here -- and with a long sweep the falloff
   // would otherwise charge the far enemy full damage and the near one the
@@ -293,6 +339,12 @@ PierceBullet.prototype.update = function (dt, enemies) {
     var nearX = ex - this.dirX * step * t;
     var nearY = ey - this.dirY * step * t;
     if (nearX * nearX + nearY * nearY > hitRadius * hitRadius) continue;
+
+    // ONLY WHAT IS IN FRONT OF THE ROCK. An enemy standing behind cover is not
+    // a candidate at all -- it is never claimed, never damaged, and never
+    // counted in the falloff, which would otherwise weaken the shot on bodies
+    // it never reached.
+    if (t > stopT) continue;
 
     candidates.push({ enemy: candidate, t: t });
   }
@@ -335,6 +387,19 @@ PierceBullet.prototype.update = function (dt, enemies) {
     // hitCount counts enemies gone THROUGH; pierce is how many may follow the
     // first, so the shot survives its (pierce + 1)th contact and stops there.
     if (this.hitCount > this.pierce) this.dead = true;
+  }
+
+  // THE ROCK STOPS IT, after everything in front of the rock has been resolved.
+  // Placed here rather than before the loop so a shot that reaches two bodies
+  // and then a boulder still pays out on both -- "stopped by cover" is not
+  // "wasted".
+  if (obstacle && !this.dead) {
+    this.x = obstacle.x;
+    this.y = obstacle.y;
+    this.dead = true;
+    if (typeof Effects !== "undefined" && Effects.terrainImpact) {
+      Effects.terrainImpact(obstacle.x, obstacle.y);
+    }
   }
 
   // Out of range, or off the map entirely.

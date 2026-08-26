@@ -4235,7 +4235,21 @@ test("exactly one route is the reference, and it defines the scale", function (t
   var flagged = h.game.Maps.LIST.filter(function (m) { return m.reference; });
 
   t.eq(flagged.length, 1, "exactly one reference route");
-  t.eq(flagged[0].id, h.game.Maps.DEFAULT_ID, "the default route is the reference");
+
+  // THE REFERENCE AND THE DEFAULT ARE DIFFERENT MAPS SINCE 2026-08-26, and
+  // that is deliberate rather than a slip. The reference is what FIXES THE
+  // SCALE -- every balance figure in the game is measured against its length,
+  // so moving the flag would silently rescale the whole campaign. The default
+  // is only what you land on when you press Play, and Ironwood Frontier took
+  // that over as the flagship board.
+  //
+  // They were the same map for as long as there was one obvious main route,
+  // which made "the default is the reference" look like a rule. It never was:
+  // this assertion pins that the reference is a STABLE, DELIBERATE choice, and
+  // the line below still pins that it is the map the scale is derived from.
+  t.eq(flagged[0].id, "rune-circuit", "the reference is Rune Circuit, and stays put");
+  t.ok(h.game.Maps.DEFAULT_ID !== flagged[0].id,
+    "the flagship default is a different map, and moving it did not move the scale");
   t.near(h.game.Maps.analyse(flagged[0]).lengthUl,
     h.game.Maps.referenceLengthUl(), 0.001, "the reference route is referenceLengthUl long");
 });

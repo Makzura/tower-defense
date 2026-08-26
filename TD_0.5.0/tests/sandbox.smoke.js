@@ -438,20 +438,62 @@ function w(value) {
   return value * sandbox.UNIT_LENGTH / sandbox.AUTHORED_AT_PX_PER_UL;
 }
 
-// (530, 505) sits beside the long straight -- the spot tests/run.js uses.
-// Longshot goes at (700, 545): its 20 u.l. footprint needs more clearance
-// from the road centre line than the first placement, so (700, 505) is too close.
+// MOVED 2026-08-26, when Ironwood Frontier became the default board.
+//
+// The sandbox opens on Maps.DEFAULT_ID, and these two coordinates were chosen
+// against Rune Circuit's long straight -- on the forest board (700, 545) sits
+// 28.9 px from the new road, inside the Arcane Sniper's clearance, so the click
+// was refused and `longshot` came back undefined. The failure surfaced four
+// assertions later as "cannot read properties of undefined", which is the
+// least useful place it could have surfaced.
+//
+// (350, 230) and (430, 242) sit beside the forest board's western switchback:
+// off the road, outside every blocker and every landmark, within reach of the
+// route, and far enough apart that the SECOND placement still fits once the
+// first is standing. That last clause is what the two earlier attempts missed
+// -- a pair swept independently can be legal individually and refused in
+// sequence, which surfaces as `longshot` being undefined four assertions later.
+//
+// Swept against the real whyCannotBuild, the real distance to the route, and
+// with the Warbringer already placed. This test is about the sandbox's click
+// path working at all, not about any particular patch of dirt, so it follows
+// the default board wherever it goes.
+// A CLEAR SPOT BESIDE THE ROAD ON WHATEVER BOARD IS DEFAULT.
+//
+// Every placement in this file used to type (700, 545), which was a good spot
+// on Rune Circuit and is inside the Arcane Sniper's road clearance on Ironwood
+// Frontier. Typed in eight places, it had to be corrected in eight places; as a
+// constant it has to be correct once. Swept against the real whyCannotBuild.
+var CLEAR_SPOT = { x: 430, y: 242 };
+var SECOND_SPOT = { x: 350, y: 230 };
+
+// RETURNS THE TOWER THAT WAS NOT THERE BEFORE, not the last one in the array.
+//
+// `towers` is kept sorted by position ALONG THE PATH -- that ordering is what
+// makes target claiming deterministic -- so the tower just placed is last only
+// when it happens to sit furthest along the route. That was true of the two
+// spots this file used on Rune Circuit and stopped being true the moment they
+// moved, at which point `place` handed back the PREVIOUS tower and the failure
+// surfaced four assertions later as a missing `.stats`.
+//
+// A latent bug in the helper rather than in anything it was testing, and the
+// map change only exposed it. Diffing the array is correct at any sort order.
 function place(slotIndex, x, y) {
+  var before = sandbox.towers.slice();
   run("selectedSlot = " + slotIndex + "; refreshBlockReason();");
   elements.game.fire("click", { clientX: w(x), clientY: w(y) });
-  return sandbox.towers[sandbox.towers.length - 1];
+  for (var i = 0; i < sandbox.towers.length; i++) {
+    if (before.indexOf(sandbox.towers[i]) === -1) return sandbox.towers[i];
+  }
+  return null;                     // the click was refused
 }
 
-var warbringer = place(0, 530, 505);
+var warbringer = place(0, SECOND_SPOT.x, SECOND_SPOT.y);
 check("a Warbringer places via the real click handler",
   sandbox.towers.length === 1 && warbringer.name === "Warbringer");
 
-var longshot = place(1, 700, 545);
+run("selectedSlot = 1; refreshBlockReason();");
+var longshot = place(1, CLEAR_SPOT.x, CLEAR_SPOT.y);
 check("a Longshot places too",
   sandbox.towers.length === 2 && longshot.name === "Arcane Sniper",
   "towers = " + sandbox.towers.map(function (t) { return t.name; }).join(", "));
@@ -498,7 +540,7 @@ check("a leak still costs the base its remaining HP",
 // --- upgrades on a placed tower --------------------------------------------
 
 run("enemies = []; bullets = []; towers = [];");
-var upgradeTarget = place(1, 700, 545);
+var upgradeTarget = place(1, CLEAR_SPOT.x, CLEAR_SPOT.y);
 run("inspected = towers[0];");
 
 var rangeBefore = upgradeTarget.core.stats.range;
@@ -528,7 +570,7 @@ check("statLines renders for an upgraded tower",
 // --- the on-canvas panel buttons -------------------------------------------
 
 run("towers = []; enemies = []; bullets = [];");
-var panelTower = place(1, 700, 545);
+var panelTower = place(1, CLEAR_SPOT.x, CLEAR_SPOT.y);
 run("inspected = towers[0];");
 
 var layout = run("inspectionLayout(inspected)");
@@ -673,7 +715,7 @@ check("and charges its price",
 
 // Take B to 5 so the ability unlocks, then confirm a third rectangle appears.
 run("towers = []; inspected = null;");
-var abilityTower = place(1, 700, 545);
+var abilityTower = place(1, CLEAR_SPOT.x, CLEAR_SPOT.y);
 run("inspected = towers[0];");
 for (var b = 0; b < 5; b++) abilityTower.purchase("B");
 
@@ -743,7 +785,7 @@ check("clicking the ability rectangle fires it and charges the HP cost",
 // pierce" does not mean "hits everything on screen".
 
 run("towers = []; enemies = []; bullets = []; inspected = null;");
-var piercer = place(1, 700, 545);
+var piercer = place(1, CLEAR_SPOT.x, CLEAR_SPOT.y);
 
 run("enemies = [];");
 for (var e = 0; e < 12; e++) {
@@ -834,7 +876,7 @@ check("the first hit takes full damage", damages[0] === 500,
 // --- cone re-aim (spec 5.6) ------------------------------------------------
 
 run("towers = []; enemies = []; bullets = []; inspected = null;");
-var coneTower = place(1, 700, 545);
+var coneTower = place(1, CLEAR_SPOT.x, CLEAR_SPOT.y);
 run("inspected = towers[0];");
 
 check("no re-aim button before the tower has a cone",
@@ -863,10 +905,16 @@ check("clicking it arms aiming rather than re-aiming immediately",
 // The next map click sets the direction -- and must not also place a tower.
 var towersBefore = sandbox.towers.length;
 run("selectedSlot = 0; refreshBlockReason();");     // arm the gunner too
-elements.game.fire("click", { clientX: w(700), clientY: w(200) });  // straight up
+// STRAIGHT UP FROM WHEREVER THE TOWER ACTUALLY IS. This used to click a typed
+// (700, 200) and compare against a typed 545 -- the tower's old y -- so moving
+// the placement spot broke the expectation without touching the mechanic. The
+// angle is read off the tower now, and the click is placed directly above it,
+// which is what "straight up" was always supposed to mean.
+var aimClickY = w(120);
+elements.game.fire("click", { clientX: coneTower.x, clientY: aimClickY });
 
 check("the next map click sets the cone direction",
-  Math.abs(coneTower.core.aimRad - Math.atan2(w(200) - w(545), 0)) < 1e-9,
+  Math.abs(coneTower.core.aimRad - Math.atan2(aimClickY - coneTower.y, 0)) < 1e-9,
   "aim = " + coneTower.core.aimRad);
 check("and does not also build a tower",
   sandbox.towers.length === towersBefore, "towers = " + sandbox.towers.length);
@@ -893,7 +941,7 @@ run("selectedSlot = null;");
 run("towers = []; enemies = []; bullets = []; inspected = null;");
 run("baseHp = BASE_MAX_HP; DeathDenial.reset();");
 
-var beam = place(2, 700, 505);
+var beam = place(2, CLEAR_SPOT.x, CLEAR_SPOT.y);
 check("the beam tower places through the normal build path",
   beam && beam.name === "Siphon", "placed = " + (beam && beam.name));
 
@@ -936,7 +984,7 @@ run("towers = []; enemies = []; inspected = null; cash = 999999;");
 
 // Place FIRST, then stop the top-up and zero the bank -- the tower costs 800,
 // so zeroing the cash before placing just refuses the placement.
-var earner = place(2, 700, 505);
+var earner = place(2, CLEAR_SPOT.x, CLEAR_SPOT.y);
 elements.lockGold.checked = false;
 elements.lockGold.fire("change");        // stop the top-up so income is visible
 run("cash = 0; enemies = [];");
@@ -950,7 +998,7 @@ check("a beam with NO A3 deals damage but earns no per-damage cash",
 
 // With A3 and charges banked, the same damage is worth more.
 run("towers = []; enemies = []; cash = 999999;");
-var charger = place(2, 700, 505);
+var charger = place(2, CLEAR_SPOT.x, CLEAR_SPOT.y);
 for (var ca = 0; ca < 3; ca++) charger.purchase("A");
 check("A3 grants the charge mechanic", charger.core.stats.flags.charge_to_gold === true);
 
@@ -1028,7 +1076,7 @@ check("the underlying value keeps its precision",
 
 run("towers = []; enemies = []; inspected = null;");
 run("baseHp = BASE_MAX_HP; cash = 999999;");
-var healer = place(2, 700, 505);
+var healer = place(2, CLEAR_SPOT.x, CLEAR_SPOT.y);
 for (var lb = 0; lb < 4; lb++) healer.purchase("B");     // B4: 10:2 lifesteal
 check("B4 grants lifesteal at 20%",
   healer.core.stats.flags.lifesteal &&
@@ -1097,7 +1145,7 @@ run("baseHp = BASE_MAX_HP;");
 
 run("towers = []; enemies = []; inspected = null; DeathDenial.reset();");
 run("baseHp = 20000; cash = 999999;");
-var denier = place(2, 700, 505);
+var denier = place(2, CLEAR_SPOT.x, CLEAR_SPOT.y);
 for (var db = 0; db < 4; db++) denier.purchase("B");
 run("HealingLedger.reset(); HealingLedger.record(5000);");  // the B5 gate
 denier.purchase("B");
@@ -1244,7 +1292,7 @@ check("setting base HP above zero un-freezes a lost run",
 // The point of the gold control: A5's AD scales off the live bank, so being
 // able to pin gold is what makes it testable at all.
 run("towers = []; enemies = []; cash = 999999;");
-var a5 = place(2, 700, 505);
+var a5 = place(2, CLEAR_SPOT.x, CLEAR_SPOT.y);
 for (var ga = 0; ga < 5; ga++) a5.purchase("A");
 check("A5 grants gold-to-power", a5.core.stats.flags.gold_to_power === true);
 
@@ -1365,7 +1413,7 @@ var overflowing = [];
 [0, 1, 2, 3].forEach(function (slotIndex) {
   BUILDS.forEach(function (build) {
     run("towers = []; enemies = []; bullets = []; inspected = null; cash = 99999999;");
-    var tower = place(slotIndex, 700, 545);
+    var tower = place(slotIndex, CLEAR_SPOT.x, CLEAR_SPOT.y);
     run("inspected = towers[0];");
 
     ["A", "B"].forEach(function (branch, i) {
@@ -1395,7 +1443,7 @@ check("every upgradeable tower's panel fits the canvas at every build",
 // measure again -- eleven rows plus three buttons is the most a Soldier can
 // ever ask for.
 run("towers = []; enemies = []; bullets = []; inspected = null; cash = 99999999;");
-var recruiter = place(3, 700, 545);
+var recruiter = place(3, CLEAR_SPOT.x, CLEAR_SPOT.y);
 run("inspected = towers[0];");
 for (var bTier = 0; bTier < 5; bTier++) {
   var tier = recruiter.nextUpgrade("B");

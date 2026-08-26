@@ -78,6 +78,10 @@ function stubContext() {
 // Boots a fresh game. Every returned helper drives the game through its own
 // public entry points -- real event handlers, the real update() -- so a test
 // exercises the same code the browser does.
+// The board the suites stand on unless they ask for another. See the note
+// at the chooseMap call below for why this is not Maps.DEFAULT_ID.
+var HARNESS_DEFAULT_MAP = "rune-circuit";
+
 function boot(mapId) {
   var canvasListeners = {};
   var windowListeners = {};
@@ -438,7 +442,22 @@ function boot(mapId) {
   // test it directly.
   api.pressPlay();
   if (mapId !== null) {
-    api.chooseMap(mapId || sandbox.Maps.DEFAULT_ID);
+    // THE SUITES BOOT ON A BOARD WITH NO TERRAIN, and they say which one
+    // rather than following Maps.DEFAULT_ID.
+    //
+    // Ironwood Frontier became the default on 2026-08-26 and it is the first
+    // map with solid geometry -- rocks that refuse placement and block sight.
+    // Around a hundred and forty tests here are about TOWERS, not about the
+    // default board, and they place gunners and read what they hit on the
+    // assumption of an empty floor. Following the default silently moved all
+    // of them onto a forest and broke thirty-two at once, none of which had
+    // anything to do with what had changed.
+    //
+    // So this is pinned, exactly as pinWaveBreak pins the pacing and for the
+    // same reason: the harness holds the SETTING still so the tests can be
+    // about their subject. A test that wants the shipping default asks for it
+    // by name -- harness.boot("ironwood-frontier") -- and several now do.
+    api.chooseMap(mapId || HARNESS_DEFAULT_MAP);
 
     // AND THEN START THE RUN, skipping the ten-second opening pause.
     //
