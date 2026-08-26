@@ -225,6 +225,11 @@ var BASELINE = [
     // repaired, because Normal and Hard were deleted as unfinished placeholders.
     // A suite getting SMALLER reads as loss on a totals diff, so it is written
     // down here as a deliberate removal.
+    // MERGED 2026-08-26. Two sets of additions landed on run.js from either
+    // side of this merge and the suite now holds both, so the count below is
+    // neither side's -- it is MEASURED off the merged tree, which is what the
+    // header of this file demands and the only number that could be right.
+    //
     // 135 on 2026-08-26, from 133: TWO tests ADDED, both regressions on clocks
     // the timeline rewrite got wrong and its own suite could not see. The
     // existing step-size test deploys each wave IN ISOLATION -- cursor moved by
@@ -240,7 +245,23 @@ var BASELINE = [
     // step sizes; dropping the overshoot handover goes red on the spread; moving
     // auto-send back above the countdown block goes red at dt = 0.1.
     //
-    file: "tests/run.js", pass: 135, fail: 0,
+    //
+    // 112 on 2026-08-26, from 108: FOUR tests added with the Vanguard's import.
+    // Each one pins a failure that draws a plausible picture rather than
+    // throwing -- a band that is never selected (the boss walks, in the wrong
+    // gait), a variant flag that latches (the boss stays in pieces for the rest
+    // of the run), a reform that finishes at the wrong moment, and a shield
+    // fragment welded into the torso. Self-tested by mutation: emptying
+    // `ENEMY_GAIT_BAND` and dropping the `shieldOut = false` line in
+    // `grantShield` turns three of them red; dropping `model.positions` in
+    // gl-models turns the fourth red. Green again on restore.
+    // 139 measured on the merged tree: 108 at the fork, +27 from the timeline
+    // rewrite and +4 from the Vanguard's import, which is exactly the sum and
+    // so is evidence that nothing was lost in the merge. ONE fixture was
+    // repaired to get there, and no product code moved for it: the flying-wave
+    // list read [24, 31, 35], written on a branch that forked before the owner
+    // ruled that the Healer flies (2026-08-26). Wave 32 is the healer wave.
+    file: "tests/run.js", pass: 139, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
@@ -265,6 +286,21 @@ var BASELINE = [
     //     12 s interval.
     //   - the stunned tower passed spawnAt a converted PIXEL value where it
     //     takes a path progress, parking the enemy 307 px from a 104 px reach.
+    //
+    // 219/0 on 2026-08-26: +2 for the forest board. One pins the board's own
+    // contract -- that it declares weather and wildness, that every camp prop
+    // it names is a kind the geometry can actually build (a rename in the
+    // scenery switch would otherwise turn every barricade into the default
+    // block, silently), and that its ground patches are the flat kind rather
+    // than slabs, which is the only thing on that board that could reach
+    // gameplay. The other covers the half of the chooser's new layout that
+    // nothing else does: rows that hold different numbers of cards, each
+    // centred on its own contents, must not land on top of one another. The
+    // seventh map's row running off the bottom of the canvas was already
+    // caught by the hit-test check next door -- self-tested by restoring the
+    // fixed-size grid, which goes red on card 6 in BOTH -- so this one pins
+    // overlap and the room left for the line under the grid, and does not
+    // repeat the fit.
     //
     // 217/0 on 2026-08-20: +1 for the Fractal Slime's tier ladder reaching the
     // schedule. The campaign sent one rung of the six while the index printed
@@ -315,6 +351,10 @@ var BASELINE = [
     //     `inspected` instead of the `tower` it is handed, so the two callers
     //     that never set the global indexed with -1 and handed `buyUpgrade`
     //     an undefined tower. It now upgrades its own argument.
+    // MERGED 2026-08-26 with Marc's forest-board branch: he added tests and
+    // so did this branch, so the count below is neither of the two numbers
+    // that conflicted here (236 and 219) -- it is measured after the merge.
+    //
     // 236 on 2026-08-26, from 217: NINETEEN tests ADDED across the balance and
     // meta pass, and none removed.
     //
@@ -346,7 +386,9 @@ var BASELINE = [
     // re-acquires during its own wind-up, so the body the swing "could not
     // reach" is swung by the time the hammer lands. They ask the damage
     // pipeline directly now, which is what they were always about.
-    file: "tests/content.test.js", pass: 236, fail: 0,
+    // 238 after merging Marc's forest board: his two and this branch's
+    // nineteen, on top of the 217 both started from.
+    file: "tests/content.test.js", pass: 238, fail: 0,
     failing: []
   },
   {

@@ -490,20 +490,8 @@ var Codex = (function () {
     ["Towers", "Enemies"].forEach(function (label, i) {
       var r = tabRect(i);
       var active = (i === 0) === (tab === "towers");
-      var hot = pointInRect(mouse.x, mouse.y, r);
-
-      ctx.fillStyle = active ? "rgba(140,199,255,0.18)"
-        : (hot ? "rgba(28,30,38,0.95)" : "rgba(28,30,38,0.85)");
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.lineWidth = active ? 2 : 1;
-      ctx.strokeStyle = active ? "rgba(170,215,255,0.95)" : "rgba(140,179,230,0.35)";
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "600 15px system-ui, sans-serif";
-      ctx.fillStyle = active ? "#cfe3ff" : "rgba(199,209,224,0.6)";
-      ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
+      // Same control the armoury's tabs and the Back button are cut from.
+      drawAshControl(r, label.toUpperCase(), { active: active });
     });
   }
 
@@ -554,10 +542,10 @@ var Codex = (function () {
     var r = towerBodyRect();
     var hot = pointInRect(mouse.x, mouse.y, r);
 
-    ctx.fillStyle = "rgba(22,25,34,0.9)";
+    ctx.fillStyle = "rgba(24,18,22,0.9)";
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = hot ? "rgba(170,215,255,0.8)" : "rgba(140,179,230,0.28)";
+    ctx.strokeStyle = hot ? "rgba(255,190,130,0.8)" : "rgba(240,150,78,0.28)";
     ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
     // Which body: the picked tier's, or the unbought one when nothing is
@@ -593,7 +581,7 @@ var Codex = (function () {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.font = "600 13px system-ui, sans-serif";
-    ctx.fillStyle = "#cfe3ff";
+    ctx.fillStyle = "#f6d9b4";
     ctx.fillText(fitText(ctx, label, r.w - 20), cx, r.y + 202);
 
     // SAY WHEN A TIER BUYS NO NEW BODY. The Rifleman's A1, A2 and A4 wear the
@@ -613,7 +601,7 @@ var Codex = (function () {
       }
     }
     ctx.font = "11px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.5)";
+    ctx.fillStyle = "rgba(186,158,140,0.5)";
     ctx.fillText(fitText(ctx, note, r.w - 20), cx, r.y + 224);
     ctx.textAlign = "left";
   }
@@ -625,12 +613,9 @@ var Codex = (function () {
       var active = i === towerIndex;
       var hot = pointInRect(mouse.x, mouse.y, r);
 
-      ctx.fillStyle = active ? "rgba(255,215,110,0.10)"
-        : (hot ? "rgba(32,38,52,0.95)" : "rgba(22,25,34,0.9)");
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.lineWidth = active ? 2 : 1;
-      ctx.strokeStyle = active ? "rgba(255,215,110,0.85)" : "rgba(140,179,230,0.3)";
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      // The armoury's card and the chooser's route plate, cut once more.
+      drawAshPlate(r, { accent: ASH_EMBER,
+        live: active ? 0.9 : (hot ? 0.45 : 0), cut: 12 });
 
       // THE REAL BODY, not the hand-drawn glyph, and at 52 px rather than 22.
       // The card is 76 px tall and was spending 22 of them on a picture with a
@@ -644,7 +629,7 @@ var Codex = (function () {
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.font = "600 15px system-ui, sans-serif";
-      ctx.fillStyle = active ? "#ffd76e" : "#c7d1e0";
+      ctx.fillStyle = active ? "#f0a45c" : "#d9c8b6";
       ctx.fillText(fitText(ctx, model.name, r.w - 88),
         r.x + 74, r.y + r.h / 2 - 10);
       ctx.font = "13px system-ui, sans-serif";
@@ -658,7 +643,7 @@ var Codex = (function () {
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = "600 22px system-ui, sans-serif";
-    ctx.fillStyle = "#cfe3ff";
+    ctx.fillStyle = "#f6d9b4";
     ctx.fillText(model.name, 300, 150);
     ctx.font = "600 15px system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,215,110,0.85)";
@@ -671,11 +656,11 @@ var Codex = (function () {
       var value = String(row[1]);
       var valueW = ctx.measureText(value).width;
       ctx.textAlign = "right";
-      ctx.fillStyle = "#e6eefc";
+      ctx.fillStyle = "#ecdece";
       ctx.fillText(value, 300 + statW, ry);
       ctx.textAlign = "left";
       ctx.font = "13px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.65)";
+      ctx.fillStyle = "rgba(186,158,140,0.65)";
       ctx.fillText(fitText(ctx, row[0], statW - valueW - 10), 300, ry);
     });
 
@@ -684,7 +669,7 @@ var Codex = (function () {
     // The upgrade tree, or the honest absence of one.
     if (!model.branches) {
       ctx.font = "14px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.55)";
+      ctx.fillStyle = "rgba(186,158,140,0.55)";
       ctx.fillText("No upgrade paths — the " + model.name.toLowerCase() +
         " is the reference tower.", TREE_X.A, TREE_Y + 4);
       return;
@@ -701,20 +686,20 @@ var Codex = (function () {
         var active = pick && pick.branch === branch && pick.tier === i;
         var hot = pointInRect(mouse.x, mouse.y, r);
 
-        ctx.fillStyle = active ? "rgba(108,230,133,0.20)"
-          : (hot ? "rgba(108,230,133,0.10)" : "rgba(108,230,133,0.05)");
+        ctx.fillStyle = active ? "rgba(116,240,214,0.20)"
+          : (hot ? "rgba(116,240,214,0.10)" : "rgba(116,240,214,0.05)");
         ctx.fillRect(r.x, r.y, r.w, r.h);
         ctx.lineWidth = active ? 2 : 1;
         ctx.strokeStyle = active ? "rgba(140,230,157,0.95)"
-          : "rgba(108,230,133," + (tier.reason ? "0.25" : "0.45") + ")";
+          : "rgba(116,240,214," + (tier.reason ? "0.25" : "0.45") + ")";
         ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
         ctx.textAlign = "center";
         ctx.font = "600 13px system-ui, sans-serif";
-        ctx.fillStyle = tier.reason ? "rgba(199,209,224,0.5)" : "#8ce69d";
+        ctx.fillStyle = tier.reason ? "rgba(186,158,140,0.5)" : "#74f0d6";
         ctx.fillText(tier.id, r.x + r.w / 2, r.y + 15);
         ctx.font = "11px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(219,231,255,0.75)";
+        ctx.fillStyle = "rgba(236,222,206,0.75)";
         ctx.fillText(fitText(ctx, tier.price, r.w - 10), r.x + r.w / 2, r.y + 32);
       });
     });
@@ -736,7 +721,7 @@ var Codex = (function () {
       }
     } else if (model.branches.A.length || model.branches.B.length) {
       ctx.font = "13px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.45)";
+      ctx.fillStyle = "rgba(186,158,140,0.45)";
       ctx.fillText("Click an upgrade to preview it.", cardX, TREE_Y + 4);
     }
   }
@@ -924,10 +909,10 @@ var Codex = (function () {
       var textX = iconX + (narrow ? 24 : 50);
       var textW = r.w - (textX - r.x) - 12;
 
-      ctx.fillStyle = "rgba(22,25,34,0.9)";
+      ctx.fillStyle = "rgba(24,18,22,0.9)";
       ctx.fillRect(r.x, r.y, r.w, r.h);
       ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(140,179,230,0.3)";
+      ctx.strokeStyle = "rgba(240,150,78,0.3)";
       ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
       // The exhibit: the real sprite, enlarged. Scaling the context rather
@@ -948,7 +933,7 @@ var Codex = (function () {
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.font = "600 " + (narrow ? 14 : 16) + "px system-ui, sans-serif";
-      ctx.fillStyle = "#cfe3ff";
+      ctx.fillStyle = "#f6d9b4";
       ctx.fillText(fitText(ctx, model.name, textW), textX, r.y + 14);
 
       var badge = enemyBadge(model);
@@ -1005,7 +990,7 @@ var Codex = (function () {
       rows.forEach(function (row, j) {
         var ry = r.y + 58 + j * 19;
         ctx.font = "12px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(199,209,224,0.65)";
+        ctx.fillStyle = "rgba(186,158,140,0.65)";
         var label = fitText(ctx, row[0], r.w * 0.5);
         ctx.fillText(label, r.x + 14, ry);
         // The value gets whatever the label left, MEASURED rather than
@@ -1014,7 +999,7 @@ var Codex = (function () {
         var room = r.w - 28 - ctx.measureText(label).width - 8;
         ctx.textAlign = "right";
         ctx.font = "600 12px system-ui, sans-serif";
-        ctx.fillStyle = "#e6eefc";
+        ctx.fillStyle = "#ecdece";
         ctx.fillText(fitText(ctx, row[1], room), r.x + r.w - 14, ry);
         ctx.textAlign = "left";
       });
@@ -1024,7 +1009,7 @@ var Codex = (function () {
       // is better than a bare "Waves" with nothing after it.
       ctx.font = "12px system-ui, sans-serif";
       ctx.fillStyle = model.waves.length
-        ? "rgba(140,179,230,0.8)" : "rgba(199,209,224,0.45)";
+        ? "rgba(240,150,78,0.8)" : "rgba(186,158,140,0.45)";
       ctx.fillText(fitText(ctx,
         model.waves.length ? "Waves " + model.waves.join(", ") : "Sandbox only — no wave",
         r.w - 28), r.x + 14, r.y + 58 + 5 * 19 + 3);
@@ -1229,10 +1214,10 @@ var Codex = (function () {
   function drawViewerArrow(ctx, dir) {
     var r = viewerArrowRect(dir);
     var hot = pointInRect(mouse.x, mouse.y, r);
-    ctx.fillStyle = hot ? "rgba(140,199,255,0.22)" : "rgba(28,32,44,0.9)";
+    ctx.fillStyle = hot ? "rgba(240,150,78,0.22)" : "rgba(30,22,26,0.9)";
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = hot ? "rgba(170,215,255,0.95)" : "rgba(140,179,230,0.4)";
+    ctx.strokeStyle = hot ? "rgba(255,190,130,0.95)" : "rgba(240,150,78,0.4)";
     ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
     var cx = r.x + r.w / 2, cy = r.y + r.h / 2;
@@ -1241,7 +1226,7 @@ var Codex = (function () {
     ctx.lineTo(cx + dir * 9, cy);
     ctx.lineTo(cx - dir * 8, cy + 13);
     ctx.closePath();
-    ctx.fillStyle = hot ? "#e7f2ff" : "rgba(199,209,224,0.8)";
+    ctx.fillStyle = hot ? "#ffe6c4" : "rgba(186,158,140,0.8)";
     ctx.fill();
   }
 
@@ -1255,10 +1240,10 @@ var Codex = (function () {
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     var s = viewerStageRect();
-    ctx.fillStyle = "rgba(18,21,30,0.96)";
+    ctx.fillStyle = "rgba(19,14,18,0.96)";
     ctx.fillRect(s.x, s.y, s.w, s.h);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(140,179,230,0.4)";
+    ctx.strokeStyle = "rgba(240,150,78,0.4)";
     ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w - 1, s.h - 1);
 
     // THE MOTION. Elapsed time drives both the turn and the walk, and they are
@@ -1295,7 +1280,7 @@ var Codex = (function () {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.font = "700 28px system-ui, sans-serif";
-    ctx.fillStyle = "#cfe3ff";
+    ctx.fillStyle = "#f6d9b4";
     ctx.fillText(fitText(ctx, item.label, s.w - 48), viewCx(), s.y + 402);
 
     // The second line says what this body IS, and for an enemy that is the
@@ -1304,9 +1289,9 @@ var Codex = (function () {
     if (item.enemy) {
       var badge = enemyBadge(item.enemy);
       sub = badge ? badge[0] : "STANDARD — no special ability";
-      ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.6)";
+      ctx.fillStyle = badge ? badge[1] : "rgba(186,158,140,0.6)";
     } else {
-      ctx.fillStyle = "rgba(199,209,224,0.6)";
+      ctx.fillStyle = "rgba(186,158,140,0.6)";
     }
     if (sub) {
       ctx.font = "600 13px system-ui, sans-serif";
@@ -1325,7 +1310,7 @@ var Codex = (function () {
     }
 
     ctx.font = "12px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.5)";
+    ctx.fillStyle = "rgba(186,158,140,0.5)";
     ctx.fillText((viewer.i + 1) + " / " + list.length, viewCx(), s.y + 486);
 
     drawViewerArrow(ctx, -1);
@@ -1334,11 +1319,11 @@ var Codex = (function () {
     var close = viewerCloseRect();
     var closeHot = pointInRect(mouse.x, mouse.y, close);
     ctx.font = "600 18px system-ui, sans-serif";
-    ctx.fillStyle = closeHot ? "#e7f2ff" : "rgba(199,209,224,0.55)";
+    ctx.fillStyle = closeHot ? "#ffe6c4" : "rgba(186,158,140,0.55)";
     ctx.fillText("×", close.x + close.w / 2, close.y + 4);
 
     ctx.font = "12px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.45)";
+    ctx.fillStyle = "rgba(186,158,140,0.45)";
     ctx.fillText("← →  previous / next     ·     Esc  back to the index",
       viewCx(), s.y + s.h + 16);
 
@@ -1495,7 +1480,7 @@ var Codex = (function () {
 
     ctx.textBaseline = "middle";
     ctx.font = "600 10px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.55)";
+    ctx.fillStyle = "rgba(186,158,140,0.55)";
     ctx.textAlign = "left";
     ctx.fillText("ENEMY", ENEMY_LIST_X + 62, ENEMY_LIST_Y - 10);
     ctx.textAlign = "right";
@@ -1520,13 +1505,16 @@ var Codex = (function () {
       var active = i === enemyIndex;
       var hot = pointInRect(mouse.x, mouse.y, r) &&
         pointInRect(mouse.x, mouse.y, view);
-      ctx.fillStyle = active ? "rgba(140,199,255,0.18)" :
-        (hot ? "rgba(34,40,54,0.96)" :
-          (i % 2 ? "rgba(22,25,34,0.88)" : "rgba(27,30,40,0.88)"));
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.lineWidth = active ? 2 : 1;
-      ctx.strokeStyle = active ? "rgba(170,215,255,0.9)" : "rgba(140,179,230,0.18)";
-      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      // QUIET plates here, and the flag is doing real work: ten rows are
+      // visible at once, and ten sets of rivets and sheared corners is a
+      // texture rather than a list. The banding that told one row from the
+      // next is kept as a fill, so the theme arrives without the density.
+      drawAshPlate(r, {
+        accent: ASH_EMBER, quiet: true, cut: 8,
+        live: active ? 0.85 : (hot ? 0.4 : 0),
+        fill: active ? "rgba(52,34,26,0.94)"
+          : (i % 2 ? "rgba(20,16,20,0.88)" : "rgba(26,20,24,0.88)")
+      });
 
       // The REAL BODY now, at a fixed three-quarter yaw and its rest frame --
       // the same shape the detail panel's exhibit uses, so the thing in the
@@ -1544,7 +1532,7 @@ var Codex = (function () {
 
       ctx.textAlign = "left";
       ctx.font = "600 14px system-ui, sans-serif";
-      ctx.fillStyle = active ? "#e7f2ff" : "#c7d1e0";
+      ctx.fillStyle = active ? "#ffe6c4" : "#d9c8b6";
       ctx.fillText(fitText(ctx, model.name, textW), textX, r.y + 17);
 
       // The badge, or the speed when a type has no single defining property.
@@ -1552,7 +1540,7 @@ var Codex = (function () {
       // failed to load rather than as an ordinary enemy.
       var badge = enemyBadge(model);
       ctx.font = "600 10px system-ui, sans-serif";
-      ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.5)";
+      ctx.fillStyle = badge ? badge[1] : "rgba(186,158,140,0.5)";
       ctx.fillText(fitText(ctx, badge ? badge[0] : "STANDARD — no special ability",
         textW), textX, r.y + 34);
 
@@ -1567,7 +1555,7 @@ var Codex = (function () {
       // Speed under the money, so the two columns each carry a "how much" and
       // a "how fast" rather than the row being three numbers in a line.
       ctx.font = "11px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.55)";
+      ctx.fillStyle = "rgba(186,158,140,0.55)";
       ctx.fillText(Math.round(model.speed) + " u.l./s", r.x + r.w - 14, r.y + 35);
     });
 
@@ -1579,22 +1567,22 @@ var Codex = (function () {
     var max = enemyScrollMax();
     if (max > 0) {
       var trackX = view.x + view.w + 6;
-      ctx.fillStyle = "rgba(140,179,230,0.12)";
+      ctx.fillStyle = "rgba(240,150,78,0.12)";
       ctx.fillRect(trackX, view.y, 5, view.h);
 
       var thumbH = Math.max(28, view.h * (view.h / (view.h + max)));
       var thumbY = view.y + (view.h - thumbH) * (enemyScroll / max);
-      ctx.fillStyle = "rgba(170,215,255,0.55)";
+      ctx.fillStyle = "rgba(255,190,130,0.55)";
       ctx.fillRect(trackX, thumbY, 5, thumbH);
     }
   }
 
   function drawEnemyDetail(ctx, model) {
     var r = enemyDetailRect();
-    ctx.fillStyle = "rgba(18,21,30,0.94)";
+    ctx.fillStyle = "rgba(19,14,18,0.94)";
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(140,179,230,0.35)";
+    ctx.strokeStyle = "rgba(240,150,78,0.35)";
     ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
     // The exhibit, and the door into the viewer. Its rectangle is
@@ -1602,10 +1590,10 @@ var Codex = (function () {
     // that opens something has to say so.
     var icon = enemyDetailIconRect();
     if (pointInRect(mouse.x, mouse.y, icon)) {
-      ctx.fillStyle = "rgba(140,199,255,0.10)";
+      ctx.fillStyle = "rgba(240,150,78,0.10)";
       ctx.fillRect(icon.x, icon.y, icon.w, icon.h);
       ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(170,215,255,0.7)";
+      ctx.strokeStyle = "rgba(255,190,130,0.7)";
       ctx.strokeRect(icon.x + 0.5, icon.y + 0.5, icon.w - 1, icon.h - 1);
     }
     drawEnemyBody(ctx, model, icon.x + icon.w / 2, icon.y + icon.h / 2, 88,
@@ -1614,7 +1602,7 @@ var Codex = (function () {
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = "700 26px system-ui, sans-serif";
-    ctx.fillStyle = "#cfe3ff";
+    ctx.fillStyle = "#f6d9b4";
     // FIT, NOT BARE. This was a plain fillText with no fit and no clip, and
     // every display name in the game is being rewritten -- a name two words
     // longer would have run straight out of the panel and over the stat
@@ -1622,10 +1610,10 @@ var Codex = (function () {
     ctx.fillText(fitText(ctx, model.name, r.w - 142), r.x + 122, r.y + 20);
     var badge = enemyBadge(model);
     ctx.font = "600 12px system-ui, sans-serif";
-    ctx.fillStyle = badge ? badge[1] : "rgba(199,209,224,0.6)";
+    ctx.fillStyle = badge ? badge[1] : "rgba(186,158,140,0.6)";
     ctx.fillText(badge ? badge[0] : "STANDARD ENEMY", r.x + 122, r.y + 58);
     ctx.font = "12px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.5)";
+    ctx.fillStyle = "rgba(186,158,140,0.5)";
     ctx.fillText("Click the model to see it walk  ·  select another from the list to compare.",
       r.x + 122, r.y + 82);
 
@@ -1662,11 +1650,11 @@ var Codex = (function () {
       ctx.textBaseline = "top";
       ctx.textAlign = "left";
       ctx.font = "12px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(199,209,224,0.58)";
+      ctx.fillStyle = "rgba(186,158,140,0.58)";
       ctx.fillText(row[0], x, y);
       ctx.textAlign = "right";
       ctx.font = "600 12px system-ui, sans-serif";
-      ctx.fillStyle = "#e6eefc";
+      ctx.fillStyle = "#ecdece";
       ctx.fillText(fitText(ctx, row[1], statColumnW * 0.58), x + statColumnW, y);
     });
 
@@ -1674,7 +1662,7 @@ var Codex = (function () {
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = "700 12px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(140,199,255,0.9)";
+    ctx.fillStyle = "rgba(240,150,78,0.9)";
     ctx.fillText("BEHAVIOUR", r.x + 20, behaviourY);
     behaviourY += 24;
 
@@ -1707,11 +1695,10 @@ var Codex = (function () {
     // what stops the click, this only stops the ghost.
     if (!viewer) drawBackButton();
 
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "#cfe3ff";
-    ctx.font = "700 30px system-ui, sans-serif";
-    ctx.fillText("INDEX", VIEW_WIDTH / 2, 28);
+    // The heading is game.js's, not a second one: the chooser, the index and
+    // the armoury are three screens with one voice, and three copies of an
+    // Impact heading is how that stops being true.
+    drawAshHeading("INDEX", "FIELD RECORDS", 18, true);
 
     drawTabs(ctx);
     if (tab === "towers") drawTowersTab(ctx);

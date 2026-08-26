@@ -94,6 +94,7 @@ var World3D = (function () {
     ((env && env.zones) || []).forEach(function (z) {
       var zh = ZONE_HEIGHT[z.kind];
       if (zh === undefined || !z.w || !z.h) return;
+      if (zh === 0) return;                       // a patch, not a platform
       var zw = ul(z.w / AUTHORED_PX_PER_UL), zd = ul(z.h / AUTHORED_PX_PER_UL);
       var cx = ul(z.x / AUTHORED_PX_PER_UL) + zw / 2;
       var cy = ul(z.y / AUTHORED_PX_PER_UL) + zd / 2;
@@ -175,7 +176,17 @@ var World3D = (function () {
 
   // Which zone kinds are floor. The other nineteen are props -- consoles,
   // pylons, crystals -- and are deliberately absent rather than faked as slabs.
-  var ZONE_HEIGHT = { deck: 9, bay: 5, hazard: 2.5, "void": -4 };
+  //
+  // `dirt` IS ZERO ON PURPOSE, and zero means something different from every
+  // other value here: not a slab one unit thick, but a PATCH -- a different
+  // ground colour painted onto the floor at the floor's own height. It exists
+  // because the forest board wants bare earth, ash and standing water marked
+  // out across it, and every other zone kind would answer that with a raised
+  // platform. A raised platform is not cosmetic: `levelUnder` refuses a tower
+  // that straddles an edge, so a mud puddle built as a slab would quietly
+  // become a no-build ring. A patch stamps no height at all and so can never
+  // move a build spot.
+  var ZONE_HEIGHT = { deck: 9, bay: 5, hazard: 2.5, "void": -4, dirt: 0 };
 
   var prims = null;
 
@@ -190,6 +201,14 @@ var World3D = (function () {
     var t = (typeof Maps !== "undefined" && Maps.themeOf)
       ? (Maps.themeOf(map) || {}) : {};
     function hex(v, fallback) { return GLGeometry.hex(v || fallback); }
+    // The same parse without the gamma: what the display shows, not what the
+    // light is. `GLGeometry.hex` is the linear one.
+    function displayHex(v, fallback) {
+      var text = String(v || fallback).replace("#", "");
+      return [parseInt(text.substr(0, 2), 16) / 255,
+              parseInt(text.substr(2, 2), 16) / 255,
+              parseInt(text.substr(4, 2), 16) / 255];
+    }
     function triple(v, fallback) {
       if (!v) return GLGeometry.hex(fallback);
       var p = String(v).split(",");
@@ -206,7 +225,24 @@ var World3D = (function () {
       metalDark: hex(t.metalDark, "#132733"),
       roadTop: hex(t.roadInner, "#274553"),
       roadSide: hex(t.roadOuter, "#0a1922"),
-      accent: triple(t.accent, "#4FE3D2")
+      accent: triple(t.accent, "#4FE3D2"),
+      // WEATHER IS OPT-IN, and absent means absent. A board that declares no
+      // `fog` renders through exactly the shader path it did before fog
+      // existed, because density 0 is what `GLRenderer.begin` restores.
+      // `color` is the mist, LINEAR, because the shader mixes it into linear
+      // light. `clear` is the void behind the board, in DISPLAY space, because
+      // `gl.clearColor` writes straight into the framebuffer and never passes
+      // through the shader's sRGB conversion -- handing it a linear triple
+      // paints the void several stops darker than everything in front of it.
+      fog: t.fog ? {
+        color: hex(t.fog.color, t.background || "#07090c"),
+        clear: displayHex(t.background || t.fog.color, "#07090c"),
+        density: t.fog.density || 0,
+        height: t.fog.height || 0
+      } : null,
+      // A board that is not a facility does not get the facility's floor
+      // seams. See where the grid is laid, below.
+      wild: !!t.wild
     };
   }
 
@@ -232,14 +268,21 @@ var World3D = (function () {
     var g = new GLGeometry.Builder();
     GLGeometry.ground(g, minX, minY, maxX, maxY, 0, P.terrain);
 
-    var step = 200;
-    for (var gx = Math.ceil(minX / step) * step; gx < maxX; gx += step) {
-      GLGeometry.box(g, gx, (minY + maxY) / 2, 2.5, maxY - minY, 1.2,
-        P.terrainEdge);
-    }
-    for (var gy = Math.ceil(minY / step) * step; gy < maxY; gy += step) {
-      GLGeometry.box(g, (minX + maxX) / 2, gy, maxX - minX, 2.5, 1.2,
-        P.terrainEdge);
+    // FLOOR SEAMS ARE A MANUFACTURED FLOOR'S SEAMS. Six of the seven boards are
+    // decks inside a facility and the grid is what says so. Ruled lines two
+    // hundred units apart across a forest would say the same thing about a
+    // forest, which is exactly wrong -- so a board that declares itself wild
+    // gets bare ground and the props do the work instead.
+    if (!P.wild) {
+      var step = 200;
+      for (var gx = Math.ceil(minX / step) * step; gx < maxX; gx += step) {
+        GLGeometry.box(g, gx, (minY + maxY) / 2, 2.5, maxY - minY, 1.2,
+          P.terrainEdge);
+      }
+      for (var gy = Math.ceil(minY / step) * step; gy < maxY; gy += step) {
+        GLGeometry.box(g, (minX + maxX) / 2, gy, maxX - minX, 2.5, 1.2,
+          P.terrainEdge);
+      }
     }
 
     var env = (typeof Maps !== "undefined" && Maps.ENVIRONMENTS && map)
@@ -250,6 +293,15 @@ var World3D = (function () {
       var w = ul(z.w / AUTHORED_PX_PER_UL), d = ul(z.h / AUTHORED_PX_PER_UL);
       var cx = ul(z.x / AUTHORED_PX_PER_UL) + w / 2;
       var cy = ul(z.y / AUTHORED_PX_PER_UL) + d / 2;
+      // A PATCH. Painted onto the floor a hair above it -- enough to win the
+      // depth test against the ground plane, nowhere near enough to be a step.
+      // No rim, because a patch of mud has no edge rail, and no height stamp
+      // (see buildHeightField), because it must not move a build spot.
+      if (h === 0) {
+        GLGeometry.ground(g, cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2,
+          0.08, P.terrainEdge);
+        return;
+      }
       var thickness = Math.max(1.5, Math.abs(h));
       var z0 = h < 0 ? -0.2 : 0.4;
       var slabTop = z0 + thickness;
@@ -597,9 +649,26 @@ var World3D = (function () {
   // qualifies for two variants gets one answer rather than whichever branch was
   // written last. Nothing has two today; the rule is here so the second one
   // does not have to invent it.
+  //
+  // A THIRD TYPE JOINED ON 2026-08-26, AND IT IS THE FIRST WHOSE VARIANT IS NOT
+  // A ONE-WAY DOOR. The Vanguard shields ITSELF every seven seconds
+  // (`support.pick === "self"` on its type row), so its shield is a rhythm: it
+  // goes, it is gone for the rest of that window, and it comes back. The owner
+  // asked for the wreckage to be visible for exactly that window and for the
+  // fragments to reassemble into the shield at the end of it -- so this body
+  // swaps INTO the shattered mesh and back OUT of it, several times a run.
+  //
+  // `shieldOut`, WHICH IS NEITHER OF THE FLAGS ABOVE. `shieldBroken` is
+  // permanent and would leave the boss in pieces for the rest of the run;
+  // `shield <= 0` is true of a body that has never been shielded at all, and
+  // the Vanguard spawns that way and waits out its first seven seconds. The
+  // full argument is at the field itself in js/enemy.js -- this is the third
+  // time that distinction has had to be drawn on this table and the second time
+  // it has been drawn the other way round.
   var ENEMY_VARIANT = {
     revenant: { revived: "enemy-revenant-undead" },
-    shielded: { shieldBroken: "enemy-shielded-broken" }
+    shielded: { shieldBroken: "enemy-shielded-broken" },
+    boss_fast: { shieldOut: "enemy-boss_fast-shattered" }
   };
 
   // A CAMO BODY WEARS THE MODEL OF THE TYPE IT SHADOWS (2026-08-19, at the
@@ -1370,7 +1439,24 @@ var World3D = (function () {
     if (typeof EnemyWreck !== "undefined") EnemyWreck.update(state);
 
     var vp = camera.viewProjection();
-    renderer.begin(vp);
+    // THE VOID BEHIND A FOGGED BOARD IS THAT BOARD'S OWN BACKGROUND.
+    //
+    // MEASURED, and the first version of this line was wrong in a way that
+    // only a measurement shows: it cleared to the FOG's colour, on the theory
+    // that the far edge fades to fog and the void should meet it. It does not.
+    // At a density anyone would actually play with, the far edge of the ground
+    // only ever reaches about a third of the way to the fog colour -- read off
+    // the framebuffer at (41,43,37) against a (43,46,39) clear -- so clearing
+    // to the mist puts a band of BRIGHT sky around a dark board and inverts
+    // the whole picture. The theme's own background is the colour the board
+    // says its void is, which is the answer that was there all along.
+    var fog = mapPalette && mapPalette.fog;
+    renderer.begin(vp, fog ? fog.clear : null);
+    // SET ONCE PER FRAME, BEFORE ANYTHING IS DRAWN, so the board, the towers,
+    // the bodies and the projectiles all stand in the same air. `begin` has
+    // just restored clear air, so a board with no fog needs no call and cannot
+    // inherit the last board's weather.
+    if (fog) renderer.setFog(fog.color, fog.density, fog.height);
     // The board's scenery carries its own emission, so the map pass is drawn
     // with the glow driven. Constant, not animated: these are installations
     // that are simply switched on, and a breathing board would pull the eye off
@@ -1686,6 +1772,11 @@ var World3D = (function () {
       // The object it returns is shared scratch, consumed synchronously by the
       // drawActor call below before any other body reaches this line.
       var strike = strikeOf(e, model);
+      // DISJOINT BY CONSTRUCTION -- one body has a mast and the other has
+      // shards, and no mesh has both -- but written so the shards win if that
+      // ever stops being true, because a strike is a 0.4 s flourish and the
+      // shards are the whole of what a broken Vanguard is.
+      var shards = shardPose(e, model, yaw, radius / 11, lift);
       // A CAMO BODY IS DRAWN TWICE: depth first, then colour.
       //
       // With depth writes off, EVERY front-facing surface of a translucent body
@@ -1720,7 +1811,7 @@ var World3D = (function () {
         // uniform even inside the enemy family (8 on nine bodies, 12 on `angry`
         // and `flying`), so any constant here would already be wrong twice.
         var em = GLModels.get(renderer, model);
-        var eBand = walkBand(em);
+        var eBand = gaitBand(em, e);
         var rate = clockRate(e);
         var walk = rate
           ? bandFrame(eBand, boardClock * rate)
@@ -1735,7 +1826,8 @@ var World3D = (function () {
         var pulse = supportGlow(e);
         if (pulse) renderer.setGlow(pulse, supportTint(e));
         else if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
-        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk, strike);
+        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk,
+          shards || strike);
         // Put it back. setGlow is state, not an argument, so a flier that left
         // it lit would hand its lantern to the next body drawn.
         if (pulse || e.isFlying) renderer.setGlow(0, null);
@@ -1925,6 +2017,53 @@ var World3D = (function () {
       }
     }
     return [0, n];
+  }
+
+  // WHICH BAND A BODY IS IN, WHEN A BODY HAS MORE THAN ONE GAIT.
+  //
+  // `walkBand` answers "which frames are the default cycle" and every body in
+  // the library was content with that until the Vanguard, which carries two
+  // gaits in one mesh: it DASHES the opening 400 u.l. and BOUNDS the rest of
+  // the road (the owner, 2026-08-26 -- "an explosive burst of speed, a dash ...
+  // then transition to a bouncing attack run at normal speed"). Both are baked,
+  // both are distance-driven, and the only thing left to decide per frame is
+  // which one is playing.
+  //
+  // A PREDICATE AND NOT A FLAG NAME, WHICH IS THE ONE PLACE THIS TABLE DIFFERS
+  // FROM `ENEMY_VARIANT` NEXT DOOR. A variant is chosen off a stored fact, so
+  // that table can name a field. This is not a stored fact: `isSprinting()` is
+  // `progress < ul(sprint.untilUl)`, a comparison against WHERE ON THE MAP the
+  // body is, and js/enemy.js keeps it as a function on purpose so the 2D wake,
+  // the tests and this all ask the same question rather than three copies of
+  // the comparison. Caching it into a field would be a fourth copy and the one
+  // most likely to go stale.
+  //
+  // FALLS BACK TO THE DEFAULT BAND, never to a missing one: a type with no row,
+  // a body whose mesh declares one band, or a predicate that asks for a band
+  // this model does not have all end up drawing band 0, which is the gait the
+  // exporter promises is there. See `vanguard` in tools/glb_to_model.py for why
+  // band 0 is the BOUND and not the dash -- a fallback should be the common
+  // case, and the dash is over 400 u.l. into a route thousands long.
+  var ENEMY_GAIT_BAND = {
+    boss_fast: function (e) {
+      return (e.isSprinting && e.isSprinting()) ? 1 : 0;
+    }
+  };
+
+  function gaitBand(m, e) {
+    var pick = e ? ENEMY_GAIT_BAND[e.typeId] : null;
+    if (!pick) return walkBand(m);
+    var want = pick(e);
+    if (!want) return walkBand(m);
+    var n = (m && m.frames.length) ? m.frames.length : 1;
+    var b = m && m.bands;
+    var row = (b && b.length > want) ? b[want] : null;
+    if (row && row.length === 2 &&
+        typeof row[0] === "number" && typeof row[1] === "number" &&
+        row[0] >= 0 && row[1] > 0 && row[0] + row[1] <= n) {
+      return row;
+    }
+    return walkBand(m);
   }
 
   // A drive value -- cycles completed -- reduced into a band. Non-negative by
@@ -2191,6 +2330,220 @@ var World3D = (function () {
     return strikeOverrides;
   }
 
+  // --- THE VANGUARD'S SHIELD, THROWN ON THE ROAD AND PULLED BACK ------------
+  //
+  // The owner's brief, 2026-08-26: "the fragments of shield you see must be
+  // modeled as to be shooting outwards, and then drop to the floor from the
+  // shields that are broken in the shielded model. they will stay there for 3
+  // seconds, then in the last 4 seconds, they start flying back to the
+  // vanguard, as if attracted to him magnetically and form the shield again, to
+  // complete the 7 second cooldown."
+  //
+  // WHY THIS IS AN OVERRIDE AND NOT BAKED FRAMES, which is the same argument
+  // the Hedger's strike makes one section up and a stronger version of it. A
+  // baked frame is a pose in the MODEL's own space, so a fragment baked onto
+  // the floor travels down the road with the boss -- and this boss is the
+  // fastest thing in the game, 175 u.l./s for its opening stretch. Over the
+  // three seconds the brief asks the fragments to lie still it covers 525 u.l.
+  // A shard that follows it is not lying on the floor, it is being carried.
+  //
+  // So the drop point is frozen in WORLD space at the moment of the break --
+  // `Enemy.prototype.breakShield` records the position and heading, and nothing
+  // else needs storing -- and every frame this converts that fixed point back
+  // into the body's current model space. The shards really are left behind, and
+  // the flight home really does cross the ground the boss gained. Nothing is
+  // integrated and nothing accumulates: hand this function the same enemy at
+  // the same progress twice and it draws the same thing.
+  //
+  // THE THREE PHASES ARE SHARES OF THE GAP, NOT SECONDS. `shieldReformProgress`
+  // is 0 at the break and 1 on the frame the shield returns, whenever that is,
+  // so the reassembly lands exactly on the pulse that refills the pool. At the
+  // Vanguard's full seven-second cadence the shares below ARE the brief's 0.9 /
+  // 3 / 4; a shield broken two seconds before its own pulse gets the same
+  // picture in two seconds rather than a picture that finishes after the shield
+  // is already back.
+  var SHARD_MODEL = "enemy-boss_fast-shattered";
+  // The throw. 0.9 s of the seven, which is long enough to read as a launch and
+  // short enough that the fragments are down well inside the three seconds the
+  // brief gives them to lie there.
+  var SHARD_THROW = 0.9 / 7;
+  // When they stop lying still. The brief's three seconds, measured from the
+  // break and not from the landing -- "they will stay there for 3 seconds, then
+  // in the last 4 seconds" is one seven-second window split once.
+  var SHARD_SETTLED = 3 / 7;
+  // How far out they are thrown, in MODEL units, plus a per-shard spread. The
+  // body is 1.298 units tall, so 1.55 is a little over a body length -- about
+  // 94 board px at this type's own size, which is two and a half times its own
+  // radius and clearly "off the boss" rather than "beside it".
+  var SHARD_BURST = 1.55;
+  var SHARD_SPREAD = 0.55;
+  // The arc. Up out of the shield, then down under its own weight: the
+  // horizontal channel eases OUT (fast off the body, slowing) and the vertical
+  // one eases IN (a u-squared fall), which between them is a ballistic curve
+  // without integrating one.
+  var SHARD_POP = 0.42;
+  // The return is a MAGNET and not a throw reversed, so it is cubed rather than
+  // eased: almost nothing for the first half of the four seconds, then a rush.
+  // A shard that drifts home at a constant rate reads as floating.
+  var SHARD_PULL = 3;
+  // Off the floor on the way in, and a shiver while the field takes hold of
+  // something that is still lying still. Both small -- 0.30 units is 18 board
+  // px of lift and 0.03 is under two.
+  var SHARD_HOME_LIFT = 0.30;
+  var SHARD_SHIVER = 0.03;
+  // Roughly one turn over the throw, held through the rest, unwound to nothing
+  // by the time the shard is home -- so it locks back into the ring square
+  // rather than at whatever angle it happened to stop at.
+  var SHARD_TUMBLE = 5.5;
+
+  // A HASH OF THE SHARD'S OWN INDEX, so every fragment differs and none of them
+  // differs between two runs of the same board. There is no per-shard state
+  // anywhere in this system and this is what pays for that: spread, tumble axis
+  // and shiver phase are all read out of the name.
+  function shardNoise(index, salt) {
+    var h = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+    return h - Math.floor(h);
+  }
+
+  // The fragments of one model, measured once. `home` is the group's own
+  // centroid in model space -- which is also the point tools/glb_to_model.py's
+  // `vanguard_pivot_of` gave it, arrived at from the geometry rather than
+  // carried across, so the two cannot disagree about where a shard's centre is.
+  // `sit` is how far that centre stands above the shard's lowest point, which
+  // is what puts a dropped fragment ON the road instead of half inside it.
+  function shardsOf(model) {
+    var cached = typePrims["shards:" + model];
+    if (cached) return cached;
+    var m = GLModels.get(renderer, model);
+    var list = [];
+    if (m) {
+      for (var g = 0; g < m.groups.length; g++) {
+        var grp = m.groups[g];
+        if (!grp.count || grp.name.indexOf("shard_") !== 0) continue;
+        var sx = 0, sy = 0, sz = 0, low = Infinity;
+        for (var v = grp.first; v < grp.first + grp.count; v++) {
+          var x = m.positions[v * 3], y = m.positions[v * 3 + 1],
+              z = m.positions[v * 3 + 2];
+          sx += x; sy += y; sz += z;
+          if (z < low) low = z;
+        }
+        var n = grp.count;
+        var index = parseInt(grp.name.slice(6), 10) || 0;
+        var home = [sx / n, sy / n, sz / n];
+        list.push({
+          name: grp.name, home: home, sit: home[2] - low,
+          spread: shardNoise(index, 1),
+          // Mostly about Z, which is what keeps a settled fragment lying FLAT
+          // on the road: a full free tumble would leave some of them standing
+          // on edge, and `sit` -- measured on the rest pose -- would then be
+          // the wrong height to put them at.
+          ax: 0.35 * (shardNoise(index, 2) * 2 - 1),
+          ay: 0.35 * (shardNoise(index, 3) * 2 - 1),
+          turn: 0.7 + 0.6 * shardNoise(index, 4),
+          phase: shardNoise(index, 5) * Math.PI * 2,
+          mat: new Float32Array(16)
+        });
+      }
+    }
+    typePrims["shards:" + model] = list;
+    return list;
+  }
+
+  // Reused across frames and across bodies. Safe for exactly the reason
+  // `strikeOverrides` is: drawActor consumes it SYNCHRONOUSLY on the next line.
+  // The keys are the same ten group names every frame, so nothing needs
+  // clearing between calls.
+  var shardOverrides = null;
+
+  // `scale` IS THE INSTANCE SCALE, NOT THE MODEL-TO-PIXEL FACTOR, and mixing
+  // the two is the one arithmetic mistake this function can make silently.
+  // `drawActor` draws a body at `m.unitsToPx * scale` board px per model unit;
+  // `scale` alone is `radiusPx() / 11`, which is 1.9 on this boss against a
+  // real factor of 60.4. Fed the wrong one, every drop point lands about a
+  // pixel from the machine's own feet -- the shards still throw, still settle
+  // and still come home, so nothing looks broken, it just looks like nothing
+  // happened. Found exactly that way on the real board.
+  function shardPose(e, model, yaw, scale, lift) {
+    if (model !== SHARD_MODEL) return null;
+    if (!e || typeof e.shieldReformProgress !== "function") return null;
+    var t = e.shieldReformProgress();
+    // -1 is "no gap to be through", and 0 is the frame the shield went. See
+    // the method: the test is on the sign, never on truthiness.
+    if (t < 0) return null;
+    var at = e.shieldBreakAt;
+    if (!at) return null;
+    var list = shardsOf(model);
+    if (!list.length) return null;
+    if (!shardOverrides) shardOverrides = {};
+    // Board px per model unit, the same product drawActor forms.
+    var size = GLModels.unitsToPx(model) * scale;
+    if (!(size > 0)) return null;
+
+    // The inverse of the instance matrix's rotation, so a fixed world point can
+    // be expressed in the body's own space this frame; and the break-time
+    // rotation, which is where the drop points were laid down.
+    var cos = Math.cos(yaw), sin = Math.sin(yaw);
+    var ac = Math.cos(at.yaw), as = Math.sin(at.yaw);
+
+    for (var i = 0; i < list.length; i++) {
+      var sh = list[i];
+      var home = sh.home;
+
+      // OUTWARD IS RADIAL FROM THE BODY'S OWN AXIS, measured off the fragment's
+      // rest position rather than chosen: the artist scattered these around a
+      // ring, so each one already knows which way "off the shield" is. A
+      // fragment sitting on the axis has no radial direction and is thrown
+      // forward instead of dividing by zero.
+      var rx = home[0], ry = home[1];
+      var r = Math.sqrt(rx * rx + ry * ry);
+      if (r < 1e-4) { rx = 1; ry = 0; r = 1; }
+      var out = SHARD_BURST + SHARD_SPREAD * sh.spread;
+      var mx = home[0] + rx / r * out;
+      var my = home[1] + ry / r * out;
+
+      // Where it lands, in board space, frozen at the break.
+      var dx = at.x + (mx * ac - my * as) * size;
+      var dy = at.y + (mx * as + my * ac) * size;
+      var dz = groundHeightAt(dx, dy) + sh.sit * size;
+
+      // ...and back into the model space of the body as it stands NOW. This is
+      // the whole trick: the offset grows on its own as the boss runs away from
+      // its own wreckage, with nothing tracking the distance.
+      var ox = dx - e.pos.x, oy = dy - e.pos.y;
+      var tx = (ox * cos + oy * sin) / size - home[0];
+      var ty = (oy * cos - ox * sin) / size - home[1];
+      var tz = (dz - lift) / size - home[2];
+
+      var px, py, pz, spin;
+      if (t < SHARD_THROW) {
+        var u = t / SHARD_THROW;
+        var fly = 1 - (1 - u) * (1 - u);
+        px = tx * fly;
+        py = ty * fly;
+        pz = tz * u * u + SHARD_POP * Math.sin(Math.PI * u);
+        spin = SHARD_TUMBLE * u;
+      } else if (t < SHARD_SETTLED) {
+        px = tx; py = ty; pz = tz;
+        spin = SHARD_TUMBLE;
+      } else {
+        var v = (t - SHARD_SETTLED) / (1 - SHARD_SETTLED);
+        var pull = Math.pow(v, SHARD_PULL);
+        var shiver = SHARD_SHIVER * (1 - v) *
+          Math.sin(v * 26 + sh.phase);
+        px = tx * (1 - pull) + shiver;
+        py = ty * (1 - pull) - shiver;
+        pz = tz * (1 - pull) + SHARD_HOME_LIFT * Math.sin(Math.PI * v);
+        spin = SHARD_TUMBLE * (1 - pull);
+      }
+
+      var turn = spin * sh.turn;
+      GLMath.localPose(sh.mat, home, turn * sh.ax, turn * sh.ay, turn,
+        px, py, pz);
+      shardOverrides[sh.name] = sh.mat;
+    }
+    return shardOverrides;
+  }
+
   function drawActor(model, x, y, yaw, scale, lift, frame, overrides, tilt) {
     var m = model ? GLModels.get(renderer, model) : null;
     if (!m) {
@@ -2377,6 +2730,93 @@ var World3D = (function () {
     ctx.strokeStyle = stroke;
     ctx.lineWidth = width || 2;
     ctx.stroke();
+  }
+
+  // THE SPRINT WAKE -- "energy trails emphasizing the acceleration".
+  //
+  // A body with a `sprint` block on its type runs its opening stretch faster
+  // than anything else in the game and then never again, and the 2D board has
+  // drawn a wake behind it since the type existed (Enemy.prototype.draw) for a
+  // reason that is teaching rather than decoration: the player has to be able
+  // to SEE where the burst ends, or "it arrived early" is the only evidence
+  // they ever get. The 3D board drew nothing, so the one state change the
+  // Vanguard announces about itself was invisible on the board the game
+  // actually ships.
+  //
+  // GENERIC, AND KEYED ON `isSprinting()` LIKE EVERYTHING ELSE. Nothing here
+  // names the Vanguard; a second type with a `sprint` block gets the wake with
+  // no edit, exactly as it would get the 2D one.
+  //
+  // THREE LANES RATHER THAN ONE, which is the whole difference from the flat
+  // 2D stroke. A wake at a single height reads as a shadow on a board with a
+  // camera above it; three at different heights up the body read as air coming
+  // off a thing that is moving, and they are cheap -- two projected points and
+  // one gradient each.
+  //
+  // FROM THE HEADING, NOT FROM THE PATH, and the 2D wake's comment is the
+  // reason: the index screen parks a body at an arbitrary card position with
+  // its `progress` still 0, and a wake sampled off the path there is a stray
+  // line running to the mouth of the road.
+  //
+  // THE TYPE'S OWN COLOUR, so the two boards say the same thing about the same
+  // body and so the trail belongs to the enemy the hover card describes rather
+  // than to whatever palette its mesh happened to import with.
+  // 78 u.l., WHICH IS DELIBERATELY LONGER THAN THE 2D BOARD'S 26. That wake is
+  // a flat stroke on a flat board and 26 reads there; this one is projected
+  // under an elevated camera, so a length in world units is foreshortened to
+  // roughly half of itself on screen -- and the near half of it is BEHIND the
+  // machine, which is 78 board px tall. Measured on the real page at 34: the
+  // streak was 54 screen px, of which the body covered most. What is drawn has
+  // to be long enough to leave the silhouette.
+  var WAKE_ULS = 78;                       // how far back the streak reaches
+  var WAKE_LANES = [0.20, 0.52, 0.84];     // shares of the body's own height
+  var WAKE_HZ = 11;                        // flicker, so it reads as energy
+  // The streak STARTS behind the body rather than at its centre, for the same
+  // reason: a gradient whose hot end is inside the mesh spends its brightest
+  // stop on pixels the depth buffer already owns.
+  var WAKE_LEAD = 0.55;                    // radii back from the body's point
+
+  function drawSprintWake(ctx, e) {
+    if (typeof e.isSprinting !== "function" || !e.isSprinting()) return;
+    var heading = (e.path && e.path.tangentAt)
+      ? e.path.tangentAt(e.progress) : null;
+    if (!heading) return;
+    var radius = e.radiusPx ? e.radiusPx() : 11;
+    var top = enemyTop(e);
+    var tint = e.color || { r: 255, g: 200, b: 120 };
+    var rgb = tint.r + "," + tint.g + "," + tint.b;
+    var back = ul(WAKE_ULS);
+
+    for (var i = 0; i < WAKE_LANES.length; i++) {
+      // Each lane flickers on its own phase and none of them ever reaches
+      // zero length, so the wake breathes instead of blinking out.
+      var beat = 0.72 + 0.28 *
+        Math.sin(boardClock * WAKE_HZ + i * 2.1);
+      var reach = back * beat;
+      var lead = radius * WAKE_LEAD;
+      var z = top * WAKE_LANES[i];
+      var head = project(e.pos.x - heading.x * lead,
+        e.pos.y - heading.y * lead, z);
+      var tail = project(e.pos.x - heading.x * (lead + reach),
+        e.pos.y - heading.y * (lead + reach), z * 0.78);
+      if (!head || !tail) continue;
+      var g = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
+      // Hot and nearly solid where it leaves the machine, gone by the tail.
+      // The middle lane is the brightest: it is the one over the centre of
+      // mass and the other two are the spill either side of it.
+      var peak = (i === 1) ? 0.80 : 0.52;
+      g.addColorStop(0, "rgba(255,255,255," + (peak * 0.85).toFixed(3) + ")");
+      g.addColorStop(0.22, "rgba(" + rgb + "," + peak.toFixed(3) + ")");
+      g.addColorStop(1, "rgba(" + rgb + ",0)");
+      ctx.strokeStyle = g;
+      ctx.lineWidth = radius * (i === 1 ? 0.70 : 0.44);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(head.x, head.y);
+      ctx.lineTo(tail.x, tail.y);
+      ctx.stroke();
+    }
+    ctx.lineCap = "butt";
   }
 
   function drawGroundRing(ctx, x, y, radius, stroke, fill, width) {
@@ -2757,6 +3197,11 @@ var World3D = (function () {
       ctx.setLineDash([4, 4]);
       drawGroundRing(ctx, ce.pos.x, ce.pos.y, cr, CAMO_RING_RGBA, null, 1.5);
       ctx.restore();
+    }
+    // Behind the bars and behind the bodies' own interface, because it is the
+    // only thing in this pass that is not information.
+    for (i = 0; i < state.enemies.length; i++) {
+      drawSprintWake(ctx, state.enemies[i]);
     }
     for (i = 0; i < state.enemies.length; i++) bar(ctx, state.enemies[i], "enemy");
 
@@ -4548,6 +4993,13 @@ var World3D = (function () {
     modelFor: towerModel,
     enemyModelFor: enemyModel,
     walkBand: walkBand,
+    // AND WHICH BAND THIS PARTICULAR BODY IS IN, which `walkBand` cannot say:
+    // it takes a model and the model does not know how far down the road the
+    // thing wearing it has come. Exported for the same reason `walkBand` is --
+    // so a test and the model viewer ask the renderer rather than keeping a
+    // second copy of the table -- and because the Vanguard's two gaits are
+    // otherwise unassertable from outside this file.
+    gaitBand: gaitBand,
     bandFrame: bandFrame,
     // WHAT DRIVES A BODY'S ANIMATION, for a viewer that has no road under it.
     //

@@ -42,6 +42,10 @@ function GLRenderer(canvas) {
     "varying vec3 vCol;\n" +
     "varying float vEmi;\n" +
     "varying float vDepth;\n" +
+    // How far this vertex is DOWN THE VIEW AXIS, which is what fog thickens
+    // with. A perspective projection already computes it -- clip w IS the
+    // view-space depth -- so this costs a copy and no extra matrix.
+    "varying float vView;\n" +
     "void main() {\n" +
     // Rotation only -- every model matrix here is a yaw plus a translation
     // plus a uniform scale, so the upper 3x3 is already orthogonal and the
@@ -52,6 +56,7 @@ function GLRenderer(canvas) {
     "  vec4 world = uModel * vec4(aPos, 1.0);\n" +
     "  gl_Position = uViewProj * world;\n" +
     "  vDepth = world.z;\n" +
+    "  vView = gl_Position.w;\n" +
     "}\n";
 
   var fs =
@@ -60,6 +65,7 @@ function GLRenderer(canvas) {
     "varying vec3 vCol;\n" +
     "varying float vEmi;\n" +
     "varying float vDepth;\n" +
+    "varying float vView;\n" +
     "uniform vec3 uKeyDir;\n" +
     "uniform vec3 uFillDir;\n" +
     "uniform vec3 uAmbient;\n" +
@@ -74,6 +80,15 @@ function GLRenderer(canvas) {
     // How solid this instance is. 1 for everything on the board; only a body
     // being cleared away ever asks for less. See setFade.
     "uniform float uAlpha;\n" +
+    // THE AIR THE BOARD IS SEEN THROUGH. Density is per view-unit and is ZERO
+    // for every board that does not ask for weather, so a map that declares no
+    // fog renders exactly as it did before this uniform existed. `uFogFall` is
+    // 1/height: the mist lies on the floor and thins upward, so a tree top
+    // stands clear of the same bank its roots are buried in. At 0 the fog is
+    // uniform with height, which is the honest reading of "no falloff".
+    "uniform vec3 uFogColor;\n" +
+    "uniform float uFogDensity;\n" +
+    "uniform float uFogFall;\n" +
     "void main() {\n" +
     "  vec3 n = normalize(vNrm);\n" +
     "  float key = max(dot(n, uKeyDir), 0.0) * uKeyStrength;\n" +
@@ -96,6 +111,13 @@ function GLRenderer(canvas) {
     // converts once at the end, which is why its renders of these exact
     // colours are rich and this was not. Vertex colours arrive linear (see
     // GLModels.expand and GLGeometry.hex); this is the conversion back.
+    // FOG IS MIXED IN LINEAR, for the same reason the lighting above is done
+    // in linear: mist is light scattered on the way to the eye, not paint on
+    // the surface, and mixing it after the sRGB curve washes the dark end out
+    // exactly the way multiplying an sRGB colour by a light term did.
+    "  float fog = 1.0 - exp(-vView * vView * uFogDensity * uFogDensity);\n" +
+    "  fog *= exp(-max(vDepth, 0.0) * uFogFall);\n" +
+    "  lit = mix(lit, uFogColor, clamp(fog, 0.0, 1.0));\n" +
     "  gl_FragColor = vec4(pow(max(lit, vec3(0.0)), vec3(1.0 / 2.2)), uAlpha);\n" +
     "}\n";
 
@@ -118,7 +140,10 @@ function GLRenderer(canvas) {
     keyStrength: gl.getUniformLocation(this.program, "uKeyStrength"),
     glow: gl.getUniformLocation(this.program, "uGlow"),
     glowTint: gl.getUniformLocation(this.program, "uGlowTint"),
-    alpha: gl.getUniformLocation(this.program, "uAlpha")
+    alpha: gl.getUniformLocation(this.program, "uAlpha"),
+    fogColor: gl.getUniformLocation(this.program, "uFogColor"),
+    fogDensity: gl.getUniformLocation(this.program, "uFogDensity"),
+    fogFall: gl.getUniformLocation(this.program, "uFogFall")
   };
   // Solid until something asks otherwise, and `_faded` tracks the GL state so
   // setFade can be called per body without touching BLEND on every one.
@@ -272,6 +297,11 @@ GLRenderer.prototype.begin = function (viewProj, clearColor) {
   gl.uniform1f(this.uniform.keyStrength, this.keyStrength);
   this.setGlow(0, null);
   this.setFade(1);
+  // CLEAR AIR IS THE DEFAULT OF THE RENDERER, not a promise each caller makes
+  // -- same reasoning as setFade above. A board with weather sets its own fog
+  // straight after this call; a board without one, and every preview and
+  // model viewer that shares this class, can never inherit the last map's.
+  this.setFog(null, 0, 0);
   this.drawCalls = 0;
   this.triangles = 0;
 };
@@ -279,6 +309,26 @@ GLRenderer.prototype.begin = function (viewProj, clearColor) {
 // Ley teal by default -- the colour every emissive material on these models
 // was authored in. A rapture-path weapon passes its own violet.
 GLRenderer.LEY = [0.31, 0.89, 0.82];
+
+// THE AIR THE NEXT DRAWS ARE SEEN THROUGH.
+//
+//   color    what the mist is, in LINEAR light (GLGeometry.hex gives it)
+//   density  per view-unit; 0 is clear air and is what `begin` restores
+//   height   how tall the bank is, in world units. The mist thins with an
+//            e-fold over this distance, so a 40 tall bank buries a barricade
+//            and leaves the top of a dead pine standing out of it. 0 means no
+//            falloff at all -- fog uniform with height, which is haze rather
+//            than ground mist.
+//
+// Left set until changed, exactly like setGlow, so the board pass sets it once
+// per frame and every actor drawn after it stands in the same weather.
+GLRenderer.prototype.setFog = function (color, density, height) {
+  var gl = this.gl;
+  var c = color || [0, 0, 0];
+  gl.uniform3f(this.uniform.fogColor, c[0], c[1], c[2]);
+  gl.uniform1f(this.uniform.fogDensity, density || 0);
+  gl.uniform1f(this.uniform.fogFall, height > 0 ? 1 / height : 0);
+};
 
 // How hard the next draws push their emissive materials. Left set until
 // changed, so a caller that lights one tower must put it back.

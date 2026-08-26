@@ -82,6 +82,13 @@ auditJs("cylinder", function (b) { G.cylinder(b, 0, 0, 0.5, 1, [1, 1, 1], 0, 12)
 auditJs("box",      function (b) { G.box(b, 0, 0, 1, 1, 1, [1, 1, 1], 0); });
 auditJs("boxAt",    function (b) { G.boxAt(b, 0, 0, 1, 1, 1, [1, 1, 1], 0, 0.3); });
 auditJs("frustum",  function (b) { G.frustum(b, 0, 0, 0.6, 0.4, 1, [1, 1, 1], 0, 8); });
+// Three orientations, because `segment` picks its reference vector from the
+// direction it is given and the near-vertical case takes the other branch --
+// a winding that is only correct for leaning trunks would leave every fence
+// post and every tree in the forest inside out.
+auditJs("segment up",   function (b) { G.segment(b, 0, 0, 0, 0, 0, 2, 0.3, [1, 1, 1]); });
+auditJs("segment lean", function (b) { G.segment(b, 0, 0, 0, 1, 0.6, 2, 0.3, [1, 1, 1]); });
+auditJs("segment flat", function (b) { G.segment(b, -1, 0, 1, 1, 0, 1, 0.3, [1, 1, 1]); });
 
 // --- the offline primitives, tools/blender/td_mesh.py -----------------------
 // Driven through Python because that is the only thing that can execute them.

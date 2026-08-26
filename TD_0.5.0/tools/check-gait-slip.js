@@ -129,6 +129,13 @@ var SIZE_SCALE = {
   // shield breaks (gl-world.js::enemyModel), and `sizeScale: 1.15` on the
   // `shielded` row scales both -- the swap is a change of body, never of size.
   "enemy-shielded-broken": 1.15,
+  // AND THE THIRD, for the same reason again. The Vanguard wears the shattered
+  // mesh while its self-granted shield is down (gl-world.js::enemyModel), and
+  // `sizeScale: 1.9` on the `boss_fast` row scales both -- the swap is a change
+  // of body, never of size, and 1.9 is the largest multiplier in this table
+  // bar the Tyrant's, so grading the variant at the default 1 would understate
+  // its slip by 47%.
+  "enemy-boss_fast-shattered": 1.9,
   "enemy-healer": 1.45,
   // ONE MODEL, SIX SIZES, AND THE ROW IN js/enemy.js IS THE SMALL ONE. The
   // Fractal Slime's `sizeScale` is 1, and no instance is ever drawn at it
@@ -161,6 +168,37 @@ var HOVERS = { "enemy-flying": true, "enemy-healer": true,
   // its sizeScale, and would be the worst figure in the library for a body
   // that is not touching the road at all.
   "enemy-shieldbearer": true };
+
+// AND A THIRD CATEGORY, WHICH IS NEITHER A WALKER NOR A HOVERER: A BAND WHOSE
+// CONTACT IS SUPPOSED TO SLIDE.
+//
+// `HOVERS` above exempts bodies with no foot on the road at all. This exempts
+// bands whose foot IS on the road and is MEANT to travel with the machine
+// rather than with the tarmac. The Vanguard skates the whole road after its
+// opening dash (the owner, 2026-08-26: "make the vanguard slide as if he has
+// roller skates after his initial dash"), and a wheel that stayed on one patch
+// of road would be a wheel that had stopped rolling. A reads 53.7 px on that
+// band and every one of those pixels is the animation.
+//
+// KEYED PER BAND, `model#band`, AND THAT IS THE WHOLE REASON THIS TABLE IS NOT
+// SHAPED LIKE `HOVERS`. The same two meshes carry a dash in band 1 that plants
+// properly and must keep being graded at zero -- exempting the MODEL would
+// stop checking the gait that still has a right answer, which is the failure
+// mode this file's own header warns about at length. Adding a body here is
+// therefore a claim about one band of it and never about the mesh.
+//
+// AND IT IS AN EXEMPTION FROM `A`, NOT FROM THE FILE. A glide band is still
+// walked, still measured and still printed -- with its real number and a note
+// saying why it is not a fault -- because a glide that changed shape should
+// still show up in a diff of this output.
+var GLIDES = {
+  // The two Vanguard meshes, band 0 only. See `vanguard_skate_cycle` in
+  // tools/glb_to_model.py: there is no plant window, no swing lift and no
+  // solve in that cycle at all, which is the honest way to author a body on
+  // wheels and the reason no rig change could bring this number down.
+  "enemy-boss_fast#0": true,
+  "enemy-boss_fast-shattered#0": true
+};
 
 // ---------------------------------------------------------------------------
 
@@ -233,21 +271,52 @@ function analyse(name, data, opts) {
     out.notes.push("CLOCK-DRIVEN (boardClock * the body's own rate), not " +
       "distance-driven -- A is not a slip figure for this body");
   }
+  if (GLIDES[name + "#" + (opts.band || 0)]) {
+    out.glides = true;
+    out.notes.push("GLIDE BAND -- the contact is MEANT to travel with the " +
+      "machine (wheels), so A is the animation and not a defect. Other " +
+      "bands of this model are graded normally");
+  }
   if (data.unitsToPx && Math.abs(data.unitsToPx - UNITS_TO_PX) > 1e-6) {
     out.notes.push("unitsToPx is " + data.unitsToPx + ", not " + UNITS_TO_PX +
       " -- cycle length recomputed for this body");
   }
 
-  // The walk band, by exactly the rule gl-world.js walkBand() uses.
+  // WHICH BAND IS BEING GRADED, by exactly the rule gl-world.js walkBand()
+  // uses -- extended to any band index, because a model may declare several.
+  //
+  // THIS USED TO READ BAND 0 AND ONLY BAND 0, WHICH IS A CHECK THAT CANNOT
+  // FAIL ON THE THING IT IS ABOUT. Every banded body in the library had one
+  // gait until the Vanguard arrived with two, and a second gait skates in
+  // exactly the way the first one is graded for: `plant_windows` and
+  // `leg_series` are per-gait, so a duty or a phase authored for band 1 gets
+  // its own solve and its own chance to be wrong. Grading band 0 twice and
+  // calling it a library sweep is the failure this file's own header warns
+  // about -- "an instrument that has only ever returned one answer has not
+  // been tested". `main` now walks every declared band and prints one row per
+  // band; band 0's row is bit-identical to what it printed before.
   var n = frames.length || 1;
-  var band = [0, n];
+  var wanted = opts.band || 0;
+  var band = wanted ? null : [0, n];
   var b = data.bands;
-  if (b && b.length && b[0] && b[0].length === 2) {
-    var first = b[0][0], count = b[0][1];
+  if (b && b.length && b[wanted] && b[wanted].length === 2) {
+    var first = b[wanted][0], count = b[wanted][1];
     if (typeof first === "number" && typeof count === "number" &&
         first >= 0 && count > 0 && first + count <= n) band = [first, count];
   }
+  // A band that was asked for and does not exist is reported, never silently
+  // graded as band 0 -- that would print a clean row for a gait nothing looked
+  // at, which is worse than printing nothing.
+  if (!band) {
+    out.notes.push("no band " + wanted + " declared");
+    out.N = 0;
+    out.gaitErrorUnits = 0; out.gaitErrorPx = 0;
+    out.sawtoothPx = 0; out.totalSlipPx = 0;
+    out.planPercentOfRing = 0;
+    return out;
+  }
   out.walkBand = band;
+  out.bandIndex = wanted;
   var N = band[1];
   out.N = N;
 
@@ -481,12 +550,16 @@ function analyse(name, data, opts) {
 
 function main() {
   var args = process.argv.slice(2);
-  var opts = { scale: null, json: false, verbose: false };
+  var opts = { scale: null, json: false, verbose: false, band: null };
   var names = [];
   for (var i = 0; i < args.length; i++) {
     if (args[i] === "--scale") opts.scale = parseFloat(args[++i]);
     else if (args[i] === "--json") opts.json = true;
     else if (args[i] === "--verbose") opts.verbose = true;
+    // `--band N` grades that band and nothing else. Without it every declared
+    // band is graded, which is the default because a sweep that skips a gait
+    // is the defect this option exists to make impossible to reintroduce.
+    else if (args[i] === "--band") opts.band = parseInt(args[++i], 10);
     else names.push(args[i]);
   }
   var dir = path.join(__dirname, "..", "js", "gl", "models");
@@ -501,7 +574,19 @@ function main() {
       ? names[i] : path.join(dir, names[i] + ".js");
     if (!fs.existsSync(file)) { console.error("missing: " + file); continue; }
     var m = loadModel(file);
-    results.push(analyse(m.name, m.data, opts));
+    if (opts.band !== null) {
+      results.push(analyse(m.name, m.data, opts));
+      continue;
+    }
+    var declared = (m.data.bands && m.data.bands.length) || 1;
+    for (var bi = 0; bi < declared; bi++) {
+      var one = analyse(m.name, m.data,
+        { scale: opts.scale, json: opts.json, verbose: opts.verbose, band: bi });
+      // The suffix goes on ONLY when there is a second band to tell it from,
+      // so every single-gait row in the library reads exactly as it did.
+      if (declared > 1) one.model = m.name + " #" + bi;
+      results.push(one);
+    }
   }
   if (opts.json) { console.log(JSON.stringify(results, null, 2)); return; }
 

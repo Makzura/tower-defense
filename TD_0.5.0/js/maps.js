@@ -316,6 +316,42 @@ Maps.LIST.push(Maps.Generator.generate({
   ]
 }));
 
+// THE ONE BOARD THAT IS NOT A FACILITY.
+//
+// Authored, not generated, and pushed here rather than written into the LIST
+// literal above so the four original routes stay together as the set the
+// difficulty measure was calibrated against.
+//
+// The route walks in from the treeline on the left, switchbacks twice through
+// the forest and turns down the last straight INTO the camp -- so the barricades
+// on the right are the last thing between the road and the base, which is what
+// they are for. Nothing about the scenery is read by the measurement: the camp
+// is a picture, and the route would score the same drawn across bare floor.
+Maps.LIST.push({
+  id: "test",
+  name: "Test",
+  blurb: ["Black dirt and dead stems. The fog",
+          "stops at the camp's barricades."],
+  decorations: [
+    { kind: "bones", x: 250, y: 545, size: 22, color: "173,166,149" },
+    { kind: "husk", x: 620, y: 148, size: 26, color: "86,82,66" },
+    { kind: "bones", x: 878, y: 302, size: 18, color: "173,166,149" },
+    { kind: "husk", x: 150, y: 430, size: 30, color: "86,82,66" },
+    { kind: "bones", x: 1122, y: 662, size: 20, color: "173,166,149" },
+    { kind: "husk", x: 1012, y: 132, size: 24, color: "86,82,66" }
+  ],
+  points: [
+    { x: -60,  y: 175 },
+    { x: 300,  y: 175 },
+    { x: 300,  y: 470 },
+    { x: 690,  y: 470 },
+    { x: 690,  y: 235 },
+    { x: 960,  y: 235 },
+    { x: 960,  y: 545 },
+    { x: 1340, y: 545 }
+  ]
+});
+
 // --- sci-fi environments --------------------------------------------------
 //
 // Routes decide gameplay; environments decide presentation. Keeping the two
@@ -482,6 +518,145 @@ Maps.ENVIRONMENTS = {
       { kind: "pylon", x: 1035, y: 170, size: 51, rotation: 0.12 },
       { kind: "pylon", x: 1035, y: 550, size: 51, rotation: -0.12 },
       { kind: "gate", x: 1180, y: 360, size: 54, rotation: Math.PI / 2 }
+    ]
+  },
+
+  // THE FOREST. Everything above this line is a facility; this is what is left
+  // of one. The palette is the whole argument: the biggest surface on the board
+  // is black dirt, the timber is grey because it was never treated, the bark is
+  // darker than the dirt, and the ONE saturated colour in the theme is an ember
+  // -- the fire in the camp's barrels and the lamp on its watchtower. There is
+  // no ley line here, so there is nothing else for a colour to be.
+  //
+  // `wild` turns off the two things that say "manufactured floor": the ruled
+  // panel grid under everything and the circuit trunks strung between props.
+  // Both are correct on a deck and absurd across a forest.
+  //
+  // `fog` is read by the 3D board (js/gl/gl-world.js) and washed over the 2D
+  // one. Its height is the reason the fog reads as WEATHER rather than as a
+  // dimmer: at 52 the mist buries a barricade and lets the tops of the stems
+  // stand out of it, which is the whole picture the board is after.
+  "test": {
+    theme: {
+      background: "#0a0b09", floor: "#1a1913", panel: "#2f2a1c",
+      // A HAIR DARKER THAN THE FLOOR, DELIBERATELY. `panelDark` is what the
+      // bare-earth patches are painted in, and at the first value it was six
+      // stops under the floor -- which on a board with no seams and no grid
+      // did not read as ground at all, it read as three rectangular PITS cut
+      // into the forest. Ground variation is the effect; a hole is not.
+      panelDark: "#171610", panelLine: "64,60,46", accent: "255,138,52",
+      accent2: "198,206,180", metal: "#4a4336", metalDark: "#1c1812",
+      roadOuter: "#100f0b", roadInner: "#332c1f",
+      roadEdge: "104,94,68", roadCenter: "142,130,96",
+      wild: true,
+      // MEASURED OFF THE FRAMEBUFFER, not guessed. The first pass ran at
+      // 0.00048 and the board came back at (41,43,37) against a (43,46,39)
+      // mist -- eighty-eight per cent fogged, which is not weather, it is a
+      // white sheet with a road printed on it. The view depth across this
+      // board is about 3 000 units, so the density here puts the near edge
+      // near a fifth fogged and the far edge near a third: a gradient you can
+      // see, over dirt that stays black.
+      fog: { color: "#2b2e27", density: 0.00019, height: 52 }
+    },
+    // Three of these are PATCHES, not platforms -- bare earth and standing
+    // water scraped through the leaf litter, at the floor's own height, so
+    // they can never turn into a no-build ring. See ZONE_HEIGHT in
+    // js/gl/gl-world.js for why that distinction had to be built.
+    // The other two are the camp: an earth bank thrown up short of the road
+    // and a plank floor inside the wire.
+    zones: [
+      { kind: "dirt", x: 330, y: 205, w: 300, h: 200 },
+      { kind: "dirt", x: 60, y: 250, w: 200, h: 230 },
+      { kind: "dirt", x: 700, y: 270, w: 230, h: 240 },
+      { kind: "bay", x: 1000, y: 610, w: 250, h: 80 },
+      { kind: "deck", x: 1100, y: 428, w: 150, h: 62 }
+    ],
+    // THE TREELINE IS THE FRAME AND THE CAMP IS THE SUBJECT. Full-height stems
+    // are banked along the top, the left edge and the bottom, where they can
+    // never stand between the camera and a tower; everything inside the route's
+    // pockets is knee-high -- stumps, fallen logs, dead bramble -- because
+    // those pockets are where the player builds and a tree in one would hide
+    // the thing it was hiding behind.
+    models: [
+      // THE TREELINE, and half of it stands OUTSIDE the 1280x720 play area.
+      // The 3D board is built 120 units proud of the view on every side (see
+      // buildMapMesh), so there is real ground out there for a wall of stems
+      // to stand on -- and a prop out there can never hide a tower, an enemy
+      // or a build spot, because none of those can be there. It is the one
+      // place a forest can actually be DENSE.
+      { kind: "tree", x: -70, y: -40, size: 50, rotation: 1.1 },
+      { kind: "tree", x: -60, y: 150, size: 44, rotation: 3.4 },
+      { kind: "tree", x: -75, y: 330, size: 48, rotation: 0.2 },
+      { kind: "tree", x: -55, y: 520, size: 42, rotation: 2.6 },
+      { kind: "tree", x: -70, y: 700, size: 46, rotation: 4.7 },
+      { kind: "tree", x: 120, y: -60, size: 43, rotation: 2.1 },
+      { kind: "tree", x: 320, y: -55, size: 47, rotation: 0.8 },
+      { kind: "tree", x: 520, y: -70, size: 41, rotation: 3.7 },
+      { kind: "tree", x: 720, y: -50, size: 45, rotation: 1.4 },
+      { kind: "tree", x: 920, y: -65, size: 49, rotation: 5.1 },
+      { kind: "tree", x: 1120, y: -55, size: 42, rotation: 2.3 },
+      { kind: "tree", x: 1330, y: -40, size: 46, rotation: 0.5 },
+      { kind: "tree", x: 1345, y: 140, size: 44, rotation: 3.1 },
+      { kind: "tree", x: 1350, y: 690, size: 45, rotation: 1.8 },
+      { kind: "tree", x: 210, y: 760, size: 44, rotation: 4.2 },
+      { kind: "tree", x: 430, y: 775, size: 48, rotation: 0.9 },
+      { kind: "tree", x: 650, y: 765, size: 42, rotation: 2.5 },
+      { kind: "tree", x: 880, y: 780, size: 46, rotation: 5.3 },
+      { kind: "tree", x: 1120, y: 770, size: 43, rotation: 1.0 },
+
+      { kind: "tree", x: 55, y: 70, size: 46, rotation: 0.3 },
+      { kind: "tree", x: 140, y: 45, size: 38, rotation: 1.9 },
+      { kind: "tree", x: 215, y: 100, size: 42, rotation: 3.2 },
+      { kind: "tree", x: 380, y: 60, size: 48, rotation: 0.7 },
+      { kind: "tree", x: 455, y: 110, size: 36, rotation: 2.4 },
+      { kind: "tree", x: 545, y: 55, size: 44, rotation: 4.1 },
+      { kind: "tree", x: 640, y: 105, size: 40, rotation: 1.2 },
+      { kind: "tree", x: 735, y: 60, size: 46, rotation: 5.0 },
+      { kind: "tree", x: 830, y: 110, size: 38, rotation: 2.8 },
+      { kind: "tree", x: 925, y: 55, size: 43, rotation: 0.4 },
+      { kind: "tree", x: 1030, y: 105, size: 45, rotation: 3.6 },
+      { kind: "tree", x: 1130, y: 50, size: 39, rotation: 1.5 },
+      { kind: "tree", x: 1235, y: 100, size: 47, rotation: 4.8 },
+      { kind: "tree", x: 45, y: 262, size: 40, rotation: 2.2 },
+      { kind: "tree", x: 62, y: 382, size: 44, rotation: 0.9 },
+      { kind: "tree", x: 40, y: 502, size: 37, rotation: 3.9 },
+      { kind: "tree", x: 110, y: 612, size: 46, rotation: 1.6 },
+      { kind: "tree", x: 205, y: 560, size: 41, rotation: 5.2 },
+      { kind: "tree", x: 300, y: 662, size: 43, rotation: 0.6 },
+      { kind: "tree", x: 420, y: 620, size: 38, rotation: 2.7 },
+      { kind: "tree", x: 530, y: 670, size: 45, rotation: 4.3 },
+      { kind: "tree", x: 650, y: 615, size: 40, rotation: 1.1 },
+      { kind: "tree", x: 762, y: 665, size: 42, rotation: 3.3 },
+      { kind: "tree", x: 872, y: 620, size: 39, rotation: 5.5 },
+      { kind: "snag", x: 410, y: 300, size: 34, rotation: 0.5 },
+      { kind: "snag", x: 600, y: 380, size: 30, rotation: 2.0 },
+      { kind: "snag", x: 175, y: 168, size: 32, rotation: 4.4 },
+      { kind: "stump", x: 500, y: 250, size: 26, rotation: 1.0 },
+      { kind: "stump", x: 820, y: 420, size: 24, rotation: 3.0 },
+      { kind: "stump", x: 620, y: 520, size: 25, rotation: 0.2 },
+      { kind: "log", x: 350, y: 560, size: 34, rotation: 0.4 },
+      { kind: "log", x: 890, y: 640, size: 32, rotation: 2.2 },
+      { kind: "log", x: 128, y: 470, size: 30, rotation: 1.4 },
+      { kind: "brush", x: 480, y: 420, size: 26, rotation: 1.3 },
+      { kind: "brush", x: 758, y: 322, size: 24, rotation: 0.8 },
+      { kind: "brush", x: 170, y: 300, size: 28, rotation: 2.9 },
+      { kind: "brush", x: 1000, y: 662, size: 26, rotation: 1.7 },
+
+      // The camp. It is built along the INSIDE of the last two legs of the
+      // road, so every wall faces something that is coming.
+      { kind: "barricade", x: 1010, y: 340, size: 44, rotation: Math.PI / 2 },
+      { kind: "barricade", x: 1010, y: 452, size: 44, rotation: Math.PI / 2 },
+      { kind: "barricade", x: 1150, y: 602, size: 42, rotation: 0 },
+      { kind: "spikes", x: 1002, y: 252, size: 38, rotation: Math.PI / 2 },
+      { kind: "spikes", x: 1292, y: 600, size: 36, rotation: 0 },
+      { kind: "sandbags", x: 1082, y: 505, size: 40, rotation: 0 },
+      { kind: "sandbags", x: 1232, y: 505, size: 40, rotation: 0 },
+      { kind: "fence", x: 1120, y: 250, size: 44, rotation: 0 },
+      { kind: "fence", x: 1252, y: 250, size: 44, rotation: 0 },
+      { kind: "wreck", x: 1180, y: 302, size: 46, rotation: 0.5 },
+      { kind: "watchtower", x: 1150, y: 392, size: 52, rotation: 0.3 },
+      { kind: "barrel", x: 1075, y: 445, size: 30, rotation: 0 },
+      { kind: "barrel", x: 1265, y: 378, size: 28, rotation: 0 }
     ]
   }
 };
@@ -708,6 +883,40 @@ function drawDecoration(ctx, decoration) {
     }
     ctx.fillStyle = decorationRgba(decoration, 0.32);
     ctx.fillRect(-3, -3, 6, 6);
+  } else if (decoration.kind === "bones") {
+    // A rib cage in the dirt, seen from above. The forest board's decals are
+    // the only place anything on it is legibly a REMAINS rather than a ruin,
+    // and they are deliberately small: found, not staged.
+    ctx.strokeStyle = decorationRgba(decoration, 0.5);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.5, 0);
+    ctx.lineTo(size * 0.55, 0);
+    ctx.stroke();
+    for (i = 0; i < 5; i++) {
+      var rib = -size * 0.36 + i * size * 0.2;
+      var span = size * (0.30 - Math.abs(i - 2) * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(rib, -span);
+      ctx.lineTo(rib, span);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(size * 0.68, 0, size * 0.16, 0, Math.PI * 2);
+    ctx.strokeStyle = decorationRgba(decoration, 0.62);
+    ctx.stroke();
+  } else if (decoration.kind === "husk") {
+    // A dead shrub: spokes with nothing on them.
+    ctx.strokeStyle = decorationRgba(decoration, 0.55);
+    for (i = 0; i < 9; i++) {
+      var spoke = i * Math.PI * 2 / 9 + size * 0.01;
+      var reach = size * (0.5 + (i % 3) * 0.2);
+      ctx.lineWidth = 1.7 - (i % 3) * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(spoke) * reach, Math.sin(spoke) * reach * 0.86);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
@@ -738,6 +947,22 @@ function hexagon(ctx, radius, squash) {
 function drawZone(ctx, zone, theme) {
   ctx.save();
   ctx.translate(zone.x, zone.y);
+
+  // A PATCH OF GROUND IS NOT A DECK. `dirt` is bare earth scraped through the
+  // litter -- no drop shadow, no bevel, no inset rail and no seams, because
+  // every one of those says "this was manufactured and set down here". The 3D
+  // board makes the same distinction and for a harder reason: a patch stamps
+  // no height, so it can never turn into a no-build ring (js/gl/gl-world.js,
+  // ZONE_HEIGHT).
+  if (zone.kind === "dirt") {
+    ctx.fillStyle = theme.panelDark;
+    ctx.fillRect(0, 0, zone.w, zone.h);
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.22);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, zone.w - 1, zone.h - 1);
+    ctx.restore();
+    return;
+  }
 
   ctx.fillStyle = "rgba(2,7,10,0.46)";
   ctx.fillRect(7, 9, zone.w, zone.h);
@@ -1027,6 +1252,160 @@ function drawModel(ctx, model, theme) {
     ctx.fillStyle = themeRgba(theme, "accent2", 0.95);
     ctx.fillRect(-size * 0.62, -size * 0.08, size * 0.17, size * 0.16);
     ctx.fillRect(size * 0.45, -size * 0.08, size * 0.17, size * 0.16);
+
+  // --- the forest board's own props, seen from above --------------------
+  //
+  // These exist so the map CARD shows the map. `drawMapThumbnail` renders a
+  // route through this exact function, so a prop the 3D board builds and this
+  // one does not is a prop that is in the game and not on the card -- which is
+  // the state every piece of scenery was in before the 3D board learned to
+  // build any of them. From this angle a dead stem is a trunk and the shadow
+  // of its limbs, and a barricade is a row of boards: no elevation is visible,
+  // so nothing here tries to imply one.
+  } else if (model.kind === "tree" || model.kind === "snag") {
+    var stem = model.kind === "tree" ? 1 : 0.66;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.5);
+    for (i = 0; i < 6; i++) {
+      var limb = i * Math.PI * 2 / 6 + size * 0.02;
+      var out = size * stem * (0.42 + (i % 3) * 0.22);
+      ctx.lineWidth = 2.6 - (i % 3) * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(limb) * out, Math.sin(limb) * out);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.17 * stem, 0, Math.PI * 2);
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.8);
+    ctx.stroke();
+  } else if (model.kind === "stump") {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = theme.metalDark;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = theme.panel;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.26, -size * 0.08);
+    ctx.lineTo(size * 0.24, size * 0.12);
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.7);
+    ctx.stroke();
+  } else if (model.kind === "log") {
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.6, 0);
+    ctx.lineTo(size * 0.6, 0);
+    ctx.lineWidth = size * 0.38;
+    ctx.strokeStyle = theme.metalDark;
+    ctx.stroke();
+    ctx.lineWidth = size * 0.06;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.7);
+    ctx.stroke();
+  } else if (model.kind === "brush") {
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.62);
+    for (i = 0; i < 5; i++) {
+      var stick = i * Math.PI / 5 + 0.3;
+      var half = size * (0.3 + (i % 2) * 0.18);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-Math.cos(stick) * half, -Math.sin(stick) * half);
+      ctx.lineTo(Math.cos(stick) * half * 0.8, Math.sin(stick) * half * 0.8);
+      ctx.stroke();
+    }
+  } else if (model.kind === "barricade" || model.kind === "fence") {
+    var run = size * (model.kind === "fence" ? 1.6 : 1.5);
+    var boards = model.kind === "fence" ? 3 : 7;
+    ctx.fillStyle = theme.metal;
+    ctx.fillRect(-run / 2, -size * 0.09, run, size * 0.18);
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.strokeRect(-run / 2, -size * 0.09, run, size * 0.18);
+    ctx.strokeStyle = theme.metalDark;
+    ctx.lineWidth = 2.4;
+    for (i = 0; i < boards; i++) {
+      var post = -run / 2 + run * i / (boards - 1);
+      ctx.beginPath();
+      ctx.moveTo(post, -size * 0.15);
+      ctx.lineTo(post, size * 0.15);
+      ctx.stroke();
+    }
+  } else if (model.kind === "spikes") {
+    ctx.strokeStyle = theme.metal;
+    ctx.lineWidth = 2.4;
+    for (i = 0; i < 3; i++) {
+      var at = (i - 1) * size * 0.52;
+      ctx.beginPath();
+      ctx.moveTo(at - size * 0.16, -size * 0.32);
+      ctx.lineTo(at + size * 0.16, size * 0.32);
+      ctx.moveTo(at + size * 0.16, -size * 0.32);
+      ctx.lineTo(at - size * 0.16, size * 0.32);
+      ctx.stroke();
+    }
+  } else if (model.kind === "sandbags") {
+    for (i = 0; i < 6; i++) {
+      var bag = (i - 2.5) * size * 0.26;
+      ctx.fillStyle = i % 2 ? theme.panel : theme.metal;
+      ctx.fillRect(bag - size * 0.12, -size * 0.16, size * 0.24, size * 0.32);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = themeRgba(theme, "panelLine", 0.8);
+      ctx.strokeRect(bag - size * 0.12, -size * 0.16, size * 0.24, size * 0.32);
+    }
+  } else if (model.kind === "watchtower") {
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(-size * 0.42, -size * 0.42, size * 0.84, size * 0.84);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.strokeRect(-size * 0.42, -size * 0.42, size * 0.84, size * 0.84);
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.42, -size * 0.42);
+    ctx.lineTo(size * 0.42, size * 0.42);
+    ctx.moveTo(size * 0.42, -size * 0.42);
+    ctx.lineTo(-size * 0.42, size * 0.42);
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+    ctx.stroke();
+    // The lamp, and the only lit thing in the forest.
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.13, 0, Math.PI * 2);
+    ctx.fillStyle = themeRgba(theme, "accent", 0.95);
+    ctx.fill();
+  } else if (model.kind === "wreck") {
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(-size * 0.6, -size * 0.3, size * 1.2, size * 0.6);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+    ctx.strokeRect(-size * 0.6, -size * 0.3, size * 1.2, size * 0.6);
+    ctx.fillStyle = theme.metal;
+    ctx.fillRect(-size * 0.34, -size * 0.24, size * 0.5, size * 0.48);
+    ctx.strokeRect(-size * 0.34, -size * 0.24, size * 0.5, size * 0.48);
+    for (i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc((i & 1 ? 1 : -1) * size * 0.42, (i & 2 ? 1 : -1) * size * 0.3,
+        size * 0.09, 0, Math.PI * 2);
+      ctx.fillStyle = theme.metalDark;
+      ctx.fill();
+      ctx.stroke();
+    }
+  } else if (model.kind === "barrel") {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.34, 0, Math.PI * 2);
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = themeRgba(theme, "accent", 0.92);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -1054,20 +1433,26 @@ Maps.drawEnvironment = function (ctx, map) {
   ctx.fillRect(-30, -30, VIEW_WIDTH / scale + 60, VIEW_HEIGHT / scale + 60);
 
   // A manufactured panel grid unifies the whole floor before the larger
-  // coloured decks and models establish each facility's silhouette.
-  ctx.strokeStyle = themeRgba(theme, "panelLine", 0.18);
-  ctx.lineWidth = 1;
-  for (var x = 0; x <= VIEW_WIDTH / scale; x += 80) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, VIEW_HEIGHT / scale);
-    ctx.stroke();
-  }
-  for (var y = 0; y <= VIEW_HEIGHT / scale; y += 72) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(VIEW_WIDTH / scale, y);
-    ctx.stroke();
+  // coloured decks and models establish each facility's silhouette. A board
+  // that declares itself `wild` has no manufactured floor to unify -- ruled
+  // lines across a forest would say exactly the wrong thing about it -- so it
+  // gets the bare ground and lets its own props carry the picture. The 3D
+  // board drops the same grid on the same flag.
+  if (!theme.wild) {
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.18);
+    ctx.lineWidth = 1;
+    for (var x = 0; x <= VIEW_WIDTH / scale; x += 80) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, VIEW_HEIGHT / scale);
+      ctx.stroke();
+    }
+    for (var y = 0; y <= VIEW_HEIGHT / scale; y += 72) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(VIEW_WIDTH / scale, y);
+      ctx.stroke();
+    }
   }
 
   for (var zoneIndex = 0; zoneIndex < map.zones.length; zoneIndex++) {
@@ -1075,19 +1460,24 @@ Maps.drawEnvironment = function (ctx, map) {
   }
 
   // Circuit trunks visually connect separate machines without changing any
-  // route or collision data.
-  ctx.strokeStyle = themeRgba(theme, "accent", 0.19);
-  ctx.lineWidth = 3;
-  for (var trunk = 0; trunk < map.models.length - 1; trunk += 2) {
-    var from = map.models[trunk];
-    var to = map.models[trunk + 1];
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-    ctx.fillStyle = themeRgba(theme, "accent2", 0.62);
-    ctx.fillRect(to.x - 3, to.y - 3, 6, 6);
+  // route or collision data. Nothing cables a tree to another tree, so a wild
+  // board draws none -- and on this one they would be forty-seven ember lines
+  // strung between the stems, which is the single loudest thing that could
+  // possibly be on a board whose whole point is that the lights went out.
+  if (!theme.wild) {
+    ctx.strokeStyle = themeRgba(theme, "accent", 0.19);
+    ctx.lineWidth = 3;
+    for (var trunk = 0; trunk < map.models.length - 1; trunk += 2) {
+      var from = map.models[trunk];
+      var to = map.models[trunk + 1];
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.fillStyle = themeRgba(theme, "accent2", 0.62);
+      ctx.fillRect(to.x - 3, to.y - 3, 6, 6);
+    }
   }
 
   for (var modelIndex = 0; modelIndex < map.models.length; modelIndex++) {
@@ -1100,8 +1490,75 @@ Maps.drawEnvironment = function (ctx, map) {
       decorationIndex < map.decorations.length; decorationIndex++) {
     drawDecoration(ctx, map.decorations[decorationIndex]);
   }
+
+  // WEATHER, LAST, OVER EVERYTHING THE BOARD JUST DREW.
+  //
+  // The 3D board fogs by DISTANCE, which is a thing a top-down 2D pass has no
+  // access to -- there is no camera and every pixel is the same distance away.
+  // So this is not the same effect and does not pretend to be: it is a bank of
+  // mist lying across the board, thickest at the edges and thinnest where the
+  // road is, which is what the fog LOOKS like from above. Drawn here rather
+  // than in the play renderer so the map card and the battlefield agree, which
+  // is the whole contract `drawMapThumbnail` relies on.
+  if (theme.fog) drawFogBank(ctx, theme, scale);
   ctx.restore();
 };
+
+// The mist, in the authored pixel space the rest of the environment uses.
+// Deterministic: same board, same banks, every frame and every card.
+//
+// GRADIENTS ARE ASKED FOR, NOT ASSUMED. The test harness's canvas accepts every
+// call and returns nothing from all of them, so `createRadialGradient` hands
+// back undefined there and calling `addColorStop` on it throws -- which would
+// take out "a full frame draws without throwing" and every card that renders
+// this board. Where there is no gradient the mist falls back to a flat wash:
+// the same colour at the same weight, without the shape.
+function fogRgba(theme, alpha) {
+  var hex = String(theme.fog.color).replace("#", "");
+  return "rgba(" + parseInt(hex.substr(0, 2), 16) + "," +
+    parseInt(hex.substr(2, 2), 16) + "," +
+    parseInt(hex.substr(4, 2), 16) + "," + alpha + ")";
+}
+
+function drawFogBank(ctx, theme, scale) {
+  var w = VIEW_WIDTH / scale, h = VIEW_HEIGHT / scale;
+  var i;
+
+  ctx.save();
+
+  // A vignette of mist around the edges. The centre is left alone, because a
+  // wash over the whole board is not fog -- it is a lowered contrast slider,
+  // and it takes the road down with it.
+  var edge = ctx.createRadialGradient(w / 2, h / 2, h * 0.28,
+    w / 2, h / 2, h * 0.95);
+  if (edge && edge.addColorStop) {
+    edge.addColorStop(0, fogRgba(theme, 0));
+    edge.addColorStop(1, fogRgba(theme, 0.42));
+    ctx.fillStyle = edge;
+  } else {
+    ctx.fillStyle = fogRgba(theme, 0.16);
+  }
+  ctx.fillRect(0, 0, w, h);
+
+  // Four banks drifting across it, so the mist has a shape rather than being
+  // an even film. Authored, not random: a card that redraws differently every
+  // frame reads as flicker.
+  var banks = [[0.18, 0.14, 0.34], [0.62, 0.08, 0.28],
+               [0.30, 0.86, 0.32], [0.82, 0.72, 0.30]];
+  for (i = 0; i < banks.length; i++) {
+    var bx = banks[i][0] * w, by = banks[i][1] * h, br = banks[i][2] * h;
+    var blob = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    if (!blob || !blob.addColorStop) break;
+    blob.addColorStop(0, fogRgba(theme, 0.26));
+    blob.addColorStop(1, fogRgba(theme, 0));
+    ctx.fillStyle = blob;
+    ctx.beginPath();
+    ctx.ellipse(bx, by, br * 1.7, br, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 
 // Compatibility for older tools that asked only for the old decal layer.
 Maps.drawDecorations = Maps.drawEnvironment;

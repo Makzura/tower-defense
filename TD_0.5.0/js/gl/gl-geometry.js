@@ -300,6 +300,47 @@ var GLGeometry = (function () {
     return builder;
   }
 
+  // A SQUARE PRISM BETWEEN TWO POINTS IN SPACE, which is the one shape the
+  // three primitives above cannot make: `frustum` and `cylinder` stand upright
+  // and `boxAt` only ever turns about z. A leaning trunk, a branch reaching up
+  // and out, a stake driven into the ground at an angle and a plank nailed
+  // across a barricade are all this.
+  //
+  // The reference vector is chosen away from the segment's own direction, or
+  // the cross product collapses and the prism comes out with no width -- which
+  // is exactly the case a vertical post hits, and vertical posts are most of
+  // what a camp is built from.
+  function segment(builder, ax, ay, az, bx, by, bz, r, color, emissive) {
+    var dx = bx - ax, dy = by - ay, dz = bz - az;
+    var len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len < 1e-6) return builder;
+    dx /= len; dy /= len; dz /= len;
+    // Up unless the segment is itself near-vertical, in which case +X.
+    var ux = 0, uy = 0, uz = 1;
+    if (Math.abs(dz) > 0.9) { ux = 1; uz = 0; }
+    var px = dy * uz - dz * uy, py = dz * ux - dx * uz, pz = dx * uy - dy * ux;
+    var pl = Math.sqrt(px * px + py * py + pz * pz);
+    px /= pl; py /= pl; pz /= pl;
+    var qx = dy * pz - dz * py, qy = dz * px - dx * pz, qz = dx * py - dy * px;
+
+    function corner(x, y, z, su, sv) {
+      return [x + (px * su + qx * sv) * r,
+              y + (py * su + qy * sv) * r,
+              z + (pz * su + qz * sv) * r];
+    }
+    var a0 = corner(ax, ay, az, -1, -1), a1 = corner(ax, ay, az, 1, -1);
+    var a2 = corner(ax, ay, az, 1, 1), a3 = corner(ax, ay, az, -1, 1);
+    var b0 = corner(bx, by, bz, -1, -1), b1 = corner(bx, by, bz, 1, -1);
+    var b2 = corner(bx, by, bz, 1, 1), b3 = corner(bx, by, bz, -1, 1);
+    builder.quad(b1, b0, a0, a1, color, emissive);
+    builder.quad(b2, b1, a1, a2, color, emissive);
+    builder.quad(b3, b2, a2, a3, color, emissive);
+    builder.quad(b0, b3, a3, a0, color, emissive);
+    builder.quad(b1, b2, b3, b0, color, emissive);
+    builder.quad(a0, a3, a2, a1, color, emissive);
+    return builder;
+  }
+
   // --- board scenery -------------------------------------------------------
   //
   // The six maps each author nine props (js/maps.js ENVIRONMENTS[].models) and
@@ -316,12 +357,78 @@ var GLGeometry = (function () {
   // per-frame work at all.
   var EMI = 2.6;
 
+  // THE PROPS THAT ARE NOT MACHINERY.
+  //
+  // The ten kinds below the switch are one facility's equipment and they all
+  // stand on the same manufactured footing, which is what makes them read as a
+  // set. A dead tree does not stand on a milled plinth and a sandbag wall was
+  // not delivered on one, so the forest kinds are listed here and skip it.
+  // Membership is the ONLY thing this list decides -- each kind still builds
+  // its own geometry in the same switch.
+  var WILD = {
+    tree: 1, snag: 1, stump: 1, log: 1, brush: 1,
+    barricade: 1, spikes: 1, sandbags: 1, watchtower: 1, wreck: 1,
+    barrel: 1, fence: 1
+  };
+
+  // Deterministic per-prop variation, from the prop's own position.
+  //
+  // A forest of thirty identical trunks reads as wallpaper, and thirty
+  // hand-authored variations are thirty numbers to keep in a map file. This is
+  // the middle: the same tree at the same coordinates is the same tree on
+  // every machine and every run -- which matters, because the board mesh is
+  // built once per map and a prop that moved between builds would be a prop
+  // that moved when the player restarted.
+  function wobble(cx, cy, salt) {
+    var h = Math.imul((cx * 73856093) ^ (cy * 19349663) ^ (salt * 83492791), 2654435761);
+    return ((h >>> 8) & 0xffff) / 0xffff;
+  }
+
+  // A DEAD STEM, which is the one shape the whole forest is made of.
+  //
+  // Built from two LEANING segments rather than one upright frustum, and the
+  // lean grows with the square of the height so the base still meets the dirt
+  // square. A plantation of perfectly straight poles reads as a fence; this is
+  // meant to read as something that died standing up.
+  //
+  // The limbs reach UP as well as out. A branch drawn flat reads as a plank
+  // nailed to the trunk, which is the failure the first pass had.
+  function deadStem(builder, cx, cy, size, rot, bark, tallness) {
+    var r = size / 2;
+    var lx = (wobble(cx, cy, 1) - 0.5) * 0.30;
+    var ly = (wobble(cx, cy, 2) - 0.5) * 0.30;
+    var h = size * tallness * (0.82 + wobble(cx, cy, 3) * 0.36);
+    function at(f) {
+      return [cx + lx * h * f * f, cy + ly * h * f * f, size * 0.08 + (h - size * 0.08) * f];
+    }
+    var mid = at(0.55), top = at(1);
+
+    // Root flare, so the trunk grows out of the dirt instead of being pushed
+    // into it.
+    frustum(builder, cx, cy, r * 0.36, r * 0.22, size * 0.14, bark, 0, 7);
+    segment(builder, cx, cy, size * 0.05, mid[0], mid[1], mid[2], r * 0.15, bark);
+    segment(builder, mid[0], mid[1], mid[2], top[0], top[1], top[2], r * 0.08, bark);
+
+    var limbs = 2 + Math.floor(wobble(cx, cy, 4) * 3);
+    for (var i = 0; i < limbs; i++) {
+      var base = at(0.50 + i * 0.14);
+      var a = rot + wobble(cx, cy, 20 + i) * Math.PI * 2;
+      var reach = size * (0.30 + wobble(cx, cy, 30 + i) * 0.30);
+      segment(builder, base[0], base[1], base[2],
+        base[0] + Math.cos(a) * reach, base[1] + Math.sin(a) * reach,
+        base[2] + reach * (0.35 + wobble(cx, cy, 40 + i) * 0.55),
+        r * 0.05, bark);
+    }
+  }
+
   function scenery(builder, kind, cx, cy, size, rot, P) {
     var r = size / 2;
     var dark = P.metalDark, body = P.metal, trim = P.panel, ley = P.accent;
 
-    // Every prop stands on the same footing, which is what makes them a set.
-    frustum(builder, cx, cy, r * 0.92, r * 0.80, size * 0.10, dark, 0, 8);
+    // Every machine stands on the same footing, which is what makes them a set.
+    if (!WILD[kind]) {
+      frustum(builder, cx, cy, r * 0.92, r * 0.80, size * 0.10, dark, 0, 8);
+    }
 
     switch (kind) {
       case "antenna":
@@ -421,6 +528,202 @@ var GLGeometry = (function () {
         sphere(builder, cx, cy, r * 0.17, ley, size * 1.22, 8, 6, EMI);
         break;
 
+      // --- the dead forest ---------------------------------------------
+      //
+      // Nothing below here has a leaf on it, and nothing below here glows
+      // except the fire in the barrel and the lamp on the watchtower. That is
+      // the whole difference between this board and the other six: on a ley
+      // line the light comes out of the scenery, and in the forest the scenery
+      // is what is left when the light went out.
+
+      case "tree":
+        deadStem(builder, cx, cy, size, rot, dark, 2.1);
+        break;
+
+      case "snag":
+        // Snapped off partway up, with the splinters still on it.
+        frustum(builder, cx, cy, r * 0.42, r * 0.31, size * 0.16, dark, 0, 7);
+        frustum(builder, cx, cy, r * 0.30, r * 0.21, size * 0.86, dark, size * 0.10, 7);
+        for (var sp = 0; sp < 3; sp++) {
+          var sa = rot + Math.PI * 2 * sp / 3 + wobble(cx, cy, 50 + sp) * 0.9;
+          segment(builder,
+            cx + Math.cos(sa) * r * 0.11, cy + Math.sin(sa) * r * 0.11, size * 0.90,
+            cx + Math.cos(sa) * r * 0.19, cy + Math.sin(sa) * r * 0.19,
+            size * (1.02 + wobble(cx, cy, 60 + sp) * 0.28), r * 0.05, dark);
+        }
+        break;
+
+      case "stump":
+        frustum(builder, cx, cy, r * 0.54, r * 0.45, size * 0.26, dark, 0, 8);
+        // The cut face, one value up, so a stump is not a black disc.
+        frustum(builder, cx, cy, r * 0.41, r * 0.41, size * 0.03, trim, size * 0.24, 8);
+        break;
+
+      case "log":
+        // Fallen, lying along its own rotation and RESTING on the dirt rather
+        // than half sunk into it.
+        segment(builder,
+          cx - Math.cos(rot) * size * 0.60, cy - Math.sin(rot) * size * 0.60, r * 0.19,
+          cx + Math.cos(rot) * size * 0.60, cy + Math.sin(rot) * size * 0.60, r * 0.21,
+          r * 0.19, dark);
+        break;
+
+      case "brush":
+        // Dead bramble. Low, untidy, and the only thing that fills the gaps
+        // between the stems.
+        for (var bs = 0; bs < 5; bs++) {
+          var ba = rot + wobble(cx, cy, 70 + bs) * Math.PI * 2;
+          var bl = size * (0.26 + wobble(cx, cy, 80 + bs) * 0.28);
+          segment(builder,
+            cx - Math.cos(ba) * bl, cy - Math.sin(ba) * bl, size * 0.02,
+            cx + Math.cos(ba) * bl * 0.7, cy + Math.sin(ba) * bl * 0.7,
+            size * (0.13 + wobble(cx, cy, 90 + bs) * 0.16), r * 0.035, trim);
+        }
+        break;
+
+      // --- what the humans put up ----------------------------------------
+
+      case "barricade": {
+        // A plank wall somebody threw up in a hurry: uneven boards, two rails
+        // across them, and a brace on the inside holding the whole thing off
+        // the ground. The unevenness is the point -- a wall of identical
+        // boards reads as fencing that was DELIVERED, not as a wall that was
+        // built out of whatever was to hand.
+        var wco = Math.cos(rot), wsi = Math.sin(rot);
+        var span = size * 1.5;
+        for (var pk = 0; pk < 7; pk++) {
+          var pt = (pk / 6 - 0.5) * span;
+          boxAt(builder, cx + wco * pt, cy + wsi * pt,
+            size * 0.17, size * 0.09,
+            size * (0.66 + wobble(cx + pk * 13, cy, 100) * 0.34), body, 0, rot);
+        }
+        for (var rl = 0; rl < 2; rl++) {
+          segment(builder,
+            cx - wco * span * 0.52, cy - wsi * span * 0.52, size * (0.24 + rl * 0.36),
+            cx + wco * span * 0.52, cy + wsi * span * 0.52, size * (0.24 + rl * 0.36),
+            size * 0.045, dark);
+        }
+        for (var br = -1; br <= 1; br += 2) {
+          segment(builder,
+            cx + wco * span * 0.34 * br, cy + wsi * span * 0.34 * br, size * 0.74,
+            cx + wco * span * 0.34 * br - wsi * size * 0.52,
+            cy + wsi * span * 0.34 * br + wco * size * 0.52, 0, size * 0.05, dark);
+        }
+        break;
+      }
+
+      case "spikes": {
+        // Sharpened stakes, crossed in pairs and raked at whatever is coming.
+        // Nothing about them is decorative: this is the first thing a camp
+        // builds and the last thing it can afford to.
+        var kco = Math.cos(rot), ksi = Math.sin(rot);
+        for (var xk = 0; xk < 3; xk++) {
+          var kt = (xk - 1) * size * 0.52;
+          var kx = cx + kco * kt, ky = cy + ksi * kt;
+          for (var kside = -1; kside <= 1; kside += 2) {
+            segment(builder,
+              kx + ksi * size * 0.34 * kside, ky - kco * size * 0.34 * kside, 0,
+              kx - ksi * size * 0.28 * kside, ky + kco * size * 0.28 * kside, size * 0.60,
+              size * 0.045, body);
+          }
+        }
+        break;
+      }
+
+      case "sandbags": {
+        // Three courses, each shorter than the one under it, every bag turned
+        // a little off true because they were stacked by hand.
+        var sco = Math.cos(rot), ssi = Math.sin(rot);
+        for (var cr = 0; cr < 3; cr++) {
+          var bags = 6 - cr;
+          for (var bg = 0; bg < bags; bg++) {
+            var bt = (bg - (bags - 1) / 2) * size * 0.26;
+            boxAt(builder, cx + sco * bt, cy + ssi * bt,
+              size * 0.25, size * 0.31, size * 0.15, cr === 1 ? trim : body,
+              size * 0.15 * cr,
+              rot + (wobble(cx + bg * 17, cy + cr * 29, 110) - 0.5) * 0.34);
+          }
+        }
+        break;
+      }
+
+      case "watchtower": {
+        // Four legs raked inward, a platform, a rail -- and a lamp, which is
+        // the one thing on this board that is deliberately lit. It marks the
+        // camp from across the map through the fog, which is exactly what a
+        // watchtower is for.
+        var legH = size * 1.55;
+        var deck = [];
+        for (var lg = 0; lg < 4; lg++) {
+          var la = rot + Math.PI / 4 + Math.PI * 2 * lg / 4;
+          segment(builder,
+            cx + Math.cos(la) * r * 0.90, cy + Math.sin(la) * r * 0.90, 0,
+            cx + Math.cos(la) * r * 0.50, cy + Math.sin(la) * r * 0.50, legH,
+            size * 0.055, dark);
+          deck.push([cx + Math.cos(la) * r * 0.50, cy + Math.sin(la) * r * 0.50]);
+        }
+        boxAt(builder, cx, cy, size * 0.84, size * 0.84, size * 0.08, body, legH, rot);
+        for (var rr = 0; rr < 4; rr++) {
+          segment(builder, deck[rr][0], deck[rr][1], legH + size * 0.08,
+            deck[rr][0], deck[rr][1], legH + size * 0.44, size * 0.04, dark);
+          var nx2 = deck[(rr + 1) % 4];
+          segment(builder, deck[rr][0], deck[rr][1], legH + size * 0.40,
+            nx2[0], nx2[1], legH + size * 0.40, size * 0.03, dark);
+        }
+        frustum(builder, cx, cy, size * 0.10, size * 0.07, size * 0.13,
+          ley, legH + size * 0.30, 8, EMI);
+        break;
+      }
+
+      case "wreck": {
+        // A burnt-out car, shoved off the track and stripped. It sits low and
+        // nothing on it lights up: it is a landmark, not a lamp.
+        boxAt(builder, cx, cy, size * 1.20, size * 0.60, size * 0.22, dark,
+          size * 0.09, rot);
+        boxAt(builder, cx - Math.cos(rot) * size * 0.10, cy - Math.sin(rot) * size * 0.10,
+          size * 0.54, size * 0.52, size * 0.24, body, size * 0.29, rot);
+        for (var wl = 0; wl < 4; wl++) {
+          var wx = ((wl & 1) ? 1 : -1) * size * 0.42;
+          var wy = ((wl & 2) ? 1 : -1) * size * 0.30;
+          frustum(builder,
+            cx + Math.cos(rot) * wx - Math.sin(rot) * wy,
+            cy + Math.sin(rot) * wx + Math.cos(rot) * wy,
+            size * 0.11, size * 0.11, size * 0.10, dark, 0, 7);
+        }
+        break;
+      }
+
+      case "barrel":
+        // A drum with a fire in it. The camp's only warm light, and the reason
+        // this board's accent is an ember and not a ley line.
+        frustum(builder, cx, cy, r * 0.34, r * 0.34, size * 0.50, body, 0, 10);
+        frustum(builder, cx, cy, r * 0.37, r * 0.37, size * 0.04, dark, size * 0.13, 10);
+        frustum(builder, cx, cy, r * 0.37, r * 0.37, size * 0.04, dark, size * 0.38, 10);
+        // Driven at half the board's emission on purpose. At full EMI the
+        // accent clips through orange to a white-yellow cone and the drum
+        // under it disappears -- which is a flare, not a fire in a barrel.
+        frustum(builder, cx, cy, r * 0.27, r * 0.05, size * 0.34, ley,
+          size * 0.48, 7, EMI * 0.5);
+        break;
+
+      case "fence": {
+        // Corrugated sheet wired to posts -- where the camp ran out of timber.
+        var fco = Math.cos(rot), fsi = Math.sin(rot);
+        var fspan = size * 1.6;
+        for (var fp = 0; fp < 3; fp++) {
+          var ft = (fp - 1) * fspan * 0.5;
+          segment(builder, cx + fco * ft, cy + fsi * ft, 0,
+            cx + fco * ft, cy + fsi * ft, size * 0.84, size * 0.05, dark);
+        }
+        for (var fs2 = 0; fs2 < 2; fs2++) {
+          var fa = (fs2 - 0.5) * fspan * 0.5;
+          boxAt(builder, cx + fco * fa, cy + fsi * fa,
+            fspan * 0.47, size * 0.05, size * (0.60 + fs2 * 0.11), body,
+            size * 0.05, rot);
+        }
+        break;
+      }
+
       default:
         // An unknown kind still gets a body rather than nothing, so a new prop
         // added to maps.js shows up as a block instead of silently vanishing.
@@ -440,8 +743,15 @@ var GLGeometry = (function () {
     box: box,
     frustum: frustum,
     boxAt: boxAt,
+    segment: segment,
     scenery: scenery,
     SCENERY_KINDS: ["antenna", "server", "reactor", "console", "pylon",
-                    "tank", "vent", "holo", "battery", "coil"]
+                    "tank", "vent", "holo", "battery", "coil",
+                    // The forest board's own vocabulary. Listed beside the
+                    // machinery rather than in a second table, because every
+                    // reader of this list wants "what can a map ask for".
+                    "tree", "snag", "stump", "log", "brush",
+                    "barricade", "spikes", "sandbags", "watchtower", "wreck",
+                    "barrel", "fence"]
   };
 })();

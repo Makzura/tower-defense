@@ -575,7 +575,14 @@ function (t) {
     if (groups.every(function (g) { return !!Enemy.typeOf(g.type).isCamo; })) camo.push(i + 1);
   });
   t.eq(flies[0], 24, "flight is introduced at wave 24");
-  t.deep(flies, [24, 31, 35], "and returns twice after that");
+  // 32 JOINED THIS SET WHEN THE HEALER LEARNED TO FLY, and this fixture is
+  // simply older than that ruling -- it was written on a branch that forked
+  // before it. `isFlying: true` on the healer row is deliberate, dated
+  // 2026-08-26 and carries the owner's instruction verbatim ("make the healer
+  // a flying unit") plus the reversal of the argument that used to sit there.
+  // The CODE is canonical; this list is the thing that went stale. Wave 32 is
+  // the healer wave, so it is the only one the change could have added.
+  t.deep(flies, [24, 31, 32, 35], "and returns three times after that");
   t.deep(camo, [14, 18, 28], "waves 14, 18 and 28 are camo end to end");
 
   // THE TIER LADDER, ONE RUNG PER APPEARANCE. Wave 16 sends four separate T0
@@ -4735,6 +4742,163 @@ test("every camo type is drawn as the body it shadows, not as a sphere", functio
   t.eq(shadows.camo_normal, "normal", "a camo normal is a normal");
   t.eq(shadows.camo_fast, "fast", "a camo fast is a fast");
   t.eq(shadows.camo_heavy, "slow", "a camo heavy is a camo SLOW -- the plodder");
+});
+
+
+// --- the Vanguard: two gaits, and a shield that comes back ------------------
+//
+// Four things are pinned here and none of them is "the animation looks right",
+// which no suite can say. What they are is the four places this feature can
+// break SILENTLY: a band that is not declared, a variant flag that latches,
+// a reform that finishes at the wrong moment, and a fragment that is not its
+// own group. Every one of those draws a plausible picture of the wrong thing.
+
+test("the Vanguard carries two gaits as two bands and the sprint picks the second", function (t) {
+  var h = harness.boot();
+  var G = h.game;
+  var fake = { mesh: function () { return {}; } };
+
+  // THE MODELS DECLARE THE LAYOUT, and it is read off the REGISTRY rather than
+  // out of the importer or out of the file text: the registry is what the
+  // renderer asks, and `register` dropping the field on the floor is a defect
+  // this project has already shipped once.
+  ["enemy-boss_fast", "enemy-boss_fast-shattered"].forEach(function (id) {
+    var m = G.GLModels.get(fake, id);
+    t.ok(!!m, id + " is registered");
+    var bands = m.bands;
+    t.ok(!!bands, id + " declares a bands field");
+    t.eq(bands.length, 2, id + " declares exactly two bands");
+    t.eq(bands[0][0], 0, id + " band 0 starts at frame 0");
+    t.eq(bands[1][0], bands[0][1],
+      id + " band 1 starts where band 0 ends -- no gap, no overlap");
+    t.eq(bands[1][0] + bands[1][1], m.frames.length,
+      id + " and the two together are the whole frame list");
+  });
+
+  // AND THE RENDERER PICKS BETWEEN THEM OFF THE SPRINT. `gaitBand` is asked,
+  // never re-derived: a copy of the rule here would agree with itself and
+  // prove nothing.
+  var model = G.GLModels.get(fake, "enemy-boss_fast");
+
+  var e = new G.Enemy(h.game.path, undefined, "boss_fast");
+  t.eq(e.isSprinting(), true, "it spawns inside its opening sprint");
+  var dashing = G.World3D.gaitBand(model, e);
+  e.progress = G.ul(G.Enemy.TYPES.boss_fast.sprint.untilUl) + 1;
+  t.eq(e.isSprinting(), false, "past 400 u.l. the sprint is spent");
+  var bounding = G.World3D.gaitBand(model, e);
+
+  t.ok(dashing[0] !== bounding[0],
+    "the two states index different bands (" + dashing + " vs " + bounding + ")");
+  t.deep(bounding, G.World3D.walkBand(model),
+    "the BOUND is band 0 -- the default any reader falls back to");
+  t.eq(dashing[0], bounding[1], "the DASH is the band after it");
+
+  // A body with no row in the table keeps the default, whatever it is doing.
+  var plain = new G.Enemy(h.game.path, undefined, "fast");
+  var plainModel = G.GLModels.get(fake, "enemy-fast");
+  t.deep(G.World3D.gaitBand(plainModel, plain), G.World3D.walkBand(plainModel),
+    "a type with no gait row draws its default band");
+});
+
+test("a broken Vanguard wears the shattered mesh for exactly as long as its shield is gone", function (t) {
+  var h = harness.boot();
+  var G = h.game;
+  var e = new G.Enemy(h.game.path, undefined, "boss_fast");
+
+  // IT ARRIVES WITH ITS SHIELD UP. Its own pulse is seven seconds away and its
+  // opening sprint is most of that, so a boss that waited for the first pulse
+  // spent the stretch the shield matters most on without one.
+  t.eq(e.shield, 100, "it walks on already shielded");
+  t.eq(e.shieldMax, 100, "and the bar is drawn against the same pool");
+  t.eq(e.shieldFlash, 0,
+    "but it did not GAIN one in front of the player, so nothing flashes");
+  t.eq(e.shieldOut, false, "a full pool is not a broken one");
+  t.eq(G.World3D.enemyModelFor(e), "enemy-boss_fast",
+    "so it walks on in one piece");
+  t.eq(e.shieldReformProgress(), -1, "and there is no reform to draw");
+
+  // A SUPPORTER THAT SHIELDS OTHERS GETS NOTHING AT SPAWN, which is the half
+  // of the rule a bare `support.shield` reading would have broken.
+  var giver = new G.Enemy(h.game.path, undefined, "shieldbearer");
+  t.eq(giver.shield, 0, "a Shieldbearer arrives with nothing of its own");
+
+  // Its own pulse, on its own timer, refreshing rather than stacking.
+  e.supportTimer = 0;
+  e.supportAllies(0, [e]);
+  t.eq(e.shield, 100, "the pulse refreshes the pool to 100, never past it");
+  var gap = e.supportTimer;
+  t.eq(gap, G.Enemy.TYPES.boss_fast.support.intervalSeconds,
+    "and the next pulse is a full interval away");
+
+  e.takeDamage(e.shield + 5, 0, 0);
+  t.eq(e.shieldOut, true, "breaking the pool opens the gap");
+  t.eq(e.shieldBroken, true, "and records that this body has stood without one");
+  t.eq(e.shieldGapSeconds, gap, "the gap is as long as the wait for the pulse");
+  t.eq(e.shieldReformProgress(), 0, "the reform starts at zero, not at nothing");
+  t.eq(G.World3D.enemyModelFor(e), "enemy-boss_fast-shattered",
+    "and the wreckage is what gets drawn");
+  t.ok(!!e.shieldBreakAt, "the road it broke on is recorded for the fragments");
+
+  // HALF WAY. Progress is a share of THIS gap, so it is 0.5 at half of it
+  // whatever the gap turned out to be.
+  e.supportTimer = gap / 2;
+  t.eq(Math.round(e.shieldReformProgress() * 1000), 500,
+    "half the gap spent is half the reform done");
+
+  // AND THE PULSE THAT REFILLS IT ENDS THE GAP ON THE SAME FRAME.
+  e.supportTimer = 0;
+  e.supportAllies(0, [e]);
+  t.eq(e.shield, 100, "the pulse puts the shield back");
+  t.eq(e.shieldOut, false, "so the gap is closed");
+  t.eq(e.shieldReformProgress(), -1, "there is nothing left to reassemble");
+  t.eq(G.World3D.enemyModelFor(e), "enemy-boss_fast",
+    "and the body is whole again -- the swap goes BOTH ways");
+  t.eq(e.shieldBroken, true,
+    "`shieldBroken` is one-way and did NOT follow it back");
+});
+
+test("the Bulwark's own swap is still one-way, which is the flag it does not share", function (t) {
+  var h = harness.boot();
+  var G = h.game;
+  var b = new G.Enemy(h.game.path, undefined, "shielded");
+  t.ok(b.shieldMax > 0, "a Bulwark arrives behind a shield");
+  b.takeDamage(b.shield + b.health + 5, 0, 0);
+  t.eq(b.shieldBroken, true, "breaking it is permanent");
+  // A Shieldbearer's plate closes `shieldOut` and must NOT put the halo back.
+  b.grantShield(20, true);
+  t.eq(b.shieldOut, false, "a granted plate closes the gap");
+  t.eq(b.shieldBroken, true, "and leaves the permanent flag alone");
+  t.eq(G.World3D.enemyModelFor(b), "enemy-shielded-broken",
+    "so the stripped body stays stripped");
+});
+
+test("every shield fragment is its own group, so the renderer can throw it", function (t) {
+  var h = harness.boot();
+  var G = h.game;
+  var fake = { mesh: function () { return {}; } };
+
+  var whole = G.GLModels.get(fake, "enemy-boss_fast");
+  var broken = G.GLModels.get(fake, "enemy-boss_fast-shattered");
+
+  function shards(m) {
+    return m.groups.filter(function (g) {
+      return g.name.indexOf("shard_") === 0 && g.count > 0;
+    });
+  }
+  t.eq(shards(whole).length, 0, "an unbroken shield has no loose pieces");
+  t.eq(shards(broken).length, 10, "a broken one has ten, each its own group");
+  t.ok(whole.groups.some(function (g) { return g.name === "barrier"; }),
+    "and the whole body carries the ring they came off");
+
+  // THE POSITIONS THE RENDERER MEASURES THEM FROM. `get()` did not expose this
+  // at all until 2026-08-26, and the shield bubble silently drew at its
+  // no-mesh fallback size for every body in the game because of it.
+  t.ok(whole.positions && whole.positions.length > 0,
+    "an expanded model exposes its vertex positions");
+  t.eq(whole.positions.length % 3, 0, "as flat triples");
+  t.eq(whole.positions.length / 3,
+    whole.groups.reduce(function (n, g) { return n + g.count; }, 0),
+    "one position per vertex the groups account for");
 });
 
 

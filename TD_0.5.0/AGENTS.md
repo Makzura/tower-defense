@@ -14,9 +14,9 @@ additions and the flying Aether Wisp imported from v0.4.10.0.
 **A shield now pays nothing, ever**, and so does healed health;
 waves
 that mix three or four types at once; a clear bonus of a tenth of each wave;
-**six decorated maps** — the four authored routes plus deterministic Shifting
-Ley and two-entrance Twin Confluence, each with its own non-interactive
-procedural scenery;
+**seven decorated maps** — the four authored routes plus deterministic Shifting
+Ley, two-entrance Twin Confluence and the forest board `test`, each with its own
+non-interactive procedural scenery;
 **five towers in five build slots, which is now FULL** — Warbringer, Arcane
 Sniper, Siphon, the Rifleman, the $300 burst-fire/automatic starter unit, and
 the **Summoner** (2026-08-10, the $450 tower that never fires: it plants blubs
@@ -397,9 +397,10 @@ js/path.js          GamePath: polyline, length, sampling, distance queries,
 js/targeting.js     WHICH enemy to shoot: the six modes, TowerScore, and
                      Targeting.sees (the camo/flying rules for flat towers:
                      gunner, smasher, Soldier and its recruits)
-js/maps.js          four authored maps plus two deterministic generated maps;
-                     multi-route normalization, derived difficulty, and
-                     themed non-gameplay sci-fi environments
+js/maps.js          five authored maps plus two deterministic generated maps;
+                     multi-route normalization, derived difficulty, and themed
+                     non-gameplay environments -- six sci-fi facilities and one
+                     wild board (dead forest, fog, a human camp)
 js/enemy.js         Enemy: the twenty-one-type roster, movement, lane offsets,
                      health, armor/defense, camo, flight, per-type sprite size,
                      timed slows, hover hit test, damage reporting
@@ -464,10 +465,14 @@ js/gl/gl-camera.js  OrbitCamera: middle-drag orbit about the cursor, right-drag
                      logical 1280x720 space) and the projection cache
 js/gl/gl-math.js    perspective, look-at, one multiply, ray/plane. Column-major
 js/gl/gl-geometry.js procedural primitives: ground, road, box, boxAt, sphere,
-                     cylinder, frustum -- plus `scenery`, the ten authored board
-                     prop kinds, and a per-vertex EMISSIVE channel on Builder so
-                     runtime geometry can carry a lit surface like an exported
-                     model does
+                     cylinder, frustum, segment (a prism between two points in
+                     space -- the leaning-trunk/angled-stake shape the others
+                     cannot make) -- plus `scenery`, the twenty-two authored
+                     board prop kinds (ten machines, twelve wild: stems, stumps,
+                     logs, bramble and the camp's barricades, spikes, sandbags,
+                     watchtower, wreck, barrel and fence), and a per-vertex
+                     EMISSIVE channel on Builder so runtime geometry can carry a
+                     lit surface like an exported model does
 js/gl/gl-models.js  the model registry the generated js/gl/models/*.js register
                      into; expands per-triangle data to per-vertex once, lazily
 js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
@@ -2034,22 +2039,133 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   opened straight onto the chooser and the sandbox had no entrance from the
   game at all — you had to know `sandbox.html` existed and open it by hand.
 
-  **The title screen is one COMMAND DECK composition, not a button stack with
-  props beside it** (2026-08-18). A defense node fills the left bay and aims
-  inward; the orbital relay fills the right bay; signal trunks from both end at
-  the controls between them. PLAY is the 480×88 primary command. Armoury,
-  Index and Sandbox are one subordinate horizontal rail of 170×58 controls,
-  so their equal status is visible and none competes with starting a run. The
-  four existing rectangle functions remain the single source for drawing and
-  hit testing.
+  **The title screen is THE ASH WASTE: an animated post-apocalyptic
+  fantasy-tech world** (2026-08-25, replacing the 2026-08-18 cyan command deck
+  entirely at the owner's request — backdrop, props, controls and type). A
+  burnt sky over a ruined skyline, a colossal fractured ley-pylon in the left
+  bay, a downed sky-relay in the right, rock torn off the ground and left
+  floating with shards in orbit, and rifts in the upper air that strike on
+  their own clocks. The layout is unchanged: PLAY is still the 480×88 primary
+  command, Armoury/Index/Sandbox are still one subordinate rail of 170×58
+  controls, and **the four existing rectangle functions remain the single
+  source for drawing and hit testing.**
 
-  **Cyan and gold are the only accent hues on the menu.** Dark blue-gray and
-  off-white are neutral surfaces and text, not extra accents; purple and green
-  do not appear in this screen's renderer. The grid is deliberately faint and
-  sits behind recessed panels, static scanlines and data-stream ticks. There is
-  exactly one ambient animation: a slow cyan halo around PLAY, derived from
-  `performance.now()` and affecting only stroke opacity, so motion never moves
-  a hit target or changes layout.
+  **THE SCREEN ANIMATES CONTINUOUSLY, AND NOTHING ANIMATED MOVES A HIT
+  TARGET.** `draw()` already runs every frame on the menu; the old screen used
+  that for one breathing halo and nothing else. Ash falls, embers rise, dust
+  sweeps the horizon, the pylon's core gutters, the relay's feed horn sweeps,
+  islands bob, rifts crack. Every animated value feeds a colour, an alpha or a
+  decoration's own position — none of the four rectangle functions reads the
+  clock. **Verified by pixel readback, not by a screenshot glance**, per the
+  visual-testing rule above: `draw()` driven at three fixed times off a stubbed
+  `performance.now` gives three different core colours, and the hover states
+  were diffed at ONE fixed time so the difference could not be the animation.
+
+  **AND SINCE 2026-08-26 EVERY OTHER MENU IS THE SAME THEME** (at the owner's
+  instruction: *"arrange the other Menu UI's to match the main menu theme"*).
+  The chooser, the index, the armoury, the pause menu and both run-over
+  overlays were explicitly deferred when the title screen landed, which left
+  the game opening on a burnt sky and cutting to a blue sci-fi grid the moment
+  anything was clicked.
+
+  **IT REACHED THREE SCREENS THROUGH TWO FUNCTIONS.** `drawSelectBackdrop` and
+  `drawBackButton` are called by the chooser, by `js/codex.js` and by
+  `js/store.js` — one backdrop and one control across three screens — so
+  re-cutting those two re-cut all three and nothing in the index's or the
+  armoury's own layout had to move. **Anything a new screen needs must go
+  through the shared pieces for the same reason**: `drawAshInterior`,
+  `drawAshFrame`, `drawAshHeading`, `drawAshPlate`, `drawAshControl` and the
+  `ASH_EMBER` / `ASH_LEY` / `ASH_BONE` / `ASH_DUST` / `ASH_IRON` palette, all in
+  `js/game.js` so the other two files can reach them.
+
+  **AN INTERIOR KEEPS THE THEME'S SURFACE AND DROPS ITS SUBJECT.** The title
+  screen is a composition; these screens are dense — six route cards, an enemy
+  list with a live 3D viewer, a shop grid — and a scene behind that is noise
+  competing with the content for the same pixels. So an interior is the burnt
+  sky, the horizon heat, the ground, the ash, the vignette and the corner
+  frame, and no pylon, wreck, rift or skyline. **The plate is `menuPlatePath`'s
+  own two sheared corners**, so the interiors and the title screen are the same
+  piece of hull rather than two designs that resemble each other. Baked through
+  the same `drawMenuLayer` machinery, so only the falling ash reads the clock.
+
+  **A HEADING'S SUB-LINE GOES ABOVE ITS TITLE WHEN THE SCREEN HAS TABS**, and
+  that is a collision rather than a taste: the index and the armoury put their
+  tab row at y = 78, and a centred sub-line landed on it. The rule is an
+  argument inside `drawAshHeading` rather than two hand-placed y values, so a
+  tab row that moves cannot leave it stranded.
+
+  **THE PANEL INK WAS A PALETTE SWEEP AND NOT A REDESIGN.** The index and the
+  armoury carry dozens of colour literals from the old screen; the pass maps
+  them (`#cfe3ff` → bone, the `140,179,230` structural blue → ember, `#ffd76e` →
+  ember, the "good" green → ley-teal, cool-grey fills → ash-brown at the same
+  alphas) and **touches no rectangle, font size or layout number**. `TIER_COLOURS`
+  went with it, and the new set is also an ORDER — ley-teal easy, bone normal,
+  ember hard — where teal/yellow/pink was not.
+
+  **Ash and rust are the surfaces; ember and bone are the warm accents; and
+  ley-teal and ley-violet are the ONLY cool hues, reserved for arcane energy.**
+  This replaces the old cyan-and-gold rule rather than extending it. Nothing
+  that is not arcane may use the cool pair — the pylon's core reads teal
+  against a warm scene precisely because nothing else does.
+
+  **THE CENTRE STAYS QUIET.** The scene's mass is in the outer thirds, and
+  `drawMenuAtmosphere` lays a soft dark veil over the middle before any type
+  goes down. A burning sky must never cost the title or the controls their
+  contrast.
+
+  **Every "random" detail is `menuNoise(i)`, a pure hash of an index** — not a
+  generator. The scene keeps hundreds of authored details (skyline shapes,
+  wear streaks, ash grains, rubble) without storing one of them between
+  frames, and it looks identical on every boot.
+
+  **Type is `MENU_DISPLAY_FONT` (Impact and its fallbacks) and
+  `MENU_TECH_FONT` (system monospace), both drawn through `drawMenuText`,
+  which does letter tracking by hand.** No webfont: the game runs from a
+  double-clicked `file://` page, so a downloaded face would need either a
+  server or a megabyte of base64 in the HTML. `ctx.letterSpacing` is not used
+  because a browser without it would silently draw every line on the screen
+  too tight; `drawMenuText` measures each glyph, lays them out with a gap, and
+  honours `ctx.textAlign` itself.
+
+  **Controls are salvaged plates, cut by `menuPlatePath`**: a rectangle with
+  the top-left and bottom-right corners sheared off — two cuts, not four,
+  because four reads as a rounded sci-fi pill and two reads as hull cut to
+  fit. Rivets, mill lines, rust streaks and hazard chevrons are the same on
+  all four; the accent `rgb` handed to `drawMenuButton` is the ONLY thing that
+  differs, so they read as parts off one wreck. Hover fills the plate's foot
+  with ley-light and runs a charge up its left flank; PLAY breathes on its
+  own. **`drawMenuButton(r, label, key, rgb, primary)` keeps its signature** —
+  the title-screen test counts calls through it.
+
+  **THE TWO STATIC LAYERS ARE BAKED, and that is load-bearing, not a
+  polish pass.** The first draft cost **72 ms a frame** against a 2560×1440
+  backing store — about 14 fps — and 51 ms of it was two functions that never
+  read the clock: the sky's full-width gradient with the sun in it, and the
+  atmosphere's calm-centre veil plus two full-screen vignettes and 144
+  scanlines. `drawMenuSkyBase` and `drawMenuVeil` are now painted once into
+  offscreen canvases at the backing store's own resolution and blitted, which
+  brought the frame to **1.8 ms**, both measured through a `getImageData`
+  flush because Canvas2D queues its commands and timing `draw()` alone
+  measures submission, not rasterisation.
+
+  `menuLayers` is keyed on `canvas.width + "x" + canvas.height`, so a window
+  resize or a changed DPR rebuilds it rather than leaving a soft layer behind
+  — including the very first frames, where the canvas is still 300×150 because
+  the game has not sized it yet. **If anything time-dependent is ever added to
+  either baked function it will freeze**; put it in `drawMenuSkyBands` or in
+  `drawMenuAtmosphere`'s live tail instead. Baking goes through the same
+  function the live path calls, by lending it the module's `ctx`, so one
+  drawing of each layer exists and the cached picture cannot drift from the
+  uncached one. Where `document.createElement` is missing or gives back
+  something without a 2D context — which is exactly the harness — the bake
+  fails once, is remembered as `false`, and every frame paints the layer
+  directly.
+
+  Both gradient helpers (`menuLinear`, `menuRadial`) fall back to a flat
+  colour when handed something that is not a gradient. That is not defensive
+  habit: the harness's canvas stub answers unknown methods with a function
+  returning `undefined`, so `createLinearGradient(...).addColorStop` would
+  throw there and take the whole suite down.
 - **`"store"`** (added 2026-07-29, `js/store.js`) is the armoury: a **Store**
   tab that sells tower types for meta coins and an **Inventory** tab that puts
   owned towers into the five build-bar slots. Built exactly like the index —
@@ -3357,7 +3473,8 @@ A baked frame list is a LOOP — a walk, a bolt cycle — and a loop cannot expr
 something that happens at a moment. `drawActor(model, x, y, yaw, scale, lift,
 frame, overrides, tilt)` takes an optional `{ groupName: mat4 }` applied AFTER
 the frame's own pose, in that group's LOCAL space. The Hedger's strike
-(2026-08-14) is the enemy-side user; `js/gl/blub-summon.js` is the other.
+(2026-08-14) is the enemy-side user; the **Vanguard's shield fragments**
+(2026-08-26) are the second; `js/gl/blub-summon.js` is the other.
 
 Four rules, each of which has already cost something:
 
@@ -3395,6 +3512,36 @@ Four rules, each of which has already cost something:
   is not on the model, and the resulting plain walk is pixel-identical to a body
   that never triggered. `World3D.strikeSeam().missingGroupOn` publishes every
   model that was asked and did not carry the group; a test asserts it is empty.
+
+**AND A FIFTH THE SECOND USER ADDED: AN OVERRIDE IS THE ONLY WAY TO PUT A PIECE
+OF A MODEL SOMEWHERE THE MODEL IS NOT.** A baked frame is a pose in the model's
+own space, so a part baked onto the floor travels with the body. That is
+harmless on a walker and wrong on the Vanguard: the owner's brief has its broken
+shield fall on the road and lie there for three seconds while the boss keeps
+running, and at 175 u.l./s that is 525 u.l. of road. `shardPose` in
+`gl-world.js` freezes the drop point in WORLD space at the break
+(`Enemy.prototype.breakShield` records position and heading, and that is all it
+records) and converts it back into the body's current model space every frame:
+`p = R(-yaw) · (W - pos) / (unitsToPx · scale)`. Two consequences worth carrying:
+
+- **`scale` IS NOT THE MODEL-TO-PIXEL FACTOR.** `drawActor` draws at
+  `m.unitsToPx * scale`, and `scale` alone is `radiusPx() / 11` — 1.9 on this
+  boss against a real factor of 60.4. Fed the wrong one, every fragment lands
+  about a pixel from the machine's own feet: it still throws, still settles and
+  still comes home, so nothing looks broken, it just looks like nothing
+  happened. Found that way on the real board, not by a test.
+- **A DRIVEN GROUP'S BAKED POSE SHOULD BE THE IDENTITY.** The shards' frames are
+  identity in both bands, so the override's space is the model's own rather than
+  the torso's — and a body drawn with no override at all then wears its
+  fragments exactly where the artist scattered them, which is the honest
+  fallback.
+
+**NOTHING INTEGRATES AND NOTHING ACCUMULATES.** Per-shard variation (spread,
+tumble axis, shiver phase) is a hash of the shard's own index, and the phase is
+`Enemy.prototype.shieldReformProgress()` — a share of the CURRENT gap, so the
+reassembly lands on the frame the shield actually returns whatever the gap
+turned out to be. Hand the same body at the same progress twice and it draws the
+same thing.
 
 Render state may be parked on a simulation object (the strike latches its
 bearing on `enemy._glStrike`) only while it is strictly one-way: `update()` must
@@ -3612,13 +3759,13 @@ All four arrived in the v0.3.5 fusion. Each one is built the same way: **the
 data is in one place and everything else is derived from it.** That is the
 property to preserve when extending any of them.
 
-**Maps (`js/maps.js`).** Six in the current pool. Four are authored at
+**Maps (`js/maps.js`).** Seven in the current pool. Five are authored at
 `AUTHORED_AT_PX_PER_UL`; Shifting Ley and Twin Confluence are deterministic,
 versioned generator outputs with fixed seeds. `rune-circuit` is the reference
 and remains the original path.
 
 Every map owns a full non-gameplay environment: a `theme` palette, at least
-four large coloured `zones`, nine top-down machinery `models`, and its older
+four large coloured `zones`, nine or more top-down `models`, and its older
 `decorations` as fine-detail decals. `Maps.drawEnvironment` paints manufactured
 floor panels, deck bays, circuit trunks, reactors, pylons, consoles, tanks,
 servers, vents, antennae, holograms, coils and gates under the road. The road
@@ -3627,6 +3774,31 @@ guide. All of this is **background only**. None of it is read by `Maps.analyse`,
 `buildableSpot`, path construction, placement or targeting. Coordinates pass
 through the same authored-pixel scale as the road, so a UNIT_LENGTH retune
 cannot pull scenery away from its map.
+
+**`test` is the one board that is not a facility** (2026-08-26). A dead forest
+on black dirt: bare leaning stems banked around the edges, stumps, fallen logs
+and bramble inside the route's pockets, and a human camp — barricades, crossed
+stakes, sandbag courses, a watchtower, a burnt-out car, wire fence and two fire
+barrels — built along the inside of the last two legs of the road. Its theme
+carries **two keys no other map sets**, and both are opt-in so the other six
+render byte-identically without them:
+
+- `wild: true` turns off the two things that say *manufactured floor* — the
+  ruled panel grid under everything and the circuit trunks strung between
+  props — in **both** renderers.
+- `fog: { color, density, height }` is real distance fog in the 3D board
+  (`GLRenderer.setFog`, applied in linear light before the sRGB conversion,
+  thinning with an e-fold over `height` so stems stand out of the bank) and a
+  painted mist in the 2D pass, so the card and the battlefield agree. Density 0
+  — every other map — is the state `GLRenderer.begin` restores, so no board and
+  no preview can inherit another's weather.
+
+It also introduces the zone kind **`dirt`, whose height is 0 and means a PATCH,
+not a platform**: a different ground colour painted at the floor's own height.
+Every other zone kind is a raised slab, and `World3D.levelUnder` refuses a tower
+that straddles a slab edge — so bare earth built as a slab would be an invisible
+no-build ring in open ground. A patch stamps no height and cannot move a build
+spot.
 
 `Maps.routesOf` normalizes every map to route definitions. Authored single-route
 maps may keep `points`; generated maps use `routes`. The runtime owns `paths`
@@ -3673,8 +3845,8 @@ scheduled** — a passing test in `tests/run.js` pins that.
 | `revenant` | 16 **×2 lives** | ×0.85, **0 after** | — | — | — | 1.2 | 21 | attention — a parked body keeps eating shots meant for the wave behind it |
 | `hive` | 150 | ×0.4 | — | — | — | 1.6 | 26 | speed of kill — it seeds 5 normals every 7 s, and each of THOSE wears a shield equal to its life and pays nothing |
 | `boss` | 5000 **+1000 at half** | ×0.3, **×0.405 after** | — | — | — | 2.4 | 35 | DEPTH — it stops, aims, and hits your single best tower for 45 and a stun; after the roar it also leaps 90 u.l. and shockwaves whatever it lands beside |
-| `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | 27 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays. **Hovers** since its body became the beacon — a picture, not a targeting rule, exactly as the Healer's is |
-| `healer` | 200 | ×0.4 | — | — | — | 1.45 | 32 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either. **Hovers** — a picture, not a targeting rule (see below) |
+| `shieldbearer` | 60 | ×0.45 | — | — | — | 1.35 | 27 | that you shoot the SUPPORT — 20 shield to the 10 strongest bodies every 10 s, stacking, and none of it pays. **Never to itself** (2026-08-26). **Hovers** since its body became the beacon — a picture, not a targeting rule, and since the Healer started flying it is the only type left that does |
+| `healer` | 200 | ×0.4 | — | — | — | 1.45 | 32 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either. **FLIES** since 2026-08-26 — a targeting rule, so wave 32 needs air reach (it hovered, as a picture only, until then) |
 | `boss_fast` | 750 | ×3.5 **for the first 400 u.l.**, then ×1.75 | — | — | — | 1.9 | 34 | TEMPO — 100 shield every 7 s that never stacks, on a body that crosses the opening stretch faster than anything else in the game |
 | `camo_heavy` | 20 | ×0.65 | **5** | 20% | **yes** | 1.4 | 28 | that SEEING it and KILLING it are two separate purchases |
 
@@ -3798,13 +3970,40 @@ Four rules:
   *time* rather than a bigger leak.
 - **AND THE TILL DOES NOT.** See below.
 
+**A SHIELD ABSORBS THE WHOLE BLOW — NOTHING SPILLS THROUGH** (2026-08-26, the
+owner's words: *"for any shielded enemy, the shield should absorb all damage,
+for example if a enemy has 100 HP and 10 shield and gets hit for 200 damage, the
+shield breaks because it is inferior to 200 but nothing happens to the
+health"*). One hit takes at most one layer. This REVERSES the spill rule, and
+the argument the spill rule had is still true and is now the point: stopping the
+overflow at the shell wastes the rest of a heavy weapon's blow, which is the
+same waste target claiming exists to prevent — so **a shield is worth a whole
+SHOT rather than its own thickness**, and the answer to a shielded wave is many
+cheap hits rather than one expensive one. Three things that did NOT move with
+it, each of which a reader will assume did:
+
+- **It is not a damage cap.** A body with no shield takes the full blow, and a
+  body whose shield emptied on an earlier hit takes the next one in full. Only
+  the hit that BREAKS the shell is absorbed by it.
+- **Effective HP is unchanged.** `waveEffectiveHealth` counts a shield as health
+  the player must remove and it still must be removed; what changed is how many
+  shots that costs, and no authored figure in this document counts shots.
+- **`breakShield` still fires on the same frame**, so the Bulwark still doubles
+  its speed and the Vanguard still throws its fragments onto the road at the
+  moment the pool empties.
+
+**It is a real difficulty change and it is not measured anywhere.** Every
+shielded body — the Bulwark, a Hive's brood, anything a Shieldbearer has
+touched, the Vanguard on its seven-second cadence — costs at least one more shot
+than it did. A retune, if one is wanted, is its own piece of work.
+
 **A SHIELD PAYS NOTHING, EVER** (2026-07-30, the owner's exact words: *"make it
 so that shield gives 0 money, ever"*). This is a fifth rule and it changed a
 number the rest of this document leaned on for a long time, so it is worth
 being precise about what moved:
 
 - **`Enemy.takeDamage` returns only what landed on HEALTH.** The shield still
-  soaks in full, still spills through, still flashes — the *return value* is
+  soaks in full and still flashes — the *return value* is
   what changed, and that value has always meant "what this blow was worth to
   the player" rather than "what it removed". It is the same door a Hive's
   brood already came through, which is why one edit covered every till at once:
@@ -3955,10 +4154,21 @@ through this step).
 
 Five things about it that are decisions rather than details:
 
-- **The supporter is a candidate for its own pulse.** It is not "help somebody
-  else", it is "help the strongest", and a 60 HP Shieldbearer usually *is* one
-  of the ten. The fast boss's self-shield is the same block with `pick: "self"`
-  rather than a second mechanism.
+- **A SUPPORTER AIMED AT OTHERS NEVER PICKS ITSELF; ONE AIMED AT ITSELF STILL
+  DOES** (2026-08-26, at the owner's instruction: *"the shieldbearer should not
+  shield himself"*). This bullet said the opposite until then — "it is not 'help
+  somebody else', it is 'help the strongest', and a 60 HP Shieldbearer usually
+  *is* one of the ten" — and the reversal is the owner's. It mattered more than
+  "usually" suggested: `"strongest"` sorts on life still standing, so the
+  beacon's own stacking plate made it the strongest body on the board by a
+  wider margin after every pulse, compounding, and the type that exists to make
+  everything else expensive was quietly the hardest thing to remove.
+
+  **The exclusion is one line in `supportCandidates`, and that is the whole of
+  what it can mean.** `pick: "self"` never comes through that function —
+  `supportAllies` short-circuits to `[this]` — so the fast boss, whose entire
+  mechanic is shielding itself, is untouched. The two are still one block with
+  one field between them, not two mechanisms.
 - **A heal outlives the Healer that granted it**, because the timer lives on
   the target. That is what makes killing the Healer mid-pulse feel like the
   right play rather than a wasted one: you stop the *next* four seconds, not
@@ -3997,18 +4207,28 @@ Five things about it that are decisions rather than details:
 
 **HOVERING IS A HEIGHT. FLYING IS A TARGETING RULE. NEVER CONFLATE THEM**
 (2026-08-18). A type may carry `hover: { liftRadii, animHz }`, which lifts its
-body off the road and hands its animation a clock. It is **cosmetic in full**:
-the Healer is a ground target, every tower on the board can shoot it, and
-killing it first is the whole lesson of wave 32. `isFlying` is the other thing
-entirely — `Targeting.sees` and `RangeFilter` both fail closed on it, so a
-tower without air reach cannot touch a flier — and a Healer that had quietly
-picked up that immunity is a defect **nothing on screen would show**. Three
-readers, one number:
+body off the road and hands its animation a clock. It is **cosmetic in full**;
+`isFlying` is the other thing entirely — `Targeting.sees` and `RangeFilter` both
+fail closed on it, so a tower without air reach cannot touch a flier — and a
+body that quietly picked up that immunity would be a defect **nothing on screen
+would show**.
+
+**THE DISTINCTION STANDS. THE HEALER IS NO LONGER AN EXAMPLE OF IT** (2026-08-26,
+at the owner's instruction: *"make the healer a flying unit"*). This block used
+to name the Healer as the hovering case and argue that every tower could still
+shoot it. That ruling is REVERSED: the Healer is `isFlying`, wave 32 is now
+answerable only with air reach, and **its `hover` block is deleted** rather than
+left beside the flag that overrides it — every reader takes the flying branch
+first, so it would have been a declaration nothing reads. **The Shieldbearer is
+the surviving hovering type**, and it is the one to read for what `hover` means.
+
+Three readers, one number:
 
 - `Enemy.prototype.visualBodyLift` turns `liftRadii` into pixels and is the only
   place any of the three heights becomes a number. `GROUND_LIFT_RADII` (0.48) is
-  a walker lifted off its own shadow, `hover.liftRadii` (1.25 on the Healer) is
-  a body drifting above the road, `FLIGHT_LIFT_RADII` (3.45) is air.
+  a walker lifted off its own shadow, `hover.liftRadii` (0.55 on the
+  Shieldbearer) is a body drifting above the road, `FLIGHT_LIFT_RADII` (3.45) is
+  air.
 - `gl-world.js::bodyLift` is the 3D half — renamed from `flightLift` when it
   stopped being only about flight — and the health bar, the hover card's anchor,
   the falling wreck and a shot leading its target all read it through
@@ -4116,13 +4336,17 @@ warning:
 **A type may own MORE THAN ONE mesh** (2026-08-16). `enemyModel` resolves
 `enemy-<typeId>` and then consults `ENEMY_VARIANT`, a table in `gl-world.js`
 keyed by type id, whose value is a map of **state flag → model name**, first
-match wins. **There are two entries** (2026-08-20): the Revenant draws
+match wins. **There are three entries** (2026-08-26): the Revenant draws
 `enemy-revenant` until it dies and `enemy-revenant-undead` after it gets back
-up, and the **Bulwark** draws `enemy-shielded` until its shield empties and
-`enemy-shielded-broken` afterwards. Three rules, and each one is load-bearing:
+up; the **Bulwark** draws `enemy-shielded` until its shield empties and
+`enemy-shielded-broken` afterwards; and the **Vanguard** draws `enemy-boss_fast`
+while its shield holds and `enemy-boss_fast-shattered` while it is gone. Three
+rules, and each one is load-bearing:
 
-- **The predicate is a ONE-WAY fact about what this body has already been
-  through — never a live reading of the mechanic it came from.** The Revenant's
+- **THE PREDICATE IS A FACT ABOUT THIS BODY THAT SOMETHING OWNS AND KEEPS —
+  never a live reading of the mechanic it came from, and not necessarily
+  one-way.** The one-way part was the rule until 2026-08-26 and it was a rule
+  about the two types that had variants, not about variants. The Revenant's
   is `revived`, never `rooted` and never `revivesLeft`: all three move at the
   same instant on today's only revive spec and none of them mean the same thing.
   `rooted` is a movement fact any future snare could set on any type;
@@ -4134,6 +4358,27 @@ up, and the **Bulwark** draws `enemy-shielded` until its shield empties and
   Bulwark's pool, so the pool goes positive again while the doubled speed the
   break bought never comes back. See the shield section for the full argument;
   `Enemy.prototype.breakShield` is its only writer.
+
+  **THE VANGUARD'S IS `shieldOut`, AND IT IS NEITHER OF THE OTHER TWO — WHICH IS
+  WHY THE HEADLINE OF THIS BULLET CHANGED.** That boss shields ITSELF every
+  seven seconds (`support.pick === "self"`), so its shield is a rhythm and not
+  an event: it goes, it is gone for the rest of that window, and it comes back.
+  Both of the readings that work elsewhere are wrong here, in opposite
+  directions. `shieldBroken` is permanent and would leave the fast boss in its
+  wreckage for the rest of the run. `shield <= 0` is true of a body that has
+  **never been shielded at all** — the Vanguard spawns with `shieldMax` 0 and
+  waits out its first seven seconds — and would walk the boss onto the board
+  already in pieces. `shieldOut` means "the pool has emptied and nothing has
+  refilled it yet": set in `breakShield`, cleared in `grantShield` by ANY grant,
+  so a Shieldbearer's plate closes a Vanguard's gap exactly as its own pulse
+  does. `shieldBroken` deliberately does NOT follow it back, and the Bulwark
+  still keys on that one.
+
+  The generalisation, since three types have now needed three different
+  answers: **ask what the second mesh DEPICTS, and pick the flag that is true
+  exactly while that is true.** Wreckage that is repaired is not the same claim
+  as wreckage that is permanent, and neither is the same claim as an empty
+  pool.
 - **A missing variant falls back to the BASE mesh, not to the sphere.** Losing a
   `<script>` tag must not turn a Revenant into a coloured ball at the one moment
   the player is looking at it. `tools/check-model-tags.js` is what actually
@@ -4157,6 +4402,25 @@ have sprung it:** the bubble draws while `shieldFlash` decays and `shieldBroken`
 is already set by then, so the first Bulwark bubble a board ever drew could be
 one measured off the stripped body — no halo, a much smaller plan extent — and
 every Bulwark for the rest of the session would have worn it.
+
+**AND UNTIL 2026-08-26 THAT CACHE HAD NEVER MEASURED ANYTHING, ON ANY BODY.**
+`bodyExtentRadii` reads `m.positions` off the object `GLModels.get()` returns,
+and **that field did not exist**: `expand` built the array, filed it under
+`expanded` and nulled `raw`. The guard `if (!m.positions) return null` therefore
+fired on every model in the library, and every shield bubble in the game was
+drawn at the stand-in size meant for bodies with **no mesh at all** — 1.0 plan
+radii and 2.2 top. Nothing threw, nothing was reported, and a sphere-sized
+bubble around a Bulwark looked deliberate. One line in `gl-models.js`
+(`model.positions = arrays.positions`) fixes it, and the bubbles now hug the
+hulls they are measured off.
+
+**THE RULE THIS IS AN INSTANCE OF, and it is the same one `bands` already
+records:** *any new field on the model contract has to be added where it is
+built AND where it is published, or it is decoration.* `bands` shipped on eight
+models while `register` dropped it; `positions` existed on every model while
+`get()` never exposed it. Both were found by the first caller that had no
+fallback — which is also the argument for **not** writing a fallback into a
+reader that is measuring something real.
 
 **Geometry imported through `--rig humanoid` is stored in WORLD space, with the
 joint written into the frame matrix** (`T(J).R.T(-J)`), rather than offset to
@@ -5842,7 +6106,7 @@ on 2026-08-13 and any figure written down is wrong by the next commit;
 falling back to the sphere — so `ls js/gl/models/enemy-*.js` against
 `Enemy.TYPES` is the answer, and it is always current.
 
-**ELEVEN BODIES NOW COME FROM A `.glb` AND NOT FROM `tools/blender`**, and which
+**THIRTEEN BODIES NOW COME FROM A `.glb` AND NOT FROM `tools/blender`**, and which
 ones cannot be worked out from the directory listings. `enemy-flying` (the
 Aether Wisp) was the first, brought in on 2026-08-12; both Revenant meshes
 followed on 2026-08-16; **`enemy-fast` joined them on 2026-08-17**;
@@ -5851,16 +6115,18 @@ which had drawn a coloured sphere until then; **`enemy-shieldbearer` (the
 Auroris beacon) the same day**; **`enemy-slow` (the plodder) and
 **`enemy-boss` (the Tyrant Hunter-Killer) on 2026-08-19**; and
 **`enemy-shielded` and `enemy-shielded-broken` (the Bulwark, before and after
-its shield goes) on 2026-08-20**. All eleven are
+its shield goes) on 2026-08-20**; and **`enemy-boss_fast` and
+`enemy-boss_fast-shattered` (the Vanguard, before and after its own shield
+goes) on 2026-08-26**. All thirteen are
 regenerated by
 `tools/glb_to_model.py` from `glb/`, and none of them can be rebuilt from
-`tools/blender`. **Five of the eleven REPLACED a body this repo had already
-built** — `enemy-fast`, `enemy-shieldbearer`, `enemy-slow`, `enemy-boss` and
-`enemy-shielded` —
+`tools/blender`. **Six of the thirteen REPLACED a body this repo had already
+built** — `enemy-fast`, `enemy-shieldbearer`, `enemy-slow`, `enemy-boss`,
+`enemy-shielded` and `enemy-boss_fast` —
 and each cost a row in `export_mesh.py::TARGETS`; see the trap below, which has
-now been sprung five times.
+now been sprung six times.
 
-**TWO OF THE ELEVEN ARE ONE BODY IMPORTED TWICE, AND THE SECOND IMPORT IS NOT
+**TWO PAIRS ARE ONE BODY IMPORTED TWICE, AND THE SECOND IMPORT IS NEVER
 INDEPENDENT OF THE FIRST.** `bulwark_shield.glb` and `bulwark_no_shield.glb` are
 the same machine, and the stripped one is imported with `--span 3.0771` — the
 span the FIRST command prints — so that the pair share a scale rather than
@@ -5868,8 +6134,19 @@ merely a fitted height. The two files are 3.0771 and 3.0371 source units tall;
 fitting each to 1.354 independently would make the stripped body 1.3% larger and
 grow the Bulwark at the instant its shield pops. Re-run them as a pair, and read
 `glb_to_model.py`'s header for both command lines. The same `--span` rule is why
-the Revenant's two halves are the same size, and that is what the flag exists
-for.
+the Revenant's two halves are the same size, and why the Vanguard's shattered
+body carries `--span 4.3500` off the intact file (4.3500 against its own 4.3700,
+so an independent fit would have grown the boss 0.5% at the instant its shield
+popped). That is what the flag exists for.
+
+**AND THE VANGUARD'S PAIR IS THE ONE WHERE THE TWO FILES DO *NOT* MEAN TWO
+GAITS.** The Bulwark needs two rigs because its shield break is permanent and
+the machine moves differently afterwards forever. The Vanguard's two states are
+not before-and-after anything: it dashes the opening 400 u.l. and bounds the
+rest of the road, and it does both with its shield up and with it gone — the
+shield comes back every seven seconds. So the pair of gaits lives in the MODEL,
+as two `bands`, and BOTH files carry both. One rig, two cycles. Read the block
+above `VANGUARD_HEAD_PARTS` before assuming a second file implies a second rig.
 
 **EVERY SOURCE FILE IS NAMED FOR ITS ENEMY, AND THAT IS A RULE ABOUT `glb/`
 RATHER THAN ABOUT THE IMPORTER** (2026-08-19, at the owner's instruction:
@@ -5960,6 +6237,18 @@ hazard the block itself had been warning about:** `enemy-boss` was the first
 target name in TARGETS that is a PREFIX of another (`enemy-boss_fast`), so
 `--only=enemy-boss` rewrote the Vanguard too — identical in triangles, not in
 bytes. With the row gone the prefix has one match again.
+
+**AND A SIXTH, ON 2026-08-26: `enemy-boss_fast`.** The chassis Vanguard
+(`enemy_vanguard.py`) built the fast boss until `vanguard.glb` replaced it.
+`enemy_vanguard.py` is KEPT for a reason that has nothing to do with the row: it
+was the first body in this repo whose swing angle was SOLVED rather than
+authored, and `tools/blender/check_group_gait.py`'s notes are written against
+exactly that module. **And removing the row put the prefix hazard BACK, in the
+other direction**: `enemy-boss_fast` is now a prefix of
+`enemy-boss_fast-shattered`. Neither has a TARGETS row, so `_requested()` cannot
+be what goes wrong — and `glb_to_model.py` takes an exact `--name` with no
+prefix matching at all — but any batch tool that grows a prefix match has two
+files to hit here and must name the one it means.
 
 **AND A FIFTH, ON 2026-08-20: `enemy-shielded`.** The Courier
 (`enemy_courier.py`) built the Bulwark until `bulwark_shield.glb` replaced it.
@@ -6426,13 +6715,15 @@ the fallback right now — `enemy-normal`, `brute`, `flying`, `hive`, `swarm` �
 because they have not been re-exported since the field landed; the other seven
 declare an explicit `[[0, n]]` that means exactly the same thing.
 
-**AND ONLY ONE OF THE THREE WRITERS EMITS IT AT ALL, WHICH IS THE READING THE
-PARAGRAPH ABOVE WARNS ABOUT.** `export_mesh.py` declares `bands`;
-**`tools/glb_to_model.py` and `tools/blender/td_mesh.py` do not** — the first
-was written for imported bodies, the second for towers, blubs and summoners,
-which are the families the field is deliberately absent on. So every IMPORTED
-enemy and `enemy-fractal_slime` ship without it for a reason that has nothing to
-do with re-exporting, and a re-export is NOT the fix for them.
+**TWO OF THE THREE WRITERS EMIT IT NOW.** `export_mesh.py` always did.
+**`tools/glb_to_model.py` does since 2026-08-26**, but only for a rig that
+declares more than one cycle — a single-cycle import emits no `bands` at all, so
+the seven that predate the change reproduce byte-identical. `tools/blender/
+td_mesh.py` still does not, and should not: it writes towers, blubs and
+summoners, which are the families the field is deliberately absent on. So an
+IMPORTED enemy with one gait, and `enemy-fractal_slime`, ship without it for a
+reason that has nothing to do with re-exporting, and a re-export is NOT the fix
+for them.
 
 It is correct on all of them today, because each ships exactly one cycle and the
 fallback is the whole strip. What it costs is that they are exposed to the
@@ -6441,13 +6732,15 @@ stride, every frame individually right and only the sequence wrong. When one of
 those bodies needs a state pose, the fix is to teach its WRITER the field —
 never to hand-edit a generated file.
 
-**Measured 2026-08-18, and it corrects two rows of the dated list below.**
-`bands` present: `angry`, `armored`, `boss`, `boss_fast`, `camo_normal`,
-`colossus`, `shielded`, `slow`. Absent: `brute`, `fast`, `flying`,
-`fractal_slime`, `healer`, `hive`, `midboss`, `normal`, `revenant`,
-`revenant-undead`, `shieldbearer`, `swarm`. `fast` and `shieldbearer` moved from
-the first group to the second without losing anything: both were REPLACED by
-imports, and the writer changed under them.
+**Measured 2026-08-26.** `bands` present: `angry`, `armored`, `boss`,
+`boss_fast`, `boss_fast-shattered`, `camo_normal`, `colossus`, `shielded`,
+`slow`. Absent: `brute`, `fast`, `flying`, `fractal_slime`, `healer`, `hive`,
+`midboss`, `normal`, `revenant`, `revenant-undead`, `shieldbearer`, `swarm`.
+`fast` and `shieldbearer` moved from the first group to the second on 2026-08-18
+without losing anything: both were REPLACED by imports, and the writer changed
+under them. **`boss_fast` moved BACK on 2026-08-26**, and it is the only row
+that has ever done so — it was replaced by an import too, and that import
+declares two real bands.
 
 **A PAIR, NOT A LENGTH, and the reason is a defect this replaces.** Two
 incompatible arithmetics already coexist in `gl-world.js`: enemies index frame 0
@@ -6472,9 +6765,35 @@ asserting the walk never presents the state pose) is the only thing that
 exercises the feature at all. The first alone passes a reader that ignores the
 field entirely.
 
-**`bands[n][0]` has no caller yet.** Nothing addresses a state band, so that path
-ships unexercised by real geometry until the first genuinely banded body lands.
-Do not expect a plant or a raise pose to animate on arrival.
+**`bands[n][0]` HAS A CALLER SINCE 2026-08-26, and it is the Vanguard.** This
+paragraph read "no caller yet ... ships unexercised by real geometry until the
+first genuinely banded body lands" for eight days. That body has landed:
+`enemy-boss_fast` and `enemy-boss_fast-shattered` each declare `[[0, 16], [16,
+16]]`, and `gaitBand` in `gl-world.js` addresses band 1 whenever the boss is
+inside its opening sprint.
+
+**BAND 1 IS A SECOND GAIT HERE, NOT A STATE POSE, and the field turns out to be
+the right shape for both.** A state pose is addressed once and held; a second
+gait is a second CYCLE, driven by the same distance drive as the first. Nothing
+in the contract had to change for that — a pair is a pair — but the acceptance
+argument above did: a second band that is a cycle can SKATE, and the
+whole-list-fallback null cannot see it. `tools/check-gait-slip.js` now grades
+**every declared band** (one row per band, `--band N` for one), which is the
+gate that catches it. Grading band 0 twice and reporting a library sweep is
+exactly the failure this document warns about elsewhere: an instrument that has
+only ever returned one answer has not been tested.
+
+**WHICH BAND A BODY IS IN IS A SEPARATE QUESTION FROM WHICH BANDS EXIST, and
+they are two functions on purpose.** `walkBand(model)` answers the second and
+cannot answer the first — a model does not know how far down the road the thing
+wearing it has come. `gaitBand(model, enemy)` answers the first, off
+`ENEMY_GAIT_BAND`, a table of type id → predicate. It is a **predicate and not a
+flag name**, which is the one place it differs from `ENEMY_VARIANT`: `isSprinting()`
+is `progress < ul(sprint.untilUl)`, a comparison against where on the MAP the
+body is, and `js/enemy.js` keeps it as a function so the 2D wake, the tests and
+the renderer all ask one question rather than keeping three copies of it.
+Everything falls back to `walkBand`: a type with no row, a mesh with one band,
+or a predicate asking for a band this model does not have.
 
 ---
 
@@ -6573,7 +6892,8 @@ no mechanic was moved to match the description.
 | Rendered sheet cache version | `ASSET_VERSION = 14` | js/skins/draw-pack.js |
 | Measured rendered `contentTop` | Normal .8438; Swarm .6875; Brute .6937; Hive .5750 (shield-safe); Sniper base .7695, A3 .7539, A4 .5547, A5 .5625, B3 .7383, B4 .6406, B5 .5938 | js/skins/draw-pack.js; printed by tools/blender/td_scene.py |
 | Path length | ~1865 u.l. on the reference route | `Maps.referenceLengthUl()` (derived, not declared) |
-| Maps | 6: four authored plus fixed-seed Shifting Ley and two-route Twin Confluence | `Maps.LIST`, `Maps.DEFAULT_ID`, `Maps.routesOf` |
+| Maps | 7: five authored (including the forest board `test`) plus fixed-seed Shifting Ley and two-route Twin Confluence | `Maps.LIST`, `Maps.DEFAULT_ID`, `Maps.routesOf` |
+| Map chooser grid | up to 6 routes: 3 columns at 372x240. Past 6: 4 columns, card width fitted to the viewport and height derived from it at 16:9 | `mapGrid`, `mapCardRect` in game.js |
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
@@ -6615,6 +6935,8 @@ no mechanic was moved to match the description.
 | Enemy mechanic blocks | `attack`, `shield`, `revive`, `spawns`, `phases`, `support`, `sprint` — data, never a branch on the id | `Enemy.TYPES`, and one method per block |
 | What a shield pays | **nothing, ever** (2026-07-30). Healed HP too. Only health pays | `Enemy.takeDamage`, `Enemy.bounty` |
 | Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks, **and a second mesh from that moment on** | `Enemy.TYPES.shielded`, `shieldBroken`, `ENEMY_VARIANT` |
+| Vanguard's shield | 100 every 7 s, non-stacking, granted to ITSELF. A break swaps in the shattered mesh, throws the fragments onto the road and pulls them home again, and the mesh swaps BACK when the pool refills | `Enemy.TYPES.boss_fast.support`, `shieldOut`, `shieldReformProgress`, `ENEMY_VARIANT`, `shardPose` |
+| Vanguard's two gaits | a dash for the opening 400 u.l., a bound for the rest — two `bands` in one mesh, both distance-driven | `Enemy.TYPES.boss_fast.sprint`, `isSprinting`, `ENEMY_GAIT_BAND`, `gaitBand` |
 | Revenant | 16 HP, revives once to full and roots where it fell | `Enemy.TYPES.revenant` |
 | Hive | 150 HP, ordinary, pays normally | `Enemy.TYPES.hive` |
 | Hive brood | 5 normals every 7 s, each with a shield equal to its life and paying $0 | `Enemy.TYPES.hive.spawns` |

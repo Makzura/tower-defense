@@ -5082,7 +5082,10 @@ function drawGameOver() {
 
   drawRunOverlay({
     title: "BASE DESTROYED",
-    titleColor: "#e0736e",
+    // The two endings keep two colours, and both are now in the theme's own
+    // palette: a loss burns, a win holds the ley. Red and green were the old
+    // screen's and were the last two off-palette inks on any menu.
+    titleColor: "#f0784c",
     subtitle: "Fell on wave " +
       reachedWave() + " of " + WAVES.length +
       "  ·  " + runKills + " enemies destroyed"
@@ -5096,7 +5099,7 @@ function drawVictory() {
 
   drawRunOverlay({
     title: "THE BASE STANDS",
-    titleColor: "#8ce69d",
+    titleColor: "#74f0d6",
     subtitle: "All " +
       WAVES.length + " waves held  ·  " + runKills +
       " enemies destroyed  ·  " + Math.round(baseHp) + " base HP left"
@@ -5104,18 +5107,25 @@ function drawVictory() {
 }
 
 function drawRunOverlay(spec) {
-  ctx.fillStyle = "rgba(10,11,16,0.82)";
+  // A SCRIM OVER THE BOARD, NOT THE INTERIOR BACKDROP. The battlefield is
+  // still under this and is still worth seeing -- where the leak came through
+  // is the first thing a player looks for -- so the theme arrives as ash and
+  // ember over the run rather than as a wall in front of it.
+  ctx.fillStyle = "rgba(7,6,9,0.84)";
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  drawAshFall(menuClock());
+  drawAshFrame();
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.font = "50px " + MENU_DISPLAY_FONT;
   ctx.fillStyle = spec.titleColor;
-  ctx.font = "700 52px system-ui, sans-serif";
-  ctx.fillText(spec.title, VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 42);
+  drawMenuText(spec.title, VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 42, 5);
 
-  ctx.fillStyle = "#c7d1e0";
-  ctx.font = "18px system-ui, sans-serif";
-  ctx.fillText(spec.subtitle, VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 4);
+  ctx.font = "12px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_BONE + ",0.78)";
+  drawMenuText(spec.subtitle.toUpperCase(), VIEW_WIDTH / 2,
+    VIEW_HEIGHT / 2 - 4, 1.4);
 
   // What the run was worth, and what that buys. The payout is shown on BOTH
   // endings for the same reason the buttons are the same on both: "what do I
@@ -5132,10 +5142,10 @@ function drawRunOverlay(spec) {
   drawOverlayButton(changeMapButtonRect(), "Choose another route");
   drawOverlayButton(mainMenuButtonRect(), "Main menu");
 
-  ctx.fillStyle = "rgba(199,209,224,0.65)";
-  ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("R / Enter to restart    ·    M for another route    ·    Escape for the menu",
-    VIEW_WIDTH / 2, mainMenuButtonRect().y + 64);
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_DUST + ",0.6)";
+  drawMenuText("R / ENTER RESTART   \u00b7   M ANOTHER ROUTE   \u00b7   ESC MENU",
+    VIEW_WIDTH / 2, mainMenuButtonRect().y + 64, 1.3);
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -5271,31 +5281,35 @@ function drawBuildBar() {
 function drawPauseMenu() {
   if (!paused) return;
 
-  ctx.fillStyle = "rgba(10,11,16,0.82)";
+  // Same scrim as the run-over overlays, and for the same reason: the board is
+  // still worth seeing behind a menu that is mostly asking whether to go back
+  // to it.
+  ctx.fillStyle = "rgba(7,6,9,0.84)";
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  drawAshFall(menuClock());
+  drawAshFrame();
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#cfe3ff";
-  ctx.font = "700 46px system-ui, sans-serif";
-  ctx.fillText("PAUSED", VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 96);
+  ctx.font = "44px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "#f6d9b4";
+  drawMenuText("PAUSED", VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 96, 6);
 
   // Where the run stands, so the menu is worth opening for more than leaving.
-  ctx.fillStyle = "rgba(199,209,224,0.75)";
-  ctx.font = "16px system-ui, sans-serif";
-  ctx.fillText((currentMap ? currentMap.name + "  ·  " : "") +
-    "Wave " + reachedWave() +
-    " of " + WAVES.length + "  ·  " +
-    towers.length + " towers  ·  " + runKills + " destroyed  ·  Base " +
-    Math.round(baseHp), VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 52);
+  ctx.font = "11px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_BONE + ",0.72)";
+  drawMenuText(((currentMap ? currentMap.name + "  \u00b7  " : "") +
+    "WAVE " + reachedWave() + " OF " + WAVES.length + "  \u00b7  " +
+    towers.length + " TOWERS  \u00b7  " + runKills + " DESTROYED  \u00b7  BASE " +
+    Math.round(baseHp)).toUpperCase(), VIEW_WIDTH / 2, VIEW_HEIGHT / 2 - 52, 1.4);
 
   drawOverlayButton(resumeButtonRect(), "Resume");
   drawOverlayButton(backToMenuButtonRect(), "Back to main menu");
 
-  ctx.fillStyle = "rgba(199,209,224,0.55)";
-  ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("Esc to resume  ·  leaving does not save this run",
-    VIEW_WIDTH / 2, backToMenuButtonRect().y + 74);
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_DUST + ",0.58)";
+  drawMenuText("ESC TO RESUME  \u00b7  LEAVING DOES NOT SAVE THIS RUN",
+    VIEW_WIDTH / 2, backToMenuButtonRect().y + 74, 1.3);
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -6160,22 +6174,52 @@ window.addEventListener("load", init);
 
 // --- map chooser and enemy hover (merged from the other branch, v0.3.5) ---
 
+// THE GRID THE CARDS SIT ON, DERIVED FROM HOW MANY THERE ARE.
+//
+// The old version of this took the column count and the card size as given and
+// simply stacked more rows. That was fine while adding a map meant a fourth
+// card in an unfinished row, and it stopped being fine at SEVEN: three columns
+// of 240 px cards is three rows, which ends 902 px down a 720 px canvas -- the
+// bottom row entirely off the screen, unclickable, with no error anywhere to
+// say so. Layout that silently walks off the viewport is the failure this
+// function exists to make impossible.
+//
+// So the card size is a CAP now, not a constant. Up to six routes nothing
+// changes at all -- three columns at the full authored 372x240, which is what
+// the arithmetic below returns for that case, byte for byte. Past six it opens
+// a fourth column and shrinks the card to whatever fits the width, keeping the
+// render 16:9 by taking the height from the width rather than the other way
+// round (see mapPreviewRect: 16:9 is not negotiable, so the CARD is the thing
+// that gives).
+function mapGrid() {
+  var n = Maps.LIST.length;
+  var cols = Math.min(n, n <= MAP_CARD_COLS * 2 ? MAP_CARD_COLS : MAP_CARD_COLS + 1);
+  var w = Math.min(CARD_W,
+    Math.floor((VIEW_WIDTH - CARD_MARGIN * 2 - (cols - 1) * CARD_GAP) / cols));
+  var h = Math.min(CARD_H,
+    Math.round(CARD_CHROME_H + (w - 24) * VIEW_HEIGHT / VIEW_WIDTH));
+  return { cols: cols, rows: Math.ceil(n / cols), w: w, h: h };
+}
+
 function mapCardRect(i) {
-  var col = i % MAP_CARD_COLS;
-  var row = Math.floor(i / MAP_CARD_COLS);
-  var cols = Math.min(MAP_CARD_COLS, Maps.LIST.length);
-  var total = cols * CARD_W + (cols - 1) * CARD_GAP;
+  var g = mapGrid();
+  var col = i % g.cols;
+  var row = Math.floor(i / g.cols);
+  // Each ROW is centred on the cards it actually holds, so an odd last row
+  // sits under the middle of the grid instead of hanging off its left edge.
+  var inRow = Math.min(g.cols, Maps.LIST.length - row * g.cols);
+  var total = inRow * g.w + (inRow - 1) * CARD_GAP;
   return {
-    x: (VIEW_WIDTH - total) / 2 + col * (CARD_W + CARD_GAP),
-    y: CARD_Y + row * (CARD_H + CARD_ROW_GAP),
-    w: CARD_W,
-    h: CARD_H
+    x: (VIEW_WIDTH - total) / 2 + col * (g.w + CARD_GAP),
+    y: CARD_Y + row * (g.h + CARD_ROW_GAP),
+    w: g.w,
+    h: g.h
   };
 }
 
 function mapGridBottom() {
-  var rows = Math.ceil(Maps.LIST.length / MAP_CARD_COLS);
-  return CARD_Y + rows * CARD_H + (rows - 1) * CARD_ROW_GAP;
+  var g = mapGrid();
+  return CARD_Y + g.rows * g.h + (g.rows - 1) * CARD_ROW_GAP;
 }
 
 // Index of the map card under a point, or null.
@@ -6214,395 +6258,1194 @@ function backButtonRect() {
   return { x: 28, y: 28, w: 96, h: 34 };
 }
 
-function drawMenuHex(ctx, x, y, radius, squash) {
-  ctx.beginPath();
-  for (var i = 0; i < 6; i++) {
-    var angle = Math.PI / 6 + i * Math.PI / 3;
-    var px = x + Math.cos(angle) * radius;
-    var py = y + Math.sin(angle) * radius * squash;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
+// --- the title screen: THE ASH WASTE ----------------------------------------
+//
+// Theme, 2026-08-25, at the owner's request: the cyan command deck that stood
+// here from 2026-08-18 is gone entirely -- backdrop, props, controls and type.
+// What replaces it is a post-apocalyptic fantasy-tech world: a burnt sky over
+// a dead skyline, a colossal fractured ley-pylon on the left, a downed
+// sky-relay on the right, and a rift torn in the upper air that strikes on its
+// own clock. The screen ANIMATES continuously -- ash falls, embers rise, dust
+// sweeps the horizon, the rift cracks, debris floats -- because draw() already
+// runs every frame on the menu and the old screen's single breathing halo was
+// the whole of its life.
+//
+// Rules this screen keeps:
+//
+// - MOTION NEVER MOVES A HIT TARGET. Every animated value feeds a colour, an
+//   alpha, or a decoration's own position. The four rectangle functions above
+//   remain the single source for both drawing and hit testing, and none of
+//   them reads the clock.
+// - THE CENTRE STAYS QUIET. The scene's mass is in the left and right thirds;
+//   a soft dark veil is laid over the middle before the type goes down, so a
+//   burning sky can never cost the title or the controls their contrast.
+// - PALETTE: ash and rust are the surfaces (near-black browns, iron greys),
+//   ember orange and bone are the warm accents, and ley-teal and ley-violet
+//   are the ONLY cool ones -- they mark arcane energy, and nothing that is not
+//   arcane is allowed to use them. The old screen's cyan-and-gold rule is
+//   replaced by this one, not extended.
+// - DETERMINISM: every "random" detail comes from menuNoise(), a pure hash of
+//   an index, so the scene is identical on every boot and no array of particle
+//   state is kept alive between frames.
+
+// Impact is the display face on both macOS and Windows and needs no download,
+// which matters more here than a prettier choice would: the game runs from a
+// double-clicked file:// page, so a webfont would either need a server or a
+// megabyte of base64 in the HTML. Condensed, heavy and all-caps, it reads as
+// stencilled salvage rather than as system UI -- which is exactly the job the
+// old "700 15px system-ui" was failing at.
+var MENU_DISPLAY_FONT =
+  '"Impact", "Haettenschweiler", "Franklin Gothic Bold", "Arial Narrow", sans-serif';
+// The instrument face: readouts, hotkeys and the small print under a label.
+var MENU_TECH_FONT =
+  'ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace';
+
+var MENU_HORIZON = 604;          // where the sky stops and the waste begins
+
+// Seconds, monotonic. The harness's performance.now() is frozen at 0, so under
+// test every animated term collapses to its t=0 value and the screen still
+// draws -- deliberately, since the suite asserts that it draws, not what it
+// looks like.
+function menuClock() {
+  return typeof performance !== "undefined" && performance.now
+    ? performance.now() / 1000
+    : 0;
 }
 
-// The title screen is a command deck, not the chooser's empty lattice. Its
-// machinery deliberately echoes the top-down models on the maps without
-// becoming part of map content or simulation.
-function drawMenuReactor() {
+// A pure hash in [0,1). Not a generator: menuNoise(i) is the same number every
+// frame and every boot, which is what lets the scene keep hundreds of authored
+// details without keeping a single one of them in memory.
+function menuNoise(i) {
+  var x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// The test harness's canvas stub answers every unknown method with a function
+// that returns undefined, so ctx.createLinearGradient(...).addColorStop would
+// throw there and take the suite down. Both helpers degrade to the last stop's
+// flat colour when they are handed something that is not a gradient. This is
+// presentation only: a flat colour in a test that never looks at pixels costs
+// nothing, and a crash would cost the whole file.
+function menuLinear(x0, y0, x1, y1, stops) {
+  var g = ctx.createLinearGradient(x0, y0, x1, y1);
+  if (!g || typeof g.addColorStop !== "function") return stops[stops.length - 1][1];
+  for (var i = 0; i < stops.length; i++) g.addColorStop(stops[i][0], stops[i][1]);
+  return g;
+}
+
+function menuRadial(x, y, r0, r1, stops) {
+  var g = ctx.createRadialGradient(x, y, r0, x, y, r1);
+  if (!g || typeof g.addColorStop !== "function") return stops[stops.length - 1][1];
+  for (var i = 0; i < stops.length; i++) g.addColorStop(stops[i][0], stops[i][1]);
+  return g;
+}
+
+// Letter-spaced text. Canvas has ctx.letterSpacing now, but it is recent
+// enough that a browser without it would silently draw the whole screen's type
+// too tight, so the tracking is done by hand: measure each glyph, lay them out
+// with a gap, and honour ctx.textAlign ourselves because per-character drawing
+// cannot use the canvas's own alignment. Returns the width it drew, which the
+// title uses to place its rule.
+function drawMenuText(text, x, y, track, stroked) {
+  var chars = String(text).split("");
+  var widths = [];
+  var total = 0;
+  var i;
+  for (i = 0; i < chars.length; i++) {
+    var w = ctx.measureText(chars[i]).width || 0;
+    widths.push(w);
+    total += w;
+  }
+  if (chars.length > 1) total += track * (chars.length - 1);
+
+  var align = ctx.textAlign;
+  var cx = align === "center" ? x - total / 2 : (align === "right" ? x - total : x);
+  ctx.textAlign = "left";
+  for (i = 0; i < chars.length; i++) {
+    if (stroked) ctx.strokeText(chars[i], cx, y);
+    else ctx.fillText(chars[i], cx, y);
+    cx += widths[i] + track;
+  }
+  ctx.textAlign = align;
+  return total;
+}
+
+// STATIC LAYERS ARE BAKED ONCE AND BLITTED, and this is a measurement, not a
+// precaution. The first draft of this screen cost 72 ms a frame against a
+// 2560x1440 backing store -- about 14 fps -- and 51 ms of that was two
+// functions: the sky's full-width gradient with the sun in it (14 ms) and the
+// atmosphere's calm-centre veil, two full-screen vignette gradients and 144
+// scanlines (37 ms). Not one of those reads the clock, so they were being
+// re-rasterised sixty times a second for nothing.
+//
+// Each is painted into an offscreen canvas at the backing store's own
+// resolution -- so scanlines stay one device pixel -- and drawn back as a
+// single composite. The cache is keyed on the backing store's size, so a
+// window resize rebuilds it and a hot-swapped DPR cannot leave a soft layer
+// behind.
+//
+// WHERE IT CANNOT BAKE, IT PAINTS LIVE. The test harness's document has only
+// getElementById and its canvas stub has no real 2D context, so every path
+// below falls through to drawing the layer directly: same picture, nothing
+// thrown, and the suite never learns this optimisation exists.
+var menuLayers = { key: "", sky: null, veil: null };
+
+function menuBakeLayer(paint) {
+  var made;
+  try { made = document.createElement("canvas"); } catch (e) { return null; }
+  if (!made || typeof made.getContext !== "function") return null;
+  var scale = canvas && canvas.width > 0 ? canvas.width / VIEW_WIDTH : 1;
+  made.width = Math.round(VIEW_WIDTH * scale);
+  made.height = Math.round(VIEW_HEIGHT * scale);
+  var into = made.getContext("2d");
+  if (!into || typeof into.scale !== "function") return null;
+  into.scale(scale, scale);
+  // Baked through the SAME function the live path calls, by lending it the
+  // module's `ctx` for the duration. One drawing of each layer exists, so the
+  // cached picture cannot drift from the uncached one.
+  var live = ctx;
+  ctx = into;
+  try { paint(); } finally { ctx = live; }
+  return made;
+}
+
+// Returns the baked layer, or null when this environment cannot bake -- in
+// which case the caller paints it. A failed bake is remembered as `false` so
+// it is attempted once, not once a frame.
+function menuLayer(name, paint) {
+  var key = canvas ? canvas.width + "x" + canvas.height : "0x0";
+  if (menuLayers.key !== key) menuLayers = { key: key, sky: null, veil: null };
+  if (menuLayers[name] === null) menuLayers[name] = menuBakeLayer(paint) || false;
+  return menuLayers[name] || null;
+}
+
+function drawMenuLayer(name, paint) {
+  var baked = menuLayer(name, paint);
+  if (baked) ctx.drawImage(baked, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  else paint();
+}
+
+// A burnt sky: night at the top, a bruised middle, and a band of ember heat
+// sitting on the horizon where the sun is going down behind the ruins.
+function drawMenuSky(t) {
+  drawMenuLayer("sky", drawMenuSkyBase);
+  drawMenuSkyBands(t);
+}
+
+// The half of the sky that never changes: the gradient, the sun's halo, its
+// disc and the cracks across it. The sun used to breathe on a 0.7 Hz sine;
+// that pulse was the only thing keeping this out of the cache and the scene
+// has no shortage of motion without it.
+function drawMenuSkyBase() {
+  ctx.fillStyle = menuLinear(0, 0, 0, MENU_HORIZON, [
+    [0.00, "#07060b"],
+    [0.22, "#150d18"],
+    [0.44, "#3a1a22"],
+    [0.66, "#7e3320"],
+    [0.84, "#c25f24"],
+    [0.95, "#eea24a"],
+    [1.00, "#f6c274"]
+  ]);
+  ctx.fillRect(0, 0, VIEW_WIDTH, MENU_HORIZON);
+
+  // The dying sun, half-sunk. Its disc is deliberately dim and its halo wide:
+  // it lights the skyline from behind and never competes with the title.
+  ctx.fillStyle = menuRadial(640, MENU_HORIZON, 20, 330, [
+    [0.00, "rgba(255,196,110,0.30)"],
+    [0.35, "rgba(236,124,50,0.17)"],
+    [1.00, "rgba(120,40,26,0)"]
+  ]);
+  ctx.fillRect(300, MENU_HORIZON - 340, 680, 350);
+
   ctx.save();
-  ctx.translate(166, 405);
-
   ctx.beginPath();
-  ctx.ellipse(10, 88, 118, 31, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.56)";
+  ctx.rect(0, 0, VIEW_WIDTH, MENU_HORIZON);
+  ctx.clip();
+  ctx.beginPath();
+  ctx.arc(640, MENU_HORIZON, 152, 0, Math.PI * 2);
+  ctx.fillStyle = menuRadial(640, MENU_HORIZON - 40, 10, 160, [
+    [0.00, "rgba(255,226,168,0.62)"],
+    [0.55, "rgba(240,142,58,0.44)"],
+    [1.00, "rgba(190,72,32,0.20)"]
+  ]);
   ctx.fill();
 
-  // Wide hexagonal footing: the left decoration is now unmistakably a tower,
-  // and its barrel points into the command rail rather than away from the UI.
-  drawMenuHex(ctx, 0, 62, 108, 0.42);
-  ctx.fillStyle = "#0b1a24";
-  ctx.fill();
+  // Cracks across the disc: this sun is not well.
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(74,218,255,0.48)";
-  ctx.stroke();
-
-  ctx.fillStyle = "#122b39";
-  ctx.fillRect(-72, 28, 144, 42);
-  ctx.strokeStyle = "rgba(74,218,255,0.38)";
-  ctx.strokeRect(-71.5, 28.5, 143, 41);
-  ctx.fillStyle = "#173746";
-  ctx.fillRect(-54, -31, 108, 61);
-  ctx.strokeRect(-53.5, -30.5, 107, 60);
-
-  ctx.beginPath();
-  ctx.moveTo(-45, -31);
-  ctx.lineTo(-30, -82);
-  ctx.lineTo(31, -82);
-  ctx.lineTo(46, -31);
-  ctx.closePath();
-  ctx.fillStyle = "#1b4150";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(74,218,255,0.55)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Armoured turret cap and the inward-facing weapon/sensor boom.
-  ctx.fillStyle = "#091720";
-  ctx.fillRect(-58, -94, 112, 22);
-  ctx.strokeStyle = "rgba(255,197,83,0.65)";
-  ctx.strokeRect(-57.5, -93.5, 111, 21);
-  ctx.beginPath();
-  ctx.moveTo(50, -88);
-  ctx.lineTo(126, -77);
-  ctx.lineTo(126, -66);
-  ctx.lineTo(48, -72);
-  ctx.closePath();
-  ctx.fillStyle = "#173746";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(74,218,255,0.5)";
-  ctx.stroke();
-  ctx.fillStyle = "#ffd76e";
-  ctx.fillRect(119, -77, 10, 12);
-
-  // The cyan core is functional: it runs from the footing to the turret head.
-  ctx.beginPath();
-  ctx.moveTo(-12, 18);
-  ctx.lineTo(-19, -21);
-  ctx.lineTo(0, -55);
-  ctx.lineTo(19, -21);
-  ctx.lineTo(12, 18);
-  ctx.closePath();
-  ctx.fillStyle = "rgba(74,218,255,0.2)";
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(112,232,255,0.92)";
-  ctx.stroke();
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "700 11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(145,241,255,0.72)";
-  ctx.fillText("DEFENSE NODE // A1", 0, 126);
-  ctx.font = "10px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(122,178,198,0.55)";
-  ctx.fillText("ARC READY  ·  98.7%", 0, 143);
+  for (var crack = 0; crack < 5; crack++) {
+    var ca = menuNoise(crack + 41) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(640 + Math.cos(ca) * 30, MENU_HORIZON - 40 + Math.sin(ca) * 30);
+    for (var seg = 1; seg <= 4; seg++) {
+      var ra = ca + (menuNoise(crack * 7 + seg) - 0.5) * 0.7;
+      ctx.lineTo(640 + Math.cos(ra) * (30 + seg * 32),
+        MENU_HORIZON - 40 + Math.sin(ra) * (30 + seg * 32));
+    }
+    ctx.strokeStyle = "rgba(92,26,18,0.34)";
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-function drawMenuComms() {
-  ctx.save();
-  ctx.translate(1095, 356);
+// Ley-light in the upper air. Three ribbons, undulating on their own phase.
+// Teal and violet only, and never above 0.13 alpha -- this is weather, not an
+// element the eye should stop on. Strokes, so they are cheap enough to stay
+// live while everything behind them is baked.
+function drawMenuSkyBands(t) {
+  for (var band = 0; band < 3; band++) {
+    var base = 74 + band * 58;
+    var hue = band === 1 ? "158,116,255" : "94,226,201";
+    ctx.beginPath();
+    ctx.moveTo(-20, base);
+    for (var bx = -20; bx <= VIEW_WIDTH + 20; bx += 40) {
+      ctx.lineTo(bx,
+        base + Math.sin(bx * 0.0052 + t * (0.16 + band * 0.05) + band * 2.1) * 21 +
+        Math.sin(bx * 0.0131 - t * 0.09) * 7);
+    }
+    // Wide and very faint, and stroked twice: a soft core inside a softer
+    // halo. A single 16 px stroke at this alpha read as a ruled band across
+    // the sky, which is the opposite of light in the air.
+    var lit = (0.026 + 0.022 * (1 + Math.sin(t * 0.5 + band))).toFixed(4);
+    ctx.strokeStyle = "rgba(" + hue + "," + lit + ")";
+    ctx.lineWidth = 46 + band * 22;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(" + hue + "," + (lit * 1.6).toFixed(4) + ")";
+    ctx.lineWidth = 9 + band * 4;
+    ctx.stroke();
+  }
+}
 
-  // Angled console deck and its holographic tactical screen.
+// Two dead cities on the horizon: a far row bleached by haze, a nearer row
+// almost black. Both drift a few pixels on a slow sine, which is the parallax
+// of a camera that is breathing rather than a scroll.
+function drawMenuSkyline(t) {
+  var layer, i;
+  for (layer = 0; layer < 2; layer++) {
+    var far = layer === 0;
+    var drift = Math.sin(t * (far ? 0.05 : 0.08) + layer) * (far ? 5 : 9);
+    var baseY = MENU_HORIZON - (far ? 8 : 0);
+    ctx.save();
+    ctx.translate(drift, 0);
+    var body = far ? "rgba(48,24,30,0.62)" : "#100910";
+    ctx.fillStyle = body;
+    for (i = 0; i < (far ? 26 : 19); i++) {
+      var seed = i + layer * 60;
+      var bx = -40 + i * (far ? 52 : 72) + menuNoise(seed) * 26;
+      var bw = (far ? 26 : 40) + menuNoise(seed + 7) * (far ? 22 : 34);
+      var bh = (far ? 40 : 66) + menuNoise(seed + 13) * (far ? 78 : 132);
+      var shape = menuNoise(seed + 21);
+      // MOST OF THIS CITY IS BROKEN, and that is the point: a row of intact
+      // rectangles is a skyline at dusk, not a skyline after the war. Only the
+      // last case below is a whole building, and it is the minority.
+      ctx.beginPath();
+      if (shape > 0.62) {
+        // Snapped off on the diagonal.
+        ctx.moveTo(bx, baseY);
+        ctx.lineTo(bx, baseY - bh);
+        ctx.lineTo(bx + bw * 0.45, baseY - bh * (0.58 + menuNoise(seed + 3) * 0.2));
+        ctx.lineTo(bx + bw, baseY - bh * 0.5);
+        ctx.lineTo(bx + bw, baseY);
+      } else if (shape > 0.38) {
+        // Collapsed into a stump with one wall still standing.
+        ctx.moveTo(bx, baseY);
+        ctx.lineTo(bx, baseY - bh * 0.42);
+        ctx.lineTo(bx + bw * 0.28, baseY - bh * 0.34);
+        ctx.lineTo(bx + bw * 0.34, baseY - bh);
+        ctx.lineTo(bx + bw * 0.62, baseY - bh * 0.92);
+        ctx.lineTo(bx + bw * 0.7, baseY - bh * 0.3);
+        ctx.lineTo(bx + bw, baseY - bh * 0.24);
+        ctx.lineTo(bx + bw, baseY);
+      } else if (shape > 0.18) {
+        // Leaning, and going the rest of the way at some point.
+        var tilt = (menuNoise(seed + 33) - 0.5) * bw * 0.6;
+        ctx.moveTo(bx, baseY);
+        ctx.lineTo(bx + tilt * 0.6, baseY - bh);
+        ctx.lineTo(bx + bw + tilt, baseY - bh * 0.86);
+        ctx.lineTo(bx + bw, baseY);
+      } else {
+        ctx.rect(bx, baseY - bh, bw, bh);
+      }
+      ctx.closePath();
+      ctx.fill();
+      // A few windows still have power, and they gutter.
+      if (!far && menuNoise(seed + 31) > 0.55) {
+        var lit = 0.25 + 0.2 * (1 + Math.sin(t * (1.4 + menuNoise(seed) * 2) + i));
+        ctx.fillStyle = "rgba(255,168,86," + lit.toFixed(3) + ")";
+        ctx.fillRect(bx + bw * 0.3, baseY - bh * 0.55, 4, 7);
+        ctx.fillRect(bx + bw * 0.6, baseY - bh * 0.34, 4, 7);
+        ctx.fillStyle = body;
+      }
+    }
+    ctx.restore();
+  }
+
+  // Dust rolling along the horizon, left to right, on a loop long enough that
+  // it never reads as a repeat.
+  var veil = ((t * 22) % 2000) - 360;
+  ctx.fillStyle = menuRadial(veil, MENU_HORIZON - 46, 20, 300, [
+    [0.00, "rgba(196,142,96,0.13)"],
+    [1.00, "rgba(196,142,96,0)"]
+  ]);
+  ctx.fillRect(veil - 300, MENU_HORIZON - 200, 600, 210);
+}
+
+// Rock torn off the ground and left hanging: the fantasy half of the fiction,
+// stated once and plainly. Each island is a dark wedge with a lit underside
+// and a rune ring holding it up, drifting on its own slow bob. They sit in the
+// outer thirds only -- the centre is the type's, and a shape floating behind
+// the title would be exactly the distraction the calm veil exists to prevent.
+function drawMenuIslands(t) {
+  // Placed clear of the title, the eyebrow and both bays' machinery. The two
+  // small ones sit high, where the sky is emptiest.
+  var spots = [[318, 108, 1.05], [1134, 150, 0.92], [792, 66, 0.5],
+    [498, 54, 0.42]];
+  for (var i = 0; i < spots.length; i++) {
+    var sx = spots[i][0] + Math.sin(t * 0.11 + i * 1.9) * 14;
+    var sy = spots[i][1] + Math.sin(t * 0.19 + i * 2.7) * 9;
+    var k = spots[i][2];
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(k, k);
+
+    // ASYMMETRIC AND WIDER THAN TALL, deliberately. The first draft was a
+    // symmetrical wedge with a long point and a full ellipse under it, and
+    // between them they read as a flying saucer rather than as a piece of
+    // ground: a lump of rock is lopsided and its broken face is off-centre.
+    ctx.beginPath();
+    ctx.moveTo(-72, -4);
+    ctx.lineTo(-46, -17);
+    ctx.lineTo(-8, -23);
+    ctx.lineTo(28, -15);
+    ctx.lineTo(64, -5);
+    ctx.lineTo(50, 11);
+    ctx.lineTo(22, 15);
+    ctx.lineTo(9, 38);
+    ctx.lineTo(-4, 17);
+    ctx.lineTo(-36, 13);
+    ctx.closePath();
+    ctx.fillStyle = menuLinear(0, -22, 0, 38, [
+      [0.00, "#3a2830"],
+      [0.45, "#1d1219"],
+      [1.00, "#0c070c"]
+    ]);
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = "rgba(146,88,60,0.5)";
+    ctx.stroke();
+
+    // RIM LIGHT, and it is what makes these read as rock rather than as a
+    // hole in the sky: the sun is behind and below, so the torn underside
+    // catches ember and the top plate takes a thin bone edge. Without it a
+    // dark shape on a dark sky was invisible and only its runes showed.
+    ctx.beginPath();
+    ctx.moveTo(-36, 13);
+    ctx.lineTo(-4, 17);
+    ctx.lineTo(9, 38);
+    ctx.lineTo(22, 15);
+    ctx.lineTo(50, 11);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = "rgba(255,150,72,0.6)";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-72, -4);
+    ctx.lineTo(-46, -17);
+    ctx.lineTo(-8, -23);
+    ctx.lineTo(28, -15);
+    ctx.lineTo(64, -5);
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = "rgba(228,192,158,0.48)";
+    ctx.stroke();
+
+    // A ruin still standing on it, so the rock reads as a piece of somewhere.
+    ctx.fillStyle = "#0f0910";
+    ctx.fillRect(-26, -48, 12, 29);
+    ctx.fillRect(0, -36, 8, 17);
+    ctx.fillStyle = "rgba(226,190,158,0.34)";
+    ctx.fillRect(-26, -48, 12, 2);
+    ctx.fillRect(0, -36, 8, 2);
+
+    // WHAT HOLDS IT UP IS SHOWN BY WHAT ORBITS IT, not by a ring under it.
+    // Two drafts wore a glowing ellipse -- first a skirt below the rock, then
+    // a band around its waist -- and both projected in front of and behind
+    // the silhouette, which is exactly the read of a saucer. Loose shards
+    // circling say the same thing (this rock is not obeying gravity) and
+    // cannot be mistaken for a hull.
+    var lift = 0.55 + 0.25 * (1 + Math.sin(t * 1.4 + i * 1.3));
+    for (var g = 0; g < 4; g++) {
+      var ga = t * (0.34 + menuNoise(g + i * 5) * 0.2) * (i % 2 ? -1 : 1) +
+        g * 1.6;
+      var gx = Math.cos(ga) * (58 + g * 11);
+      var gy = 8 + Math.sin(ga) * (13 + g * 3);
+      var gs = 3 + menuNoise(g + i * 9) * 4;
+      ctx.beginPath();
+      ctx.moveTo(gx - gs, gy);
+      ctx.lineTo(gx - gs * 0.2, gy - gs);
+      ctx.lineTo(gx + gs, gy - gs * 0.3);
+      ctx.lineTo(gx + gs * 0.3, gy + gs * 0.8);
+      ctx.closePath();
+      ctx.fillStyle = "#170e14";
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(132,246,222," + (0.34 + 0.3 * lift).toFixed(3) + ")";
+      ctx.stroke();
+    }
+    // The ley-light the shards are riding on, thrown up into the stone.
+    ctx.fillStyle = menuRadial(-4, 10, 6, 84, [
+      [0.00, "rgba(132,246,222," + (0.10 * lift).toFixed(3) + ")"],
+      [1.00, "rgba(132,246,222,0)"]
+    ]);
+    ctx.fillRect(-88, -22, 176, 84);
+    ctx.restore();
+  }
+}
+
+// A tear in the sky. `period` seconds apart it flares white-hot and its
+// branches re-cut themselves; between strikes it sits as a dim seam, so the
+// eye is caught a couple of times a minute rather than nagged continuously.
+function drawMenuRift(t, x, y, height, spread, hue, period) {
+  var strike = Math.floor(t / period);
+  var phase = (t / period) % 1;
+  var flash = phase < 0.10 ? 1 - phase / 0.10 : 0;
+  var idle = 0.20 + Math.sin(t * 1.7 + x) * 0.05;
+  var power = idle + flash * 0.8;
+
+  ctx.save();
+  ctx.fillStyle = menuRadial(x, y + height / 2, 6, height * 0.9, [
+    [0.00, "rgba(" + hue + "," + (0.16 * power * 3).toFixed(3) + ")"],
+    [1.00, "rgba(" + hue + ",0)"]
+  ]);
+  ctx.fillRect(x - height, y - height * 0.3, height * 2, height * 1.7);
+
+  var branch;
+  for (branch = 0; branch < 3; branch++) {
+    var seed = strike * 17 + branch * 9;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    var px = x;
+    var py = y;
+    for (var step = 1; step <= 7; step++) {
+      px += (menuNoise(seed + step) - 0.5) * spread * (branch === 0 ? 1 : 1.7);
+      py += height / 7;
+      ctx.lineTo(px, py);
+    }
+    ctx.lineWidth = branch === 0 ? 3.2 : 1.4;
+    ctx.strokeStyle = "rgba(" + hue + "," +
+      Math.min(0.95, power * (branch === 0 ? 1 : 0.5)).toFixed(3) + ")";
+    ctx.stroke();
+    if (branch === 0 && flash > 0.2) {
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(255,246,232," + (flash * 0.8).toFixed(3) + ")";
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// LEFT BAY: a colossal ley-pylon, snapped near the top, still holding its
+// core. It is the tower this game is about, a hundred years after the war --
+// which is why it is a silhouette with one live light in it rather than a
+// diagram of a working machine.
+function drawMenuPylon(t) {
+  ctx.save();
+  ctx.translate(196, MENU_HORIZON);
+
+  // The shadow it throws toward the viewer.
   ctx.beginPath();
-  ctx.moveTo(-132, 52);
-  ctx.lineTo(112, 52);
-  ctx.lineTo(138, 118);
-  ctx.lineTo(-106, 118);
+  ctx.ellipse(14, 22, 172, 30, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fill();
+
+  // Buttressed footing.
+  ctx.fillStyle = "#1b1116";
+  ctx.beginPath();
+  ctx.moveTo(-128, 12);
+  ctx.lineTo(-86, -74);
+  ctx.lineTo(84, -74);
+  ctx.lineTo(126, 12);
   ctx.closePath();
-  ctx.fillStyle = "#173445";
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(75,204,241,0.62)";
+  ctx.strokeStyle = "rgba(232,142,72,0.28)";
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(45,175,215,0.2)";
-  ctx.fillRect(-91, 68, 165, 26);
-  ctx.strokeStyle = "rgba(80,220,255,0.72)";
-  ctx.strokeRect(-91, 68, 165, 26);
-  for (var lamp = 0; lamp < 5; lamp++) {
+  // The shaft, leaning: a plumb tower would look maintained.
+  ctx.save();
+  ctx.rotate(-0.055);
+  ctx.fillStyle = menuLinear(-56, -420, 62, -60, [
+    [0.00, "#2a1a1c"],
+    [0.55, "#1d1216"],
+    [1.00, "#120b0f"]
+  ]);
+  ctx.beginPath();
+  ctx.moveTo(-58, -70);
+  ctx.lineTo(-40, -352);
+  ctx.lineTo(38, -352);
+  ctx.lineTo(58, -70);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(238,150,78,0.30)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Ribs, and the rust that has run down from each of them.
+  for (var rib = 0; rib < 7; rib++) {
+    var ry = -96 - rib * 38;
+    var half = 56 - rib * 2.4;
+    ctx.fillStyle = "rgba(96,52,34,0.55)";
+    ctx.fillRect(-half, ry, half * 2, 5);
+    ctx.fillStyle = "rgba(150,72,38,0.16)";
+    ctx.fillRect(-half + 8 + menuNoise(rib) * 40, ry + 5, 3, 22 + menuNoise(rib + 5) * 18);
+  }
+
+  // The snapped crown: torn plate, not a clean cut.
+  ctx.beginPath();
+  ctx.moveTo(-40, -352);
+  ctx.lineTo(-30, -404);
+  ctx.lineTo(-6, -378);
+  ctx.lineTo(10, -420);
+  ctx.lineTo(26, -372);
+  ctx.lineTo(38, -352);
+  ctx.closePath();
+  ctx.fillStyle = "#241419";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(238,150,78,0.38)";
+  ctx.stroke();
+
+  // The core still burning in the shaft, seen through the tear. Ley-teal,
+  // pulsing on two frequencies so it flickers like something failing.
+  var core = 0.62 + Math.sin(t * 2.3) * 0.18 + Math.sin(t * 5.9) * 0.08;
+  ctx.fillStyle = menuRadial(0, -232, 4, 130, [
+    [0.00, "rgba(150,255,232," + (0.55 * core).toFixed(3) + ")"],
+    [0.45, "rgba(72,214,190," + (0.22 * core).toFixed(3) + ")"],
+    [1.00, "rgba(30,120,120,0)"]
+  ]);
+  ctx.fillRect(-130, -362, 260, 260);
+  ctx.beginPath();
+  ctx.moveTo(-13, -160);
+  ctx.lineTo(-20, -246);
+  ctx.lineTo(0, -300);
+  ctx.lineTo(20, -246);
+  ctx.lineTo(13, -160);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(120,246,220," + (0.20 * core).toFixed(3) + ")";
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(158,255,236," + (0.86 * core).toFixed(3) + ")";
+  ctx.stroke();
+  ctx.restore();
+
+  // Glyph rings turning around the shaft at different rates and tilts. Drawn
+  // as arc segments rather than a dashed stroke so no browser's dash support
+  // is load-bearing on the look.
+  for (var ring = 0; ring < 3; ring++) {
+    var ry2 = -150 - ring * 84;
+    var rr = 96 - ring * 14;
+    var spin = t * (0.22 + ring * 0.09) * (ring % 2 ? -1 : 1);
+    ctx.lineWidth = 2;
+    for (var g = 0; g < 14; g++) {
+      var a0 = spin + (g / 14) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.ellipse(0, ry2, rr, rr * 0.26, 0.04, a0, a0 + 0.20);
+      ctx.strokeStyle = "rgba(" + (g % 4 === 0 ? "255,182,96" : "116,240,214") + "," +
+        (0.30 + 0.24 * (1 + Math.sin(t * 1.3 + g))).toFixed(3) + ")";
+      ctx.stroke();
+    }
+  }
+
+  // Debris held up by the rings. Slow orbits, no two the same period.
+  for (var d = 0; d < 7; d++) {
+    var ang = t * (0.13 + menuNoise(d) * 0.1) + d * 1.7;
+    var dx = Math.cos(ang) * (74 + menuNoise(d + 3) * 66);
+    var dy = -120 - d * 34 + Math.sin(ang * 1.4 + d) * 13;
+    var ds = 6 + menuNoise(d + 11) * 11;
     ctx.beginPath();
-    ctx.arc(93 + (lamp % 2) * 14, 70 + Math.floor(lamp / 2) * 13,
-      3, 0, Math.PI * 2);
-    ctx.fillStyle = lamp === 4 ? "#ffd76e" : "#5ce2ff";
+    ctx.moveTo(dx - ds, dy);
+    ctx.lineTo(dx - ds * 0.3, dy - ds * 0.9);
+    ctx.lineTo(dx + ds, dy - ds * 0.2);
+    ctx.lineTo(dx + ds * 0.4, dy + ds * 0.8);
+    ctx.closePath();
+    ctx.fillStyle = "#1c1218";
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "rgba(116,240,214," +
+      (0.30 + 0.2 * (1 + Math.sin(t * 1.9 + d))).toFixed(3) + ")";
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  drawMenuRift(t, 232, 96, 150, 40, "132,246,222", 5.2);
+}
+
+// RIGHT BAY: a sky-relay that came down and was never recovered. Hull half
+// buried, dish snapped off its mount and leaning, one salvaged panel still
+// answering. Ember-lit, so the two bays are not the same colour of dead.
+function drawMenuWreck(t) {
+  ctx.save();
+  ctx.translate(1082, MENU_HORIZON);
+
+  ctx.beginPath();
+  ctx.ellipse(-8, 20, 186, 30, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fill();
+
+  // Hull, nose-down in the ash, its spine broken over a rise.
+  ctx.save();
+  ctx.rotate(-0.19);
+  ctx.beginPath();
+  ctx.moveTo(-172, 14);
+  ctx.lineTo(-138, -58);
+  ctx.lineTo(96, -96);
+  ctx.lineTo(158, -54);
+  ctx.lineTo(150, 10);
+  ctx.closePath();
+  ctx.fillStyle = menuLinear(0, -100, 0, 14, [
+    [0.00, "#3a2620"],
+    [0.60, "#241619"],
+    [1.00, "#150d11"]
+  ]);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(240,152,74,0.34)";
+  ctx.stroke();
+
+  // Hull plating, and the tear where the spine gave way.
+  for (var plate = 0; plate < 6; plate++) {
+    ctx.strokeStyle = "rgba(232,140,70,0.13)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-140 + plate * 48, -56 - plate * 5);
+    ctx.lineTo(-146 + plate * 48, 10);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(14, -92);
+  ctx.lineTo(30, -46);
+  ctx.lineTo(6, -30);
+  ctx.lineTo(34, 8);
+  ctx.strokeStyle = "rgba(255,146,64,0.5)";
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Ports along the flank, a couple of them still lit.
+  for (var port = 0; port < 7; port++) {
+    var live = menuNoise(port + 51) > 0.6;
+    ctx.fillStyle = live
+      ? "rgba(255,178,92," + (0.35 + 0.3 * (1 + Math.sin(t * 2.2 + port))).toFixed(3) + ")"
+      : "rgba(38,24,26,0.9)";
+    ctx.fillRect(-118 + port * 40, -60 - port * 4, 15, 10);
+  }
+  ctx.restore();
+
+  // The dish, thrown clear and leaning on the wreck. Its feed horn still
+  // sweeps -- the only thing on this screen still trying to do its job.
+  ctx.save();
+  ctx.translate(-34, -128);
+  ctx.rotate(0.42);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 86, 40, 0, 0, Math.PI * 2);
+  ctx.fillStyle = menuLinear(-86, -40, 86, 40, [
+    [0.00, "#33221f"],
+    [0.52, "#1e1417"],
+    [1.00, "#2a1b1c"]
+  ]);
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(244,158,80,0.46)";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(-6, -3, 54, 22, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(244,158,80,0.20)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // A bite taken out of the rim.
+  ctx.beginPath();
+  ctx.moveTo(52, -20);
+  ctx.lineTo(86, -4);
+  ctx.lineTo(48, 14);
+  ctx.closePath();
+  ctx.fillStyle = "#120b0f";
+  ctx.fill();
+
+  var sweep = Math.sin(t * 0.8) * 0.5;
+  ctx.save();
+  ctx.rotate(sweep * 0.28);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(4, -66);
+  ctx.strokeStyle = "rgba(250,178,104,0.72)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(4, -70, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,206,140," +
+    (0.6 + 0.4 * (1 + Math.sin(t * 3.4)) * 0.5).toFixed(3) + ")";
+  ctx.fill();
+  ctx.restore();
+  ctx.restore();
+
+  // A salvaged panel bolted to the hull, still holding a signal. This is the
+  // screen's one piece of working technology and it is doing it on scrap.
+  ctx.save();
+  ctx.translate(96, -104);
+  ctx.rotate(-0.12);
+  ctx.fillStyle = "rgba(10,8,12,0.88)";
+  ctx.fillRect(-56, -34, 112, 68);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(116,240,214,0.42)";
+  ctx.strokeRect(-55.5, -33.5, 111, 67);
+  ctx.beginPath();
+  ctx.moveTo(-44, 6);
+  for (var s = -44; s <= 44; s += 8) {
+    ctx.lineTo(s, 6 - Math.abs(Math.sin(s * 0.09 + t * 2.4)) * 22 *
+      (0.4 + menuNoise(Math.floor(s / 8) + 3) * 0.6));
+  }
+  ctx.strokeStyle = "rgba(132,248,220,0.78)";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(116,240,214,0.5)";
+  ctx.fillRect(-44, 20, 88 * (0.35 + 0.32 * (1 + Math.sin(t * 0.9))), 4);
+  ctx.restore();
+  ctx.restore();
+
+  drawMenuRift(t, 1004, 62, 176, 52, "168,132,255", 7.7);
+}
+
+// The waste itself: ash flats, a broken road running out of frame, wreckage
+// and the marker posts someone put up before they left.
+function drawMenuGround(t) {
+  ctx.fillStyle = menuLinear(0, MENU_HORIZON - 6, 0, VIEW_HEIGHT, [
+    [0.00, "#31201c"],
+    [0.24, "#1d1316"],
+    [1.00, "#0a0709"]
+  ]);
+  ctx.fillRect(0, MENU_HORIZON - 6, VIEW_WIDTH, VIEW_HEIGHT - MENU_HORIZON + 6);
+
+  // The lip of the horizon catches the last of the sun.
+  ctx.fillStyle = "rgba(255,168,88,0.30)";
+  ctx.fillRect(0, MENU_HORIZON - 7, VIEW_WIDTH, 2);
+
+  // Road out of the frame, converging on the sun. Its edges are what give the
+  // flats any depth at all.
+  ctx.beginPath();
+  ctx.moveTo(624, MENU_HORIZON - 4);
+  ctx.lineTo(656, MENU_HORIZON - 4);
+  ctx.lineTo(966, VIEW_HEIGHT);
+  ctx.lineTo(314, VIEW_HEIGHT);
+  ctx.closePath();
+  ctx.fillStyle = menuLinear(0, MENU_HORIZON, 0, VIEW_HEIGHT, [
+    [0.00, "rgba(96,62,48,0.85)"],
+    [0.45, "rgba(58,38,34,0.75)"],
+    [1.00, "rgba(30,20,22,0.7)"]
+  ]);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(238,150,80,0.30)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Broken centre line, running to the vanishing point. Perspective is in the
+  // spacing: the dashes shorten and narrow toward the horizon, which is the
+  // whole reason the flats have any depth.
+  for (var dash = 0; dash < 9; dash++) {
+    var near = dash / 8;
+    var dy2 = MENU_HORIZON + 2 + near * near * (VIEW_HEIGHT - MENU_HORIZON) * 1.28;
+    if (dy2 > VIEW_HEIGHT) break;
+    var dl = 2 + near * near * 26;
+    var dw2 = 1.5 + near * 6;
+    ctx.fillStyle = "rgba(232,182,120," + (0.10 + near * 0.22).toFixed(3) + ")";
+    ctx.fillRect(640 - dw2 / 2, dy2, dw2, dl);
+  }
+
+  // Fissures with ley-fire still burning in them. The ground is not merely
+  // dark down here -- something is under it.
+  for (var fis = 0; fis < 4; fis++) {
+    var fx = 60 + fis * 380 + menuNoise(fis + 300) * 160;
+    var fy = MENU_HORIZON + 22 + menuNoise(fis + 310) * 70;
+    var glow = 0.5 + 0.25 * (1 + Math.sin(t * 1.1 + fis * 2.3));
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    var cx2 = fx;
+    var cy2 = fy;
+    for (var fseg = 1; fseg <= 5; fseg++) {
+      cx2 += 14 + menuNoise(fis * 11 + fseg) * 34;
+      cy2 += (menuNoise(fis * 13 + fseg) - 0.4) * 13;
+      ctx.lineTo(cx2, cy2);
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(255,132,52," + (0.30 * glow).toFixed(3) + ")";
+    ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(255,208,150," + (0.55 * glow).toFixed(3) + ")";
+    ctx.stroke();
+  }
+
+  // Ash drifts and debris scattered across the flats, thinning with distance.
+  for (var i = 0; i < 34; i++) {
+    var dy = MENU_HORIZON + 6 + menuNoise(i + 90) * (VIEW_HEIGHT - MENU_HORIZON - 10);
+    var depth = (dy - MENU_HORIZON) / (VIEW_HEIGHT - MENU_HORIZON);
+    var dx = menuNoise(i + 140) * VIEW_WIDTH;
+    var dw = (6 + menuNoise(i + 190) * 26) * (0.4 + depth);
+    ctx.fillStyle = "rgba(12,8,11,0.75)";
+    ctx.beginPath();
+    ctx.moveTo(dx, dy);
+    ctx.lineTo(dx + dw * 0.4, dy - dw * 0.42);
+    ctx.lineTo(dx + dw, dy);
+    ctx.closePath();
     ctx.fill();
   }
 
-  ctx.fillStyle = "#0a1c28";
-  ctx.fillRect(-10, -9, 18, 69);
-  ctx.strokeStyle = "rgba(80,220,255,0.5)";
-  ctx.strokeRect(-10, -9, 18, 69);
+  // Leaning marker posts with cable strung between them.
+  for (var post = 0; post < 5; post++) {
+    var px = 90 + post * 268 + menuNoise(post + 200) * 40;
+    var ph = 34 + menuNoise(post + 210) * 26;
+    var lean = (menuNoise(post + 220) - 0.5) * 0.4;
+    ctx.save();
+    ctx.translate(px, MENU_HORIZON + 26 + post * 3);
+    ctx.rotate(lean);
+    ctx.fillStyle = "#0d090c";
+    ctx.fillRect(-3, -ph, 6, ph);
+    ctx.fillStyle = "rgba(255,164,84,0.30)";
+    ctx.fillRect(-3, -ph, 6, 4);
+    ctx.restore();
+  }
+}
 
-  ctx.beginPath();
-  ctx.ellipse(0, -46, 83, 41, -0.24, 0, Math.PI * 2);
-  ctx.fillStyle = "#244a5b";
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(78,220,255,0.82)";
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(-8, -50, 56, 24, -0.24, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(133,237,255,0.42)";
-  ctx.stroke();
+// Ash falling through the whole frame. Sixty-four grains, each one a pure
+// function of its index and the clock: nothing is stored, so this costs one
+// loop a frame and no memory at all.
+function drawMenuAsh(t) {
+  for (var i = 0; i < 64; i++) {
+    var fall = 14 + menuNoise(i) * 34;
+    var y = ((menuNoise(i + 17) * 820 + t * fall) % 820) - 50;
+    var x = (menuNoise(i + 29) * 1360 + t * (3 + menuNoise(i + 5) * 9)) % 1360 - 40 +
+      Math.sin(t * 0.7 + i * 1.3) * 16;
+    var size = 1 + menuNoise(i + 41) * 2.3;
+    var near = size / 3.3;
+    ctx.fillStyle = "rgba(226,206,182," + (0.10 + near * 0.22).toFixed(3) + ")";
+    ctx.fillRect(x, y, size, size * 1.4);
+  }
+}
 
-  ctx.beginPath();
-  ctx.moveTo(0, -48);
-  ctx.lineTo(56, -128);
-  ctx.strokeStyle = "rgba(96,226,255,0.9)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(58, -131, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffd76e";
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(58, -131, 22, -0.65, 0.65);
-  ctx.strokeStyle = "rgba(255,215,110,0.45)";
+// Embers off the burning ground, rising and going out. Warm and short-lived,
+// they are what keeps the bottom third of the screen alive under the type.
+function drawMenuEmbers(t) {
+  for (var i = 0; i < 26; i++) {
+    var life = 4.5 + menuNoise(i + 3) * 4;
+    var phase = ((t + menuNoise(i + 61) * life) % life) / life;
+    var x = menuNoise(i + 77) * VIEW_WIDTH + Math.sin(t * 1.1 + i * 2.1) * 26;
+    var y = VIEW_HEIGHT + 12 - phase * (200 + menuNoise(i + 91) * 240);
+    var fade = Math.sin(phase * Math.PI);
+    var r = 1.2 + menuNoise(i + 101) * 1.8;
+    ctx.fillStyle = menuRadial(x, y, 0, r * 5, [
+      [0.00, "rgba(255,196,120," + (0.62 * fade).toFixed(3) + ")"],
+      [0.35, "rgba(255,128,48," + (0.24 * fade).toFixed(3) + ")"],
+      [1.00, "rgba(255,96,32,0)"]
+    ]);
+    ctx.fillRect(x - r * 5, y - r * 5, r * 10, r * 10);
+    ctx.fillStyle = "rgba(255,232,190," + (0.85 * fade).toFixed(3) + ")";
+    ctx.fillRect(x - r / 2, y - r / 2, r, r);
+  }
+}
+
+// Everything laid over the world before the interface goes down: the calm
+// centre the type needs, a vignette, dust haze, scanlines and grain.
+function drawMenuAtmosphere(t) {
+  drawMenuLayer("veil", drawMenuVeil);
+
+  // A rolling band and grain over the top: the picture is coming off salvaged
+  // glass. These two are all that is left live here -- everything static went
+  // into the baked veil above.
+  var roll = (t * 84) % (VIEW_HEIGHT + 220) - 110;
+  ctx.fillStyle = menuLinear(0, roll, 0, roll + 110, [
+    [0.00, "rgba(255,214,170,0)"],
+    [0.50, "rgba(255,214,170,0.022)"],
+    [1.00, "rgba(255,214,170,0)"]
+  ]);
+  ctx.fillRect(0, roll, VIEW_WIDTH, 110);
+
+  // Grain. Twenty-eight specks, re-seeded four times a second -- enough to
+  // sit on the picture, far short of a per-pixel noise pass.
+  var tick = Math.floor(t * 4);
+  for (var g = 0; g < 28; g++) {
+    ctx.fillStyle = "rgba(255,236,208,0.05)";
+    ctx.fillRect(menuNoise(g + tick * 31) * VIEW_WIDTH,
+      menuNoise(g + tick * 57) * VIEW_HEIGHT, 2, 2);
+  }
+}
+
+// The static half of the atmosphere, baked: the calm centre, both vignettes
+// and the scanlines. Nothing here reads the clock.
+function drawMenuVeil() {
+  // THE CALM CENTRE. Without this the sun sits directly behind PLAY and the
+  // title loses its edge against the sky. It is a veil, not a panel: the
+  // scene still shows through it everywhere.
+  ctx.fillStyle = menuRadial(640, 336, 40, 470, [
+    [0.00, "rgba(8,5,10,0.72)"],
+    [0.55, "rgba(8,5,10,0.44)"],
+    [1.00, "rgba(8,5,10,0)"]
+  ]);
+  ctx.fillRect(140, -140, 1000, 960);
+
+  ctx.fillStyle = menuLinear(0, 0, 0, VIEW_HEIGHT, [
+    [0.00, "rgba(6,4,8,0.62)"],
+    [0.30, "rgba(6,4,8,0)"],
+    [0.76, "rgba(6,4,8,0)"],
+    [1.00, "rgba(6,4,8,0.66)"]
+  ]);
+  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  ctx.fillStyle = menuLinear(0, 0, VIEW_WIDTH, 0, [
+    [0.00, "rgba(6,4,8,0.58)"],
+    [0.22, "rgba(6,4,8,0)"],
+    [0.78, "rgba(6,4,8,0)"],
+    [1.00, "rgba(6,4,8,0.58)"]
+  ]);
+  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+  ctx.fillStyle = "rgba(206,178,150,0.020)";
+  for (var scan = 2; scan < VIEW_HEIGHT; scan += 5) {
+    ctx.fillRect(0, scan, VIEW_WIDTH, 1);
+  }
+}
+
+// The frame: bracket corners cut from plate, and the two readouts that make
+// the screen feel operated rather than designed.
+function drawMenuFrame(t) {
+  var corners = [[26, 26, 1, 1], [VIEW_WIDTH - 26, 26, -1, 1],
+    [26, VIEW_HEIGHT - 26, 1, -1], [VIEW_WIDTH - 26, VIEW_HEIGHT - 26, -1, -1]];
   ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.strokeStyle = "rgba(240,150,78,0.42)";
+  for (var c = 0; c < corners.length; c++) {
+    var k = corners[c];
+    ctx.beginPath();
+    ctx.moveTo(k[0], k[1] + 34 * k[3]);
+    ctx.lineTo(k[0], k[1]);
+    ctx.lineTo(k[0] + 34 * k[2], k[1]);
+    ctx.stroke();
+  }
 
-  // Translucent map projection above the console.
+  // Left readout, stencilled on a scrap plate.
+  ctx.fillStyle = "rgba(9,6,10,0.80)";
   ctx.beginPath();
-  ctx.moveTo(-82, 45);
-  ctx.lineTo(-50, -78);
-  ctx.lineTo(72, -65);
-  ctx.lineTo(87, 45);
+  ctx.moveTo(44, 40);
+  ctx.lineTo(258, 40);
+  ctx.lineTo(268, 56);
+  ctx.lineTo(268, 100);
+  ctx.lineTo(54, 100);
+  ctx.lineTo(44, 84);
   ctx.closePath();
-  ctx.fillStyle = "rgba(65,203,239,0.08)";
   ctx.fill();
-  ctx.strokeStyle = "rgba(82,220,255,0.35)";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(240,150,78,0.36)";
   ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-55, 13);
-  ctx.lineTo(-18, -22);
-  ctx.lineTo(8, -5);
-  ctx.lineTo(41, -48);
-  ctx.lineTo(65, -17);
-  ctx.strokeStyle = "rgba(121,237,255,0.7)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.font = "700 11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(145,241,255,0.72)";
-  ctx.fillText("ORBITAL RELAY // LINKED", 8, 148);
-  ctx.restore();
+  ctx.font = "20px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "#f0a45c";
+  drawMenuText("ASH SECTOR VII", 60, 60, 1.6);
+  ctx.font = "9px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(186,158,140,0.62)";
+  drawMenuText("LEY-CORE UNSTABLE", 60, 80, 1.2);
+  // Two bars: one ember, one ley, the second one always losing ground.
+  ctx.fillStyle = "rgba(240,150,78,0.75)";
+  ctx.fillRect(60, 89, 84, 3);
+  ctx.fillStyle = "rgba(116,240,214,0.5)";
+  ctx.fillRect(150, 89, 40 + Math.sin(t * 0.9) * 22, 3);
 }
 
 function drawMenuBackdrop() {
-  ctx.fillStyle = "#050d13";
-  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  var t = menuClock();
 
-  // Large wall plates and recessed side bays establish the room before its
-  // models are drawn. The centre stays quieter so the controls remain clear.
-  ctx.fillStyle = "#091a24";
-  ctx.fillRect(0, 24, VIEW_WIDTH, 108);
-  ctx.fillRect(0, 625, VIEW_WIDTH, 95);
-  ctx.fillStyle = "#0b202b";
-  ctx.fillRect(22, 154, 307, 418);
-  ctx.fillRect(951, 154, 307, 418);
-  ctx.fillStyle = "#071722";
-  ctx.fillRect(340, 96, 600, 520);
+  drawMenuSky(t);
+  drawMenuIslands(t);
+  drawMenuSkyline(t);
+  drawMenuGround(t);
+  drawMenuPylon(t);
+  drawMenuWreck(t);
+  drawMenuAsh(t);
+  drawMenuEmbers(t);
+  drawMenuAtmosphere(t);
+  drawMenuFrame(t);
 
-  // The grid is structural depth, not decoration: low-contrast minor lines
-  // recede behind a sparse set of stronger command-deck divisions.
-  ctx.lineWidth = 1;
-  for (var x = 0; x <= VIEW_WIDTH; x += 80) {
-    ctx.strokeStyle = x % 320 === 0
-      ? "rgba(74,218,255,0.14)"
-      : "rgba(74,218,255,0.055)";
-    ctx.beginPath();
-    ctx.moveTo(x + 0.5, 0);
-    ctx.lineTo(x + 0.5, VIEW_HEIGHT);
-    ctx.stroke();
-  }
-  for (var y = 24; y <= VIEW_HEIGHT; y += 72) {
-    ctx.strokeStyle = (y - 24) % 288 === 0
-      ? "rgba(74,218,255,0.13)"
-      : "rgba(74,218,255,0.05)";
-    ctx.beginPath();
-    ctx.moveTo(0, y + 0.5);
-    ctx.lineTo(VIEW_WIDTH, y + 0.5);
-    ctx.stroke();
-  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
 
-  // Faint floor-perspective rails deepen the room without sitting behind the
-  // title or competing with the controls.
-  ctx.strokeStyle = "rgba(74,218,255,0.055)";
-  for (var rail = -160; rail <= VIEW_WIDTH + 160; rail += 160) {
-    ctx.beginPath();
-    ctx.moveTo(VIEW_WIDTH / 2, 590);
-    ctx.lineTo(rail, VIEW_HEIGHT);
-    ctx.stroke();
-  }
-
-  // Recessed-bay bevels and luminous rails.
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(70,206,244,0.35)";
-  ctx.strokeRect(22.5, 154.5, 306, 417);
-  ctx.strokeRect(951.5, 154.5, 306, 417);
-  ctx.strokeRect(340.5, 96.5, 599, 519);
-  ctx.strokeStyle = "rgba(74,218,255,0.18)";
-  ctx.strokeRect(349.5, 105.5, 581, 501);
-
-  ctx.fillStyle = "rgba(74,218,255,0.7)";
-  ctx.fillRect(341, 96, 128, 3);
-  ctx.fillRect(811, 96, 128, 3);
-  ctx.fillStyle = "rgba(255,215,110,0.75)";
-  ctx.fillRect(590, 613, 100, 3);
-
-  // Signal trunks terminate at the action cluster, so the tower, relay and
-  // buttons read as one command system rather than three decorations.
-  ctx.strokeStyle = "rgba(74,218,255,0.28)";
-  ctx.lineWidth = 3;
+// The plate every control is cut from: a rectangle with the top-left and
+// bottom-right corners sheared off. Two cuts rather than four, because four
+// reads as a rounded sci-fi pill and two reads as a piece of hull that was cut
+// to fit. The path follows `r` exactly, so what is drawn and what is clicked
+// are the same shape.
+function menuPlatePath(r, cut, dx, dy) {
+  var x = r.x + (dx || 0);
+  var y = r.y + (dy || 0);
   ctx.beginPath();
-  ctx.moveTo(292, 328);
-  ctx.lineTo(352, 328);
-  ctx.lineTo(400, 378);
-  ctx.moveTo(988, 328);
-  ctx.lineTo(928, 328);
-  ctx.lineTo(880, 378);
-  ctx.moveTo(328, 487);
-  ctx.lineTo(370, 487);
-  ctx.moveTo(910, 487);
-  ctx.lineTo(952, 487);
-  ctx.stroke();
-  ctx.fillStyle = "rgba(118,234,255,0.86)";
-  ctx.fillRect(288, 324, 8, 8);
-  ctx.fillRect(984, 324, 8, 8);
-  ctx.fillStyle = "rgba(255,197,83,0.78)";
-  ctx.fillRect(324, 483, 8, 8);
-  ctx.fillRect(948, 483, 8, 8);
+  ctx.moveTo(x + cut, y);
+  ctx.lineTo(x + r.w, y);
+  ctx.lineTo(x + r.w, y + r.h - cut);
+  ctx.lineTo(x + r.w - cut, y + r.h);
+  ctx.lineTo(x, y + r.h);
+  ctx.lineTo(x, y + cut);
+  ctx.closePath();
+}
 
-  // Hazard stripes keep the deck industrial instead of reading as another
-  // abstract UI background.
+// A control is a salvaged plate with a rune slot bolted to it: sheared
+// corners, rivets, rust bleeding down from the seams, a stencilled label and
+// one live edge of ley-light that fills when the cursor is on it. `rgb` is the
+// plate's accent, and it is the ONLY colour that changes between them -- the
+// iron underneath is identical, so the four read as parts off the same wreck.
+//
+// The signature is unchanged (r, label, key, rgb, primary): the title screen
+// test counts calls through it, and the hit rectangles are still the callers'.
+function drawMenuButton(r, label, key, rgb, primary) {
+  var hot = pointInRect(mouse.x, mouse.y, r);
+  var t = menuClock();
+  var detail = label === "PLAY" ? "HOLD THE LAST GATE"
+    : (label === "ARMOURY" ? "SALVAGE & LOADOUT"
+    : (label === "INDEX" ? "FIELD RECORDS" : "TEST RANGE"));
+  var cut = primary ? 22 : 14;
+  // The primary breathes; the rail lights only under the cursor. One ambient
+  // pulse on the screen's controls, as before -- the scene carries the rest.
+  var pulse = primary ? 0.5 + Math.sin(t * 1.9) * 0.5 : 0;
+  var live = hot ? 1 : (primary ? 0.25 + pulse * 0.3 : 0);
+
+  // Ley-light bleeding out from under the plate.
+  if (live > 0.02) {
+    ctx.fillStyle = menuRadial(r.x + r.w / 2, r.y + r.h / 2, r.h * 0.3,
+      r.w * 0.72, [
+        [0.00, "rgba(" + rgb + "," + (0.30 * live).toFixed(3) + ")"],
+        [1.00, "rgba(" + rgb + ",0)"]
+      ]);
+    ctx.fillRect(r.x - r.w * 0.4, r.y - r.h, r.w * 1.8, r.h * 3);
+  }
+
+  // Cast shadow, then the plate.
+  menuPlatePath(r, cut, 5, 7);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fill();
+
+  menuPlatePath(r, cut, 0, 0);
+  ctx.fillStyle = menuLinear(r.x, r.y, r.x, r.y + r.h, [
+    [0.00, hot ? "#3b2f2a" : "#2a221f"],
+    [0.46, hot ? "#241b1c" : "#191315"],
+    [1.00, hot ? "#2e2020" : "#140e11"]
+  ]);
+  ctx.fill();
+
+  ctx.save();
+  ctx.clip();
+
+  // Rolled iron: horizontal mill lines, then rust running down from the top
+  // seam. Both come off the hash, so a plate's wear is its own and never
+  // shimmers between frames.
+  ctx.fillStyle = "rgba(255,222,196,0.022)";
+  for (var mill = 4; mill < r.h; mill += 7) ctx.fillRect(r.x, r.y + mill, r.w, 1);
+  for (var streak = 0; streak < 7; streak++) {
+    var sx = r.x + 12 + menuNoise(streak + r.w) * (r.w - 24);
+    ctx.fillStyle = "rgba(148,74,38,0.13)";
+    ctx.fillRect(sx, r.y, 2 + menuNoise(streak + 9) * 3,
+      r.h * (0.3 + menuNoise(streak + 21) * 0.6));
+  }
+
+  // Hazard chevrons in the sheared bottom-right corner: the salvage marking
+  // that says which end of the plate was cut.
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 625, VIEW_WIDTH, 30);
+  ctx.rect(r.x + r.w - 46, r.y + r.h - 12, 46, 12);
   ctx.clip();
-  ctx.strokeStyle = "rgba(255,190,74,0.17)";
-  ctx.lineWidth = 9;
-  for (var stripe = -50; stripe < VIEW_WIDTH + 50; stripe += 36) {
+  ctx.strokeStyle = "rgba(240,150,78,0.30)";
+  ctx.lineWidth = 4;
+  for (var hz = -20; hz < 60; hz += 11) {
     ctx.beginPath();
-    ctx.moveTo(stripe, 655);
-    ctx.lineTo(stripe + 30, 625);
+    ctx.moveTo(r.x + r.w - 46 + hz, r.y + r.h);
+    ctx.lineTo(r.x + r.w - 46 + hz + 12, r.y + r.h - 12);
     ctx.stroke();
   }
   ctx.restore();
 
-  // Static data streams and very faint scanlines keep the military-tech read
-  // without adding another animated element to the title screen.
-  for (var bit = 0; bit < 7; bit++) {
-    ctx.fillStyle = bit % 3 === 0
-      ? "rgba(255,197,83,0.26)"
-      : "rgba(74,218,255,0.18)";
-    ctx.fillRect(306, 176 + bit * 50, 3, 16 + (bit % 2) * 8);
-    ctx.fillRect(971, 195 + bit * 47, 3, 12 + (bit % 3) * 6);
+  // The live edge: a bar of ley-light along the foot of the plate that fills
+  // from the left as the control comes alive.
+  ctx.fillStyle = "rgba(" + rgb + "," + (0.20 + live * 0.7).toFixed(3) + ")";
+  ctx.fillRect(r.x, r.y + r.h - 3, r.w * (0.18 + live * 0.82), 3);
+
+  // A charge running up the left flank, hover only. It is the plate waking up,
+  // and it is why a hovered control feels powered rather than merely tinted.
+  if (hot) {
+    var runY = r.y + r.h - ((t * 190) % (r.h + 40));
+    ctx.fillStyle = menuLinear(r.x, runY, r.x, runY + 34, [
+      [0.00, "rgba(" + rgb + ",0)"],
+      [0.50, "rgba(" + rgb + ",0.55)"],
+      [1.00, "rgba(" + rgb + ",0)"]
+    ]);
+    ctx.fillRect(r.x, runY, 6, 34);
   }
-  ctx.fillStyle = "rgba(166,226,242,0.018)";
-  for (var scan = 2; scan < VIEW_HEIGHT; scan += 6) {
-    ctx.fillRect(0, scan, VIEW_WIDTH, 1);
-  }
+  ctx.restore();
 
-  drawMenuReactor();
-  drawMenuComms();
-
-  // Corner status plates make the frame feel inhabited and operational.
-  ctx.fillStyle = "rgba(5,14,21,0.82)";
-  ctx.fillRect(28, 31, 208, 68);
-  ctx.strokeStyle = "rgba(74,218,255,0.38)";
-  ctx.strokeRect(28.5, 31.5, 207, 67);
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.font = "700 11px system-ui, sans-serif";
-  ctx.fillStyle = "#78e6ff";
-  ctx.fillText("BASE COMMAND // ONLINE", 43, 46);
-  ctx.font = "10px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(169,210,223,0.55)";
-  ctx.fillText("SECTOR 07   ·   GRID STABLE", 43, 67);
-  ctx.fillStyle = "#5ce2ff";
-  ctx.fillRect(43, 83, 72, 3);
-  ctx.fillStyle = "rgba(255,197,83,0.25)";
-  ctx.fillRect(119, 83, 96, 3);
-}
-
-function drawMenuButton(r, label, key, rgb, primary) {
-  var hot = pointInRect(mouse.x, mouse.y, r);
-  var detail = label === "ARMOURY" ? "LOADOUT & STORE"
-    : (label === "INDEX" ? "FIELD DATABASE" : "SIMULATION BAY");
-
-  // The single ambient motion on the screen: PLAY breathes slowly. It marks
-  // the intended next action without moving geometry or distracting from the
-  // command-deck anchors.
-  if (primary) {
-    var menuNow = typeof performance !== "undefined" && performance.now
-      ? performance.now() / 1000
-      : 0;
-    var pulse = 0.5 + Math.sin(menuNow * 2.1) * 0.5;
-    ctx.strokeStyle = "rgba(74,218,255," + (0.10 + pulse * 0.10) + ")";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(r.x - 7.5, r.y - 7.5, r.w + 15, r.h + 15);
-  }
-
-  ctx.fillStyle = "rgba(0,0,0,0.38)";
-  ctx.fillRect(r.x + 6, r.y + 7, r.w, r.h);
-  ctx.fillStyle = hot
-    ? "rgba(" + rgb + ",0.25)"
-    : (primary ? "rgba(" + rgb + ",0.16)" : "rgba(10,28,39,0.94)");
-  ctx.fillRect(r.x, r.y, r.w, r.h);
-
-  ctx.lineWidth = hot ? 2 : 1;
-  ctx.strokeStyle = "rgba(" + rgb + "," + (hot ? "0.95" : "0.55") + ")";
-  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-  ctx.fillStyle = "rgba(" + rgb + "," + (hot ? "1" : "0.72") + ")";
-  ctx.fillRect(r.x, r.y, hot ? 7 : 4, r.h);
-
-  // Mechanical corner brackets, larger on the primary PLAY control.
-  var bracket = primary ? 16 : 12;
-  ctx.strokeStyle = "rgba(" + rgb + ",0.9)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(r.x, r.y + bracket); ctx.lineTo(r.x, r.y); ctx.lineTo(r.x + bracket, r.y);
-  ctx.moveTo(r.x + r.w - bracket, r.y); ctx.lineTo(r.x + r.w, r.y);
-  ctx.lineTo(r.x + r.w, r.y + bracket);
-  ctx.moveTo(r.x, r.y + r.h - bracket); ctx.lineTo(r.x, r.y + r.h);
-  ctx.lineTo(r.x + bracket, r.y + r.h);
-  ctx.moveTo(r.x + r.w - bracket, r.y + r.h); ctx.lineTo(r.x + r.w, r.y + r.h);
-  ctx.lineTo(r.x + r.w, r.y + r.h - bracket);
+  // Edges: a hard dark outline with the accent riding just inside it.
+  menuPlatePath(r, cut, 0, 0);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(6,4,7,0.9)";
+  ctx.stroke();
+  ctx.lineWidth = hot ? 2 : 1.2;
+  ctx.strokeStyle = "rgba(" + rgb + "," + (hot ? 0.95 : 0.44) + ")";
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(" + rgb + ",0.15)";
-  ctx.fillRect(r.x + 13, r.y + 11, 32, r.h - 22);
-  ctx.strokeStyle = "rgba(" + rgb + ",0.5)";
-  ctx.strokeRect(r.x + 13.5, r.y + 11.5, 31, r.h - 23);
+  // Rivets. Four on the rail plates, six on the primary, each a dark pit with
+  // a highlight on the sunward side.
+  var rivets = primary
+    ? [[cut + 8, 10], [r.w / 2, 9], [r.w - 11, 12], [10, r.h - 11],
+       [r.w / 2, r.h - 9], [r.w - cut - 8, r.h - 11]]
+    : [[cut + 6, 9], [r.w - 10, 10], [9, r.h - 10], [r.w - cut - 6, r.h - 9]];
+  for (var v = 0; v < rivets.length; v++) {
+    var vx = r.x + rivets[v][0];
+    var vy = r.y + rivets[v][1];
+    ctx.beginPath();
+    ctx.arc(vx, vy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(8,5,8,0.85)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(vx - 0.7, vy - 0.9, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(226,178,140,0.35)";
+    ctx.fill();
+  }
+
+  // The rune slot: a hexagonal socket holding the hotkey. It replaces the old
+  // square key chip because the hotkeys on this screen are the one place the
+  // arcane side of the fiction touches the interface.
+  var socketX = r.x + (primary ? 34 : 27);
+  var socketY = r.y + r.h / 2;
+  var socketR = primary ? 20 : 15;
+  ctx.beginPath();
+  for (var h = 0; h < 6; h++) {
+    var ha = -Math.PI / 2 + h * Math.PI / 3;
+    var hx = socketX + Math.cos(ha) * socketR;
+    var hy = socketY + Math.sin(ha) * socketR;
+    if (h === 0) ctx.moveTo(hx, hy);
+    else ctx.lineTo(hx, hy);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "rgba(" + rgb + "," + (0.10 + live * 0.16).toFixed(3) + ")";
+  ctx.fill();
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = "rgba(" + rgb + "," + (0.5 + live * 0.45).toFixed(3) + ")";
+  ctx.stroke();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "700 12px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(" + rgb + ",0.9)";
-  ctx.fillText(key, r.x + 29, r.y + r.h / 2 + 1);
+  ctx.font = (primary ? "21px " : "16px ") + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "rgba(" + rgb + "," + (0.72 + live * 0.28).toFixed(3) + ")";
+  ctx.fillText(key, socketX, socketY + 1);
 
-  ctx.font = (primary ? "800 25px" : "700 15px") + " system-ui, sans-serif";
-  ctx.fillStyle = hot ? "#ffffff" : "#d9f3ff";
-  ctx.fillText(label, r.x + r.w / 2 + 14,
-    r.y + r.h / 2 + (primary ? 1 : -7));
-  if (!primary) {
-    ctx.font = "700 10px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(" + rgb + ",0.78)";
-    ctx.fillText(detail, r.x + r.w / 2 + 14, r.y + r.h / 2 + 11);
-  }
+  // Stencilled label. Impact, tracked, with a dark stamp under it so it looks
+  // sprayed onto plate rather than typeset over it.
+  var textX = r.x + (r.w + (primary ? 54 : 40)) / 2;
+  var labelY = r.y + r.h / 2 - (primary ? 11 : 8);
+  ctx.font = (primary ? "42px " : "22px ") + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  drawMenuText(label, textX + 2, labelY + 2, primary ? 7 : 4);
+  ctx.fillStyle = hot ? "#fff3e2" : "#e8d3bd";
+  drawMenuText(label, textX, labelY, primary ? 7 : 4);
+
+  ctx.font = (primary ? "10px " : "9px ") + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + rgb + "," + (hot ? 0.92 : 0.62) + ")";
+  drawMenuText(detail, textX, r.y + r.h / 2 + (primary ? 22 : 13), 1.6);
 }
 
 function drawMenu() {
@@ -6611,73 +7454,122 @@ function drawMenu() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Shadow, edge and face make the title feel stamped into the command
-  // terminal instead of floating over it.
+  // THE TITLE IS STAMPED PLATE, not type over a picture: an ember bloom
+  // behind it, a black stamp under it, a bone-to-rust face, and a scored edge.
   //
-  // THE BLOCK SITS 23 px LOWER THAN IT DID, and that is the deletion of the
-  // strap line showing up in the layout rather than a nudge for its own sake.
-  // A line reading "35 waves. 6 ley-lines. N towers. Hold the base." used to
-  // run under the rule; it was removed 2026-08-13 at the owner's request --
-  // he did not want it corrected, he wanted it gone. Removing it alone would
-  // have left 103 px of nothing between the rule and PLAY where the strap's
-  // own line box had kept that gap at 80. Moving the whole block down by that
-  // line box restores the gap exactly and changes no other relationship: the
-  // title, its rule and the four controls stand as they always did, one
-  // element shorter. Every offset below is expressed against `titleY` so the
-  // block can be moved again as one thing.
+  // The block still sits at 188 and every offset below is still expressed
+  // against `titleY`, for the reason recorded when the strap line was deleted
+  // on 2026-08-13 -- it was removed at the owner's request, the block moved
+  // down by exactly that line box to keep the gap to PLAY at 80, and it is
+  // meant to keep moving as one thing. Nothing here reintroduces a line
+  // under the rule.
   var titleY = 188;
-  ctx.font = "800 70px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(0,0,0,0.6)";
-  ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2 + 5, titleY + 5);
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(67,205,244,0.62)";
-  ctx.strokeText("TOWER DEFENSE", VIEW_WIDTH / 2, titleY);
-  ctx.fillStyle = "#d9f7ff";
-  ctx.fillText("TOWER DEFENSE", VIEW_WIDTH / 2, titleY);
-  ctx.fillStyle = "rgba(74,218,255,0.78)";
-  ctx.fillRect(VIEW_WIDTH / 2 - 128, titleY + 39, 256, 2);
+  var t = menuClock();
 
-  ctx.font = "700 11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,197,83,0.72)";
-  ctx.fillText("STRATEGIC DEFENSE NETWORK  //  COMMAND AUTHORITY",
-    VIEW_WIDTH / 2, titleY - 58);
-  ctx.font = "700 10px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(74,218,255,0.54)";
-  ctx.fillText("SELECT OPERATION", VIEW_WIDTH / 2, 294);
+  ctx.fillStyle = menuRadial(VIEW_WIDTH / 2, titleY, 30, 380, [
+    [0.00, "rgba(238,132,54," + (0.14 + Math.sin(t * 0.8) * 0.03).toFixed(3) + ")"],
+    [1.00, "rgba(238,132,54,0)"]
+  ]);
+  ctx.fillRect(VIEW_WIDTH / 2 - 380, titleY - 380, 760, 760);
 
-  drawMenuButton(playButtonRect(), "PLAY", "1", "74,218,255", true);
-  drawMenuButton(storeButtonRect(), "ARMOURY",
-    "2", "255,197,83", false);
-  drawMenuButton(indexButtonRect(), "INDEX",
-    "3", "74,218,255", false);
-  drawMenuButton(sandboxButtonRect(), "SANDBOX",
-    "4", "255,197,83", false);
+  ctx.font = "78px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  drawMenuText("TOWER DEFENSE", VIEW_WIDTH / 2 + 6, titleY + 6, 7);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(120,48,24,0.85)";
+  drawMenuText("TOWER DEFENSE", VIEW_WIDTH / 2, titleY, 7, true);
+  ctx.fillStyle = menuLinear(0, titleY - 34, 0, titleY + 32, [
+    [0.00, "#fdf0dc"],
+    [0.48, "#e6c39a"],
+    [0.72, "#c0703a"],
+    [1.00, "#8a3f22"]
+  ]);
+  var titleW = drawMenuText("TOWER DEFENSE", VIEW_WIDTH / 2, titleY, 7);
 
-  // The coin purse, top right. On the title screen because that is where the
+  // Scoring across the face: four hairlines of the sky showing through where
+  // the plate has been worn back. Cheap weathering, and the reason the title
+  // does not read as a clean vector letterform.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(VIEW_WIDTH / 2 - titleW / 2, titleY - 30, titleW, 60);
+  ctx.clip();
+  ctx.lineWidth = 1.4;
+  for (var sc = 0; sc < 5; sc++) {
+    ctx.strokeStyle = "rgba(18,10,14," + (0.20 + menuNoise(sc + 5) * 0.2).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.moveTo(VIEW_WIDTH / 2 - titleW / 2 - 10,
+      titleY - 26 + menuNoise(sc) * 54);
+    ctx.lineTo(VIEW_WIDTH / 2 + titleW / 2 + 10,
+      titleY - 26 + menuNoise(sc + 40) * 54);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // The rule: two ember bars with a ley node burning between them.
+  var ruleY = titleY + 42;
+  ctx.fillStyle = "rgba(238,142,64,0.7)";
+  ctx.fillRect(VIEW_WIDTH / 2 - 168, ruleY, 138, 2);
+  ctx.fillRect(VIEW_WIDTH / 2 + 30, ruleY, 138, 2);
+  var node = 0.6 + Math.sin(t * 2.2) * 0.25;
+  ctx.beginPath();
+  for (var nh = 0; nh < 6; nh++) {
+    var na = -Math.PI / 2 + nh * Math.PI / 3;
+    var nx = VIEW_WIDTH / 2 + Math.cos(na) * 9;
+    var ny = ruleY + 1 + Math.sin(na) * 9;
+    if (nh === 0) ctx.moveTo(nx, ny);
+    else ctx.lineTo(nx, ny);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "rgba(116,240,214," + (0.25 * node).toFixed(3) + ")";
+  ctx.fill();
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = "rgba(150,255,232," + node.toFixed(3) + ")";
+  ctx.stroke();
+
+  ctx.font = "16px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "rgba(240,150,78,0.78)";
+  drawMenuText("THE LEY-LINES ARE BURNING", VIEW_WIDTH / 2, titleY - 58, 4.5);
+  ctx.font = "11px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  drawMenuText("SELECT DIRECTIVE", VIEW_WIDTH / 2 + 1, 295, 3.4);
+  ctx.fillStyle = "rgba(146,250,224,0.86)";
+  drawMenuText("SELECT DIRECTIVE", VIEW_WIDTH / 2, 294, 3.4);
+
+  drawMenuButton(playButtonRect(), "PLAY", "1", "255,146,60", true);
+  drawMenuButton(storeButtonRect(), "ARMOURY", "2", "230,168,84", false);
+  drawMenuButton(indexButtonRect(), "INDEX", "3", "116,240,214", false);
+  drawMenuButton(sandboxButtonRect(), "SANDBOX", "4", "168,132,255", false);
+
+  // The salvage chit, top right. On the title screen because that is where the
   // decision it funds gets made, and because a currency you cannot see is a
   // currency nobody spends.
-  ctx.fillStyle = "rgba(5,14,21,0.86)";
-  ctx.fillRect(VIEW_WIDTH - 238, 31, 208, 68);
-  ctx.strokeStyle = "rgba(255,215,110,0.45)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(VIEW_WIDTH - 237.5, 31.5, 207, 67);
+  var purse = { x: VIEW_WIDTH - 268, y: 40, w: 224, h: 60 };
+  menuPlatePath(purse, 14, 0, 0);
+  ctx.fillStyle = "rgba(9,6,10,0.82)";
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(230,168,84,0.42)";
+  ctx.stroke();
   ctx.textAlign = "right";
-  ctx.font = "600 20px system-ui, sans-serif";
-  ctx.fillStyle = "#ffd76e";
-  ctx.fillText(MetaProgress.coins() + " ⬡", VIEW_WIDTH - 46, 52);
-  ctx.font = "12px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(199,209,224,0.5)";
-  ctx.fillText("ARMOURY CREDIT", VIEW_WIDTH - 46, 77);
+  ctx.font = "30px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "#ffbe72";
+  drawMenuText(MetaProgress.coins() + " ⬡", VIEW_WIDTH - 62, 62, 2);
+  ctx.font = "9px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(186,158,140,0.6)";
+  drawMenuText("SALVAGE CREDIT", VIEW_WIDTH - 62, 84, 1.4);
   ctx.textAlign = "center";
 
-  ctx.fillStyle = "rgba(199,209,224,0.72)";
-  ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("Enter / 1 play    ·    2 armoury    ·    3 index    ·    4 sandbox",
-    VIEW_WIDTH / 2, 646);
-  ctx.font = "10px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(94,186,215,0.45)";
-  ctx.fillText("LEYLINE DEFENSE NETWORK   //   COMMAND TERMINAL 04.11",
-    VIEW_WIDTH / 2, 680);
+  ctx.font = "11px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  drawMenuText("ENTER / 1 PLAY   ·   2 ARMOURY   ·   3 INDEX   ·   4 SANDBOX",
+    VIEW_WIDTH / 2 + 1, 649, 1.8);
+  ctx.fillStyle = "rgba(236,208,180,0.92)";
+  drawMenuText("ENTER / 1 PLAY   ·   2 ARMOURY   ·   3 INDEX   ·   4 SANDBOX",
+    VIEW_WIDTH / 2, 648, 1.8);
+  ctx.font = "9px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(196,150,116,0.72)";
+  drawMenuText("LEYLINE DEFENSE NETWORK   //   RELAY 04.11   //   SIGNAL DEGRADED",
+    VIEW_WIDTH / 2, 680, 1.6);
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -6686,61 +7578,284 @@ function drawMenu() {
 // The "← Menu" escape hatch, top-left. Shared by the chooser and the index
 // screen -- one drawing, one rectangle, so the two screens cannot drift on
 // how leaving looks or where it is clicked.
-function drawBackButton() {
-  var back = backButtonRect();
-  var backHot = pointInRect(mouse.x, mouse.y, back);
-  ctx.fillStyle = backHot ? "rgba(140,179,230,0.22)" : "rgba(28,30,38,0.85)";
-  ctx.fillRect(back.x, back.y, back.w, back.h);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = backHot ? "rgba(170,215,255,0.95)" : "rgba(140,179,230,0.4)";
-  ctx.strokeRect(back.x + 0.5, back.y + 0.5, back.w - 1, back.h - 1);
+// --- THE ASH WASTE, EVERYWHERE ELSE -----------------------------------------
+//
+// 2026-08-26, at the owner's instruction: *"arrange the other Menu UI's to
+// match the main menu theme."* The title screen became the Ash Waste on
+// 2026-08-25 and the chooser, index, armoury, pause menu and run-over overlays
+// were explicitly deferred to a later pass. This is that pass.
+//
+// THE SCREENS ALREADY SHARED TWO FUNCTIONS, AND THAT IS WHY THIS IS SMALL.
+// `drawSelectBackdrop` and `drawBackButton` are called by the chooser, by
+// js/codex.js and by js/store.js -- three screens, one backdrop, one control --
+// so re-theming those two re-themes all three, and nothing in the index's or
+// the armoury's own layout had to move for the change to reach them. Anything
+// that had to be reinvented per screen would have drifted by the second one.
+//
+// AN INTERIOR IS NOT THE TITLE SCREEN AND MUST NOT BE. The title screen is a
+// composition: a fractured pylon in the left bay, a downed relay in the right,
+// a rift, and four controls between them. These screens are DENSE -- six route
+// cards, an enemy list with a live 3D viewer, a shop grid -- and a scene behind
+// them is not atmosphere, it is noise competing with the content for the same
+// pixels. So an interior keeps the theme's SURFACE and drops its subject:
+// the burnt sky, the horizon heat, the ground, the ash, the vignette and the
+// corner frame; no pylon, no wreck, no rift, no skyline.
+//
+// PALETTE, and it is the title screen's own rather than a second one. Ash and
+// rust are the surfaces, ember orange and bone the warm accents, ley-teal the
+// only cool one, and it marks arcane energy and nothing else. Named here
+// because six functions below and two other FILES read them, and six copies of
+// "rgba(240,150,78,0.42)" is how a theme comes apart.
+var ASH_EMBER = "240,150,78";        // the accent: heat, and every live edge
+var ASH_LEY = "116,240,214";         // arcane only -- never furniture
+var ASH_BONE = "236,222,206";        // type that has to be read
+var ASH_DUST = "186,158,140";        // type that is only there to be there
+var ASH_IRON = "16,13,17";           // the plate every control is cut from
+
+// One ambient clock for the interiors, so a tab and a card and a button all
+// breathe together rather than each on its own phase.
+function ashPulse(hz) {
+  return 0.5 + Math.sin(menuClock() * (hz || 1.4)) * 0.5;
+}
+
+// THE INTERIOR BACKDROP. Baked through the same `drawMenuLayer` machinery the
+// title screen uses -- none of it reads the clock except the ash, so painting
+// the rest sixty times a second would be the exact waste that pass measured
+// and fixed (72 ms a frame down to a blit).
+function drawAshInterior() {
+  drawMenuLayer("interior", paintAshInterior);
+  drawAshFall(menuClock());
+  drawAshFrame();
+}
+
+function paintAshInterior() {
+  // Sky: night overhead, a bruised middle, ember heat sitting on the horizon.
+  // The horizon is pushed far down an interior -- the content sits over the
+  // upper two thirds, so the scene's only bright band belongs below it.
+  var horizon = 596;
+  ctx.fillStyle = menuLinear(0, 0, 0, horizon, [
+    [0, "#08070c"], [0.42, "#140f16"], [0.74, "#2a1720"], [1, "#5c2f22"]
+  ]);
+  ctx.fillRect(0, 0, VIEW_WIDTH, horizon);
+
+  // The sun, gone down behind whatever is left of the skyline.
+  ctx.fillStyle = menuRadial(VIEW_WIDTH / 2, horizon, 10, 300, [
+    [0, "rgba(255,178,96,0.34)"], [0.45, "rgba(216,104,58,0.14)"],
+    [1, "rgba(216,104,58,0)"]
+  ]);
+  ctx.fillRect(VIEW_WIDTH / 2 - 300, horizon - 300, 600, 302);
+
+  // Ground: dark, flat, and lit only by what is behind it.
+  ctx.fillStyle = menuLinear(0, horizon, 0, VIEW_HEIGHT, [
+    [0, "#1a1114"], [1, "#0a0709"]
+  ]);
+  ctx.fillRect(0, horizon, VIEW_WIDTH, VIEW_HEIGHT - horizon);
+  ctx.fillStyle = "rgba(240,150,78,0.20)";
+  ctx.fillRect(0, horizon - 1, VIEW_WIDTH, 2);
+
+  // Dust drifts, deterministic like everything else on this theme.
+  for (var i = 0; i < 26; i++) {
+    var dy = horizon + 6 + menuNoise(i + 90) * (VIEW_HEIGHT - horizon - 8);
+    var depth = (dy - horizon) / (VIEW_HEIGHT - horizon);
+    ctx.fillStyle = "rgba(150,120,104," + (0.03 + depth * 0.05).toFixed(3) + ")";
+    ctx.fillRect(menuNoise(i + 40) * VIEW_WIDTH - 120, dy,
+      110 + menuNoise(i + 150) * 240, 1 + depth * 2);
+  }
+
+  // The veil: a vignette, and a calm middle so dense content never has to
+  // fight the sky for contrast. This is the layer the title screen measured at
+  // 37 ms; here it is baked with the rest.
+  ctx.fillStyle = menuRadial(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 120, 760, [
+    [0, "rgba(6,5,8,0.30)"], [0.55, "rgba(6,5,8,0.52)"], [1, "rgba(6,5,8,0.86)"]
+  ]);
+  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+  // Static scanlines, one device pixel each because this is baked at the
+  // backing store's own resolution.
+  ctx.fillStyle = "rgba(0,0,0,0.16)";
+  for (var y = 0; y < VIEW_HEIGHT; y += 3) ctx.fillRect(0, y, VIEW_WIDTH, 1);
+}
+
+// The one live layer: ash coming down. Cheap -- 40 marks, no gradient.
+function drawAshFall(t) {
+  for (var i = 0; i < 40; i++) {
+    var speed = 12 + menuNoise(i + 7) * 26;
+    var x = menuNoise(i) * VIEW_WIDTH + Math.sin(t * 0.4 + i) * 14;
+    var y = (menuNoise(i + 3) * VIEW_HEIGHT + t * speed) % (VIEW_HEIGHT + 40) - 20;
+    ctx.fillStyle = "rgba(206,186,170," +
+      (0.05 + menuNoise(i + 11) * 0.13).toFixed(3) + ")";
+    ctx.fillRect(x, y, 1.5, 1.5 + menuNoise(i + 19) * 2);
+  }
+}
+
+// Corner brackets, the title screen's own, so every screen is cut from the
+// same frame.
+function drawAshFrame() {
+  var corners = [[26, 26, 1, 1], [VIEW_WIDTH - 26, 26, -1, 1],
+    [26, VIEW_HEIGHT - 26, 1, -1], [VIEW_WIDTH - 26, VIEW_HEIGHT - 26, -1, -1]];
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(" + ASH_EMBER + ",0.34)";
+  for (var c = 0; c < corners.length; c++) {
+    var k = corners[c];
+    ctx.beginPath();
+    ctx.moveTo(k[0], k[1] + 28 * k[3]);
+    ctx.lineTo(k[0], k[1]);
+    ctx.lineTo(k[0] + 28 * k[2], k[1]);
+    ctx.stroke();
+  }
+}
+
+// A STENCILLED SCREEN HEADING: Impact, tracked, with a rule under it that is
+// measured off the type rather than guessed. `sub` is the instrument-face line
+// that says what the screen is for.
+//
+// THE SUB GOES ABOVE THE TITLE WHEN THE SCREEN HAS A TAB ROW, and that is not
+// a taste -- it is a collision. The index and the armoury put their tabs at
+// y = 78, and a heading at y = 26 with its rule at 66 leaves the sub landing
+// on top of them. Two screens out of four wanted it above, so it is an
+// argument rather than two hand-placed y values that would come apart the
+// first time a tab row moves.
+function drawAshHeading(title, sub, y, eyebrow) {
+  var top = y === undefined ? 34 : y;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  if (sub && eyebrow) {
+    ctx.font = "9px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.6)";
+    drawMenuText(sub, VIEW_WIDTH / 2, top, 2.2);
+    top += 14;
+  }
+
+  ctx.font = "34px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = "#f6d9b4";
+  var w = drawMenuText(title, VIEW_WIDTH / 2, top, 4);
+
+  // The rule: ember at the centre, gone at both ends, so it reads as heat in
+  // the metal rather than as a divider somebody drew.
+  var half = w / 2 + 26;
+  ctx.fillStyle = menuLinear(VIEW_WIDTH / 2 - half, 0, VIEW_WIDTH / 2 + half, 0, [
+    [0, "rgba(" + ASH_EMBER + ",0)"], [0.5, "rgba(" + ASH_EMBER + ",0.7)"],
+    [1, "rgba(" + ASH_EMBER + ",0)"]
+  ]);
+  ctx.fillRect(VIEW_WIDTH / 2 - half, top + 40, half * 2, 2);
+
+  if (sub && !eyebrow) {
+    ctx.font = "10px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.66)";
+    drawMenuText(sub, VIEW_WIDTH / 2, top + 48, 1.4);
+  }
+  ctx.textAlign = "left";
+}
+
+// A SALVAGED PLATE. The shape every panel, card and tab on these screens is
+// cut from -- `menuPlatePath`'s two sheared corners, so the interiors and the
+// title screen are the same piece of hull.
+//
+// `opts`: { accent, live (0..1), fill, cut, quiet }. `live` is the edge light,
+// and it is the only thing that moves between a resting control and a hot one.
+function drawAshPlate(r, opts) {
+  var o = opts || {};
+  var accent = o.accent || ASH_EMBER;
+  var live = o.live || 0;
+  var cut = o.cut === undefined ? 12 : o.cut;
+
+  menuPlatePath(r, cut, 0, 3);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fill();
+
+  menuPlatePath(r, cut, 0, 0);
+  ctx.fillStyle = o.fill || menuLinear(r.x, r.y, r.x, r.y + r.h, [
+    [0, "rgba(38,30,34,0.94)"], [0.55, "rgba(22,17,21,0.94)"],
+    [1, "rgba(13,10,13,0.96)"]
+  ]);
+  ctx.fill();
+  ctx.lineWidth = o.quiet ? 1 : 1.5;
+  ctx.strokeStyle = "rgba(" + accent + "," + (0.20 + live * 0.62).toFixed(3) + ")";
+  ctx.stroke();
+
+  // The live edge: one lit run along the bottom, which is the title screen's
+  // rune slot reduced to the part that reads at this size.
+  if (live > 0.01) {
+    ctx.save();
+    menuPlatePath(r, cut, 0, 0);
+    ctx.clip();
+    ctx.fillStyle = "rgba(" + accent + "," + (live * 0.5).toFixed(3) + ")";
+    ctx.fillRect(r.x, r.y + r.h - 3, r.w, 3);
+    ctx.restore();
+  }
+
+  // Rivets, top-right and bottom-left, on the corners that were NOT sheared.
+  if (!o.quiet) {
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.28)";
+    ctx.fillRect(r.x + r.w - 9, r.y + 5, 2, 2);
+    ctx.fillRect(r.x + 7, r.y + r.h - 7, 2, 2);
+  }
+}
+
+// A control cut from that plate. `detail` is optional small print under the
+// label; `accent` defaults to ember.
+function drawAshControl(r, label, opts) {
+  var o = opts || {};
+  var hot = pointInRect(mouse.x, mouse.y, r);
+  var live = o.disabled ? 0
+    : (hot ? 1 : (o.primary ? 0.22 + ashPulse(1.9) * 0.28 : (o.active ? 0.55 : 0)));
+  var accent = o.accent || ASH_EMBER;
+
+  drawAshPlate(r, { accent: accent, live: live, cut: o.primary ? 18 : 10 });
+
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "600 13px system-ui, sans-serif";
-  ctx.fillStyle = backHot ? "#cfe3ff" : "rgba(199,209,224,0.75)";
-  ctx.fillText("← Menu", back.x + back.w / 2, back.y + back.h / 2 + 1);
+  var mid = r.y + r.h / 2 + (o.detail ? -6 : 1);
+  ctx.font = (o.primary ? "22px " : "16px ") + MENU_DISPLAY_FONT;
+  ctx.fillStyle = o.disabled ? "rgba(" + ASH_DUST + ",0.38)"
+    : (hot || o.active ? "#ffe6c4" : "rgba(" + ASH_BONE + ",0.86)");
+  drawMenuText(label, r.x + r.w / 2, mid, o.primary ? 2.4 : 1.4);
+
+  if (o.detail) {
+    ctx.font = "9px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + "," + (hot ? 0.8 : 0.5) + ")";
+    drawMenuText(o.detail, r.x + r.w / 2, r.y + r.h / 2 + 10, 1.1);
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
+// SHARED BY THREE SCREENS -- the chooser, js/codex.js and js/store.js all call
+// it -- which is why re-cutting it here re-cuts it on all of them.
+function drawBackButton() {
+  drawAshControl(backButtonRect(), "\u2190 MENU", {});
 }
 
 function drawMapSelect() {
   drawSelectBackdrop();
   drawBackButton();
 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-
-  ctx.fillStyle = "#cfe3ff";
-  ctx.font = "700 40px system-ui, sans-serif";
-  ctx.fillText("CHOOSE YOUR RUN", VIEW_WIDTH / 2, 48);
-
-  ctx.fillStyle = "rgba(199,209,224,0.6)";
-  ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("Pick a ley-line.", VIEW_WIDTH / 2, 86);
+  drawAshHeading("CHOOSE YOUR RUN", "SELECT A LEY-LINE", 40);
 
   for (var i = 0; i < Maps.LIST.length; i++) drawMapCard(i);
 
-  ctx.fillStyle = "rgba(199,209,224,0.5)";
-  ctx.font = "13px system-ui, sans-serif";
-  ctx.fillText("click a route or press 1 - " + Maps.LIST.length,
-    VIEW_WIDTH / 2, mapGridBottom() + 16);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
+  drawMenuText("CLICK A ROUTE OR PRESS 1 - " + Maps.LIST.length,
+    VIEW_WIDTH / 2, mapGridBottom() + 18, 1.4);
 
   ctx.textAlign = "left";
 }
 
-// A faint circuit lattice behind the cards. Procedural, like everything else --
-// no images to load, which is what lets the game run from a bare folder.
+// THE BACKDROP EVERY INTERIOR SCREEN SITS ON -- the chooser, the index and the
+// armoury, which is the whole reason it is one function.
+//
+// It was a faint blue circuit lattice until 2026-08-26. That was the old
+// screen's language and it survived the title screen's rebuild by not being
+// looked at, which left the game opening on a burnt sky and then cutting to a
+// sci-fi grid the moment anything was clicked. `drawAshInterior` is the same
+// theme's surface without its subject -- see the block above it for why an
+// interior does not get the pylon and the wreck.
 function drawSelectBackdrop() {
-  ctx.strokeStyle = "rgba(140,199,255,0.05)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (var x = 40; x < VIEW_WIDTH; x += 40) {
-    ctx.moveTo(x + 0.5, 0);
-    ctx.lineTo(x + 0.5, VIEW_HEIGHT);
-  }
-  for (var y = 40; y < VIEW_HEIGHT; y += 40) {
-    ctx.moveTo(0, y + 0.5);
-    ctx.lineTo(VIEW_WIDTH, y + 0.5);
-  }
-  ctx.stroke();
+  drawAshInterior();
 }
 
 // The route card.
@@ -6772,18 +7887,23 @@ function drawMapCard(i) {
   var tier = TIER_COLOURS[a.tier];
   var hot = mapCardAt(mouse.x, mouse.y) === i;
 
-  ctx.fillStyle = hot ? "rgba(32,38,52,0.95)" : "rgba(22,25,34,0.9)";
-  ctx.fillRect(r.x, r.y, r.w, r.h);
+  // THE CARD IS A SALVAGED PLATE, and the map render inside it is untouched --
+  // "make it so that the maps showed when choosing the map look exactly like
+  // the map we're playing in" is a 2026-08-01 ruling and re-theming the chrome
+  // must not walk it back. What changed is the frame around the picture.
+  // The plate takes the ROUTE'S OWN BAND as its accent, so the difficulty is
+  // legible from the card's edge before any text is read.
+  drawAshPlate(r, { accent: tier.rgb, live: hot ? 0.85 : 0, cut: 14 });
 
   // Hotkey, top-left, same convention as a build slot.
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.3)";
-  ctx.fillText(String(i + 1), r.x + 8, r.y + 21);
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
+  ctx.fillText(String(i + 1), r.x + 10, r.y + 21);
 
-  ctx.font = "600 18px system-ui, sans-serif";
-  ctx.fillStyle = "#e6eefc";
+  ctx.font = "19px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = hot ? "#ffe6c4" : "#e9dccb";
   // Measured against where the badge starts, not eyeballed: the badge is
   // 86 px, the score's column 52, and both are anchored to the right edge.
   ctx.fillText(fitText(ctx, map.name, r.w - 192), r.x + 22, r.y + 21);
@@ -6797,13 +7917,14 @@ function drawMapCard(i) {
   ctx.strokeRect(badge.x + 0.5, badge.y + 0.5, badge.w - 1, badge.h - 1);
 
   ctx.textAlign = "center";
-  ctx.font = "600 12px system-ui, sans-serif";
+  ctx.font = "10px " + MENU_TECH_FONT;
   ctx.fillStyle = tier.text;
-  ctx.fillText(a.tier.toUpperCase(), badge.x + badge.w / 2, badge.y + badge.h / 2 + 1);
+  drawMenuText(a.tier.toUpperCase(), badge.x + badge.w / 2,
+    badge.y + badge.h / 2 + 1, 1.6);
 
   // Two maps can share a band, and this is what tells them apart.
   ctx.textAlign = "right";
-  ctx.font = "600 15px system-ui, sans-serif";
+  ctx.font = "16px " + MENU_DISPLAY_FONT;
   ctx.fillStyle = tier.text;
   ctx.fillText(a.score.toFixed(2), r.x + r.w - 16, badge.y + badge.h / 2 + 1);
 
@@ -6831,6 +7952,13 @@ function drawMapCard(i) {
     ["Entrances", String(a.routeCount)],
     ["Road per Rifleman", a.goodCoverageUl.toFixed(1) + " u.l."]
   ];
+  // THE NUMBER IS FITTED FIRST AND THE LABEL TAKES WHAT IS LEFT.
+  //
+  // It used to be the other way round, which was invisible while a card was
+  // 372 px wide and became the whole point at 296: the label ate its 62 % and
+  // "2153.8 u.l." was clipped to "215...". A truncated LABEL is still legible
+  // from its column and its neighbours; a truncated NUMBER is not a number.
+  // So the value is the one that gets its width reserved.
   var statsH = 52;
   var statsY = view.y + view.h - statsH;
   ctx.fillStyle = "rgba(8,10,16,0.72)";
@@ -6841,17 +7969,17 @@ function drawMapCard(i) {
     var cx = view.x + 10 + (row % 2) * colW;
     var cy = statsY + 8 + Math.floor(row / 2) * 22;
 
-    ctx.textAlign = "left";
-    ctx.font = "11px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(199,209,224,0.62)";
-    var label = fitText(ctx, rows[row][0], colW * 0.62);
-    ctx.fillText(label, cx, cy + 2);
-
     ctx.textAlign = "right";
     ctx.font = "600 12px system-ui, sans-serif";
     ctx.fillStyle = "#dce6f8";
-    ctx.fillText(fitText(ctx, rows[row][1],
-      colW - ctx.measureText(label).width - 14), cx + colW - 8, cy + 1);
+    var value = fitText(ctx, rows[row][1], colW * 0.66);
+    var valueW = ctx.measureText(value).width;
+    ctx.fillText(value, cx + colW - 8, cy + 1);
+
+    ctx.textAlign = "left";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(199,209,224,0.62)";
+    ctx.fillText(fitText(ctx, rows[row][0], colW - valueW - 22), cx, cy + 2);
   }
 
   // The border last, so it sits over the render's edge rather than under it.
@@ -6868,7 +7996,12 @@ function drawMapCard(i) {
 // 16:9 is not negotiable here -- see drawMapThumbnail.
 function mapPreviewRect(card) {
   var w = card.w - 24;
-  return { x: card.x + 12, y: card.y + 40, w: w, h: w * VIEW_HEIGHT / VIEW_WIDTH };
+  return {
+    x: card.x + 12,
+    y: card.y + CARD_CHROME_H - 4,
+    w: w,
+    h: w * VIEW_HEIGHT / VIEW_WIDTH
+  };
 }
 
 // THE MAP, drawn small. The whole 1280x720 battlefield scaled into `box`,
@@ -7421,36 +8554,47 @@ function drawResultTab() {
   ctx.textBaseline = "top";
 }
 
+// The pause menu's and both run-over overlays' control. One function, so
+// "Resume", "Restart" and "Main menu" cannot end up three different shapes.
 function drawOverlayButton(r, label) {
-  var hovering = pointInRect(mouse.x, mouse.y, r);
-
-  ctx.fillStyle = hovering ? "#8cb3e6" : "#475c80";
-  ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#b8c7e0";
-  ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "600 16px system-ui, sans-serif";
-  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
+  drawAshControl(r, String(label).toUpperCase(), {});
 }
 
 // Map chooser geometry. Interface chrome, so pixels are correct here -- a card
 // is anchored to the 1280x720 viewport, not to anything in the world.
 //
-// The row is centred and sized from the number of maps, so adding a fifth route
-// to Maps.LIST lays itself out without touching this.
+// The grid is centred and sized from the number of maps, so adding a route to
+// Maps.LIST lays itself out without touching this -- see mapGrid, which is
+// where that claim is actually kept. CARD_W and CARD_H are the LARGEST a card
+// is ever drawn, not the size it always is.
 var MAP_CARD_COLS = 3;
 var CARD_W = 372;
 var CARD_H = 240;
 var CARD_GAP = 18;
 var CARD_ROW_GAP = 14;
 var CARD_Y = 154;
+// Clear of the viewport edges, so a full row never touches the frame.
+var CARD_MARGIN = 20;
+// Everything on a card that is NOT the 16:9 render: the name/badge line above
+// it and a hair of padding below. Kept here because mapGrid derives the card
+// height from it and mapPreviewRect places the render against it, and two
+// copies of one number is how the render ends up off the bottom of the plate.
+var CARD_CHROME_H = 44;
 
+// THE THREE DIFFICULTY BANDS, RE-CUT INTO THE ASH PALETTE (2026-08-26). Teal,
+// yellow and pink were the old screen's; ley-teal, bone and ember are this
+// one's, and they are ALSO an order -- cool for the easy routes, hot for the
+// hard ones -- which the old set was not. The keys and the shape are unchanged,
+// so `Maps.analyse` and every reader of a tier keep working untouched.
 var TIER_COLOURS = {
-  easy:   { text: "#7ce0c0", line: "rgba(124,224,192,0.85)", fill: "rgba(124,224,192,0.12)" },
-  normal: { text: "#ffd76e", line: "rgba(255,215,110,0.85)", fill: "rgba(255,215,110,0.12)" },
-  hard:   { text: "#e08ad8", line: "rgba(224,138,216,0.85)", fill: "rgba(224,138,216,0.12)" }
+  // `rgb` is the same colour as a bare triple, because drawAshPlate takes one
+  // and a second literal of the same colour is the copy that goes stale.
+  easy:   { text: "#74f0d6", rgb: "116,240,214",
+            line: "rgba(116,240,214,0.8)", fill: "rgba(116,240,214,0.10)" },
+  normal: { text: "#f6d9b4", rgb: "236,222,206",
+            line: "rgba(236,222,206,0.8)", fill: "rgba(236,222,206,0.10)" },
+  hard:   { text: "#f0a45c", rgb: "240,150,78",
+            line: "rgba(240,150,78,0.85)", fill: "rgba(240,150,78,0.14)" }
 };
 
 
