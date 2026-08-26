@@ -1800,8 +1800,11 @@ function loadMap(map) {
   paths = Maps.routesOf(map).map(function (route) {
     // Walked and drawn are the SAME line -- see Maps.walkablePoints. Smoothing
     // only the picture made enemies cut every rounded corner and walk beside
-    // their own road.
-    var gamePath = new GamePath(Maps.toWorld(Maps.walkablePoints(map, route.points)));
+    // their own road. The profile rides alongside it: its anchors are
+    // FRACTIONS of the route's own length, so smoothing the line does not
+    // move where the road narrows.
+    var gamePath = new GamePath(Maps.toWorld(Maps.walkablePoints(map, route.points)),
+      Maps.profileOf(route));
     gamePath.id = route.id;
     return gamePath;
   });
@@ -2857,6 +2860,35 @@ function buildClearancePx(type) {
   return ul(ROAD_WIDTH_UL / 2 + type.FOOTPRINT_RADIUS_UL);
 }
 
+// The same rule, on a route whose road CHANGES WIDTH along its length (see the
+// profile block at the bottom of js/path.js). Half of however wide the road is
+// here, plus the tower's own footprint.
+//
+// This is the whole reason a chokepoint is worth anything to the player: the
+// road pulls its edges in, the clearance ring comes in with it, and a tower may
+// stand where a tower could not stand on open road -- closer, so more of the
+// road falls inside its circle. A plaza does the opposite and pushes every
+// tower back off it. Neither is a bonus bolted on; both fall out of the one
+// derived rule above.
+//
+// `maxWidthScaleNear` rather than the width at one distance: the nearest point
+// of the centreline is not always where the road is widest, so a tower beside
+// a ramp into a plaza would otherwise be allowed to stand on tarmac a few
+// units further along. The window is one road width, which is more than the
+// steepest ramp any profile can open over.
+//
+// On a route with no profile this is `buildClearancePx` to the last bit --
+// `maxWidthScaleNear` returns 1 through a null check -- so six of the seven
+// boards place towers exactly where they always did.
+function roadHalfWidthAt(routePath, progress) {
+  var nominal = ul(ROAD_WIDTH_UL);
+  return nominal * routePath.maxWidthScaleNear(progress, nominal) / 2;
+}
+
+function buildClearanceOn(routePath, progress, type) {
+  return roadHalfWidthAt(routePath, progress) + ul(type.FOOTPRINT_RADIUS_UL);
+}
+
 function nearestPathTo(x, y) {
   var best = { path: path, distance: Infinity, progress: 0, index: 0 };
   for (var i = 0; i < paths.length; i++) {
@@ -2943,7 +2975,12 @@ function whyCannotBuild(x, y, type) {
   }
 
   for (var routeIndex = 0; routeIndex < paths.length; routeIndex++) {
-    if (paths[routeIndex].distanceToPoint(x, y) < buildClearancePx(type)) {
+    // One search, two answers: how far the road is and WHERE ALONG IT the
+    // nearest point sits -- which is what decides how wide the road is there.
+    // Asking distanceToPoint and then asking again for the progress would be
+    // two searches that could disagree about which point is nearest.
+    var hit = paths[routeIndex].closestToPoint(x, y);
+    if (hit.distance < buildClearanceOn(paths[routeIndex], hit.progress, type)) {
       return "too close to the path";
     }
   }
@@ -4646,34 +4683,80 @@ function drawRoadOn(routeList, map) {
   ctx.lineCap = "round";
 
   for (var i = 0; i < routeList.length; i++) {
-    tracePath(routeList[i]);
-    ctx.lineWidth = outer + 13;
-    ctx.strokeStyle = "rgba(" + theme.roadEdge + ",0.18)";
-    ctx.stroke();
+    var route = routeList[i];
 
-    tracePath(routeList[i]);
-    ctx.lineWidth = outer;
-    ctx.strokeStyle = theme.roadOuter;
-    ctx.stroke();
+    // A ROAD THAT CHANGES WIDTH CANNOT BE STROKED, and that is the whole
+    // reason there are two branches here rather than one.
+    //
+    // `lineWidth` is one number for a whole path, so the three body layers of
+    // a profiled route are FILLED as outlines instead -- built from the same
+    // `roadEdges` the 3D mesh is extruded from, so the card, the 2D board and
+    // the GL board round their corners identically. The two centreline strokes
+    // below are unchanged in both branches: a line down the middle of the road
+    // does not care how wide the road is.
+    //
+    // A route with no width profile takes the original five strokes, on its own
+    // untouched points array. Six of the seven boards therefore paint exactly
+    // the pixels they painted before profiles existed, which is worth more than
+    // having one code path.
+    if (route.hasWidthProfile && route.hasWidthProfile()) {
+      var ribbon = route.ribbon(outer, ul(RIBBON_STEP_UL));
+      fillRibbon(ribbon, outer / 2, 13, "rgba(" + theme.roadEdge + ",0.18)");
+      fillRibbon(ribbon, outer / 2, 0, theme.roadOuter);
+      fillRibbon(ribbon, outer / 2, -8, theme.roadInner);
+    } else {
+      tracePath(route);
+      ctx.lineWidth = outer + 13;
+      ctx.strokeStyle = "rgba(" + theme.roadEdge + ",0.18)";
+      ctx.stroke();
 
-    tracePath(routeList[i]);
-    ctx.lineWidth = outer - 8;
-    ctx.strokeStyle = theme.roadInner;
-    ctx.stroke();
+      tracePath(route);
+      ctx.lineWidth = outer;
+      ctx.strokeStyle = theme.roadOuter;
+      ctx.stroke();
 
-    tracePath(routeList[i]);
+      tracePath(route);
+      ctx.lineWidth = outer - 8;
+      ctx.strokeStyle = theme.roadInner;
+      ctx.stroke();
+    }
+
+    tracePath(route);
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(" + theme.roadEdge + ",0.72)";
     ctx.stroke();
 
     ctx.save();
     ctx.setLineDash([14, 18]);
-    tracePath(routeList[i]);
+    tracePath(route);
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = "rgba(" + theme.roadCenter + ",0.82)";
     ctx.stroke();
     ctx.restore();
   }
+}
+
+// How finely a road that changes width is resampled, in u.l. In u.l. and not
+// pixels because everything else about the road is: retune UNIT_LENGTH and the
+// ribbon keeps the same number of steps per road width rather than getting
+// coarser as the board grows.
+var RIBBON_STEP_UL = 13;
+
+// One layer of a profiled road: up the left edge and back down the right,
+// filled. `inflate` widens both edges, which is how the outer glow is drawn as
+// ONE fill -- stroking it per segment instead would compound its 0.18 alpha at
+// every overlap and band the whole road.
+function fillRibbon(ribbon, defaultHalf, inflate, style) {
+  var edges = roadEdges(ribbon, defaultHalf, inflate);
+  var i;
+
+  ctx.beginPath();
+  ctx.moveTo(edges[0].lx, edges[0].ly);
+  for (i = 1; i < edges.length; i++) ctx.lineTo(edges[i].lx, edges[i].ly);
+  for (i = edges.length - 1; i >= 0; i--) ctx.lineTo(edges[i].rx, edges[i].ry);
+  ctx.closePath();
+  ctx.fillStyle = style;
+  ctx.fill();
 }
 
 function drawRoad() {
@@ -4802,25 +4885,25 @@ function circleRing(cx, cy, radius, steps) {
   return pts;
 }
 
-// The road as a filled BAND of the given half-width, rather than a stroked
-// line. A stroke of constant screen width is a lie on a tilted board -- the far
-// end of the road would be painted as wide as the near end -- and the width is
-// the entire information here, because the rule the band stands for is measured
-// in world units.
+// The road as a filled BAND, rather than a stroked line. A stroke of constant
+// screen width is a lie on a tilted board -- the far end of the road would be
+// painted as wide as the near end -- and the width is the entire information
+// here, because the rule the band stands for is measured in world units.
 //
-// Every point gets the normal of its own neighbourhood, which is safe at this
-// subdivision: the tightest bend on the curve has a radius of about twenty-five
-// pixels against an eleven pixel half-width, so the inner edge never folds.
-function roadBandRing(points, half) {
+// OFF `roadEdges` AND OFF THE RIBBON, which is the only correct answer once a
+// road may change width along its length. This was its own mitre offsetter for
+// one commit, written against a single ROAD_WIDTH_UL, and the merge with the
+// route-profile branch made it a second copy of a function that already existed
+// -- and a wrong one: it would have painted a chokepoint at open-road width
+// while `buildClearanceOn` refused towers at the narrow one. The wash and the
+// rule have to be the same derivation or the wash is decoration.
+function roadBandRing(routePath) {
+  var half = ul(ROAD_WIDTH_UL) / 2;
+  var edges = roadEdges(routePath.ribbon(ul(ROAD_WIDTH_UL)), half, 0);
   var left = [], right = [], i;
-  for (i = 0; i < points.length; i++) {
-    var a = points[Math.max(0, i - 1)];
-    var b = points[Math.min(points.length - 1, i + 1)];
-    var dx = b.x - a.x, dy = b.y - a.y;
-    var len = Math.sqrt(dx * dx + dy * dy) || 1;
-    var nx = -dy / len * half, ny = dx / len * half;
-    left.push([points[i].x + nx, points[i].y + ny]);
-    right.push([points[i].x - nx, points[i].y - ny]);
+  for (i = 0; i < edges.length; i++) {
+    left.push([edges[i].lx, edges[i].ly]);
+    right.push([edges[i].rx, edges[i].ry]);
   }
   right.reverse();
   return left.concat(right);
@@ -4843,13 +4926,13 @@ function noBuildRings(type) {
   if (!type) return rings;
   var i;
 
-  // The road, at its own half-width. `buildClearancePx` is that half-width plus
-  // the footprint, so a footprint touching the band is exactly a centre inside
-  // the clearance -- the painted rule and the enforced rule are one derivation.
-  var half = ul(ROAD_WIDTH_UL / 2);
+  // The road, at its own half-width WHEREVER YOU ARE ON IT. `buildClearanceOn`
+  // is that half-width plus the footprint, so a footprint touching the band is
+  // exactly a centre inside the clearance -- the painted rule and the enforced
+  // rule are one derivation, at a gate as much as on open road.
   for (i = 0; i < paths.length; i++) {
     if (paths[i].points && paths[i].points.length > 1) {
-      rings.push(roadBandRing(paths[i].points, half));
+      rings.push(roadBandRing(paths[i]));
     }
   }
 
@@ -8607,8 +8690,19 @@ function drawMapThumbnail(map, box) {
 
   // Routes converted the same way loadMap converts them, so the road on the
   // card is at the same world coordinates it will be at in the run.
+  //
+  // REAL GamePaths, not bare {points}, since 2026-08-26: a route may now
+  // declare a width profile and the card has to show the chokepoints and the
+  // plaza, or the promise that the preview IS the map is broken by exactly the
+  // feature the player would most want to see before picking a board.
+  // Construction is a cumulative-length pass over a dozen points.
   drawRoadOn(Maps.routesOf(map).map(function (route) {
-    return { points: Maps.toWorld(route.points) };
+    // THE SMOOTHED LINE, like every other GamePath on the board. This call
+    // and the one in loadMap came from opposite branches and git merged them
+    // without a word: this one kept the authored polyline, so the sampler
+    // measured a route the enemies do not walk.
+    return new GamePath(Maps.toWorld(Maps.walkablePoints(map, route.points)),
+      Maps.profileOf(route));
   }), map);
 
   ctx.restore();

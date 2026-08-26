@@ -41,6 +41,19 @@ var World3D = (function () {
   var uiCanvas = null;
 
   var mapMesh = null;
+  // PROPS THAT DO NOT GLOW IN THE BOARD'S COLOUR, as their own meshes.
+  //
+  // Emission is `uGlowTint * vEmi` -- ONE tint per draw call, not per vertex --
+  // so the whole board pass emits in the map's accent and a prop cannot opt out
+  // of that by carrying a different vertex colour: its diffuse would be violet
+  // and every lit surface on it would still be adding ember. The only way a
+  // prop owns its own LIGHT rather than just its own paint is to be drawn
+  // separately, so a prop that declares `accent` is split out of the board mesh
+  // into one of these and drawn immediately after it under its own tint.
+  //
+  // Grouped by colour, not one per prop: six caskets in one violet would cost
+  // one draw call, not six.
+  var accentMeshes = [];
   var mapKey = null;
   var bounds = null;
   // Kept from the last build so the world pass can light the board's own
@@ -62,7 +75,8 @@ var World3D = (function () {
   var heightField = null;
   var HEIGHT_CELL = 6;
 
-  function buildHeightField(minX, minY, maxX, maxY, env, routePaths, roadWidth, map) {
+  function buildHeightField(minX, minY, maxX, maxY, env, routePaths, roadWidth,
+      river, map) {
     var w = Math.max(1, Math.ceil((maxX - minX) / HEIGHT_CELL));
     var h = Math.max(1, Math.ceil((maxY - minY) / HEIGHT_CELL));
     var data = new Float32Array(w * h);          // 0 = bare floor
@@ -105,6 +119,24 @@ var World3D = (function () {
       stampRect(cx - zw / 2, cy - zd / 2, cx + zw / 2, cy + zd / 2, top);
     });
 
+    // THE RIVER, STAMPED BEFORE THE ROAD AND UNCONDITIONALLY.
+    //
+    // Every other stamp in this function is "highest wins", which is right for
+    // slabs laid on a floor and wrong for a hole cut through one: a channel at
+    // -25 loses that contest to the bare floor at 0 and the water never
+    // appears under anything standing near it. So it is written flat -- and it
+    // is written FIRST, so the road's own stamp still wins across the crossing
+    // and a body on the bridge stands on the bridge.
+    if (river) {
+      var rx0 = river.x - river.width / 2 - river.banks;
+      var rx1 = river.x + river.width / 2 + river.banks;
+      var ri0 = Math.max(0, Math.floor((rx0 - minX) / HEIGHT_CELL));
+      var ri1 = Math.min(w - 1, Math.ceil((rx1 - minX) / HEIGHT_CELL));
+      for (var rj = 0; rj < h; rj++) {
+        for (var ri = ri0; ri <= ri1; ri++) data[rj * w + ri] = -river.depth;
+      }
+    }
+
     // THE BUILDABLE STUMPS, stamped as discs so a tower placed on one stands on
     // its cut face instead of inside the trunk.
     //
@@ -135,24 +167,34 @@ var World3D = (function () {
 
     // The road, stamped as a real band rather than a bounding box, or every
     // corner would raise a square of open floor beside it.
-    var half = roadWidth / 2;
+    //
+    // Off the RIBBON, so a road that changes width is stamped at the width it
+    // actually is: the surface a body stands on has to be the surface that was
+    // built, and a chokepoint stamped at open-road width would leave an enemy
+    // squeezing through the gate walking on a strip of road-height ground
+    // wider than the road under it.
     routePaths.forEach(function (p) {
-      var pts = p.points;
+      var pts = roadRibbon(p, roadWidth);
+      var flat = roadWidth / 2;
       for (var s = 0; s + 1 < pts.length; s++) {
         var ax = pts[s].x, ay = pts[s].y, bx = pts[s + 1].x, by = pts[s + 1].y;
+        var halfA = pts[s].half === undefined ? flat : pts[s].half;
+        var halfB = pts[s + 1].half === undefined ? flat : pts[s + 1].half;
+        var wide = Math.max(halfA, halfB);
         var dx = bx - ax, dy = by - ay;
         var len2 = dx * dx + dy * dy;
-        var i0 = Math.max(0, Math.floor((Math.min(ax, bx) - half - minX) / HEIGHT_CELL));
-        var i1 = Math.min(w - 1, Math.ceil((Math.max(ax, bx) + half - minX) / HEIGHT_CELL));
-        var j0 = Math.max(0, Math.floor((Math.min(ay, by) - half - minY) / HEIGHT_CELL));
-        var j1 = Math.min(h - 1, Math.ceil((Math.max(ay, by) + half - minY) / HEIGHT_CELL));
+        var i0 = Math.max(0, Math.floor((Math.min(ax, bx) - wide - minX) / HEIGHT_CELL));
+        var i1 = Math.min(w - 1, Math.ceil((Math.max(ax, bx) + wide - minX) / HEIGHT_CELL));
+        var j0 = Math.max(0, Math.floor((Math.min(ay, by) - wide - minY) / HEIGHT_CELL));
+        var j1 = Math.min(h - 1, Math.ceil((Math.max(ay, by) + wide - minY) / HEIGHT_CELL));
         for (var j = j0; j <= j1; j++) {
           for (var i = i0; i <= i1; i++) {
             var px = minX + (i + 0.5) * HEIGHT_CELL, py = minY + (j + 0.5) * HEIGHT_CELL;
             var t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
             t = t < 0 ? 0 : (t > 1 ? 1 : t);
             var qx = px - (ax + dx * t), qy = py - (ay + dy * t);
-            if (qx * qx + qy * qy > half * half) continue;
+            var here = halfA + (halfB - halfA) * t;
+            if (qx * qx + qy * qy > here * here) continue;
             var k = j * w + i;
             if (ROAD_LIFT > data[k]) data[k] = ROAD_LIFT;
           }
@@ -180,6 +222,18 @@ var World3D = (function () {
   // rule below exists to refuse. Samples the rim of the footprint as well as
   // its centre, because a small tower can bridge an edge with its middle clear.
   function levelUnder(x, y, radius) {
+    // NOT IN THE RIVER, AT ANY DEPTH.
+    //
+    // The rest of this function refuses a footprint that STRADDLES two levels,
+    // and a channel wide enough to swallow a whole footprint passes that test
+    // perfectly: the bed is as flat as any deck. It is still a tower standing
+    // in running water twenty-five units under the board. The river is
+    // therefore its own rule rather than a consequence of the height field,
+    // which is honest -- "you cannot build in the river" is not a statement
+    // about levels.
+    if (riverBand && x + radius > riverBand.x0 && x - radius < riverBand.x1) {
+      return { min: riverBand.bed, max: 0, flat: false };
+    }
     var lo = Infinity, hi = -Infinity;
     for (var a = 0; a < 8; a++) {
       var th = Math.PI * 2 * a / 8;
@@ -194,6 +248,15 @@ var World3D = (function () {
   }
 
   var ROAD_WIDTH_UL = 21.875;
+  // How finely a road that changes width is resampled for this board, in world
+  // units. Mirrors js/game.js's RIBBON_STEP_UL through ul() for the same reason
+  // AUTHORED_PX_PER_UL is mirrored below: the mesh and the 2D pass have to
+  // resample the same road the same way or the card and the board disagree
+  // about where a chokepoint starts.
+  function roadRibbon(routePath, roadWidth) {
+    return routePath.ribbon ? routePath.ribbon(roadWidth, ul(13))
+      : routePath.points;
+  }
   // How proud of the floor the road ribbon sits. Read by BOTH the mesh and the
   // height field, so the surface an enemy is drawn standing on is the same
   // number as the surface that was built under it.
@@ -214,9 +277,52 @@ var World3D = (function () {
   // that straddles an edge, so a mud puddle built as a slab would quietly
   // become a no-build ring. A patch stamps no height at all and so can never
   // move a build spot.
-  var ZONE_HEIGHT = { deck: 9, bay: 5, hazard: 2.5, "void": -4, dirt: 0 };
+  //
+  // `plate` and `flux` are the same kind of zero as `dirt` -- a cracked floor
+  // panel and a patch of ground the buried plant is leaking into, both painted
+  // at the floor's own height. Three ground colours rather than one, because a
+  // board asked to stop being monochrome cannot answer with one more shade of
+  // the same brown.
+  var ZONE_HEIGHT = {
+    deck: 9, bay: 5, hazard: 2.5, "void": -4,
+    dirt: 0, plate: 0, flux: 0
+  };
+
+  // What a PATCH is painted in. The floor's own edge colour for bare earth, the
+  // board's panel for a plate, and the accent for a leak -- weak, because it is
+  // a stain on the ground and not a light: the casket taught this board that a
+  // surface painted in the accent at full strength is a bright coloured
+  // rectangle, whatever its emission is set to.
+  function patchColor(kind, P) {
+    if (kind === "plate") return P.panel;
+    if (kind === "flux") return GLGeometry.mix(P.terrainEdge, P.accent2, 0.16);
+    return P.terrainEdge;
+  }
 
   var prims = null;
+
+  // THE RIVER, IN WORLD UNITS, kept from the last board build.
+  //
+  // Two things outside `buildMapMesh` need it and neither can re-derive it:
+  // the height field has to sink the channel, and `levelUnder` has to refuse a
+  // tower standing in it. Null on every board that declares no river, which is
+  // six of the seven.
+  var riverBand = null;
+
+  // The authored river spec, in world units. `x`, `width`, `banks` and `depth`
+  // are authored in the same pixel space as the zones and the props.
+  function riverOf(env) {
+    var r = env && env.river;
+    if (!r || !r.width) return null;
+    return {
+      x: ul(r.x / AUTHORED_PX_PER_UL),
+      width: ul(r.width / AUTHORED_PX_PER_UL),
+      banks: ul((r.banks || 0) / AUTHORED_PX_PER_UL),
+      depth: ul((r.depth || 24) / AUTHORED_PX_PER_UL),
+      spill: r.spill === "max" ? "max" : "min",
+      water: r.water, foam: r.foam
+    };
+  }
 
   // The action occupies the first part of a firing cycle and the rest is the
   // aimed pose held -- a weapon still cycling when the next shot leaves reads
@@ -224,6 +330,19 @@ var World3D = (function () {
   var WORK_SHARE = 0.45;
 
   // --- palette -------------------------------------------------------------
+
+  // An "r,g,b" string as linear light -- the spelling `theme.accent` and the
+  // decorations already use. Hoisted out of `paletteFor` because a single PROP
+  // can now override the board's accent (see the casket, below), and a second
+  // copy of this parse is a second place for the curve to drift.
+  function linearTriple(v, fallback) {
+    if (!v) return GLGeometry.hex(fallback);
+    var p = String(v).split(",");
+    return p.length === 3
+      ? [Math.pow(+p[0] / 255, 2.2), Math.pow(+p[1] / 255, 2.2),
+         Math.pow(+p[2] / 255, 2.2)]
+      : GLGeometry.hex(fallback);
+  }
 
   function paletteFor(map) {
     var t = (typeof Maps !== "undefined" && Maps.themeOf)
@@ -237,14 +356,7 @@ var World3D = (function () {
               parseInt(text.substr(2, 2), 16) / 255,
               parseInt(text.substr(4, 2), 16) / 255];
     }
-    function triple(v, fallback) {
-      if (!v) return GLGeometry.hex(fallback);
-      var p = String(v).split(",");
-      return p.length === 3
-        ? [Math.pow(+p[0] / 255, 2.2), Math.pow(+p[1] / 255, 2.2),
-           Math.pow(+p[2] / 255, 2.2)]
-        : GLGeometry.hex(fallback);
-    }
+    function triple(v, fallback) { return linearTriple(v, fallback); }
     return {
       terrain: hex(t.floor, "#0c2633"),
       terrainEdge: hex(t.panelDark, "#081d29"),
@@ -261,7 +373,17 @@ var World3D = (function () {
       ridgeDark: hex(t.ridgeDark, t.metalDark || "#132733"),
       roadTop: hex(t.roadInner, "#274553"),
       roadSide: hex(t.roadOuter, "#0a1922"),
+      // THE ROAD'S OWN LIGHT, and absent means absent. A board declares
+      // `roadGlow` when its floor has no value contrast left to draw the route
+      // with -- see the kerb lights in GLGeometry.road. Undefined on the six
+      // facility boards, whose lit floor grid already says where everything is.
+      roadGlow: t.roadGlow ? triple(t.roadGlow, "#4FE3D2") : null,
       accent: triple(t.accent, "#4FE3D2"),
+      // The board's SECOND colour, where it has one. Used by the ground
+      // patches that are a leak rather than a surface, so a board can put a
+      // cold pool of light on a warm floor without either one being the
+      // accent -- see `patchColor`.
+      accent2: triple(t.accent2, t.accent || "#4FE3D2"),
       // WEATHER IS OPT-IN, and absent means absent. A board that declares no
       // `fog` renders through exactly the shader path it did before fog
       // existed, because density 0 is what `GLRenderer.begin` restores.
@@ -336,8 +458,36 @@ var World3D = (function () {
     maxX = playMaxX + apron;
     maxY = playMaxY + apron;
 
+    var env = (typeof Maps !== "undefined" && Maps.ENVIRONMENTS && map)
+      ? Maps.ENVIRONMENTS[map.id] : null;
+
+    // THE FLOOR IS ONE QUAD, AND A RIVER NEEDS A HOLE IN IT.
+    //
+    // `GLGeometry.river` builds a channel that goes below z 0, and nothing it
+    // builds is visible under a lid. Every flat surface this function lays --
+    // the floor itself and each of the ground PATCHES painted on it -- is
+    // therefore laid in two pieces around the river's band, and the band edge
+    // is the same ±(width/2 + banks) the channel's outer lip uses. The two
+    // numbers are shared rather than matched: an approximation here shows as a
+    // strip of void down the whole run.
+    var river = riverOf(env);
+    var gap = river
+      ? { x0: river.x - river.width / 2 - river.banks,
+          x1: river.x + river.width / 2 + river.banks }
+      : null;
+    riverBand = river ? { x0: gap.x0, x1: gap.x1, bed: -river.depth } : null;
+
+    function flat(builder, x0, y0, x1, y1, z, color) {
+      if (!gap || gap.x1 <= x0 || gap.x0 >= x1) {
+        GLGeometry.ground(builder, x0, y0, x1, y1, z, color);
+        return;
+      }
+      if (gap.x0 > x0) GLGeometry.ground(builder, x0, y0, gap.x0, y1, z, color);
+      if (gap.x1 < x1) GLGeometry.ground(builder, gap.x1, y0, x1, y1, z, color);
+    }
+
     var g = new GLGeometry.Builder();
-    GLGeometry.ground(g, minX, minY, maxX, maxY, 0, P.terrain);
+    flat(g, minX, minY, maxX, maxY, 0, P.terrain);
 
     // FLOOR SEAMS ARE A MANUFACTURED FLOOR'S SEAMS. Six of the seven boards are
     // decks inside a facility and the grid is what says so. Ruled lines two
@@ -356,8 +506,6 @@ var World3D = (function () {
       }
     }
 
-    var env = (typeof Maps !== "undefined" && Maps.ENVIRONMENTS && map)
-      ? Maps.ENVIRONMENTS[map.id] : null;
     ((env && env.zones) || []).forEach(function (z) {
       var h = ZONE_HEIGHT[z.kind];
       if (h === undefined || !z.w || !z.h) return;
@@ -369,8 +517,8 @@ var World3D = (function () {
       // No rim, because a patch of mud has no edge rail, and no height stamp
       // (see buildHeightField), because it must not move a build spot.
       if (h === 0) {
-        GLGeometry.ground(g, cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2,
-          0.08, P.terrainEdge);
+        flat(g, cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2,
+          0.08, patchColor(z.kind, P));
         return;
       }
       var thickness = Math.max(1.5, Math.abs(h));
@@ -397,12 +545,19 @@ var World3D = (function () {
         Math.max(0, slabTop - rimH - 0.6));
     });
 
+    // The channel, cut BEFORE the road is laid so the crossing is drawn over
+    // the water rather than into it.
+    if (river) GLGeometry.river(g, river, minY, maxY, P);
+
     var roadWidth = ul(ROAD_WIDTH_UL);
     routePaths.forEach(function (p) {
-      // `p.points` IS the curve -- loadMap builds the walked path from the
-      // same spline -- so the ribbon is drawn along exactly the line the
-      // enemies walk. Smoothing again here is what made the two diverge.
-      GLGeometry.road(g, p.points, roadWidth, ROAD_LIFT, P.roadTop, P.roadSide);
+      // `ribbon` is the route's own points on a board whose road is one width
+      // the whole way -- six of the seven -- and a resampled list carrying a
+      // per-point half-width where the route declares a profile. One call
+      // either way, so a chokepoint is real narrowed tarmac in the mesh and
+      // not a marking painted on a road that never changed.
+      GLGeometry.road(g, roadRibbon(p, roadWidth), roadWidth, ROAD_LIFT,
+        P.roadTop, P.roadSide, P.roadGlow);
     });
 
     // The authored scenery. Each map names nine props and until now the 3D
@@ -413,18 +568,42 @@ var World3D = (function () {
     //
     // Placed in the SAME authored-pixel space as the zones above, so a prop
     // sits where maps.js says it does relative to the deck it belongs to.
+    //
+    // ONE PROP MAY OWN ITS OWN ACCENT. Every other colour on a board comes out
+    // of the theme, and that is what makes a prop on Mana Coil violet and the
+    // same prop on Sigil Lattice green without a second table. The exception
+    // is a prop whose light is NOT the board's light -- the forest's casket
+    // glows violet on a board whose one saturated colour is an ember, and the
+    // whole point of it is that it does not belong here. Declared per prop as
+    // `accent: "r,g,b"`, the same spelling the theme and the decorations use,
+    // and layered over the palette rather than replacing it so everything else
+    // about the prop is still the board's.
+    var accentGroups = {};
     ((env && env.models) || []).forEach(function (m) {
       if (!m || !m.kind) return;
-      // The model is handed through as well, with anything it authored in
-      // PIXELS converted here -- the same single conversion `size` gets. A prop
-      // that needs more than a size and a rotation (a stump declares its own
-      // height, so the height field and the geometry agree) reads it off this.
-      GLGeometry.scenery(g, m.kind,
+      var into = g, props = P;
+      if (m.accent) {
+        var group = accentGroups[m.accent];
+        if (!group) {
+          var tint = linearTriple(m.accent, "#4FE3D2");
+          var lit = Object.create(P);
+          lit.accent = tint;
+          group = accentGroups[m.accent] =
+            { builder: new GLGeometry.Builder(), palette: lit, tint: tint };
+        }
+        into = group.builder;
+        props = group.palette;
+      }
+      GLGeometry.scenery(into, m.kind,
         ul(m.x / AUTHORED_PX_PER_UL), ul(m.y / AUTHORED_PX_PER_UL),
-        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, P,
-        { heightPx: typeof m.height === "number"
-            ? ul(m.height / AUTHORED_PX_PER_UL) : undefined });
+        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, props);
     });
+
+    accentMeshes = Object.keys(accentGroups).map(function (key) {
+      var group = accentGroups[key];
+      return { mesh: group.builder.build(renderer), tint: group.tint };
+    });
+
 
     // GAMEPLAY GEOMETRY, BUILT FROM THE SHAPES THEMSELVES.
     //
@@ -459,7 +638,7 @@ var World3D = (function () {
     // orbit out over empty forest and would open the run zoomed to a speck.
     bounds = { minX: playMinX, minY: playMinY, maxX: playMaxX, maxY: playMaxY };
     heightField = buildHeightField(playMinX, playMinY, playMaxX, playMaxY, env,
-      routePaths, roadWidth, map);
+      routePaths, roadWidth, river, map);
     return g.build(renderer);
   }
 
@@ -1575,6 +1754,13 @@ var World3D = (function () {
     // not set its own glow cannot inherit the board's.
     renderer.setGlow(1, mapPalette ? mapPalette.accent : null);
     renderer.draw(mapMesh, 0, 0, 0, 0, 1);
+    // The board's own exceptions, each under the light it declared. Same
+    // static geometry and the same fog; only the tint of what it emits is its
+    // own. See `accentMeshes` for why this cannot be one draw call.
+    for (var am = 0; am < accentMeshes.length; am++) {
+      renderer.setGlow(1, accentMeshes[am].tint);
+      renderer.draw(accentMeshes[am].mesh, 0, 0, 0, 0, 1);
+    }
     renderer.setGlow(0, null);
 
     var i;
