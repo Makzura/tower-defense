@@ -247,10 +247,26 @@ var MapGeometry = (function () {
   // case on a live board -- most shots reach their target -- and allocating a
   // "no hit" record per bullet per step is exactly the churn the hot paths in
   // this game are written to avoid.
-  function firstHit(shapes, ax, ay, bx, by, inflate) {
+  // A SHAPE ONLY STOPS AN EYE THAT IS BELOW ITS TOP.
+  //
+  // `eyeHeight` is how high the line is being cast from -- zero on the ground,
+  // the stump's top for a tower standing on one. A shape whose height is at or
+  // under that is looked over and does not participate. Shapes with no height
+  // declared come out of the compiler as Infinity, so a board that has never
+  // heard of elevation behaves exactly as it did: every shape stops everything.
+  //
+  // Strictly greater, not >=: standing exactly as high as a rock is standing on
+  // top of the sightline, and the alternative is a band one float wide where
+  // the answer depends on rounding -- the same reasoning as tangency.
+  function clears(shape, eyeHeight) {
+    return eyeHeight > 0 && shape.height !== undefined && shape.height <= eyeHeight;
+  }
+
+  function firstHit(shapes, ax, ay, bx, by, inflate, eyeHeight) {
     if (!shapes || !shapes.length) return null;
     var bestT = -1, bestShape = null;
     for (var i = 0; i < shapes.length; i++) {
+      if (eyeHeight && clears(shapes[i], eyeHeight)) continue;
       var t = segmentHit(shapes[i], ax, ay, bx, by, inflate);
       if (t < 0) continue;
       if (bestT < 0 || t < bestT) { bestT = t; bestShape = shapes[i]; }
@@ -269,9 +285,10 @@ var MapGeometry = (function () {
   // Separate from firstHit because this is the question asked most often --
   // once per tower per candidate enemy per step -- and it does not need the
   // contact point, so it must not build one.
-  function clearLine(shapes, ax, ay, bx, by) {
+  function clearLine(shapes, ax, ay, bx, by, eyeHeight) {
     if (!shapes || !shapes.length) return true;
     for (var i = 0; i < shapes.length; i++) {
+      if (eyeHeight && clears(shapes[i], eyeHeight)) continue;
       if (segmentHit(shapes[i], ax, ay, bx, by, 0) >= 0) return false;
     }
     return true;
@@ -283,6 +300,7 @@ var MapGeometry = (function () {
     segmentHit: segmentHit,
     firstHit: firstHit,
     clearLine: clearLine,
+    clears: clears,
     // Exposed for the suites and for callers that need the primitives on their
     // own -- the stump snap measures a plain point-to-centre distance, and the
     // difficulty sampler measures road distance the same way.

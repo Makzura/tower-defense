@@ -35,9 +35,49 @@
 // targeting, the genre default) and fires one bullet per second.
 // ---------------------------------------------------------------------------
 
+// ELEVATION, and it is two rules from one number.
+//
+// A tower standing on a stump SEES OVER anything shorter than the stump, and it
+// REACHES FURTHER. Both come from the height of the ground under it, which is
+// the map's business and is asked for exactly once, at construction.
+//
+// Guarded on both globals because these files are booted without a map in the
+// unit suites, and a tower with no map under it is a tower standing on the
+// floor -- which is what every board but Ironwood Frontier actually is.
+function groundHeightUnder(x, y) {
+  if (typeof Maps === "undefined" || !Maps.groundHeightAt) return 0;
+  if (typeof currentMap === "undefined" || !currentMap) return 0;
+  return Maps.groundHeightAt(currentMap, x, y) || 0;
+}
+
+// +1% of range per 1.6 u.l. of elevation, straight line, no cap and no floor.
+// The tallest stump on Ironwood Frontier is 24 u.l., which is +15% -- the
+// figure the owner asked for -- and the shortest is 10.6 u.l., which is +6.6%.
+// Deliberately small: a stump is a firing position, not an upgrade, and a tower
+// that gains a tier's worth of range by standing somewhere is a tower whose
+// tiers stop mattering.
+//
+// The height divides by UNIT_LENGTH because it arrives in world pixels and this
+// rate is per u.l. -- retuning the unit must not retune the bonus.
+Tower.ELEVATION_RANGE_PER_UL = 0.00625;
+
+function elevatedRangePx(tower, rangeUl) {
+  if (rangeUl === Infinity) return Infinity;
+  var px = ul(rangeUl);
+  var h = (tower && tower.groundHeight) || 0;
+  if (!h) return px;
+  return px * (1 + Tower.ELEVATION_RANGE_PER_UL * (h / UNIT_LENGTH));
+}
+
 function Tower(x, y, path) {
   this.x = x;
   this.y = y;
+
+  // HOW HIGH THE GROUND UNDER IT IS, read once, at construction. Zero on dirt.
+  // This one number is the whole of elevation: RangeFilter reads it to decide
+  // what this tower can see over, bullet.js reads it to decide what its rounds
+  // fly over, and elevatedRangePx reads it for the reach bonus.
+  this.groundHeight = groundHeightUnder(x, y);
 
   // How far along the path this tower sits. Towers claim targets in this
   // order, so the gunner an enemy walks past FIRST gets first refusal on it.
@@ -65,7 +105,7 @@ function Tower(x, y, path) {
   // footprintPx are the tower's cached world-space values; everything that
   // compares distances against them (findTarget, containsPoint, placement)
   // stays in that same world space rather than re-deriving u.l. per check.
-  this.rangePx = ul(this.rangeUl);
+  this.rangePx = elevatedRangePx(this, this.rangeUl);
   this.footprintPx = ul(this.footprintRadiusUl);
   this.cooldown = 0;
   this.aim = -Math.PI / 2;

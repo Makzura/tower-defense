@@ -13,6 +13,58 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — Ironwood Frontier: elevation, and the end of a rock being two
+objects.**
+
+**The rock you can see is now the rock you collide with.** Every blocker was
+authored twice — a collision shape in `blockers` and a scenery prop in `models`
+with a size of its own — and the two numbers were about a factor of two apart: a
+blocker of radius 48 had a prop of SIZE 48, so it was drawn at half the width of
+the thing a bullet stops against. Every rock on the board wore an invisible
+skirt. The comment above those props claimed they were "drawn at the position and
+size the blocker list authors", which is what a comment holding two numbers
+together is worth.
+
+There is one number now. `GLGeometry.solid` builds the rock FROM the compiled
+shape and `Maps.drawSolids` does the same on the flat board: a circle's base ring
+is exactly its radius, a polygon's bottom face is the authored polygon vertex for
+vertex, a capsule is a barrel of exactly its radius — so a capsule's height is
+twice its radius, because it is a log lying on the ground. A test asserts the
+second copy stays gone, which is the only assertion that actually prevents this.
+
+Two art corrections inside that. The first pass drew circles as five coaxial
+rings, which is a terraced wedding cake, not stone — they are jittered per vertex
+with drifting centres now. And it lit them with the machine colours, `metal` on
+the sides and `panel` on top, where `panel` is the darker of the two on this
+board: five rocks darker than the dirt they stand on. The theme carries `rock`
+and `rockDark`, and the faces pointing at the sky are the light ones.
+
+**Higher ground sees over lower things, and reaches further.** Every solid
+declares a height and a line is only stopped by something standing higher than
+the eye that cast it. Stumps are in that list — they were drawn as a metre of
+standing timber from the first day and did not act like any. From the tallest
+stump you look down over the other five and over the fallen log; from any of
+them, over the low shelf; over the boulders, never.
+
+Reach is a straight line, +1% per 1.6 u.l. of elevation, no cap: +15% on the
+tallest stump, which is what was asked for, down to +6.6% on the shortest. Per
+u.l. rather than per pixel, so retuning the unit does not retune the bonus. The
+build ghost shows it before you commit — hover a stump and the ring grows.
+
+The rounds obey the same rule as the eye, off the same number, because a tower
+that can SEE something it cannot SHOOT is the worst possible pair of rules.
+
+**And the world came in a touch**, as asked: the periphery is 12% closer and the
+ground 4600 rather than 5400.
+
+Two test spots moved, and both for the same reason rather than by hand: the
+sandbox's firing position could be BUILT on but no longer SEE the road past two
+stumps, and the pierce corridor at y = 300 runs straight through stump-p6. Both
+are swept at run time now, and both assert what they need before using it.
+
+Ironwood measures 0.792, normal. Wave compositions identical. Suites 167 / 238 /
+74 / 47 / 53, 0 failing.
+
 **2026-08-26 — Ironwood Frontier, playtest round three.** Three reports, and one
 of them was a rule I had invented on my own.
 

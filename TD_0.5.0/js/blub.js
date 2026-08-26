@@ -60,6 +60,12 @@ function BlubTower(x, y, path) {
   this.x = x;
   this.y = y;
 
+  // HOW HIGH THE GROUND UNDER IT IS, read once, at construction. Zero on dirt.
+  // This one number is the whole of elevation: RangeFilter reads it to decide
+  // what this tower can see over, bullet.js reads it to decide what its rounds
+  // fly over, and elevatedRangePx reads it for the reach bonus.
+  this.groundHeight = groundHeightUnder(x, y);
+
   // Firing priority along the path, same rule as every other tower. The
   // summoner never fires, but its blubs are sorted into the same array by the
   // same key, and a tower without the field would sort as undefined.
@@ -402,7 +408,7 @@ BlubTower.prototype.recalcStats = function () {
 
   this.maxHp = maxHp;
   this.rangeUl = rangeUl;
-  this.rangePx = ul(rangeUl);
+  this.rangePx = elevatedRangePx(this, rangeUl);
 
   this.hasToggles = this.hasA3;
   this.hasWeaken = this.hasA4;

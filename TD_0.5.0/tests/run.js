@@ -5553,4 +5553,162 @@ function (t) {
     "in both places");
 });
 
+group("Ironwood Frontier — elevation");
+
+test("21  a stump reaches further, in a straight line, and dirt reaches nothing extra",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+
+  function towerAt(x, y) {
+    var route = g.nearestPathTo(x, y);
+    return new g.Soldier(x, y, route.path);
+  }
+  var ground = towerAt(700, 300);
+  t.eq(ground.groundHeight, 0, "a tower on dirt stands on nothing");
+  t.near(ground.rangePx, g.ul(g.Soldier.BASE_RANGE_UL), 1e-9,
+    "and reaches exactly its base range");
+
+  // The owner asked for "not abusive -- say 15% on the tallest stump here",
+  // and for a straight line under it. Both are checked, not just the endpoint:
+  // a cap or a curve would pass a single-point test and is not what was asked.
+  var tallest = null, i;
+  for (i = 0; i < geo.platforms.length; i++) {
+    if (!tallest || geo.platforms[i].height > tallest.height) tallest = geo.platforms[i];
+  }
+  var top = towerAt(tallest.x, tallest.y);
+  t.eq(top.groundHeight, tallest.height, "a tower on a stump stands on the stump");
+  t.near(top.rangePx / ground.rangePx, 1.15, 0.005,
+    "and the tallest stump is worth +15% reach");
+
+  var slope = null;
+  geo.platforms.forEach(function (pf) {
+    var tw = towerAt(pf.x, pf.y);
+    var bonus = tw.rangePx / ground.rangePx - 1;
+    var per = bonus / (pf.height / g.UNIT_LENGTH);
+    if (slope === null) slope = per;
+    t.near(per, slope, 1e-9, pf.id + " is on the same straight line");
+    t.ok(bonus > 0.05 && bonus < 0.16,
+      pf.id + " gives " + Math.round(bonus * 1000) / 10 + "%");
+  });
+
+  // THE BONUS IS PER u.l., NOT PER PIXEL. `groundHeight` arrives in world
+  // pixels, so a rate applied straight to it would double when the unit
+  // doubled -- the whole board would quietly gain reach.
+  var before = towerAt(tallest.x, tallest.y).rangePx / ground.rangePx;
+  h.run("UNIT_LENGTH = UNIT_LENGTH * 1.5; Maps.resetGeometry(); " +
+        "loadMap(Maps.byId('ironwood-frontier'));");
+  var geo2 = g.Maps.geometryOf(g.currentMap);
+  var tall2 = geo2.platforms.filter(function (pf) { return pf.id === tallest.id; })[0];
+  var ground2 = towerAt(tall2.x + tall2.radius * 6, tall2.y);
+  t.eq(ground2.groundHeight, 0, "the control tower is still on dirt after a rescale");
+  t.near(towerAt(tall2.x, tall2.y).rangePx / ground2.rangePx, before, 1e-9,
+    "and the bonus survives a rescale of the unit");
+});
+
+test("22  the rock you can see IS the rock you collide with", function (t) {
+  var h = ironwood();
+  var map = h.game.Maps.byId("ironwood-frontier");
+
+  // ONE SOURCE, and this is the assertion that keeps it one. The blockers and
+  // the stumps used to be authored TWICE -- a collision shape in `blockers` and
+  // a scenery prop in `models` with a size of its own -- and the two numbers
+  // were about a factor of two apart, so every rock wore an invisible skirt of
+  // hitbox. They are built from the shapes now; a prop of one of these kinds
+  // coming back means someone has re-created the second copy.
+  var dupes = map.models.filter(function (m) {
+    return m.kind === "boulder" || m.kind === "outcrop" ||
+           m.kind === "trunk" || m.kind === "platform";
+  });
+  t.eq(dupes.length, 0,
+    "no blocker or stump is authored a second time as a scenery prop");
+
+  // Every solid declares how high it stands, because sight is decided against
+  // that number and an undeclared one silently means "nothing clears this".
+  map.blockers.forEach(function (b) {
+    t.ok(typeof b.height === "number" && b.height > 0,
+      b.id + " declares a height");
+    // A capsule is a log lying on the ground with a round cross-section, so
+    // its crown is one diameter up. Any other pairing draws a log that is not
+    // the shape a bullet stops against.
+    if (b.shape === "capsule") {
+      t.eq(b.height, b.radius * 2, b.id + " is as tall as it is thick");
+    }
+  });
+  map.landmarks.forEach(function (l) {
+    t.ok(typeof l.height === "number" && l.height > 0, l.id + " declares a height");
+  });
+});
+
+test("23  a stump is cover, and standing on one lets you see over things",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  function byId(id) {
+    return geo.sightBlockers.filter(function (s) { return s.id === id; })[0];
+  }
+  var log = byId("blocker-o3"), boulder = byId("blocker-o1");
+  var stump = byId("stump-p3");                       // the tallest, 25
+  t.ok(stump && stump.height > 0, "the stumps are in the sight list at all");
+
+  // A LINE STRAIGHT THROUGH THE LOG, from ground level and from up on a stump.
+  var lx = (log.a.x + log.b.x) / 2, ly = (log.a.y + log.b.y) / 2;
+  var ax = lx - 120, ay = ly, bx = lx + 120, by = ly;
+  t.eq(g.MapGeometry.clearLine([log], ax, ay, bx, by, 0), false,
+    "from the floor the log stops the line");
+  t.eq(g.MapGeometry.clearLine([log], ax, ay, bx, by, stump.height), true,
+    "from the tallest stump it does not");
+  t.eq(g.MapGeometry.clearLine([boulder], boulder.x - 200, boulder.y,
+    boulder.x + 200, boulder.y, stump.height), false,
+    "but a boulder still does, because it is taller than any stump");
+
+  // And the rule runs all the way through the real predicate a tower uses.
+  var shooter = { x: ax, y: ay, groundHeight: 0 };
+  var target = { x: bx, y: by };
+  t.eq(g.RangeFilter.sightClear(shooter, target), false,
+    "a tower on the floor cannot see across the log");
+  shooter.groundHeight = stump.height;
+  t.eq(g.RangeFilter.sightClear(shooter, target), true,
+    "the same tower up on a stump can");
+});
+
+test("24  a shot obeys the same rule its shooter's eye does", function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var log = geo.sightBlockers.filter(function (s) {
+    return s.id === "blocker-o3";
+  })[0];
+  var lx = (log.a.x + log.b.x) / 2, ly = (log.a.y + log.b.y) / 2;
+  var tall = geo.platforms.filter(function (p) { return p.id === "stump-p3"; })[0];
+
+  // A tower that can SEE something it cannot SHOOT is the worst possible pair
+  // of rules, so terrainHit takes the same height the sight predicate does.
+  t.ok(!!g.terrainHit(lx - 120, ly, lx + 120, ly, 0),
+    "a round fired from the floor stops on the log");
+  t.eq(g.terrainHit(lx - 120, ly, lx + 120, ly, tall.height), null,
+    "one fired from the tallest stump passes over it");
+
+  // AND THROUGH THE REAL PROJECTILE, which is where it actually has to hold:
+  // the height reaches the sweep off the bullet's OWNER, so a round leaving a
+  // tower on a stump has to carry its shooter's elevation with it.
+  function fire(owner) {
+    var target = new g.Enemy(g.path, 5000);
+    target.pos = { x: lx + 130, y: ly };
+    target.reserveDamage = function () {};
+    target.releaseDamage = function () {};
+    var b = new g.Bullet(lx - 130, ly, target, 40, null, owner, 0);
+    var hp = target.health;
+    for (var i = 0; i < 400 && !b.dead; i++) b.update(1 / 60);
+    return { died: b.dead, hit: target.health < hp };
+  }
+  var fromDirt = fire({ x: lx - 130, y: ly, groundHeight: 0 });
+  t.eq(fromDirt.hit, false, "a real round from the floor never arrives");
+  var fromStump = fire({ x: lx - 130, y: ly, groundHeight: tall.height });
+  t.eq(fromStump.hit, true, "the same round from the tallest stump does");
+});
+
+
 runner.run();

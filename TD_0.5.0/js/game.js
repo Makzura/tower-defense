@@ -1829,8 +1829,8 @@ function applyMapOcclusion() {
   }
   var shapes = geo.sightBlockers;
   mapSightBlockers = shapes;
-  RangeFilter.setOcclusion(function (ax, ay, bx, by) {
-    return MapGeometry.clearLine(shapes, ax, ay, bx, by);
+  RangeFilter.setOcclusion(function (ax, ay, bx, by, eyeHeight) {
+    return MapGeometry.clearLine(shapes, ax, ay, bx, by, eyeHeight);
   });
 }
 
@@ -1842,9 +1842,9 @@ var mapSightBlockers = null;
 // Where a shot from A to B first meets terrain, or null. Used by both bullet
 // families; kept here rather than in bullet.js so there is one place that knows
 // which list terrain lives in.
-function terrainHit(ax, ay, bx, by) {
+function terrainHit(ax, ay, bx, by, eyeHeight) {
   if (!mapSightBlockers) return null;
-  return MapGeometry.firstHit(mapSightBlockers, ax, ay, bx, by, 0);
+  return MapGeometry.firstHit(mapSightBlockers, ax, ay, bx, by, 0, eyeHeight);
 }
 
 function startRun(map) {
@@ -4361,7 +4361,7 @@ function worldRenderState() {
     ghost = {
       x: worldMouse.x, y: worldMouse.y,
       radius: ul(type.FOOTPRINT_RADIUS_UL),
-      rangePx: ul(type.BASE_RANGE_UL),
+      rangePx: previewRangePx(type, worldMouse.x, worldMouse.y),
       ok: blockReason === null
     };
   }
@@ -4959,78 +4959,150 @@ function drawPlacementFeedback() {
   if (type && worldMouse && mouse.x >= -100 &&
       !overInterfaceChrome(mouse.x, mouse.y)) {
     drawNoBuildOverlay(type);
-    drawSightShadows(worldMouse.x, worldMouse.y, ul(type.BASE_RANGE_UL));
+    // AT THE HEIGHT IT WOULD STAND AT, both of them. Hover a stump and the
+    // range ring grows and two of the red patches go out before you commit --
+    // which is the only way a player finds out that elevation does anything.
+    var eye = groundHeightUnder(worldMouse.x, worldMouse.y);
+    drawSightShadows(worldMouse.x, worldMouse.y,
+      previewRangePx(type, worldMouse.x, worldMouse.y), eye);
     return;
   }
   // Not placing: the inspected tower's own blind spots, so a player can ask an
   // already-built tower what it cannot see.
   var t = inspected || aimingTower;
   if (t && !(t.isDestroyed && t.isDestroyed())) {
-    drawSightShadows(t.x, t.y, t.rangePx);
+    drawSightShadows(t.x, t.y, t.rangePx, t.groundHeight || 0);
   }
 }
 
-function sightShadowFor(shape, tx, ty, rangePx) {
-  var pts = [];
-  var i;
-  pts = shapeRing(shape);
-  if (!pts) return null;
-
-  // Angles are measured RELATIVE to the direction of the shape, so a blocker
-  // straddling the -pi/pi seam does not come back as a span of nearly a full
-  // turn. Every blocker on this board subtends far less than half a turn from
-  // any legal tower position, which is what makes that safe.
-  var cx = 0, cy = 0;
-  for (i = 0; i < pts.length; i++) { cx += pts[i][0]; cy += pts[i][1]; }
-  cx /= pts.length; cy /= pts.length;
-  var base = Math.atan2(cy - ty, cx - tx);
-
-  var lo = Infinity, hi = -Infinity, near = Infinity;
-  for (i = 0; i < pts.length; i++) {
-    var dx = pts[i][0] - tx, dy = pts[i][1] - ty;
-    var d = Math.sqrt(dx * dx + dy * dy);
-    if (d < near) near = d;
-    var rel = Math.atan2(dy, dx) - base;
-    while (rel > Math.PI) rel -= Math.PI * 2;
-    while (rel < -Math.PI) rel += Math.PI * 2;
-    if (rel < lo) lo = rel;
-    if (rel > hi) hi = rel;
-  }
-  // Entirely out of reach: it casts no shadow the tower could have used.
-  if (near >= rangePx) return null;
-  return { from: base + lo, to: base + hi, near: near };
+// What a tower of this type would reach FROM HERE -- its base range, grown by
+// the elevation of the ground under the cursor. The one derivation the ghost,
+// the shadows and the built tower all use, so the ring the player is shown is
+// the ring they get.
+function previewRangePx(type, x, y) {
+  return elevatedRangePx({ groundHeight: groundHeightUnder(x, y) },
+    type.BASE_RANGE_UL);
 }
 
-// The wedge as a ring of WORLD points, near arc out to far arc.
+// THE PATCH OF GROUND ONE OBSTACLE HIDES, as a ring of WORLD points.
 //
 // Built as world coordinates rather than stroked directly, because the board is
 // usually a 3D one: a shape painted flat on the overlay canvas sits at the
 // wrong place and the wrong shape the moment the camera is tilted or turned.
-// Every point here goes through the same projection the range ring does, which
-// is what keeps the red patch ON the ground the tower cannot see.
-function sightShadowRing(sh, tx, ty, rangePx) {
-  var ring = [];
-  var steps = 10;
-  var span = sh.to - sh.from;
-  var i, a;
-  for (i = 0; i <= steps; i++) {
-    a = sh.from + span * i / steps;
-    ring.push([tx + Math.cos(a) * rangePx, ty + Math.sin(a) * rangePx]);
+//
+// THE SHADOW IS THE ROCK'S OWN SHAPE, THROWN OUTWARD. The first version took
+// the angular span of the whole obstacle and filled it from the NEAREST point
+// of the obstacle out to the range ring -- one flat arc across the whole wedge.
+// That is a shadow the size of the widest part of the rock starting at the
+// closest part of it, so a long thin outcrop cast a fat rectangle detached from
+// its own front face, and the owner's report was exactly that: the hidden zone
+// does not look like the size of the thing hiding it.
+//
+// So the near edge is MEASURED, ray by ray: for each angle across the
+// silhouette, where does the line from the tower FIRST meet the shape. That is
+// the same `segmentHit` a bullet uses, so the red patch begins precisely where
+// a round would stop.
+var SHADOW_RAYS = 14;
+
+// The silhouette, in angles relative to the direction of the shape. Measured
+// relative so a blocker straddling the -pi/pi seam does not come back as a span
+// of nearly a full turn.
+//
+// A circle's silhouette is its TANGENTS, which is wider than any polygon drawn
+// inside it -- taking the extremes of a 24-gon's vertices under-reports it, and
+// under-reporting the silhouette is how a shadow ends up narrower than the rock
+// casting it. So circles and capsules are done with asin and only the polygon,
+// where vertices ARE the silhouette, is done from points.
+function silhouetteSpan(shape, tx, ty) {
+  var i, base, half, d;
+  if (shape.shape === "circle") {
+    d = Math.sqrt((shape.x - tx) * (shape.x - tx) + (shape.y - ty) * (shape.y - ty));
+    if (d <= 1e-6) return null;
+    base = Math.atan2(shape.y - ty, shape.x - tx);
+    half = Math.asin(Math.min(1, shape.radius / Math.max(d, shape.radius)));
+    return { base: base, lo: -half, hi: half, near: Math.max(0, d - shape.radius) };
   }
-  for (i = steps; i >= 0; i--) {
-    a = sh.from + span * i / steps;
-    ring.push([tx + Math.cos(a) * sh.near, ty + Math.sin(a) * sh.near]);
+  if (shape.shape === "capsule") {
+    // The union of the two end discs: the body lies inside their hull, so the
+    // extremes of the two are the extremes of the whole stadium.
+    var mx = (shape.a.x + shape.b.x) / 2, my = (shape.a.y + shape.b.y) / 2;
+    base = Math.atan2(my - ty, mx - tx);
+    var lo = Infinity, hi = -Infinity, near = Infinity;
+    var ends = [shape.a, shape.b];
+    for (i = 0; i < 2; i++) {
+      d = Math.sqrt((ends[i].x - tx) * (ends[i].x - tx) +
+                    (ends[i].y - ty) * (ends[i].y - ty));
+      if (d <= 1e-6) return null;
+      var rel = Math.atan2(ends[i].y - ty, ends[i].x - tx) - base;
+      while (rel > Math.PI) rel -= Math.PI * 2;
+      while (rel < -Math.PI) rel += Math.PI * 2;
+      half = Math.asin(Math.min(1, shape.radius / Math.max(d, shape.radius)));
+      if (rel - half < lo) lo = rel - half;
+      if (rel + half > hi) hi = rel + half;
+      if (d - shape.radius < near) near = d - shape.radius;
+    }
+    return { base: base, lo: lo, hi: hi, near: Math.max(0, near) };
+  }
+  var pts = shapeRing(shape);
+  if (!pts || !pts.length) return null;
+  var cx = 0, cy = 0;
+  for (i = 0; i < pts.length; i++) { cx += pts[i][0]; cy += pts[i][1]; }
+  cx /= pts.length; cy /= pts.length;
+  base = Math.atan2(cy - ty, cx - tx);
+  var plo = Infinity, phi = -Infinity, pnear = Infinity;
+  for (i = 0; i < pts.length; i++) {
+    var dx = pts[i][0] - tx, dy = pts[i][1] - ty;
+    var pd = Math.sqrt(dx * dx + dy * dy);
+    if (pd < pnear) pnear = pd;
+    var pr = Math.atan2(dy, dx) - base;
+    while (pr > Math.PI) pr -= Math.PI * 2;
+    while (pr < -Math.PI) pr += Math.PI * 2;
+    if (pr < plo) plo = pr;
+    if (pr > phi) phi = pr;
+  }
+  return { base: base, lo: plo, hi: phi, near: pnear };
+}
+
+function sightShadowRing(shape, tx, ty, rangePx) {
+  var sp = silhouetteSpan(shape, tx, ty);
+  if (!sp || sp.near >= rangePx) return null;   // out of reach: hides nothing
+
+  var span = sp.hi - sp.lo;
+  var i, a, ring = [], nearPts = [];
+  for (i = 0; i <= SHADOW_RAYS; i++) {
+    a = sp.base + sp.lo + span * i / SHADOW_RAYS;
+    var ex = tx + Math.cos(a) * rangePx, ey = ty + Math.sin(a) * rangePx;
+    var t = MapGeometry.segmentHit(shape, tx, ty, ex, ey, 0);
+    // The two edge rays are tangents and may miss by a float; they inherit the
+    // nearest measured distance rather than being dropped, which would leave a
+    // notch in the near profile.
+    var dist = t >= 0 ? t * rangePx : -1;
+    ring.push([ex, ey]);
+    nearPts.push(dist);
+  }
+  var fallback = sp.near;
+  for (i = 0; i < nearPts.length; i++) if (nearPts[i] >= 0) { fallback = nearPts[i]; break; }
+  var last = fallback;
+  for (i = 0; i < nearPts.length; i++) {
+    if (nearPts[i] < 0) nearPts[i] = last; else last = nearPts[i];
+  }
+
+  for (i = SHADOW_RAYS; i >= 0; i--) {
+    a = sp.base + sp.lo + span * i / SHADOW_RAYS;
+    ring.push([tx + Math.cos(a) * nearPts[i], ty + Math.sin(a) * nearPts[i]]);
   }
   return ring;
 }
 
-function drawSightShadows(tx, ty, rangePx) {
+// EVERY BLIND SPOT THIS EYE HAS, at this height.
+//
+// `eyeHeight` is how high the observer's ground is. A shape at or below it is
+// looked over and casts nothing -- which is the visible half of the elevation
+// rule: put a tower on the tall stump and watch two of the red patches go out.
+function drawSightShadows(tx, ty, rangePx, eyeHeight) {
   var geo = Maps.geometryOf(currentMap);
   if (!geo.any || !geo.sightBlockers.length) return;
 
-  // The camera when the board is 3D, and null when it is the flat fallback --
-  // in which case world coordinates ARE screen coordinates and the projection
-  // is the identity.
   var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
              World3D.camera) ? World3D.camera() : null;
 
@@ -5038,29 +5110,22 @@ function drawSightShadows(tx, ty, rangePx) {
   // STRONG ENOUGH TO READ ON A DARK BOARD. At 0.20 over forest floor this was
   // there and invisible, which is the same as not being there: the whole point
   // is that a player can see the cover before they spend $900 shooting into it.
-  // Filled AND outlined, because a soft wash on dark ground loses its edge and
-  // the edge is where the information is.
   ctx.fillStyle = "rgba(232,64,52,0.34)";
   ctx.strokeStyle = "rgba(255,118,102,0.55)";
   ctx.lineWidth = 1.5;
   for (var i = 0; i < geo.sightBlockers.length; i++) {
-    var sh = sightShadowFor(geo.sightBlockers[i], tx, ty, rangePx);
-    if (!sh) continue;
-    var ring = sightShadowRing(sh, tx, ty, rangePx);
+    var shape = geo.sightBlockers[i];
+    if (MapGeometry.clears(shape, eyeHeight || 0)) continue;
+    var ring = sightShadowRing(shape, tx, ty, rangePx);
+    if (!ring) continue;
+    var screened = projectRing(ring, cam);
+    if (!screened || screened.length < 3) continue;
 
     ctx.beginPath();
-    var started = false, broke = false;
-    for (var k = 0; k < ring.length; k++) {
-      var sx = ring[k][0], sy = ring[k][1];
-      if (cam) {
-        var p = cam.worldToScreen(sx, sy, 0);
-        if (!p) { broke = true; break; }   // behind the eye: not drawable
-        sx = p.x; sy = p.y;
-      }
-      if (!started) { ctx.moveTo(sx, sy); started = true; }
-      else ctx.lineTo(sx, sy);
+    ctx.moveTo(screened[0][0], screened[0][1]);
+    for (var k = 1; k < screened.length; k++) {
+      ctx.lineTo(screened[k][0], screened[k][1]);
     }
-    if (broke || !started) continue;
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -5077,7 +5142,7 @@ function drawBuildPreview() {
   // overInterfaceChrome.
   if (overInterfaceChrome(mouse.x, mouse.y)) return;
 
-  var previewRangePx = ul(type.BASE_RANGE_UL);
+  var rangeRingPx = previewRangePx(type, worldMouse.x, worldMouse.y);
   var footprintPx = ul(type.FOOTPRINT_RADIUS_UL);
 
   // UNDER THE CURSOR, because that is where it builds. This used to ask
@@ -5089,7 +5154,7 @@ function drawBuildPreview() {
 
   // Range
   ctx.beginPath();
-  ctx.arc(ghostX, ghostY, previewRangePx, 0, Math.PI * 2);
+  ctx.arc(ghostX, ghostY, rangeRingPx, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(" + c + ",0.09)";
   ctx.fill();
   ctx.lineWidth = 2;

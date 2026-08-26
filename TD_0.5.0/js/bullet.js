@@ -44,9 +44,13 @@
 // Routed through the game's own `terrainHit` rather than reaching for the map
 // here: bullet.js has never known what a map is, and the one place that knows
 // which list terrain lives in should stay one place.
-function terrain(ax, ay, bx, by) {
+// `from` is the tower that fired, and all this takes from it is how high the
+// ground under it is: a round leaving a tower on a stump passes over anything
+// shorter than the stump, exactly as that tower's eye does. One rule, so a
+// tower can never be able to SEE something it cannot SHOOT.
+function terrain(ax, ay, bx, by, from) {
   if (typeof terrainHit !== "function") return null;
-  return terrainHit(ax, ay, bx, by);
+  return terrainHit(ax, ay, bx, by, (from && from.groundHeight) || 0);
 }
 
 function Bullet(x, y, target, damage, onHit, owner, defenseFlatPierce) {
@@ -116,7 +120,7 @@ Bullet.prototype.update = function (dt) {
   // again, which reads as the tower going quiet for no reason.
   var nx = this.x + (dx / distance) * step;
   var ny = this.y + (dy / distance) * step;
-  var hit = terrain(this.x, this.y, nx, ny);
+  var hit = terrain(this.x, this.y, nx, ny, this.owner);
   if (hit) {
     this.x = hit.x;
     this.y = hit.y;
@@ -315,7 +319,7 @@ PierceBullet.prototype.update = function (dt, enemies) {
   //
   // `stopT` is where along THIS step the rock is, in the same parameter the
   // enemy candidates below are measured in, so the comparison is direct.
-  var obstacle = terrain(fromX, fromY, this.x, this.y);
+  var obstacle = terrain(fromX, fromY, this.x, this.y, this.owner);
   var stopT = obstacle ? obstacle.t : 1;
 
   // Gather first, then apply IN ORDER ALONG THE SHOT. Array order is spawn

@@ -107,9 +107,14 @@ var RangeFilter = (function () {
 
   // Broken out because the cone branch above returns before the deadzone line,
   // and both branches need it.
+  // The fifth argument is HOW HIGH THE EYE IS. Passed rather than looked up,
+  // for the same reason the predicate is injected at all: this module answers
+  // "within reach" for anything with an {x, y} and must not learn what a map is.
+  // Anything without a groundHeight is standing on the floor.
   function sightClear(towerPos, enemy) {
     if (!occlusion) return true;
-    return occlusion(towerPos.x, towerPos.y, enemy.x, enemy.y);
+    return occlusion(towerPos.x, towerPos.y, enemy.x, enemy.y,
+      towerPos.groundHeight || 0);
   }
 
   function getValidTargets(stats, towerPos, aimRad, enemies) {

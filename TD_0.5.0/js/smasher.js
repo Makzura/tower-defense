@@ -23,6 +23,12 @@ function Smasher(x, y, path) {
   this.x = x;
   this.y = y;
 
+  // HOW HIGH THE GROUND UNDER IT IS, read once, at construction. Zero on dirt.
+  // This one number is the whole of elevation: RangeFilter reads it to decide
+  // what this tower can see over, bullet.js reads it to decide what its rounds
+  // fly over, and elevatedRangePx reads it for the reach bonus.
+  this.groundHeight = groundHeightUnder(x, y);
+
   // Firing priority along the path, same rule as the gunner.
   this.pathProgress = path.progressAtPoint(x, y);
 
@@ -351,7 +357,7 @@ Smasher.prototype.recalcStats = function () {
 
   this.rangeUl += rangeBonusUl;
   this.maxHp = maxHp;
-  this.rangePx = ul(this.rangeUl);
+  this.rangePx = elevatedRangePx(this, this.rangeUl);
   this.arcRadians = this.arcDegrees * Math.PI / 180;
   this.fullCircle = this.arcDegrees >= 360;
 };

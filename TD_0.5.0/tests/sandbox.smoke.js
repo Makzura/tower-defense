@@ -463,9 +463,36 @@ function w(value) {
 // Every placement in this file used to type (700, 545), which was a good spot
 // on Rune Circuit and is inside the Arcane Sniper's road clearance on Ironwood
 // Frontier. Typed in eight places, it had to be corrected in eight places; as a
-// constant it has to be correct once. Swept against the real whyCannotBuild.
-var CLEAR_SPOT = { x: 430, y: 242 };
-var SECOND_SPOT = { x: 350, y: 230 };
+// constant it has to be correct once.
+//
+// MOVED AGAIN 2026-08-27, when the stumps became cover. (430, 242) is legal
+// ground and always was; what changed is that from there the western switchback
+// is behind stump-p1 and stump-p6, so the tower placed and then never fired and
+// "towers shoot it" failed with health 40 -> 40. A spot that can be BUILT ON is
+// not the same as a spot that can SEE, and this file needs the second.
+//
+// Swept against the real whyCannotBuild AND the real sight predicate, with the
+// Warbringer already standing; (510, 430) sees 41 of the route's 86 sampled
+// points, which is the most any legal spot on the board sees. The check below
+// re-derives that at run time so the next map change fails HERE, loudly, rather
+// than four assertions later as an undefined tower.
+var CLEAR_SPOT = { x: 510, y: 430 };
+var SECOND_SPOT = { x: 480, y: 470 };
+
+(function verifySpots() {
+  var geo = sandbox.Maps.geometryOf(sandbox.currentMap);
+  var pts = sandbox.path.points;
+  var seen = 0;
+  var reach = sandbox.ul(sandbox.BUILD_SLOTS[1].BASE_RANGE_UL);
+  for (var i = 0; i < pts.length; i += 4) {
+    var d = Math.hypot(pts[i].x - CLEAR_SPOT.x, pts[i].y - CLEAR_SPOT.y);
+    if (d > reach) continue;
+    if (sandbox.MapGeometry.clearLine(geo.sightBlockers,
+        CLEAR_SPOT.x, CLEAR_SPOT.y, pts[i].x, pts[i].y, 0)) seen++;
+  }
+  check("the test's firing position can actually see the road", seen >= 20,
+    "sees " + seen + " of " + Math.ceil(pts.length / 4) + " sampled road points");
+})();
 
 // RETURNS THE TOWER THAT WAS NOT THERE BEFORE, not the last one in the array.
 //
@@ -821,18 +848,36 @@ check("still ONE projectile at infinite pierce", sandbox.bullets.length === 1,
 // Driven directly rather than through the map, so the geometry is exact:
 // a shot heading along +x, six enemies standing on that line, and one
 // standing well off it.
+//
+// THE LINE HAS TO BE CLEAR OF TERRAIN, and y = 300 stopped being clear on
+// 2026-08-27: it runs straight through stump-p6, which became a sight blocker
+// that day, so the shot died on the stump and three pierce checks went red
+// while pierce itself was fine. The corridor is swept rather than typed, so the
+// next board with rocks on it does not cost another debugging session.
+var LINE_Y = (function () {
+  var geo = sandbox.Maps.geometryOf(sandbox.currentMap);
+  for (var y = 60; y <= 660; y += 5) {
+    if (sandbox.MapGeometry.clearLine(geo.sightBlockers, 90, y, 520, y, 0)) return y;
+  }
+  return 300;
+})();
+var OFF_LINE_Y = LINE_Y + 200;
+check("the pierce corridor is clear of terrain",
+  sandbox.MapGeometry.clearLine(
+    sandbox.Maps.geometryOf(sandbox.currentMap).sightBlockers,
+    90, LINE_Y, 520, LINE_Y, 0), "y = " + LINE_Y);
 
 function lineTest(pierce, hasFalloff, damage) {
   var targets = [];
   for (var i = 0; i < 6; i++) {
     targets.push(run("(function () { var en = new Enemy(path, 1000000); " +
-      "en.pos = { x: " + (200 + i * 40) + ", y: 300 }; en.progress = 0; return en; })()"));
+      "en.pos = { x: " + (200 + i * 40) + ", y: " + LINE_Y + " }; en.progress = 0; return en; })()"));
   }
   var offLine = run("(function () { var en = new Enemy(path, 1000000); " +
-    "en.pos = { x: 300, y: 500 }; en.progress = 0; return en; })()");
+    "en.pos = { x: 300, y: " + OFF_LINE_Y + " }; en.progress = 0; return en; })()");
 
   var all = targets.concat([offLine]);
-  var shot = run("new PierceBullet({ x: 100, y: 300, angle: 0, damage: " + damage +
+  var shot = run("new PierceBullet({ x: 100, y: " + LINE_Y + ", angle: 0, damage: " + damage +
     ", pierce: " + (pierce === Infinity ? "Infinity" : pierce) +
     ", hasFalloff: " + hasFalloff + ", falloffParams: { softener: 20, decay: 0.95 }" +
     ", maxTravelPx: 100000 })");

@@ -1892,7 +1892,53 @@ asks a question about a battlefield has to go through `js/systems/map-geometry.j
 |---|---|---|---|
 | `blockers` | yes | yes | yes |
 | `landmarks` | yes | only if `blocksSight` | only if `blocksSight` |
-| `platforms` | no — they are the BEST ground | no | no |
+| `platforms` | no — they are the BEST ground | yes | yes |
+
+**EVERY SOLID DECLARES A HEIGHT, and a line is only stopped by something
+standing higher than the eye that cast it.** `MapGeometry.clears` is the whole
+rule. A shape with no declared height compiles to `Infinity`, so the six older
+boards behave exactly as they always did: everything stops everything.
+
+A tower's eye height is `groundHeight` — the height of the ground under it, zero
+on dirt and the stump's top on a stump — read once at construction and carried on
+the tower. `RangeFilter.sightClear` passes it to the injected predicate;
+`bullet.js` passes the SHOOTER'S to `terrainHit`. Those two must never disagree:
+a tower that can see something it cannot shoot is the worst possible pair of
+rules, and one test fires a real round to say so.
+
+**Stumps are cover.** They were drawn as a metre of standing timber from the
+first day and did not act like any until a playtest noticed. They are in
+`sightBlockers` with their own heights, which is what makes elevation worth
+something: from the tallest stump you look down over the other five and over the
+fallen log; from any of them, over the low shelf; over the boulders, never.
+
+**Elevation also buys reach: `Tower.ELEVATION_RANGE_PER_UL`, +1% per 1.6 u.l.,
+a straight line with no cap.** The tallest stump on Ironwood is 24 u.l., which
+is +15% — the figure the owner asked for — and the shortest is +6.6%. The rate
+is per u.l. and the height arrives in world pixels, so `elevatedRangePx` divides
+by `UNIT_LENGTH`: retuning the unit must not retune the bonus. Deliberately
+small. A stump is a firing position, not an upgrade.
+
+**A SOLID IS DRAWN FROM THE SHAPE THAT BLOCKS — there is no prop beside it.**
+`GLGeometry.solid` takes the compiled shape and builds the rock from it, and
+`Maps.drawSolids` is its opposite number on the flat board. The silhouette at
+ground level IS the collision shape: a circle's base ring is exactly its radius,
+a polygon's bottom face is the authored polygon vertex for vertex, and a
+capsule's barrel is exactly its radius — which is why a capsule's `height` must
+be twice its radius, since it is a log lying on the ground.
+
+They were authored TWICE until 2026-08-27 — a shape in `blockers` and a scenery
+model in `models` with a size of its own — and the two numbers were about a
+factor of two apart, so a blocker of radius 48 was drawn 48 wide and every rock
+on the board wore an invisible skirt of hitbox. A comment above them claimed
+they were "drawn at the position and size the blocker list authors"; a comment
+cannot hold two numbers together. Test 22 asserts the second copy stays gone.
+
+A rock may narrow as it RISES — real ones do, and a hitbox is a footprint — so
+every jitter in those two functions scales down from 1 and none scales up.
+Light tops, dark sides, in the theme's own `rock`/`rockDark`: the first version
+lit them from underneath with the machine colours and produced five rocks darker
+than the dirt they stood on.
 
 **Decorative foliage is in none of them, and that separation is the design.** The
 forest border is dense on purpose; if its canopies decided what could be built or
@@ -1937,7 +1983,7 @@ on a stump has exactly the range, damage and accuracy it has on dirt.
 rejected with the same footprint inflation `whyCannotBuild` uses, and road a
 tower cannot SEE does not count as coverage. The six bare boards are byte
 identical — 0.826, 0.566, 0.886, 1.061, 0.909, 0.863 — and a test pins that.
-Ironwood Frontier measures 0.789, normal, on the curve it is actually walked.
+Ironwood Frontier measures 0.792, normal, on the curve it is actually walked.
 
 **A tower goes WHERE YOU CLICKED, on a stump exactly as on dirt.** This is a
 rule, not an implementation detail: `resolveBuildPoint` moves nothing. It answers

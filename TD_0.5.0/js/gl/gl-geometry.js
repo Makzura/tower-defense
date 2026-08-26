@@ -498,6 +498,201 @@ var GLGeometry = (function () {
     return (typeof value === "number" && value > 0) ? value : fallback;
   }
 
+  // A GAMEPLAY BLOCKER, DRAWN FROM THE SHAPE THAT BLOCKS.
+  //
+  // Not from a prop beside it with its own size. The five rocks on Ironwood
+  // Frontier were authored twice -- once as a collision shape and once as a
+  // scenery model -- and the two numbers were about a factor of two apart, so
+  // every rock on the board had an invisible skirt of hitbox around it. The
+  // owner's report was exactly that: "the hitbox of the obstacles does not
+  // correspond with their visual".
+  //
+  // So there is one number now. This takes the COMPILED shape, in world units,
+  // and the silhouette it draws at ground level IS that shape:
+  //
+  //   circle   base ring at exactly `radius`, jittered inward as it rises
+  //   polygon  bottom face is the authored polygon, vertex for vertex
+  //   capsule  a barrel of exactly `radius`, lying along a-b
+  //
+  // A rock may narrow as it rises -- real ones do, and the hitbox is a
+  // footprint, so only the base has to agree. It must never grow outward, so
+  // every jitter here scales DOWN from 1 and none of them scales up.
+  //
+  // LIGHT TOPS, DARK SIDES. The first version had it the other way round and
+  // the outcrops disappeared into the forest floor: on a board this dark the
+  // only thing separating a rock from the dirt is the face pointing at the sky.
+
+  // A stack of rings, each a ring of [x, y, z], skinned with quads and capped.
+  // Written here rather than reusing lumpyMass because that one is built around
+  // a fixed profile and this needs the BASE ring to be exact.
+  function skin(builder, rings, side, top) {
+    var i, k;
+    for (i = 0; i < rings.length - 1; i++) {
+      var lo = rings[i], hi = rings[i + 1];
+      for (k = 0; k < lo.length; k++) {
+        var k2 = (k + 1) % lo.length;
+        builder.quad(hi[k], hi[k2], lo[k2], lo[k], side);
+      }
+    }
+    var cap = rings[rings.length - 1];
+    var cx = 0, cy = 0, cz = 0;
+    for (k = 0; k < cap.length; k++) { cx += cap[k][0]; cy += cap[k][1]; cz += cap[k][2]; }
+    cx /= cap.length; cy /= cap.length; cz /= cap.length;
+    for (k = 0; k < cap.length; k++) {
+      builder.tri([cx, cy, cz], cap[k], cap[(k + 1) % cap.length], top);
+    }
+    return [cx, cy, cz];
+  }
+
+  function solid(builder, shape, P) {
+    if (!shape) return builder;
+    // LIGHT TOPS, DARK SIDES, and both of them STONE. The first version had
+    // `metal` on the sides and `panel` on top -- panel is the darker of the two
+    // on this board, so every rock was lit from underneath and sat darker than
+    // the dirt around it. Five invisible rocks is worse than five wrong ones.
+    var lit = P.rock || P.metal;                 // the faces pointing at the sky
+    var body = P.rockDark || P.panel;            // everything turned away
+    var dark = P.metalDark;
+    var moss = P.accent2 || P.panel;
+    var h = (typeof shape.height === "number" && isFinite(shape.height))
+      ? shape.height : 40;
+    var i, k, t;
+
+    if (shape.shape === "circle") {
+      // FRACTURED STONE, not a wedding cake. Every band is jittered per VERTEX
+      // and its centre drifts, so no two bands share an axis and the silhouette
+      // breaks up -- five coaxial rings of decreasing radius is a terraced cone
+      // and reads as a debug shape, which is what the first version drew.
+      var sides = 11, bands = 4, rings = [];
+      for (i = 0; i <= bands; i++) {
+        t = i / bands;
+        var shrink = 1 - t * t * 0.62;              // slow at the base, fast at the top
+        var ox = Math.cos(wobble(shape.x, shape.y, 500 + i) * 6.28) *
+                 shape.radius * 0.10 * t;
+        var oy = Math.sin(wobble(shape.x, shape.y, 510 + i) * 6.28) *
+                 shape.radius * 0.10 * t;
+        var ring = [];
+        for (k = 0; k < sides; k++) {
+          var a = k * Math.PI * 2 / sides;
+          // The base ring is jittered too, but only INWARD of the radius, and
+          // the two vertices nearest each axis stay out at it so the footprint
+          // still reads as the circle it is.
+          var j = 1 - wobble(shape.x + k * 3.1, shape.y - k * 2.7, 520 + i) *
+                      (i === 0 ? 0.10 : 0.26);
+          var rr = shape.radius * shrink * j;
+          var zz = h * (t + wobble(shape.x + k, shape.y + k, 530 + i) * 0.08 * (i ? 1 : 0));
+          ring.push([shape.x + ox + Math.cos(a) * rr,
+                     shape.y + oy + Math.sin(a) * rr, zz]);
+        }
+        rings.push(ring);
+      }
+      var crown = skin(builder, rings, body, lit);
+      // Lichen on the shoulder, where water sits.
+      sphere(builder, crown[0] - shape.radius * 0.24, crown[1] + shape.radius * 0.20,
+        shape.radius * 0.17, moss, h * 0.72, 6, 4);
+      return builder;
+    }
+
+    if (shape.shape === "polygon") {
+      // BEDROCK: the authored footprint, extruded in tiers that step in toward
+      // the centroid with a tilted, broken crown.
+      var pts = shape.points, n = pts.length;
+      var pcx = 0, pcy = 0;
+      for (i = 0; i < n; i++) { pcx += pts[i][0]; pcy += pts[i][1]; }
+      pcx /= n; pcy /= n;
+      // A shallow tilt across the whole slab, so the top is a plane at an angle
+      // rather than a flat lid -- the single cheapest thing that makes an
+      // extruded polygon read as rock.
+      var tiltA = wobble(pcx, pcy, 560) * 6.28;
+      var tiltK = h * 0.22;
+      var prings = [];
+      [[1.00, 0.00], [0.80, 0.62], [0.46, 1.00]].forEach(function (tier, ti) {
+        prings.push(pts.map(function (pt, pi) {
+          var kk = ti === 0 ? 1 : tier[0] *
+            (1 - wobble(pt[0], pt[1], 570 + ti + pi) * 0.16);
+          var px = pcx + (pt[0] - pcx) * kk, py = pcy + (pt[1] - pcy) * kk;
+          var lean = ti === 0 ? 0 :
+            (Math.cos(tiltA) * (px - pcx) + Math.sin(tiltA) * (py - pcy)) /
+            Math.max(1, shapeSpan(pts, pcx, pcy)) * tiltK;
+          return [px, py, h * tier[1] + lean];
+        }));
+      });
+      skin(builder, prings, ti0Colour(prings, body, lit), lit);
+      return builder;
+    }
+
+    if (shape.shape === "capsule") {
+      // A FALLEN LOG. Its cross-section is a circle of the capsule's own
+      // radius, so it rests with its crown at exactly twice that -- which is
+      // why the map declares `height` as 2 * radius for every capsule and a
+      // test says so.
+      //
+      // Built as a real barrel rather than through `segment`, which extrudes a
+      // FOUR-sided prism: at a log's proportions that is a black box lying in
+      // the clearing, which is precisely what it looked like.
+      barrel(builder, shape.a.x, shape.a.y, shape.b.x, shape.b.y,
+        shape.radius, 9, body, lit);
+      var ang = Math.atan2(shape.b.y - shape.a.y, shape.b.x - shape.a.x);
+      for (i = 0; i < 2; i++) {
+        var f = 0.34 + i * 0.32;
+        var sx = shape.a.x + (shape.b.x - shape.a.x) * f;
+        var sy = shape.a.y + (shape.b.y - shape.a.y) * f;
+        var sa = ang + (i ? 1.9 : -2.1);
+        barrel(builder, sx, sy, sx + Math.cos(sa) * shape.radius * 1.6,
+          sy + Math.sin(sa) * shape.radius * 1.6, shape.radius * 0.30, 5, dark, dark);
+      }
+      sphere(builder, shape.a.x, shape.a.y, shape.radius * 0.55, moss,
+        shape.radius * 1.6, 6, 4);
+      return builder;
+    }
+    return builder;
+  }
+
+  // How wide a polygon is, for scaling a tilt across it.
+  function shapeSpan(pts, cx, cy) {
+    var m = 0;
+    for (var i = 0; i < pts.length; i++) {
+      m = Math.max(m, Math.hypot(pts[i][0] - cx, pts[i][1] - cy));
+    }
+    return m;
+  }
+  function ti0Colour(rings, body) { return body; }
+
+  // A round barrel lying between two ground points, resting ON the ground: its
+  // axis is one radius up, so the underside touches z = 0 and the crown is at
+  // 2r. Capped at both ends.
+  function barrel(builder, ax, ay, bx, by, r, sides, side, top) {
+    var dx = bx - ax, dy = by - ay;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) return builder;
+    var nx = -dy / len, ny = dx / len;
+    var i, k;
+    var ends = [];
+    for (i = 0; i < 2; i++) {
+      var ex = i ? bx : ax, ey = i ? by : ay;
+      var ring = [];
+      for (k = 0; k < sides; k++) {
+        var a = k * Math.PI * 2 / sides;
+        ring.push([ex + nx * Math.cos(a) * r, ey + ny * Math.cos(a) * r,
+                   r + Math.sin(a) * r]);
+      }
+      ends.push(ring);
+    }
+    for (k = 0; k < sides; k++) {
+      var k2 = (k + 1) % sides;
+      var up = Math.sin(k * Math.PI * 2 / sides) > 0.25;
+      builder.quad(ends[1][k2], ends[1][k], ends[0][k], ends[0][k2],
+        up ? top : side);
+    }
+    for (i = 0; i < 2; i++) {
+      var cx = i ? bx : ax, cy = i ? by : ay;
+      for (k = 0; k < sides; k++) {
+        builder.tri([cx, cy, r], ends[i][k], ends[i][(k + 1) % sides], side);
+      }
+    }
+    return builder;
+  }
+
   function scenery(builder, kind, cx, cy, size, rot, P, model) {
     model = model || {};
     var r = size / 2;
@@ -794,14 +989,19 @@ var GLGeometry = (function () {
         // when this invented its own the two disagreed and every tower placed
         // on a stump sank into it.
         var pfH = worldOr(model.heightPx, size * 0.30);
-        var pfR = r * 0.94;
+        // THE BARREL'S BASE IS THE COLLISION RADIUS. `r` is half the prop size
+        // and the barrel flares to pfR * 1.10 at the ground, so pfR is that
+        // radius divided back out -- otherwise the widest part of the stump
+        // stands three per cent outside the circle that refuses towers, which
+        // is the same class of lie the rocks were telling at twice the scale.
+        var pfR = r / 1.10;
 
         // Roots first: they flare from under the barrel and reach the ground,
         // which is what stops the trunk looking pushed into the floor.
         var roots = 6 + Math.floor(wobble(cx, cy, 401) * 3);
         for (var pr2 = 0; pr2 < roots; pr2++) {
           var prA = pr2 * (Math.PI * 2 / roots) + wobble(cx, cy, 410 + pr2) * 0.5;
-          var reach = pfR * (1.18 + wobble(cx, cy, 420 + pr2) * 0.45);
+          var reach = pfR * (1.02 + wobble(cx, cy, 420 + pr2) * 0.30);
           segment(builder,
             cx + Math.cos(prA) * pfR * 0.80, cy + Math.sin(prA) * pfR * 0.80,
             pfH * 0.34,
@@ -819,7 +1019,7 @@ var GLGeometry = (function () {
         var ridges = 9;
         for (var rg = 0; rg < ridges; rg++) {
           var rgA = rg * (Math.PI * 2 / ridges) + wobble(cx, cy, 440 + rg) * 0.30;
-          var rgD = pfR * (0.97 + wobble(cx, cy, 450 + rg) * 0.10);
+          var rgD = pfR * (0.92 + wobble(cx, cy, 450 + rg) * 0.10);
           var rgH = pfH * (0.62 + wobble(cx, cy, 460 + rg) * 0.36);
           boxAt(builder, cx + Math.cos(rgA) * rgD, cy + Math.sin(rgA) * rgD,
             pfR * (0.14 + wobble(cx, cy, 470 + rg) * 0.10), pfR * 0.16, rgH,
@@ -1246,6 +1446,8 @@ var GLGeometry = (function () {
     cylinder: cylinder,
     ground: ground,
     road: road,
+    solid: solid,
+    wobble: wobble,
     box: box,
     frustum: frustum,
     boxAt: boxAt,

@@ -251,6 +251,10 @@ var World3D = (function () {
       panel: hex(t.panel, "#123848"),
       metal: hex(t.metal, "#263f4c"),
       metalDark: hex(t.metalDark, "#132733"),
+      // Solid blockers. Falls back to the machine colours, so the six boards
+      // that have never had a rock on them are byte identical.
+      rock: hex(t.rock, t.metal || "#263f4c"),
+      rockDark: hex(t.rockDark, t.panel || "#123848"),
       roadTop: hex(t.roadInner, "#274553"),
       roadSide: hex(t.roadOuter, "#0a1922"),
       accent: triple(t.accent, "#4FE3D2"),
@@ -417,6 +421,34 @@ var World3D = (function () {
         { heightPx: typeof m.height === "number"
             ? ul(m.height / AUTHORED_PX_PER_UL) : undefined });
     });
+
+    // GAMEPLAY GEOMETRY, BUILT FROM THE SHAPES THEMSELVES.
+    //
+    // Not from the model list above. The rocks and the stumps used to be props
+    // in it with sizes of their own beside the collision shapes, and the two
+    // sets of numbers were about a factor of two apart -- a blocker of radius
+    // 48 had a prop of SIZE 48 -- so every rock on the board was drawn at half
+    // the width of the rock a bullet stops against.
+    //
+    // Reading the compiled geometry means there is one number. `Maps.geometryOf`
+    // has already converted it to world units, which is the same space this
+    // mesh is built in, so nothing is converted twice either.
+    var solids = (typeof Maps !== "undefined" && Maps.geometryOf)
+      ? Maps.geometryOf(map) : null;
+    if (solids && solids.any) {
+      solids.blockers.forEach(function (shape) {
+        GLGeometry.solid(g, shape, P);
+      });
+      // The stumps keep their own prop -- a cut trunk is a lot more than an
+      // extruded circle -- but its size and height come from the same table,
+      // and the barrel's base ring is exactly the circle that decides where a
+      // tower may stand.
+      solids.platforms.forEach(function (pf) {
+        GLGeometry.scenery(g, "platform", pf.x, pf.y, pf.radius * 2,
+          GLGeometry.wobble(pf.x, pf.y, 77) * Math.PI * 2, P,
+          { heightPx: pf.height });
+      });
+    }
 
     // THE PLAY AREA, not the ground. `bounds` is what the camera frames and
     // what it clamps panning to, so handing it the apron would let the player

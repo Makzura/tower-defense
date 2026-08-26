@@ -301,7 +301,21 @@ var BASELINE = [
     // on 4; making rim tangency a refusal goes red on 4b; treating every vertex
     // as a hard corner goes red on 4c; narrowing the painted road, or leaving
     // built towers out of the wash, goes red on 4e.
-    file: "tests/run.js", pass: 163, fail: 0,
+    // 167 on 2026-08-27, from 163: ELEVATION, and the end of a rock being two
+    // objects. 21 pins the reach bonus as a straight line through the stump
+    // heights, per u.l. rather than per pixel. 22 is the one that matters most
+    // and asserts an ABSENCE: no blocker or stump may be authored a second time
+    // as a scenery prop, because that second copy is what let the rocks be
+    // drawn at half the width of the rocks you collide with. 23 and 24 pin the
+    // two halves of "higher ground sees over lower things" -- the eye and the
+    // round it fires, which must never disagree.
+    //
+    // Mutation-checked, all six restored: a flat +15% instead of a line goes
+    // red on 21, and so does applying the rate per world pixel; ignoring height
+    // in MapGeometry goes red on 23 and 24; dropping the stumps from the sight
+    // list goes red on 23; re-authoring one blocker prop goes red on 22; and
+    // taking the shooter's elevation off the bullet goes red on 24.
+    file: "tests/run.js", pass: 167, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
