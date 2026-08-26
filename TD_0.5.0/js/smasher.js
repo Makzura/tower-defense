@@ -607,6 +607,24 @@ Smasher.prototype.covers = function (enemy) {
   return Math.abs(delta) <= this.arcRadians / 2;
 };
 
+// Can this tower SEE that enemy -- terrain, not detection?
+//
+// Kept separate from covers() on purpose, and that separation is the AoE rule.
+// covers() answers "is this body inside the swing", which is a question about
+// the ZONE and is what the blast is applied over; this answers "could the
+// Warbringer have picked this body as its primary", which is a question about
+// the line to it.
+//
+// So a boulder inside the wedge does not shield what is behind it from a swing
+// that was legally started -- the hammer comes down on an area -- but the
+// Warbringer cannot START a swing on a body it cannot see. That is the
+// exception the brief names, and writing it as two functions is what keeps it
+// from being a special case buried inside one.
+Smasher.prototype.canSee = function (enemy) {
+  if (typeof Targeting === "undefined" || !Targeting.hasSightTo) return true;
+  return Targeting.hasSightTo(this, enemy);
+};
+
 Smasher.prototype.enemiesInZone = function (enemies) {
   var hits = [];
   for (var i = 0; i < enemies.length; i++) {
@@ -622,7 +640,7 @@ Smasher.prototype.enemiesInZone = function (enemies) {
 // wave by accident.
 Smasher.prototype.sightedIn = function (hits) {
   for (var i = 0; i < hits.length; i++) {
-    if (Targeting.sees(this, hits[i])) return true;
+    if (Targeting.sees(this, hits[i]) && this.canSee(hits[i])) return true;
   }
   return false;
 };

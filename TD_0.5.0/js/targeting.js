@@ -145,6 +145,16 @@ var Targeting = {
   // Without that, identical enemies -- which is all of them right now -- would
   // make weakest/strongest/fastest depend on array order, and the tower would
   // jitter between targets from frame to frame.
+  // Is the straight line from this tower to this enemy clear of terrain?
+  //
+  // Delegated to RangeFilter, which is where the active map's predicate is
+  // installed -- one hook for the whole game rather than two that can disagree.
+  // True on every board with no terrain, at the cost of a null check.
+  hasSightTo: function (tower, enemy) {
+    if (typeof RangeFilter === "undefined" || !RangeFilter.sightClear) return true;
+    return RangeFilter.sightClear(tower, enemy.pos || enemy);
+  },
+
   pick: function (tower, enemies, skipClaimed) {
     var mode = tower.targeting;
     var best = null;
@@ -162,6 +172,15 @@ var Targeting = {
       var dy = e.pos.y - tower.y;
       var distanceSquared = dx * dx + dy * dy;
       if (distanceSquared > rangeSquared) continue;
+      // COVER, LAST. Every cheap test above has already thrown most candidates
+      // away, and this is the only one that walks a shape list -- so it runs on
+      // the handful that are actually in reach and visible, never on the board.
+      //
+      // Here rather than in each tower: the Rifleman, the Summoner's creatures
+      // and every recruit come through this one picker, so they all learn about
+      // rocks at once and cannot drift apart. The config-driven towers ask
+      // RangeFilter, which carries the same predicate.
+      if (!Targeting.hasSightTo(tower, e)) continue;
 
       var s = Targeting.score(mode, e, distanceSquared);
       if (s > bestScore || (s === bestScore && e.progress > bestProgress)) {

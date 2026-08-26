@@ -854,33 +854,59 @@ var GLGeometry = (function () {
         break;
 
       case "depot": {
+        // MASS FIRST. The first version was a slab: correct proportions, no
+        // weight. What a warehouse on wheels needs is a chassis you can see
+        // UNDER it, a hull that overhangs that chassis, and enough vertical
+        // steps that the eye reads three storeys rather than one prism.
         // THE MOBILE WAREHOUSE. Not a box: a hull with a chamfered nose, a
         // ribbed roof, a stepped upper deck, a stack and a freight door with a
         // lit interior behind it. The door is the brightest thing on this half
         // of the board because that is where the enemies come from.
         var dw = size * 0.62, dd = size * 0.46, dh = size * 0.52;
-        boxAt(builder, cx, cy, dw * 2, dd * 2, dh, dark, 0, rot);
+        // The chassis: a narrower deck the hull sits ON, lifted clear of the
+        // dirt so the running gear has somewhere to be and the machine reads as
+        // parked rather than buried.
+        var lift = size * 0.20;
+        boxAt(builder, cx, cy, dw * 1.86, dd * 1.70, lift, body, 0, rot);
+        for (var cr = -1; cr <= 1; cr += 2) {
+          boxAt(builder, cx + Math.cos(rot + Math.PI / 2) * dd * 1.62 * cr,
+            cy + Math.sin(rot + Math.PI / 2) * dd * 1.62 * cr,
+            dw * 1.94, dd * 0.22, lift * 0.80, dark, lift * 0.10, rot);
+        }
+        boxAt(builder, cx, cy, dw * 2, dd * 2, dh, dark, lift, rot);
         // Chamfered nose, west-facing, built from two shrinking blocks.
         for (var no = 0; no < 2; no++) {
           boxAt(builder, cx - dw * (0.92 + no * 0.16), cy,
             dw * 0.30, dd * (1.7 - no * 0.5), dh * (0.92 - no * 0.18), dark,
-            dh * (0.04 + no * 0.08), rot);
+            lift + dh * (0.04 + no * 0.08), rot);
         }
         // Ribbed roof.
         for (var rb = 0; rb < 7; rb++) {
           boxAt(builder, cx - dw + (dw * 2) * (rb + 0.5) / 7, cy,
-            dw * 0.10, dd * 2.06, dh * 0.10, body, dh, rot);
+            dw * 0.10, dd * 2.06, dh * 0.10, body, lift + dh, rot);
         }
         // Stepped upper deck and a cab at the back.
         boxAt(builder, cx + dw * 0.30, cy, dw * 0.90, dd * 1.30, dh * 0.42, dark,
-          dh * 1.06, rot);
+          lift + dh * 1.06, rot);
         boxAt(builder, cx + dw * 0.86, cy, dw * 0.34, dd * 0.80, dh * 0.34, body,
-          dh * 1.48, rot);
+          lift + dh * 1.48, rot);
+        // Gantry rails over the deck, and a hoist on them: loading gear, so
+        // the thing reads as a WAREHOUSE and not merely a container.
+        for (var gr = -1; gr <= 1; gr += 2) {
+          segment(builder, cx - dw * 0.70,
+            cy + Math.cos(rot) * dd * 0.86 * gr, lift + dh * 1.48,
+            cx + dw * 0.50, cy + Math.cos(rot) * dd * 0.86 * gr,
+            lift + dh * 1.48, size * 0.030, body);
+        }
+        boxAt(builder, cx - dw * 0.24, cy, dw * 0.22, dd * 0.90, dh * 0.20,
+          body, lift + dh * 1.30, rot);
+        segment(builder, cx - dw * 0.24, cy, lift + dh * 1.30,
+          cx - dw * 0.24, cy, lift + dh * 0.70, size * 0.016, body);
         // THE FREIGHT DOOR: a recess in the west face, lit from inside.
         boxAt(builder, cx - dw * 1.02, cy, dw * 0.10, dd * 0.86, dh * 0.72,
-          hex("#0a0806"), dh * 0.02, rot);
+          hex("#0a0806"), lift + dh * 0.02, rot);
         boxAt(builder, cx - dw * 0.96, cy, dw * 0.04, dd * 0.70, dh * 0.58,
-          ley, dh * 0.06, rot, EMI);
+          ley, lift + dh * 0.06, rot, EMI);
         break;
       }
 

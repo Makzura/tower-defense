@@ -4902,4 +4902,425 @@ test("every shield fragment is its own group, so the renderer can throw it", fun
 });
 
 
+// ---------------------------------------------------------------------------
+// IRONWOOD FRONTIER -- the first board whose scenery is also solid.
+//
+// Every other route in this game is a polyline on an empty floor, and every
+// system that asks a question about a battlefield was written on that
+// assumption. This group is what holds the new answers still: shapes, placement,
+// sight, bullets, the difficulty measurement, and that none of it leaked onto
+// the seven boards that have no terrain at all.
+// ---------------------------------------------------------------------------
+
+group("Ironwood Frontier — map geometry");
+
+var MapGeom = require("../js/systems/map-geometry.js");
+
+var CIRCLE = { shape: "circle", x: 100, y: 100, radius: 20 };
+var SQUARE = { shape: "polygon", points: [[200, 200], [240, 200], [240, 240], [200, 240]] };
+var CAPSULE = { shape: "capsule", a: { x: 300, y: 300 }, b: { x: 400, y: 300 }, radius: 10 };
+
+test("1  circles, polygons and capsules answer contains and crosses", function (t) {
+  t.eq(MapGeom.contains(CIRCLE, 100, 100), true, "circle: centre is inside");
+  t.eq(MapGeom.contains(CIRCLE, 130, 100), false, "circle: outside is outside");
+  t.eq(MapGeom.contains(SQUARE, 220, 220), true, "polygon: inside");
+  t.eq(MapGeom.contains(SQUARE, 260, 220), false, "polygon: outside");
+  t.eq(MapGeom.contains(CAPSULE, 350, 300), true, "capsule: on the spine");
+  t.eq(MapGeom.contains(CAPSULE, 350, 316), false, "capsule: past the radius");
+
+  // Crossings return WHERE, not merely whether -- which is the half that stops
+  // a bullet at the near face instead of behind the rock.
+  t.near(MapGeom.segmentHit(CIRCLE, 50, 100, 150, 100), 0.30, 1e-9,
+    "circle: entered 30% along");
+  t.eq(MapGeom.segmentHit(CIRCLE, 50, 200, 150, 200) < 0, true, "circle: clean miss");
+  t.near(MapGeom.segmentHit(SQUARE, 180, 220, 260, 220), 0.25, 1e-9, "polygon: 25% along");
+  t.near(MapGeom.segmentHit(CAPSULE, 350, 250, 350, 350), 0.40, 1e-9, "capsule: 40% along");
+
+  var first = MapGeom.firstHit([CAPSULE, CIRCLE, SQUARE], 50, 100, 300, 100);
+  t.eq(first.shape, CIRCLE, "firstHit returns the NEAREST shape, not the first listed");
+  t.near(first.x, 80, 1e-9, "and the contact point on it");
+});
+
+test("2  tangency counts as contact, on every shape", function (t) {
+  // Exactly on the rim, exactly on the edge, exactly at the radius. The
+  // alternative is a band one float wide where the answer depends on rounding.
+  t.eq(MapGeom.contains(CIRCLE, 120, 100), true, "circle: exactly r away is touching");
+  t.eq(MapGeom.contains(SQUARE, 240, 220), true, "polygon: exactly on an edge");
+  t.eq(MapGeom.contains(SQUARE, 240, 240), true, "polygon: exactly on a corner");
+  t.eq(MapGeom.contains(CAPSULE, 350, 310), true, "capsule: exactly at the radius");
+  t.eq(MapGeom.segmentHit(CIRCLE, 50, 120, 150, 120) >= 0, true,
+    "a line that grazes the rim has hit it");
+});
+
+test("3  placement inflates a blocker by the tower's real footprint", function (t) {
+  // A tower is not a point. 25 px from a 20 px circle is clear for a point and
+  // blocked for anything with a 6 px skirt.
+  t.eq(MapGeom.contains(CIRCLE, 125, 100), false, "the centre alone is clear");
+  t.eq(MapGeom.contains(CIRCLE, 125, 100, 6), true, "the footprint is not");
+  t.eq(MapGeom.contains(CIRCLE, 125, 100, 4), false, "and a smaller tower still fits");
+});
+
+group("Ironwood Frontier — placement");
+
+function ironwood() {
+  var h = harness.boot("ironwood-frontier");
+  h.run("cash = 1000000");
+  return h;
+}
+// Authored pixels -> world, the one conversion every coordinate in this group
+// goes through. Typing world numbers here would silently break the moment
+// UNIT_LENGTH moved, which is the whole point of test 19 below.
+function px(h, v) { return h.game.ul(v / h.game.AUTHORED_AT_PX_PER_UL); }
+
+test("4  the ghost and the click resolve to the same stump centre", function (t) {
+  var h = ironwood();
+  var geo = h.game.Maps.geometryOf(h.game.currentMap);
+  var stump = geo.platforms[0];
+
+  // A cursor NEAR the stump, not on its centre.
+  var cursorX = stump.x + stump.radius * 0.5;
+  var cursorY = stump.y - stump.radius * 0.4;
+
+  var ghost = h.game.resolveBuildPoint(cursorX, cursorY, h.game.Soldier);
+  t.eq(ghost.platform && ghost.platform.id, "stump-p1", "the ghost takes the stump");
+  t.near(ghost.x, stump.x, 1e-9, "and snaps to its centre in x");
+  t.near(ghost.y, stump.y, 1e-9, "and in y");
+
+  // The click goes through the real handler at the same cursor position.
+  h.run("selectedSlot = 0; refreshBlockReason();");
+  h.click(cursorX, cursorY);
+  t.eq(h.game.towers.length, 1, "a tower was built");
+  t.near(h.game.towers[0].x, stump.x, 1e-9, "at the stump's centre, not the cursor");
+  t.near(h.game.towers[0].y, stump.y, 1e-9, "in both axes");
+
+  // One tower per stump.
+  t.eq(h.game.whyCannotBuild(cursorX, cursorY, h.game.Soldier), "occupied platform",
+    "and the stump is taken");
+});
+
+test("5  ordinary ground is still freely buildable", function (t) {
+  var h = ironwood();
+  // This is not a fixed-slot map: clear dirt away from the road takes a tower
+  // anywhere, and the resolver leaves it exactly where the cursor was.
+  var x = px(h, 690), y = px(h, 160);
+  t.eq(h.game.whyCannotBuild(x, y, h.game.Soldier), null, "clear ground is legal");
+  var spot = h.game.resolveBuildPoint(x, y, h.game.Soldier);
+  t.eq(spot.platform, null, "no platform involved");
+  t.near(spot.x, x, 1e-9, "and no snapping");
+});
+
+test("6  all five blockers refuse a tower", function (t) {
+  var h = ironwood();
+  [["blocker-o1", 365, 405], ["blocker-o2", 470, 297], ["blocker-o3", 740, 385],
+   ["blocker-o4", 1010, 340], ["blocker-o5", 759, 249]].forEach(function (b) {
+    t.eq(h.game.whyCannotBuild(px(h, b[1]), px(h, b[2]), h.game.Soldier),
+      "blocked by terrain", b[0] + " refuses");
+  });
+});
+
+test("7  the settlement and the depot refuse a tower", function (t) {
+  var h = ironwood();
+  t.eq(h.game.whyCannotBuild(px(h, 150), px(h, 362), h.game.Soldier),
+    "blocked by terrain", "inside the settlement");
+  t.eq(h.game.whyCannotBuild(px(h, 1160), px(h, 180), h.game.Soldier),
+    "blocked by terrain", "inside the depot");
+});
+
+group("Ironwood Frontier — line of sight");
+
+// O5 is the central boulder, spanning roughly x 720-798, y 216-282. A line
+// straight through it at y = 249 is blocked; the same line well south of it is
+// not. Every sight test below is built on that one pair.
+function acrossO5(h) { return { ax: px(h, 640), ay: px(h, 249), bx: px(h, 880), by: px(h, 249) }; }
+
+test("8  a Rifleman cannot acquire through cover", function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var tower = { x: line.ax, y: line.ay, rangePx: 10000, targeting: "first" };
+  var behind = { pos: { x: line.bx, y: line.by }, x: line.bx, y: line.by,
+                 dead: false, leaked: false, progress: 10,
+                 unclaimedHealth: function () { return 100; } };
+  var open = { pos: { x: line.ax + px(h, 60), y: line.ay }, x: line.ax + px(h, 60),
+               y: line.ay, dead: false, leaked: false, progress: 5,
+               unclaimedHealth: function () { return 100; } };
+
+  t.eq(h.run("Targeting.hasSightTo({x:" + tower.x + ",y:" + tower.y + "}, {pos:{x:" +
+    line.bx + ",y:" + line.by + "}})"), false, "the boulder blocks the line");
+  t.eq(h.run("Targeting.hasSightTo({x:" + tower.x + ",y:" + tower.y + "}, {pos:{x:" +
+    open.x + ",y:" + open.y + "}})"), true, "open ground does not");
+
+  var picked = h.game.Targeting.pick(tower, [behind, open], false);
+  t.eq(picked, open, "so the picker takes the enemy it can see, not the nearest one");
+  t.eq(h.game.Targeting.pick(tower, [behind], false), null,
+    "and takes nothing at all when the only enemy is behind cover");
+});
+
+test("9  a Warbringer cannot acquire through cover, but its blast reaches behind it",
+function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var hidden = { pos: { x: line.bx, y: line.by }, dead: false, leaked: false };
+
+  // Placed on legal ground WEST of the boulder, on the same line through it --
+  // (640, 249) authored is inside the road's clearance, so the click is refused
+  // and placeSmasher hands back null.
+  var s = h.placeSmasher(px(h, 612), px(h, 249));
+  t.ok(s !== null, "the Warbringer placed on clear ground");
+  s.rangePx = h.game.ul(100000);
+  s.fullCircle = true;
+  // The two halves of the rule, and they are deliberately two functions.
+  t.eq(s.canSee(hidden), false, "it cannot SEE a body behind the boulder");
+  t.eq(s.sightedIn([hidden]), false, "so it will not start a swing for it");
+
+  // covers() is about the ZONE, and the zone does not care about cover -- a
+  // hammer legally swung comes down on an area. This is the intentional
+  // exception the brief names.
+  var inZone = { pos: { x: line.ax + px(h, 8), y: line.ay }, dead: false, leaked: false };
+  t.eq(s.covers(inZone), true, "a body in the wedge is in the wedge");
+  t.eq(typeof s.covers, "function", "and covers() never consults terrain");
+});
+
+test("10  a Siphon does not lock through cover and drops a lock that goes behind it",
+function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var stats = { range: 100000, deadzone: 0, targetShape: "circle",
+                seesFlying: true, seesCamo: true };
+  var from = { x: line.ax, y: line.ay };
+
+  t.eq(h.run("RangeFilter.canTarget(" + JSON.stringify(stats) + "," +
+    JSON.stringify(from) + ",0,{x:" + line.bx + ",y:" + line.by + "})"), false,
+    "it cannot acquire through the boulder");
+  t.eq(h.run("RangeFilter.canTarget(" + JSON.stringify(stats) + "," +
+    JSON.stringify(from) + ",0,{x:" + (line.ax + px(h, 60)) + ",y:" + line.ay + "})"), true,
+    "and can acquire in the open");
+
+  // A lock is re-tested every step through the same predicate, so an enemy that
+  // WALKS behind the rock stops being a legal target on the step it does.
+  t.eq(h.run("RangeFilter.canTarget(" + JSON.stringify(stats) + "," +
+    JSON.stringify(from) + ",0,{x:" + line.bx + ",y:" + line.by + "})"), false,
+    "which is what drops the lock");
+});
+
+test("11  the Arcane Sniper's ordinary shots respect cover", function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var stats = { range: 100000, deadzone: 0, targetShape: "circle",
+                seesFlying: true, seesCamo: true };
+  t.eq(h.run("RangeFilter.canTarget(" + JSON.stringify(stats) + ",{x:" + line.ax +
+    ",y:" + line.ay + "},0,{x:" + line.bx + ",y:" + line.by + "})"), false,
+    "no ordinary acquisition through the boulder");
+  // Cone mode takes the same path, and used to return before the sight test.
+  var cone = { range: 100000, deadzone: 0, targetShape: "cone", coneArcDeg: 180,
+               seesFlying: true, seesCamo: true };
+  t.eq(h.run("RangeFilter.canTarget(" + JSON.stringify(cone) + ",{x:" + line.ax +
+    ",y:" + line.ay + "},0,{x:" + line.bx + ",y:" + line.by + "})"), false,
+    "cone mode too");
+});
+
+test("12  the B5 global ability ignores cover, because global means global",
+function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var ls = new h.game.LongshotTower(line.ax, line.ay, h.game.path);
+  for (var i = 0; i < 5; i++) ls.purchase("B");
+
+  var hidden = new h.game.Enemy(h.game.path, 90000);
+  hidden.pos = { x: line.bx, y: line.by };
+
+  // The ritual selects the strongest enemy ANYWHERE and never tests the
+  // Sniper's own reach -- so a boulder in the way is equally irrelevant.
+  t.eq(ls.performAction("ability", { enemies: [hidden] }), "channelling",
+    "it fires at a target it cannot see");
+  t.eq(ls.channel.target, hidden, "and locks the hidden enemy");
+});
+
+group("Ironwood Frontier — bullets and terrain");
+
+test("13  a homing bullet dies on terrain and releases its claim", function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var target = new h.game.Enemy(h.game.path, 5000);
+  target.pos = { x: line.bx, y: line.by };
+
+  var claimed = 0;
+  target.reserveDamage = function (n) { claimed += n; };
+  target.releaseDamage = function (n) { claimed -= n; };
+
+  var b = new h.game.Bullet(line.ax, line.ay, target, 40, null, null, 0);
+  t.eq(claimed, 40, "the shot reserved its damage");
+
+  var hpBefore = target.health;
+  for (var i = 0; i < 400 && !b.dead; i++) b.update(1 / 60);
+  t.eq(b.dead, true, "it died on the way");
+  t.eq(target.health, hpBefore, "without touching the enemy behind the rock");
+  t.eq(claimed, 0, "and gave the claim back, so the tower will fire again");
+});
+
+test("14  a 14 000 u.l./s rail shot cannot tunnel through a boulder", function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  // One step at this speed covers far more than the boulder is wide, which is
+  // exactly the case an endpoint test samples straight over.
+  var b = new h.game.PierceBullet({
+    x: line.ax, y: line.ay, angle: 0,
+    damage: 500, speedUlps: 14000, pierce: 99,
+    maxTravelPx: 100000, owner: null
+  });
+  var behind = new h.game.Enemy(h.game.path, 9000);
+  behind.pos = { x: line.bx, y: line.by };
+
+  var hp = behind.health;
+  b.update(1 / 60, [behind]);
+  t.eq(b.dead, true, "the shot stopped");
+  t.eq(behind.health, hp, "and never reached the body behind the rock");
+  t.ok(b.x < line.bx, "it died short of it (" + Math.round(b.x) + " < " +
+    Math.round(line.bx) + ")");
+});
+
+test("15  a pierce shot damages what is in front of cover and nothing behind it",
+function (t) {
+  var h = ironwood();
+  var line = acrossO5(h);
+  var infront = new h.game.Enemy(h.game.path, 9000);
+  infront.pos = { x: line.ax + px(h, 40), y: line.ay };
+  var behind = new h.game.Enemy(h.game.path, 9000);
+  behind.pos = { x: line.bx, y: line.by };
+
+  var b = new h.game.PierceBullet({
+    x: line.ax, y: line.ay, angle: 0,
+    damage: 500, speedUlps: 14000, pierce: 99,
+    maxTravelPx: 100000, owner: null
+  });
+  var frontHp = infront.health, backHp = behind.health;
+  b.update(1 / 60, [infront, behind]);
+
+  t.ok(infront.health < frontHp, "the body in front took the shot");
+  t.eq(behind.health, backHp, "the body behind did not");
+  t.eq(b.dead, true, "and the shot stopped at the rock rather than carrying on");
+});
+
+group("Ironwood Frontier — measurement and lifecycle");
+
+test("16  the boards with no terrain score exactly what they always did", function (t) {
+  var h = harness.boot();
+  // Typed on purpose. The subject of this test IS that these numbers did not
+  // move when the measurement learned about rocks, so reading them from the
+  // analyser would only assert that it equals itself.
+  [["rune-circuit", 0.826, "normal"], ["mana-coil", 0.566, "easy"],
+   ["sigil-lattice", 0.886, "normal"], ["null-meridian", 1.061, "hard"],
+   ["shifting-ley", 0.909, "normal"], ["twin-confluence", 0.863, "normal"]]
+  .forEach(function (row) {
+    var a = h.game.Maps.analyse(h.game.Maps.byId(row[0]));
+    t.near(a.score, row[1], 0.001, row[0] + " scores " + row[1]);
+    t.eq(a.tier, row[2], "and is still " + row[2]);
+  });
+});
+
+test("17  Ironwood Frontier measures as a normal board, from its real geometry",
+function (t) {
+  var h = harness.boot();
+  var map = h.game.Maps.byId("ironwood-frontier");
+  var a = h.game.Maps.analyse(map);
+  t.eq(a.tier, "normal", "normal");
+  t.ok(a.score >= 0.78 && a.score <= 0.90,
+    "inside the 0.78-0.90 band the brief asks for (" + a.score.toFixed(3) + ")");
+  t.eq(h.game.Maps.DEFAULT_ID, "ironwood-frontier", "and it is the default board");
+
+  // The measurement saw the terrain: a spot inside a blocker is not offered.
+  var geo = h.game.Maps.geometryOf(map);
+  var inside = 0;
+  a.spots.forEach(function (spot) {
+    if (MapGeom.containsAny(geo.noBuild, spot.x, spot.y, 0)) inside++;
+  });
+  t.eq(inside, 0, "no candidate spot sits inside terrain");
+});
+
+test("18  switching maps does not leave the previous board's rocks behind",
+function (t) {
+  var h = harness.boot("ironwood-frontier");
+  t.eq(h.game.Maps.geometryOf(h.game.currentMap).blockers.length, 5, "five blockers");
+  t.ok(h.run("mapSightBlockers !== null"), "and a sight hook");
+
+  h.run("openMapSelect()");
+  h.chooseMap("rune-circuit");
+  t.eq(h.game.Maps.geometryOf(h.game.currentMap).any, false,
+    "the bare board has no geometry");
+  t.eq(h.run("mapSightBlockers"), null, "the sight hook was taken away");
+  // And the old rocks are not still refusing placement on the new board.
+  t.eq(h.game.whyCannotBuild(px(h, 365), px(h, 405), h.game.Soldier) === "blocked by terrain",
+    false, "where a blocker used to be is ordinary ground again");
+
+  h.run("openMapSelect()");
+  h.chooseMap("ironwood-frontier");
+  t.eq(h.run("mapSightBlockers !== null"), true, "and coming back reinstalls it");
+});
+
+test("19  rescaling UNIT_LENGTH moves the route, the blockers and the platforms together",
+function (t) {
+  var h = harness.boot("ironwood-frontier");
+  var map = h.game.Maps.byId("ironwood-frontier");
+
+  function shot() {
+    var geo = h.game.Maps.geometryOf(map);
+    return {
+      route: h.game.path.length,
+      blocker: geo.blockers[0].radius,
+      blockerX: geo.blockers[0].x,
+      platform: geo.platforms[0].radius,
+      unit: h.game.UNIT_LENGTH
+    };
+  }
+  var before = shot();
+
+  h.run("UNIT_LENGTH = UNIT_LENGTH * 2; Maps.resetGeometry(); loadMap(currentMap);");
+  var after = shot();
+
+  t.near(after.unit / before.unit, 2, 1e-9, "the unit doubled");
+  t.near(after.route / before.route, 2, 1e-6, "and so did the route");
+  t.near(after.blocker / before.blocker, 2, 1e-9, "and the blocker's radius");
+  t.near(after.blockerX / before.blockerX, 2, 1e-9, "and its position");
+  t.near(after.platform / before.platform, 2, 1e-9, "and the stump's radius");
+
+  // Sight is proportional too: the same authored line is still blocked.
+  t.eq(h.run("MapGeometry.clearLine(mapSightBlockers," +
+    h.game.ul(640 / h.game.AUTHORED_AT_PX_PER_UL) + "," +
+    h.game.ul(249 / h.game.AUTHORED_AT_PX_PER_UL) + "," +
+    h.game.ul(880 / h.game.AUTHORED_AT_PX_PER_UL) + "," +
+    h.game.ul(249 / h.game.AUTHORED_AT_PX_PER_UL) + ")"), false,
+    "and the boulder still blocks the same authored line");
+});
+
+test("20  both pages load every script the game needs, in the same order",
+function (t) {
+  var fs = require("fs");
+  var nodePath = require("path");
+  function scripts(page) {
+    var html = fs.readFileSync(nodePath.join(__dirname, "..", page), "utf8");
+    var out = [], re = /<script\s+src="([^"]+)"\s*>\s*<\/script>/g, m;
+    while ((m = re.exec(html)) !== null) out.push(m[1]);
+    return out;
+  }
+  var index = scripts("index.html");
+  var sandbox = scripts("sandbox.html");
+
+  ["js/systems/map-geometry.js", "js/systems/range-filter.js", "js/maps.js",
+   "js/targeting.js", "js/bullet.js"].forEach(function (file) {
+    t.ok(index.indexOf(file) !== -1, "index.html loads " + file);
+    t.ok(sandbox.indexOf(file) !== -1, "sandbox.html loads " + file);
+  });
+
+  // ORDER, not merely presence. map-geometry defines the shapes range-filter
+  // and maps.js ask about, and a classic script that loads after its dependants
+  // leaves them holding an undefined global at call time.
+  t.ok(index.indexOf("js/systems/map-geometry.js") < index.indexOf("js/systems/range-filter.js"),
+    "index.html loads the geometry before the range filter");
+  t.ok(index.indexOf("js/systems/map-geometry.js") < index.indexOf("js/maps.js"),
+    "and before the maps that compile through it");
+  t.ok(sandbox.indexOf("js/systems/map-geometry.js") < sandbox.indexOf("js/systems/range-filter.js"),
+    "sandbox.html agrees");
+  t.ok(sandbox.indexOf("js/systems/map-geometry.js") < sandbox.indexOf("js/maps.js"),
+    "in both places");
+});
+
 runner.run();

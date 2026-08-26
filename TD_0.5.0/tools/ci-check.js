@@ -261,7 +261,31 @@ var BASELINE = [
     // repaired to get there, and no product code moved for it: the flying-wave
     // list read [24, 31, 35], written on a branch that forked before the owner
     // ruled that the Healer flies (2026-08-26). Wave 32 is the healer wave.
-    file: "tests/run.js", pass: 139, fail: 0,
+    // 159 on 2026-08-26, from 139: TWENTY tests ADDED with Ironwood Frontier,
+    // the first board whose scenery is also solid, and none removed.
+    //
+    // Three cover the geometry layer itself -- circle, polygon and capsule
+    // contains-and-crosses, tangency counting as contact on every shape, and
+    // footprint inflation. Four cover placement: the ghost and the click
+    // resolving to the same stump centre, ordinary ground staying free, all
+    // five blockers refusing, and the two landmarks refusing. Five cover sight,
+    // one per attacker family, including the two intentional exceptions -- the
+    // Warbringer's blast reaching behind cover it could not have acquired
+    // through, and the B5 ritual ignoring cover because global means global.
+    // Three cover bullets: a homing round dying on terrain and RELEASING ITS
+    // CLAIM, a 14 000 u.l./s rail shot failing to tunnel, and a pierce shot
+    // paying out in front of a rock and not behind it. Five cover the rest:
+    // the six bare boards scoring exactly what they always did, Ironwood
+    // measuring normal from its real geometry, map switching not leaving the
+    // previous board's rocks behind, UNIT_LENGTH rescaling route, blockers,
+    // platforms and sight together, and both pages loading every script in an
+    // order that puts the geometry before its dependants.
+    //
+    // Self-tested by mutation, restored after each: dropping the terrain sweep
+    // from PierceBullet goes red on 14 and 15; dropping the sight test from
+    // Targeting.pick goes red on 8; returning the cursor instead of the stump
+    // centre from resolveBuildPoint goes red on 4.
+    file: "tests/run.js", pass: 159, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
