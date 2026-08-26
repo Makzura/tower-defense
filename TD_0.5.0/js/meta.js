@@ -474,7 +474,13 @@ var MetaProgress = (function () {
   // Returns { ok, reason }. The refusal reasons are shown verbatim on the
   // store button, which is why they read as sentences rather than codes --
   // same arrangement whyCannotBuild has with the build preview.
-  function buy(id) {
+  // `opts.dryRun` asks the same question without spending anything, so the
+  // store button can print exactly what a press would answer. One rule, two
+  // readers -- the alternative is the UI carrying its own copy of the gate and
+  // the two drifting apart, which is the failure this whole file is arranged
+  // to avoid.
+  function buy(id, opts) {
+    var dryRun = !!(opts && opts.dryRun);
     var s = ensure();
     var found = entry(id);
     if (!found) return { ok: false, reason: "no such tower" };
@@ -498,6 +504,8 @@ var MetaProgress = (function () {
     if (s.coins < found.price) {
       return { ok: false, reason: "needs " + (found.price - s.coins) + " more coins" };
     }
+
+    if (dryRun) return { ok: true, dryRun: true };
 
     s.coins -= found.price;
     s.owned.push(id);
@@ -656,6 +664,13 @@ var MetaProgress = (function () {
     slotConstructors: slotConstructors,
     unlockAll: unlockAll,
     reset: reset,
+    // Load a RAW profile object through the same `sanitise` a file goes
+    // through, without touching storage. It exists so the migration and the
+    // hostile-data rules can be tested against the real guard rather than
+    // against a re-implementation of it in the test: writing the JSON into
+    // localStorage would work in a browser and not in the Node harness, which
+    // has none.
+    __loadForTest: function (raw) { state = sanitise(raw); return snapshot(); },
     load: load,
     save: save,
     snapshot: snapshot

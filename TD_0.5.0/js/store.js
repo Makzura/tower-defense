@@ -138,6 +138,27 @@ var Store = (function () {
 
     if (tab === "store") {
       if (MetaProgress.owns(id)) return { label: "Owned", enabled: false };
+
+      // LOCKED BEFORE BROKE, because the wall the player has to hear about is
+      // the one they cannot buy their way past. A tower that is both locked and
+      // unaffordable reads as "reach wave 11" rather than as "earn 4 more
+      // coins", which is the honest answer to "why can I not have this".
+      //
+      // The reason is NOT computed here: MetaProgress.buy() is the rule and it
+      // returns the sentence, so the button prints what the rule would say if
+      // it were pressed. Deriving a second copy of the condition in the UI is
+      // how a store ends up promising something buy() then refuses.
+      var probe = MetaProgress.buy(id, { dryRun: true });
+      if (probe.locked) {
+        return {
+          label: "Locked — " + item.price + " ⬡",
+          enabled: false,
+          note: probe.reason,
+          progress: probe.progress,
+          requiresWave: probe.requiresWave
+        };
+      }
+
       if (MetaProgress.coins() < item.price) {
         return { label: "Buy — " + item.price + " ⬡", enabled: false,
                  note: (item.price - MetaProgress.coins()) + " more coins needed" };

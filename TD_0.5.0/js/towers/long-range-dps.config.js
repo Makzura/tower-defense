@@ -186,7 +186,12 @@ TowerConfigs.longRangeDPS = {
       { // A1
         tier: 1,
         cost: 300,
-        deltas: { damage: 5, range: 50, fireRate: 0.25, deadzone: 25 },
+        // fireRate +0.15 since 2026-08-26, from +0.25. A1 is bought by BOTH
+        // finished builds -- it is the cheap camo detection -- so it is the one
+        // dial that moves the A5 and the B5 together. The A5 gets the ten
+        // hundredths back through its own delta; the B5 does not, and that is
+        // where its slowdown to 0.20 comes from.
+        deltas: { damage: 5, range: 50, fireRate: 0.15, deadzone: 25 },
         grants: ["camoDetection"]
       },
       { // A2
@@ -211,8 +216,17 @@ TowerConfigs.longRangeDPS = {
       },
       { // A5
         tier: 5,
-        cost: 13900,
-        deltas: { damage: 350, range: 1000, fireRate: -0.15, hp: 1400, coneArcDeg: 4 },
+        // 2026-08-26: damage 350 -> 275, fireRate -0.15 -> -0.05, cost
+        // 13 900 -> 10 500. The A5 was not too strong so much as too easily
+        // strong, and it is cheaper now BECAUSE it is less explosive -- the
+        // price cut is part of the change, not an apology for it.
+        //
+        // The fireRate delta moves with A1's so the finished build is
+        // untouched: A1 lost 0.10 and A5 gives 0.10 back, which is what keeps
+        // A5+B2 at exactly 0.60 shots a second while the pure-B5 build, which
+        // never buys A5, keeps A1's loss.
+        cost: 10500,
+        deltas: { damage: 275, range: 1000, fireRate: -0.05, hp: 1400, coneArcDeg: 4 },
         // pierce -> Infinite (flag, not delta -- see 5.1 for the effective
         // ~64-target cap this produces via the falloff formula).
         grants: ["infinitePierce", "killStackAttackSpeed"]
@@ -258,7 +272,11 @@ TowerConfigs.longRangeDPS = {
       },
       { // B5
         tier: 5,
-        cost: 23300,
+        // 23 300 -> 18 000 (2026-08-26). Its own numbers are untouched: the
+        // damage, the crits, the execute, the reload and the guaranteed fourth
+        // shot all stand, and the slowdown to 0.20 comes entirely from A1's
+        // crosspath change above rather than from anything on this tier.
+        cost: 18000,
         deltas: { damage: 1250, range: 150, fireRate: -0.14, hp: 650, critDamage: 110 },
         grants: ["guaranteedReloadShotCrit", "activeAbility"]
       }
@@ -286,9 +304,17 @@ TowerConfigs.longRangeDPS = {
     },
 
     killStackAttackSpeed: {
+      // 2026-08-26: the ceiling fell 200 -> 75 and the window 5 s -> 4 s. The
+      // per-stack bonus is unchanged at +1%.
+      //
+      // THIS IS THE SELF-AMPLIFICATION, and it was the real problem rather than
+      // the raw damage: a cone that kills faster stacks faster, and 200 stacks
+      // is +200% attack speed, which a wave dense enough to feed it could reach
+      // and then hold. 75 caps the loop at +75% and the shorter window means it
+      // has to be re-earned rather than merely maintained.
       perStackBonus: 0.01,   // +1% attack speed per stack
-      stackDurationSeconds: 5,
-      maxStacks: 200
+      stackDurationSeconds: 4,
+      maxStacks: 75
     },
 
     reload: {
@@ -317,7 +343,13 @@ TowerConfigs.longRangeDPS = {
     },
 
     activeAbility: {
-      damage: 25000,
+      // 25 000 -> 18 000 (2026-08-26). It still pays for itself and the
+      // arithmetic is the point: the ritual costs about ten seconds of fire --
+      // three channelling, seven stunned -- and a B5+A2 makes roughly 866 DPS
+      // single-target, so roughly 8 700 damage is given up. An 18 000 strike
+      // that ignores defence and armour is still a clear gain, and the local
+      // AoE is on top of that.
+      damage: 18000,
       aoeRadius: 25,           // u.l.
 
       // THE RITUAL TAKES THREE SECONDS. Added at the owner's request, and it
@@ -338,7 +370,22 @@ TowerConfigs.longRangeDPS = {
       // watch, then seven of exhaustion, instead of ten flat afterwards.
       stunSeconds: 7,          // tower cannot fire or reload while stunned
       maxHpLoss: 300,          // permanent, current HP is clamped to new max
-      cooldownSeconds: null,   // TODO(section 7)
+
+      // SIXTY SECONDS, AND THE CLOCK STARTS AT ACTIVATION (2026-08-26). This
+      // was `null` with a TODO against it, which meant no cooldown at all.
+      //
+      // At activation rather than after the lockout, and the difference is ten
+      // seconds: the channel and the exhaustion are ALREADY the price of using
+      // it, and charging the cooldown after them would be charging twice for
+      // the same three-plus-seven. So the ritual and its recovery run inside
+      // the sixty, and the button comes back fifty seconds after the tower
+      // starts firing again.
+      //
+      // A REFUSED ATTEMPT NEVER STARTS IT. Not enough HP, already channelling,
+      // still stunned, nothing on the board -- none of them consume the
+      // cooldown, because a button that punishes you for pressing it when it
+      // could not fire is a button nobody presses.
+      cooldownSeconds: 60,
       // TODO: spec section 5.5 leaves "strongest enemy" undefined (highest
       // max HP vs highest current HP vs highest bounty). See
       // js/systems/active-ability.js selectStrongestEnemy() for the

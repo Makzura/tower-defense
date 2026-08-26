@@ -33,6 +33,21 @@ function LongshotTower(x, y, path) {
   // walking it forward along the path, which needs the path itself.
   this.path = path;
 
+  // THE ABILITY'S COOLDOWN, in simulation seconds. Zero means ready.
+  //
+  // It lives on the tower rather than in ActiveAbility because it is per-tower
+  // state, and it is ticked from update() -- so it advances on exactly the
+  // clock everything else does. Pause stops it because update() stops; 3x
+  // speed spends it three times as fast because update() runs three times as
+  // often; victory and defeat freeze it because the whole simulation freezes;
+  // and a restart rebuilds the tower, which is what clears it.
+  //
+  // There is deliberately no second clock and no wall-time anywhere near this.
+  // It belongs HERE and not in resolveChannel, where it first landed: setting
+  // it as the ritual resolves zeroes the clock three seconds after it starts,
+  // which reads as a working cooldown right up until you time it.
+  this.abilityCooldown = 0;
+
   this.core = new ConfiguredTower(LongshotTower.CONFIG, x, y);
 
   this.name = LongshotTower.DISPLAY_NAME;
@@ -235,6 +250,7 @@ LongshotTower.prototype.panelActions = function () {
 
   if (this.core.stats.flags.activeAbility) {
     var stunned = this.core.stunTimer > 0;
+    var cooling = this.abilityCooldown > 0;
     var ability = this.core.stats.mechanics.activeAbility;
     // Automatic timing is valid for the nuke because it needs no second input.
     // Cone re-aim above deliberately has no switch: it still needs a direction
@@ -244,19 +260,32 @@ LongshotTower.prototype.panelActions = function () {
       label: "Ability",
       detail: stunned
         ? "stunned " + this.core.stunTimer.toFixed(1) + "s"
-        : ability.damage + " dmg · costs " + ability.maxHpLoss + " HP",
-      effects: TowerStats.distance(ability.aoeRadius) + " blast, ignores defense, " +
-        ability.stunSeconds + " s stunned",
-      enabled: !stunned,
+        : cooling
+          ? "recharging " + this.abilityCooldown.toFixed(0) + "s"
+          : ability.damage + " dmg · costs " + ability.maxHpLoss + " HP",
+      // GLOBAL RANGE IS NAMED HERE because it is the ability's most surprising
+      // property and nothing else on the panel says it: the ritual picks the
+      // strongest enemy ANYWHERE on the board, without testing the Sniper's own
+      // range. What is local is the BLAST -- 25 u.l. around whoever was chosen.
+      // A reader who takes "global" to mean "hits everything" has it backwards.
+      effects: "anywhere on the map · " + TowerStats.distance(ability.aoeRadius) +
+        " blast, ignores defense, " + ability.stunSeconds + " s stunned",
+      enabled: !stunned && !cooling,
       tone: "ability",
       tooltip: UpgradeEffects.card({
         title: "Active ability",
-        subtitle: stunned ? "stunned for " + this.core.stunTimer.toFixed(1) + " s" : "ready",
+        subtitle: stunned
+          ? "stunned for " + this.core.stunTimer.toFixed(1) + " s"
+          : cooling
+            ? "recharging, " + this.abilityCooldown.toFixed(1) + " s left"
+            : "ready",
         changes: [
           { label: "Damage", from: "", to: String(ability.damage), delta: "" },
+          { label: "Target", from: "", to: "strongest, anywhere", delta: "" },
           { label: "Blast", from: "", to: TowerStats.distance(ability.aoeRadius), delta: "" },
           { label: "Stun", from: "", to: ability.stunSeconds + " s", delta: "" },
-          { label: "Tower HP lost", from: "", to: "-" + ability.maxHpLoss, delta: "" }
+          { label: "Tower HP lost", from: "", to: "-" + ability.maxHpLoss, delta: "" },
+          { label: "Cooldown", from: "", to: (ability.cooldownSeconds || 0) + " s", delta: "" }
         ],
         abilities: UpgradeEffects.abilities(["activeAbility"], this.core.stats.mechanics),
         note: "The HP loss is permanent -- it lowers this tower's maximum, not just its current health."
@@ -341,8 +370,15 @@ LongshotTower.prototype.performAction = function (id, context) {
     // renderer. If the locked enemy dies or leaks during the ritual, the
     // strike still lands at the last place the channel saw it rather than
     // snapping to somebody else or disappearing.
+    // EVERY REFUSAL COMES BEFORE THE COOLDOWN IS TAKEN, which is the whole
+    // ordering rule here: a press that could not fire must cost nothing, or
+    // the button punishes the player for testing it. The cooldown is set at
+    // the single point below where the ritual is actually armed.
     if (this.channel) return "already channelling";
     if (this.core.stunTimer > 0) return "stunned";
+    if (this.abilityCooldown > 0) {
+      return "recharging " + this.abilityCooldown.toFixed(1) + "s";
+    }
 
     var params = this.core.stats.mechanics.activeAbility;
     var strongest = null;
@@ -354,6 +390,18 @@ LongshotTower.prototype.performAction = function (id, context) {
       }
     }
     if (!strongest) return "no enemy on screen";
+
+    // THE CLOCK STARTS HERE, at activation, and not when the tower is free
+    // again. The three seconds of ritual and the seven of exhaustion are
+    // already the price of using it; charging the cooldown after them would be
+    // charging twice for the same ten seconds. So the lockout runs INSIDE the
+    // sixty and the button returns fifty seconds after the tower fires again.
+    //
+    // A config that leaves `cooldownSeconds` null or absent gets no cooldown,
+    // which is what shipped before 2026-08-26 -- the number is the config's to
+    // state, not this file's to invent.
+    var cd = params.cooldownSeconds;
+    this.abilityCooldown = (typeof cd === "number" && cd > 0) ? cd : 0;
 
     var seconds = params.channelSeconds || 0;
     this.channel = {
@@ -376,6 +424,15 @@ LongshotTower.prototype.performAction = function (id, context) {
 
 LongshotTower.prototype.update = function (dt, enemies, bullets) {
   this.core.update(dt);
+
+  // BEFORE the channel's early return, because the sixty seconds RUN THROUGH
+  // the ritual and the exhaustion rather than starting after them. Putting
+  // this below the `if (this.channel)` block would silently add ten seconds to
+  // every cooldown and would have been invisible in every test that only ever
+  // measures a ready button.
+  if (this.abilityCooldown > 0) {
+    this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
+  }
 
   // The ritual, if one is running. Ticked before anything else so the frame
   // it completes on is the frame the strike lands.
@@ -406,6 +463,12 @@ LongshotTower.prototype.update = function (dt, enemies, bullets) {
 
   // Use the same action path as a manual cast so its damage, stun and permanent
   // maximum-HP cost cannot drift between manual and automatic use.
+  //
+  // AND SO THAT AUTO CANNOT OUTRUN THE COOLDOWN. performAction refuses a press
+  // that is channelling, stunned or recharging, and returns before anything is
+  // spent -- so the automatic caster gets exactly the same three answers the
+  // button does, every frame, without this line having to know about any of
+  // them. A separate automatic path is how those two drift apart.
   if (AutoAbility.isOn(this, "ability") && this.core.stats.flags.activeAbility) {
     this.performAction("ability", {
       enemies: enemies
@@ -579,6 +642,7 @@ LongshotTower.prototype.resolveChannel = function (enemies) {
   var params = this.core.stats.mechanics.activeAbility;
   var point = this.channel;
   this.channel = null;
+
   if (!point) return;
 
   var radiusPx = ul(params.aoeRadius);

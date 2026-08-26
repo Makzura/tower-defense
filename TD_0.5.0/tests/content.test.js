@@ -1969,6 +1969,130 @@ function makeChannelTestSniper(h) {
   return ls;
 }
 
+// --- the ability's cooldown (2026-08-26) ------------------------------------
+//
+// It was `null` with a TODO against it, which meant the strongest button in the
+// game had no cooldown at all. These pin the four properties that make the
+// sixty seconds mean what the brief says: it starts at ACTIVATION, it runs
+// through the lockout rather than after it, a refused press never spends it,
+// and it advances on simulation time so pause, speed and the end-of-run freeze
+// all carry.
+
+function chargedSniper(h) {
+  var ls = makeChannelTestSniper(h);
+  ls.abilityCooldown = 0;
+  return ls;
+}
+function oneEnemy(h, hp) {
+  var e = new h.game.Enemy(h.game.path, hp || 50000);
+  e.pos = { x: 500, y: 500 };
+  return e;
+}
+
+test("the ability's cooldown is sixty seconds and starts when it is cast", function (t) {
+  var h = harness.boot();
+  var ls = chargedSniper(h);
+  var cfg = ls.core.stats.mechanics.activeAbility;
+  t.eq(cfg.cooldownSeconds, 60, "the config says sixty");
+
+  t.eq(ls.performAction("ability", { enemies: [oneEnemy(h)] }), "channelling", "it fires");
+  // AT ACTIVATION, not when the tower is free again: the clock is already
+  // running while the ritual is still being channelled.
+  t.eq(ls.abilityCooldown, 60, "and the full sixty are on the clock immediately");
+});
+
+test("the cooldown runs THROUGH the channel and the exhaustion, not after them",
+function (t) {
+  var h = harness.boot();
+  var ls = chargedSniper(h);
+  var e = oneEnemy(h);
+  ls.performAction("ability", { enemies: [e] });
+
+  // Ten seconds is the whole lockout: three channelling, seven stunned.
+  for (var i = 0; i < 600; i++) ls.update(1 / 60, [e], []);
+  t.near(ls.abilityCooldown, 50, 0.05,
+    "ten seconds later, fifty remain -- the lockout was spent INSIDE the sixty");
+  t.eq(ls.channel, null, "the ritual is long over");
+
+  // And it is still refused until the clock runs out, whatever the stun says.
+  // One more second, so the exhaustion is unambiguously over: the stun starts
+  // when the ritual RESOLVES, three seconds in, so it ends at exactly ten and
+  // asking at ten gets "stunned" rather than the answer this is about.
+  for (var k = 0; k < 60; k++) ls.update(1 / 60, [e], []);
+  t.eq(ls.core.stunTimer, 0, "the tower is free to fire again");
+  var refusal = ls.performAction("ability", { enemies: [e] });
+  t.ok(String(refusal).indexOf("recharging") !== -1,
+    "but the ability is still refused, and the reason names the cooldown (got: " +
+    refusal + ")");
+
+  // Repeated subtraction of 1/60 does not land on zero exactly, so this is a
+  // near rather than an eq -- the residue is picoseconds and the button is
+  // gated on `> 0`, which a positive picosecond would wrongly hold shut. The
+  // extra steps past sixty are what make sure it actually reaches the floor.
+  for (var j = 0; j < 3140; j++) ls.update(1 / 60, [e], []);
+  t.near(ls.abilityCooldown, 0, 1e-9, "and at sixty it is ready again");
+});
+
+test("a refused cast never spends the cooldown", function (t) {
+  var h = harness.boot();
+  var ls = chargedSniper(h);
+
+  // Nothing on the board: refused, and nothing is taken.
+  t.eq(ls.performAction("ability", { enemies: [] }), "no enemy on screen", "refused");
+  t.eq(ls.abilityCooldown, 0, "no cooldown started");
+  t.eq(ls.core.maxHp, ls.core.stats.hp, "and no HP burnt");
+
+  // Mid-channel: refused, and the running cooldown is not extended either.
+  var e = oneEnemy(h);
+  ls.performAction("ability", { enemies: [e] });
+  ls.update(1, [e], []);
+  var left = ls.abilityCooldown;
+  t.eq(ls.performAction("ability", { enemies: [e] }), "already channelling", "refused again");
+  t.eq(ls.abilityCooldown, left, "and the clock was neither restarted nor extended");
+});
+
+test("the cooldown is simulation time, so pause and the end-of-run freeze hold it",
+function (t) {
+  var h = harness.boot();
+  var ls = chargedSniper(h);
+  var e = oneEnemy(h);
+  ls.performAction("ability", { enemies: [e] });
+  ls.update(5, [e], []);
+  var held = ls.abilityCooldown;
+
+  // A paused game does not call update(), and neither does a finished one --
+  // update() returns early on gameOver/victory. Not stepping IS the freeze,
+  // which is why this is asserted as "no dt, no progress" rather than by
+  // reaching for a pause flag this tower has never heard of.
+  t.eq(ls.abilityCooldown, held, "no step, no progress");
+  ls.update(0, [e], []);
+  t.eq(ls.abilityCooldown, held, "a zero-length step spends nothing either");
+
+  // 3x speed is three steps rather than one long one, and spends accordingly.
+  for (var i = 0; i < 3; i++) ls.update(1, [e], []);
+  t.near(ls.abilityCooldown, held - 3, 1e-9, "three steps of one second spend three");
+});
+
+test("auto-ability cannot outrun the cooldown or restart a running channel",
+function (t) {
+  var h = harness.boot();
+  var ls = chargedSniper(h);
+  h.game.AutoAbility.set(ls, "ability", true);
+  var e = oneEnemy(h);
+
+  ls.update(1 / 60, [e], []);
+  t.eq(ls.abilityCooldown > 0, true, "auto fired it once");
+  var casts = 0;
+  var realResolve = ls.resolveChannel;
+  ls.resolveChannel = function (enemies) { casts++; return realResolve.call(this, enemies); };
+
+  // Thirty seconds of automatic pressing, every frame, against a sixty second
+  // cooldown: exactly one resolution, the one already in flight.
+  for (var i = 0; i < 1800; i++) ls.update(1 / 60, [e], []);
+  t.eq(casts, 1, "and never again while the clock runs");
+  t.ok(ls.abilityCooldown > 0, "the cooldown is still the thing holding it");
+});
+
 test("the Longshot B5 channel follows its first locked enemy without retargeting",
   function (t) {
     var h = harness.boot();
@@ -2000,7 +2124,7 @@ test("the Longshot B5 channel follows its first locked enemy without retargeting
 
     t.eq(ls.channel, null, "the ritual resolves after the unchanged three seconds");
     t.eq(ls.aim, 0.321, "the resolution frame does not turn the newly stunned tower");
-    t.eq(locked.health, lockedBefore - 25000,
+    t.eq(locked.health, lockedBefore - 18000,
       "the blast lands on the locked enemy's latest position");
     t.eq(rival.health, rivalBefore, "the later stronger enemy was never retargeted");
   });
@@ -4659,6 +4783,155 @@ function bootStore() {
   h.run("Store.open()");
   return h;
 }
+
+// --- the Warbringer's unlock, and the ledgers behind it (2026-08-26) --------
+
+test("the Warbringer is a purchase now, gated on having reached wave 11", function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  h.run("MetaProgress.reset()");
+
+  var entry = M.entry("smasher");
+  t.eq(entry.starter, false, "not in the opening hand any more");
+  t.eq(entry.price, 10, "ten coins");
+  t.eq(entry.requiresWave, 11, "and gated on wave 11");
+
+  // REFUSED IN buy(), not merely greyed out on a button. A hand-edited save or
+  // a direct call has to hit the same wall the store does, so this asks the
+  // rule rather than the UI -- and it asks with the coins already in hand, so
+  // the refusal cannot be mistaken for poverty.
+  h.run("MetaProgress.unlockAll === undefined");
+  var rich = M.snapshot();
+  h.run("MetaProgress.awardRun({ wavesCompleted: 9, waveReached: 9 })");
+  var refused = M.buy("smasher");
+  t.eq(refused.ok, false, "refused before wave 11");
+  t.eq(refused.locked, true, "and refused as LOCKED rather than as broke");
+  t.eq(M.owns("smasher"), false, "nothing was bought");
+
+  // Reaching wave 11 pays the milestone that buys it, which is the loop.
+  var award = M.awardRun({ wavesCompleted: 10, waveReached: 11 });
+  t.eq(award.objectives.length, 1, "reaching 11 pays one objective");
+  t.eq(award.objectives[0].id, "reach_11", "the wave 11 milestone");
+  t.eq(award.objectives[0].amount, 10, "worth exactly the Warbringer's price");
+
+  var bought = M.buy("smasher");
+  t.eq(bought.ok, true, "and now it can be bought");
+  t.eq(M.owns("smasher"), true, "owned");
+  t.ok(rich !== null, "");
+});
+
+test("losing to the Midboss still unlocks it -- the gate is the wave REACHED", function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  h.run("MetaProgress.reset()");
+  // Ten waves finished, eleventh reached and lost: the Midboss was met and not
+  // beaten, which is the case the brief names.
+  M.awardRun({ wavesCompleted: 10, waveReached: 11, victory: false });
+  t.eq(M.bestWave(), 11, "the high-water mark is the wave reached");
+  t.eq(M.buy("smasher").ok, true, "and that is enough");
+});
+
+test("the high-water mark never falls, so a bad run cannot take an unlock away",
+function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  h.run("MetaProgress.reset()");
+  M.awardRun({ wavesCompleted: 20, waveReached: 21 });
+  t.eq(M.bestWave(), 21, "twenty-one reached");
+  M.awardRun({ wavesCompleted: 1, waveReached: 2 });
+  t.eq(M.bestWave(), 21, "a wave-2 disaster afterwards leaves it alone");
+});
+
+test("an old save keeps its towers, coins, loadout and runs", function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  // A profile written BEFORE 2026-08-26: it owns the Warbringer because the
+  // Warbringer used to be free, and it has none of the three new fields.
+  var old = { coins: 137, owned: ["smasher", "soldier", "longshot"],
+              equipped: ["smasher", "soldier", "longshot", null, null], runs: 9 };
+  h.run("MetaProgress.__loadForTest(" + JSON.stringify(old) + ")");
+
+  var p = M.snapshot();
+  t.eq(p.coins, 137, "its coins survive");
+  t.eq(M.owns("smasher"), true, "IT KEEPS THE WARBRINGER -- ownership is never taken back");
+  t.eq(M.owns("longshot"), true, "and everything else it bought");
+  t.deep(p.equipped, ["smasher", "soldier", "longshot", null, null], "its loadout stands");
+  t.eq(p.runs, 9, "and its run count");
+
+  // The new fields default to "nothing claimed", which costs it nothing it had
+  // and leaves every objective still ahead of it.
+  t.eq(p.bestWave, 0, "no high-water mark yet");
+  t.deep(p.milestones, [], "no milestones claimed");
+  t.deep(p.routesWon, [], "no routes won");
+});
+
+test("a hostile save cannot crash the boot or mint anything", function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  h.run("MetaProgress.__loadForTest(" + JSON.stringify({
+    coins: -5000, runs: -1, bestWave: -3,
+    owned: ["soldier", "soldier", "no-such-tower", 7, null],
+    equipped: ["longshot", "longshot", 42, null, null],
+    milestones: ["reach_11", "reach_11", "reach_999", 12],
+    routesWon: ["rune-circuit", "rune-circuit", "", 5, "a-map-this-build-lacks"]
+  }) + ")");
+  var p = M.snapshot();
+  t.eq(p.coins, 0, "negative coins refused");
+  t.eq(p.runs, 0, "negative runs refused");
+  t.eq(p.bestWave, 0, "negative high-water refused");
+  t.deep(p.owned, ["soldier"], "duplicates and unknown ids dropped, starters kept");
+  t.eq(p.equipped.indexOf("longshot"), -1, "a tower you do not own cannot be equipped");
+  t.deep(p.milestones, ["reach_11"], "unknown and duplicate milestones dropped");
+  // An unknown ROUTE is kept rather than dropped: this file cannot enumerate
+  // maps without depending on Maps, and a save naming a map a future build adds
+  // must survive a round trip through an older one.
+  t.deep(p.routesWon, ["rune-circuit", "a-map-this-build-lacks"],
+    "routes deduplicated, junk dropped, unknown ids tolerated");
+});
+
+test("every reward source carries an id, a label and an amount, and they sum to the total",
+function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  h.run("MetaProgress.reset()");
+  var r = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true,
+                       mapId: "rune-circuit", mapName: "Rune Circuit" });
+  t.eq(r.total, 175, "a first full clear on a fresh save and a new route is 175");
+  t.eq(r.repeatable, 80, "80 of it is the clear itself");
+  t.deep(r.bounties, [], "and the bounty slot is present and empty, ready for rotation");
+
+  var summed = r.repeatable;
+  r.objectives.forEach(function (o) {
+    t.ok(typeof o.id === "string" && o.id.length > 0, "each source has a stable id");
+    t.ok(typeof o.label === "string" && o.label.length > 0, "and a printable label");
+    t.ok(typeof o.amount === "number" && o.amount > 0, "and an amount");
+    summed += o.amount;
+  });
+  t.eq(summed, r.total, "the total is derived FROM the sources, not beside them");
+
+  // Keyed on the ROUTE ID, not its display name.
+  var ids = r.objectives.map(function (o) { return o.id; });
+  t.ok(ids.indexOf("first_win:rune-circuit") !== -1, "the first clear is keyed on the map id");
+});
+
+test("two different routes each pay their first clear, and neither pays twice",
+function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  h.run("MetaProgress.reset()");
+  var win = { wavesCompleted: 35, waveReached: 35, victory: true };
+
+  var a = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true, mapId: "rune-circuit" });
+  var again = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true, mapId: "rune-circuit" });
+  var b = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true, mapId: "mana-coil" });
+
+  t.eq(a.total, 175, "the first clear ever: 80 + four milestones + 25");
+  t.eq(again.total, 80, "the same route again pays the repeatable alone");
+  t.eq(again.objectives.length, 0, "nothing one-time is left on it");
+  t.eq(b.total, 105, "a NEW route pays 80 + its own 25");
+  t.eq(b.objectives.length, 1, "and only that one");
+  t.ok(win !== null, "");
+});
 
 test("a fresh profile owns the starter kit and nothing else", function (t) {
   var h = harness.boot();

@@ -76,13 +76,20 @@ test("base stats match the spec exactly", function (t) {
 group("section 3 — path A absolute values");
 
 // damage / range / fireRate / pierce / deadzone / hp, tier by tier.
+//
+// RETUNED 2026-08-26. A1's fireRate delta fell +0.25 -> +0.15, which carries
+// down the whole column (0.75 -> 0.65), and A5's damage fell 350 -> 275 and its
+// fireRate penalty -0.15 -> -0.05. A5's absolute damage is therefore 425 rather
+// than 500, and its absolute rate is 0.60 as before -- the ten hundredths A1
+// gave up are exactly the ten A5 stopped taking, which is what holds the
+// finished A build still while slowing every build that does NOT buy A5.
 var PATH_A_TABLE = [
   // tier, damage, range, fireRate, pierce, deadzone, hp
-  [1, 15, 300, 0.75, 0, 75, 100],
-  [2, 25, 350, 0.75, 1, 75, 150],
-  [3, 40, 450, 0.75, 6, 100, 250],
-  [4, 150, 500, 0.75, 6, 0, 1100],
-  [5, 500, 1500, 0.6, Infinity, 0, 2500]
+  [1, 15, 300, 0.65, 0, 75, 100],
+  [2, 25, 350, 0.65, 1, 75, 150],
+  [3, 40, 450, 0.65, 6, 100, 250],
+  [4, 150, 500, 0.65, 6, 0, 1100],
+  [5, 425, 1500, 0.6, Infinity, 0, 2500]
 ];
 
 PATH_A_TABLE.forEach(function (row) {
@@ -250,7 +257,7 @@ test("A5+B2 crosspath matches the spec's table exactly", function (t) {
   buyTiers(tower, "A", 5);
   buyTiers(tower, "B", 2);
   var s = tower.stats;
-  t.eq(s.damage, 530, "A5+B2 damage");
+  t.eq(s.damage, 455, "A5+B2 damage");
   t.eq(s.range, 1550, "A5+B2 range");
   t.near(s.fireRate, 0.6, 1e-9, "A5+B2 fireRate");
   t.eq(s.hp, 2650, "A5+B2 hp");
@@ -270,7 +277,7 @@ test("B5+A2 crosspath matches the spec's table exactly", function (t) {
   var s = tower.stats;
   t.eq(s.damage, 1590, "B5+A2 damage");
   t.eq(s.range, 650, "B5+A2 range");
-  t.near(s.fireRate, 0.30, 1e-9, "B5+A2 fireRate");
+  t.near(s.fireRate, 0.20, 1e-9, "B5+A2 fireRate");
   t.eq(s.hp, 1500, "B5+A2 hp");
   t.eq(s.pierce, 1, "B5+A2 pierce");
   t.eq(s.deadzone, 75, "B5+A2 deadzone");
@@ -404,10 +411,37 @@ test("each stack independently expires after its own 5s", function (t) {
   t.eq(tracker.count(), 0, "second stack expired on its own (later) schedule");
 });
 
-test("stacks cap at 200", function (t) {
+test("stacks cap at whatever they are told to", function (t) {
   var tracker = new TimedStackTracker(200, 5);
   for (var i = 0; i < 250; i++) tracker.addStack();
-  t.eq(tracker.count(), 200, "capped at 200 stacks");
+  t.eq(tracker.count(), 200, "the tracker honours its own ceiling");
+});
+
+// AND WHAT THE GAME ACTUALLY TELLS IT, which the test above deliberately does
+// not: it builds a tracker from literals, so it would keep passing whatever the
+// config said. These four numbers are the retune (2026-08-26) and nothing else
+// pins them.
+test("the A5 kill-stack ceiling and window are the retuned ones", function (t) {
+  var k = CONFIG.mechanics.killStackAttackSpeed;
+  t.eq(k.maxStacks, 75, "75 stacks, down from 200");
+  t.eq(k.stackDurationSeconds, 4, "each lasting 4 seconds, down from 5");
+  t.near(k.perStackBonus, 0.01, 1e-9, "still +1% apiece");
+  // +75% rather than +200%: the self-amplifying loop is what was cut, not the
+  // per-stack reward.
+  t.near(k.maxStacks * k.perStackBonus, 0.75, 1e-9, "so the ceiling is +75% attack speed");
+});
+
+test("the retuned prices and the ability's numbers are the shipped ones", function (t) {
+  t.eq(CONFIG.paths.A[4].cost, 10500, "A5 costs 10 500, down from 13 900");
+  t.eq(CONFIG.paths.B[4].cost, 18000, "B5 costs 18 000, down from 23 300");
+  var a = CONFIG.mechanics.activeAbility;
+  t.eq(a.damage, 18000, "the ritual hits for 18 000, down from 25 000");
+  t.eq(a.cooldownSeconds, 60, "and has a cooldown at last, of 60 s");
+  t.eq(a.channelSeconds, 3, "channel unchanged");
+  t.eq(a.stunSeconds, 7, "exhaustion unchanged");
+  t.eq(a.maxHpLoss, 300, "permanent HP cost unchanged");
+  t.eq(a.aoeRadius, 25, "and the blast is still LOCAL, 25 u.l.");
+  t.eq(a.ignoresDefense, true, "still ignores defence and armour");
 });
 
 test("effectiveFireRate applies +1% per stack, only once A5 is granted", function (t) {
@@ -784,8 +818,8 @@ test("a preview shows what the upgrade does to DPS", function (t) {
   // is what this row exists to save.
   t.ok(dps, "there is a DPS row");
   t.eq(dps.from, "5.0", "from what it does now");
-  t.eq(dps.to, "11.3", "to what it would do");
-  t.eq(dps.delta, "+6.25", "and the gain");
+  t.eq(dps.to, "9.8", "to what it would do");
+  t.eq(dps.delta, "+4.75", "and the gain");
 
   // Last, the same place the inspection panel puts it: it summarises the rows
   // above it, so it has to read as their conclusion rather than as an aside.
