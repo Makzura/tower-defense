@@ -2073,6 +2073,23 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   an abstract polyline in the difficulty band's colour on a flat swatch, so
   every map looked like every other map in a different tint.
 
+  **The card is flipped vertically while the board is the 3D one** (2026-08-25).
+  Routes are authored in canvas pixels, where +y is DOWN, and the card paints
+  them on a 2D canvas that honours that; the GL board reads the same world y
+  under a camera whose screen-up is `0.56*y + 0.829*z`, so +y goes UP. The two
+  were exact mirrors in that one axis and identical in the other — measured,
+  not eyeballed: world y 160 -> screen y 436 and world y 460 -> 327 on Rune
+  Circuit at the opening camera, while world x -60 -> 166 and x 1340 -> 1101.
+  **The card is the side that gives**, because no camera above the ground can
+  reverse the ground plane's handedness: swinging it to the +y side to put y
+  downward puts +x leftward too, trading a vertical mirror for a horizontal
+  one. The flip is `translate(0, VIEW_HEIGHT); scale(1, -1)` inside
+  `drawMapThumbnail`'s own save/restore, and it is **conditional on
+  `World3D.isEnabled()`** — the 2D fallback board is genuinely +y-down, and a
+  card flipped against it would be wrong in the other direction. Nothing
+  simulated moves; the authored points, `Maps.toWorld` and every analysis
+  figure are untouched.
+
   **`mapPreviewRect` is 16:9 and that is load-bearing.** The scale is uniform;
   a non-16:9 box would force either letterboxing or a squashed map, and a
   squashed map misrepresents exactly the shape the card is asking the player to

@@ -753,6 +753,59 @@ rather than riding on the tier one.
 
 No enemy, tower, HP, quantity, cost, reward or map was touched: 35 waves,
 830 bodies, 25 939 effective HP, all six suites at their measured baselines.
+**2026-08-25 — The route cards were the map's mirror image, in one axis
+exactly. `drawMapThumbnail` now flips its render vertically while the board is
+the 3D one.**
+
+Reported by the owner as the cards and the battlefield being "inversées" since
+the move from 2D to 3D, and that is precisely what it was: a **vertical mirror,
+horizontal untouched**.
+
+**MEASURED, NOT EYEBALLED.** Rune Circuit's own route points, pushed through
+`camera.worldToScreen` at the opening camera:
+
+    world (-60, 160) -> screen (166, 436)
+    world ( 300, 460) -> screen (437, 327)
+    world (1340, 220) -> screen (1101, 412)
+
+World y rising 160 -> 460 moves screen y 436 -> 327, i.e. UP. World x rising
+-60 -> 1340 moves screen x 166 -> 1101, i.e. right, same as the card. One axis,
+inverted; the other, identical. Nothing was rotated and no waypoint order was
+reversed.
+
+**THE CAUSE IS A CONVENTION, NOT A BUG IN EITHER RENDERER.** Routes are
+authored in canvas pixels where +y is DOWN, and `drawMapThumbnail` still paints
+them on a 2D canvas, which honours that. The GL board reads the same world y
+through a camera parked on the -y side of its target (`OrbitCamera`'s default
+`yaw = -PI/2`, `gl-camera.js`) with world up at +z, so its screen-up is
+`0.56*y + 0.829*z`
+and +y goes UP. Both are correct on their own terms and they disagree by a
+mirror.
+
+**THE CARD IS THE SIDE THAT GIVES, because the board's side cannot be turned
+round.** A camera anywhere above the ground plane maps (x, y) to the screen the
+same way round; swinging it to the +y side to send y downward sends +x leftward
+with it, since `right = cross(fwd, up)` flips too — that trades a vertical
+mirror for a horizontal one and fixes nothing. The only genuine board-side
+fixes are a negated y through every mesh, every actor and `screenToWorld`, or a
+mirrored projection, and a mirrored projection inverts every triangle's winding
+and hands every model its other hand. Against that, the card's fix is
+`translate(0, VIEW_HEIGHT); scale(1, -1)`.
+
+**GUARDED ON `World3D.isEnabled()`, deliberately.** With no WebGL the
+battlefield falls back to the 2D pass in `draw()`, which really is +y-down, and
+a card flipped against that would break the same promise in the other
+direction. The flip is therefore a statement about which renderer is on, not a
+correction to the authored data.
+
+**NOTHING SIMULATED MOVED.** No route point, no `GamePath`, no `Maps.toWorld`
+output and no analysis figure changed — the whole change is a canvas transform
+inside the preview's own `save`/`restore`. `tools/ci-check.js`: 495 / 0 and
+`MANIFEST OK`, unchanged.
+
+Verified on screen for Rune Circuit (road entering low-left and rising, both
+sides) and Null Meridian (its one long ley-line descending left-to-right on
+both, where before the card climbed and the board fell).
 
 **2026-08-20 — The Bulwark is TWO imported bodies, and breaking its shield
 swaps one for the other. `glb_to_model.py` grows a pair of rigs: a jog with a

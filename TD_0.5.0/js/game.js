@@ -4436,6 +4436,12 @@ var DEFAULT_ROAD_THEME = {
 // map" is for one function to paint both. A second copy tuned to look similar
 // is the thing this signature is here to prevent.
 //
+// That promise covers the STROKES and, since the board went 3D, no longer
+// covers WHICH WAY UP: the GL board draws its road as geometry under a camera
+// whose screen-up is +y, while this paints on a canvas whose screen-up is -y.
+// The compensation lives in drawMapThumbnail, deliberately, because the 2D
+// fallback board still calls this function unflipped and must keep doing so.
+//
 // `routeList` is anything with a `points` array of world coordinates -- the
 // live GamePath objects in `paths`, or a bare {points} from Maps.toWorld.
 function drawRoadOn(routeList, map) {
@@ -6787,8 +6793,10 @@ function mapPreviewRect(card) {
 }
 
 // THE MAP, drawn small. The whole 1280x720 battlefield scaled into `box`,
-// through the same three calls the play screen makes in the same order:
-// the theme's background, its environment, then the road.
+// through the same three calls the 2D play screen makes in the same order:
+// the theme's background, its environment, then the road. The 3D board is a
+// different renderer that shares only the world coordinates with these, which
+// is why the flip below exists.
 //
 // UNIFORM SCALE, and the box is built 16:9 to make that possible. Fitting a
 // non-16:9 box would mean either letterboxing (the map floating in a frame it
@@ -6800,7 +6808,10 @@ function mapPreviewRect(card) {
 // Nothing here is a copy of the battlefield's renderer -- Maps.drawEnvironment
 // and drawRoadOn ARE the battlefield's renderer. That is the whole point: a
 // theme retune, a new decoration kind or a change to the road's five strokes
-// shows up on these cards without anyone remembering to update them.
+// shows up on these cards without anyone remembering to update them. It stayed
+// true through the move to 3D for WHAT is painted and quietly stopped being
+// true for WHICH WAY UP; that is the one thing the card now has to know about
+// the board, and it is one transform rather than a second renderer.
 //
 // What is deliberately NOT drawn: towers, enemies, the build preview, and the
 // old start/end dots. The first three are run state and there is no run yet;
@@ -6813,6 +6824,39 @@ function drawMapThumbnail(map, box) {
   ctx.clip();
   ctx.translate(box.x, box.y);
   ctx.scale(box.w / VIEW_WIDTH, box.h / VIEW_HEIGHT);
+
+  // SCREEN-UP CHANGED DIRECTION UNDER THE CARD WHEN THE BOARD WENT 3D. This
+  // flip is what puts it back, and it is the whole of the fix.
+  //
+  // Routes are authored in canvas pixels, where +y is DOWN the screen, and
+  // that is still what the three calls below paint. The GL board reads the
+  // same world y through a camera parked on the -y side of its target
+  // (`OrbitCamera`'s default `yaw = -PI/2`) with world up at +z, so its
+  // screen-up is `0.56*y + 0.829*z` and +y goes UP. Measured on Rune Circuit
+  // at the opening camera: world y 160 projects to screen y 436 and world y
+  // 460 to 327 -- y rising, screen y falling. World x -60 projected to 166
+  // and x 1340 to 1101 in the same read, so the horizontal is untouched.
+  // One axis exactly, which is why every card looked nearly right and no
+  // card was.
+  //
+  // THE CARD IS THE SIDE THAT GIVES, because the board's side cannot be turned
+  // round. A camera anywhere above the ground maps the (x, y) plane to the
+  // screen the same way round; swinging it to the +y side to send y downward
+  // sends +x leftward with it, because `right = cross(fwd, up)` flips too --
+  // that trades this vertical mirror for a horizontal one and fixes nothing.
+  // The only real board-side fixes are a negated y through every mesh, every
+  // actor and screenToWorld, or a mirrored projection -- and a mirrored
+  // projection inverts every triangle's winding and hands every model its
+  // other hand.
+  //
+  // Asked of the renderer rather than applied unconditionally: with no WebGL
+  // the battlefield falls back to the 2D pass in draw(), which really is
+  // +y-down, and a card flipped against that would break the same promise in
+  // the other direction.
+  if (typeof World3D !== "undefined" && World3D.isEnabled()) {
+    ctx.translate(0, VIEW_HEIGHT);
+    ctx.scale(1, -1);
+  }
 
   ctx.fillStyle = Maps.backgroundColor ? Maps.backgroundColor(map) : "#1c1e26";
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
