@@ -1430,7 +1430,19 @@ Enemy.prototype.positionAt = function (progress) {
   // at the point of use -- the same edge-of-the-system rule every other
   // distance follows.
   var t = this.path.tangentAt(progress);
-  var offset = ul(this.laneOffsetUl);
+  // THE SPREAD IS A FRACTION OF THE ROAD, NOT A FIXED DISTANCE.
+  //
+  // `laneOffsetUl` is authored against the road at its nominal width, and on a
+  // route that narrows to a gate it would put half the column in the ditch
+  // either side -- the column would not read as squeezing through the gap, it
+  // would read as walking straight past it. Scaling by the road's own width
+  // here is what makes a chokepoint DO something visible: bodies fall into
+  // single file through it and spread out again in the plaza beyond, and the
+  // lane each one holds is still the lane its deterministic sequence gave it.
+  //
+  // 1 on every route that declares no width profile (js/path.js), so this is
+  // the same offset it has always been on six of the seven boards.
+  var offset = ul(this.laneOffsetUl) * this.path.widthScaleAt(progress);
   return { x: centre.x - t.y * offset, y: centre.y + t.x * offset };
 };
 
@@ -1506,7 +1518,20 @@ Enemy.prototype.currentSpeedUlps = function () {
   if (sprint && this.progress < ul(sprint.untilUl)) {
     speed *= sprint.speedMultiplier;
   }
-  return speed;
+
+  // AND WHAT THE ROAD ITSELF DOES TO A BODY WALKING IT.
+  //
+  // The same shape of fact as `sprint` directly above -- keyed on where on the
+  // map the body is, not on a clock -- and deliberately the other side of the
+  // same seam: `sprint` is a property of the TYPE ("this thing charges the
+  // first stretch"), pace is a property of the ROUTE ("nothing crosses that
+  // basin quickly"). A board can therefore hurry bodies down a final run at
+  // the base without every enemy in the game carrying a note about it.
+  //
+  // Multiplied, not substituted: a slow applied by a tower still halves the
+  // speed of something running a fast stretch. 1 on every route that declares
+  // no pace profile.
+  return speed * this.path.paceScaleAt(this.progress);
 };
 
 // Is this enemy still in the opening sprint? Its own function because the draw

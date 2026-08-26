@@ -287,6 +287,64 @@ var BASELINE = [
     //   - the stunned tower passed spawnAt a converted PIXEL value where it
     //     takes a path progress, parking the enemy 307 px from a 104 px reach.
     //
+    // 225/0 on 2026-08-26: +3 with the road that changes width. Each one pins a
+    // half of the feature that nothing else could see:
+    //
+    //   The first walks the forest's own route and asks every rule that reads
+    //   the road to answer at a chokepoint, on open road and in the plaza --
+    //   the width, the build clearance, an actual refused placement, the lane
+    //   a body walks in, and that the RIBBON the two renderers draw from
+    //   carries the same half-width the placement rule measures. A profile
+    //   that moved the tarmac and not the clearance would leave towers
+    //   standing in the road with every suite green.
+    //
+    //   The second pins that the crossing time is WALKED and not divided
+    //   (39.8 s against the 49.0 the division gives), that the grace term is
+    //   taken off that clock, and that a slow still multiplies through the
+    //   gauntlet -- without which the last fifth of the board would be immune
+    //   to every slow in the game.
+    //
+    //   The third is the one that made the feature safe to land: the six
+    //   boards that declare no profile get IDENTITY back from `ribbon`, the
+    //   nominal half-width, the same divide and the same grace. Not "close
+    //   enough" -- the same objects and the same arithmetic.
+    //
+    // Self-tested by four mutations, restored after each: dropping the width
+    // scale from the enemy's lane offset, dropping the pace multiply from
+    // currentSpeedUlps, and taking `buildClearanceOn` back to the flat
+    // `buildClearancePx` each turn exactly one of them red; forcing `ribbon`
+    // to resample an unprofiled route turns the third red.
+    //
+    // 222/0 on 2026-08-26: +3 for the forest's river, its grave and its cleared
+    // watchtower deck.
+    //
+    // The river one is the load-bearing one, because the band it measures is a
+    // number that has to be IDENTICAL in two files: `GLGeometry.river` puts the
+    // channel's outer lip at width/2 + banks either side of the centre line and
+    // `World3D.buildMapMesh` opens the floor at the same offset. Nothing at run
+    // time checks that they agree, and when they do not the board shows a strip
+    // of void down the whole run. The same test pins that no PROP stands in the
+    // water -- nine had to move off that strip when the river landed, and
+    // scenery is never validated against terrain, so a tenth added later would
+    // be a dead stem growing out of a river bed with every suite green -- and
+    // that the bridge's span actually reaches both banks, which is the one
+    // measurement on that prop that is not taste. Self-tested by dropping the
+    // bridge's size to 80: red on the abutment span, green on everything else.
+    //
+    // The grave one pins the only per-prop colour override in the game. Every
+    // other colour on a board is derived from its theme; the casket declares
+    // `accent` because its light is deliberately NOT the camp's ember, and
+    // dropping that one field would leave it glowing orange with nothing
+    // failing anywhere. Self-tested by deleting `accent`: red on both colour
+    // assertions.
+    //
+    // The deck one is measured off built GEOMETRY rather than asserted about
+    // source: it builds the watchtower and looks at what is actually in the
+    // volume a body standing on the platform would occupy. The lamp used to sit
+    // dead centre there and read as a stool on a tower whose whole job is to
+    // have somebody on it. Self-tested by moving the lamp back to `cx, cy`: the
+    // closest-to-axis measurement goes to 0.000 x size and the test goes red.
+    //
     // 219/0 on 2026-08-26: +2 for the forest board. One pins the board's own
     // contract -- that it declares weather and wildness, that every camp prop
     // it names is a kind the geometry can actually build (a rename in the
@@ -351,7 +409,7 @@ var BASELINE = [
     //     `inspected` instead of the `tower` it is handed, so the two callers
     //     that never set the global indexed with -1 and handed `buyUpgrade`
     //     an undefined tower. It now upgrades its own argument.
-    file: "tests/content.test.js", pass: 219, fail: 0,
+    file: "tests/content.test.js", pass: 225, fail: 0,
     failing: []
   },
   {

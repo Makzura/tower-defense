@@ -6145,6 +6145,328 @@ test("the forest board is scenery, not gameplay, and its patches stay flat", fun
   t.eq(h.game.paths.length, 1, "one entrance");
 });
 
+test("the forest's river is cut, crossed and stood clear of", function (t) {
+  var h = harness.boot();
+  var Maps = h.game.Maps;
+  var forest = Maps.byId("test");
+  var river = forest.river;
+
+  t.ok(!!river && river.width > 0, "the forest declares a river");
+  t.eq(Maps.byId("rune-circuit").river, null,
+    "and a board that declares none gets null rather than a default one");
+
+  // THE BAND IS A SHARED NUMBER, not a proportion. `GLGeometry.river` builds
+  // its outer lip at exactly this offset and `World3D.buildMapMesh` opens the
+  // floor at exactly this offset; if the two ever stop agreeing the board shows
+  // a strip of void down the whole run. Everything below is measured off it.
+  var x0 = river.x - river.width / 2 - river.banks;
+  var x1 = river.x + river.width / 2 + river.banks;
+
+  // NOTHING STANDS IN THE WATER. Nine props had to move off this strip when the
+  // river landed, and a tenth added later without checking would be a dead
+  // stem growing out of a river bed -- which nothing in the renderer would
+  // complain about, because scenery is never validated against terrain.
+  var intruding = [];
+  forest.models.forEach(function (m) {
+    if (m.kind === "bridge") return;              // the one that must cross it
+    var radius = (m.size || 44) * 0.25;
+    if (m.x + radius > x0 && m.x - radius < x1) {
+      intruding.push(m.kind + " at " + m.x + "," + m.y);
+    }
+  });
+  t.eq(intruding.join(" / "), "", "no prop stands in the cut");
+
+  // THE CROSSING REACHES BOTH BANKS. `size` is the span over 1.5 (see the
+  // bridge case in gl-geometry), and the abutments sit at 0.47 of the span --
+  // so this is the one measurement on that prop that is not taste. A bridge
+  // that stops short of the cut has its abutments in the water.
+  var bridge = forest.models.filter(function (m) { return m.kind === "bridge"; })[0];
+  t.ok(!!bridge, "the road is carried over the river by a bridge");
+  var span = bridge.size * 1.5;
+  t.ok(bridge.x - span * 0.47 < x0 && bridge.x + span * 0.47 > x1,
+    "and its abutments land outside the cut, not in it");
+
+  // THE ROAD CROSSES THE WATER EXACTLY ONCE, and the bridge is on that leg.
+  //
+  // Found rather than indexed. The first version of this named points[2] and
+  // points[3] by number, which pinned the shape of a route that has since been
+  // redrawn -- and a test that has to be edited every time a leg moves is a
+  // test that will be edited without being read. What actually matters is the
+  // count: a second crossing would be a wave walking through the river, and
+  // nothing in the renderer or the simulation would say a word about it.
+  var points = Maps.primaryPoints(forest);
+  var crossings = [];
+  for (var i = 1; i < points.length; i++) {
+    var a = points[i - 1], b = points[i];
+    if ((a.x < river.x) === (b.x < river.x)) continue;
+    crossings.push({ a: a, b: b });
+  }
+  t.eq(crossings.length, 1, "the road meets the river exactly once");
+  t.eq(crossings[0].a.y, crossings[0].b.y,
+    "and crosses it square, on a straight leg");
+  t.eq(crossings[0].a.y, bridge.y, "which is the leg the bridge is on");
+  t.ok(bridge.x > Math.min(crossings[0].a.x, crossings[0].b.x) &&
+    bridge.x < Math.max(crossings[0].a.x, crossings[0].b.x),
+    "and between that leg's two ends");
+
+  ["bridge", "casket"].forEach(function (kind) {
+    t.ok(h.game.GLGeometry.SCENERY_KINDS.indexOf(kind) >= 0,
+      kind + " is a kind the geometry knows how to build");
+  });
+});
+
+test("the spawn is a grave, and it brings a light the board does not own",
+    function (t) {
+  var h = harness.boot();
+  var Maps = h.game.Maps;
+  var forest = Maps.byId("test");
+  var casket = forest.models.filter(function (m) {
+    return m.kind === "casket";
+  })[0];
+
+  t.ok(!!casket, "the route's first point has something to come out of");
+
+  // THE WHOLE POINT OF THE PROP IS THAT ITS LIGHT IS WRONG FOR THIS BOARD.
+  // Every other colour here is derived from the theme, which is what makes one
+  // prop violet on Mana Coil and green on Sigil Lattice without a second table.
+  // The casket is the single declared exception in the game, so an edit that
+  // quietly dropped `accent` would leave it glowing in the camp's ember and
+  // nothing would fail.
+  t.ok(!!casket.accent, "the casket declares its own accent");
+  t.ok(casket.accent !== forest.theme.accent,
+    "and it is not the board's ember: " + casket.accent);
+
+  // It stands WEST of where bodies appear, with its mouth toward the road, so
+  // an enemy's first step is off it rather than into it.
+  var start = Maps.primaryPoints(forest)[0];
+  t.ok(casket.x < start.x, "it sits behind the first point of the route");
+  t.ok(Math.abs(casket.y - start.y) < 8, "and on the road's own line");
+});
+
+test("the watchtower deck is clear enough to stand on", function (t) {
+  var h = harness.boot();
+  var GLGeometry = h.game.GLGeometry;
+
+  // THE LAMP USED TO BE A STOOL. It was built dead centre on the platform of a
+  // tower whose entire job is to have somebody standing on it, and from above
+  // it read as a squat lit bollard nobody could get past. It now hangs on a
+  // corner post -- same light, same only-lit-thing-in-the-forest, just not in
+  // the middle of the floor.
+  //
+  // Measured off the geometry rather than asserted about the source: build the
+  // prop and look at what is actually in the volume a body would occupy.
+  var size = 52, legH = size * 1.55;
+  var builder = new GLGeometry.Builder();
+  GLGeometry.scenery(builder, "watchtower", 0, 0, size, 0.3, {
+    metalDark: "#1c1812", metal: "#4a4336", panel: "#2f2a1c",
+    terrain: "#1a1913", terrainEdge: "#171610", accent: [1, 0.5, 0.2]
+  });
+
+  // THE WINDOW IS THE WHOLE STANDING VOLUME, and the first version of this test
+  // got that wrong in a way that made it useless. It looked only between 0.09
+  // and 0.40 x size above the deck -- the band the OLD lamp happened to occupy
+  // -- so putting the current lamp back on the axis left it above the window
+  // and the test stayed green through exactly the regression it exists to
+  // catch. Self-tested again after widening: moving the lamp to `cx, cy` now
+  // takes the measurement to 0.000 and the test goes red.
+  var closest = Infinity, above = 0;
+  for (var i = 0; i < builder.pos.length; i += 3) {
+    var z = builder.pos[i + 2];
+    if (z <= legH + size * 0.02 || z >= legH + size * 1.00) continue;
+    above++;
+    closest = Math.min(closest,
+      Math.hypot(builder.pos[i], builder.pos[i + 1]));
+  }
+
+  t.ok(above > 0, "there is geometry standing on the deck -- rails and a lamp");
+  // The deck's own corners are at 0.25 x size and that is where the rails, the
+  // lamp and the top of the ladder live; measured, the nearest any of them
+  // comes to the axis is 0.171. Anything at 0.12 or less is standing in the
+  // middle of the floor, and a prop ON the axis measures 0.
+  t.ok(closest > size * 0.12,
+    "and none of it is in the middle of the floor: closest is " +
+    (closest / size).toFixed(3) + " x size");
+});
+
+test("the forest's road changes width, and every rule that reads the road " +
+    "reads it there", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  h.run("startRun(Maps.byId('test'))");
+  var path = g.path;
+
+  t.ok(path.hasWidthProfile(), "the forest route declares a width profile");
+
+  // The three stretches the board is authored around, by fraction along the
+  // route. Anything that reads the road has to answer differently at each.
+  var gate = path.length * 0.85;        // the wire gate, the tightest point
+  var open = path.length * 0.40;        // this board's open road
+  var basin = path.length * 0.70;       // the plaza around the top corner
+
+  t.ok(path.widthScaleAt(gate) < path.widthScaleAt(open),
+    "the wire gate is narrower than open road: " +
+    path.widthScaleAt(gate).toFixed(2) + " vs " +
+    path.widthScaleAt(open).toFixed(2));
+  t.ok(path.widthScaleAt(basin) > path.widthScaleAt(open) * 2,
+    "and the basin is more than twice open road: " +
+    path.widthScaleAt(basin).toFixed(2));
+
+  // PLACEMENT FOLLOWS THE ROAD, which is the whole reason the profile is not
+  // decoration. A chokepoint is worth building beside because the road pulls
+  // its edge in and lets a gun stand closer; a plaza pushes every gun off it.
+  // Measured: 18.8 px at the gate, 27.1 on open road, 45.3 in the basin.
+  var clearance = function (d) {
+    return g.buildClearanceOn(path, d, g.Soldier);
+  };
+  t.ok(clearance(gate) < clearance(open) - 5,
+    "a Rifleman may stand closer at the gate: " + clearance(gate).toFixed(1) +
+    " px against " + clearance(open).toFixed(1));
+  t.ok(clearance(basin) > clearance(open) + 15,
+    "and is pushed well off the basin: " + clearance(basin).toFixed(1) + " px");
+
+  // A point that is legal beside the gate must be ILLEGAL at the same offset
+  // beside the basin, or the two rules are the same rule wearing a hat.
+  var off = (clearance(gate) + clearance(open)) / 2;
+  function spotAtOffset(d) {
+    var p = path.pointAt(d), tan = path.tangentAt(d);
+    return { x: p.x - tan.y * off, y: p.y + tan.x * off };
+  }
+  var atGate = spotAtOffset(gate), atBasin = spotAtOffset(basin);
+  t.eq(g.whyCannotBuild(atGate.x, atGate.y, g.Soldier), null,
+    "the gate lets a tower in at " + off.toFixed(1) + " px");
+  t.eq(g.whyCannotBuild(atBasin.x, atBasin.y, g.Soldier), "too close to the path",
+    "and the basin refuses one at the same offset");
+
+  // THE COLUMN NARROWS WITH THE ROAD. A lane offset authored against the
+  // nominal width would put half a wave in the ditch either side of a gate --
+  // the queue would not read as squeezing through, it would read as walking
+  // past.
+  var body = new g.Enemy(path, 100, "normal", { lane: 3 });
+  body.laneOffsetUl = g.Enemy.LANE_SPREAD_UL;
+  function offCentre(d) {
+    var p = body.positionAt(d), c = path.pointAt(d);
+    return Math.hypot(p.x - c.x, p.y - c.y);
+  }
+  t.ok(offCentre(gate) < offCentre(open) * 0.6,
+    "a body walks nearer the centre line at the gate: " +
+    offCentre(gate).toFixed(1) + " px against " + offCentre(open).toFixed(1));
+  t.ok(offCentre(basin) > offCentre(open) * 1.8,
+    "and spreads out across the basin: " + offCentre(basin).toFixed(1) + " px");
+
+  // AND THE ROAD THAT IS DRAWN IS THE ROAD THAT IS MEASURED. Both renderers
+  // build from `ribbon`, so a half-width in it that disagreed with
+  // `widthScaleAt` would be a chokepoint you could see and not build beside.
+  var nominal = g.ul(21.875);
+  var ribbon = path.ribbon(nominal, g.ul(13));
+  t.ok(ribbon.length > path.points.length * 8,
+    "the ribbon is resampled fine enough to change width along a leg: " +
+    ribbon.length + " points");
+  var worst = 0;
+  ribbon.forEach(function (pt) {
+    var hit = path.closestToPoint(pt.x, pt.y);
+    worst = Math.max(worst,
+      Math.abs(pt.half - nominal * path.widthScaleAt(hit.progress) / 2));
+  });
+  t.ok(worst < 1.2, "and every point carries the width the road has there: " +
+    "worst disagreement " + worst.toFixed(2) + " px");
+});
+
+test("the forest's pace is a property of the road, and the clock is measured " +
+    "through it", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var Maps = g.Maps;
+  var forest = Maps.byId("test");
+  h.run("startRun(Maps.byId('test'))");
+  var path = g.path;
+  var report = Maps.analyse(forest);
+
+  // THE COMPLAINT THIS ANSWERS was that the old route read as a trudge. This
+  // one is LONGER and is crossed in less time, because the stretches where
+  // nothing happens are walked quickly and the ones where something does are
+  // not. Divided rather than walked, this route would take 49.0 s.
+  var divided = report.lengthUl / g.Enemy.BASE_SPEED_ULPS;
+  t.ok(report.crossingSeconds < divided - 8,
+    "the crossing is walked, not divided: " +
+    report.crossingSeconds.toFixed(1) + " s against " + divided.toFixed(1));
+  t.ok(report.crossingSeconds > 36 && report.crossingSeconds < 43,
+    "and lands in the band the board was tuned for: " +
+    report.crossingSeconds.toFixed(1) + " s");
+
+  // GRACE IS A CLOCK. The term exists because a longer route gives the economy
+  // more time before the first leak, so a gauntlet that runs bodies in faster
+  // has to shorten it exactly as cutting the route would. Keyed off the
+  // measured crossing rather than off the length.
+  t.near(report.graceRatio,
+    Maps.referenceLengthUl() / (report.crossingSeconds * g.Enemy.BASE_SPEED_ULPS),
+    0.0001, "grace is measured off the crossing time");
+
+  // THE GAUNTLET IS THE MECHANIC. A body that clears the wire gate is at half
+  // again its speed with the camp still to run.
+  var body = new g.Enemy(path, 100, "normal", {});
+  body.progress = path.length * 0.70;               // the basin
+  var slow = body.currentSpeedUlps();
+  body.progress = path.length * 0.95;               // the run in to the base
+  var fast = body.currentSpeedUlps();
+  t.ok(fast > slow * 1.7, "the gauntlet runs bodies in: " + fast.toFixed(1) +
+    " u.l./s against " + slow.toFixed(1) + " in the basin");
+
+  // A slow put on by a tower still applies on top of it -- pace multiplies the
+  // body's speed rather than replacing it, or the last fifth of the board
+  // would be immune to every slow in the game.
+  body.slowMultiplier = 0.5;
+  t.near(body.currentSpeedUlps(), fast * 0.5, 0.001,
+    "and a slow still halves it");
+});
+
+test("width and pace are opt-in, and the six other boards take neither",
+    function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var Maps = g.Maps;
+
+  // THE CLAIM THIS PINS is the one that made the feature safe to land: a route
+  // that declares no profile behaves exactly as every route did before either
+  // existed. Not "close enough" -- the same points array, the same divide, the
+  // same clearance.
+  var plain = 0;
+  Maps.LIST.forEach(function (map) {
+    if (map.id === "test") return;
+    plain++;
+    var route = Maps.routesOf(map)[0];
+    t.eq(Maps.profileOf(route), null, map.id + " declares no profile");
+
+    var path = new g.GamePath(Maps.toWorld(route.points), Maps.profileOf(route));
+    t.eq(path.hasWidthProfile(), false, map.id + " has no width profile");
+    t.eq(path.widthScaleAt(path.length * 0.4), 1, map.id + " is one width");
+    t.eq(path.paceScaleAt(path.length * 0.4), 1, map.id + " is one pace");
+    // IDENTITY, not a copy: the renderers then run the code they ran before
+    // profiles existed, on the objects they ran it on.
+    t.ok(path.ribbon(g.ul(21.875), g.ul(13)) === path.points,
+      map.id + " hands its own points back as its ribbon");
+    t.near(g.roadHalfWidthAt(path, path.length * 0.4), g.ul(21.875) / 2,
+      0.0001, map.id + " keeps the nominal half-width");
+
+    var report = Maps.analyse(map);
+    t.eq(report.crossingSeconds,
+      report.shortestLengthUl / g.Enemy.BASE_SPEED_ULPS,
+      map.id + " still divides its length by one speed");
+    t.eq(report.graceRatio,
+      Maps.referenceLengthUl() / report.shortestLengthUl,
+      map.id + " still takes grace off its length");
+  });
+  t.eq(plain, 6, "six boards declare nothing");
+
+  // And the kerb lights are opt-in the same way, for the same reason: a
+  // facility with a lit floor grid does not need its road outlined, and a
+  // theme key that appeared on every board would have changed all seven.
+  t.ok(!!Maps.byId("test").theme.roadGlow, "the forest lights its own kerbs");
+  Maps.LIST.forEach(function (map) {
+    if (map.id === "test") return;
+    t.eq(map.theme.roadGlow, undefined, map.id + " declares no kerb light");
+  });
+});
+
 test("the map grid fits its canvas and no two cards overlap", function (t) {
   var h = harness.boot(null);
   var rects = [];

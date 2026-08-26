@@ -13,6 +13,233 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-26 — The test board is redrawn, and the road stops being one width.**
+
+At the owner's instruction: the map was *"too linear and boring"* — a winding
+route with real turns, chokepoints at 40–50% width, a wide arena, islands the
+path curves around, obvious tower zones, colour and light to guide attention, a
+final gauntlet where enemies accelerate, and a crossing that does not feel like
+a trudge.
+
+**Most of that is not a data change, because a route could not do any of it.**
+A route was a polyline and nothing else: one road width in `js/game.js`, one
+speed off the enemy type. So the first half of this is a mechanism.
+
+**A ROUTE MAY NOW DECLARE WHAT THE ROAD DOES ALONG ITS LENGTH.** Two profiles,
+`width` and `pace`, authored as anchor lists over fractions of the route's own
+length and ramped linearly between. Everything that reads the road reads them,
+and each rule still has exactly one copy:
+
+- `buildClearanceOn` is half of however wide the road is *here* plus the
+  footprint — the same derivation `buildClearancePx` always made. **This is the
+  whole point of a chokepoint**: the road pulls its edge in, the clearance ring
+  comes with it, and a gun stands closer. Measured on the new board: 18.8 px
+  from the centre line at the wire gate, 27.1 on open road, 45.3 in the basin,
+  which through the Rifleman's own reach is 196.7 / 193.1 / 179.5 u.l. of road
+  covered. A plaza is a real cost and a gate is a real reward, and both fall out
+  of one derived rule rather than a bonus.
+- `GamePath.ribbon` resamples the route with a per-point half-width, and the 3D
+  mesh, the 2D board, the map card and the height field all build from it.
+- The mitre that offsets a polyline is now **one function** (`roadEdges`, in
+  `js/path.js`) shared by both renderers. It was already in `GLGeometry.road`;
+  a second copy in the 2D pass would have drifted and the road's corners would
+  be one shape on the board and another on the card.
+- `Enemy.positionAt` scales the lane offset by the local width, so a wave falls
+  into single file through a gate and spreads across a plaza. Measured on the
+  lead body of wave 1: 2.4 px off the centre line at the wire gate, 7.4 in the
+  basin.
+- `currentSpeedUlps` multiplies by the local pace — the same shape of fact as a
+  type's `sprint`, on the other side of the same seam: `sprint` belongs to the
+  TYPE, pace belongs to the ROUTE. Multiplied, not substituted, so a slow still
+  halves it.
+
+**GRACE IS A CLOCK, and length was only ever a proxy for it.** `Maps.analyse`
+scored a route's grace off its length, which stops being honest the moment the
+road hurries bodies along one stretch and holds them on another.
+`Maps.walkSeconds` integrates the reciprocal of the pace instead. On the six
+boards that declare no profile it is the same division by the same arithmetic —
+a board's published score is not the place to move a last decimal for nothing.
+
+**ABSENCE IS EXACT.** A route with no profile gets 1 from both lookups through a
+null check, gets its **own points array back** from `ribbon` (identity, not a
+copy), and takes the original five strokes in the 2D pass. All six other boards
+are provably untouched, and a test walks all six and pins it rather than trusting
+the reasoning.
+
+**THE BOARD ITSELF.** Eleven legs, nine turns, 731° of turning against the old
+route's six right angles and 540°. In order: the muster yard just inside the
+gate (1.90), the notch on the descent (0.68), the crossing narrowed onto the
+bridge (0.90), two switchbacks 190 and 170 units apart around two islands, the
+basin around the top corner (2.95) and the wire gate into the final gauntlet
+(0.62, pace 1.55). Wide before tight, every time: the yard before the notch, the
+mire before the bridge, the basin before the gate.
+
+*It is longer and it takes less time.* 2 451 u.l. against 2 154 — fourteen per
+cent more road — crossed in 39.8 s against 43.1, because the stretches where
+nothing happens are walked quickly and the ones where something does are not.
+Divided rather than walked this route would take 49.0 s. It scores **0.78
+against the old 0.79**: as hard as what it replaced, with good spots covering
+276.3 u.l. against 260.2.
+
+*Four raised decks are the tower zones*, placed rather than scattered — the west
+spur, the relay island inside the first switchback (ninety units from the lane
+going out and ninety from the lane coming back, both inside a Rifleman's 100),
+the knoll, and the camp deck. **Nothing stands on any of them:** props draw at
+floor height whatever they are standing over, so a prop on a deck sinks into it,
+and a deck is where the guns go. Energy nodes mark the corners instead. A
+validator swept every prop and every deck against the road and the river's
+no-build column; ten props and three decks moved before it came back clean.
+
+**THE ROAD WAS INVISIBLE AND THAT WAS THE REAL FIX.** Black asphalt on black
+dirt has no value contrast left to be seen by. The first build of the new route
+rendered as a bare board — the width profile was working perfectly and could not
+be seen at all. A theme may now declare `roadGlow`, which lays two emissive
+lines along the kerbs; with them the notch, the basin and the wire gate read
+from the opening camera. Paid for once on the way: **both strips were wound
+inside-out**, so with `CULL_FACE/BACK` on they were culled on every frame and
+the road had no lights and nothing anywhere said why.
+
+*And the second colour.* `accent2` on this board was a bone grey, which on a
+floor where everything is within a few stops of everything else is not a colour,
+it is a lighter version of the same one. The board now argues in two lights: the
+camp is an ember (barrels, watchtower lamp, the relay consoles they took over,
+the arch at the base) and the buried facility is cold cyan (cable cores, sensor
+masts, deck-corner nodes, the leaks in the ground). Cyan props declare `accent`
+per prop — one draw call per colour, and the only way a prop owns its own light.
+
+*Three ground colours instead of one.* New zone kinds `plate` (cracked floor
+panel) and `flux` (ground the plant is leaking into) join `dirt`, all at height
+0 — a patch, never a slab, because `levelUnder` refuses a footprint that
+straddles a slab edge and a puddle built as a platform is an invisible no-build
+ring.
+
+*Two new scenery kinds.* `conduit`, a buried cable run laid parallel to the road
+— the only prop in the game whose job is to point *along* something — and
+`gate`, an arch that straddles the road at both ends of the route. **`gate` had
+been declared three times by Twin Confluence since it was written and had no
+case in the scenery switch at all**; every one of them was rendering as the
+default block.
+
+The river moved to x 420 and is still crossed exactly once, on the long straight
+after the notch. That test no longer names `points[2]` and `points[3]` by number
+— it *finds* the crossing and pins that there is only one, which is the thing
+that actually matters and does not have to be edited every time a leg moves.
+
+Suite: content 222 → 225. Three added, self-tested by four mutations.
+
+**2026-08-26 — The forest board gets a river under a bridge, a grave at the
+spawn, and a watchtower you could actually put somebody on.**
+
+At the owner's instruction: *"in the test map, between the second and third
+turn, add a small bridge that passes over a running river, the river should run
+off the map dropping into the void. for the spawn, also make it look like the
+enemies are coming out of a casket in the ground, adding some purpleish
+lighting. remove teh stool on top of the sniper tower, allowing it to have
+troops."*
+
+**The route is untouched.** Six right-angle turns, 2 154 u.l., still measures
+0.79. Everything below is scenery and terrain; `Maps.analyse` reads none of it.
+
+**THE RIVER IS THE FIRST TERRAIN IN THIS GAME THAT IS NOT FLAT**, and the first
+geometry anywhere that goes below the floor. It runs north–south, the road
+crosses it exactly once — on the straight between the second and third turn,
+which is the leg the player watches every wave walk down — and it leaves the
+board over the near edge.
+
+*The floor is one quad, so a river needs a hole in it.* `GLGeometry.river` builds
+a channel that goes below z 0 and none of it is visible under a lid, so the
+ground and every ground PATCH painted on it are now laid in two pieces around
+the river's band. The band edge is a number **shared** between the two files
+rather than matched: an approximation shows as a strip of void down the whole
+run. Pinned by a test, because nothing at run time compares them.
+
+*The height field writes the channel flat and BEFORE the road.* Every other
+stamp in `buildHeightField` is "highest wins", which is right for a slab laid on
+a floor and exactly wrong for a hole cut through one — a bed at −34 loses that
+contest to bare floor at 0 and the water never appears under anything standing
+near it. Writing it first leaves the road's own stamp to win across the
+crossing. Measured on the live board: 41 of 41 samples of an enemy on the
+crossing report ground height 7, which is `ROAD_LIFT` and identical to the road
+either side.
+
+*"You cannot build in the river" had to be its own rule.* The rest of
+`levelUnder` refuses a footprint that STRADDLES two levels, and a channel wide
+enough to swallow a whole footprint passes that perfectly — the bed is as flat
+as any deck. It is still a tower standing in running water twenty-five units
+under the board. Verified live: open floor either side buildable, both banks and
+the water and the bridge refused.
+
+**Three numbers were wrong on the first pass and all three were settled by
+reading the framebuffer, not by looking.**
+
+*The waterfall came out brown.* Authored a cold grey-green and measured
+(124,86,70) — a warm brown that read as a timber ramp. Emission in this shader
+is `uGlowTint * vEmi`, ONE tint for the whole board pass, and on this board that
+tint is the camp's ember: every emissive vertex in the channel, whatever colour
+it was painted, was adding orange light. Water does not glow anyway. Nothing in
+the channel emits now and all of its contrast is diffuse.
+
+*The channel read as a stripe painted on the floor.* The banks were the floor's
+own `terrainEdge` and measured (33,33,28) against a (34,34,29) floor — one value
+apart. And a bench at 0.42 of the depth under a 34-wide bank is an eighteen-
+degree slope, which from the game's own camera is flat. It now has a real value
+ladder and a waterline BELOW the bench, so there is always a strip of dry wall
+between the dirt and the water — that strip is the only thing in the picture
+that says the water is down in something. Measured across the finished channel:
+floor 31 → bank 21 → wall 16 → water (30,39,47) → wall 18 → bank 23 → floor 31.
+
+*Most of the fall was under the build bar.* It dropped `depth * 5.5 + 90` — 277
+units — and a probe down the sheet found everything past about a third of the
+way projecting to screen y > 720. A fall the player can watch END reads as water
+going into nothing; a fall that leaves the bottom of the screen reads as one
+that was cut off. It is `depth * 1.8 + 55` now and finishes in frame.
+
+**THE SPAWN IS A GRAVE.** The route's first point is off the west edge and
+bodies simply existed there and walked in out of nothing. There is now a stone
+casket sunk in the dirt just west of it, lid dragged half off, four leaning
+markers and a violet light coming out of the gap.
+
+*A prop that owns its own LIGHT needs its own draw call.* `accent: "r,g,b"` on a
+model was the obvious first move and it is only half the answer: it changes the
+prop's vertex colour, and emission is one tint per draw, so the casket's diffuse
+went violet while every lit surface on it kept adding ember. Props that declare
+`accent` are now split out of the board mesh into `accentMeshes`, grouped by
+colour, and drawn straight after it under their own tint. The casket is the only
+user in the game, and the violet is the point precisely because it is not the
+camp's ember.
+
+*And light on the ground is painted in the GROUND's colour.* The stain discs
+were painted `accent` and driven at emission 0.045, and the outer edge still
+measured (206,117,245): a violet surface lit normally IS bright violet, and what
+was on the dirt was a hard-edged magenta ellipse the size of the spawn. They
+take the floor's colour now and the violet arrives entirely through the emissive
+channel, over six steps instead of three — which is also the only version that
+dims correctly when the board's fog thickens over it. Measured on the finished
+spawn: 10 950 violet pixels, 9 032 of them between brightness 40 and 80 (the
+wash on black dirt) and 693 above 140 (the mouth, the marker tips, the wisps).
+
+**THE WATCHTOWER'S LAMP WAS A STOOL.** It was a squat lit cone dead centre on
+the platform — on a tower whose entire job is to have somebody standing on it.
+It hangs on a corner post now, where it lights the approach instead of the shins
+of whoever is up there, and the tower gained a ladder. Same light, same
+only-lit-thing-in-the-forest; it is just not in the way.
+
+Nine props moved off the water. Scenery is never validated against terrain, so a
+tenth added later would be a dead stem growing out of a river bed with every
+suite green — hence the clearance test.
+
+**One thing this does NOT do:** the casket is invisible on the map card and in
+the 2D fallback, because it stands at x −82 and the 2D board only covers
+0..1280. That is not a regression — the route's own first point is at −60 and
+has always been off-canvas — but it does mean the grave reads in the 3D board
+only. The river and the bridge are on the card.
+
+`tests/content.test.js` 219 → 222. All three are self-tested, and the third one
+FAILED its self-test first: the deck check originally looked only at the height
+band the OLD lamp occupied, so putting the current lamp back on the axis left it
+above the window and the test stayed green through exactly the regression it
+exists to catch. Widened to the whole standing volume, it now measures 0.000.
+
 **2026-08-26 — A seventh map, `test`: a dead forest on black dirt, with fog,
 and a human camp dug in at the end of the road.**
 

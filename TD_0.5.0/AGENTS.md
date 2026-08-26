@@ -126,7 +126,7 @@ baseline:
 
 ```
 node tests/run.js                 133 pass / 0 fail   core game and schedule
-node tests/content.test.js        217 pass / 0 fail   content, visuals and index
+node tests/content.test.js        225 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js  72 pass / 0 fail   the Longshot spec
 node tests/beam.test.js            45 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
@@ -393,15 +393,20 @@ index.html          loads the scripts in order; order matters. Since
                      the sandbox stops being a truthful preview of the game
 js/units.js         UNIT_LENGTH + ul(): u.l. -> pixels (must load first)
 js/path.js          GamePath: polyline, length, sampling, distance queries,
-                     and tangentAt (the road's heading, for lane offsets)
+                     tangentAt (the road's heading, for lane offsets), the
+                     WIDTH and PACE profiles, and `roadEdges` -- the one copy
+                     of the mitre both renderers offset the road with
 js/targeting.js     WHICH enemy to shoot: the six modes, TowerScore, and
                      Targeting.sees (the camo/flying rules for flat towers:
                      gunner, smasher, Soldier and its recruits)
 js/maps.js          five authored maps plus two deterministic generated maps;
-                     multi-route normalization, derived difficulty, and themed
-                     non-gameplay environments -- six sci-fi facilities and one
-                     wild board (dead forest, fog, a human camp)
-js/enemy.js         Enemy: the twenty-one-type roster, movement, lane offsets,
+                     multi-route normalization, ROUTE PROFILES (a road that
+                     changes width and pace along its length), derived
+                     difficulty, and themed non-gameplay environments -- six
+                     sci-fi facilities and one wild board (a dead relay in a
+                     forest: fog, a river, a human camp)
+js/enemy.js         Enemy: the twenty-one-type roster, movement, lane offsets
+                     (scaled by the road's own width),
                      health, armor/defense, camo, flight, per-type sprite size,
                      timed slows, hover hit test, damage reporting
 js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces)
@@ -3746,12 +3751,36 @@ guide. All of this is **background only**. None of it is read by `Maps.analyse`,
 through the same authored-pixel scale as the road, so a UNIT_LENGTH retune
 cannot pull scenery away from its map.
 
-**`test` is the one board that is not a facility** (2026-08-26). A dead forest
-on black dirt: bare leaning stems banked around the edges, stumps, fallen logs
-and bramble inside the route's pockets, and a human camp — barricades, crossed
-stakes, sandbag courses, a watchtower, a burnt-out car, wire fence and two fire
-barrels — built along the inside of the last two legs of the road. Its theme
-carries **two keys no other map sets**, and both are opt-in so the other six
+**`test` is the one board that is not a facility, and the one whose road is not
+one width** (2026-08-26). A dead relay station on black dirt, with the forest
+grown over it: bare leaning stems banked around the edges, stumps, fallen logs
+and bramble in the route's pockets, a buried plant still lit in cold cyan, and a
+human camp — barricades, crossed stakes, sandbag courses, a watchtower, a
+burnt-out car, wire fence and fire barrels — built along the inside of the last
+two legs of the road. A river runs north–south at x 420, crossed once by a
+timber bridge on the long straight after the notch and spilling off the near
+edge of the board into the void; the road's first point is a stone casket sunk
+in the dirt under a lit arch, and its last is a second arch at the base.
+
+**The route is eleven legs and reads as six decisions**, in order: the muster
+yard just inside the gate (road at 1.90), the notch on the descent (0.68), the
+crossing narrowed onto the bridge (0.90), two switchbacks 190 and 170 units
+apart around two islands, the basin around the top corner (2.95) and the wire
+gate into the final gauntlet (0.62, and the pace profile at 1.55). 2 451 u.l.,
+crossed in 39.8 s, scored 0.78 — as hard as the straight-legged route it
+replaced (0.79) and three seconds quicker across, on fourteen per cent more
+road.
+
+**Four raised decks are the tower zones**, and they are placed rather than
+scattered: the west spur over the entry and the notch, the relay island inside
+the first switchback (ninety units from the lane going out and ninety from the
+lane coming back — both inside a Rifleman's 100), the knoll between the basin
+and the switchback below it, and the camp deck over the wire gate and the run
+in. **Nothing stands on any of them**: props are drawn at floor height whatever
+they are standing over, so a prop on a deck sinks into it, and a deck is where
+the player's guns go. They are marked with energy nodes at the corners instead.
+
+Its theme carries **four keys no other map sets**, all opt-in so the other six
 render byte-identically without them:
 
 - `wild: true` turns off the two things that say *manufactured floor* — the
@@ -3763,17 +3792,151 @@ render byte-identically without them:
   painted mist in the 2D pass, so the card and the battlefield agree. Density 0
   — every other map — is the state `GLRenderer.begin` restores, so no board and
   no preview can inherit another's weather.
+- `roadGlow: "r,g,b"` lays two emissive lines along the road's kerbs in the 3D
+  board (`GLGeometry.road`). It exists because **black asphalt on black dirt has
+  no value contrast left to be seen by**: before it, the route on this board was
+  invisible from the opening camera and the width profile below could not be
+  read at all. A facility with a lit floor grid needs none of it, and undefined
+  means the road is the three quads per segment it has always been.
+- `accent2` is a real second colour here rather than a near-white highlight.
+  The board's argument is two lights and two owners: the camp is an ember
+  (barrels, the watchtower lamp, the relay consoles they took over, the arch at
+  the base) and the buried facility is cold cyan (cable cores, sensor masts,
+  the nodes at the deck corners, the leaks in the ground). Cyan props declare
+  `accent` per prop, which costs one draw call per colour and is the only way a
+  prop owns its own light.
 
-It also introduces the zone kind **`dirt`, whose height is 0 and means a PATCH,
-not a platform**: a different ground colour painted at the floor's own height.
-Every other zone kind is a raised slab, and `World3D.levelUnder` refuses a tower
-that straddles a slab edge — so bare earth built as a slab would be an invisible
-no-build ring in open ground. A patch stamps no height and cannot move a build
-spot.
+It also introduces three zone kinds **whose height is 0 and which mean a PATCH,
+not a platform**: `dirt` (bare earth), `plate` (cracked floor panel, milled and
+seamed) and `flux` (ground the buried plant is leaking into, painted in
+`accent2`). Every other zone kind is a raised slab, and `World3D.levelUnder`
+refuses a tower that straddles a slab edge — so bare earth built as a slab would
+be an invisible no-build ring in open ground. A patch stamps no height and
+cannot move a build spot.
+
+And two scenery kinds: **`conduit`**, a buried cable run laid parallel to the
+road, which is the only prop in the game whose job is to point *along*
+something; and **`gate`**, an arch that straddles the road. `gate` was already
+declared three times by Twin Confluence and had no case in the scenery switch
+at all — every one of them rendered as the default block.
+
+**The river (2026-08-26) is the only terrain in the game that is not flat, and
+the only geometry anywhere that goes below the floor.** A board declares it as
+`river: { x, width, banks, depth, spill, water, foam }` beside its zones; six of
+the seven declare none and `map.river` is `null` for them. Four facts about it
+are load-bearing:
+
+- **The band is a shared number.** `GLGeometry.river` puts the channel's outer
+  lip at `width/2 + banks` either side of `x`, and `World3D.buildMapMesh` opens
+  the floor at *exactly* that offset — the floor is one quad and the ground
+  patches are painted on it, so both are laid in two pieces around the band.
+  Nothing at run time checks the two agree; when they do not the board shows a
+  strip of void down the whole run. Pinned by a test.
+- **The height field writes the channel FLAT and BEFORE the road.** Every other
+  stamp is "highest wins", which is right for a slab on a floor and wrong for a
+  hole through one — a bed at −34 loses that contest to bare floor at 0. Writing
+  it first leaves the road's own stamp to win across the crossing, so a body on
+  the bridge stands on the bridge.
+- **"You cannot build in the river" is its own rule**, not a consequence of the
+  height field. A channel wide enough to swallow a whole footprint passes the
+  straddle test perfectly: the bed is as flat as any deck. `levelUnder` refuses
+  the band outright.
+- **Scenery is never validated against terrain.** Nine props had to move off the
+  strip when the river landed, and a tenth added later would be a dead stem
+  growing out of a river bed with every suite green. A test pins the clearance.
+
+The **`spill`** end (`"min"` or `"max"` in y) is where the water leaves the
+board and falls into the void. `"min"` is the NEAR edge under the default
+camera, which is the only one where the fall is seen face-on rather than from
+behind. The fall's length is chosen so it FINISHES inside the frame — a sheet
+that leaves the bottom of the screen reads as cut off, not as water going into
+nothing.
+
+**A prop may own its own light, and exactly one does.** `accent: "r,g,b"` on a
+model overrides the board's accent for that prop. It needs a **separate draw
+call**, not just a different vertex colour: emission in the shader is
+`uGlowTint * vEmi` — one tint per draw — so the whole board pass emits in the
+map's accent and a violet-painted prop would still add orange light. Props that
+declare `accent` are split out of the board mesh into `accentMeshes`, grouped by
+colour, and drawn immediately after it under their own tint. The forest's
+`casket` at the route's first point is the only user: its violet is the point
+precisely because it is not the camp's ember.
+
+And the matching trap, paid for twice: **light falling on the ground is painted
+in the GROUND's colour and carried entirely by emission.** Painting the stain
+discs `accent` and driving them at emission 0.045 still measured (206,117,245) —
+a violet surface lit normally *is* bright violet, and what was on the dirt was a
+hard-edged magenta ellipse rather than light.
 
 `Maps.routesOf` normalizes every map to route definitions. Authored single-route
 maps may keep `points`; generated maps use `routes`. The runtime owns `paths`
 plus a primary-route compatibility alias `path`.
+
+### A route may declare what the road DOES along its length (2026-08-26)
+
+A route was a polyline and nothing else, and every property of the road was a
+global: one width in `js/game.js`, one speed off the enemy type. A **profile** is
+the other half — a property that varies *along* the route, authored per map. Two
+exist, deliberately the same shape so that a third is a data change and not a
+mechanism:
+
+| key | what it multiplies | authored as |
+| --- | --- | --- |
+| `width` | `ROAD_WIDTH_UL` | `[{ at, scale }, …]` |
+| `pace` | how fast a body walks that stretch | `[{ at, scale }, …]` |
+
+`at` is a **fraction of the route's own length**, not a pixel and not a point
+index. Pixels would need re-authoring every time a leg moved; indices could not
+put a chokepoint halfway along a straight, which is where chokepoints belong.
+The value ramps linearly between anchors and holds outside the ends, so a flat
+road is one anchor. Both live on the route (`Maps.profileOf`), because a
+two-entrance board could narrow one road and not the other.
+
+**Everything that reads the road reads the profile, and there is one copy of
+each rule:**
+
+- **Placement.** `buildClearanceOn(path, progress, type)` is half of however
+  wide the road is *here*, plus the tower's footprint — the same derivation
+  `buildClearancePx` always made, with the local half-width in place of the
+  nominal one. This is why a chokepoint is worth something: the road pulls its
+  edge in, the clearance ring comes with it, and a gun stands closer. A plaza
+  does the opposite. Neither is a bonus bolted on. It asks
+  `maxWidthScaleNear`, not the width at one distance, because the nearest point
+  of the centreline is not always where the road is widest.
+- **Both renderers.** `GamePath.ribbon` resamples the route with a per-point
+  half-width and **both** the 3D mesh and the 2D pass build from it, so a
+  chokepoint cannot be in one and not the other. The mitre that offsets a
+  polyline is `roadEdges` in `js/path.js` — **one copy**, shared, because two
+  would drift and the road's corners would be one shape on the board and
+  another on the card. A road that changes width cannot be *stroked*
+  (`lineWidth` is one number per path), so the 2D pass fills outlines instead;
+  an unprofiled route still takes the original five strokes.
+- **The height field.** Stamped off the ribbon, so the surface a body stands on
+  is the surface that was built.
+- **The column.** `Enemy.positionAt` scales the lane offset by the local width.
+  An offset authored against the nominal road would put half a wave in the ditch
+  either side of a gate — the queue would not read as squeezing through, it
+  would read as walking past.
+- **Speed.** `currentSpeedUlps` multiplies by `paceScaleAt` at the end. Same
+  shape of fact as a type's `sprint` and the other side of the same seam:
+  `sprint` is a property of the TYPE, pace is a property of the ROUTE.
+  Multiplied, not substituted, so a tower's slow still applies.
+- **The measurement.** `Maps.analyse` offsets its candidate spots by the local
+  clearance (at the nominal one, every candidate beside a plaza is refused and
+  the widest stretch of the route contributes nothing), and grace comes off the
+  crossing clock.
+
+**Profiles are opt-in and absence is exact, not approximate.** A route that
+declares neither gets `1` from both lookups through a null check, gets its **own
+points array back** from `ribbon` — identity, not a copy — and the same divide
+and the same grace it always had. Six of the seven boards declare nothing and are
+provably untouched; a test walks all six and pins it.
+
+Two bounds on the numbers, and neither is taste. **Narrow:** a body is 22 px
+across and the nominal road is 22.75, so below about 0.55 the road is no longer
+a road. **Wide:** clearance grows with the road, so a plaza pushes every tower
+off it — the forest's basin at 2.95 costs about 15 u.l. of covered road against
+open road, which is the point of a plaza and is meant to be a cost.
 
 Twin Confluence has two entrances and one shared endpoint. Each fixed schedule
 beat is mirrored onto both routes and advances the wave cursor once, so it has
@@ -3786,8 +3949,18 @@ road the reference Rifleman standing there could actually shoot — using the ga
 clearance rule, so it can never count a spot the player is not allowed to use.
 Score is `(coverageRatio² × graceRatio × routeCount)^⅓`, where coverage is the straight-road
 yardstick over what the map's good spots actually offer, and grace is the
-reference length over this route's length. 1.00 is "as hard as a plain
-straight road". The analysis is cached on the map object, not recomputed.
+reference length over this route's **crossing time × base speed**. 1.00 is "as
+hard as a plain straight road". The analysis is cached on the map object, not
+recomputed.
+
+**Grace is a clock, and length was only ever a proxy for it.** The term exists
+because a longer route gives the economy more time before the first leak lands,
+so on a route that declares a pace profile the honest measure is how long the
+crossing actually takes — `Maps.walkSeconds` integrates the reciprocal of the
+pace along the route rather than dividing by a speed the road no longer has. On
+the six boards that declare none this is the same division it always was, and
+deliberately by the same arithmetic: a board's published score is not the place
+to move a last decimal for nothing.
 
 Two findings from that measurement are worth not re-deriving: **turn count
 barely matters** (a corner helps the tower on the inside and hurts the one on
@@ -6854,7 +7027,7 @@ no mechanic was moved to match the description.
 | Rendered sheet cache version | `ASSET_VERSION = 14` | js/skins/draw-pack.js |
 | Measured rendered `contentTop` | Normal .8438; Swarm .6875; Brute .6937; Hive .5750 (shield-safe); Sniper base .7695, A3 .7539, A4 .5547, A5 .5625, B3 .7383, B4 .6406, B5 .5938 | js/skins/draw-pack.js; printed by tools/blender/td_scene.py |
 | Path length | ~1865 u.l. on the reference route | `Maps.referenceLengthUl()` (derived, not declared) |
-| Maps | 7: five authored (including the forest board `test`) plus fixed-seed Shifting Ley and two-route Twin Confluence | `Maps.LIST`, `Maps.DEFAULT_ID`, `Maps.routesOf` |
+| Maps | 7: five authored (including the forest board `test`, the only one whose road changes width) plus fixed-seed Shifting Ley and two-route Twin Confluence | `Maps.LIST`, `Maps.DEFAULT_ID`, `Maps.routesOf`, `Maps.profileOf` |
 | Map chooser grid | up to 6 routes: 3 columns at 372x240. Past 6: 4 columns, card width fitted to the viewport and height derived from it at 16:9 | `mapGrid`, `mapCardRect` in game.js |
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |

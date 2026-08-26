@@ -172,7 +172,21 @@ Maps.LIST = [
 // while making the runtime structurally multi-route.
 Maps.routesOf = function (map) {
   if (map.routes && map.routes.length) return map.routes;
-  return [{ id: "main", points: map.points }];
+  // `width` and `pace` ride along with the points because they are properties
+  // of THE ROUTE, not of the map: a two-entrance board could narrow one road
+  // and not the other. An authored single-route map declares them at the top
+  // level for the same reason it declares `points` there.
+  return [{ id: "main", points: map.points,
+            width: map.width || null, pace: map.pace || null }];
+};
+
+// What the road DOES along this route, in the shape GamePath takes, or null
+// when it does nothing -- which is six of the seven boards. One function, so
+// the three places that build a GamePath cannot disagree about where a
+// profile lives. See the profile block at the bottom of js/path.js.
+Maps.profileOf = function (route) {
+  if (!route || (!route.width && !route.pace)) return null;
+  return { width: route.width || null, pace: route.pace || null };
 };
 
 Maps.primaryPoints = function (map) {
@@ -316,39 +330,145 @@ Maps.LIST.push(Maps.Generator.generate({
   ]
 }));
 
-// THE ONE BOARD THAT IS NOT A FACILITY.
+// THE ONE BOARD THAT IS NOT A FACILITY, and the only one whose ROAD is not one
+// width the whole way.
 //
 // Authored, not generated, and pushed here rather than written into the LIST
 // literal above so the four original routes stay together as the set the
 // difficulty measure was calibrated against.
 //
-// The route walks in from the treeline on the left, switchbacks twice through
-// the forest and turns down the last straight INTO the camp -- so the barricades
-// on the right are the last thing between the road and the base, which is what
-// they are for. Nothing about the scenery is read by the measurement: the camp
-// is a picture, and the route would score the same drawn across bare floor.
+// WHAT THE ROUTE DOES, in order, because every one of these is a place the
+// player has to make a different decision:
+//
+//   the gate      bodies walk out of a lit arch and into a MUSTER YARD -- the
+//                 road at nearly twice width, open ground, nothing to shoot
+//                 from close. A wide space before a tight one, so the wave is
+//                 visible as a crowd before it is a queue.
+//   the notch     the descent, squeezed to two thirds of a road (0.68) between
+//                 the west mound and the mire. The road pulls its edges in, so
+//                 a tower may stand CLOSER here than anywhere before it.
+//   the crossing  the mire opens out again, then narrows onto the bridge --
+//                 the one place the river may be crossed, and a second queue.
+//   the switchbacks  two U-turns around two islands, 190 and 170 units apart.
+//                 This is where towers double their work: one gun in the
+//                 middle of a fold covers the lane going out and the lane
+//                 coming back.
+//   the basin     the road opens to nearly three times width around the top
+//                 corner. A wave stops being a column here and spreads, which
+//                 is what a boss needs and what a Rifleman on the rim hates:
+//                 the tarmac pushes every tower back off it.
+//   the wire gate the tightest thing on the board (0.62) and the start of the
+//                 FINAL GAUNTLET -- the last fifth of the route, where the
+//                 pace profile puts bodies at half again their speed and the
+//                 camp is the only thing left between them and the base.
+//
+// Nothing about the scenery is read by the measurement: the camp is a picture,
+// and the route would score the same drawn across bare floor.
 Maps.LIST.push({
   id: "test",
   name: "Test",
-  blurb: ["Black dirt and dead stems. The fog",
-          "stops at the camp's barricades."],
+  blurb: ["A dead relay on black dirt. Gate,",
+          "notch, crossing, basin, wire."],
   decorations: [
-    { kind: "bones", x: 250, y: 545, size: 22, color: "173,166,149" },
-    { kind: "husk", x: 620, y: 148, size: 26, color: "86,82,66" },
-    { kind: "bones", x: 878, y: 302, size: 18, color: "173,166,149" },
-    { kind: "husk", x: 150, y: 430, size: 30, color: "86,82,66" },
+    { kind: "bones", x: 250, y: 640, size: 22, color: "173,166,149" },
+    { kind: "husk", x: 620, y: 92, size: 26, color: "86,82,66" },
+    { kind: "crystal", x: 905, y: 108, size: 20, color: "120,214,255" },
+    { kind: "husk", x: 120, y: 470, size: 30, color: "86,82,66" },
     { kind: "bones", x: 1122, y: 662, size: 20, color: "173,166,149" },
-    { kind: "husk", x: 1012, y: 132, size: 24, color: "86,82,66" }
+    { kind: "motes", x: 596, y: 425, size: 30, color: "120,214,255" },
+    { kind: "motes", x: 232, y: 300, size: 26, color: "120,214,255" },
+    { kind: "crystal", x: 1012, y: 622, size: 18, color: "120,214,255" }
+  ],
+  // THE ROAD'S WIDTH, ALONG THE ROAD. Anchors are fractions of the route's own
+  // length and the value ramps between them -- see the profile block at the
+  // bottom of js/path.js, and `buildClearanceOn` in js/game.js for what it
+  // does to placement.
+  //
+  // The numbers are bounded by the game at both ends and neither bound is
+  // taste:
+  //
+  //   NARROW. A body is 22 px across (Enemy.RADIUS_PX) and the nominal road is
+  //   22.75. 0.62 is 14.1 px, so the wire gate is narrower than the things
+  //   going through it and every one of them overhangs the kerb -- which is the
+  //   picture that stretch is for, and is the same overhang AGENTS.md already
+  //   accepts on open road at full lane spread. Below about 0.55 the road stops
+  //   reading as a road at all.
+  //
+  //   WIDE. A Rifleman reaches 100 u.l. and must stand clear of the tarmac, so
+  //   the basin at 2.95 (67.1 px of road) puts a gun 45.3 px off the centre
+  //   line against 27.1 on this board's open road and 18.8 at the wire gate.
+  //   Through the reference tower's own reach that is 179.5 u.l. of road
+  //   covered in the basin, 193.1 on open road and 196.7 at the gate -- so a
+  //   plaza is a real cost and a chokepoint is a real reward, both of them
+  //   falling out of one derived placement rule rather than a bonus.
+  //
+  // Measured off Maps.analyse for the whole board: good spots cover 276.3 u.l.
+  // against 260.2 for the straight-legged route this replaced, and the score
+  // lands at 0.78 against 0.79. The board is as hard as it was; what changed is
+  // what the player is looking at and what they have to decide.
+  width: [
+    { at: 0.000, scale: 1.10 },   // the gate mouth
+    { at: 0.030, scale: 1.90 },   // THE MUSTER YARD
+    { at: 0.075, scale: 1.90 },
+    { at: 0.110, scale: 1.35 },   // open road, this board's own normal
+    { at: 0.125, scale: 0.68 },   // THE NOTCH
+    { at: 0.160, scale: 0.68 },
+    { at: 0.185, scale: 1.35 },
+    { at: 0.225, scale: 1.60 },   // the mire, a breath before the crossing
+    { at: 0.255, scale: 1.60 },
+    { at: 0.280, scale: 0.90 },   // THE BRIDGE
+    { at: 0.305, scale: 0.90 },
+    { at: 0.340, scale: 1.35 },
+    { at: 0.470, scale: 1.35 },
+    { at: 0.520, scale: 1.15 },   // held in around the switchbacks
+    { at: 0.580, scale: 1.15 },
+    { at: 0.640, scale: 2.95 },   // THE BASIN
+    { at: 0.760, scale: 2.95 },
+    { at: 0.800, scale: 1.35 },
+    { at: 0.835, scale: 0.62 },   // THE WIRE GATE
+    { at: 0.870, scale: 0.62 },
+    { at: 0.900, scale: 1.00 },   // the run in to the base
+    { at: 1.000, scale: 1.00 }
+  ],
+  // AND HOW FAST THE ROAD IS WALKED. Same shape, same anchors, and it exists
+  // because of a complaint about the old route rather than for its own sake:
+  // six right angles at one speed took 43.1 s to cross and read as a trudge.
+  //
+  // This route is LONGER -- 2 451 u.l. against 2 154 -- and is crossed in
+  // 39.8 s, because the stretches where nothing is happening are walked
+  // quickly and the ones where something is are not. Measured through
+  // Maps.walkSeconds, which integrates this profile rather than dividing by a
+  // speed the road no longer has.
+  //
+  // 1.55 over the last fifth is the FINAL GAUNTLET, and it is the one number
+  // here that is a mechanic rather than a pace: a body that clears the wire
+  // gate is at half again its speed with the camp still to run, so the towers
+  // that were comfortable at the basin get a third less time each.
+  pace: [
+    { at: 0.000, scale: 1.00 },   // out of the gate, still shambling
+    { at: 0.060, scale: 1.35 },
+    { at: 0.185, scale: 1.35 },
+    { at: 0.240, scale: 1.10 },   // the crossing is walked, not run
+    { at: 0.330, scale: 1.35 },
+    { at: 0.480, scale: 1.35 },
+    { at: 0.560, scale: 0.95 },   // the basin holds them
+    { at: 0.780, scale: 0.95 },
+    { at: 0.830, scale: 1.75 },   // THE GAUNTLET
+    { at: 1.000, scale: 1.75 }
   ],
   points: [
-    { x: -60,  y: 175 },
-    { x: 300,  y: 175 },
-    { x: 300,  y: 470 },
-    { x: 690,  y: 470 },
-    { x: 690,  y: 235 },
-    { x: 960,  y: 235 },
-    { x: 960,  y: 545 },
-    { x: 1340, y: 545 }
+    { x: -60,  y: 190 },
+    { x: 180,  y: 190 },
+    { x: 180,  y: 410 },
+    { x: 300,  y: 520 },
+    { x: 660,  y: 520 },
+    { x: 660,  y: 330 },
+    { x: 510,  y: 330 },
+    { x: 510,  y: 160 },
+    { x: 830,  y: 160 },
+    { x: 830,  y: 380 },
+    { x: 1040, y: 380 },
+    { x: 1340, y: 440 }
   ]
 });
 
@@ -538,16 +658,40 @@ Maps.ENVIRONMENTS = {
   // stand out of it, which is the whole picture the board is after.
   "test": {
     theme: {
-      background: "#0a0b09", floor: "#1a1913", panel: "#2f2a1c",
+      background: "#0a0b09", floor: "#1a1913", panel: "#3a3527",
       // A HAIR DARKER THAN THE FLOOR, DELIBERATELY. `panelDark` is what the
       // bare-earth patches are painted in, and at the first value it was six
       // stops under the floor -- which on a board with no seams and no grid
       // did not read as ground at all, it read as three rectangular PITS cut
       // into the forest. Ground variation is the effect; a hole is not.
       panelDark: "#171610", panelLine: "64,60,46", accent: "255,138,52",
-      accent2: "198,206,180", metal: "#4a4336", metalDark: "#1c1812",
-      roadOuter: "#100f0b", roadInner: "#332c1f",
-      roadEdge: "104,94,68", roadCenter: "142,130,96",
+      // THE SECOND COLOUR ON THE BOARD, and it is not a second brown.
+      //
+      // `accent2` was a bone grey and did nothing: on a board whose floor,
+      // panels, metal and road are all within a few stops of each other, a
+      // near-white highlight is not a colour, it is a lighter version of the
+      // same one. Cyan is what the buried facility is lit in -- the cable
+      // cores, the sensor masts, the nodes at the deck corners -- so the board
+      // now has an ember (the camp, warm, alive) and a cyan (the plant, cold,
+      // running with nobody left to run it), which is a picture rather than a
+      // palette.
+      accent2: "120,214,255", metal: "#4a4336", metalDark: "#1c1812",
+      // THE ROAD IS THE DARKEST SURFACE ON THE BOARD AND ITS MARKINGS ARE THE
+      // COLDEST. Both halves are deliberate: the enemy's ground is black
+      // asphalt against dirt and lighter milled decks, so "where do they walk"
+      // and "where may I build" are answered by value before anything else,
+      // and the kerb line and centre dashes are cyan because the plant marked
+      // its own service road and nobody has repainted it.
+      roadOuter: "#100f0b", roadInner: "#2a2519",
+      roadEdge: "120,170,178", roadCenter: "150,214,228",
+      // AND THE ONE KEY NO OTHER BOARD SETS. Black asphalt on black dirt has
+      // no value contrast left to be seen by, which on the board that most
+      // needs its route read is the wrong place to be austere. `roadGlow` puts
+      // two emissive lines along the kerbs in the 3D board (GLGeometry.road) --
+      // the plant's own service lighting, still running, and the only thing
+      // that makes the notch, the basin and the wire gate legible from the
+      // opening camera.
+      roadGlow: "96,178,196",
       wild: true,
       // MEASURED OFF THE FRAMEBUFFER, not guessed. The first pass ran at
       // 0.00048 and the board came back at (41,43,37) against a (43,46,39)
@@ -558,25 +702,124 @@ Maps.ENVIRONMENTS = {
       // see, over dirt that stays black.
       fog: { color: "#2b2e27", density: 0.00019, height: 52 }
     },
-    // Three of these are PATCHES, not platforms -- bare earth and standing
-    // water scraped through the leaf litter, at the floor's own height, so
-    // they can never turn into a no-build ring. See ZONE_HEIGHT in
-    // js/gl/gl-world.js for why that distinction had to be built.
-    // The other two are the camp: an earth bank thrown up short of the road
-    // and a plank floor inside the wire.
+    // THE RIVER, and it is the only terrain in the game that is not flat.
+    //
+    // It runs north-south across the board and the road crosses it ONCE, on
+    // the long straight after the notch -- which is the whole reason the
+    // crossing is worth building: a bridge on a corner is a bridge nobody
+    // looks at, and a bridge on the long straight is the thing the player
+    // watches every wave walk over. The width profile narrows the road onto
+    // the bridge deck, so the crossing is a chokepoint as well as a picture.
+    //
+    // ITS COLUMN IS A NO-BUILD STRIP THE FULL HEIGHT OF THE BOARD, which is
+    // the reason the route was drawn where it was: at x 359..481 nothing may
+    // stand, so the road crosses it square, the decks stand clear of it either
+    // side, and the switchbacks fold east of it where there is ground to build
+    // on.
+    //
+    // `banks` is the earth cut on EACH side of the water, so the band the
+    // floor has to open for is width/2 + banks either side of `x`: 359..481.
+    // Nothing may stand in that strip -- see the props that were moved off it
+    // when this landed -- and `js/gl/gl-world.js` refuses a tower there
+    // outright rather than letting one stand flat on the bed.
+    //
+    // `spill: "min"` is the low-y edge, which under the default camera is the
+    // NEAR one: the water runs toward the viewer and goes over the edge of the
+    // board into the void, in full view, rather than off the far side where
+    // all you would see is it stopping.
+    //
+    // The two colours are authored here for the reason every other colour on
+    // this board is: the theme's one saturated note is an ember and water is
+    // not an ember. Cold, desaturated, and only a few stops off the black
+    // dirt -- the contrast is in VALUE, which is this board's whole rule.
+    river: {
+      x: 420, width: 78, banks: 22, depth: 34,
+      spill: "min", water: "#18222a", foam: "#63777c"
+    },
+    // THE GROUND, IN FOUR COLOURS, and every one of them is FLAT.
+    //
+    // A slab has a rim, `World3D.levelUnder` refuses a footprint that straddles
+    // one, and a patch of mud built as a slab is an invisible no-build ring in
+    // open ground -- so `dirt`, `plate` and `flux` all stamp zero height (see
+    // ZONE_HEIGHT in js/gl/gl-world.js). They are paint, and they are here
+    // because a board asked to stop being monochrome cannot answer with one
+    // more shade of the same brown:
+    //
+    //   dirt   bare earth scraped through the litter, the floor's own shadow.
+    //   plate  cracked floor panel, all that is left of the buildings that
+    //          stood here. Milled, seamed, and lighter than the dirt.
+    //   flux   ground the buried plant is still leaking into. The board's ONE
+    //          saturated colour, weak, on the ground rather than in the air.
+    //
+    // THE FOUR DECKS ARE THE OTHER THING ENTIRELY, and they are gameplay
+    // furniture rather than paint: raised, rimmed, unmistakable from above, and
+    // placed exactly where a tower does the most work. A player who builds on
+    // the four of them and nowhere else has covered every leg of this route,
+    // and two of them (the island and the knoll) reach two lanes at once
+    // because the switchbacks fold the road back past them.
+    //
+    //   the west spur    215,225   the entry straight, the first corner and
+    //                              the notch, all from one pocket.
+    //   the relay island 505,360   inside the first switchback. Ninety units
+    //                              from the crossing straight and ninety from
+    //                              the lane coming back -- both inside a
+    //                              Rifleman's 100.
+    //   the knoll        540,215   between the basin and the switchback below
+    //                              it, and in reach of the climb as well.
+    //   the camp deck    870,440   the wire gate and the whole run to the base.
+    //
+    // Nothing stands ON any of the four. Props are drawn at floor height
+    // whatever they are standing over, so a prop on a deck sinks into it --
+    // and a deck is where the player's guns go, which is the last place that
+    // wants scenery in the way. They are marked at the corners instead.
     zones: [
-      { kind: "dirt", x: 330, y: 205, w: 300, h: 200 },
-      { kind: "dirt", x: 60, y: 250, w: 200, h: 230 },
-      { kind: "dirt", x: 700, y: 270, w: 230, h: 240 },
-      { kind: "bay", x: 1000, y: 610, w: 250, h: 80 },
-      { kind: "deck", x: 1100, y: 428, w: 150, h: 62 }
+      { kind: "deck", x: 215, y: 225, w: 130, h: 150 },
+      { kind: "deck", x: 505, y: 360, w: 130, h: 130 },
+      { kind: "deck", x: 540, y: 215, w: 175, h: 85 },
+      { kind: "deck", x: 870, y: 440, w: 180, h: 115 },
+      { kind: "bay", x: 1100, y: 470, w: 175, h: 105 },
+
+      { kind: "plate", x: 900, y: 190, w: 160, h: 140 },
+      { kind: "plate", x: 1080, y: 610, w: 190, h: 90 },
+      { kind: "plate", x: 205, y: 40, w: 145, h: 95 },
+      { kind: "dirt", x: 40, y: 250, w: 120, h: 130 },
+      { kind: "dirt", x: 200, y: 560, w: 150, h: 120 },
+      { kind: "dirt", x: 690, y: 590, w: 210, h: 105 },
+      { kind: "flux", x: 500, y: 545, w: 200, h: 110 },
+      { kind: "flux", x: 30, y: 430, w: 130, h: 95 },
+      { kind: "flux", x: 640, y: 40, w: 150, h: 75 }
     ],
-    // THE TREELINE IS THE FRAME AND THE CAMP IS THE SUBJECT. Full-height stems
-    // are banked along the top, the left edge and the bottom, where they can
-    // never stand between the camera and a tower; everything inside the route's
-    // pockets is knee-high -- stumps, fallen logs, dead bramble -- because
-    // those pockets are where the player builds and a tree in one would hide
-    // the thing it was hiding behind.
+    // THE TREELINE IS THE FRAME, THE ROAD IS THE SUBJECT, AND THE RELAY IS WHAT
+    // THE FOREST GREW OVER.
+    //
+    // Full-height stems are banked along the top, the left edge and the bottom,
+    // where they can never stand between the camera and a tower. Everything
+    // inside the route's pockets is knee-high, or it is machinery.
+    //
+    // THE MACHINERY IS THE HALF OF THIS BOARD THAT IS NEW, and it is authored
+    // by what it points at rather than by where there was a gap:
+    //
+    //   conduit  a buried cable run with its core showing, laid PARALLEL to the
+    //            road. It is the only prop on the board whose job is to point
+    //            along something -- five of them walk the eye from the gate to
+    //            the base, and where the road turns, the run turns with it.
+    //   pylon    an energy node. Two stand at the corners of every deck, which
+    //            is how a tower zone announces itself from above.
+    //   antenna  a sensor array, on the high ground looking over the basin and
+    //            the crossing.
+    //   holo /
+    //   console  the relay itself: what the facility was for, in the board's
+    //            own ember, because the camp took these over and runs them.
+    //   gate     the two ends of the route (see below).
+    //
+    // COLOUR IS THE ARGUMENT AND IT HAS EXACTLY TWO SIDES. The board's theme
+    // accent is an ember and everything the CAMP owns burns in it -- the
+    // watchtower lamp, the barrels, the relay consoles they took over, the
+    // gate they will run back through. Everything the FACILITY owns is cold
+    // cyan and declares `accent` per prop, which costs one extra draw call per
+    // colour and is the only way a prop can own its own light (see
+    // `accentMeshes`, js/gl/gl-world.js). Two lights, two owners, on a floor
+    // that is neither.
     models: [
       // THE TREELINE, and half of it stands OUTSIDE the 1280x720 play area.
       // The 3D board is built 120 units proud of the view on every side (see
@@ -585,13 +828,13 @@ Maps.ENVIRONMENTS = {
       // or a build spot, because none of those can be there. It is the one
       // place a forest can actually be DENSE.
       { kind: "tree", x: -70, y: -40, size: 50, rotation: 1.1 },
-      { kind: "tree", x: -60, y: 150, size: 44, rotation: 3.4 },
+      { kind: "tree", x: -118, y: 92, size: 44, rotation: 3.4 },
       { kind: "tree", x: -75, y: 330, size: 48, rotation: 0.2 },
       { kind: "tree", x: -55, y: 520, size: 42, rotation: 2.6 },
       { kind: "tree", x: -70, y: 700, size: 46, rotation: 4.7 },
       { kind: "tree", x: 120, y: -60, size: 43, rotation: 2.1 },
       { kind: "tree", x: 320, y: -55, size: 47, rotation: 0.8 },
-      { kind: "tree", x: 520, y: -70, size: 41, rotation: 3.7 },
+      { kind: "tree", x: 610, y: -70, size: 41, rotation: 3.7 },
       { kind: "tree", x: 720, y: -50, size: 45, rotation: 1.4 },
       { kind: "tree", x: 920, y: -65, size: 49, rotation: 5.1 },
       { kind: "tree", x: 1120, y: -55, size: 42, rotation: 2.3 },
@@ -599,64 +842,150 @@ Maps.ENVIRONMENTS = {
       { kind: "tree", x: 1345, y: 140, size: 44, rotation: 3.1 },
       { kind: "tree", x: 1350, y: 690, size: 45, rotation: 1.8 },
       { kind: "tree", x: 210, y: 760, size: 44, rotation: 4.2 },
-      { kind: "tree", x: 430, y: 775, size: 48, rotation: 0.9 },
+      { kind: "tree", x: 300, y: 778, size: 48, rotation: 0.9 },
       { kind: "tree", x: 650, y: 765, size: 42, rotation: 2.5 },
       { kind: "tree", x: 880, y: 780, size: 46, rotation: 5.3 },
       { kind: "tree", x: 1120, y: 770, size: 43, rotation: 1.0 },
 
+      // The stems that stand on the board itself, in the pockets the route and
+      // the decks leave. None of them is in the river's cut and none is on the
+      // tarmac; both are pinned by tests, because scenery is never validated
+      // against terrain at run time.
       { kind: "tree", x: 55, y: 70, size: 46, rotation: 0.3 },
-      { kind: "tree", x: 140, y: 45, size: 38, rotation: 1.9 },
-      { kind: "tree", x: 215, y: 100, size: 42, rotation: 3.2 },
-      { kind: "tree", x: 380, y: 60, size: 48, rotation: 0.7 },
-      { kind: "tree", x: 455, y: 110, size: 36, rotation: 2.4 },
-      { kind: "tree", x: 545, y: 55, size: 44, rotation: 4.1 },
-      { kind: "tree", x: 640, y: 105, size: 40, rotation: 1.2 },
-      { kind: "tree", x: 735, y: 60, size: 46, rotation: 5.0 },
-      { kind: "tree", x: 830, y: 110, size: 38, rotation: 2.8 },
-      { kind: "tree", x: 925, y: 55, size: 43, rotation: 0.4 },
-      { kind: "tree", x: 1030, y: 105, size: 45, rotation: 3.6 },
-      { kind: "tree", x: 1130, y: 50, size: 39, rotation: 1.5 },
-      { kind: "tree", x: 1235, y: 100, size: 47, rotation: 4.8 },
-      { kind: "tree", x: 45, y: 262, size: 40, rotation: 2.2 },
-      { kind: "tree", x: 62, y: 382, size: 44, rotation: 0.9 },
-      { kind: "tree", x: 40, y: 502, size: 37, rotation: 3.9 },
-      { kind: "tree", x: 110, y: 612, size: 46, rotation: 1.6 },
-      { kind: "tree", x: 205, y: 560, size: 41, rotation: 5.2 },
-      { kind: "tree", x: 300, y: 662, size: 43, rotation: 0.6 },
-      { kind: "tree", x: 420, y: 620, size: 38, rotation: 2.7 },
-      { kind: "tree", x: 530, y: 670, size: 45, rotation: 4.3 },
-      { kind: "tree", x: 650, y: 615, size: 40, rotation: 1.1 },
-      { kind: "tree", x: 762, y: 665, size: 42, rotation: 3.3 },
-      { kind: "tree", x: 872, y: 620, size: 39, rotation: 5.5 },
-      { kind: "snag", x: 410, y: 300, size: 34, rotation: 0.5 },
-      { kind: "snag", x: 600, y: 380, size: 30, rotation: 2.0 },
-      { kind: "snag", x: 175, y: 168, size: 32, rotation: 4.4 },
-      { kind: "stump", x: 500, y: 250, size: 26, rotation: 1.0 },
-      { kind: "stump", x: 820, y: 420, size: 24, rotation: 3.0 },
-      { kind: "stump", x: 620, y: 520, size: 25, rotation: 0.2 },
-      { kind: "log", x: 350, y: 560, size: 34, rotation: 0.4 },
-      { kind: "log", x: 890, y: 640, size: 32, rotation: 2.2 },
-      { kind: "log", x: 128, y: 470, size: 30, rotation: 1.4 },
-      { kind: "brush", x: 480, y: 420, size: 26, rotation: 1.3 },
-      { kind: "brush", x: 758, y: 322, size: 24, rotation: 0.8 },
-      { kind: "brush", x: 170, y: 300, size: 28, rotation: 2.9 },
-      { kind: "brush", x: 1000, y: 662, size: 26, rotation: 1.7 },
+      { kind: "tree", x: 140, y: 118, size: 38, rotation: 1.9 },
+      { kind: "tree", x: 262, y: 152, size: 40, rotation: 3.2 },
+      { kind: "tree", x: 330, y: 62, size: 44, rotation: 0.7 },
+      { kind: "tree", x: 330, y: 200, size: 36, rotation: 2.4 },
+      { kind: "tree", x: 545, y: 62, size: 42, rotation: 4.1 },
+      { kind: "tree", x: 620, y: 108, size: 34, rotation: 1.2 },
+      { kind: "tree", x: 745, y: 58, size: 46, rotation: 5.0 },
+      { kind: "tree", x: 880, y: 62, size: 38, rotation: 2.8 },
+      { kind: "tree", x: 1010, y: 55, size: 43, rotation: 0.4 },
+      { kind: "tree", x: 1150, y: 96, size: 45, rotation: 3.6 },
+      { kind: "tree", x: 1258, y: 42, size: 39, rotation: 1.5 },
+      { kind: "tree", x: 1236, y: 168, size: 41, rotation: 4.8 },
+      { kind: "tree", x: 42, y: 232, size: 40, rotation: 2.2 },
+      { kind: "tree", x: 30, y: 392, size: 44, rotation: 0.9 },
+      { kind: "tree", x: 45, y: 552, size: 37, rotation: 3.9 },
+      { kind: "tree", x: 122, y: 622, size: 46, rotation: 1.6 },
+      { kind: "tree", x: 232, y: 700, size: 41, rotation: 5.2 },
+      { kind: "tree", x: 330, y: 620, size: 43, rotation: 0.6 },
+      { kind: "tree", x: 520, y: 690, size: 38, rotation: 2.7 },
+      { kind: "tree", x: 626, y: 672, size: 45, rotation: 4.3 },
+      { kind: "tree", x: 762, y: 700, size: 40, rotation: 1.1 },
+      { kind: "tree", x: 900, y: 672, size: 42, rotation: 3.3 },
+      { kind: "tree", x: 1042, y: 690, size: 39, rotation: 5.5 },
+      { kind: "tree", x: 1300, y: 620, size: 44, rotation: 2.0 },
+      { kind: "tree", x: 940, y: 240, size: 36, rotation: 1.3 },
 
-      // The camp. It is built along the INSIDE of the last two legs of the
-      // road, so every wall faces something that is coming.
-      { kind: "barricade", x: 1010, y: 340, size: 44, rotation: Math.PI / 2 },
-      { kind: "barricade", x: 1010, y: 452, size: 44, rotation: Math.PI / 2 },
-      { kind: "barricade", x: 1150, y: 602, size: 42, rotation: 0 },
-      { kind: "spikes", x: 1002, y: 252, size: 38, rotation: Math.PI / 2 },
-      { kind: "spikes", x: 1292, y: 600, size: 36, rotation: 0 },
-      { kind: "sandbags", x: 1082, y: 505, size: 40, rotation: 0 },
-      { kind: "sandbags", x: 1232, y: 505, size: 40, rotation: 0 },
-      { kind: "fence", x: 1120, y: 250, size: 44, rotation: 0 },
-      { kind: "fence", x: 1252, y: 250, size: 44, rotation: 0 },
-      { kind: "wreck", x: 1180, y: 302, size: 46, rotation: 0.5 },
-      { kind: "watchtower", x: 1150, y: 392, size: 52, rotation: 0.3 },
-      { kind: "barrel", x: 1075, y: 445, size: 30, rotation: 0 },
-      { kind: "barrel", x: 1265, y: 378, size: 28, rotation: 0 }
+      // Knee-high, inside the pockets the player builds in.
+      { kind: "snag", x: 250, y: 530, size: 32, rotation: 4.4 },
+      { kind: "snag", x: 742, y: 236, size: 30, rotation: 2.0 },
+      { kind: "snag", x: 700, y: 452, size: 28, rotation: 0.5 },
+      { kind: "stump", x: 118, y: 300, size: 26, rotation: 1.0 },
+      { kind: "stump", x: 706, y: 552, size: 24, rotation: 3.0 },
+      { kind: "stump", x: 990, y: 620, size: 25, rotation: 0.2 },
+      { kind: "log", x: 168, y: 495, size: 32, rotation: 0.4 },
+      { kind: "log", x: 862, y: 618, size: 32, rotation: 2.2 },
+      { kind: "log", x: 118, y: 462, size: 28, rotation: 1.4 },
+      { kind: "brush", x: 268, y: 402, size: 24, rotation: 1.3 },
+      { kind: "brush", x: 726, y: 268, size: 24, rotation: 0.8 },
+      { kind: "brush", x: 96, y: 148, size: 26, rotation: 2.9 },
+      { kind: "brush", x: 1090, y: 650, size: 26, rotation: 1.7 },
+      // THE BANKS. Dead stems lean over a cut like this because the water took
+      // the ground out from under them, so the props nearest the channel are
+      // the only ones on the board placed for a REASON rather than a rhythm.
+      { kind: "log", x: 340, y: 592, size: 30, rotation: 1.35 },
+      { kind: "brush", x: 146, y: 352, size: 22, rotation: 2.6 },
+      { kind: "snag", x: 496, y: 618, size: 27, rotation: 1.7 },
+      { kind: "brush", x: 498, y: 128, size: 22, rotation: 0.5 },
+
+      // THE CROSSING, on the long straight between the notch and the
+      // switchbacks. Its `size` is the SPAN divided by 1.5 (see gl-geometry's
+      // bridge case) and the abutments sit at 0.47 of the span, so 105 reaches
+      // x 386..534 -- outside the 399..521 cut at both ends, landing on solid
+      // bank. That is the one measurement on this prop that is not taste.
+      { kind: "bridge", x: 420, y: 520, size: 105, rotation: 0 },
+
+      // THE TWO ENDS OF THE ROAD.
+      //
+      // The gate at the spawn stands over the road with the casket behind it,
+      // and both burn violet -- the one light on this board that belongs to
+      // neither the camp nor the facility. `accent` is the per-prop override
+      // (js/gl/gl-world.js); the violet is here precisely because it is not
+      // the camp's ember and does not belong in this forest.
+      //
+      // The gate at the base is the same prop in the camp's own ember, turned
+      // to stand across the last leg. Two arches, at the two ends, doing
+      // opposite jobs: bodies come out of one and must never reach the other.
+      { kind: "casket", x: -82, y: 190, size: 60, rotation: 0,
+        accent: "168,96,236" },
+      { kind: "gate", x: -22, y: 190, size: 58, rotation: 0,
+        accent: "168,96,236" },
+      { kind: "gate", x: 1300, y: 432, size: 58, rotation: 0.197 },
+
+      // THE CABLE RUNS. Laid along the road, turning where it turns, so the
+      // board's own lighting walks the player from the gate to the base.
+      { kind: "conduit", x: 62, y: 228, size: 58, rotation: 0,
+        accent: "88,214,255" },
+      { kind: "conduit", x: 248, y: 556, size: 52, rotation: 0,
+        accent: "88,214,255" },
+      { kind: "conduit", x: 578, y: 566, size: 58, rotation: 0,
+        accent: "88,214,255" },
+      { kind: "conduit", x: 762, y: 250, size: 48, rotation: 1.5708,
+        accent: "88,214,255" },
+      { kind: "conduit", x: 952, y: 322, size: 54, rotation: 0,
+        accent: "88,214,255" },
+
+      // ENERGY NODES AT THE DECK CORNERS. Two per deck, diagonally opposite,
+      // so the platform reads as a marked-out position from directly above and
+      // still has a lit edge from a tilted camera.
+      { kind: "pylon", x: 206, y: 388, size: 32, accent: "88,214,255" },
+      { kind: "battery", x: 346, y: 214, size: 26, accent: "88,214,255" },
+      { kind: "pylon", x: 494, y: 350, size: 30, accent: "88,214,255" },
+      { kind: "battery", x: 498, y: 486, size: 24, accent: "88,214,255" },
+      { kind: "pylon", x: 548, y: 308, size: 28, accent: "88,214,255" },
+      { kind: "battery", x: 726, y: 206, size: 24, accent: "88,214,255" },
+      { kind: "pylon", x: 860, y: 566, size: 32, accent: "88,214,255" },
+      { kind: "battery", x: 1060, y: 430, size: 26, accent: "88,214,255" },
+
+      // SENSOR ARRAYS, on the ground that overlooks the three places a wave
+      // bunches up: the crossing, the basin and the wire gate.
+      { kind: "antenna", x: 250, y: 96, size: 42, rotation: -0.25,
+        accent: "88,214,255" },
+      { kind: "antenna", x: 966, y: 128, size: 44, rotation: 0.3,
+        accent: "88,214,255" },
+      { kind: "antenna", x: 636, y: 620, size: 40, rotation: -0.4,
+        accent: "88,214,255" },
+      { kind: "server", x: 1006, y: 258, size: 36, rotation: 0.1,
+        accent: "88,214,255" },
+      { kind: "coil", x: 76, y: 470, size: 34, rotation: 0.2,
+        accent: "88,214,255" },
+      { kind: "battery", x: 690, y: 92, size: 30, accent: "88,214,255" },
+
+      // THE RELAY THE CAMP TOOK OVER. Ember, not cyan: these are the ones
+      // somebody is still running.
+      { kind: "holo", x: 756, y: 462, size: 40, rotation: -0.1 },
+      { kind: "console", x: 1152, y: 342, size: 36, rotation: 0.12 },
+      { kind: "vent", x: 92, y: 596, size: 36, rotation: 0 },
+
+      // THE CAMP, built along the inside of the last two legs of the road, so
+      // every wall faces something that is coming. It starts at the wire gate
+      // -- the tightest point on the board -- and everything behind it is the
+      // final gauntlet.
+      { kind: "barricade", x: 902, y: 338, size: 42, rotation: 0 },
+      { kind: "barricade", x: 998, y: 338, size: 42, rotation: 0 },
+      { kind: "barricade", x: 1148, y: 604, size: 42, rotation: 0 },
+      { kind: "spikes", x: 940, y: 300, size: 36, rotation: 0 },
+      { kind: "spikes", x: 1284, y: 508, size: 36, rotation: 0.197 },
+      { kind: "sandbags", x: 884, y: 596, size: 38, rotation: 0 },
+      { kind: "sandbags", x: 1226, y: 604, size: 38, rotation: 0 },
+      { kind: "fence", x: 1076, y: 336, size: 44, rotation: 0 },
+      { kind: "fence", x: 1208, y: 340, size: 44, rotation: 0 },
+      { kind: "wreck", x: 796, y: 596, size: 44, rotation: 0.5 },
+      { kind: "watchtower", x: 1082, y: 546, size: 52, rotation: 0.3 },
+      { kind: "barrel", x: 1068, y: 472, size: 28, rotation: 0 },
+      { kind: "barrel", x: 1256, y: 386, size: 26, rotation: 0 }
     ]
   }
 };
@@ -671,6 +1000,9 @@ for (var environmentIndex = 0; environmentIndex < Maps.LIST.length;
   environmentMap.theme = environment.theme;
   environmentMap.zones = environment.zones;
   environmentMap.models = environment.models;
+  // Optional, and absent on six of the seven boards. `drawEnvironment` and the
+  // 3D mesh both test for it rather than assuming one.
+  environmentMap.river = environment.river || null;
 }
 
 Maps.DEFAULT_ID = "rune-circuit";
@@ -926,6 +1258,21 @@ function themeRgba(theme, key, alpha) {
   return "rgba(" + theme[key] + "," + alpha.toFixed(3) + ")";
 }
 
+// A theme hex, darkened. The board's palettes are authored as the surfaces they
+// name -- floor, panel, metal -- and none of them names "the same earth, in
+// shadow", which is what the inside of a cut is. Multiplying the one it IS is
+// honest and keeps every board's river the colour of that board's ground.
+function shadeHex(hex, factor) {
+  var text = String(hex).replace("#", "");
+  if (text.length === 3) {
+    text = text[0] + text[0] + text[1] + text[1] + text[2] + text[2];
+  }
+  var n = parseInt(text, 16);
+  function c(v) { return Math.max(0, Math.min(255, Math.round(v * factor))); }
+  return "rgb(" + c((n >> 16) & 255) + "," + c((n >> 8) & 255) + "," +
+    c(n & 255) + ")";
+}
+
 function polygon(ctx, points) {
   ctx.beginPath();
   ctx.moveTo(points[0][0], points[0][1]);
@@ -960,6 +1307,43 @@ function drawZone(ctx, zone, theme) {
     ctx.strokeStyle = themeRgba(theme, "panelLine", 0.22);
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, zone.w - 1, zone.h - 1);
+    ctx.restore();
+    return;
+  }
+
+  // THE OTHER TWO PATCHES, and they are patches for the same hard reason
+  // `dirt` is: a slab has a rim, `World3D.levelUnder` refuses a footprint that
+  // straddles one, and a puddle built as a slab is an invisible no-build ring
+  // in the middle of open ground. Ground COLOUR is the whole effect here, so
+  // none of the three stamps any height.
+  //
+  //   plate  a cracked floor panel left where a facility stood. Painted in the
+  //          board's `panel` and split by seams, which is what says milled.
+  //   flux   ground the buried plant is still leaking into. The accent, weak,
+  //          because it is a stain and not a light source.
+  if (zone.kind === "plate" || zone.kind === "flux") {
+    ctx.fillStyle = zone.kind === "plate"
+      ? theme.panel : themeRgba(theme, "accent", 0.10);
+    ctx.fillRect(0, 0, zone.w, zone.h);
+    ctx.strokeStyle = zone.kind === "plate"
+      ? themeRgba(theme, "panelLine", 0.5)
+      : themeRgba(theme, "accent", 0.28);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, zone.w - 1, zone.h - 1);
+    // A plate is CRACKED, so its seams run all the way across it; a flux patch
+    // has no seams at all and is drawn as a second, brighter pool inside the
+    // first so it reads as soaking outward rather than as a painted rectangle.
+    if (zone.kind === "plate") {
+      for (var seamX = 34; seamX < zone.w; seamX += 34) {
+        ctx.beginPath();
+        ctx.moveTo(seamX, 0);
+        ctx.lineTo(seamX - 6, zone.h);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = themeRgba(theme, "accent", 0.14);
+      ctx.fillRect(zone.w * 0.18, zone.h * 0.2, zone.w * 0.64, zone.h * 0.6);
+    }
     ctx.restore();
     return;
   }
@@ -1011,6 +1395,82 @@ function drawZone(ctx, zone, theme) {
   ctx.restore();
 }
 
+// THE RIVER, SEEN FROM ABOVE.
+//
+// The 3D board cuts a real channel and pours it off the edge of the world
+// (GLGeometry.river). None of that is available here and none of it is faked:
+// from straight down a river is two bank strips, a stripe of water and the
+// places the surface breaks over the bed. What this DOES have to agree with is
+// where the water is, because `drawMapThumbnail` renders the map card through
+// this same function -- a river the card does not show is a river the player
+// meets for the first time in the run.
+//
+// Drawn after the zones and before the props, which is the same order the mesh
+// is built in: the channel cuts THROUGH the ground patches, and the bridge is
+// a prop that has to land on top of it.
+function drawRiver(ctx, river, theme, height) {
+  var half = river.width / 2;
+  var x0 = river.x - half - river.banks;
+  var x1 = river.x + half + river.banks;
+  var top = river.spill === "max" ? height : 0;
+  var lip = river.spill === "max" ? -1 : 1;   // into the board, from the lip
+
+  // THE CUT, AS A VALUE LADDER: bank, then wall, then water. The first pass
+  // filled the whole band in `metalDark` and measured (28,24,18) against a
+  // (27,27,20) floor -- one value apart, which from above is not a river bank,
+  // it is a stripe of the same dirt. The 3D board carries the identical ladder
+  // and for the identical reason: the eye reads depth as darkness.
+  ctx.fillStyle = shadeHex(theme.floor, 0.55);
+  ctx.fillRect(x0, -30, x1 - x0, height + 60);
+  ctx.fillStyle = shadeHex(theme.metalDark, 0.5);
+  ctx.fillRect(river.x - half, -30, half * 2, height + 60);
+  ctx.fillStyle = river.water;
+  ctx.fillRect(river.x - half * 0.88, -30, half * 1.76, height + 60);
+  ctx.strokeStyle = themeRgba(theme, "panelLine", 0.30);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(river.x - half * 0.88, -30);
+  ctx.lineTo(river.x - half * 0.88, height + 30);
+  ctx.moveTo(river.x + half * 0.88, -30);
+  ctx.lineTo(river.x + half * 0.88, height + 30);
+  ctx.stroke();
+
+  // Riffles. Deterministic, and the only reason a flat stripe reads as moving.
+  ctx.strokeStyle = river.foam;
+  ctx.lineWidth = 1.6;
+  for (var y = 30; y < height - 30; y += 74) {
+    var w = half * (0.30 + ((y * 37) % 41) / 41 * 0.44);
+    var c = river.x + (((y * 53) % 29) / 29 - 0.5) * half * 0.5;
+    ctx.globalAlpha = 0.42;
+    ctx.beginPath();
+    ctx.moveTo(c - w, y);
+    ctx.lineTo(c + w, y + 2.5);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // AND THE EDGE OF THE BOARD. In 3D the water leans out and falls; from above
+  // there is nothing to fall INTO, so what the top-down view can honestly show
+  // is the water reaching the last of the ground and the void past it.
+  //
+  // PULLED INSIDE THE CANVAS. Drawn at the true board edge the whole thing sat
+  // at y = 0 and above, where a map card has no pixels: the river simply ran
+  // off the top and the one moment the 3D board is built around -- the water
+  // leaving the world -- was the one thing the card did not show. Eight pixels
+  // in is a lie of eight pixels and buys the entire read.
+  var edge = top + lip * 8;
+  ctx.fillStyle = theme.background;
+  ctx.fillRect(x0 - 2, edge - lip * 38, x1 - x0 + 4, 38);
+  ctx.strokeStyle = river.foam;
+  ctx.lineWidth = 2.4;
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  ctx.moveTo(river.x - half * 0.9, edge);
+  ctx.lineTo(river.x + half * 0.9, edge);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
 function drawMachineShadow(ctx, size) {
   ctx.beginPath();
   ctx.ellipse(size * 0.1, size * 0.26, size * 0.82, size * 0.45,
@@ -1022,6 +1482,18 @@ function drawMachineShadow(ctx, size) {
 function drawModel(ctx, model, theme) {
   var size = model.size;
   var i;
+
+  // ONE PROP MAY OWN ITS OWN LIGHT. `accent` on a model overrides the board's
+  // accent for that prop and nothing else about it -- see the 3D side in
+  // js/gl/gl-world.js, where it costs a separate draw call because emission is
+  // one tint per call. Here it costs a shadowed theme, which is cheaper and
+  // has to exist anyway: a card that paints the spawn gate in the camp's ember
+  // while the board paints it violet breaks the promise that the preview is
+  // the map, on the one prop whose whole point is its colour.
+  if (model.accent) {
+    theme = Object.create(theme);
+    theme.accent = model.accent;
+  }
 
   ctx.save();
   ctx.translate(model.x, model.y);
@@ -1262,6 +1734,23 @@ function drawModel(ctx, model, theme) {
   // build any of them. From this angle a dead stem is a trunk and the shadow
   // of its limbs, and a barricade is a row of boards: no elevation is visible,
   // so nothing here tries to imply one.
+  } else if (model.kind === "conduit") {
+    // A cable run, from above: three sections of dark sheath with the core
+    // showing in the breaks between them. Drawn along the prop's own x axis,
+    // like the 3D one, so a run authored parallel to the road is parallel to
+    // the road on the card too.
+    for (i = -1; i <= 1; i++) {
+      ctx.fillStyle = theme.metalDark;
+      ctx.fillRect(i * size * 0.62 - size * 0.25, -size * 0.1,
+        size * 0.5, size * 0.2);
+    }
+    ctx.strokeStyle = themeRgba(theme, "accent", 0.85);
+    ctx.lineWidth = size * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.93, 0);
+    ctx.lineTo(size * 0.93, 0);
+    ctx.stroke();
+
   } else if (model.kind === "tree" || model.kind === "snag") {
     var stem = model.kind === "tree" ? 1 : 0.66;
     ctx.strokeStyle = themeRgba(theme, "panelLine", 0.5);
@@ -1372,11 +1861,25 @@ function drawModel(ctx, model, theme) {
     ctx.lineTo(-size * 0.42, size * 0.42);
     ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
     ctx.stroke();
-    // The lamp, and the only lit thing in the forest.
+    // THE LAMP IS ON A CORNER POST, not in the middle of the deck. It stood
+    // dead centre until 2026-08-26 and read as a stool bolted to the platform
+    // -- on a tower whose whole job is to have somebody standing on it. Same
+    // light, same only-lit-thing-in-the-forest; it is just not in the way any
+    // more. The 3D build makes the identical move.
     ctx.beginPath();
-    ctx.arc(0, 0, size * 0.13, 0, Math.PI * 2);
+    ctx.arc(-size * 0.3, -size * 0.3, size * 0.1, 0, Math.PI * 2);
     ctx.fillStyle = themeRgba(theme, "accent", 0.95);
     ctx.fill();
+    // The ladder, on the opposite corner.
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.75);
+    ctx.lineWidth = 1.4;
+    for (i = 0; i < 4; i++) {
+      var rung = size * (0.16 + i * 0.09);
+      ctx.beginPath();
+      ctx.moveTo(rung, size * 0.2);
+      ctx.lineTo(rung * 0.86, size * 0.42);
+      ctx.stroke();
+    }
   } else if (model.kind === "wreck") {
     ctx.fillStyle = theme.metalDark;
     ctx.fillRect(-size * 0.6, -size * 0.3, size * 1.2, size * 0.6);
@@ -1393,6 +1896,85 @@ function drawModel(ctx, model, theme) {
       ctx.fillStyle = theme.metalDark;
       ctx.fill();
       ctx.stroke();
+    }
+  } else if (model.kind === "bridge") {
+    // From above a bridge is planks and two rails, and the rails are what say
+    // "bridge" rather than "wide bit of road" -- so they are the strongest
+    // line here even though in 3D they are the thinnest thing on it.
+    var span = size * 1.5;
+    var deck = size * 0.17;
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(-span / 2, -deck, span, deck * 2);
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+    ctx.lineWidth = 1.4;
+    for (i = 0; i < 13; i++) {
+      var plank = -span / 2 + span * i / 12;
+      ctx.beginPath();
+      ctx.moveTo(plank, -deck);
+      ctx.lineTo(plank, deck);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = theme.metal;
+    ctx.lineWidth = 2.6;
+    for (i = -1; i <= 1; i += 2) {
+      ctx.beginPath();
+      ctx.moveTo(-span * 0.47, deck * 0.94 * i);
+      ctx.lineTo(span * 0.47, deck * 0.94 * i);
+      ctx.stroke();
+    }
+    // The abutments, where the timber comes back down onto the bank.
+    ctx.fillStyle = theme.metalDark;
+    for (i = -1; i <= 1; i += 2) {
+      ctx.fillRect(span * 0.47 * i - size * 0.07, -deck * 1.15,
+        size * 0.14, deck * 2.3);
+    }
+  } else if (model.kind === "casket") {
+    // The grave, and the light in it. `model.accent` is the one per-prop
+    // colour override in the game -- see the prop in ENVIRONMENTS.test -- and
+    // this board's own accent is deliberately NOT what lights this.
+    var glow = model.accent || theme.accent;
+    var boxL = size * 1.15, boxW = size * 0.62;
+    var spill = ctx.createRadialGradient(0, 0, size * 0.2, 0, 0, size * 1.55);
+    if (spill) {
+      spill.addColorStop(0, "rgba(" + glow + ",0.34)");
+      spill.addColorStop(1, "rgba(" + glow + ",0)");
+      ctx.fillStyle = spill;
+    } else {
+      ctx.fillStyle = "rgba(" + glow + ",0.14)";
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.55, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = theme.panel;
+    ctx.fillRect(-boxL / 2, -boxW / 2, boxL, boxW);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.strokeRect(-boxL / 2, -boxW / 2, boxL, boxW);
+    // The mouth, and the violet standing in it.
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(-boxL / 2 + size * 0.2, -boxW / 2 + size * 0.2,
+      boxL - size * 0.4, boxW - size * 0.4);
+    ctx.fillStyle = "rgba(" + glow + ",0.92)";
+    ctx.fillRect(-boxL / 2 + size * 0.26, -boxW / 2 + size * 0.26,
+      boxL - size * 0.52, boxW - size * 0.52);
+    // The lid, dragged clear.
+    ctx.save();
+    ctx.translate(boxL * 0.42, -boxW * 0.92);
+    ctx.rotate(0.22);
+    ctx.fillStyle = theme.panel;
+    ctx.fillRect(-boxL * 0.36, -boxW * 0.4, boxL * 0.72, boxW * 0.8);
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.8);
+    ctx.strokeRect(-boxL * 0.36, -boxW * 0.4, boxL * 0.72, boxW * 0.8);
+    ctx.restore();
+    // Four markers, lit at the tip.
+    for (i = 0; i < 4; i++) {
+      var mx = ((i & 1) ? 1 : -1) * boxL * 0.62;
+      var my = ((i & 2) ? 1 : -1) * boxW * 1.05;
+      ctx.beginPath();
+      ctx.arc(mx, my, size * 0.075, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(" + glow + ",0.85)";
+      ctx.fill();
     }
   } else if (model.kind === "barrel") {
     ctx.beginPath();
@@ -1458,6 +2040,10 @@ Maps.drawEnvironment = function (ctx, map) {
   for (var zoneIndex = 0; zoneIndex < map.zones.length; zoneIndex++) {
     drawZone(ctx, map.zones[zoneIndex], theme);
   }
+
+  // The channel cuts through the ground patches above and is crossed by a prop
+  // below, so it goes between them -- the same order the 3D mesh is built in.
+  if (map.river) drawRiver(ctx, map.river, theme, VIEW_HEIGHT / scale);
 
   // Circuit trunks visually connect separate machines without changing any
   // route or collision data. Nothing cables a tree to another tree, so a wild
@@ -1620,11 +2206,49 @@ Maps.straightCoverageUl = function () {
 // measurement can never count a spot the player is not allowed to use.
 Maps.buildableSpot = function (gamePaths, x, y, clearancePx) {
   if (!Array.isArray(gamePaths)) gamePaths = [gamePaths];
+  var nominalHalf = ul(ROAD_WIDTH_UL) / 2;
   for (var i = 0; i < gamePaths.length; i++) {
-    if (gamePaths[i].distanceToPoint(x, y) < clearancePx) return false;
+    var hit = gamePaths[i].closestToPoint(x, y);
+    // `clearancePx` is the rule on a road at its NOMINAL width, which is the
+    // only width six of the seven boards have. Where a route declares a width
+    // profile the road's own half-width takes the place of the nominal one --
+    // the same substitution `buildClearanceOn` makes in js/game.js, spelled
+    // here in terms of the number this function is handed so that the caller
+    // does not have to know which tower it is measuring with.
+    var required = clearancePx - nominalHalf +
+      roadHalfWidthAt(gamePaths[i], hit.progress);
+    if (hit.distance < required) return false;
   }
   if (x < 0 || y < 0 || x > VIEW_WIDTH || y > VIEW_HEIGHT) return false;
   return slotAt(x, y) < 0;            // the build bar eats clicks beneath it
+};
+
+// How long a body walking at base speed takes to cross a route, in seconds.
+//
+// A route may hurry bodies down one stretch and hold them back on another (the
+// `pace` profile, js/path.js), and a road like that does not have "a" speed --
+// the crossing time is the integral of the reciprocal of the pace along it.
+// Two hundred steps is a hundredth of the shortest leg on any authored board,
+// which is finer than the ramps a profile can author.
+//
+// A route with no pace profile takes the division it always took, exactly:
+// summing two hundred equal terms is not bit-identical to one divide, and a
+// board's reported crossing time is not the place to introduce a wobble in the
+// last decimal.
+Maps.walkSeconds = function (gamePath) {
+  var lengthUl = gamePath.length / UNIT_LENGTH;
+  if (!gamePath.paceProfile || !gamePath.paceProfile.length) {
+    return lengthUl / Enemy.BASE_SPEED_ULPS;
+  }
+
+  var steps = 200;
+  var stepPx = gamePath.length / steps;
+  var seconds = 0;
+  for (var i = 0; i < steps; i++) {
+    seconds += (stepPx / UNIT_LENGTH) /
+      (Enemy.BASE_SPEED_ULPS * gamePath.paceScaleAt(stepPx * (i + 0.5)));
+  }
+  return seconds;
 };
 
 // Full geometric report for a map. Cached on the map object: the sampling is
@@ -1637,7 +2261,7 @@ Maps.analyse = function (map) {
 
   var definitions = Maps.routesOf(map);
   var gamePaths = definitions.map(function (route) {
-    return new GamePath(Maps.toWorld(route.points));
+    return new GamePath(Maps.toWorld(route.points), Maps.profileOf(route));
   });
   var Reference = Maps.REFERENCE_TOWER();
   var rangePx = ul(Reference.BASE_RANGE_UL);
@@ -1675,7 +2299,15 @@ Maps.analyse = function (map) {
 
       // Step off the road perpendicularly, on both sides. A shade past the
       // legal clearance keeps floating point from rounding it back inside.
-      var offset = clearancePx * 1.02;
+      //
+      // The clearance HERE, not the nominal one: on a board with a plaza in it
+      // the nominal offset lands the candidate spot on tarmac, every one of
+      // them is refused, and the widest stretch of the route -- the one a
+      // player most wants to know about -- contributes nothing at all to the
+      // measurement. Identical to `clearancePx * 1.02` on a route with no
+      // width profile.
+      var offset = (clearancePx - ul(ROAD_WIDTH_UL) / 2 +
+        roadHalfWidthAt(gamePaths[routeIndex], along[i].progress)) * 1.02;
       for (var side = -1; side <= 1; side += 2) {
         var x = along[i].x + (-ty / tlen) * side * offset;
         var y = along[i].y + (tx / tlen) * side * offset;
@@ -1706,11 +2338,14 @@ Maps.analyse = function (map) {
 
   var totalLengthUl = 0;
   var shortestLengthUl = Infinity;
+  var soonestCrossing = Infinity;
   var bends = { count: 0, degrees: 0 };
   for (routeIndex = 0; routeIndex < gamePaths.length; routeIndex++) {
     var routeLengthUl = gamePaths[routeIndex].length / UNIT_LENGTH;
     totalLengthUl += routeLengthUl;
     shortestLengthUl = Math.min(shortestLengthUl, routeLengthUl);
+    soonestCrossing = Math.min(soonestCrossing,
+      Maps.walkSeconds(gamePaths[routeIndex]));
     var routeBends = Maps.turns(definitions[routeIndex].points);
     bends.count += routeBends.count;
     bends.degrees += routeBends.degrees;
@@ -1724,7 +2359,25 @@ Maps.analyse = function (map) {
   // where length only decides how long you get before the first leak. Route
   // count is pressure: scheduled bodies are mirrored onto every route.
   var coverageRatio = Maps.straightCoverageUl() / goodCoverageUl;
-  var graceRatio = Maps.referenceLengthUl() / shortestLengthUl;
+
+  // GRACE IS A CLOCK, AND LENGTH WAS ONLY EVER A PROXY FOR IT. The term exists
+  // because a longer route gives the economy more time before the first leak
+  // lands -- so on a route whose road hurries bodies along one stretch and
+  // holds them on another, the honest measure is how long the crossing takes,
+  // converted back into the distance a body would cover in that time at base
+  // speed. A gauntlet that runs bodies in at half again their speed shortens
+  // the grace exactly as cutting the route would.
+  //
+  // Taken from the length itself on every route that declares no pace profile,
+  // which is six of the seven: `crossingSeconds * BASE_SPEED` is the same
+  // number through two more floating point operations, and a board's published
+  // score is not the place to move a last decimal for nothing.
+  var pacedRoute = gamePaths.some(function (p) {
+    return p.paceProfile && p.paceProfile.length;
+  });
+  var graceLengthUl = pacedRoute
+    ? soonestCrossing * Enemy.BASE_SPEED_ULPS : shortestLengthUl;
+  var graceRatio = Maps.referenceLengthUl() / graceLengthUl;
   var score = Math.pow(
     coverageRatio * coverageRatio * graceRatio * gamePaths.length, 1 / 3);
 
@@ -1732,7 +2385,12 @@ Maps.analyse = function (map) {
     lengthUl: lengthUl,
     totalLengthUl: totalLengthUl,
     shortestLengthUl: shortestLengthUl,
-    crossingSeconds: shortestLengthUl / Enemy.BASE_SPEED_ULPS,
+    // WALKED, NOT DIVIDED. On a route that declares a pace profile the time to
+    // cross is not the length over one speed, because there is no one speed --
+    // see Maps.walkSeconds. Identical to the division on the six boards that
+    // declare none, and it is still the SOONEST arrival that matters: the base
+    // starts taking hits when the first body lands, not the average one.
+    crossingSeconds: soonestCrossing,
     routeCount: gamePaths.length,
     turns: bends.count,
     totalTurnDegrees: bends.degrees,
