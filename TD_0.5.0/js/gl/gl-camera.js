@@ -1,11 +1,21 @@
 // ---------------------------------------------------------------------------
-// The orbit camera. Baldur's Gate / Roblox controls:
+// The orbit camera. Baldur's Gate / Roblox controls on a mouse, Figma / Google
+// Maps gestures on a trackpad:
 //
 //     MIDDLE drag    orbit -- horizontal spins around the point you are
 //                    looking at, vertical raises and lowers the eye
+//     SHIFT drag     orbit, for the trackpad -- a MacBook has no middle button
+//     OPTION drag    at all, so on that hardware the mouse binding above is not
+//                    awkward, it is unreachable. Shift is the one that is
+//                    guaranteed to arrive; see the note in pointerdown.
 //     RIGHT drag     pan across the ground
+//     TWO FINGERS    pan, grabbing the ground under the fingers
+//     PINCH          zoom, toward whatever is under the cursor
 //     WHEEL          zoom, toward whatever is under the cursor
-//     WASD / arrows  pan, in screen directions rather than world ones
+//     WASD / arrows  pan, in screen directions rather than world ones.
+//                    Read by PHYSICAL POSITION, so this is ZQSD on AZERTY and
+//                    WASD on QWERTY with nothing to configure -- see the note
+//                    on the keydown binding.
 //
 // THE ONE IDEA THAT MAKES IT FEEL RIGHT: the pan is not "mouse pixels times a
 // fudge factor". It grabs the point of ground under the cursor and keeps it
@@ -89,6 +99,12 @@ function OrbitCamera(canvas, options) {
   this.yawSign = options.yawSign === undefined ? -1 : options.yawSign;
   this.pitchSign = options.pitchSign === undefined ? 1 : options.pitchSign;
   this.zoomStep = options.zoomStep === undefined ? 1.12 : options.zoomStep;
+  // HOW MANY ZOOM NOTCHES ONE PIXEL OF SCROLL IS WORTH. A mouse notch arrives
+  // as 100 pixels, so 0.01 keeps a notch worth exactly the 1.12 step it has
+  // always been worth. A pinch arrives in much smaller increments and many
+  // more of them, hence its own, larger number.
+  this.wheelZoomSpeed = options.wheelZoomSpeed === undefined ? 0.01 : options.wheelZoomSpeed;
+  this.pinchZoomSpeed = options.pinchZoomSpeed === undefined ? 0.04 : options.pinchZoomSpeed;
   this.keyPanSpeed = options.keyPanSpeed === undefined ? 900 : options.keyPanSpeed;
   // Higher is snappier. Frame-rate independent -- see update().
   this.damping = options.damping === undefined ? 16 : options.damping;
@@ -329,12 +345,44 @@ OrbitCamera.prototype._bindInput = function () {
 
   canvas.addEventListener("pointerdown", function (e) {
     if (!self.enabled) return;
-    var mode = e.button === 1 ? "orbit" : (e.button === 2 ? "pan" : null);
+    // A MODIFIED LEFT DRAG IS THE TRACKPAD'S MIDDLE BUTTON. A MacBook trackpad
+    // reports exactly two buttons, so `e.button === 1` can never arrive from
+    // one and the orbit had no binding at all on that hardware -- not an
+    // uncomfortable one, none.
+    //
+    // SHIFT IS THE ONE THAT SURVIVES THE TRIP. Option was the obvious pick --
+    // Blender, Figma and Maya all put the orbit there -- and on Diego's Mac it
+    // never reached the page at all: something upstream of the browser claims
+    // Option and zooms instead, and whatever claims it, `preventDefault` is
+    // downstream of the theft and cannot help. Control is not an option either,
+    // because macOS aliases Control+click to a right-click, which is this
+    // game's cancel. Shift is left, nothing on the platform wants it, and
+    // nothing in the game reads a modifier at all -- verified by grep across
+    // js/, where these are the only four modifier reads in the codebase.
+    //
+    // Option is KEPT as a second binding rather than replaced. Where it is not
+    // stolen it is the more familiar gesture, and a binding that silently does
+    // not fire costs nothing next to one that does.
+    var modified = e.button === 0 && (e.shiftKey || e.altKey);
+    var mode = modified ? "orbit"
+             : e.button === 1 ? "orbit"
+             : (e.button === 2 ? "pan" : null);
     if (!mode) return;
     e.preventDefault();
     // Capture, so a drag that leaves the canvas -- or the window -- still
     // tracks and still gets its pointerup.
-    if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    //
+    // GUARDED, because it THROWS rather than returning false. `NotFoundError:
+    // No active pointer with the given id` is what comes back when the pointer
+    // is already gone by the time this runs, and an exception here abandons the
+    // rest of the handler -- so the drag is never armed and the whole gesture is
+    // silently lost, which reads as "the camera does not respond" rather than as
+    // an error. The release side has been wrapped since it was written; this is
+    // the same guard on the half that was missing it. Losing the capture only
+    // costs tracking outside the canvas; losing the handler costs the gesture.
+    try {
+      if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    } catch (err) { /* no active pointer -- drag on without capture */ }
 
     var drag = { mode: mode, id: e.pointerId, x: e.clientX, y: e.clientY,
                  downX: e.clientX, downY: e.clientY };
@@ -482,6 +530,33 @@ OrbitCamera.prototype._bindInput = function () {
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
 
+  // Scroll deltas are not always pixels. deltaMode 1 counts LINES and 2 counts
+  // PAGES, and Firefox on a mouse still reports lines, so a handler that reads
+  // deltaY raw is off by a factor of sixteen on one browser and by a screen
+  // height on another.
+  function deltaPixels(e) {
+    if (e.deltaMode === 1) return { x: e.deltaX * 16, y: e.deltaY * 16 };
+    if (e.deltaMode === 2) return { x: e.deltaX * canvas.clientWidth,
+                                    y: e.deltaY * canvas.clientHeight };
+    return { x: e.deltaX, y: e.deltaY };
+  }
+
+  // TELLING A WHEEL FROM TWO FINGERS, which the platform will not tell us.
+  //
+  // There is no flag for it. What there is: a notched wheel steps in whole
+  // multiples of a line or of about 100 pixels, always straight up or down,
+  // while a trackpad streams small fractional deltas and almost always leaks a
+  // little sideways drift into deltaX. That is a heuristic and it is allowed to
+  // be -- being wrong costs one gesture behaving like the other, and BOTH
+  // gestures are bound to something sensible, so a miss is a surprise rather
+  // than a dead control. Do not tighten this into something that can return
+  // "neither".
+  function isMouseWheel(e) {
+    if (e.deltaMode !== 0) return true;            // lines or pages: a wheel
+    return e.deltaX === 0 && Math.abs(e.deltaY) >= 40 &&
+           e.deltaY === Math.round(e.deltaY);
+  }
+
   canvas.addEventListener("wheel", function (e) {
     if (!self.enabled) return;
     e.preventDefault();
@@ -489,11 +564,54 @@ OrbitCamera.prototype._bindInput = function () {
     // right: a wheel notch arriving mid-drag is not a zoom the player asked
     // for, and zooming under a frozen pan would break the grabbed ground point.
     if (self._drag) return;
-    self.zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1 : -1);
+
+    var d = deltaPixels(e);
+
+    // A PINCH IS A WHEEL EVENT WITH ctrlKey FORCED ON. Every engine on macOS
+    // synthesises the modifier for a trackpad pinch; there is no pinch event
+    // outside Safari's non-standard `gesturechange`, and this is the one signal
+    // they all agree on. It is not the player holding Control, and it must be
+    // tested BEFORE the wheel heuristic -- a pinch reports deltaMode 0 with a
+    // large integer deltaY often enough to be mistaken for a notch.
+    if (e.ctrlKey) {
+      self.zoomBy(e.clientX, e.clientY, -d.y * self.pinchZoomSpeed);
+      return;
+    }
+    if (isMouseWheel(e)) {
+      self.zoomBy(e.clientX, e.clientY, -d.y * self.wheelZoomSpeed);
+      return;
+    }
+    // Two fingers. The ground goes WITH the fingers, which is why the delta is
+    // negated: the browser reports how far the document would scroll, and a
+    // document scrolling down is content moving up.
+    self.panByPixels(-d.x, -d.y);
   }, { passive: false });
 
-  window.addEventListener("keydown", function (e) { self._keys[e.key.toLowerCase()] = true; });
-  window.addEventListener("keyup", function (e) { self._keys[e.key.toLowerCase()] = false; });
+  // DO NOT LET AN ORBIT ALSO PLACE A TOWER. The game binds its own `mousedown`
+  // and `click` to this same canvas, and the compatibility mouse events fire
+  // whatever `pointerdown` did -- so before this, Option+drag turned the camera
+  // AND spent the player's gold on whatever was armed. Captured on the window
+  // so it lands before the event reaches the canvas at all, which makes it
+  // independent of who happened to register their listener first.
+  function swallowOrbitClick(e) {
+    if (!self.enabled || !(e.shiftKey || e.altKey)) return;
+    if (e.target !== canvas && e.target !== self.canvas) return;
+    e.stopPropagation();
+  }
+  window.addEventListener("mousedown", swallowOrbitClick, true);
+  window.addEventListener("click", swallowOrbitClick, true);
+
+  // PHYSICAL POSITION, NOT PRINTED LETTER.
+  //
+  // `e.key` is what the LAYOUT prints, so on an AZERTY board the WASD cluster
+  // came back as "z q s d": S and D landed, W and A did not, and moving
+  // forward meant reaching for the top-left corner of the keyboard while the
+  // other three fingers stayed put. `e.code` names the physical key instead --
+  // KeyW is the key above KeyS on every layout ever made -- so the same four
+  // keys under the same four fingers work on QWERTY, AZERTY and QWERTZ with
+  // nothing to configure and no settings screen to find first.
+  window.addEventListener("keydown", function (e) { self._keys[e.code] = true; });
+  window.addEventListener("keyup", function (e) { self._keys[e.code] = false; });
   // A window that loses focus mid-key would otherwise pan forever.
   window.addEventListener("blur", function () { self._keys = Object.create(null); });
 };
@@ -502,6 +620,19 @@ OrbitCamera.prototype._bindInput = function () {
 // identity as the pan: measure the offset before and after the distance
 // change and move the target by the difference.
 OrbitCamera.prototype.zoomAt = function (clientX, clientY, direction) {
+  this.zoomBy(clientX, clientY, direction > 0 ? -1 : 1);
+};
+
+// Zoom by a CONTINUOUS number of notches, positive being closer.
+//
+// The notched version above threw the magnitude away and read the sign only,
+// which was fine while the only source was a mouse and wrong the moment a
+// trackpad was one: an inertial two-finger flick delivers dozens of events in a
+// few hundred milliseconds, and counting each one as a full 1.12 step meant a
+// light gesture crossed the entire zoom range. A fractional delta has to stay
+// fractional the whole way through.
+OrbitCamera.prototype.zoomBy = function (clientX, clientY, notches) {
+  if (!notches) return;
   var n = this._ndc(clientX, clientY);
   // Measured against where the orbit is HEADED, not where it currently is, for
   // the same reason the pan freezes it: mid-orbit the two differ, and mixing
@@ -511,7 +642,7 @@ OrbitCamera.prototype.zoomAt = function (clientX, clientY, direction) {
   var before = this._groundOffset(n[0], n[1], this.wantYaw, this.wantPitch,
     this.wantDistance);
 
-  var next = this.wantDistance * (direction > 0 ? this.zoomStep : 1 / this.zoomStep);
+  var next = this.wantDistance * Math.pow(this.zoomStep, -notches);
   this.wantDistance = Math.max(this.minDistance, Math.min(this.maxDistance, next));
 
   var after = this._groundOffset(n[0], n[1], this.wantYaw, this.wantPitch,
@@ -523,12 +654,36 @@ OrbitCamera.prototype.zoomAt = function (clientX, clientY, direction) {
   }
 };
 
+// Slide the view by a screen distance, the ground staying under the fingers.
+//
+// Same identity the drag-pan is built on, with the canvas CENTRE standing in
+// for the grabbed pixel: there is no pointer anchored to a two-finger scroll,
+// so there is nothing to grab, but the offset between two pixels measured
+// against a frozen orbit is exact wherever it is sampled. `dxPx`/`dyPx` are how
+// far the BOARD should travel, not the camera -- hence the subtraction.
+OrbitCamera.prototype.panByPixels = function (dxPx, dyPx) {
+  if (!dxPx && !dyPx) return;
+  var r = this.canvas.getBoundingClientRect();
+  var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  var a = this._ndc(cx, cy);
+  var b = this._ndc(cx + dxPx, cy + dyPx);
+  var from = this._groundOffset(a[0], a[1], this.wantYaw, this.wantPitch,
+    this.wantDistance);
+  var to = this._groundOffset(b[0], b[1], this.wantYaw, this.wantPitch,
+    this.wantDistance);
+  // Past the horizon there is no ground to grab and no honest answer.
+  if (!from || !to) return;
+  this.target[0] -= to[0] - from[0];
+  this.target[1] -= to[1] - from[1];
+  this._clampTarget();
+};
+
 // --- per-frame --------------------------------------------------------------
 
 OrbitCamera.prototype.update = function (dt) {
   var k = this._keys;
-  var mx = (k.d || k.arrowright ? 1 : 0) - (k.a || k.arrowleft ? 1 : 0);
-  var my = (k.w || k.arrowup ? 1 : 0) - (k.s || k.arrowdown ? 1 : 0);
+  var mx = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
+  var my = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0);
   if (mx || my) {
     // Screen-relative, and scaled by distance so a keypress covers the same
     // FRACTION of the view whether you are zoomed in or out.

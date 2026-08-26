@@ -292,16 +292,35 @@ function (t) {
   var Enemy = h.game.Enemy;
   var spec = Enemy.TYPES.fractal_slime.fractal;
 
+  // ONE RUNG PER WAVE, NOT ONE RUNG PER GROUP (2026-08-25). The timeline
+  // rewrite cut waves into the salvos they actually arrive in, so wave 16's
+  // four T0 slimes are four groups and wave 17's two T1s are two -- ten groups
+  // carrying six rungs. Counting GROUPS made this read a ladder twice as long
+  // as the one the campaign spends, with T1 landing where T0 should be. The
+  // ladder is a per-wave claim and is now counted per wave.
+  //
+  // A wave that mixed two tiers would be a real error and is still caught: the
+  // tier is read off the first group of the wave and every later group of the
+  // same type is checked against it.
   var scheduled = [];
   h.game.WAVES.forEach(function (wave, i) {
+    var tier;
+    var found = false;
     h.game.waveGroups(wave).forEach(function (g) {
       if (g.type !== "fractal_slime") return;
+      if (found) {
+        t.eq(g.tier, tier,
+          "wave " + (i + 1) + " sends one tier of Fractal Slime, not two");
+        return;
+      }
+      found = true;
+      tier = g.tier;
       scheduled.push({ wave: i + 1, group: g });
     });
   });
 
   t.eq(scheduled.length, spec.maxTier - spec.minTier + 1,
-    "one scheduled group per rung of the ladder");
+    "one scheduled WAVE per rung of the ladder");
 
   var previousWave = 0;
   var previousHp = 0;
@@ -780,23 +799,28 @@ test("it arrives in the MIDDLE of wave 35, not at its head", function (t) {
   var h = harness.boot();
   var wave = h.game.WAVES[34];
 
-  // Walk the wave the way the scheduler does and time the boss's entrance.
-  var elapsed = 0;
+  // READ OFF THE TIMELINE, WHICH IS WHERE THE ANSWER NOW LIVES (2026-08-25).
+  // This used to accumulate `interval` and `lead` down the group list, because
+  // under the sequential scheduler an entrance really was the sum of everything
+  // authored above it -- which meant the boss's arrival was an accident of the
+  // groups in front of it rather than a decision. It is `at: 13` now, and the
+  // whole point of the rewrite is that this is a number someone chose.
+  var events = h.game.waveTimeline(wave);
   var bossAt = null;
-  for (var i = 0; i < h.game.waveCount(wave); i++) {
-    var slot = h.game.waveGroupAt(wave, i);
-    if (i > 0) {
-      elapsed += (slot.opensGroup && slot.group.lead !== undefined)
-        ? slot.group.lead : slot.group.interval;
-    }
-    if (slot.group.type === "boss") bossAt = elapsed;
-  }
+  events.forEach(function (e) { if (e.type === "boss" && bossAt === null) bossAt = e.time; });
+  var lastAt = events[events.length - 1].time;
 
   t.ok(bossAt !== null, "the boss is in wave 35");
-  var fraction = bossAt / elapsed;
+  t.eq(bossAt, 13, "authored at 13 s, not arrived at by accumulation");
+  var fraction = bossAt / lastAt;
   t.ok(fraction > 0.35 && fraction < 0.65,
-    "and lands mid-wave (" + bossAt.toFixed(1) + " s of " + elapsed.toFixed(1) +
+    "and lands mid-wave (" + bossAt.toFixed(1) + " s of " + lastAt.toFixed(1) +
     " s = " + Math.round(fraction * 100) + "%)");
+
+  // Not the first body out of the gate and not the last, stated directly --
+  // the fraction above is a shape, this is the claim.
+  t.ok(events[0].type !== "boss", "something walks in ahead of it");
+  t.ok(events[events.length - 1].type !== "boss", "and something after it");
 
   // Exactly one, and only here. A second boss anywhere would be a decision
   // nobody made.
@@ -3939,15 +3963,30 @@ group("maps: the routes and the chooser");
 // 70 s is past the opening's last leak on every route: its last enemy spawns
 // at 15.2 s and the longest walk is 47 s.
 //
-// The break is pinned at 5 s (2026-07-29). At the shipping 90 s wave 2 does
-// not arrive inside the window at all and all four routes score an identical
-// 95 off wave 1 alone -- a comparison with nothing left in it. See
-// harness.pinWaveBreak: wave spacing is the player's own pacing choice and is
-// orthogonal to which route is harder, which is what this measures.
+// THE PACING IS HELD STILL WITH AUTO-SEND (2026-08-25), which is what
+// pinWaveBreak did before the timeline scheduler took the 90 s break away.
+//
+// The problem is the same one and it has moved up a level. It used to be that
+// at the shipping 90 s break wave 2 did not arrive inside the 70 s window at
+// all, and all four routes scored an identical 95 off wave 1 alone -- a
+// comparison with nothing left in it. Now there is no break to pin: a wave runs
+// its own 32 s window whether or not anything is left of it, so wave 2 lands at
+// 37 s with 33 s to walk, its leaks fall outside the window, and lattice and
+// meridian tie at 84. Same dead comparison, one level up.
+//
+// Auto-send closes each wave the instant it has finished ARRIVING and puts the
+// next three seconds behind it -- which is the cadence pinWaveBreak(5) used to
+// buy, near enough. It never compresses a wave's own intervals and never drops
+// a spawn (see updateWaves), so what is held still is the spacing between
+// waves and nothing else: exactly the pacing choice a player makes with the
+// button, and exactly the thing that is orthogonal to which route is harder.
+//
+// It is set after restartGame() because auto-send is a PREFERENCE and survives
+// a restart -- setting it first would work too, and this way the line reads in
+// the order it happens.
 function defend(mapId, gunners) {
   var h = harness.boot(mapId);
-  h.pinWaveBreak(5);
-  h.run("WAVES = WAVES.slice(0, 2); restartGame()");
+  h.run("WAVES = WAVES.slice(0, 2); restartGame(); autoSkipWaves = true;");
   h.run("cash = 100000");
 
   var spots = h.game.Maps.bestSpots(h.game.Maps.byId(mapId), gunners);
@@ -5937,8 +5976,16 @@ test("the Aether Wisp is scheduled and uses fail-closed air targeting", function
   // at whatever it physically reaches even when it cannot see it, so one
   // ground body in that wave would let a board with no air reach clear the
   // flyers as collateral and never answer the question.
-  t.eq(h.game.waveGroups(h.game.WAVES[23]).length, 1,
-    "wave 24 holds one group and nothing walks under the Wisps");
+  //
+  // "NOTHING ON THE GROUND", NOT "ONE GROUP" (2026-08-25). Purity was always a
+  // claim about the ROSTER; "one group" was a proxy for it that held only while
+  // groups deployed one after another. Wave 24 is now three salvos of Aether
+  // Wisps and is exactly as pure as it ever was -- the old assertion would have
+  // failed it while the rule it protects was untouched.
+  var ground = h.game.waveGroups(h.game.WAVES[23]).filter(function (g) {
+    return !h.game.Enemy.typeOf(g.type).isFlying;
+  });
+  t.eq(ground.length, 0, "nothing walks under the Wisps in wave 24");
 
   var point = h.game.path.pointAt(h.game.path.length * 0.4);
   var flyer = new h.game.Enemy(h.game.path, 100, "flying");
