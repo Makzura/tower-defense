@@ -3654,8 +3654,8 @@ test("Warbringer swings and Arcane Sniper B5 both respect slime AoE resistance",
   var swingTarget = new h.game.Enemy(h.game.path, undefined, "fractal_slime", { tier: 2 });
 
   warbringer.swing([swingTarget], [swingTarget]);
-  t.eq(swingTarget.health, 10, "the Warbringer's 12-damage wedge removes 6 HP");
-  t.eq(warbringer.damageDealt, 6, "its counter receives the reduced damage");
+  t.eq(swingTarget.health, 9, "the Warbringer's 14-damage wedge removes 7 HP");
+  t.eq(warbringer.damageDealt, 7, "its counter receives the reduced damage");
 
   var blastOrigin = new h.game.Enemy(h.game.path, 1, "normal");
   var chainTarget = new h.game.Enemy(h.game.path, undefined, "fractal_slime", { tier: 2 });
@@ -3663,7 +3663,7 @@ test("Warbringer swings and Arcane Sniper B5 both respect slime AoE resistance",
   chainTarget.pos = { x: 100, y: 100 };
   warbringer.explode(blastOrigin, [blastOrigin, chainTarget]);
   t.eq(chainTarget.health, 8.5, "the B4 blast's 15 damage is reduced to 7.5");
-  t.eq(warbringer.damageDealt, 13.5, "blast scoring also uses the reduced amount");
+  t.eq(warbringer.damageDealt, 14.5, "blast scoring also uses the reduced amount");
 
   var sniper = new h.game.LongshotTower(0, 0, h.game.path);
   for (var tier = 0; tier < 5; tier++) sniper.purchase("B");

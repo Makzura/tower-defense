@@ -5679,9 +5679,13 @@ reachable enemy to shoot. `js/systems/range-filter.js` (`RangeFilter`) answers
 They were both called `Targeting` on the two branches; the merge kept the name
 for the first and renamed the second.
 
-**The smasher (`js/smasher.js`).** Melee AoE: a 120° wedge, 37.5 u.l., 12
-damage every 3.5 s, $600 (retuned 2026-08-26 from 31.25 / 4.0 s / $700, in the
-same change that took it out of the opening hand). It **holds its swing** until something is in the zone
+**The smasher (`js/smasher.js`).** Melee AoE: a 120° wedge, **40 u.l., 14
+damage every 3.2 s, $600** — 4.38 DPS as placed. Retuned twice: 2026-08-26 from
+31.25 / 12 / 4.0 s / $700 in the change that took it out of the opening hand,
+and **2026-08-27 at the owner's instruction ("il est trop faible, il n'aide
+pas assez, il est trop cher"), which raised the body by 28% of its DPS and left
+the build price alone** — what moved instead is the first four tiers, $50 dearer
+each and carrying more (see the two path sections below). It **holds its swing** until something is in the zone
 rather than swinging on a fixed rhythm — the zone is narrow enough that a
 fixed rhythm would miss most enemies. Two five-tier branches under the same
 crosspath rule as the Longshot (tier 3 locks the other branch at 2), bought
@@ -5720,13 +5724,21 @@ can burst at all slows everything it swings at.
 
 Four things were asked for in one instruction, and all four are on branch B.
 
-**Range on B2 (+15 u.l.), B4 (+10) and B5 (+15).** Path B granted none at all
-before; a full B Warbringer now reaches **77.5 u.l.** against the 37.5 base, and
-A2+full-B crosspaths to 83.75. **These are ADDITIVE on the base**, unlike path
-A's `rangeUl` where the longest owned value wins — so the 2026-08-26 base rise
-carried the whole B column up with it (71.25 → 77.5, and 56.25 → 62.5 at B4)
-without a line of path B moving. That is also why A1 no longer sells range at
-all: it grants `rangeUl: 37.50`, which the base now equals.
+**Range on B1 (+5 u.l.), B2 (+20), B4 (+10) and B5 (+15).** Path B granted none
+at all before 2026-07-30; a full B Warbringer now reaches **90 u.l.** against
+the 40 base, and A1+A2+full-B crosspaths to 103.75. **These are ADDITIVE on the
+base**, unlike path A's `rangeUl` where the longest owned value wins — so both
+base rises carried the whole B column up with them without a line of path B
+moving.
+
+**AND THAT IS WHY A1 AND A2 SELL THEIR REACH THE SAME WAY SINCE 2026-08-27.**
+A1 granted an absolute `rangeUl: 37.50`; the 2026-08-26 base rise met it exactly
+and the tier silently stopped selling any reach at all — the max cannot be won
+by a value equal to it. Its five units are a `rangeBonusUl` now, which is summed
+after the max and so survives the next base rise as well as carrying up path A.
+A2 keeps its absolute 43.75, which still beats the 40 base, and takes its five
+on top. **Check this column against the base before moving either**: an absolute
+at or below the base is a tier claiming to sell reach it does not sell.
 
 **They live in a SECOND, ADDITIVE column** (`rangeBonusUl`) beside the existing
 absolute one, and that is the load-bearing detail. Path A's `rangeUl` figures
@@ -7866,14 +7878,15 @@ no mechanic was moved to match the description.
 | What stops a shot | arriving, losing its target, spending its pierce, running out of range. **Not terrain** — sight gates acquisition and nothing gates the round | `js/bullet.js` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |
 | Pierce hit radius | 12 u.l. | `PierceBullet.HIT_RADIUS_UL` |
-| Warbringer range | 37.5 u.l. base, 62.5 at A5, **77.5 at full B** (B2 +15, B4 +10, B5 +15, additive on the base) | `Smasher.BASE_RANGE_UL`, `rangeBonusUl` in `Smasher.UPGRADES` |
+| Warbringer base | **14 damage every 3.2 s, 40 u.l., 120° = 4.38 DPS** as placed (12 / 3.5 / 37.5 until 2026-08-27) | `Smasher.BASE_*` |
+| Warbringer range | 40 u.l. base, **72.5 at A5**, **90 at full B**, 103.75 on the A1+A2+full-B crosspath. A1 +5 and A2 +5 are additive like path B's; only A2-A5 carry absolutes | `Smasher.BASE_RANGE_UL`, `rangeUl` / `rangeBonusUl` in `Smasher.UPGRADES` |
 | Warbringer blast | 18.75 u.l. radius, **15 damage, CHAINS, and applies the tower's slow**; fires on ANY kill by the swing (B4) | `Smasher.EXPLOSION_RADIUS_UL`, `Smasher.EXPLOSION_DAMAGE`, `explode()` |
 | Warbringer swing order | slow FIRST, then damage, then the burst — a one-shot kill still bursts | `Smasher.prototype.swing` |
 | Warbringer earthquake (B5) | map-wide: 3 s movement stun, then 60% slow for 5 s, **45 s cooldown**, no damage; 0.75 s world shake and 2.4 s floor fissures | `Smasher.QUAKE_*`, `triggerQuake`, `Effects.earthquake` |
 | Enemy stun | timed, movement only, longest wins — distinct from `rooted` and from a slow | `Enemy.stunTimer`, `Enemy.applyStun` |
-| Warbringer cost | 700 (was 200 before 2026-07-30) | `Smasher.COST` |
-| Warbringer full A | 4500 on top of $700 (200/350/600/1400/1950) = $5200 | `Smasher.UPGRADES` |
-| Warbringer full B | 6300 on top of $700 (200/400/900/1900/2900) = $7000 | `Smasher.UPGRADES` |
+| Warbringer cost | **600** (200 before 2026-07-30, 700 until 2026-08-26; this row said 700 until 2026-08-27 and the code said 600) | `Smasher.COST` |
+| Warbringer full A | 4600 on top of $600 (**250/400**/600/1400/1950) = $5200, for 65 damage at 3.0 s = 21.7 DPS | `Smasher.UPGRADES` |
+| Warbringer full B | 6400 on top of $600 (**250/450**/900/1900/2900) = $7000, for 34 damage at 2.1 s = 16.2 DPS | `Smasher.UPGRADES` |
 | Tower HP from upgrades | every tier on both towers carries `hp`; Warbringer 150 → 575 (A) / 700 (B), Rifleman 80 → 380 (A) / 505 (B) | `Smasher.UPGRADES`, `Soldier.UPGRADES` |
 | Health tier semantics | GRANTS its delta — it does not heal to the new maximum | `applyUpgrade` on both |
 | Warbringer swing animation | base/B 0.2 s; Path A 0.48 s with three overhead afterimages and 1.6 s AoE cracks; damage still lands only at cooldown zero | `Smasher.SWING_SECONDS`, `PATH_A_*`, `swingPose`, `pathAImpact` |

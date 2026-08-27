@@ -130,18 +130,27 @@ Smasher.DISPLAY_NAME = "Warbringer";
 // place, quicker to swing, and it reaches the road from further back.
 Smasher.COST = 600;
 
-Smasher.BASE_DAMAGE = 12;            // unchanged: the swing itself is not the problem
-Smasher.BASE_COOLDOWN = 3.5;         // seconds between swings; 4.0 until 2026-08-26
-// 37.5 u.l. since 2026-08-26, from 31.25.
+// THE BODY AS PLACED WAS RAISED ON 2026-08-27, at the owner's instruction:
+// "il est trop faible, il n'aide pas assez". The build price did NOT move --
+// that was explicit -- so what a Warbringer costs to put down buys more than it
+// did, and the first four tiers pay $50 more each for what they now carry (see
+// the table).
 //
-// THIS IS THE SAME NUMBER A1 ALREADY GRANTED, and that is a real consequence
-// rather than an oversight: `rangeUl` is resolved as "the LONGEST owned value
-// wins", so A1 no longer moves the range at all and now sells its damage and
-// its hit points alone. A1 was not re-priced here because the owner's
-// instruction was the base range and the path A damage deltas, and nothing
-// else. If A1 should be re-costed for what it now carries, that is a separate
-// decision with its own measurement.
-Smasher.BASE_RANGE_UL = 37.50;
+// 12 -> 14 damage, 3.5 -> 3.2 seconds a swing: 3.43 DPS as placed becomes 4.38,
+// a 28% rise on the one number that decides whether the tower is worth the slot
+// before any upgrade is bought at all.
+Smasher.BASE_DAMAGE = 14;            // 12 until 2026-08-27
+Smasher.BASE_COOLDOWN = 3.2;         // seconds between swings; 4.0, then 3.5
+// 40 u.l. since 2026-08-27, 37.5 since 2026-08-26, from 31.25.
+//
+// **RAISING THIS KILLS ANY `rangeUl` AT OR BELOW IT**, because that column is
+// resolved as "the LONGEST owned value wins". It has already happened once: the
+// 2026-08-26 rise to 37.5 met A1's own 37.5 and left that tier selling no reach
+// at all, silently. A1's absolute is gone now and the first two tiers sell their
+// reach through `rangeBonusUl` instead, which is added AFTER the max and so
+// cannot be swallowed by a base rise. Check this column against the base before
+// moving either.
+Smasher.BASE_RANGE_UL = 40.00;
 Smasher.BASE_ARC_DEGREES = 120;
 
 // Same as the gunner's on purpose -- see the constructor.
@@ -272,8 +281,25 @@ Smasher.QUAKE_COOLDOWN_SECONDS = 45;
 // B3 grants the slow outright, B4 adds the blast on kill, and B5 buys the only
 // map-wide effect in the game. Each is priced above its damage delta alone.
 Smasher.UPGRADES = [
-  { id: "A1", branch: "A", cost: 200, damage: 4,  hp: 30,  rangeUl: 37.50 },
-  { id: "A2", branch: "A", cost: 350, damage: 5,  hp: 45,  rangeUl: 43.75, requires: "A1" },
+  // A1, A2, B1 AND B2 EACH COST $50 MORE AND EACH CARRY MORE, 2026-08-27, at
+  // the owner's instruction: "on va augmenter le prix de A1, A2, B1, B2 de
+  // cinquante, et pour chacune de ces upgrades on va donner un petit boost de
+  // range, attack speed et dégâts. Très peu, mais assez pour faire une
+  // différence." The back halves of both paths are untouched -- what they
+  // inherit is what the first two tiers now pass up the ladder.
+  //
+  // A1'S ABSOLUTE `rangeUl` IS GONE rather than raised. It was 37.50, which the
+  // base met on 2026-08-26 and has now passed, so it could never win the max
+  // again; a value that cannot win is a tier claiming to sell reach it does not
+  // sell. Its five units are a `rangeBonusUl`, which is summed after the max and
+  // therefore survives the next base rise as well as carrying up path A -- the
+  // failure this replaces, made structural rather than remembered.
+  { id: "A1", branch: "A", cost: 250, damage: 5,  hp: 30,  rangeBonusUl: 5,
+    cooldown: 3.1 },
+  // A2 KEEPS ITS ABSOLUTE, because 43.75 still beats the 40 base and still
+  // reads as this tier restating the reach. The five on top is the boost.
+  { id: "A2", branch: "A", cost: 400, damage: 6,  hp: 45,  rangeUl: 43.75,
+    rangeBonusUl: 5, cooldown: 3.0, requires: "A1" },
   // A3/A4/A5 DAMAGE RAISED 2026-08-26: 7 -> 9, 10 -> 13, 14 -> 18. A1 and A2
   // are untouched, so the path's shape is the same and only its back half pays
   // more. Nothing else on path A moved -- not a cost, not a range, not the
@@ -282,14 +308,19 @@ Smasher.UPGRADES = [
   { id: "A4", branch: "A", cost: 1400, damage: 13, hp: 110, rangeUl: 56.25, requires: "A3", locksPath: true, fullCircle: true },
   { id: "A5", branch: "A", cost: 1950, damage: 18, hp: 170, rangeUl: 62.50, requires: "A4", locksPath: true, fullCircle: true },
 
-  { id: "B1", branch: "B", cost: 200, damage: 0,  hp: 35,  cooldown: 3.0 },
-  { id: "B2", branch: "B", cost: 400, damage: 0,  hp: 55,  cooldown: 2.2, requires: "B1", rangeBonusUl: 15 },
-  { id: "B3", branch: "B", cost: 900, damage: 4,  hp: 90,  cooldown: 2.2, requires: "B2", locksPath: true,
+  // B1 AND B2 CARRY DAMAGE NOW, one point each. Path B is still the tempo
+  // branch and still sells its speed and its reach; a point of damage on each
+  // of the first two tiers is the smallest step the table can express, and it
+  // is what the owner asked for on all four.
+  { id: "B1", branch: "B", cost: 250, damage: 1,  hp: 35,  cooldown: 2.9,
+    rangeBonusUl: 5 },
+  { id: "B2", branch: "B", cost: 450, damage: 1,  hp: 55,  cooldown: 2.1, requires: "B1", rangeBonusUl: 20 },
+  { id: "B3", branch: "B", cost: 900, damage: 4,  hp: 90,  cooldown: 2.1, requires: "B2", locksPath: true,
     slow: { strength: 0.15, seconds: 2.0 } },
-  { id: "B4", branch: "B", cost: 1900, damage: 6, hp: 140, cooldown: 2.2, requires: "B3", locksPath: true,
+  { id: "B4", branch: "B", cost: 1900, damage: 6, hp: 140, cooldown: 2.1, requires: "B3", locksPath: true,
     rangeBonusUl: 10,
     slow: { strength: 0.40, seconds: 2.5 }, explodes: true },
-  { id: "B5", branch: "B", cost: 2900, damage: 8, hp: 230, cooldown: 2.2, requires: "B4", locksPath: true,
+  { id: "B5", branch: "B", cost: 2900, damage: 8, hp: 230, cooldown: 2.1, requires: "B4", locksPath: true,
     rangeBonusUl: 15,
     slow: { strength: 0.65, seconds: 3.0 }, quake: true }
 ];

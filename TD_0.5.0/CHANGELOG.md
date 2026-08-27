@@ -13,6 +13,56 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The Warbringer is worth its slot, and its first four tiers cost
+fifty more.** The owner's words: *"il est trop faible, il n'aide pas assez, il
+est trop cher"*, and then the shape of the fix — **the build price does not
+move**, A1/A2/B1/B2 each cost $50 more, and each of those four plus the body
+itself gains a little range, a little attack speed and a little damage.
+
+**The body as placed:** 12 → 14 damage, 3.5 → 3.2 seconds a swing, 37.5 → 40
+u.l. **3.43 DPS becomes 4.38, a 28% rise on the one number that decides whether
+the tower is worth the slot before an upgrade is bought at all.** Nothing about
+the arc, the hit points or the $600 changed.
+
+| tier | was | is |
+|---|---|---|
+| A1 | $200, +4 dmg | $250, +5 dmg, +5 u.l., 3.1 s |
+| A2 | $350, +5 dmg | $400, +6 dmg, +5 u.l., 3.0 s |
+| B1 | $200, 3.0 s | $250, +1 dmg, +5 u.l., 2.9 s |
+| B2 | $400, +15 u.l., 2.2 s | $450, +1 dmg, +20 u.l., 2.1 s |
+
+The back halves are untouched; what they inherit is what the first two tiers
+now pass up the ladder. Full A goes 17.4 → 21.7 DPS and 62.5 → 72.5 u.l.; full
+B 13.6 → 16.2 DPS and 77.5 → 90; the A1+A2+full-B crosspath reaches 103.75.
+
+**A1's absolute `rangeUl` is GONE rather than raised, and that is the
+interesting half.** It granted 37.50; the 2026-08-26 base rise met that number
+exactly, and under the longest-owned-wins rule the tier silently stopped selling
+any reach at all — a value equal to the max can never win it. Its five units are
+a `rangeBonusUl` now, summed after the max, so no base rise can swallow them and
+they carry up path A the way path B's always have. A2 keeps its absolute 43.75,
+which still beats the 40 base, and takes its five on top. The failure is
+structural now rather than remembered.
+
+**One fixture was broken by the range, not by the numbers, and it is the one
+worth recording.** `CHAIN_CONTROL` stood 72.6 px from the tower; a full-B reach
+went from 77.5 u.l. to 90, so the control came inside the swing — and being the
+furthest body along the road, "first" targeting turned the wedge onto it and
+dragged it off the chain, leaving three of the five links outside the arc. A
+control that is in range is not a control. It is at +200 now, 133.8 px out
+against a 93.6 px reach. Every other moved figure is a pinned number re-derived
+from the new table, not copied from the run.
+
+**Also corrected while reading:** the Current values row said the Warbringer
+cost $700 while `Smasher.COST` has been 600 since 2026-08-26, and the full-A and
+full-B totals were footed on that $700. They are footed on $600 now, and both
+come to the same $5200 / $7000 they always claimed — by arithmetic this time.
+
+**Not re-measured against a real board.** `simulate-campaign.js` and
+`measure-starter-kit.js` live in `THE_COMPANY` and a clone of this repo cannot
+run them, so the campaign effect of a 28% stronger Warbringer body is unknown.
+The schedule was not touched.
+
 **2026-08-27 — The cursor lands on the surface, and so does everything painted
 about it.** The other half of the click-target change, and the owner asked for it
 by name: the build ghost on a stump. `screenToWorld` is THE ONE FUNNEL every
