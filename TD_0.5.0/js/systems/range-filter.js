@@ -72,6 +72,25 @@ var RangeFilter = (function () {
     return normalizeAngle(a - b);
   }
 
+  // HOW FAR THIS TOWER REACHES, in world units.
+  //
+  // `stats.range` is in u.l. and the conversion happens here, once per query
+  // rather than per comparison -- that is the rule at the top of this file and
+  // it has not moved. What a caller MAY do is hand in the world-space number
+  // itself, on the same object it already hands in `groundHeight`: elevation
+  // grows a tower's reach (Tower.ELEVATION_RANGE_PER_UL) and that is a fact
+  // about WHERE the tower stands, which a stats table cannot know and this
+  // module must not learn. `rangePx` is what every tower in the game already
+  // calls that number, so a caller passing the tower itself is passing the
+  // right thing by construction.
+  //
+  // Absent, it converts. Every existing caller passes a bare {x, y} and so gets
+  // exactly the arithmetic it always got.
+  function reachOf(stats, towerPos) {
+    return (towerPos && typeof towerPos.rangePx === "number")
+      ? towerPos.rangePx : toWorld(stats.range);
+  }
+
   // Is `enemy` a legal target for a tower with `stats`, sitting at
   // `towerPos`, aimed at `aimRad` (only relevant in cone mode)?
   // All positions in world coordinates.
@@ -83,8 +102,7 @@ var RangeFilter = (function () {
     var dy = enemy.y - towerPos.y;
     var distance = Math.sqrt(dx * dx + dy * dy);
 
-    // The one conversion, done once per query rather than per comparison.
-    if (distance > toWorld(stats.range)) return false;
+    if (distance > reachOf(stats, towerPos)) return false;
 
     if (stats.targetShape === "cone") {
       // "No deadzone in cone mode." -- section 5.6.

@@ -329,7 +329,30 @@ var BASELINE = [
     // band edge used as a switch would break immediately. E20 asserts the
     // whole system is decoration -- the same run at midnight and at noon kills
     // the same enemies for the same money.
-    file: "tests/run.js", pass: 187, fail: 0,
+    //
+    // 189 on 2026-08-27, and THIS RAISE WAS NEVER RECORDED HERE. `919f259` and
+    // `5a6e610` added 4e (the forest grows through nothing) and 4f (eight
+    // authored bodies, placed the same way every load) and left the number
+    // below at 187, so the gate has been printing 189 against a baseline of 187
+    // ever since. It is written down now rather than folded silently into the
+    // raise below: a count that moves without a line here is the thing this
+    // comment exists to prevent.
+    //
+    // 191 on 2026-08-27, from 189: THE ELEVATION RULE, ASKED OF EVERY TOWER.
+    // 21 above pins the reach bonus and has only ever asked a Rifleman, and
+    // two of the five buildable types carried no `groundHeight` at all -- so
+    // an Arcane Sniper or a Siphon on a stump cast its lines from an eye at
+    // floor level, which is INSIDE a sight blocker the size of the stump, and
+    // could not acquire anything anywhere. 25 walks the LIVE CATALOGUE and asks
+    // all five for the eye, the reach and one clear line off their own stump.
+    // 26 pins `towerReach`, the one answer to "which shape is this tower's
+    // reach" that the renderer draws and the blind-spot overlay clips to.
+    //
+    // Mutation-checked, both restored: taking `groundHeight` back off either
+    // adapter goes red on 25 (measured: 100% of rays out of a Sniper blocked
+    // against 17.5% with it), and reading the cone's arc off anything but the
+    // resolved stats goes red on 26.
+    file: "tests/run.js", pass: 191, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

@@ -13,6 +13,85 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — A tower on a stump could not shoot, and the red said so twice
+over.** The owner's report, on Ironwood: put a tower on a stump and it cannot
+fire, half its range ring is red, the red patches stack darker where they
+overlap, and a Sniper in cone mode still shows them right round the circle.
+Four symptoms, three bugs, and the first one explains the first two exactly.
+
+**`LongshotTower` and `BeamTower` never set `groundHeight`.** Every other tower
+type reads it in its constructor; these two did not declare the field at all,
+and both hand `RangeFilter.canTarget` a fresh `{ x, y }` literal rather than
+themselves — so `sightClear` fell to `towerPos.groundHeight || 0` and put the
+eye of an Arcane Sniper or a Siphon on the FLOOR while the tower stood on a
+stump. **That is total, not partial.** A stump is a sight blocker at its own
+full radius and the tower stands inside it, so `segmentHit` answers 0 for every
+bearing: measured on the tallest stump, **100% of rays out of a Sniper were
+blocked** against 8.3% at the eye it should have had. It could not acquire one
+body anywhere on the board.
+
+The visual half is the same fact seen from the other end. `silhouetteSpan` on a
+circle whose centre you are inside answers a **180 degree** span at distance 0,
+so the blind-spot layer painted a half-disc of the whole range ring. "Half the
+range appears red" was a literal reading of a 180 degree number.
+
+**And they had no elevation REACH either** — `refreshDerived` wrote
+`ul(this.rangeUl)` where every other type goes through `elevatedRangePx`. The
+build preview has always drawn the elevated ring for them, because
+`previewRangePx` asks the ground rather than the type, so hovering a stump with
+a Sniper promised +15% and placing one delivered nothing. Fixing the eye alone
+would have swapped one lie for another, so both halves moved together.
+`RangeFilter.canTarget` now takes `rangePx` off the object it is handed when it
+is there and converts `stats.range` when it is not — the same object that
+already carried `groundHeight`, and for the same reason: both are facts about
+WHERE a tower stands and a stats table cannot know either.
+
+**Why no test caught it, which is the part worth keeping.** Test 21 pins the
+elevation reach bonus as a straight line through the stump heights and has been
+green throughout — it asks a Rifleman. Test 23 pins "higher ground sees over
+lower things" through the real predicate — with a hand-built `{ x, y,
+groundHeight }` literal. Both instruments were correct and neither had ever been
+given the case that was broken. Test 25 walks the LIVE CATALOGUE and asks all
+five types for the eye, the reach and one clear line off their own stump; taking
+`groundHeight` back off either adapter turns it red.
+
+**The red patches stacked, and two overlapping shadows are one hidden patch.**
+`drawSightShadows` filled each shape's shadow separately at 0.34, so an overlap
+came out at `1 − 0.66²` = 0.56 and drew a visible boundary standing for a rule
+that does not exist. It builds every ring into one path and fills once, nonzero
+winding — which is exactly what `drawNoBuildOverlay` five hundred lines above
+already says, in a comment explaining why the no-build wash is one fill. Read
+off the real canvas: a single-covered pixel and a double-covered one are now
+byte-identical at (216, 88, 88, 98); with the per-shape fill restored the second
+reads (221, 81, 77, **152**).
+
+**And the layer is clipped to the reach, whatever shape that is.** Red means
+*inside my reach and I cannot see into it*, so painting it right round the
+circle on a Sniper covering a 20 degree cone claims blind spots in ground it was
+never going to shoot at, in the one colour on the board that means refused.
+Measured on that cone: 16 638 shadow pixels inside the wedge and none outside it
+— 152 boundary samples, every one within antialiasing distance of the edge and
+not one of them red — against **76 645** outside it unclipped, up to 334 px away.
+
+**`towerReach` is where "which shape is this reach" now lives** (js/tower.js,
+beside the two elevation helpers). Three types spell it three legitimate ways and
+`gl-world.js::drawReach` was reconciling them for the drawing while the shadow
+clip needed the same answer; two reconciliations is a frame where the wedge drawn
+and the wedge shaded are different wedges on the same tower. While a cone is being
+re-aimed the clip takes the cursor's bearing, because that is the wedge gl-world
+draws at that moment. The build ghost is handed a plain circle deliberately: a
+wedge and a cone are things a BUILT tower has, and the ghost is drawn as a ring.
+
+Also in this change, and unrelated to the bug except that reading the file found
+them: the Summoner section said the monster blub's T4 threshold was **6666**
+while `js/blub.js` and the Current values table both say **7777** — it moved in
+`3724919` and only one of the two passages came with it; the Current values row
+for `SLOT_SIZE` still said 76 against the build-bar section's 86 (it grew on
+2026-08-13); and the suite table was the 2026-08-26 reading, four content
+changes out of date. All three are corrected against the code, and the gate's
+own baseline — which had been printing 189 against a recorded 187 since the
+forest commits — is raised to 191 with the two tests this change earns.
+
 **2026-08-27 — The forest is eight authored ironwoods, and which one grows
 where is a decision.** Ironwood plants nine hundred and fifty-eight trees and
 every one of them used to be the same broadleaf with a different wobble. The

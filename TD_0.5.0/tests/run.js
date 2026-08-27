@@ -5817,6 +5817,84 @@ test("24  a shot obeys the same rule its shooter's eye does", function (t) {
   t.eq(fromStump.hit, true, "the same round from the tallest stump does");
 });
 
+test("25  every buildable tower gets the eye and the reach of the stump it stands on",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var tallest = geo.platforms.reduce(function (a, b) {
+    return (a && a.height > b.height) ? a : b;
+  }, null);
+
+  // OFF THE CENTRE, because dead centre is the one point on a stump that hides
+  // this: `silhouetteSpan` bails on a zero-length vector, so a tower measured at
+  // the exact middle of its own stump reports no blind spot whatever its eye is.
+  var x = tallest.x + tallest.radius * 0.3;
+  var y = tallest.y + tallest.radius * 0.1;
+  var open = { x: x + g.ul(40), y: y - g.ul(30) };
+
+  // WALKED OFF THE LIVE CATALOGUE, never a list typed here. Test 21 above asks
+  // the same question of a Rifleman and passed for months while TWO of the five
+  // types carried no `groundHeight` at all -- and a hand-written roster is
+  // exactly how the two that were missing stayed missing under a green test
+  // named "elevation".
+  var cat = g.MetaProgress.catalogue();
+  t.ok(cat.length >= 5, "the catalogue holds every buildable type");
+
+  cat.forEach(function (row) {
+    var Type = g.MetaProgress.constructorOf(row.id);
+    var tower = new Type(x, y, g.nearestPathTo(x, y).path);
+
+    t.eq(tower.groundHeight, tallest.height,
+      row.id + " stands on the stump rather than on the floor");
+    t.near(tower.rangePx,
+      g.elevatedRangePx({ groundHeight: tallest.height }, Type.BASE_RANGE_UL), 1e-9,
+      row.id + " reaches the elevated distance the preview draws for it");
+
+    // THE FAILURE THIS PINS, in the one predicate every attacker comes through.
+    // A stump is a sight blocker at its own full radius and the tower stands
+    // INSIDE it, so an eye left at ground level is an eye inside a rock: on this
+    // stump 100% of the rays out of an Arcane Sniper were blocked and it could
+    // not acquire a single body anywhere on the board.
+    t.eq(g.RangeFilter.sightClear(tower, open), true,
+      row.id + " can see off its own stump");
+  });
+});
+
+test("26  a tower's blind spots are clipped to the reach it actually has",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var x = 700, y = 620;
+  var route = g.nearestPathTo(x, y).path;
+
+  // ONE ANSWER FOR THREE SPELLINGS. gl-world draws the reach off `towerReach`
+  // and game.js clips the red patches to the same answer; two readings of
+  // "which shape is this" is a frame where the wedge DRAWN and the wedge SHADED
+  // are different wedges on the same tower.
+  var circle = g.towerReach(new g.Soldier(x, y, route));
+  t.eq(circle.full, true, "a Rifleman covers a circle");
+  t.near(circle.arcRad, Math.PI * 2, 1e-12, "a whole turn of it");
+
+  var war = g.towerReach(new g.Smasher(x, y, route));
+  t.eq(war.full, false, "a Warbringer's swing is a wedge, not a circle");
+  t.near(war.arcRad, 120 * Math.PI / 180, 1e-9, "of exactly its own arcDegrees");
+
+  var ls = new g.LongshotTower(x, y, route);
+  var base = g.towerReach(ls);
+  t.eq(base.full, true, "an Arcane Sniper starts as a circle");
+  t.near(base.inner, g.ul(ls.core.stats.deadzone), 1e-9,
+    "with its deadzone as the hole in the middle");
+
+  for (var i = 0; i < 4; i++) ls.purchase("A");
+  var cone = g.towerReach(ls);
+  t.eq(cone.full, false, "and its cone tier turns it into a wedge");
+  t.near(cone.arcRad, ls.core.stats.coneArcDeg * Math.PI / 180, 1e-9,
+    "of exactly the arc its RESOLVED stats carry");
+  t.eq(cone.aim, ls.core.aimRad, "pointed where the player aimed it");
+  t.eq(cone.inner, 0, "and no deadzone, which is what cone mode means");
+});
+
 
 group("Day and night — the clock");
 

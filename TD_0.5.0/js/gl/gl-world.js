@@ -3399,32 +3399,22 @@ var World3D = (function () {
 
   // The reach of one tower, whichever shape it has. One place, so a cone tower
   // and a circle tower can never disagree about what "range" means.
+  // WHICH SHAPE IT IS comes from `towerReach` (js/tower.js) and not from three
+  // branches here. The Warbringer's wedge lives on the tower, the Sniper's cone
+  // in its resolved stats and everything else is a circle -- and game.js has to
+  // reconcile the same three to clip a tower's blind spots to its reach. Two
+  // copies of that reconciliation is a board where the wedge drawn and the wedge
+  // shaded are different wedges on the same frame.
   function drawReach(ctx, t, stroke, fill) {
-    // THE WARBRINGER'S REACH IS AN AOE WEDGE, and it was drawing as a plain
-    // circle -- which is a lie at every tier below A4, where the swing only
-    // covers `arcDegrees` in front of him. It keeps its arc on itself rather
-    // than in a `core.stats` block (it predates the config-driven towers), so
-    // it needs its own branch instead of falling through to the circle.
-    if (typeof t.arcDegrees === "number" && typeof t.swingProgress === "function") {
-      if (t.fullCircle) {
-        drawGroundRing(ctx, t.x, t.y, t.rangePx, stroke, fill);
-      } else {
-        drawGroundCone(ctx, t.x, t.y, t.rangePx, 0, t.aim || 0,
-          t.arcRadians || (t.arcDegrees * Math.PI / 180), stroke, fill);
-      }
+    var reach = towerReach(t);
+    if (!reach.full) {
+      drawGroundCone(ctx, t.x, t.y, reach.radius, reach.inner, reach.aim,
+        reach.arcRad, stroke, fill);
       return;
     }
-    var stats = t.core && t.core.stats;
-    var inner = stats && stats.deadzone ? ul(stats.deadzone) : 0;
-    if (stats && stats.targetShape === "cone") {
-      var aim = (typeof t.core.aimRad === "number") ? t.core.aimRad : 0;
-      drawGroundCone(ctx, t.x, t.y, t.rangePx, inner, aim,
-        (stats.coneArcDeg || 30) * Math.PI / 180, stroke, fill);
-      return;
-    }
-    drawGroundRing(ctx, t.x, t.y, t.rangePx, stroke, fill);
-    if (inner) {
-      drawGroundRing(ctx, t.x, t.y, inner, "rgba(230,140,120,0.5)", null);
+    drawGroundRing(ctx, t.x, t.y, reach.radius, stroke, fill);
+    if (reach.inner) {
+      drawGroundRing(ctx, t.x, t.y, reach.inner, "rgba(230,140,120,0.5)", null);
     }
   }
 

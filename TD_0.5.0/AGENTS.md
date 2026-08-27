@@ -120,26 +120,34 @@ suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
 Where this file says "the five unit suites" it means these six minus the smoke
 test, and that is a correct count, not a stale one. Name the set a count counts
 before repairing it. These are the current measured results, **re-run
-2026-08-26 after the timeline scheduler landed**, through
+2026-08-27 with the elevation repair**, through
 `node tools/ci-check.js`, which is the gate and holds these same numbers as its
 baseline:
 
 ```
-node tests/run.js                 133 pass / 0 fail   core game and schedule
-node tests/content.test.js        225 pass / 0 fail   content, visuals and index
-node tests/long-range-dps.test.js  72 pass / 0 fail   the Longshot spec
-node tests/beam.test.js            45 pass / 0 fail   the beam acceptance list
+node tests/run.js                 191 pass / 0 fail   core game and schedule
+node tests/content.test.js        244 pass / 0 fail   content, visuals and index
+node tests/long-range-dps.test.js  74 pass / 0 fail   the Longshot spec
+node tests/beam.test.js            47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
 node tests/sandbox.smoke.js       passed              sandbox integration
 ```
 
-`run.js` was 107 on 2026-08-14 and is 133 now. **Do not re-derive the steps
+`run.js` was 107 on 2026-08-14 and is 191 now. **Do not re-derive the steps
 from this document** — every one of them is itemised, by test name and with its
 self-test, in the baseline comment at the top of `tools/ci-check.js`: 108 → 112
 wave identity, → 118 the wave HUD, → 125 the timeline scheduler (eight added,
 one merged away), → 127 the identity audit, → 133 the schedule's composition
-and timing gates. Each raise landed in the change that earned it, which is what
-that file asks for.
+and timing gates, → 163/167 Ironwood's geometry, placement and elevation,
+→ 187 the day/night cycle, → 189 the forest placement pass, → 191 the elevation
+rule asked of every tower. Each raise landed in the change that earned it,
+which is what that file asks for.
+
+**This block said 133 / 225 / 72 / 45 / 53 until 2026-08-27**, which was the
+2026-08-26 reading and four content changes out of date by then. The gate's own
+baseline is the number to trust and it is the one this block is now copied
+from; where the two disagree, run `node tools/ci-check.js` rather than either
+of them.
 
 **The paragraph below is HISTORY, not a live failure list.** The five content
 names it records were failing on 2026-08-14; all five pass today. It is kept
@@ -420,7 +428,11 @@ js/store.js         the armoury screen (screen === "store"): a Store tab that
                      sells towers for coins and an Inventory tab that edits
                      the build bar. Derives everything from meta.js and each
                      tower's own statLines/drawIcon, like js/codex.js
-js/tower.js         Tower: targeting, fire rate, footprint, cost
+js/tower.js         Tower: targeting, fire rate, footprint, cost -- plus the
+                     three shared helpers the deleted gunner's file hosts for
+                     everybody: `groundHeightUnder` and `elevatedRangePx` (the
+                     two halves of elevation) and `towerReach`, the ONE answer
+                     to which shape a tower's reach is. See the banner in it
 js/smasher.js       Smasher: melee AoE, two upgrade branches, Path A's
                      multi-frame forge-slam, slow, the CHAINING blast, and
                      B5's map-wide earthquake
@@ -1994,6 +2006,33 @@ the tower. `RangeFilter.sightClear` passes it to the injected predicate;
 a tower that can see something it cannot shoot is the worst possible pair of
 rules, and one test fires a real round to say so.
 
+**EVERY TOWER TYPE MUST SET `groundHeight`, AND TWO OF THE FIVE DID NOT UNTIL
+2026-08-27.** `LongshotTower` and `BeamTower` never declared the field, and both
+hand `RangeFilter.canTarget` a freshly built `{x, y}` literal rather than
+themselves — so `sightClear` read `towerPos.groundHeight || 0` and put the eye of
+an Arcane Sniper or a Siphon **on the floor while the tower stood on a stump**.
+That is not a partial failure. A stump is a sight blocker at its own full radius
+and the tower is standing INSIDE it, so `segmentHit` returns 0 for every bearing:
+measured on the tallest stump, **100% of rays out of a Sniper were blocked**
+against 8.3% at the eye it should have had, and the tower could not acquire a
+single body anywhere on the board. The player's report was exactly that plus its
+visual twin — `silhouetteSpan` on a circle you are inside answers a **180 degree**
+span at distance 0, so the blind-spot overlay painted half the range ring red.
+
+Two rules came out of it, and the second is the one that generalises:
+
+- **The object handed to `RangeFilter` IS the tower, not its coordinates.**
+  `groundHeight` and `rangePx` are both facts about WHERE a tower stands that its
+  stats table cannot know — the first decides what it sees over, the second is
+  its reach with the elevation bonus already in it — and a `{x, y}` literal
+  silently drops both. `RangeFilter.canTarget` takes `rangePx` off that object
+  when it is there and converts `stats.range` when it is not, so a caller passing
+  the tower gets the right answer by construction.
+- **A test that has only ever asked ONE type has not tested the rule.** Test 21
+  pinned the reach bonus and was green for as long as the two towers were broken,
+  because it asks a Rifleman. Test 25 walks the LIVE CATALOGUE and asks all five
+  for the eye, the reach and one clear line off their own stump.
+
 **Stumps are cover.** They were drawn as a metre of standing timber from the
 first day and did not act like any until a playtest noticed. They are in
 `sightBlockers` with their own heights, which is what makes elevation worth
@@ -2006,6 +2045,14 @@ is +15% — the figure the owner asked for — and the shortest is +6.6%. The ra
 is per u.l. and the height arrives in world pixels, so `elevatedRangePx` divides
 by `UNIT_LENGTH`: retuning the unit must not retune the bonus. Deliberately
 small. A stump is a firing position, not an upgrade.
+
+**Every type's `rangePx` goes through `elevatedRangePx`, and the two adapters
+did not until 2026-08-27** — they wrote `ul(this.rangeUl)` in `refreshDerived`
+and got no bonus at all. The build preview has always drawn the elevated ring
+for them (`previewRangePx` asks the ground, not the type), so hovering a stump
+with an Arcane Sniper promised +15% of reach and placing one delivered +0%.
+Fixing the eye without fixing this would have swapped one lie for another, which
+is why both halves moved in one change.
 
 **A SOLID IS DRAWN FROM THE SHAPE THAT BLOCKS — there is no prop beside it.**
 `GLGeometry.solid` takes the compiled shape and builds the rock from it, and
@@ -2107,6 +2154,41 @@ shadows were written, tested in Node, and called only from two flat-only branche
 — so on the 3D board, which is every board, they never drew at all. Anything that
 paints a placement rule goes in `drawPlacementFeedback`, which is called from the
 2D world block and from the 3D overlay pass.
+
+**THE BLIND-SPOT LAYER IS ONE PATH AND ONE FILL, and it is CLIPPED TO THE REACH**
+(both 2026-08-27). Two separate rules that were both wrong in the same function:
+
+- **Merged, not stacked.** `drawSightShadows` filled each shape's shadow
+  separately at 0.34, so two shadows that overlap — one hidden patch, to a
+  player — painted their intersection at `1 − 0.66²` = 0.56 and drew a boundary
+  standing for a rule that is not there. It builds every ring into one path and
+  fills once under the default nonzero winding, which is `drawNoBuildOverlay`'s
+  rule arriving where it always belonged. Measured off the real canvas: a
+  single-covered pixel and a double-covered one now read byte-identical
+  (216, 88, 88, 98); before, the second read (221, 81, 77, **152**).
+- **Clipped to the reach, whatever shape that is.** Red means *inside my reach
+  and I cannot see into it*, so painting it right round the circle on an Arcane
+  Sniper covering a 24 degree arc claims blind spots in ground it was never going
+  to shoot at — in the one colour on the board that means refused. Measured on a
+  20 degree cone: 16 638 shadow pixels inside the wedge and none outside it
+  (152 boundary samples, every one within antialiasing distance of the edge and
+  not one of them red); unclipped, the same frame put **76 645** outside, up to
+  334 px away.
+
+**WHICH SHAPE A REACH IS lives in `towerReach` (js/tower.js) and nowhere else.**
+Three types spell it three legitimate ways — the Warbringer keeps
+`arcDegrees`/`fullCircle` on itself because it predates the config-driven towers,
+the Sniper and the Siphon carry `targetShape`/`coneArcDeg`/`deadzone` in resolved
+stats, everything else is a circle — and both `gl-world.js::drawReach` and the
+shadow clip read the one answer. Two reconciliations of the same three spellings
+is a frame where the wedge DRAWN and the wedge SHADED are different wedges on the
+same tower, which is the `slotRect` rule applied to the board instead of the bar.
+While a cone is being re-aimed the clip takes the CURSOR's bearing, because that
+is the wedge gl-world is drawing at that moment.
+
+The build ghost is deliberately handed a plain circle: a wedge and a cone are
+both things a BUILT tower has, and `worldRenderState` draws the ghost as a ring
+for every type, so the shadows are clipped to exactly the ring on screen.
 
 **A curved road is one line, and its hard corners are AUTHORED.** `curvedRoad:
 true` opts a map in; `Maps.walkablePoints` applies the spline ONCE and everything
@@ -6280,12 +6362,21 @@ prefers a summon — clicking the fused pair opens the monster.
 | T1 | 500–999 | 175 | 1.25 | 3 | 30 |
 | T2 | 1000–3499 | 200 | 1.5 | 8 | 35 |
 | T3 | ≥ 4500 | global | 2.5 | 15 | 50 |
-| T4 | **exactly 6666** | global | 5.0 | global | 100 |
+| T4 | **exactly 7777** | global | 5.0 | global | 100 |
 
-**Tier 4 is an exact threshold and is tested FIRST.** 6 665 and 6 667 are tier
-3; 7 777 is not. Ordering the check ahead of tier 3's `>= 4500` is the only
-thing that makes that true, so it is written as an explicit first case rather
-than as a range.
+**Tier 4 is an exact threshold and is tested FIRST.** 7 776 and 7 778 are tier
+3; 6 666 is not tier 4 at all. Ordering the check ahead of tier 3's `>= 4500`
+is the only thing that makes that true, so it is written as an explicit first
+case rather than as a range.
+
+**This table said 6666 until 2026-08-27, and the Current values table said 7777
+the whole time.** `BlubTower.MONSTER_TIERS` in `js/blub.js` carries
+`exactHp: 7777`, so the row above was the wrong copy: the threshold moved in
+`3724919` and only one of the two places that state it came with. Two passages
+of this document disagreeing about the same constant is exactly the failure the
+"Keep this file current" section opens by warning about, one document down from
+the `CLAUDE.md` case. The code is the tie-break, and it was read before this was
+edited.
 
 **The tier is decided once, at the merge, and never moves again** — a tier 3
 monster that eats its way past 6 666 does not become a tier 4.
@@ -7572,6 +7663,9 @@ no mechanic was moved to match the description.
 | Targeting modes | first, last, weakest, strongest, fastest, nearest | `Targeting.MODES` in js/targeting.js |
 | Reference range | 100 u.l. — the yardstick the whole u.l. system is anchored to. Carried by the Rifleman since the gunner was deleted | `Soldier.BASE_RANGE_UL`, `Maps.REFERENCE_TOWER` |
 | Shared footprint | 11.25 u.l. radius — Warbringer and Rifleman both take it from here | `Tower.FOOTPRINT_RADIUS_UL` |
+| Elevation | one number per tower, read once at construction: what it sees OVER and +1% reach per 1.6 u.l. **Every one of the five types carries it** — the two adapters did not until 2026-08-27 | `groundHeightUnder`, `elevatedRangePx`, `RangeFilter.sightClear` |
+| Tower reach shape | `{ radius, inner, aim, arcRad, full }` — the one reconciliation of the Warbringer's wedge, the Sniper's cone and everything else's circle. Read by the renderer AND by the blind-spot clip | `towerReach` in js/tower.js |
+| Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack) and clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |
 | Pierce hit radius | 12 u.l. | `PierceBullet.HIT_RADIUS_UL` |
 | Warbringer range | 37.5 u.l. base, 62.5 at A5, **77.5 at full B** (B2 +15, B4 +10, B5 +15, additive on the base) | `Smasher.BASE_RANGE_UL`, `rangeBonusUl` in `Smasher.UPGRADES` |
@@ -7646,7 +7740,7 @@ no mechanic was moved to match the description.
 | Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 150–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
 | Screens | menu → route chooser (`select`) / index / store → play | `screen` in game.js |
 | Pause menu | Escape only, no HUD button | `paused`, `drawPauseMenu` |
-| Build slot size | 76 px, 10 px gap | `SLOT_SIZE`, `SLOT_GAP` |
+| Build slot size | **86 px**, 10 px gap (76 until 2026-08-13; this row was left behind and said 76 until 2026-08-27, while the build-bar section above had 86) | `SLOT_SIZE`, `SLOT_GAP` |
 | Attack speed unit | attacks per second, on every tower | `TowerStats.rate` |
 | Hover card | 300 px wide, 12 px padding | `TOOLTIP_WIDTH`, `TOOLTIP_PAD` in game.js |
 | Tallest panel | 608 px of the 614 available (a 5-2 Siphon) | `inspectionLayout`, pinned in sandbox.smoke.js |

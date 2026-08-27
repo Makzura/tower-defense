@@ -4949,6 +4949,31 @@ function circleRing(cx, cy, radius, steps) {
   return pts;
 }
 
+// A WEDGE as a ring of world points -- the same shape gl-world's drawGroundCone
+// paints, built here as POINTS so a caller that needs it as a clip rather than
+// as a fill can put it through projectRing like every other ground shape.
+//
+// An `inner` of 0 closes the wedge on the apex, which is one point rather than
+// an arc; anything else lays the returning edge along the deadzone, so a
+// deadzone reads as the hole it is instead of being buried under the fill.
+function coneRing(cx, cy, radius, inner, aim, arcRad, steps) {
+  var n = Math.max(10, steps || Math.round(arcRad / (Math.PI * 2) * 64));
+  var pts = [], i, a;
+  for (i = 0; i <= n; i++) {
+    a = aim - arcRad / 2 + arcRad * (i / n);
+    pts.push([cx + Math.cos(a) * radius, cy + Math.sin(a) * radius]);
+  }
+  if (!inner) {
+    pts.push([cx, cy]);
+    return pts;
+  }
+  for (i = n; i >= 0; i--) {
+    a = aim - arcRad / 2 + arcRad * (i / n);
+    pts.push([cx + Math.cos(a) * inner, cy + Math.sin(a) * inner]);
+  }
+  return pts;
+}
+
 // The road as a filled BAND, rather than a stroked line. A stroke of constant
 // screen width is a lie on a tilted board -- the far end of the road would be
 // painted as wide as the near end -- and the width is the entire information
@@ -5109,16 +5134,31 @@ function drawPlacementFeedback() {
     // AT THE HEIGHT IT WOULD STAND AT, both of them. Hover a stump and the
     // range ring grows and two of the red patches go out before you commit --
     // which is the only way a player finds out that elevation does anything.
+    //
+    // A CIRCLE, deliberately. A Warbringer's wedge and an Arcane Sniper's cone
+    // are both things a BUILT tower has -- the ghost is drawn as a plain ring
+    // for every type (worldRenderState) -- so the shadows are clipped to
+    // precisely the ring the player is being shown and to nothing else.
     var eye = groundHeightUnder(worldMouse.x, worldMouse.y);
-    drawSightShadows(worldMouse.x, worldMouse.y,
-      previewRangePx(type, worldMouse.x, worldMouse.y), eye);
+    drawSightShadows(worldMouse.x, worldMouse.y, {
+      radius: previewRangePx(type, worldMouse.x, worldMouse.y),
+      inner: 0, aim: 0, arcRad: TOWER_FULL_TURN, full: true
+    }, eye);
     return;
   }
   // Not placing: the inspected tower's own blind spots, so a player can ask an
   // already-built tower what it cannot see.
   var t = inspected || aimingTower;
   if (t && !(t.isDestroyed && t.isDestroyed())) {
-    drawSightShadows(t.x, t.y, t.rangePx, t.groundHeight || 0);
+    var reach = towerReach(t);
+    // WHILE AIMING, THE WEDGE FOLLOWS THE CURSOR. gl-world draws it that way so
+    // there is something to aim BY, and the shadows have to be clipped to the
+    // wedge that is on screen rather than to the one still committed on the
+    // core -- otherwise the red sits where the player is aiming AWAY from.
+    if (t === aimingTower && worldMouse && !reach.full) {
+      reach.aim = Math.atan2(worldMouse.y - t.y, worldMouse.x - t.x);
+    }
+    drawSightShadows(t.x, t.y, reach, t.groundHeight || 0);
   }
 }
 
@@ -5241,42 +5281,79 @@ function sightShadowRing(shape, tx, ty, rangePx) {
   return ring;
 }
 
-// EVERY BLIND SPOT THIS EYE HAS, at this height.
+// EVERY BLIND SPOT THIS EYE HAS, at this height, inside the reach it has.
 //
 // `eyeHeight` is how high the observer's ground is. A shape at or below it is
 // looked over and casts nothing -- which is the visible half of the elevation
 // rule: put a tower on the tall stump and watch two of the red patches go out.
-function drawSightShadows(tx, ty, rangePx, eyeHeight) {
+//
+// `reach` is towerReach()'s answer (js/tower.js) and it does two jobs. Its
+// RADIUS is how far a shadow is thrown. Its WEDGE, on a tower that has one, is
+// what this whole layer is clipped to: red means "inside my reach and I cannot
+// see into it", so painting it right round the circle on an Arcane Sniper that
+// covers a 24 degree arc claims blind spots in ground it was never going to
+// shoot at, and does it in the one colour on the board that means "refused".
+//
+// ONE PATH, ONE FILL, which is drawNoBuildOverlay's rule and holds here for the
+// same reason: two shadows that overlap are ONE hidden patch, and filling them
+// separately stacks alpha and paints the overlap a brighter red than either of
+// them -- a boundary the player can see, standing for a rule that is not there.
+// Outlines come after, off the same path, so each patch keeps its own edge.
+function drawSightShadows(tx, ty, reach, eyeHeight) {
   var geo = Maps.geometryOf(currentMap);
   if (!geo.any || !geo.sightBlockers.length) return;
+
+  var radius = reach && reach.radius;
+  // A reach with no edge has no inside to shade: a fused monster blub's is the
+  // whole board, and Infinity as a ring radius projects to NaN.
+  if (!radius || !isFinite(radius)) return;
 
   var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
              World3D.camera) ? World3D.camera() : null;
 
+  var screened = [], i, k;
+  for (i = 0; i < geo.sightBlockers.length; i++) {
+    var shape = geo.sightBlockers[i];
+    if (MapGeometry.clears(shape, eyeHeight || 0)) continue;
+    var ring = sightShadowRing(shape, tx, ty, radius);
+    if (!ring) continue;
+    var r = projectRing(ring, cam);
+    if (r && r.length > 2) screened.push(r);
+  }
+  if (!screened.length) return;
+
   ctx.save();
+
+  if (!reach.full) {
+    var wedge = projectRing(coneRing(tx, ty, radius, reach.inner,
+      reach.aim, reach.arcRad), cam);
+    // A wedge that will not project is one running behind the eye. Drawing the
+    // shadows unclipped there is exactly the claim this branch exists to stop,
+    // so nothing is drawn at all rather than too much.
+    if (!wedge || wedge.length < 3) { ctx.restore(); return; }
+    ctx.beginPath();
+    ctx.moveTo(wedge[0][0], wedge[0][1]);
+    for (k = 1; k < wedge.length; k++) ctx.lineTo(wedge[k][0], wedge[k][1]);
+    ctx.closePath();
+    ctx.clip();
+  }
+
+  ctx.beginPath();
+  for (i = 0; i < screened.length; i++) {
+    ctx.moveTo(screened[i][0][0], screened[i][0][1]);
+    for (k = 1; k < screened[i].length; k++) {
+      ctx.lineTo(screened[i][k][0], screened[i][k][1]);
+    }
+    ctx.closePath();
+  }
   // STRONG ENOUGH TO READ ON A DARK BOARD. At 0.20 over forest floor this was
   // there and invisible, which is the same as not being there: the whole point
   // is that a player can see the cover before they spend $900 shooting into it.
   ctx.fillStyle = "rgba(232,64,52,0.34)";
+  ctx.fill();
   ctx.strokeStyle = "rgba(255,118,102,0.55)";
   ctx.lineWidth = 1.5;
-  for (var i = 0; i < geo.sightBlockers.length; i++) {
-    var shape = geo.sightBlockers[i];
-    if (MapGeometry.clears(shape, eyeHeight || 0)) continue;
-    var ring = sightShadowRing(shape, tx, ty, rangePx);
-    if (!ring) continue;
-    var screened = projectRing(ring, cam);
-    if (!screened || screened.length < 3) continue;
-
-    ctx.beginPath();
-    ctx.moveTo(screened[0][0], screened[0][1]);
-    for (var k = 1; k < screened.length; k++) {
-      ctx.lineTo(screened[k][0], screened[k][1]);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  }
+  ctx.stroke();
   ctx.restore();
 }
 

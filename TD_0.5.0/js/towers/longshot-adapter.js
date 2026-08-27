@@ -25,6 +25,21 @@ function LongshotTower(x, y, path) {
   this.x = x;
   this.y = y;
 
+  // HOW HIGH THE GROUND UNDER IT IS, read once, at construction. Zero on dirt.
+  // This one number is the whole of elevation: RangeFilter reads it to decide
+  // what this tower can see over, bullet.js reads it to decide what its rounds
+  // fly over, and elevatedRangePx reads it for the reach bonus.
+  //
+  // THIS TOWER DID NOT HAVE IT UNTIL 2026-08-27, and the field being ABSENT is
+  // what made the failure total rather than partial: `RangeFilter.sightClear`
+  // reads `towerPos.groundHeight || 0`, so an Arcane Sniper on a stump cast its
+  // lines from an eye at ground level -- and a stump is a sight blocker at its
+  // own full radius, which the tower is standing INSIDE. Every line out of it
+  // started in a rock, so the tower could not acquire a single enemy anywhere
+  // on the board. Measured on the tallest stump: 100% of rays blocked at eye 0,
+  // 8.3% at the eye it should have had.
+  this.groundHeight = groundHeightUnder(x, y);
+
   // Firing priority, same rule as the gunner: towers are sorted by how far
   // along the path they sit, and the update order IS the claim order.
   this.pathProgress = path.progressAtPoint(x, y);
@@ -107,7 +122,10 @@ LongshotTower.FOOTPRINT_RADIUS_UL = LongshotTower.CONFIG.base.footprint;
 LongshotTower.prototype.refreshDerived = function () {
   this.rangeUl = this.core.stats.range;
   this.footprintRadiusUl = this.core.stats.footprint;
-  this.rangePx = ul(this.rangeUl);
+  // Through elevatedRangePx, like every other tower: the ground under a tower
+  // grows its reach, and the build preview has always DRAWN that bigger ring
+  // for this type (previewRangePx) while the tower delivered the flat one.
+  this.rangePx = elevatedRangePx(this, this.rangeUl);
   this.footprintPx = ul(this.footprintRadiusUl);
 
   // `maxHp` / `currentHp` FORWARD to the core rather than being copied from
@@ -502,7 +520,13 @@ LongshotTower.prototype.update = function (dt, enemies, bullets) {
   var order = Targeting.comparator(this);
   var stats = this.core.stats;
   var aimRad = this.core.aimRad;
-  var towerPos = { x: this.x, y: this.y };
+  // THE EYE, NOT JUST THE POSITION. `groundHeight` is what RangeFilter hands
+  // the occlusion predicate and `rangePx` is this tower's reach with the
+  // elevation bonus already in it -- both are facts about WHERE it stands that
+  // its stats table cannot know. Omitting them is what put this tower's eye on
+  // the floor while it stood on a stump; see the constructor.
+  var towerPos = { x: this.x, y: this.y, groundHeight: this.groundHeight,
+                   rangePx: this.rangePx };
   var primary = null;
 
   for (var i = 0; i < enemies.length; i++) {

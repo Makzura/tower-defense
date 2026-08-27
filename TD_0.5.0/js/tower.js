@@ -69,6 +69,48 @@ function elevatedRangePx(tower, rangeUl) {
   return px * (1 + Tower.ELEVATION_RANGE_PER_UL * (h / UNIT_LENGTH));
 }
 
+// WHAT SHAPE A TOWER'S REACH IS -- one answer, for everything that draws it.
+//
+// The five types spell it three ways, all of them legitimately. The Warbringer
+// keeps `arcDegrees` / `fullCircle` / `arcRadians` on itself because it predates
+// the config-driven towers; the Arcane Sniper and the Siphon carry
+// `targetShape` / `coneArcDeg` / `deadzone` in their resolved stats; everything
+// else is a plain circle. Somewhere has to reconcile those three, and the moment
+// TWO places do it the wedge a tower is DRAWN with stops being the wedge its
+// blind spots are CLIPPED to -- which is a picture contradicting itself about
+// the same tower on the same frame. So gl-world's drawReach and game.js's sight
+// shadows both come here, exactly as slotRect is shared between the build bar's
+// drawing and its hit test.
+//
+// Distances are world units and angles are radians. `arcRad` is a whole turn for
+// a circle and `full` says so outright, so a caller that only wants "how far"
+// never has to work out which of the three shapes it was handed.
+var TOWER_FULL_TURN = Math.PI * 2;
+
+function towerReach(tower) {
+  var radius = (tower && tower.rangePx) || 0;
+
+  if (tower && typeof tower.arcDegrees === "number" &&
+      typeof tower.swingProgress === "function") {
+    if (tower.fullCircle) {
+      return { radius: radius, inner: 0, aim: 0, arcRad: TOWER_FULL_TURN, full: true };
+    }
+    return { radius: radius, inner: 0, aim: tower.aim || 0,
+      arcRad: tower.arcRadians || (tower.arcDegrees * Math.PI / 180), full: false };
+  }
+
+  var stats = tower && tower.core && tower.core.stats;
+  var inner = (stats && stats.deadzone) ? ul(stats.deadzone) : 0;
+  if (stats && stats.targetShape === "cone") {
+    return {
+      radius: radius, inner: inner,
+      aim: (typeof tower.core.aimRad === "number") ? tower.core.aimRad : 0,
+      arcRad: (stats.coneArcDeg || 30) * Math.PI / 180, full: false
+    };
+  }
+  return { radius: radius, inner: inner, aim: 0, arcRad: TOWER_FULL_TURN, full: true };
+}
+
 function Tower(x, y, path) {
   this.x = x;
   this.y = y;

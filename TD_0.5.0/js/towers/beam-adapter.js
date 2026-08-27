@@ -26,6 +26,18 @@
 function BeamTower(x, y, path) {
   this.x = x;
   this.y = y;
+
+  // HOW HIGH THE GROUND UNDER IT IS, read once, at construction. Zero on dirt.
+  // This one number is the whole of elevation: RangeFilter reads it to decide
+  // what this tower can see over, bullet.js reads it to decide what its rounds
+  // fly over, and elevatedRangePx reads it for the reach bonus.
+  //
+  // Missing here until 2026-08-27, with the same total consequence it had on
+  // the Arcane Sniper: a Siphon standing on a stump cast every beam from an eye
+  // at ground level, inside a sight blocker the size of the stump, and could
+  // therefore lock nothing at all. See the note in longshot-adapter.js.
+  this.groundHeight = groundHeightUnder(x, y);
+
   this.pathProgress = path.progressAtPoint(x, y);
   this.path = path;
 
@@ -120,7 +132,9 @@ BeamTower.prototype.refreshDerived = function () {
   // Footprint is fixed for every tier by design -- read from base, not from
   // the resolved stats, so a stray delta could never move it.
   this.footprintRadiusUl = BeamTower.CONFIG.base.footprint;
-  this.rangePx = ul(this.rangeUl);
+  // Through elevatedRangePx, like every other tower -- see the note on the same
+  // line in longshot-adapter.js.
+  this.rangePx = elevatedRangePx(this, this.rangeUl);
   this.footprintPx = ul(this.footprintRadiusUl);
 
   // `maxHp` / `currentHp` forward to the core rather than being copied --
@@ -220,7 +234,10 @@ BeamTower.prototype.canHold = function (enemy) {
   if (enemy.dead || enemy.leaked) return false;
   return RangeFilter.canTarget(
     this.core.stats,
-    { x: this.x, y: this.y },
+    // THE EYE AND THE REACH, not just the position -- see the same literal in
+    // longshot-adapter.js. Without `groundHeight` a Siphon on a stump holds no
+    // lock at all, and without `rangePx` it draws a reach it does not have.
+    { x: this.x, y: this.y, groundHeight: this.groundHeight, rangePx: this.rangePx },
     0,
     { x: enemy.pos.x, y: enemy.pos.y, isFlying: enemy.isFlying, isCamo: enemy.isCamo }
   );
