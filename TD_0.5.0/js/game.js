@@ -2348,14 +2348,11 @@ function onClick(event) {
     // a tower is the entire permitted action, and it mutates nothing but which
     // tower the panel is describing.
     if (resultMinimised) {
-      // THROUGH screenToWorld, exactly as the live picker does. `towerAt` takes
-      // WORLD coordinates, and in 3D the click arrives in screen pixels -- so
-      // passing `p` straight in silently picked nothing at all, which reads as
-      // "selection is broken" rather than as a coordinate-space mistake. Found
-      // by clicking it in a browser; every unit test passed with it wrong,
-      // because the harness's stub camera makes the two spaces identical.
-      var w = screenToWorld(p.x, p.y);
-      var pick = towerAt(w.x, w.y);
+      // THROUGH `pickTower`, exactly as the live click handler does. This used
+      // to convert with screenToWorld and call `towerAt` itself, which was the
+      // right shape for a flat board and is now one of two copies of a question
+      // that has stopped having an obvious answer -- see `pickTower`.
+      var pick = pickTower(p.x, p.y);
       if (pick) { Sound.playUIClick(); inspected = pick; }
       return;
     }
@@ -2439,7 +2436,12 @@ function onClick(event) {
 
   // Clicking a tower inspects it, whether or not a slot is armed -- you can
   // never build on top of one anyway, so there is nothing to compete with.
-  var hit = towerAt(w.x, w.y);
+  //
+  // ON THE SCREEN POINT, not on `w`. This is the one thing below the seam above
+  // that is not a question about the map: a tower is picked where it is DRAWN,
+  // and on a board with height in it that is not the world point under the
+  // cursor. See `pickTower`.
+  var hit = pickTower(p.x, p.y);
   if (hit) {
     Sound.playUIClick();
     inspected = hit;
@@ -2857,6 +2859,75 @@ function towerAt(x, y) {
     if (!hit) hit = towers[i];
   }
   return hit;
+}
+
+// WHICH TOWER IS UNDER THE CURSOR, and on a board with height in it that is a
+// SCREEN-space question rather than a world-space one.
+//
+// `towerAt` above answers the world-space version and is still the whole rule
+// on the flat board, where a tower is drawn exactly where it stands and the two
+// questions are the same question. On the 3D board they are not.
+// `screenToWorld` casts the cursor at the GROUND PLANE, so a tower up on a
+// stump is picked at the spot where z = 0 sits under it — and that spot is not
+// under the tower on screen, it is well below it. Measured in the browser, on
+// Ironwood's tallest stump at the default 34 degree pitch: with the cursor on
+// the tower's drawn feet the old pick landed **39 px** away, which is **1.87
+// footprint radii** for an Arcane Sniper and 3.3 for a Rifleman. The click
+// target and the tower do not overlap AT ALL for any of the five types, so the
+// panel could only be opened by clicking bare dirt at the right distance below
+// the thing you meant to click.
+//
+// So the body is tested WHERE IT IS DRAWN: a capsule up the column the renderer
+// painted, from the tower's base to the top of its mesh, as wide as its own
+// footprint. Clicking anywhere on the tower opens it, which is what the
+// footprint radius has always promised on the flat board — one radius doing the
+// collision rule, the drawn base and the click target — kept true on a board
+// where the drawn base is no longer at the world point beneath it.
+//
+// Two numbers come from the renderer because only the renderer has them: the
+// height of the ground it stood the tower on, and the height of the mesh it
+// gave it. The hit test itself stays here with every other hit test in this
+// file. Same division `groundHeightAt` and `isLevelUnder` already have.
+//
+// NEAREST TO THE CAMERA WINS, which is the depth-buffer's answer and therefore
+// the same one the player's eye gives. Footprints cannot overlap in plan, but
+// two columns certainly overlap on screen at a shallow pitch, and the one in
+// front is the one being pointed at. A summon still beats a tower outright —
+// see `towerAt` for why that pair is the only genuine overlap on the board.
+function pickTower(screenX, screenY) {
+  var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
+             World3D.camera) ? World3D.camera() : null;
+  if (!cam) {
+    var flat = screenToWorld(screenX, screenY);
+    return towerAt(flat.x, flat.y);
+  }
+
+  var hit = null, hitDepth = Infinity, summon = null, summonDepth = Infinity;
+  for (var i = 0; i < towers.length; i++) {
+    var t = towers[i];
+    if (t.isDestroyed && t.isDestroyed()) continue;
+
+    var ground = World3D.groundHeightAt(t.x, t.y);
+    var base = cam.worldToScreen(t.x, t.y, ground);
+    if (!base) continue;                       // behind the eye
+    var crown = cam.worldToScreen(t.x, t.y, ground + World3D.towerTopOf(t));
+    var tipX = crown ? crown.x : base.x;
+    var tipY = crown ? crown.y : base.y;
+
+    // The footprint is a WORLD radius and this comparison is in screen pixels,
+    // so it goes through the camera's own scale at that depth. Reading it flat
+    // would make a distant tower's target as fat as a near one's.
+    var r = t.footprintPx * (base.scale || 1);
+    if (MapGeometry.pointToSegmentSq(screenX, screenY, base.x, base.y,
+        tipX, tipY) > r * r) continue;
+
+    if (t.isSummon) {
+      if (base.depth < summonDepth) { summon = t; summonDepth = base.depth; }
+    } else if (base.depth < hitDepth) {
+      hit = t; hitDepth = base.depth;
+    }
+  }
+  return summon || hit;
 }
 
 function refreshBlockReason() {

@@ -13,6 +13,49 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — A tower is clicked where it is drawn.** Not a bug that was
+introduced; a promise that was quietly dropped in the 2D→3D move and never
+picked back up. `screenToWorld` casts the cursor at the GROUND PLANE, which is
+the right answer for placement and the wrong one for pointing at a body: a tower
+standing on a stump is drawn well above the world point beneath it, so the click
+target and the tower are two different places on screen.
+
+**Measured in a browser, on Ironwood's tallest stump at the default 34 degree
+pitch:** with the cursor on the tower's own feet the pick landed **39 px away**,
+which is **1.87 footprint radii for an Arcane Sniper and 3.3 for a Rifleman**.
+That is not a fiddly target, it is no target at all — for none of the five types
+does the click disc overlap the tower, so the upgrade panel could only be opened
+by clicking bare dirt the right distance below the thing you meant to click. The
+owner's report was exactly that: "quasiment impossible".
+
+**`pickTower` tests the body where it is DRAWN** — a capsule up the column the
+renderer painted, from the base to the top of the mesh, as wide as the tower's
+own footprint. So clicking anywhere on the tower opens it, which is what the
+footprint radius has always promised on the flat board ("one radius does all
+three jobs"), kept true on a board where the drawn base is no longer at the
+world point beneath it. `towerAt` stays exactly as it was and is still the whole
+rule with no 3D renderer.
+
+Two numbers come from the renderer because only the renderer has them: the
+height of the ground it stood the tower on, and the height of the mesh it gave
+it (`World3D.towerTopOf`, new, measured by the same `bodyTopOf` the Siphon's
+occluders use, so a tier that swaps in a taller body moves it with no edit). The
+hit test itself stays in game.js with every other hit test — the division
+`isLevelUnder` already has. Nearest to the camera wins, which is the depth
+buffer's answer and therefore the player's eye's: footprints cannot overlap in
+plan, but columns overlap on screen all the time.
+
+Test 28 pins it against a stand-in camera, because the harness has no WebGL and
+the real one needs it. It asserts the bug in the shape it shipped in, the
+capsule, and the depth rule in BOTH directions.
+
+**Left alone deliberately, and written down rather than fixed in passing:**
+`enemyAt` and `recruitAt` have a smaller version of the same defect on the one
+board with terrain, and the BUILD ghost has it too — hovering a stump to place a
+tower puts the ghost at the z = 0 point. Those are hover readouts and a preview
+rather than the door to the upgrade panel, and the fix is the same shape
+whenever it is wanted.
+
 **2026-08-27 — A shot stops at what it was aimed at, and nothing else; the red
 patches have one outline between them.** The follow-up to the entry below, and
 the second half of the same report. With the eye repaired the Arcane Sniper on a

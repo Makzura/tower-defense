@@ -2343,6 +2343,40 @@ to corner. The footprint is also the tower's **click target**
 change how towers are drawn, preserve this relationship or both the collision
 rule and the hit box stop matching what the player sees.
 
+**AND ON A BOARD WITH HEIGHT IN IT THE CLICK TARGET IS A SCREEN-SPACE QUESTION**
+(2026-08-27). The rule above is a promise about the player pointing at the thing
+they can see, and the 2D→3D move quietly broke it for anything standing on a
+stump. `screenToWorld` casts the cursor at the GROUND PLANE, so the world point
+under the cursor is where z = 0 sits *below* a raised tower, not where the tower
+is drawn. Measured in a browser on Ironwood's tallest stump at the default 34
+degree pitch: cursor on the tower's own feet, the pick landed **39 px away —
+1.87 footprint radii for an Arcane Sniper, 3.3 for a Rifleman**. Not fiddly:
+the target and the tower do not overlap for ANY of the five types, so the panel
+could only be opened by clicking bare dirt the right distance below it.
+
+**`pickTower(screenX, screenY)` is the picker the click handler uses**, and
+`towerAt(worldX, worldY)` stays as the world-space rule the flat board keeps.
+The body is tested where it is DRAWN — a capsule up the column the renderer
+painted, from the tower's base to the top of its mesh, **as wide as its own
+footprint**, so the radius still does all three jobs and clicking anywhere on
+the tower opens it. Two numbers come from the renderer because only it has
+them — `World3D.groundHeightAt` for the surface it stood the tower on and
+`World3D.towerTopOf` for the height of the mesh it gave it — and the hit test
+itself stays in `game.js` with every other hit test. Same division
+`isLevelUnder` already has.
+
+**NEAREST TO THE CAMERA WINS**, which is the depth buffer's answer and so the
+same one the player's eye gives: footprints cannot overlap in plan, but two
+columns certainly overlap on screen at a shallow pitch. A summon still beats a
+tower outright, which is the one genuine overlap on the board.
+
+**`enemyAt` and `recruitAt` still ask the world-space question**, and on the one
+board with terrain that is a smaller version of the same defect — a body on the
+depot's ramp or the bridge is picked below itself. It is left alone rather than
+swept in: those are hover readouts rather than the door to the upgrade panel,
+and the fix is the same shape whenever it is wanted. **So is the BUILD ghost**:
+hovering a stump to place a tower puts the ghost at the z = 0 point too.
+
 `whyCannotBuild(x, y, type)` returns `null` or a short human-readable reason,
 shown under the cursor. It is the single source of truth for placement rules —
 add new ones there, and never duplicate a rule inline in `onClick`. It takes
@@ -7710,6 +7744,7 @@ no mechanic was moved to match the description.
 | Shared footprint | 11.25 u.l. radius — Warbringer and Rifleman both take it from here | `Tower.FOOTPRINT_RADIUS_UL` |
 | Elevation | one number per tower, read once at construction: what it sees OVER and +1% reach per 1.6 u.l. **Every one of the five types carries it** — the two adapters did not until 2026-08-27 | `groundHeightUnder`, `elevatedRangePx`, `RangeFilter.sightClear` |
 | Tower reach shape | `{ radius, inner, aim, arcRad, full }` — the one reconciliation of the Warbringer's wedge, the Sniper's cone and everything else's circle. Read by the renderer AND by the blind-spot clip | `towerReach` in js/tower.js |
+| Tower click target | a capsule up the column the renderer painted — base to mesh top, as wide as the footprint. Nearest to the camera wins; a summon beats a tower. The world-space footprint test is the flat board's rule and the fallback | `pickTower` / `towerAt` in game.js, `World3D.towerTopOf` |
 | Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack), the outline is the UNION's outline (no seams through the middle) and the whole layer is clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
 | What stops a shot | arriving, losing its target, spending its pierce, running out of range. **Not terrain** — sight gates acquisition and nothing gates the round | `js/bullet.js` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |

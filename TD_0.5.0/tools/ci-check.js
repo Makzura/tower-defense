@@ -367,7 +367,21 @@ var BASELINE = [
     // described the old rule would be the stale copy this file exists to stop.
     // 14 keeps its number and its subject -- tunnelling -- against a BODY,
     // which is the half of it that survives the ruling.
-    file: "tests/run.js", pass: 192, fail: 0,
+    //
+    // 193 on 2026-08-27, from 192: A TOWER IS CLICKED WHERE IT IS DRAWN. 28
+    // pins `pickTower` against a STAND-IN CAMERA -- the harness has no WebGL,
+    // and the real one needs it -- that models the one thing the rule is about:
+    // height moves a body up the screen, so the ground plane under a raised
+    // tower is below it. It asserts the bug in the shape it shipped in (the
+    // world-space pick misses the tower it is pointing at), the capsule up the
+    // body, and the depth rule in BOTH directions, because a rule that has only
+    // ever returned one answer has not been tested.
+    //
+    // Measured in a browser rather than in Node, because the harness cannot
+    // see it: on Ironwood's tallest stump at the default pitch the old pick
+    // landed 39 px away, 1.87 footprint radii for an Arcane Sniper and 3.3 for
+    // a Rifleman -- no overlap at all for any of the five types.
+    file: "tests/run.js", pass: 193, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

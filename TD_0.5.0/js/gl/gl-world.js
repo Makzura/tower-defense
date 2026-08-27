@@ -5507,6 +5507,24 @@ var World3D = (function () {
     groundHeightAt: function (x, y, ignoreDeck) {
       return enabled ? groundHeightAt(x, y, ignoreDeck) : 0;
     },
+    // HOW TALL THE BODY THIS TOWER IS WEARING IS, in world units above the
+    // ground it stands on. Measured off the model, per tier, by the same
+    // `bodyTopOf` the Siphon's occluder capsules use -- so it is the mesh's own
+    // height and not a guess, and a tier that swaps in a taller body moves it
+    // with no edit anywhere.
+    //
+    // Exported for the CLICK TARGET (`pickTower` in game.js). On a board with
+    // height in it a tower is not drawn where the ground under it is, so
+    // "which tower did I click" is a question about the column the renderer
+    // painted -- and the renderer is the only thing that knows how tall that
+    // column is. game.js still owns the hit test itself; this hands it the one
+    // number it cannot derive, exactly as `groundHeightAt` above does.
+    //
+    // Zero with no 3D board, which is what keeps the flat renderer on its own
+    // world-space footprint test.
+    towerTopOf: function (t) {
+      return (enabled && t) ? towerTop(t) : 0;
+    },
     // The board's height field itself, read-only, for a test that has to prove
     // a scenery change did not move a build spot. The PICTURE not changing is
     // not that proof -- placement reads this, never the screen.

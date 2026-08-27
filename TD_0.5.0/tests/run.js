@@ -5963,6 +5963,97 @@ function (t) {
     "a sweep at eye zero would still stop it dead on its own stump");
 });
 
+test("28  a tower is CLICKED where it is drawn, not at the ground under it",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var tallest = geo.platforms.reduce(function (a, b) {
+    return (a && a.height > b.height) ? a : b;
+  }, null);
+  h.run("cash = 1000000");
+
+  // A STAND-IN CAMERA, because the harness has no WebGL and the real one needs
+  // it. It models the one thing this rule is about and nothing else: height
+  // moves a body UP the screen, so the ground plane under a raised tower is
+  // BELOW it. `LIFT` is roughly cot(34 degrees), the board's default pitch.
+  //
+  // The flat identity that comes with it -- screen (x, y) is world (x, y) at
+  // z = 0 -- is what lets the same numbers stand for both spaces, so the test
+  // reads as positions rather than as projections.
+  var LIFT = 1.5, BODY = 40;
+  h.run("World3D.isEnabled = function () { return true; };" +
+        "World3D.groundHeightAt = function (x, y) {" +
+        "  return Maps.groundHeightAt(currentMap, x, y); };" +
+        "World3D.towerTopOf = function (t) {" +
+        "  return (t && t.bodyTopForTest) || " + BODY + "; };" +
+        "World3D.screenToWorld = function (x, y) { return { x: x, y: y }; };" +
+        "World3D.camera = function () { return { worldToScreen:" +
+        "  function (x, y, z) {" +
+        "    return { x: x, y: y - (z || 0) * " + LIFT + "," +
+        "             scale: 1, depth: y }; } }; };");
+
+  var x = tallest.x + tallest.radius * 0.3, y = tallest.y;
+  var tower = new g.LongshotTower(x, y, g.nearestPathTo(x, y).path);
+  g.addTower(tower);
+
+  var baseY = y - tallest.height * LIFT;        // where the feet are DRAWN
+  t.ok(y - baseY > tower.footprintPx,
+    "the drawn base and the ground point under it do not overlap at all (" +
+    Math.round(y - baseY) + " px apart, against a " +
+    Math.round(tower.footprintPx) + " px footprint radius)");
+
+  // THE BUG, in the shape it shipped in: converting the click to a world point
+  // and asking `towerAt` finds nothing at all where the tower is drawn, because
+  // that world point is the patch of dirt below it.
+  var asWorld = g.screenToWorld(x, baseY);
+  t.eq(g.towerAt(asWorld.x, asWorld.y), null,
+    "the old world-space pick misses the tower it is pointing at");
+
+  t.eq(g.pickTower(x, baseY), tower, "clicking its feet opens it");
+  t.eq(g.pickTower(x, baseY - BODY * LIFT * 0.5), tower,
+    "and so does clicking halfway up its body");
+  t.eq(g.pickTower(x, baseY - BODY * LIFT), tower, "and its crown");
+  // A capsule has rounded ends, so it forgives a footprint's worth above the
+  // head. Past that is empty air and belongs to nothing.
+  t.eq(g.pickTower(x, baseY - BODY * LIFT - tower.footprintPx - 4), null,
+    "the empty air above it is not the tower");
+  t.eq(g.pickTower(x + tower.footprintPx * 2, baseY), null,
+    "and neither is the ground beside it");
+
+  // NEAREST TO THE CAMERA WINS, and it is tested in BOTH directions -- a rule
+  // that has only ever returned one answer has not been tested. Footprints
+  // cannot overlap in plan; columns certainly overlap on SCREEN, and the one in
+  // front is the one being pointed at. `depth` is the stand-in camera's world
+  // y, and larger y is further from the eye (measured on the real board: world
+  // y 160 projects to screen y 436 and world y 460 to 327, so up the screen is
+  // away).
+  var shared = y - 80;                          // inside the raised column
+  t.ok(shared <= baseY && shared >= baseY - BODY * LIFT,
+    "the sample point is inside the raised tower's column");
+
+  var nearer = new g.LongshotTower(x, y - 60, g.nearestPathTo(x, y - 60).path);
+  g.addTower(nearer);
+  t.eq(nearer.groundHeight, 0, "the second tower is on dirt, not on the stump");
+  t.eq(g.pickTower(x, shared), nearer,
+    "a column NEARER the eye takes the click off the raised one");
+
+  // And the other way: a tower further away, tall enough for its column to
+  // reach the same pixel, must NOT take it.
+  g.towers.splice(g.towers.indexOf(nearer), 1);
+  var further = new g.LongshotTower(x, y + 60, g.nearestPathTo(x, y + 60).path);
+  further.bodyTopForTest = 120;
+  g.addTower(further);
+  t.eq(g.pickTower(x, shared), tower,
+    "and a column FURTHER away leaves it with the raised tower");
+
+  // AND THE FLAT BOARD IS UNTOUCHED: with no 3D renderer, picking is exactly
+  // the world-space footprint test it has always been.
+  h.run("World3D.isEnabled = function () { return false; };");
+  t.eq(g.pickTower(x, y), tower,
+    "on a flat board the ground point under a tower IS the tower");
+});
+
 
 group("Day and night — the clock");
 
