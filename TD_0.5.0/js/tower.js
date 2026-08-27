@@ -61,6 +61,26 @@ function groundHeightUnder(x, y) {
 // rate is per u.l. -- retuning the unit must not retune the bonus.
 Tower.ELEVATION_RANGE_PER_UL = 0.00625;
 
+// HOW WIDE THE CLICKABLE COLUMN IS, as a fraction of the footprint radius.
+//
+// The click target is a dome at the tower's feet plus a shaft up to its head
+// (`pickTower` in game.js). The DOME is the footprint, unreduced, because at
+// ground level the footprint is exactly the promise the game has always made
+// about where a tower is. The SHAFT is not: a tower is much narrower than its
+// footprint everywhere above its base, and a full-width column is wider than
+// the model it stands for -- which does not merely make the target generous, it
+// makes it STEAL. A tower in front swallows the clicks meant for the one
+// behind, and the player is pointing straight at a body they cannot select.
+//
+// Half is a baseline rather than a measurement. The honest number is each
+// model's own plan extent, and it is NOT `bodyExtentRadii`: that measures the
+// whole silhouette, so a Warbringer's hammer and a Rifleman's rifle would put
+// the column back at the width this exists to cut. Per-type tuning is a
+// `hitShaftFraction` on the instance when a body wants one; nothing sets it
+// today, which is a statement about what has been measured, not about what is
+// possible.
+Tower.HIT_SHAFT_FRACTION = 0.5;
+
 function elevatedRangePx(tower, rangeUl) {
   if (rangeUl === Infinity) return Infinity;
   var px = ul(rangeUl);

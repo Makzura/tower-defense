@@ -2877,12 +2877,22 @@ function towerAt(x, y) {
 // panel could only be opened by clicking bare dirt at the right distance below
 // the thing you meant to click.
 //
-// So the body is tested WHERE IT IS DRAWN: a capsule up the column the renderer
-// painted, from the tower's base to the top of its mesh, as wide as its own
-// footprint. Clicking anywhere on the tower opens it, which is what the
-// footprint radius has always promised on the flat board — one radius doing the
-// collision rule, the drawn base and the click target — kept true on a board
-// where the drawn base is no longer at the world point beneath it.
+// So the body is tested WHERE IT IS DRAWN, as two shapes rather than one:
+//
+//   THE DOME — a hemisphere at the tower's feet, the full footprint radius.
+//     At ground level the footprint is exactly the promise this game has always
+//     made about where a tower is, so it is not reduced.
+//   THE SHAFT — a cylinder from the base to the top of the mesh AND NO HIGHER,
+//     at `Tower.HIT_SHAFT_FRACTION` of that radius.
+//
+// **The shaft was the full footprint for one revision and that was wrong in a
+// way that is worse than a fiddly target.** A tower is far narrower than its
+// footprint everywhere above its base, so a full-width column is wider than the
+// model it stands for — and a wider column does not merely forgive, it STEALS.
+// Two Riflemen one behind the other, the near one's column swallowing every
+// click aimed at the far one's body: the player is pointing straight at a tower
+// they cannot select, which is a worse failure than the one this replaced,
+// because at least that one looked like nothing was there.
 //
 // Two numbers come from the renderer because only the renderer has them: the
 // height of the ground it stood the tower on, and the height of the mesh it
@@ -2911,15 +2921,31 @@ function pickTower(screenX, screenY) {
     var base = cam.worldToScreen(t.x, t.y, ground);
     if (!base) continue;                       // behind the eye
     var crown = cam.worldToScreen(t.x, t.y, ground + World3D.towerTopOf(t));
-    var tipX = crown ? crown.x : base.x;
-    var tipY = crown ? crown.y : base.y;
 
     // The footprint is a WORLD radius and this comparison is in screen pixels,
     // so it goes through the camera's own scale at that depth. Reading it flat
     // would make a distant tower's target as fat as a near one's.
     var r = t.footprintPx * (base.scale || 1);
-    if (MapGeometry.pointToSegmentSq(screenX, screenY, base.x, base.y,
-        tipX, tipY) > r * r) continue;
+    var dx = screenX - base.x, dy = screenY - base.y;
+
+    var inside = dx * dx + dy * dy <= r * r;              // the dome
+    if (!inside && crown) {
+      // The shaft, and it is a CYLINDER rather than a capsule: a capsule's cap
+      // would hang a footprint's worth of target in the air above the tower's
+      // head, and "up to the head, no higher" is the whole of what makes the
+      // column honest about where the model ends.
+      var ax = crown.x - base.x, ay = crown.y - base.y;
+      var len2 = ax * ax + ay * ay;
+      if (len2 > 1e-9) {
+        var u = (dx * ax + dy * ay) / len2;
+        if (u >= 0 && u <= 1) {
+          var ox = dx - ax * u, oy = dy - ay * u;
+          var shaft = r * (t.hitShaftFraction || Tower.HIT_SHAFT_FRACTION);
+          inside = ox * ox + oy * oy <= shaft * shaft;
+        }
+      }
+    }
+    if (!inside) continue;
 
     if (t.isSummon) {
       if (base.depth < summonDepth) { summon = t; summonDepth = base.depth; }

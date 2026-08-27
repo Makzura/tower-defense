@@ -28,13 +28,31 @@ does the click disc overlap the tower, so the upgrade panel could only be opened
 by clicking bare dirt the right distance below the thing you meant to click. The
 owner's report was exactly that: "quasiment impossible".
 
-**`pickTower` tests the body where it is DRAWN** — a capsule up the column the
-renderer painted, from the base to the top of the mesh, as wide as the tower's
-own footprint. So clicking anywhere on the tower opens it, which is what the
-footprint radius has always promised on the flat board ("one radius does all
-three jobs"), kept true on a board where the drawn base is no longer at the
-world point beneath it. `towerAt` stays exactly as it was and is still the whole
-rule with no 3D renderer.
+**`pickTower` tests the body where it is DRAWN**, as two shapes: a **dome** at
+the tower's feet at the full footprint radius, and a **cylinder** from the base
+to the top of the mesh and no higher, at half that radius
+(`Tower.HIT_SHAFT_FRACTION`). `towerAt` stays exactly as it was and is still the
+whole rule with no 3D renderer.
+
+**The shaft was the full footprint for one revision, and that was worse than
+what it replaced.** A tower is far narrower than its footprint everywhere above
+its base, so a full-width column is wider than the model it stands for — and a
+wider column does not forgive, it steals. The owner's report, with a screenshot:
+two Riflemen one behind the other, every click aimed at the far one's body
+landing on the near one. Pointing straight at a tower you cannot select is a
+worse failure than the original defect, where at least nothing appeared to be
+there. Reproduced in the real game: the far body sat 8.5 px off the near tower's
+centre line and 78% of the way up its column, against a 9.2 px screen footprint
+radius — inside the wide column, outside the 4.6 px shaft. Measured both ways at
+that one pixel: full width picks the near tower, half width picks the far one,
+and a real pointer click confirms it.
+
+The dome is deliberately NOT reduced: at ground level the footprint is exactly
+the promise this game has always made about where a tower is. Half is a baseline
+rather than a measurement — the honest number is each model's own plan extent,
+and it is not `bodyExtentRadii`, which measures the whole silhouette and would
+put the column back at the width this exists to cut. `hitShaftFraction` on the
+instance overrides it per body; nothing sets one today.
 
 Two numbers come from the renderer because only the renderer has them: the
 height of the ground it stood the tower on, and the height of the mesh it gave

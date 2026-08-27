@@ -2356,11 +2356,35 @@ could only be opened by clicking bare dirt the right distance below it.
 
 **`pickTower(screenX, screenY)` is the picker the click handler uses**, and
 `towerAt(worldX, worldY)` stays as the world-space rule the flat board keeps.
-The body is tested where it is DRAWN — a capsule up the column the renderer
-painted, from the tower's base to the top of its mesh, **as wide as its own
-footprint**, so the radius still does all three jobs and clicking anywhere on
-the tower opens it. Two numbers come from the renderer because only it has
-them — `World3D.groundHeightAt` for the surface it stood the tower on and
+The body is tested where it is DRAWN, as **two shapes**:
+
+| shape | where | radius |
+|---|---|---|
+| the **dome** | a hemisphere at the tower's feet | the full footprint |
+| the **shaft** | a cylinder from the base to the top of the mesh, **and no higher** | `Tower.HIT_SHAFT_FRACTION` of it — 0.5 |
+
+**The shaft was the full footprint for one revision, and a column wider than the
+model does not merely forgive — it STEALS.** Two Riflemen one behind the other,
+and the near one's column swallowed every click aimed at the far one's body:
+the player points straight at a tower they cannot select, which is a worse
+failure than the original, where at least nothing appeared to be there.
+Reproduced in the real game and measured: the far body sat **8.5 px off** the
+near tower's centre line, 78% of the way up its column, against a 9.2 px screen
+footprint radius — inside the wide column, outside the 4.6 px shaft. Full width
+picks the near tower, half width picks the one being pointed at.
+
+**The dome is NOT reduced**, and the asymmetry is the point: at ground level the
+footprint is exactly the promise this game has always made about where a tower
+is, and above its base a tower is much narrower than that.
+
+**Half is a baseline, not a measurement.** The honest number is each model's own
+plan extent, and it is *not* `bodyExtentRadii` — that measures the whole
+silhouette, so a Warbringer's hammer and a Rifleman's rifle would put the column
+straight back to the width this exists to cut. A `hitShaftFraction` on the
+instance overrides it per body; nothing sets one today.
+
+Two numbers come from the renderer because only it has them —
+`World3D.groundHeightAt` for the surface it stood the tower on and
 `World3D.towerTopOf` for the height of the mesh it gave it — and the hit test
 itself stays in `game.js` with every other hit test. Same division
 `isLevelUnder` already has.
@@ -7744,7 +7768,7 @@ no mechanic was moved to match the description.
 | Shared footprint | 11.25 u.l. radius — Warbringer and Rifleman both take it from here | `Tower.FOOTPRINT_RADIUS_UL` |
 | Elevation | one number per tower, read once at construction: what it sees OVER and +1% reach per 1.6 u.l. **Every one of the five types carries it** — the two adapters did not until 2026-08-27 | `groundHeightUnder`, `elevatedRangePx`, `RangeFilter.sightClear` |
 | Tower reach shape | `{ radius, inner, aim, arcRad, full }` — the one reconciliation of the Warbringer's wedge, the Sniper's cone and everything else's circle. Read by the renderer AND by the blind-spot clip | `towerReach` in js/tower.js |
-| Tower click target | a capsule up the column the renderer painted — base to mesh top, as wide as the footprint. Nearest to the camera wins; a summon beats a tower. The world-space footprint test is the flat board's rule and the fallback | `pickTower` / `towerAt` in game.js, `World3D.towerTopOf` |
+| Tower click target | a **dome** at the feet at the full footprint radius, plus a **cylinder** to the top of the mesh and no higher at half of it. Nearest to the camera wins; a summon beats a tower. The world-space footprint test is the flat board's rule and the fallback | `pickTower` / `towerAt` in game.js, `Tower.HIT_SHAFT_FRACTION`, `World3D.towerTopOf` |
 | Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack), the outline is the UNION's outline (no seams through the middle) and the whole layer is clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
 | What stops a shot | arriving, losing its target, spending its pierce, running out of range. **Not terrain** — sight gates acquisition and nothing gates the round | `js/bullet.js` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |

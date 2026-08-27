@@ -381,6 +381,13 @@ var BASELINE = [
     // see it: on Ironwood's tallest stump at the default pitch the old pick
     // landed 39 px away, 1.87 footprint radii for an Arcane Sniper and 3.3 for
     // a Rifleman -- no overlap at all for any of the five types.
+    //
+    // 28 GREW rather than the count moving, when the column turned out to be
+    // wider than the models and started STEALING clicks from the tower behind.
+    // It now pins the dome and the shaft separately -- the same offset off the
+    // centre line hits at the feet and misses against the body -- the flat top,
+    // and the owner's own case with its null control: widen the near tower's
+    // shaft back to its footprint and it takes the click again.
     file: "tests/run.js", pass: 193, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.

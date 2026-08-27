@@ -5963,7 +5963,7 @@ function (t) {
     "a sweep at eye zero would still stop it dead on its own stump");
 });
 
-test("28  a tower is CLICKED where it is drawn, not at the ground under it",
+test("28  a tower is CLICKED where it is drawn, and its column is not wider than it is",
 function (t) {
   var h = ironwood();
   var g = h.game;
@@ -5974,75 +5974,124 @@ function (t) {
   h.run("cash = 1000000");
 
   // A STAND-IN CAMERA, because the harness has no WebGL and the real one needs
-  // it. It models the one thing this rule is about and nothing else: height
+  // it. It models the two things this rule is about and nothing else: height
   // moves a body UP the screen, so the ground plane under a raised tower is
-  // BELOW it. `LIFT` is roughly cot(34 degrees), the board's default pitch.
+  // BELOW it; and further down the board is further from the eye. Both signs
+  // are the real board's, measured -- world y 160 projects to screen y 436 and
+  // world y 460 to 327, so larger world y is higher on screen and further away.
   //
-  // The flat identity that comes with it -- screen (x, y) is world (x, y) at
-  // z = 0 -- is what lets the same numbers stand for both spaces, so the test
-  // reads as positions rather than as projections.
-  var LIFT = 1.5, BODY = 40;
+  // `LIFT` is roughly cot(34 degrees), the board's default pitch.
+  var LIFT = 1.5, BODY = 40, SHAFT = 60;      // SHAFT = BODY * LIFT, on screen
   h.run("World3D.isEnabled = function () { return true; };" +
         "World3D.groundHeightAt = function (x, y) {" +
         "  return Maps.groundHeightAt(currentMap, x, y); };" +
         "World3D.towerTopOf = function (t) {" +
         "  return (t && t.bodyTopForTest) || " + BODY + "; };" +
-        "World3D.screenToWorld = function (x, y) { return { x: x, y: y }; };" +
+        "World3D.screenToWorld = function (x, y) { return { x: x, y: -y }; };" +
         "World3D.camera = function () { return { worldToScreen:" +
         "  function (x, y, z) {" +
-        "    return { x: x, y: y - (z || 0) * " + LIFT + "," +
+        "    return { x: x, y: -y - (z || 0) * " + LIFT + "," +
         "             scale: 1, depth: y }; } }; };");
 
   var x = tallest.x + tallest.radius * 0.3, y = tallest.y;
   var tower = new g.LongshotTower(x, y, g.nearestPathTo(x, y).path);
   g.addTower(tower);
 
-  var baseY = y - tallest.height * LIFT;        // where the feet are DRAWN
-  t.ok(y - baseY > tower.footprintPx,
-    "the drawn base and the ground point under it do not overlap at all (" +
-    Math.round(y - baseY) + " px apart, against a " +
-    Math.round(tower.footprintPx) + " px footprint radius)");
+  var r = tower.footprintPx;
+  var shaft = r * g.Tower.HIT_SHAFT_FRACTION;
+  var baseY = -y - tallest.height * LIFT;       // where the feet are DRAWN
+  var groundY = -y;                             // where z = 0 is, below them
 
-  // THE BUG, in the shape it shipped in: converting the click to a world point
-  // and asking `towerAt` finds nothing at all where the tower is drawn, because
-  // that world point is the patch of dirt below it.
+  t.ok(groundY - baseY > r,
+    "the drawn base and the ground point under it do not overlap at all (" +
+    Math.round(groundY - baseY) + " px apart, against a " + Math.round(r) +
+    " px footprint radius)");
+
+  // THE BUG IN THE SHAPE IT SHIPPED IN: converting the click to a world point
+  // and asking `towerAt` finds nothing where the tower is drawn, because that
+  // world point is the patch of dirt below it.
   var asWorld = g.screenToWorld(x, baseY);
   t.eq(g.towerAt(asWorld.x, asWorld.y), null,
     "the old world-space pick misses the tower it is pointing at");
 
   t.eq(g.pickTower(x, baseY), tower, "clicking its feet opens it");
-  t.eq(g.pickTower(x, baseY - BODY * LIFT * 0.5), tower,
+  t.eq(g.pickTower(x, baseY - SHAFT * 0.5), tower,
     "and so does clicking halfway up its body");
-  t.eq(g.pickTower(x, baseY - BODY * LIFT), tower, "and its crown");
-  // A capsule has rounded ends, so it forgives a footprint's worth above the
-  // head. Past that is empty air and belongs to nothing.
-  t.eq(g.pickTower(x, baseY - BODY * LIFT - tower.footprintPx - 4), null,
-    "the empty air above it is not the tower");
-  t.eq(g.pickTower(x + tower.footprintPx * 2, baseY), null,
-    "and neither is the ground beside it");
+  t.eq(g.pickTower(x, baseY - SHAFT), tower, "and its head");
 
-  // NEAREST TO THE CAMERA WINS, and it is tested in BOTH directions -- a rule
-  // that has only ever returned one answer has not been tested. Footprints
-  // cannot overlap in plan; columns certainly overlap on SCREEN, and the one in
-  // front is the one being pointed at. `depth` is the stand-in camera's world
-  // y, and larger y is further from the eye (measured on the real board: world
-  // y 160 projects to screen y 436 and world y 460 to 327, so up the screen is
-  // away).
-  var shared = y - 80;                          // inside the raised column
-  t.ok(shared <= baseY && shared >= baseY - BODY * LIFT,
-    "the sample point is inside the raised tower's column");
+  // UP TO THE HEAD AND NO HIGHER. A capsule would hang a footprint's worth of
+  // target in the air above it; a cylinder ends where the model does.
+  t.eq(g.pickTower(x, baseY - SHAFT - 2), null,
+    "two pixels above its head is nothing at all");
 
+  // THE DOME IS THE FOOTPRINT, THE SHAFT IS HALF OF IT. Same distance off the
+  // centre line, two different answers, and both are the right one: at ground
+  // level the footprint is what the game has always promised a tower occupies,
+  // and above it the model is much narrower than that.
+  var off = (r + shaft) / 2;                    // between the two radii
+  t.ok(off > shaft && off < r, "the sample offset is between the two radii");
+  t.eq(g.pickTower(x + off, baseY), tower, "off-centre at its feet is still it");
+  t.eq(g.pickTower(x + off, baseY - SHAFT * 0.5), null,
+    "the same offset against its BODY is not");
+
+  // THE REPORT THIS SHAPE EXISTS FOR: a Rifleman in front swallowing every
+  // click aimed at the body of the one behind it. A wider column does not
+  // merely forgive, it steals -- the player points straight at a tower they
+  // cannot select, which is worse than the original defect, where at least
+  // nothing appeared to be there.
+  g.towers.length = 0;
+  var near = new g.Soldier(x, y, g.nearestPathTo(x, y).path);
+  var far = new g.Soldier(x + 9, y + 30, g.nearestPathTo(x + 9, y + 30).path);
+  g.addTower(near); g.addTower(far);
+  t.ok(Math.hypot(far.x - near.x, far.y - near.y) >
+       near.footprintPx + far.footprintPx,
+    "the two stand far enough apart to be legally placed");
+  t.ok(far.y > near.y, "and the one being aimed at is the further away");
+
+  // The far tower's feet, which is a point the NEAR one's column reaches: 9 px
+  // off its centre line and half way up it. That is the whole precondition --
+  // without it the test would pass on a picker that never looked at the near
+  // tower at all.
+  var onFarBody = { x: far.x, y: -far.y - far.groundHeight * LIFT };
+  var nearBaseY = -near.y - near.groundHeight * LIFT;
+  var along = (nearBaseY - onFarBody.y) / SHAFT;
+  t.ok(along > 0 && along < 1,
+    "the sample point is inside the near tower's column, " +
+    Math.round(along * 100) + "% of the way up it");
+  t.ok(Math.abs(onFarBody.x - near.x) > near.footprintPx *
+       g.Tower.HIT_SHAFT_FRACTION &&
+       Math.abs(onFarBody.x - near.x) < near.footprintPx,
+    "and off its centre line by more than the shaft and less than the footprint");
+
+  t.eq(g.pickTower(onFarBody.x, onFarBody.y), far,
+    "clicking the far tower's body selects the far tower");
+
+  // The null control, because a rule that has only ever returned one answer has
+  // not been tested: widen the near one's column back to its footprint and it
+  // takes the click again.
+  near.hitShaftFraction = 1;
+  t.eq(g.pickTower(onFarBody.x, onFarBody.y), near,
+    "with a full-width column the near tower steals it back");
+  near.hitShaftFraction = 0;                    // 0 is falsy -> back to default
+  t.eq(g.pickTower(onFarBody.x, onFarBody.y), far, "and narrowed, it does not");
+
+  // NEAREST TO THE CAMERA WINS, tested in BOTH directions. `depth` is world y,
+  // and larger y is further from the eye.
+  g.towers.length = 0;
+  g.addTower(tower);
+  var shared = baseY - SHAFT * 0.5;             // inside the raised column
+  // Nearer AND tall enough to reach the same pixel: on this camera a body on
+  // dirt in front of the stump is drawn LOWER, so only a taller one overlaps.
   var nearer = new g.LongshotTower(x, y - 60, g.nearestPathTo(x, y - 60).path);
+  nearer.bodyTopForTest = 120;
   g.addTower(nearer);
   t.eq(nearer.groundHeight, 0, "the second tower is on dirt, not on the stump");
+  t.ok(nearer.y < tower.y, "and nearer the eye");
   t.eq(g.pickTower(x, shared), nearer,
     "a column NEARER the eye takes the click off the raised one");
 
-  // And the other way: a tower further away, tall enough for its column to
-  // reach the same pixel, must NOT take it.
   g.towers.splice(g.towers.indexOf(nearer), 1);
-  var further = new g.LongshotTower(x, y + 60, g.nearestPathTo(x, y + 60).path);
-  further.bodyTopForTest = 120;
+  var further = new g.LongshotTower(x, y + 50, g.nearestPathTo(x, y + 50).path);
   g.addTower(further);
   t.eq(g.pickTower(x, shared), tower,
     "and a column FURTHER away leaves it with the raised tower");
