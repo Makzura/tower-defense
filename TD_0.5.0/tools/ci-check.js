@@ -388,7 +388,20 @@ var BASELINE = [
     // centre line hits at the feet and misses against the body -- the flat top,
     // and the owner's own case with its null control: widen the near tower's
     // shaft back to its footprint and it takes the click again.
-    file: "tests/run.js", pass: 193, fail: 0,
+    //
+    // 194 on 2026-08-27, from 193: THE CURSOR LANDS ON THE SURFACE. The click
+    // target was only half of it -- `screenToWorld` casts at z = 0, so hovering
+    // a stump to PLACE a tower answered with the floor and the ghost stood
+    // somewhere the cursor was not. 29 pins the seam that makes the fix
+    // possible (`OrbitCamera.planeAt`, the old `groundAt` with the plane as an
+    // argument rather than a literal) and what the placement feedback is
+    // painted on. The walk itself needs WebGL and is measured in a browser:
+    // pointing at the centre of the tallest stump used to answer 40.3 units
+    // away, on ground height 0 -- OUTSIDE a stump of radius 36 -- and now
+    // answers the centre exactly, on height 25; flat ground is identical to the
+    // float; and the no-build rim went from 28.9 px below the edge it describes
+    // to 0.
+    file: "tests/run.js", pass: 194, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

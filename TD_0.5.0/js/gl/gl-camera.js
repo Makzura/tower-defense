@@ -198,7 +198,8 @@ OrbitCamera.prototype._ndc = function (clientX, clientY) {
 // The ground point under a pixel, MEASURED FROM THE TARGET, for a camera state
 // that need not be the live one. This is the function the whole control scheme
 // is built on -- see the header.
-OrbitCamera.prototype._groundOffset = function (ndcX, ndcY, yaw, pitch, distance) {
+OrbitCamera.prototype._groundOffset = function (ndcX, ndcY, yaw, pitch, distance,
+    planeZ) {
   var o = this._orbitVector(yaw, pitch, distance);
   var l = Math.hypot(o[0], o[1], o[2]) || 1;
   var fwd = [-o[0] / l, -o[1] / l, -o[2] / l];
@@ -213,17 +214,32 @@ OrbitCamera.prototype._groundOffset = function (ndcX, ndcY, yaw, pitch, distance
                right[2] * fwd[0] - right[0] * fwd[2],
                right[0] * fwd[1] - right[1] * fwd[0]];
 
-  // The target sits on z = 0, so relative to it the ground plane is z = 0 too.
+  // The target sits on z = 0, so relative to it a plane at world z is at z too,
+  // and the default is the ground plane every caller but one wants.
   return GLMath.groundRay(o, fwd, right, camUp, Math.tan(this.fovY / 2),
-    this.aspect(), ndcX, ndcY, 0);
+    this.aspect(), ndcX, ndcY, planeZ || 0);
 };
 
 // Public: the world point under a pixel, for picking. Null past the horizon.
 OrbitCamera.prototype.groundAt = function (clientX, clientY) {
+  return this.planeAt(clientX, clientY, 0);
+};
+
+// THE SAME QUESTION AT ANY HEIGHT, which is what a board with raised ground
+// needs. `groundAt` is this with the plane at zero and always was; the plane
+// was simply a literal inside the solver.
+//
+// Two of these bracket the ray through a pixel — one at the top of the terrain
+// and one at the bottom — and that is how World3D.screenToWorld finds the
+// SURFACE under the cursor rather than the floor. A stump is a plateau, so the
+// plane hit at its own height IS the exact answer there; the pair exists for the
+// walk between plateaus, which nothing solves in closed form.
+OrbitCamera.prototype.planeAt = function (clientX, clientY, z) {
   var n = this._ndc(clientX, clientY);
-  var off = this._groundOffset(n[0], n[1], this.yaw, this.pitch, this.distance);
+  var off = this._groundOffset(n[0], n[1], this.yaw, this.pitch, this.distance,
+    z || 0);
   if (!off) return null;
-  return [this.target[0] + off[0], this.target[1] + off[1], 0];
+  return [this.target[0] + off[0], this.target[1] + off[1], z || 0];
 };
 
 // World -> canvas pixels. THE KEYSTONE OF THE 2D/3D HYBRID.

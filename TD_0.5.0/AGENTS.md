@@ -483,7 +483,10 @@ js/gl/gl-renderer.js the dependency-free WebGL renderer: one flat-shaded
                      weapon's own coils and aperture light up
 js/gl/gl-camera.js  OrbitCamera: middle-drag orbit about the cursor, right-drag
                      pan, wheel zoom-to-cursor. Owns `viewport` (the game's
-                     logical 1280x720 space) and the projection cache
+                     logical 1280x720 space) and the projection cache.
+                     `planeAt(x, y, z)` casts a pixel at ANY horizontal plane
+                     and `groundAt` is it at zero; World3D.screenToWorld
+                     brackets the ray with two of them to find the surface
 js/gl/gl-math.js    perspective, look-at, one multiply, ray/plane. Column-major
 js/gl/gl-geometry.js procedural primitives: ground, road, box, boxAt, sphere,
                      cylinder, frustum, segment (a prism between two points in
@@ -2403,12 +2406,46 @@ same one the player's eye gives: footprints cannot overlap in plan, but two
 columns certainly overlap on screen at a shallow pitch. A summon still beats a
 tower outright, which is the one genuine overlap on the board.
 
+**AND `screenToWorld` RESOLVES ONTO THE SURFACE, NOT THE FLOOR** (2026-08-27).
+The click target was only half of it. That function is THE ONE FUNNEL every
+world-space input goes through — hover, placement, inspection, aiming — and it
+cast the cursor at the ground plane, so hovering a stump to PLACE a tower
+answered with the dirt below it. Measured in a browser: pointing at the middle
+of the tallest stump answered a point **40.3 units away, on height 0 — outside a
+stump of radius 36 entirely**. The ghost, `whyCannotBuild` and `blockReason` all
+inherited it, so a tower could not be put where the cursor said it would go.
+
+**The walk is bounded by the terrain's own height, not by the view distance**,
+which is what makes it cheap. `OrbitCamera.planeAt(x, y, z)` is the old
+`groundAt` with the plane as an argument rather than a literal zero, and two of
+them bracket the ray between the top of the height field and its bottom. On
+Ironwood's 25-unit stumps at the default pitch that segment is about 37 world
+units long — half a dozen samples, then a bisection. Nothing marches to the
+horizon. A board whose band is empty skips it entirely, so the six boards with
+no terrain are byte-identical by construction, and flat ground on Ironwood
+answers the same point it always did, to the float.
+
+Sampling from the TOP means the nearest surface wins, which is what "you cannot
+point at ground you cannot see" means: the dirt hidden behind a stump is not a
+place the cursor can reach, exactly as it is not a place the player can see.
+
+**AND THE RULES PAINTED ABOUT THE CURSOR MOVED WITH IT.** `projectRing` drew
+every ground decal at z = 0 — the road band, the blockers, the ground other
+towers have taken, the rim you may not cross — which was invisible while the
+cursor was flat too and became a **28.9 px** lie the moment it was not: the
+ghost stood on the stump while every rule about it sat below the surface. It
+drapes per point now, which is clause 1b's rule for a ground decal. **Two rings
+DECLARE their height instead** (`ring.z`): a stump's rim and a tower's
+footprint, because both lie exactly ON a discontinuity and sampling a 6-unit
+grid along that edge answers two levels one point apart — measured, the tallest
+stump's 28-point rim samples 20 points at the floor and 8 on the stump, and one
+of the six stumps reads SIX levels because the ramp runs past it.
+
 **`enemyAt` and `recruitAt` still ask the world-space question**, and on the one
 board with terrain that is a smaller version of the same defect — a body on the
-depot's ramp or the bridge is picked below itself. It is left alone rather than
-swept in: those are hover readouts rather than the door to the upgrade panel,
-and the fix is the same shape whenever it is wanted. **So is the BUILD ghost**:
-hovering a stump to place a tower puts the ghost at the z = 0 point too.
+depot's ramp or the bridge is picked below itself. Left alone rather than swept
+in: those are hover readouts rather than the door to a panel, and the fix is the
+same shape whenever it is wanted.
 
 `whyCannotBuild(x, y, type)` returns `null` or a short human-readable reason,
 shown under the cursor. It is the single source of truth for placement rules —
@@ -7823,6 +7860,8 @@ no mechanic was moved to match the description.
 | Elevation | one number per tower, read once at construction: what it sees OVER and +1% reach per 1.6 u.l. **Every one of the five types carries it** — the two adapters did not until 2026-08-27 | `groundHeightUnder`, `elevatedRangePx`, `RangeFilter.sightClear` |
 | Tower reach shape | `{ radius, inner, aim, arcRad, full }` — the one reconciliation of the Warbringer's wedge, the Sniper's cone and everything else's circle. Read by the renderer AND by the blind-spot clip | `towerReach` in js/tower.js |
 | Tower click target | a **dome** at the feet at the full footprint radius, plus a **cylinder** to the top of the mesh and no higher at half of it. Nearest to the camera wins; a summon beats a tower. The world-space footprint test is the flat board's rule and the fallback | `pickTower` / `towerAt` in game.js, `Tower.HIT_SHAFT_FRACTION`, `World3D.towerTopOf` |
+| Where the cursor lands | the SURFACE under it, not the floor — the ray is walked through the height field's own band, so a stump top is what you point at. Boards with one level skip it entirely | `World3D.screenToWorld`, `OrbitCamera.planeAt` |
+| Placement feedback height | draped over the board per point; a stump rim and a tower footprint declare their own (`ring.z`) because they lie ON the edge | `projectRing`, `noBuildRings`, `drawNoBuildOverlay` |
 | Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack), the outline is the UNION's outline (no seams through the middle) and the whole layer is clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
 | What stops a shot | arriving, losing its target, spending its pierce, running out of range. **Not terrain** — sight gates acquisition and nothing gates the round | `js/bullet.js` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |

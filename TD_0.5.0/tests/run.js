@@ -6104,6 +6104,98 @@ function (t) {
 });
 
 
+test("29  the cursor lands on the SURFACE, and every rule painted about it is on that surface too",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var tallest = geo.platforms.reduce(function (a, b) {
+    return (a && a.height > b.height) ? a : b;
+  }, null);
+
+  // THE SEAM THAT MAKES IT POSSIBLE, against the real camera. `groundAt` cast
+  // the ray at a plane the solver held as a literal zero; `planeAt` is the same
+  // solver with the plane as an argument, and World3D.screenToWorld brackets
+  // the ray between the top of the board and its bottom with two of them.
+  var cam = new g.OrbitCamera({
+    width: 1280, height: 720, style: {},
+    addEventListener: function () {},
+    removeEventListener: function () {},
+    getBoundingClientRect: function () {
+      return { left: 0, top: 0, width: 1280, height: 720 };
+    }
+  });
+  cam.viewport = { width: 1280, height: 720 };
+
+  var flat = cam.groundAt(640, 400);
+  var same = cam.planeAt(640, 400, 0);
+  t.near(same[0], flat[0], 1e-12, "planeAt at zero is groundAt, to the float");
+  t.near(same[1], flat[1], 1e-12, "in both axes");
+  t.eq(same[2], 0, "and it reports the plane it solved");
+
+  // A HIGHER PLANE IS HIT SOONER, and the offset is linear in the height --
+  // which is what makes the walk between the two a short one rather than a
+  // march to the horizon.
+  var up10 = cam.planeAt(640, 400, 10);
+  var up20 = cam.planeAt(640, 400, 20);
+  var d10 = Math.hypot(up10[0] - flat[0], up10[1] - flat[1]);
+  var d20 = Math.hypot(up20[0] - flat[0], up20[1] - flat[1]);
+  t.ok(d10 > 1, "ten units up is a different point on the board (" +
+    Math.round(d10) + " units)");
+  t.near(d20 / d10, 2, 1e-9, "and twenty is exactly twice as far");
+  t.eq(up20[2], 20, "at the plane it was asked for");
+
+  // WHAT THE RULE IS PAINTED ON. `projectRing` drapes a ground decal over the
+  // board per point, and takes an authored height where the ring lies ON a
+  // discontinuity -- a stump's rim and a tower's footprint both do, and a
+  // sampled height along that edge answers two different levels one point
+  // apart.
+  var fake = { calls: [], worldToScreen: function (x, y, z) {
+    this.calls.push([x, y, z]); return { x: x, y: y - z, scale: 1, depth: y }; } };
+  // The renderer's height field is a GRID -- 6 unit cells, each answering for
+  // its own centre -- and that is the half of it this test has to model, since
+  // it is the whole reason a rim declares its height instead of sampling. On
+  // the real board, measured in a browser, the tallest stump's 28-point rim
+  // samples 20 points at the floor and 8 on the stump; one of the six reads
+  // SIX different levels, because the road ramp runs past it.
+  h.run("World3D.groundHeightAt = function (x, y) {" +
+        "  var c = 6;" +
+        "  return Maps.groundHeightAt(currentMap," +
+        "    Math.floor(x / c) * c + c / 2, Math.floor(y / c) * c + c / 2); };");
+
+  var declared = g.circleRing(tallest.x, tallest.y, tallest.radius, 28);
+  declared.z = tallest.height;
+  fake.calls.length = 0;
+  g.projectRing(declared, fake);
+  t.eq(fake.calls.every(function (c) { return c[2] === tallest.height; }), true,
+    "a ring that declares its height is projected at that height, every point");
+
+  // The same ring WITHOUT the declaration is sampled, and on the rim that is
+  // exactly where sampling stops having one answer.
+  var sampled = g.circleRing(tallest.x, tallest.y, tallest.radius, 28);
+  fake.calls.length = 0;
+  g.projectRing(sampled, fake);
+  var levels = {};
+  fake.calls.forEach(function (c) { levels[c[2]] = true; });
+  t.ok(Object.keys(levels).length > 1,
+    "the same ring sampled comes back on " + Object.keys(levels).length +
+    " different levels, which is why the rim declares one");
+
+  // And a decal that is NOT on an edge drapes, which is the whole point: a ring
+  // well inside the stump is on the stump, not under it.
+  var inside = g.circleRing(tallest.x, tallest.y, tallest.radius * 0.4, 8);
+  fake.calls.length = 0;
+  g.projectRing(inside, fake);
+  t.eq(fake.calls.every(function (c) { return c[2] === tallest.height; }), true,
+    "a ring inside the stump is draped onto the stump");
+
+  var offBoard = g.circleRing(tallest.x, tallest.y + 400, 20, 8);
+  fake.calls.length = 0;
+  g.projectRing(offBoard, fake);
+  t.eq(fake.calls.every(function (c) { return c[2] === 0; }), true,
+    "and one on open dirt is on the floor, exactly as it always was");
+});
+
 group("Day and night — the clock");
 
 // The cycle is a module, so most of this drives it directly. Where the point is

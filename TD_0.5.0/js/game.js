@@ -5136,19 +5136,43 @@ function noBuildRings(type) {
   // its ground, so it is not painted -- the same sweep whyCannotBuild skips.
   for (i = 0; i < towers.length; i++) {
     if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
-    rings.push(circleRing(towers[i].x, towers[i].y,
-      ul(towers[i].footprintRadiusUl), 16));
+    var taken = circleRing(towers[i].x, towers[i].y,
+      ul(towers[i].footprintRadiusUl), 16);
+    // ON THE SURFACE IT STANDS ON, declared rather than sampled: a tower on a
+    // stump has its footprint on the stump's top, and that circle runs right up
+    // to the rim where a sampled height flickers between two levels.
+    taken.z = towers[i].groundHeight || 0;
+    rings.push(taken);
   }
   return rings;
 }
 
 // A world ring projected to screen, or null if any of it is behind the eye.
+//
+// DRAPED OVER THE BOARD, PER POINT, which is the rule for a ground decal — see
+// clause 1b of the model contract, where `project()` samples the height under
+// each point precisely so a ring lies on the surface instead of cutting through
+// it. This projected flat at z = 0 until 2026-08-27, and that was invisible for
+// as long as the cursor was flat too: once the cursor resolved onto a stump,
+// the ghost stood on the top while every rule painted about it — the road band,
+// the blockers, the ground other towers have taken, the rim you may not cross —
+// sat **28.9 px** below the surface they describe.
+//
+// A ring may instead DECLARE its height in `ring.z`, and two of them do. A
+// stump's rim and a tower's footprint lie on a plateau at a known height, and
+// they lie exactly ON the edge of it: sampling a coarse height grid along that
+// edge answers 25 on one point and 0 on the next, so the ring would come back
+// jagged. An authored height is the exact answer where there is one.
 function projectRing(ring, cam) {
   var out = [], i;
+  var fixed = (typeof ring.z === "number") ? ring.z : null;
+  var ground = (fixed === null && typeof World3D !== "undefined" &&
+                World3D.groundHeightAt) ? World3D.groundHeightAt : null;
   for (i = 0; i < ring.length; i++) {
     var x = ring[i][0], y = ring[i][1];
     if (cam) {
-      var p = cam.worldToScreen(x, y, 0);
+      var p = cam.worldToScreen(x, y,
+        fixed !== null ? fixed : (ground ? ground(x, y) : 0));
       if (!p) return null;
       x = p.x; y = p.y;
     }
@@ -5203,8 +5227,13 @@ function drawNoBuildOverlay(type) {
   if (geo.any && geo.platforms.length) {
     ctx.beginPath();
     for (i = 0; i < geo.platforms.length; i++) {
-      var rim = projectRing(circleRing(geo.platforms[i].x, geo.platforms[i].y,
-        geo.platforms[i].radius, 28), cam);
+      // AT THE TOP OF THE STUMP, which is the edge this line is about. The rim
+      // is the one thing on the board that IS the height discontinuity, so its
+      // own authored height is the only reading of it that does not flicker.
+      var rimRing = circleRing(geo.platforms[i].x, geo.platforms[i].y,
+        geo.platforms[i].radius, 28);
+      rimRing.z = geo.platforms[i].height;
+      var rim = projectRing(rimRing, cam);
       if (!rim) continue;
       ctx.moveTo(rim[0][0], rim[0][1]);
       for (k = 1; k < rim.length; k++) ctx.lineTo(rim[k][0], rim[k][1]);

@@ -292,6 +292,19 @@ var World3D = (function () {
       });
     }
 
+    // HOW HIGH AND HOW LOW THE BOARD GOES, measured once here rather than per
+    // query. `screenToWorld` walks the ray through exactly this band to find the
+    // surface under the cursor, so on a board that is all one level the band is
+    // empty and the walk is skipped entirely -- which is what keeps the six
+    // boards with no terrain on precisely the arithmetic they always had.
+    var lo = 0, hi = 0;
+    for (var m = 0; m < data.length; m++) {
+      if (data[m] > hi) hi = data[m];
+      else if (data[m] < lo) lo = data[m];
+    }
+    f.maxZ = hi;
+    f.minZ = lo;
+
     return f;
   }
 
@@ -5514,7 +5527,79 @@ var World3D = (function () {
     var p = camera.groundAt(c[0], c[1]);
     // Off the ground plane -- above the horizon. A point nothing can be at,
     // so hit tests miss rather than matching something at the origin.
-    return p ? { x: p[0], y: p[1] } : { x: -99999, y: -99999 };
+    if (!p) return { x: -99999, y: -99999 };
+    var s = surfaceUnder(c[0], c[1], p);
+    return s || { x: p[0], y: p[1] };
+  }
+
+  // THE SURFACE UNDER THE CURSOR, not the floor under the cursor.
+  //
+  // `groundAt` casts the ray at z = 0, which is the right answer on a board that
+  // is all one level and the wrong one the moment any of it is raised: hover a
+  // stump and the point comes back where the FLOOR is, well below the top you
+  // are pointing at. Everything downstream inherits it -- the build ghost, the
+  // red wash, `whyCannotBuild`, `blockReason` -- so a tower could not be placed
+  // where the cursor said it would go. Same defect the click target had, one
+  // layer further down, and this is the one funnel both of them come through.
+  //
+  // THE WALK IS BOUNDED BY THE TERRAIN'S OWN HEIGHT, not by the view distance,
+  // which is what makes it cheap. Two plane hits bracket the ray between the
+  // top of the board and its bottom, and the segment between them is short: on
+  // Ironwood's 25-unit stumps at the default pitch it is about 37 world units,
+  // so half a dozen samples cover it. Nothing marches out to the horizon.
+  //
+  // Returns null when there is nothing to find, and every caller then keeps the
+  // z = 0 answer it always had. That covers the six boards with no terrain by
+  // construction rather than by tolerance -- their band is empty, so not one
+  // float of this runs for them.
+  function surfaceUnder(clientX, clientY, flat) {
+    var f = heightField;
+    if (!f || !camera.planeAt) return null;
+    if (!(f.maxZ > 0) && !(f.minZ < 0)) return null;      // all one level
+
+    var top = camera.planeAt(clientX, clientY, f.maxZ);
+    if (!top) return null;                                 // parallel to it
+
+    // The ray from the top plane to the bottom one, in world space. `flat` is
+    // the z = 0 hit and is already paid for, so the direction comes off the
+    // pair rather than out of the camera a third time.
+    var dx = flat[0] - top[0], dy = flat[1] - top[1], dz = -f.maxZ;
+    var span = f.maxZ - Math.min(0, f.minZ);
+    if (span <= 1e-6) return null;
+    var scale = span / f.maxZ;                             // reach past z = 0
+    dx *= scale; dy *= scale; dz *= scale;
+
+    var len = Math.sqrt(dx * dx + dy * dy);
+    var steps = Math.max(4, Math.min(256, Math.ceil(len / HEIGHT_CELL) * 2));
+
+    // The first sample BELOW the surface is the crossing; bisect between it and
+    // the last one above. Sampling from the top means the nearest surface wins,
+    // which is what "you cannot point at ground you cannot see" means -- the
+    // dirt hidden behind a stump is not a place the cursor can reach, exactly as
+    // it is not a place the player can see.
+    var prev = 0, i, t, px, py, pz;
+    for (i = 1; i <= steps; i++) {
+      t = i / steps;
+      px = top[0] + dx * t; py = top[1] + dy * t; pz = f.maxZ + dz * t;
+      if (pz > surfaceSample(f, px, py)) { prev = t; continue; }
+      for (var k = 0; k < 12; k++) {                       // bisect to ~0.02 px
+        var mid = (prev + t) / 2;
+        var mx = top[0] + dx * mid, my = top[1] + dy * mid;
+        if (f.maxZ + dz * mid > surfaceSample(f, mx, my)) prev = mid; else t = mid;
+      }
+      return { x: top[0] + dx * t, y: top[1] + dy * t };
+    }
+    return null;
+  }
+
+  // `groundHeightAt` CLAMPS to the field's edges, which is right for standing a
+  // body on the board and wrong for a ray leaving it: the edge value would be
+  // repeated forever and the walk above would find a surface out in the apron
+  // that nothing is standing on. Off the field is the floor.
+  function surfaceSample(f, x, y) {
+    if (x < f.minX || y < f.minY ||
+        x > f.minX + f.w * HEIGHT_CELL || y > f.minY + f.h * HEIGHT_CELL) return 0;
+    return groundHeightAt(x, y);
   }
 
   return {

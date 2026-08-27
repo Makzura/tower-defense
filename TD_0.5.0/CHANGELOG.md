@@ -13,6 +13,45 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The cursor lands on the surface, and so does everything painted
+about it.** The other half of the click-target change, and the owner asked for it
+by name: the build ghost on a stump. `screenToWorld` is THE ONE FUNNEL every
+world-space input goes through, and it cast the cursor at the ground plane — so
+hovering a stump to place a tower answered with the dirt below it.
+
+**Measured in a browser: pointing at the middle of the tallest stump answered a
+point 40.3 units away, on height 0 — outside a stump of radius 36 entirely.**
+The ghost, `whyCannotBuild` and `blockReason` all inherited that, so a tower
+could not be put where the cursor said it would go. It answers the centre
+exactly now, on height 25.
+
+`OrbitCamera.planeAt(x, y, z)` is the old `groundAt` with the plane as an
+argument rather than a literal zero — the plane was always there, just written
+into the solver — and two of them bracket the ray between the top of the height
+field and its bottom. **The walk is bounded by the terrain's own height, not by
+the view distance:** on 25-unit stumps at the default pitch that segment is
+about 37 world units, half a dozen samples and a bisection. A board whose band
+is empty skips it entirely, so the six boards with no terrain are byte-identical
+by construction, and flat ground on Ironwood answers the same point it always
+did, to the float. Sampling from the top means the nearest surface wins, which
+is what "you cannot point at ground you cannot see" means.
+
+**And the rules painted about the cursor moved with it.** `projectRing` drew
+every ground decal at z = 0 — the road band, the blockers, the ground other
+towers have taken, the rim you may not cross. Invisible while the cursor was
+flat too; a 28.9 px lie the moment it was not, with the ghost standing on the
+stump and every rule about it sitting below the surface. It drapes per point
+now, which is clause 1b's rule for a ground decal. Two rings declare their
+height instead (`ring.z`): a stump's rim and a tower's footprint, because both
+lie exactly ON a discontinuity — measured, the tallest stump's 28-point rim
+samples 20 points at the floor and 8 on the stump, and one of the six reads six
+different levels because the ramp runs past it. An authored height is the exact
+answer where there is one.
+
+Test 29 pins the seam (`planeAt` at zero is `groundAt` to the float; a higher
+plane is hit sooner, linearly) and what the feedback is painted on. The walk
+itself needs WebGL and is measured in a browser, not asserted here.
+
 **2026-08-27 — Ironwood's dirt is calmer, not flat.** Keeping every source face
 fixed the rectangular replacement, but the full small-scale height noise made
 the road more wrinkled than the game's broad low-poly surfaces. Only the five
