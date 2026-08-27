@@ -13,6 +13,86 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The forest is eight authored ironwoods, and which one grows
+where is a decision.** Ironwood plants nine hundred and fifty-eight trees and
+every one of them used to be the same broadleaf with a different wobble. The
+model set (Claude Design project a7f0c2ee, `tree-models.js`) has eight bodies in
+it -- a great broadleaf, a conifer, a leaner, a sapling, a broad crown, a
+storm-struck survivor, a standing deadwood and a shattered stump -- and all
+eight are ported into `ironwoodTree` in gl-geometry.js.
+
+**THE FOREST'S STRUCTURE IS UNTOUCHED.** Every position, every authored size and
+every cluster is the board's own; nothing was re-scattered. What changed is
+which body stands at each of them.
+
+**Two new primitives, and the set needs both.** `tube` is a tapered tube through
+a polyline with LEVEL rings -- the source's own trunk shape, and what gives a
+leaning ironwood its sheared, grown-that-way silhouette instead of a bent pipe.
+`coneAt` is a tapered prism between two points, which is every root, bark ridge,
+splinter and dead limb; `segment` is the same idea with four sides and no taper
+and reads as a plank where a root has to read as a root.
+
+**`Maps.assignTrees` reads the board and picks, on two axes.** STATURE comes off
+the authored `size`, which the rings already use as a depth signal -- 24 near
+the clearing, 172 at the horizon -- so a short body goes on a small tree and a
+tall one on a large tree, and a treeline recedes instead of being one hedge at
+three scales. CONDITION comes off the ground: healthy for most of the forest,
+worn for the canopy gap along the road and the clearing edge, broken for the
+ruin around the settlement, the depot and the cut stumps.
+
+**HARSH IS NOT THE SAME AS EXPOSED**, and separating them is what stops this
+reading as a ring of dead trees round every clearing. A road's shoulder is a gap
+in the canopy -- light, wind, saplings. `TREE_EXPOSURE_PX` is 150 and measures
+everything; `TREE_BLIGHT_PX` is 260, deliberately wider, and only measures the
+things `Maps.BLIGHT` marks as ruin. The result on this board: the settlement's
+outskirts are bare limbs and shattered stumps, the depot has broken ground
+around it, the road runs through young wood, and the deep rings are great trees
+and conifers with not one dead tree in them.
+
+Deterministic, because the mesh is rebuilt on every load and a forest that
+reshuffles is a forest the player cannot learn: every choice is a pure function
+of the tree's own authored position. Neighbours within two and a bit tree-widths
+may not share a body, and the variation on top is restrained -- eight per cent
+of scale, a free turn about the vertical.
+
+**Three bugs, and the first is the one that mattered.**
+
+`gl-world` never passed the model through to `GLGeometry.scenery`, so
+`model.variant` was undefined on every tree and all nine hundred and fifty-eight
+drew as the default great tree. The census said eight bodies; the board showed
+one. It looks exactly like a forest of one model, because it was one.
+
+The first table weighted its lists by repeating entries -- `["great",
+"conifer", "broad", "conifer", "great", "leaning"]` -- and came out two thirds
+those two. Every cell is an even list now; a repeated entry is a weight, and
+with a hashed start walking the list an even list is an even spread.
+
+`deadwood` was listed only under the tall statures, and the blighted ground on
+this board is the ring the map authors SMALL. It never came up once in nine
+hundred trees.
+
+**Test 4e measured with `CANOPY` while the pass measured off the model**, so
+eleven correctly-placed saplings read as failures. `Maps.foliageRadiusOf` is
+published now and both use it -- a check that disagrees with the thing it checks
+is worse than no check. Test 4f pins the rest: all eight bodies present, the
+outskirts mostly broken, the deep forest with none, and the same answer twice.
+
+Cost: 344 triangles a tree against 276, so the board's scenery goes from 296k to
+376k -- still ONE draw call, which is the project's instancing: props are baked
+into the static map mesh and cost nothing per frame. The one-off build is 281 ms
+and the assignment 63 ms, both at map load.
+
+**2026-08-27 — Ironwood's flat prototype floor became a layered forest bed.**
+The board keeps its original flat gameplay plane, but the 3D mesh now adds a
+deterministic olive grass skin, organic earth stains, moss flecks and sparse
+low-poly tufts in `js/gl/ironwood-ground.js`. The four large rectangular dirt
+zones now seed torn-edged earth clusters instead of drawing their authoring
+boxes directly. The river remains open, the exact road ribbon and solid scenery
+remain clear of blades, and no layer writes to the height field, collision,
+placement, targeting or simulation. Ground is isolated from the tree work in
+`gl-geometry.js`/`maps.js`; `gl-world.js` only calls the separate module, and
+both runtime HTML files load it in the same place.
+
 **2026-08-27 — The settlement is the authored Ironwood village, and nothing
 grows through it any more.** Two jobs in one edit, because the second one only
 became findable once the first landed.

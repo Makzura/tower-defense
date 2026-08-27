@@ -1195,6 +1195,317 @@ var GLGeometry = (function () {
     }
   }
 
+  // ================= THE IRONWOOD TREES =================
+  //
+  // Eight trees, ported from the authored three.js models (Claude Design
+  // project a7f0c2ee, `tree-models.js`): a great broadleaf, a conifer, a
+  // leaner, a sapling, a broad crown, a storm-struck survivor, a standing
+  // deadwood and a shattered stump.
+  //
+  // ONE PROP KIND, EIGHT BODIES. The board plants nine hundred and fifty-eight
+  // `ironwood` props and every one of them used to be the same tree with a
+  // different wobble. Which body each position gets is decided ONCE, in
+  // `Maps.assignTrees`, from what is around it -- the deep forest gets the tall
+  // healthy ones, the gaps and transitions get saplings and leaners, and the
+  // damaged ones are kept for what is exposed: the road's shoulder, the
+  // village's outskirts and the ground around the enemy depot. It arrives here
+  // as `model.variant`, so this file draws a tree and never chooses one.
+  //
+  // Axes. The source is metres, y-up. This board is z-up with a prop yaw:
+  //
+  //     design x  ->  local X       design z  ->  local Y       design y  ->  Z
+  //
+  // ONE SCALE FOR ALL EIGHT, so a sapling really is smaller than a great tree
+  // at the same `size` and the ring sizes the map already authors still read as
+  // distance. 0.23 puts the great tree at 2.45 by 2.0 times its `size`, which
+  // is the presence the tree it replaces had.
+  var TREE_S = 0.23;
+
+  // What each body measures in design units -- width, height -- read off the
+  // assembled source rather than estimated. `Maps.CANOPY` scales the trunk-and-
+  // inner-crown radius off `half`, and the assignment table reads `tall` and
+  // `dead` to decide where a body belongs.
+  var TREES = {
+    great:      { half: 2.7, tall: 8.72, dead: 0 },
+    conifer:    { half: 1.5, tall: 11.45, dead: 0 },
+    leaning:    { half: 2.1, tall: 7.30, dead: 0 },
+    sapling:    { half: 0.9, tall: 3.39, dead: 0 },
+    broad:      { half: 2.8, tall: 5.74, dead: 0 },
+    storm:      { half: 2.1, tall: 5.31, dead: 0.5 },
+    deadwood:   { half: 1.4, tall: 7.25, dead: 1 },
+    stump:      { half: 1.8, tall: 4.77, dead: 1 }
+  };
+  var TREE_ORDER = ["great", "conifer", "leaning", "sapling", "broad",
+                    "storm", "deadwood", "stump"];
+
+  // A TAPERED TUBE THROUGH A POLYLINE, with horizontal rings -- the source's
+  // `taperedTube`, and the shape every trunk, limb and branch in the set is
+  // made of. Rings stay level as the line leans, which is what gives a leaning
+  // ironwood its sheared, grown-that-way silhouette instead of a bent pipe.
+  function tube(builder, pts, radii, sides, color, capScale) {
+    var rings = [], i, a;
+    for (i = 0; i < pts.length; i++) {
+      var ring = [];
+      for (a = 0; a < sides; a++) {
+        var ang = (a / sides) * Math.PI * 2 + i * 0.11;
+        ring.push([pts[i][0] + Math.cos(ang) * radii[i],
+                   pts[i][1] + Math.sin(ang) * radii[i], pts[i][2]]);
+      }
+      rings.push(ring);
+    }
+    for (i = 0; i < rings.length - 1; i++) {
+      for (a = 0; a < sides; a++) {
+        var b = (a + 1) % sides;
+        builder.quad(rings[i][a], rings[i][b], rings[i + 1][b], rings[i + 1][a], color);
+      }
+    }
+    var top = pts[pts.length - 1], lr = rings[rings.length - 1];
+    var apex = [top[0], top[1], top[2] + radii[radii.length - 1] * (capScale || 0.3)];
+    for (a = 0; a < sides; a++) builder.tri(lr[a], lr[(a + 1) % sides], apex, color);
+    return builder;
+  }
+
+  // A TAPERED PRISM BETWEEN TWO POINTS -- the source's `stub` and `spike`, and
+  // what every root, bark ridge, splinter and dead limb is. `segment` is the
+  // same idea with four sides and no taper, which reads as a plank where a root
+  // has to read as a root.
+  function coneAt(builder, ax, ay, az, bx, by, bz, rBase, rTip, sides, color) {
+    var dx = bx - ax, dy = by - ay, dz = bz - az;
+    var len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len < 1e-6) return builder;
+    dx /= len; dy /= len; dz /= len;
+    var ux = 0, uy = 0, uz = 1;
+    if (Math.abs(dz) > 0.9) { ux = 1; uz = 0; }
+    var px = dy * uz - dz * uy, py = dz * ux - dx * uz, pz = dx * uy - dy * ux;
+    var pl = Math.sqrt(px * px + py * py + pz * pz) || 1;
+    px /= pl; py /= pl; pz /= pl;
+    var qx = dy * pz - dz * py, qy = dz * px - dx * pz, qz = dx * py - dy * px;
+    var lo = [], hi = [], a;
+    for (a = 0; a < sides; a++) {
+      var t = Math.PI * 2 * a / sides, c = Math.cos(t), s = Math.sin(t);
+      lo.push([ax + (px * c + qx * s) * rBase, ay + (py * c + qy * s) * rBase,
+               az + (pz * c + qz * s) * rBase]);
+      hi.push([bx + (px * c + qx * s) * rTip, by + (py * c + qy * s) * rTip,
+               bz + (pz * c + qz * s) * rTip]);
+    }
+    for (a = 0; a < sides; a++) {
+      var b = (a + 1) % sides;
+      builder.quad(lo[a], lo[b], hi[b], hi[a], color);
+    }
+    // Only the far end is capped: the near end is inside whatever it grows out
+    // of, and a root's near end is inside the trunk.
+    for (a = 1; a < sides - 1; a++) builder.tri(hi[0], hi[a], hi[a + 1], color);
+    return builder;
+  }
+
+  // The tree palette, mixed FROM the board's own so a forest on another map is
+  // that map's forest. `accent2` is the canopy on every board that declares one
+  // -- Ironwood's is the living green that its dead-forest neighbour has none
+  // of -- and the three leaf tones are steps either side of it.
+  function treePaint(P) {
+    var canopy = P.accent2 || P.panel;
+    return {
+      bark: mix(P.metalDark, hex("#3f3d38"), 0.55),
+      barkTan: mix(P.metal, hex("#5e5038"), 0.5),
+      barkDead: mix(P.rock, hex("#6b6659"), 0.5),
+      leafDark: mix(canopy, hex("#43512b"), 0.55),
+      leafMid: mix(canopy, hex("#64763b"), 0.4),
+      leafPale: mix(canopy, hex("#7e8d46"), 0.35)
+    };
+  }
+
+  // The eight bodies. Everything below is transcribed from the source in its
+  // own (x, y-up, z) and converted here, once.
+  function ironwoodTree(builder, variant, cx, cy, size, rot, P, C) {
+    var S = size * TREE_S;
+    var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
+    var leaf = [C.leafDark, C.leafMid, C.leafPale];
+    var i, a;
+
+    // design (x, y-up, z) -> world
+    function W(x, y, z) {
+      return [cx + (x * co - z * si) * S, cy + (x * si + z * co) * S, y * S];
+    }
+    function tub(pts, radii, sides, color, cap) {
+      var w = [], r = [];
+      for (var k = 0; k < pts.length; k++) {
+        w.push(W(pts[k][0], pts[k][1], pts[k][2]));
+        r.push(radii[k] * S);
+      }
+      tube(builder, w, r, sides, color, cap);
+    }
+    function stub(from, to, rBase, rTip, sides, color) {
+      var A = W(from[0], from[1], from[2]), B = W(to[0], to[1], to[2]);
+      coneAt(builder, A[0], A[1], A[2], B[0], B[1], B[2], rBase * S, rTip * S, sides, color);
+    }
+    // The source's `clump`: a flattened blob of leaves. An ellipsoid is the
+    // same silhouette as its jittered icosahedron at the size a board draws a
+    // tree, and it is a third of the triangles.
+    function clump(x, y, z, r, flat, color) {
+      var p = W(x, y, z);
+      ellipsoid(builder, p[0], p[1], p[2], r * S, r * flat * S, color, 6, 4);
+    }
+    // The source's `branch`: a limb that sags away from the trunk.
+    function limb(from, to, r0, r1, color) {
+      var mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + 0.22, (from[2] + to[2]) / 2];
+      tub([from, mid, to], [r0, (r0 + r1) / 2, r1], 5, color, 0.5);
+    }
+    // The source's `roots`: a flare collar that keeps the trunk IN the ground,
+    // and a ring of buttresses reaching down into it. Ten roots at the size
+    // this board draws a tree is ten shapes inside each other; five is the
+    // flare you can actually see.
+    function roots(count, baseR, reach, top, pal) {
+      stub([0, -0.24, 0], [0, top * 1.15, 0], baseR * 1.15, baseR * 0.6, 7, pal[0]);
+      for (var k = 0; k < count; k++) {
+        var ang = (k / count) * Math.PI * 2 + 0.31;
+        var rr = reach * (0.86 + ((k * 7) % 5) * 0.07);
+        var hh = top * (0.6 + ((k * 3) % 4) * 0.11);
+        stub([Math.cos(ang) * baseR * 0.72, hh, Math.sin(ang) * baseR * 0.72],
+             [Math.cos(ang) * rr, -0.3, Math.sin(ang) * rr],
+             baseR * 0.37, baseR * 0.19, 4, pal[k % pal.length]);
+      }
+    }
+
+    if (variant === "great") {
+      tub([[0, 0, 0], [0.06, 1.5, 0.05], [0.16, 3.0, 0.02], [0.2, 4.3, -0.05], [0.26, 5.3, -0.02]],
+        [1.45, 1.02, 0.76, 0.58, 0.48], 7, C.bark);
+      roots(6, 1.5, 1.95, 1.9, [C.bark, C.bark, C.barkTan]);
+      for (i = 0; i < 3; i++) {
+        a = (i / 3) * Math.PI * 2 + 0.5;
+        stub([Math.cos(a) * 0.95, 0.3, Math.sin(a) * 0.95],
+             [Math.cos(a) * 0.52, 3.9, Math.sin(a) * 0.52], 0.32, 0.1, 4,
+             i % 3 ? C.bark : C.barkTan);
+      }
+      var gp = [[0.3, 7.2, 0.1, 2.5, 0.64], [-2.4, 6.1, 0.5, 2.0, 0.66],
+                [2.6, 6.3, -0.4, 1.9, 0.64], [-3.4, 4.9, -0.9, 1.5, 0.68],
+                [3.3, 5.15, 1.0, 1.4, 0.68]];
+      for (i = 0; i < gp.length; i++) {
+        stub([0.2, 3.9 + i * 0.22, 0], [gp[i][0] * 0.8, gp[i][1] - 0.35, gp[i][2] * 0.8],
+          0.36, 0.19, 5, C.bark);
+        clump(gp[i][0], gp[i][1], gp[i][2], gp[i][3], gp[i][4], leaf[i % 3]);
+      }
+
+    } else if (variant === "conifer") {
+      tub([[0, 0, 0], [0.04, 2.2, 0], [0.06, 4.6, 0.03], [0.05, 7.0, 0.02], [0.02, 9.3, 0]],
+        [0.78, 0.55, 0.4, 0.28, 0.17], 7, C.bark);
+      roots(5, 0.85, 1.15, 1.1, [C.bark, C.bark, C.barkTan]);
+      for (i = 0; i < 3; i++) {
+        a = (i / 3) * Math.PI * 2;
+        stub([Math.cos(a) * 0.5, 0.25, Math.sin(a) * 0.5],
+             [Math.cos(a) * 0.3, 4.1, Math.sin(a) * 0.3], 0.17, 0.06, 4, C.barkTan);
+      }
+      // seven tiers and a spire, which is the whole silhouette
+      for (i = 0; i < 7; i++) {
+        var t = i / 6, ty = 3.1 + t * 6.1, tr = 1.85 * (1 - t * 0.76);
+        var tp = W(0, ty - (0.85 + (1 - t) * 0.45) / 2, 0);
+        // NINE SIDES, NOT SEVEN. A cone tier is the whole silhouette of this
+        // tree and at seven the facets are wide enough that the gaps between
+        // tiers open up and it reads as a stack of hats rather than a spire.
+        frustum(builder, tp[0], tp[1], tr * S, 0, (0.85 + (1 - t) * 0.45) * S,
+          leaf[i % 2 ? 0 : 1], tp[2], 9);
+      }
+      var sp = W(0, 10.4 - 1.05, 0);
+      frustum(builder, sp[0], sp[1], 0.62 * S, 0, 2.1 * S, C.leafDark, sp[2], 9);
+
+    } else if (variant === "leaning") {
+      tub([[0, 0, 0], [0.42, 1.4, 0.1], [0.95, 2.7, 0.05], [1.05, 3.9, -0.1], [0.72, 4.8, -0.05]],
+        [1.0, 0.72, 0.52, 0.42, 0.34], 7, C.bark);
+      roots(5, 1.1, 1.5, 1.5, [C.bark, C.bark, C.barkTan]);
+      for (i = 0; i < 3; i++) {
+        a = (i / 3) * Math.PI * 2 + 0.9;
+        stub([Math.cos(a) * 0.62, 0.3, Math.sin(a) * 0.62],
+             [0.5 + Math.cos(a) * 0.4, 2.85, Math.sin(a) * 0.4], 0.2, 0.07, 4, C.barkTan);
+      }
+      var lp = [[1.9, 6.1, 0.2, 1.9, 0.64], [-0.5, 5.35, -0.5, 1.45, 0.66],
+                [3.1, 5.15, -0.3, 1.3, 0.64], [-1.6, 4.35, 0.7, 1.1, 0.7]];
+      for (i = 0; i < lp.length; i++) {
+        stub([0.85, 3.6 + i * 0.2, 0], [lp[i][0] * 0.8 + 0.15, lp[i][1] - 0.3, lp[i][2] * 0.8],
+          0.31, 0.17, 5, C.bark);
+        clump(lp[i][0], lp[i][1], lp[i][2], lp[i][3], lp[i][4], leaf[(i + 1) % 3]);
+      }
+
+    } else if (variant === "sapling") {
+      tub([[0, 0, 0], [0.06, 0.8, 0.04], [0.14, 1.6, 0.02], [0.1, 2.3, -0.03]],
+        [0.26, 0.19, 0.14, 0.1], 6, C.bark);
+      roots(4, 0.3, 0.46, 0.4, [C.bark, C.barkTan]);
+      var sap = [[0.08, 2.85, 0, 0.76, 0.7], [-0.62, 2.15, 0.2, 0.5, 0.72],
+                 [0.66, 1.95, -0.15, 0.44, 0.7]];
+      for (i = 0; i < sap.length; i++) {
+        if (i) stub([0.12, 1.75, 0], [sap[i][0] * 0.7, sap[i][1] - 0.2, sap[i][2] * 0.7],
+          0.08, 0.05, 4, C.bark);
+        clump(sap[i][0], sap[i][1], sap[i][2], sap[i][3], sap[i][4], leaf[i % 2 ? 1 : 2]);
+      }
+
+    } else if (variant === "broad") {
+      tub([[0, 0, 0], [0.1, 0.9, 0.06], [0.24, 1.8, 0.02], [0.3, 2.6, -0.04]],
+        [1.35, 1.05, 0.82, 0.66], 7, C.bark);
+      roots(6, 1.55, 2.1, 1.5, [C.bark, C.bark, C.barkTan]);
+      for (i = 0; i < 3; i++) {
+        a = (i / 3) * Math.PI * 2 + 0.3;
+        stub([Math.cos(a) * 0.9, 0.25, Math.sin(a) * 0.9],
+             [Math.cos(a) * 0.6, 2.05, Math.sin(a) * 0.6], 0.26, 0.09, 4, C.barkTan);
+      }
+      var bp = [[0.2, 4.6, 0.1, 2.15, 0.56], [-2.85, 4.0, 0.6, 1.8, 0.56],
+                [2.95, 4.1, -0.5, 1.75, 0.58], [-1.4, 3.55, -2.2, 1.45, 0.6],
+                [1.9, 3.5, 2.1, 1.4, 0.6]];
+      for (i = 0; i < bp.length; i++) {
+        stub([0.26, 2.25 + i * 0.14, 0], [bp[i][0] * 0.78, bp[i][1] - 0.3, bp[i][2] * 0.78],
+          0.4, 0.2, 5, C.bark);
+        clump(bp[i][0], bp[i][1], bp[i][2], bp[i][3], bp[i][4], leaf[i % 3]);
+      }
+
+    } else if (variant === "storm") {
+      tub([[0, 0, 0], [0.08, 1.3, 0.05], [0.2, 2.6, 0], [0.28, 3.7, -0.06]],
+        [1.08, 0.82, 0.62, 0.5], 7, C.bark);
+      roots(5, 1.15, 1.65, 1.5, [C.bark, C.barkTan]);
+      stub([0.2, 1.2, 0.4], [-2.65, 0.85, 1.55], 0.44, 0.16, 4, C.barkTan);
+      // the snapped crown
+      for (i = 0; i < 4; i++) {
+        a = (i / 4) * Math.PI * 2 + 0.4;
+        stub([0.28 + Math.cos(a) * 0.28, 3.4, Math.sin(a) * 0.28],
+             [0.28 + Math.cos(a) * 0.42, 4.05 + (i % 3) * 0.28, Math.sin(a) * 0.42],
+             0.22, 0.08, 3, i % 2 ? C.barkDead : C.bark);
+      }
+      // one bare limb, one side still in leaf, and a limb down against the trunk
+      limb([0.2, 2.9, 0], [2.5, 4.6, -0.6], 0.28, 0.06, C.barkDead);
+      stub([2.5, 4.6, -0.6], [3.15, 5.15, -0.88], 0.14, 0.06, 4, C.barkDead);
+      limb([0.12, 2.5, 0.1], [-1.6, 3.6, 0.5], 0.3, 0.14, C.bark);
+      clump(-2.3, 4.2, 0.7, 1.65, 0.64, C.leafDark);
+      limb([0.22, 3.1, -0.1], [1.3, 3.4, 1.2], 0.22, 0.1, C.bark);
+      clump(1.8, 3.7, 1.7, 1.1, 0.66, C.leafMid);
+      stub([1.0, 0.15, 1.9], [0.5, 2.2, 0.55], 0.1, 0.22, 4, C.barkDead);
+
+    } else if (variant === "deadwood") {
+      tub([[0, 0, 0], [0.05, 1.6, 0.04], [0.14, 3.2, 0], [0.1, 4.6, -0.05], [0.04, 5.4, 0]],
+        [0.9, 0.66, 0.48, 0.34, 0.24], 7, C.barkDead);
+      roots(5, 0.95, 1.4, 1.3, [C.barkDead, C.bark]);
+      var dl = [[-2.1, 6.3, 0.4], [2.3, 6.6, -0.3], [-1.5, 5.2, -1.6],
+                [1.4, 4.9, 1.7], [0.3, 7.4, 0.2]];
+      for (i = 0; i < dl.length; i++) {
+        stub([0.1, 3.4 + i * 0.32, 0],
+             [dl[i][0] * 0.68, dl[i][1] - 0.62, dl[i][2] * 0.68], 0.24, 0.09, 4, C.barkDead);
+        stub([dl[i][0] * 0.68, dl[i][1] - 0.62, dl[i][2] * 0.68],
+             [dl[i][0] * 0.92, dl[i][1] - 0.18, dl[i][2] * 0.92], 0.16, 0.075, 4,
+             i % 2 ? C.barkDead : C.bark);
+      }
+
+    } else if (variant === "stump") {
+      tub([[0, 0, 0], [0.05, 1.1, 0.03], [0.12, 2.2, 0]], [1.55, 1.3, 1.05], 8, C.bark, 0.1);
+      roots(6, 1.65, 1.95, 1.5, [C.bark, C.bark, C.barkTan]);
+      // the shattered crown: seven splinters round the break and three tall ones
+      for (i = 0; i < 7; i++) {
+        a = (i / 7) * Math.PI * 2 + 0.2;
+        var sr = 0.72 + ((i * 5) % 4) * 0.075;
+        stub([Math.cos(a) * sr * 0.8, 1.8, Math.sin(a) * sr * 0.8],
+             [Math.cos(a) * sr, 2.5 + ((i * 3) % 5) * 0.3, Math.sin(a) * sr],
+             0.3, 0.07, 3, i % 3 === 0 ? C.barkDead : C.bark);
+      }
+      stub([0.1, 1.7, -0.2], [-0.2, 4.7, -0.5], 0.42, 0.09, 3, C.bark);
+      stub([0.35, 1.7, 0.3], [0.6, 4.0, 0.6], 0.34, 0.08, 3, C.barkDead);
+      stub([-0.45, 1.7, 0.35], [-0.75, 3.4, 0.6], 0.28, 0.07, 3, C.bark);
+    }
+  }
+
   // ================= THE IRONWOOD VILLAGE =================
   //
   // Ported from the authored three.js models (Claude Design project a7f0c2ee:
@@ -2045,43 +2356,16 @@ var GLGeometry = (function () {
       // flagship brief sets and the bar the first pass failed -- every prop
       // came out a grey cube because none of these cases existed.
 
-      case "ironwood": {
-        // Buttressed trunk, forking limbs, three canopy masses at different
-        // heights. The fork angle, the lean, the canopy offsets and the ring
-        // sizes are all drawn from the tree's own position, so eighty-odd of
-        // them share no silhouette and none of them flickers.
-        var iwLean = (wobble(cx, cy, 11) - 0.5) * 0.24;
-        var iwH = size * (1.55 + wobble(cx, cy, 12) * 0.75);
-        var forkZ = iwH * 0.52;
-        var topX = cx + iwLean * iwH, topY = cy + iwLean * iwH * 0.6;
-
-        // Buttress roots: four flares that meet the dirt square.
-        for (var bu = 0; bu < 4; bu++) {
-          var buA = bu * Math.PI / 2 + wobble(cx, cy, 13 + bu) * 1.2;
-          segment(builder,
-            cx + Math.cos(buA) * r * 0.42, cy + Math.sin(buA) * r * 0.42, 0,
-            cx, cy, size * 0.30, r * 0.13, dark);
-        }
-        segment(builder, cx, cy, 0, topX * 0.5 + cx * 0.5, topY * 0.5 + cy * 0.5,
-          forkZ, r * 0.22, dark);
-
-        // Two limbs off the fork, each carrying its own canopy.
-        var canopyColour = P.accent2 ? P.accent2 : trim;
-        for (var lb = 0; lb < 2; lb++) {
-          var lbA = rot + lb * Math.PI + wobble(cx, cy, 20 + lb) * 1.6;
-          var lbR = size * (0.34 + wobble(cx, cy, 24 + lb) * 0.26);
-          var lbX = topX + Math.cos(lbA) * lbR;
-          var lbY = topY + Math.sin(lbA) * lbR;
-          var lbZ = forkZ + iwH * (0.28 + wobble(cx, cy, 28 + lb) * 0.22);
-          segment(builder, topX, topY, forkZ, lbX, lbY, lbZ, r * 0.10, dark);
-          sphere(builder, lbX, lbY, size * (0.36 + wobble(cx, cy, 32 + lb) * 0.16),
-            canopyColour, lbZ, 7, 5);
-        }
-        // The crown, largest and highest, sat over the fork.
-        sphere(builder, topX, topY, size * (0.50 + wobble(cx, cy, 36) * 0.18),
-          canopyColour, forkZ + iwH * 0.46, 8, 6);
+      case "ironwood":
+        // THE FOREST, and it is eight bodies rather than one wobbled tree. The
+        // variant is decided in `Maps.assignTrees` from what stands around this
+        // position -- deep forest, gap, or the exposed ground by the road, the
+        // village and the depot -- and arrives here on the model. Absent, this
+        // draws the great tree, which is the one a board that has not been
+        // through the assignment pass should look like.
+        ironwoodTree(builder, model.variant || "great", cx, cy,
+          size * (model.grow || 1), rot, P, treePaint(P));
         break;
-      }
 
       case "ridge": {
         // A HILL ON THE HORIZON. Not a mountain in any detailed sense -- it is
@@ -3187,6 +3471,12 @@ var GLGeometry = (function () {
     Maps.registerFootprint("village", villageFootprint);
     Maps.registerFootprint("depot", depotFootprint);
   }
+  if (typeof Maps !== "undefined" && Maps.registerTreeSpan) {
+    Maps.registerTreeSpan(function (variant) {
+      var t = TREES[variant] || TREES.great;
+      return { half: t.half * TREE_S, tall: t.tall * TREE_S, dead: t.dead };
+    });
+  }
 
   return {
     Builder: Builder,
@@ -3206,6 +3496,12 @@ var GLGeometry = (function () {
     scenery: scenery,
     depotWalkway: depotWalkway,
     depotFootprint: depotFootprint,
+    TREE_KINDS: TREE_ORDER,
+    treeSpan: function (variant) {
+      // Half-width and height in `size` multiples, for the placement pass.
+      var t = TREES[variant] || TREES.great;
+      return { half: t.half * TREE_S, tall: t.tall * TREE_S, dead: t.dead };
+    },
     villagePlan: villagePlan,
     villageFootprint: villageFootprint,
     river: river,

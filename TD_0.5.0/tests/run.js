@@ -5238,12 +5238,14 @@ function (t) {
 
   // THE AUTHORED LIST IS NOT CLEAN, and that is the point: the foliage is
   // placed in bulk and nobody ever asked it where the buildings were.
+  // MEASURED THE WAY THE PASS MEASURES, off `foliageRadiusOf`. Reading `CANOPY`
+  // here instead made eleven correctly-placed saplings look like failures: a
+  // check that disagrees with the thing it checks is worse than no check.
   function overlaps(list) {
     var hits = 0;
     list.forEach(function (m) {
-      var fraction = Maps.CANOPY[m.kind];
-      if (fraction === undefined) return;
-      var radius = (m.size || 44) * fraction;
+      var radius = Maps.foliageRadiusOf(m);
+      if (radius === null) return;
       for (var i = 0; i < keep.length; i++) {
         var d = Math.hypot(keep[i].x - m.x, keep[i].y - m.y);
         if (d < keep[i].r + radius + Maps.FOLIAGE_CLEARANCE) { hits++; return; }
@@ -5266,6 +5268,71 @@ function (t) {
   // `sceneryOf`; if one of them went back to `map.models` the two would grow
   // different forests and only one of them would be checked here.
   t.eq(Maps.sceneryOf(map), Maps.sceneryOf(map), "the answer is cached, not recomputed");
+});
+
+test("4f  the forest is eight bodies, placed on purpose and the same every load",
+function (t) {
+  var h = ironwood();
+  var Maps = h.game.Maps;
+  var map = Maps.byId("ironwood-frontier");
+  var scenery = Maps.sceneryOf(map);
+  var trees = scenery.filter(function (m) { return m.kind === "ironwood"; });
+  t.ok(trees.length > 900, "the board still plants a forest (" + trees.length + ")");
+
+  // EVERY BODY IS USED. The first version weighted its lists by repeating
+  // entries and came out two thirds conifer; the one before that never picked
+  // `deadwood` at all, because it was only listed under statures the blighted
+  // ground does not have.
+  var census = {};
+  trees.forEach(function (m) { census[m.variant] = (census[m.variant] || 0) + 1; });
+  var kinds = ["great", "conifer", "leaning", "sapling", "broad",
+               "storm", "deadwood", "stump"];
+  kinds.forEach(function (k) {
+    t.ok(census[k] > 0, "the forest contains at least one " + k +
+      " (" + (census[k] || 0) + ")");
+  });
+
+  // DELIBERATE, NOT UNIFORM. The ground beside the settlement is where the
+  // forest was pushed back, so it is broken; the deep rings are not.
+  function share(filter, wanted) {
+    var n = 0, hit = 0;
+    trees.forEach(function (m) {
+      if (!filter(m)) return;
+      n++;
+      if (wanted.indexOf(m.variant) >= 0) hit++;
+    });
+    return n ? hit / n : 0;
+  }
+  var broken = ["stump", "deadwood", "storm"];
+  var outskirts = share(function (m) {
+    return Math.hypot(m.x + 16, m.y - 362) < 470;
+  }, broken);
+  var deep = share(function (m) { return m.x > 1800 || m.x < -700; }, broken);
+  t.ok(outskirts > 0.4, "the settlement's outskirts are mostly broken trees (" +
+    Math.round(outskirts * 100) + "%)");
+  t.eq(deep, 0, "and the deep forest has none");
+
+  // DETERMINISTIC. The mesh is rebuilt on every load and a forest that
+  // reshuffles is a forest the player cannot learn.
+  var again = Maps.assignTrees(map.models.map(function (m) {
+    var copy = {};
+    for (var k in m) if (Object.prototype.hasOwnProperty.call(m, k)) copy[k] = m[k];
+    return copy;
+  }), Maps.keepOutOf(map)).filter(function (m) { return m.kind === "ironwood"; });
+  var drift = 0;
+  for (var i = 0; i < again.length; i++) {
+    // `trees` has had the clearance pass over it, so compare the CHOICE rather
+    // than the position: a moved tree is still the same body.
+    if (again[i].variant !== undefined && census[again[i].variant] === undefined) drift++;
+  }
+  t.eq(drift, 0, "a second run picks from the same set");
+  var second = {};
+  again.forEach(function (m) { second[m.variant] = (second[m.variant] || 0) + 1; });
+  kinds.forEach(function (k) {
+    t.ok(Math.abs((second[k] || 0) - (census[k] || 0)) <= 12,
+      "and the same number of them, give or take what the clearance dropped (" +
+      k + ": " + (second[k] || 0) + " vs " + (census[k] || 0) + ")");
+  });
 });
 
 test("5  ordinary ground is still freely buildable", function (t) {

@@ -565,6 +565,28 @@ var World3D = (function () {
     var g = new GLGeometry.Builder();
     flat(g, minX, minY, maxX, maxY, 0, P.terrain);
 
+    // IRONWOOD'S GROUND IS LAYERED COLOUR, NEVER GAMEPLAY RELIEF. The module
+    // only adds geometry a few hundredths above the existing plane; the height
+    // field below remains the sole source of placement and collision truth.
+    // It lives outside gl-geometry so the independently-authored tree family
+    // can change without either system overwriting the other.
+    if (typeof IronwoodGround !== "undefined") {
+      IronwoodGround.build(g, {
+        map: map,
+        groundBounds: { minX: minX, minY: minY, maxX: maxX, maxY: maxY },
+        playBounds: {
+          minX: playMinX, minY: playMinY, maxX: playMaxX, maxY: playMaxY
+        },
+        riverGap: gap,
+        routeRibbons: routePaths.map(function (p) {
+          return roadRibbon(p, ul(ROAD_WIDTH_UL));
+        }),
+        zones: (env && env.zones) || [],
+        keepOut: (typeof Maps !== "undefined" && Maps.keepOutOf)
+          ? Maps.keepOutOf(map) : []
+      });
+    }
+
     // FLOOR SEAMS ARE A MANUFACTURED FLOOR'S SEAMS. Six of the seven boards are
     // decks inside a facility and the grid is what says so. Ruled lines two
     // hundred units apart across a forest would say the same thing about a
@@ -593,8 +615,11 @@ var World3D = (function () {
       // No rim, because a patch of mud has no edge rail, and no height stamp
       // (see buildHeightField), because it must not move a build spot.
       if (h === 0) {
-        flat(g, cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2,
-          0.08, patchColor(z.kind, P));
+        if (!(typeof IronwoodGround !== "undefined" &&
+              IronwoodGround.handlesPatch(map, z.kind))) {
+          flat(g, cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2,
+            0.08, patchColor(z.kind, P));
+        }
         return;
       }
       var thickness = Math.max(1.5, Math.abs(h));
@@ -676,9 +701,14 @@ var World3D = (function () {
         into = group.builder;
         props = group.palette;
       }
+      // THE MODEL ITSELF GOES THROUGH, and it has to: `scenery` reads per-prop
+      // fields off it -- a platform's authored height, and since 2026-08-27
+      // which of the eight tree bodies an ironwood is. Dropped here for one
+      // commit and every tree on the board drew as the default great tree,
+      // which looks exactly like a forest of one model because it is one.
       GLGeometry.scenery(into, m.kind,
         ul(m.x / AUTHORED_PX_PER_UL), ul(m.y / AUTHORED_PX_PER_UL),
-        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, props);
+        ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0, props, m);
     });
 
     accentMeshes = Object.keys(accentGroups).map(function (key) {

@@ -2853,6 +2853,20 @@ Maps.SOLID = {
   tank: 0.5, vent: 0.5, holo: 0.5, battery: 0.5, coil: 0.5,
   "depot-ramp": 0.5, wheel: 0.5, exhaust: 0.4
 };
+// HOW HARSH THE GROUND AROUND A THING IS, on a scale of one. It decides which
+// TREE grows there, not whether one can -- see `Maps.assignTrees`. The
+// settlement and the enemy's depot are the two places on this board where the
+// forest has been pushed back and burnt, the stumps are where it was felled,
+// the rocks are exposed shelf, and a road is merely a gap in the canopy.
+Maps.BLIGHT = {
+  village: 1, "village-signals": 1, depot: 1, floodlight: 0.9,
+  townhall: 0.9, house: 0.9, storehouse: 0.9, workshop: 0.9,
+  palisade: 0.9, "palisade-gate": 1, gate: 1, lantern: 0.6, barrel: 0.6,
+  watchtower: 0.8, wreck: 1, barricade: 0.9, sandbags: 0.9, spikes: 0.9,
+  fence: 0.8, bridge: 0.4, casket: 1, conduit: 0.5, platform: 0.85,
+  "depot-ramp": 1, wheel: 1, exhaust: 1
+};
+
 Maps.CANOPY = {
   ironwood: 0.55, tree: 0.4, snag: 0.35, stump: 0.4, log: 0.6,
   brush: 0.5, fern: 0.5, deadfall: 0.6, mossrock: 0.5, trunk: 0.6
@@ -2874,25 +2888,35 @@ Maps.ROAD_CLEARANCE = 18;
 Maps.keepOutOf = function (map) {
   var out = [], i, j;
   var models = map.models || [];
+  // EVERY CIRCLE CARRIES WHAT IT IS, not just where. The foliage pass only
+  // needs the geometry, but the tree assignment needs to know whether the
+  // nearest thing is a wall, a rock or a road: dead and broken trees belong
+  // around the settlement's outskirts and the enemy's depot, not scattered
+  // evenly down a forest track. `blight` is that, on a scale of one.
+  function keep(x, y, r, blight) { out.push({ x: x, y: y, r: r, blight: blight }); }
   for (i = 0; i < models.length; i++) {
     var m = models[i];
     var fraction = Maps.SOLID[m.kind];
     if (fraction === undefined) continue;
+    var harsh = Maps.BLIGHT[m.kind] === undefined ? 0.7 : Maps.BLIGHT[m.kind];
     var provider = Maps.FOOTPRINTS[m.kind];
     var detail = provider
       ? provider(m.x, m.y, m.size || 44, m.rotation || 0)
       : null;
-    if (detail) { for (j = 0; j < detail.length; j++) out.push(detail[j]); continue; }
-    out.push({ x: m.x, y: m.y, r: (m.size || 44) * fraction });
+    if (detail) {
+      for (j = 0; j < detail.length; j++) keep(detail[j].x, detail[j].y, detail[j].r, harsh);
+      continue;
+    }
+    keep(m.x, m.y, (m.size || 44) * fraction, harsh);
   }
   // The gameplay solids. A rock or a stump is authored geometry a bullet stops
   // against, so a tree inside one is the same lie as a tree inside a wall.
   (map.blockers || []).forEach(function (bl) {
-    if (bl.shape === "circle") out.push({ x: bl.x, y: bl.y, r: bl.radius });
+    if (bl.shape === "circle") keep(bl.x, bl.y, bl.radius, 0.5);
     else if (bl.shape === "capsule") {
-      out.push({ x: bl.a.x, y: bl.a.y, r: bl.radius });
-      out.push({ x: (bl.a.x + bl.b.x) / 2, y: (bl.a.y + bl.b.y) / 2, r: bl.radius });
-      out.push({ x: bl.b.x, y: bl.b.y, r: bl.radius });
+      keep(bl.a.x, bl.a.y, bl.radius, 0.5);
+      keep((bl.a.x + bl.b.x) / 2, (bl.a.y + bl.b.y) / 2, bl.radius, 0.5);
+      keep(bl.b.x, bl.b.y, bl.radius, 0.5);
     } else if (bl.points) {
       var cx = 0, cy = 0, far = 0;
       bl.points.forEach(function (pt) { cx += pt[0]; cy += pt[1]; });
@@ -2900,12 +2924,12 @@ Maps.keepOutOf = function (map) {
       bl.points.forEach(function (pt) {
         far = Math.max(far, Math.hypot(pt[0] - cx, pt[1] - cy));
       });
-      out.push({ x: cx, y: cy, r: far });
+      keep(cx, cy, far, 0.5);
     }
   });
-  (map.platforms || []).forEach(function (pf) {
-    out.push({ x: pf.x, y: pf.y, r: pf.radius });
-  });
+  // A CUT STUMP IS THE MARK OF THE AXE, so the ground around one is logged
+  // ground and the trees on it are the ones that did not survive being left.
+  (map.platforms || []).forEach(function (pf) { keep(pf.x, pf.y, pf.radius, 0.85); });
   // THE ROUTE, as a chain of discs down the middle of the road. Sampled rather
   // than treated as segments because a disc chain is the same test as
   // everything else above and the route is only a few dozen points long once
@@ -2918,12 +2942,191 @@ Maps.keepOutOf = function (map) {
       var steps = Math.max(1, Math.ceil(span / Maps.ROAD_CLEARANCE));
       for (j = 0; j <= steps; j++) {
         var t = j / steps;
-        out.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t,
-                   r: Maps.ROAD_CLEARANCE });
+        // A ROAD IS EXPOSURE, NOT RUIN. Its shoulder gets light and wind and
+        // therefore saplings and leaners; it does not get a dead forest.
+        keep(ax + (bx - ax) * t, ay + (by - ay) * t, Maps.ROAD_CLEARANCE, 0.3);
       }
     }
   });
   return out;
+};
+
+// WHICH TREE GROWS WHERE, and it is a decision rather than a dice roll.
+//
+// The board plants nine hundred and fifty-eight ironwoods and the model set has
+// eight bodies in it. Handing each position a body at random would give a
+// forest with dead trees scattered through its heart and saplings in its
+// canopy; distributing them evenly would give stripes. So each position is read
+// off the board it stands on -- how far it is from anything built, how harsh
+// that thing is, and how far out its authored ring sits -- and gets the body
+// that belongs there:
+//
+//   deep and mature      the great tree, the conifer, the broad crown
+//   deep and young       conifer, leaner, broad, the odd sapling
+//   the transition band  saplings and leaners, a storm-struck now and then
+//   harsh ground         the shattered stump, the deadwood, the storm-struck
+//
+// HARSH IS NOT THE SAME AS EXPOSED, and separating the two is what keeps this
+// from reading as a ring of dead trees round every clearing. A road's shoulder
+// is a gap in the canopy -- light, wind, saplings. The settlement's outskirts,
+// the ground round the enemy's depot and the ring of cut stumps are where the
+// forest was pushed back, and that is where the broken trees are.
+//
+// DETERMINISTIC, and it has to be: the mesh is built on every load and a forest
+// that reshuffles is a forest the player cannot learn. Every choice below is a
+// pure function of the tree's own authored position.
+// TWO AXES, NOT ONE: how big the board authored this tree, and what kind of
+// ground it stands on. The first version read only the ground and every deep
+// tree came out one of two bodies, which is a forest of two species.
+//
+// STATURE COMES OFF THE AUTHORED `size`, which the board already uses as its
+// depth signal -- the rings run 24 near the clearing to 172 out at the
+// horizon. A short body on a small tree and a tall one on a large tree is what
+// makes a treeline read as receding rather than as one hedge at three scales,
+// and it is why the set has a sapling AND a conifer in it. The thresholds are
+// the size terciles: 70 and 105.
+//
+// CONDITION IS THE GROUND. Healthy is most of the forest; worn is the canopy
+// gap along the road and the clearing edge; broken is the ruin around the
+// settlement, the depot and the cut stumps.
+//
+// EVERY CELL LISTS AT LEAST THREE BODIES AND NO CELL REPEATS ONE. A repeated
+// entry is a weight, and a weight is how the first version ended up two thirds
+// conifer -- with a hashed start walking the list, an even list is an even
+// spread.
+Maps.TREE_STATURE = [70, 105];
+Maps.TREE_SETS = {
+  small: {
+    healthy: ["sapling", "broad", "leaning"],
+    worn:    ["sapling", "storm", "leaning"],
+    // A STANDING DEAD TREE BELONGS HERE, and it was absent for a commit: the
+    // ground the forest has lost is nearest the settlement, and the settlement
+    // stands in the ring the board authors SMALL. With `deadwood` only listed
+    // under the tall statures it never came up once in nine hundred trees.
+    broken:  ["stump", "deadwood", "storm", "sapling"]
+  },
+  mid: {
+    healthy: ["broad", "leaning", "conifer"],
+    worn:    ["leaning", "storm", "broad"],
+    broken:  ["stump", "deadwood", "storm"]
+  },
+  tall: {
+    healthy: ["great", "conifer", "broad", "great"],
+    worn:    ["leaning", "conifer", "deadwood"],
+    broken:  ["deadwood", "stump", "storm"]
+  }
+};
+// TWO RANGES, NOT ONE, and they are different things.
+//
+// `EXPOSURE` is the canopy gap: how far the light and the wind reach in from
+// anything the forest has to stand back from, road included. Inside it a tree
+// is at an edge, and edges grow saplings and leaners.
+//
+// `BLIGHT` is how far the RUIN reaches, and it is deliberately wider and only
+// measured against the harsh things -- the settlement, the depot, the cut
+// stumps. It has to be wider or the broken trees sit in a tight collar round
+// each wall and read as a fence made of deadwood rather than as ground the
+// forest has lost. At 150 and 260 the visible border goes: broken at the
+// village and the depot, thin and young along the road, and full canopy one
+// row back, which is the depth the board wants.
+Maps.TREE_EXPOSURE_PX = 150;
+Maps.TREE_BLIGHT_PX = 260;
+Maps.TREE_SPACING = 2.2;
+
+function treeHash(x, y, salt) {
+  var h = Math.sin(x * 12.9898 + y * 78.233 + salt * 37.719) * 43758.5453;
+  return h - Math.floor(h);
+}
+
+Maps.assignTrees = function (models, keep) {
+  // A coarse grid, so "is there one of these next to me" is nine buckets rather
+  // than nine hundred and fifty-eight distance tests.
+  var CELL = 200, grid = {}, i;
+  function cellKey(x, y) {
+    return Math.floor(x / CELL) + ":" + Math.floor(y / CELL);
+  }
+  function neighbours(x, y) {
+    var found = [], gx = Math.floor(x / CELL), gy = Math.floor(y / CELL), a, b;
+    for (a = -1; a <= 1; a++) for (b = -1; b <= 1; b++) {
+      var bucket = grid[(gx + a) + ":" + (gy + b)];
+      if (bucket) found = found.concat(bucket);
+    }
+    return found;
+  }
+
+  for (i = 0; i < models.length; i++) {
+    var m = models[i];
+    if (m.kind !== "ironwood") continue;
+    var size = m.size || 44;
+
+    // The nearest thing of any kind, and separately the nearest RUINED one.
+    var gap = Infinity, ruin = Infinity, c;
+    for (c = 0; c < keep.length; c++) {
+      var d = Math.hypot(keep[c].x - m.x, keep[c].y - m.y) - keep[c].r;
+      if (d < gap) gap = d;
+      if ((keep[c].blight || 0) >= 0.7) {
+        var scaled = d / (keep[c].blight || 1);
+        if (scaled < ruin) ruin = scaled;
+      }
+    }
+    var exposure = gap <= 0 ? 1 : Math.max(0, 1 - gap / Maps.TREE_EXPOSURE_PX);
+    var blight = ruin <= 0 ? 1 : Math.max(0, 1 - ruin / Maps.TREE_BLIGHT_PX);
+    var stature = size < Maps.TREE_STATURE[0] ? "small"
+      : size < Maps.TREE_STATURE[1] ? "mid" : "tall";
+    var condition = blight > 0.45 ? "broken"
+      : exposure > 0.45 ? "worn" : "healthy";
+    var set = Maps.TREE_SETS[stature][condition];
+
+    // NO TWO NEIGHBOURS WEAR THE SAME BODY. Walking the set from a hashed start
+    // rather than picking one at random is what stops a run of six identical
+    // conifers, and it stops the fallback being "whatever comes first" as well.
+    var start = Math.floor(treeHash(m.x, m.y, 1) * set.length);
+    var near = neighbours(m.x, m.y);
+    var reach = size * Maps.TREE_SPACING;
+    var pick = set[start], k, n;
+    for (k = 0; k < set.length; k++) {
+      var candidate = set[(start + k) % set.length];
+      var clash = false;
+      for (n = 0; n < near.length; n++) {
+        if (near[n].v !== candidate) continue;
+        if (Math.hypot(near[n].x - m.x, near[n].y - m.y) < reach) { clash = true; break; }
+      }
+      if (!clash) { pick = candidate; break; }
+    }
+
+    m.variant = pick;
+    // RESTRAINED. Eight per cent of scale and a sixth of a turn is variation;
+    // more than that and a forest of one species starts to read as several.
+    m.grow = 0.92 + treeHash(m.x, m.y, 2) * 0.16;
+    m.rotation = (m.rotation || 0) + treeHash(m.x, m.y, 3) * Math.PI * 2;
+
+    var key = cellKey(m.x, m.y);
+    if (!grid[key]) grid[key] = [];
+    grid[key].push({ x: m.x, y: m.y, v: pick });
+  }
+  return models;
+};
+
+// HOW MUCH ROOM A PIECE OF FOLIAGE NEEDS, or null when it is not foliage.
+//
+// A tree's own footprint: the trunk, the roots and the crown that would
+// visibly stand inside a roof, off the MODEL once one has been chosen -- a
+// sapling needs a fifth of what a great tree does, and a pass that measured
+// every ironwood the same either leaves saplings inside walls or fells a great
+// tree that was merely close. Without a renderer loaded it is the blanket
+// `CANOPY` figure, which is larger, so a node test is conservative rather than
+// wrong.
+//
+// PUBLISHED BECAUSE THE TEST HAS TO ASK. Test 4e measured with `CANOPY` while
+// this pass measured with the model, and eleven saplings that were correctly
+// placed read as failures -- a check that disagrees with the thing it is
+// checking is worse than no check.
+Maps.foliageRadiusOf = function (m) {
+  if (m.variant && Maps.treeSpan) {
+    return (m.size || 44) * (m.grow || 1) * Maps.treeSpan(m.variant).half;
+  }
+  var fraction = Maps.CANOPY[m.kind];
+  return fraction === undefined ? null : (m.size || 44) * fraction;
 };
 
 // THE BOARD'S SCENERY, WITH NOTHING GROWING OUT OF ANYTHING.
@@ -2943,6 +3146,24 @@ Maps.sceneryOf = function (map) {
   var pad = Maps.FOLIAGE_CLEARANCE;
   var out = [], moved = 0, removed = 0, k, a;
 
+  // THE TREES CHOOSE THEIR BODIES FIRST, and the clearance runs after: a
+  // sapling needs a fifth of the room a great tree does, so a pass that
+  // measured every ironwood at one radius would either leave saplings inside
+  // walls or fell a great tree that was only close.
+  //
+  // COPIED, NOT STAMPED. `map.models` is authored data and every other reader
+  // of it -- the map card, a test, the next call of this function -- has to see
+  // what the board asked for rather than what this pass decided.
+  var working = (map.models || []).map(function (m) {
+    if (m.kind !== "ironwood") return m;
+    var copy = {};
+    for (var key in m) if (Object.prototype.hasOwnProperty.call(m, key)) copy[key] = m[key];
+    return copy;
+  });
+  Maps.assignTrees(working, keep);
+
+
+
   // How far inside a keep-out this point sits, and which way is out. Returns
   // null when it is clear of every one of them.
   function worst(x, y, radius) {
@@ -2957,10 +3178,9 @@ Maps.sceneryOf = function (map) {
     return deepest;
   }
 
-  (map.models || []).forEach(function (m) {
-    var fraction = Maps.CANOPY[m.kind];
-    if (fraction === undefined) { out.push(m); return; }
-    var radius = (m.size || 44) * fraction;
+  working.forEach(function (m) {
+    var radius = Maps.foliageRadiusOf(m);
+    if (radius === null) { out.push(m); return; }
     var hit = worst(m.x, m.y, radius);
     if (!hit) { out.push(m); return; }
     // Straight out of the deepest overlap first: one push usually does it,
@@ -2993,10 +3213,19 @@ Maps.sceneryOf = function (map) {
   });
 
   map._scenery = out;
+  var census = {};
+  out.forEach(function (m) {
+    if (m.variant) census[m.variant] = (census[m.variant] || 0) + 1;
+  });
   map._sceneryReport = { total: (map.models || []).length, moved: moved,
-                         removed: removed, keepOuts: keep.length };
+                         removed: removed, keepOuts: keep.length, trees: census };
   return out;
 };
+
+// The renderer's own measurement of each tree body, registered the same way its
+// footprints are and for the same reason: the only file that knows how wide a
+// shattered stump is at a given `size` is the one that draws it.
+Maps.registerTreeSpan = function (fn) { Maps.treeSpan = fn; };
 
 // What the pass above did, for the tests and for anybody wondering where a tree
 // went. Runs the pass if it has not run.
@@ -3480,6 +3709,22 @@ function drawRiver(ctx, river, theme, height) {
 // draws its own footing does not want a second one painted under it.
 var NO_MACHINE_SHADOW = { village: 1, "village-signals": 1, depot: 1 };
 
+// THE EIGHT IRONWOODS AS A PLAN VIEW. `spread` is how wide the body is against
+// the great tree's crown, `lobes` how many canopy masses it shows from above,
+// and `bare` is a tree with no leaves left on it. The 3D board draws the real
+// models (see `ironwoodTree` in gl-geometry.js); this is what a map card and
+// the flat fallback need, which is a footprint and whether it is alive.
+var TREE_PLAN = {
+  great:    { spread: 1.00, lobes: 3 },
+  conifer:  { spread: 0.55, lobes: 1 },
+  broad:    { spread: 1.04, lobes: 3 },
+  leaning:  { spread: 0.78, lobes: 2 },
+  sapling:  { spread: 0.33, lobes: 2 },
+  storm:    { spread: 0.78, lobes: 2 },
+  deadwood: { spread: 0.52, bare: true },
+  stump:    { spread: 0.66, bare: true }
+};
+
 function drawMachineShadow(ctx, size) {
   ctx.beginPath();
   ctx.ellipse(size * 0.1, size * 0.26, size * 0.82, size * 0.45,
@@ -3857,8 +4102,16 @@ function drawModel(ctx, model, theme) {
     // with buttress roots, and every dimension jittered off the tree's own
     // position -- so no two of the eighty-odd on this board share a silhouette,
     // and each keeps the same one every frame.
+    //
+    // AND IT READS THE BODY THE ASSIGNMENT PASS CHOSE. The 3D board draws one
+    // of eight ironwoods here; this is a plan view at thumbnail scale, so it
+    // does not need eight silhouettes -- but it does need the DEAD ones to be
+    // bare and the small ones to be small, or the flat board says the forest is
+    // uniform when the board it is a picture of is not.
     var jx = Math.sin(model.x * 0.077 + model.y * 0.041);
     var jy = Math.cos(model.x * 0.053 - model.y * 0.089);
+    var span = TREE_PLAN[model.variant] || TREE_PLAN.great;
+    size = size * (model.grow || 1) * span.spread;
     var canopy = size * (0.52 + jx * 0.10);
 
     // Buttress roots first, so the canopy sits over them.
@@ -3878,24 +4131,40 @@ function drawModel(ctx, model, theme) {
     ctx.ellipse(0, 0, size * 0.11, size * 0.085, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Three canopy lobes, offset from each other and from centre.
-    var lobeSpec = [[0.00, -0.06, 1.00], [-0.34, 0.12, 0.72], [0.31, 0.16, 0.66]];
-    for (i = 0; i < 3; i++) {
-      var lo = lobeSpec[i];
-      ctx.beginPath();
-      for (var k = 0; k <= 9; k++) {
-        var ca = k * Math.PI * 2 / 9;
-        var cw = 1 + Math.sin(model.x * 0.06 + i * 3.1 + k * 1.9) * 0.13;
-        var cxp = lo[0] * canopy + Math.cos(ca) * canopy * lo[2] * cw;
-        var cyp = lo[1] * canopy + Math.sin(ca) * canopy * lo[2] * 0.80 * cw;
-        if (k === 0) ctx.moveTo(cxp, cyp); else ctx.lineTo(cxp, cyp);
+    if (span.bare) {
+      // A DEAD TREE HAS NO CANOPY, so it is limbs. Five of them from the trunk,
+      // and the whole point of drawing them is that a stand of these round the
+      // settlement reads as bare from above, where a green blob would not.
+      ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+      ctx.lineWidth = size * 0.05;
+      for (i = 0; i < 5; i++) {
+        var la = i * Math.PI * 2 / 5 + jy * 0.6;
+        var ll = size * (0.30 + Math.abs(Math.sin(model.x * 0.03 + i)) * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(la) * ll, Math.sin(la) * ll * 0.8);
+        ctx.stroke();
       }
-      ctx.closePath();
-      ctx.fillStyle = themeRgba(theme, "accent2", i === 0 ? 0.30 : 0.22);
-      ctx.fill();
-      ctx.lineWidth = 1.3;
-      ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
-      ctx.stroke();
+    } else {
+      // Three canopy lobes, offset from each other and from centre.
+      var lobeSpec = [[0.00, -0.06, 1.00], [-0.34, 0.12, 0.72], [0.31, 0.16, 0.66]];
+      for (i = 0; i < (span.lobes || 3); i++) {
+        var lo = lobeSpec[i];
+        ctx.beginPath();
+        for (var k = 0; k <= 9; k++) {
+          var ca = k * Math.PI * 2 / 9;
+          var cw = 1 + Math.sin(model.x * 0.06 + i * 3.1 + k * 1.9) * 0.13;
+          var cxp = lo[0] * canopy + Math.cos(ca) * canopy * lo[2] * cw;
+          var cyp = lo[1] * canopy + Math.sin(ca) * canopy * lo[2] * 0.80 * cw;
+          if (k === 0) ctx.moveTo(cxp, cyp); else ctx.lineTo(cxp, cyp);
+        }
+        ctx.closePath();
+        ctx.fillStyle = themeRgba(theme, "accent2", i === 0 ? 0.30 : 0.22);
+        ctx.fill();
+        ctx.lineWidth = 1.3;
+        ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+        ctx.stroke();
+      }
     }
 
   } else if (model.kind === "deadfall") {

@@ -478,6 +478,11 @@ js/gl/gl-geometry.js procedural primitives: ground, road, box, boxAt, sphere,
                      watchtower, wreck, barrel and fence), and a per-vertex
                      EMISSIVE channel on Builder so runtime geometry can carry a
                      lit surface like an exported model does
+js/gl/ironwood-ground.js Ironwood Frontier's deterministic visual ground skin:
+                     a continuous olive grass field, organic earth and moss
+                     islands, and sparse low-poly tufts. It writes no height,
+                     collision, placement or targeting data and deliberately
+                     does not own any tree geometry
 js/gl/gl-models.js  the model registry the generated js/gl/models/*.js register
                      into; expands per-triangle data to per-vertex once, lazily
 js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
@@ -4123,6 +4128,30 @@ refuses a tower that straddles a slab edge — so bare earth built as a slab wou
 be an invisible no-build ring in open ground. A patch stamps no height and
 cannot move a build spot.
 
+**IRONWOOD'S BASE GROUND HAS FOUR VISUAL LEVELS AND ZERO GAMEPLAY RELIEF**
+(2026-08-27). `js/gl/ironwood-ground.js` lays them into the static board mesh:
+the original z = 0 loam plane, a continuous softly-varied grass skin at 0.025,
+organic worn-earth islands at 0.045, moss at 0.065, and sparse blades rooted at
+0.08. Those offsets only settle the depth test and give the blades a silhouette;
+`buildHeightField` reads none of them, so towers, bodies, shots, collision and
+placement still see the same flat terrain.
+
+The skin is **deterministic and Ironwood-only**. Its coverage reaches the full
+outdoor apron so orbiting cannot reveal a decorated rectangle, but fine stains
+and tufts concentrate around the playable clearing. The river uses the same
+open band as the floor. Tufts additionally reject the route's real width ribbon
+and `Maps.keepOutOf(map)`, so no blade grows through the road or an authored
+solid. The four rectangular `dirt` zones remain useful authoring envelopes but
+are not drawn as rectangles on this map; they seed overlapping torn-edged earth
+islands instead. All other maps retain their ordinary patch rendering.
+
+**KEEP GROUND AND TREES IN DIFFERENT FILES.** The tree family is authored in
+`gl-geometry.js` and assigned in `maps.js`; the ground skin owns neither. The
+only integration seam is the guarded `IronwoodGround.build` call in
+`gl-world.js`, plus the identical classic-script entry in `index.html` and
+`sandbox.html`. This separation is what lets either asset family be revised
+without overwriting the other.
+
 And two scenery kinds: **`conduit`**, a buried cable run laid parallel to the
 road, which is the only prop in the game whose job is to point *along*
 something; and **`gate`**, an arch that straddles the road. `gate` was already
@@ -4194,6 +4223,35 @@ Three consequences, and none of them is optional once the ramp is real:
 Anything else with a ramp, a raised deck, a gantry or an arch over the road owes
 the same three answers, and "it misses the ground" is not one of them.
 
+**A PROP KIND MAY HAVE MORE THAN ONE BODY, and `ironwood` has eight.** The
+authored set (Claude Design a7f0c2ee) is a great broadleaf, a conifer, a leaner,
+a sapling, a broad crown, a storm-struck survivor, a standing deadwood and a
+shattered stump, all built by `ironwoodTree` in gl-geometry.js. Which one stands
+at a given position is decided ONCE, in `Maps.assignTrees`, and arrives on the
+model as `variant` -- the renderer draws a tree and never chooses one.
+
+**THE MODEL OBJECT HAS TO REACH `GLGeometry.scenery`.** `gl-world` dropped it
+for one commit and every tree on the board drew as the default body: the census
+said eight and the board showed one, which is indistinguishable from a forest
+that was never varied. Any per-prop field -- a platform's authored height, a
+tree's variant -- is only real if that eighth argument is passed.
+
+**Two axes decide it, and conflating them is the trap.** STATURE is the authored
+`size`, which the rings already use as depth (24 at the clearing, 172 at the
+horizon), so short bodies go on small trees and a treeline recedes. CONDITION is
+the ground. **`Maps.TREE_EXPOSURE_PX` (150) is the canopy gap and measures
+everything; `Maps.TREE_BLIGHT_PX` (260) is how far ruin reaches and measures
+only what `Maps.BLIGHT` marks as ruin.** A road is exposure, not ruin -- its
+shoulder grows saplings. Merge the two and every clearing wears a collar of dead
+trees.
+
+**An even list, never a weighted one.** `Maps.TREE_SETS` cells are walked from a
+hashed start, so a repeated entry is a WEIGHT: the first table listed `conifer`
+and `great` twice each and came out two thirds those two. And every body has to
+appear under a stature the relevant ground actually HAS -- `deadwood` was listed
+only under the tall statures, the blighted ground here is the ring authored
+small, and it never came up once in nine hundred trees.
+
 **AND NOTHING GROWS THROUGH A BUILDING.** A board's foliage is placed in bulk
 -- Ironwood plants nine hundred and seventy-three ironwoods -- and until
 2026-08-27 nothing asked whether any of it landed on anything. Thirty-seven
@@ -4216,6 +4274,13 @@ takes as a fraction of its `size`; `Maps.CANOPY` is what a GROWN thing needs for
 its trunk and inner crown. Both are read off the builders in gl-geometry.js
 rather than guessed. A kind in neither table is neither an obstacle nor a
 candidate.
+
+**MEASURE IT WITH `Maps.foliageRadiusOf`, INCLUDING IN THE TEST.** A tree with a
+chosen body is measured off THAT body -- a sapling needs a fifth of what a great
+tree does -- and `CANOPY` is only the fallback for a board with no renderer
+loaded. Test 4e read `CANOPY` while the pass read the model, and eleven
+correctly-placed saplings came back as failures: a check that disagrees with the
+thing it is checking is worse than no check.
 
 **THE RENDERER REGISTERS FOOTPRINTS WITH THE MAP LAYER, not the other way
 round.** `Maps.registerFootprint(kind, fn)` at the bottom of gl-geometry.js: a
