@@ -2339,27 +2339,41 @@ Maps.ENVIRONMENTS = {
 
       // --- the depot --------------------------------------------------------
       //
-      // One object, built from several: the hull, the freight door facing west,
-      // the ramp that meets the road's first point, and the running gear that
-      // says it arrived rather than was built here.
-      { kind: "depot",      x: 1158, y: 178, size: 120, rotation: 0, propId: "enemy-depot" },
-      { kind: "depot-ramp", x: 1088, y: 180, size: 46,  rotation: 0 },
-      { kind: "wheel",      x: 1092, y: 262, size: 26, rotation: 0 },
-      { kind: "wheel",      x: 1178, y: 276, size: 28, rotation: 0 },
-      { kind: "wheel",      x: 1252, y: 254, size: 24, rotation: 0 },
-      { kind: "wheel",      x: 1096, y: 108, size: 24, rotation: 0 },
-      { kind: "wheel",      x: 1196, y: 96,  size: 26, rotation: 0 },
+      // ONE PROP, AND IT USED TO BE NINE. The hull was a slab, and beside it
+      // sat a separate ramp, five wheels lying loose on the dirt and two stacks
+      // planted in the ground next to the machine they were supposed to be part
+      // of -- nine positions and nine sizes to keep in step, and a transport
+      // that came apart the moment anybody moved it. The model this now draws
+      // (see `mobileDepot` in gl-geometry.js) carries its own tracks, road
+      // wheels, ramp, stacks and crane, so the wheel and exhaust props are gone
+      // from this board rather than left to double up under the new hull.
+      //
+      // `size` IS THE HULL LENGTH IN AUTHORED PIXELS, nose to tail, and it sets
+      // the whole machine -- 164 puts a 77-pixel beam and an 80-pixel roof line
+      // under the landmark's 120 of sight blocking.
+      //
+      // AND `x` IS DECIDED BY THE RAMP, not by the footprint. The bed comes
+      // down 6.69 hull-units west of centre, so at this size the toe lands on
+      // (1109, 178) -- the route's first point at (1110, 180), give or take two
+      // pixels.
+      // Enemies are drawn standing on the flat board, so anything the route
+      // crosses UNDER the bed walks through it: put the machine any further
+      // west and the first body of every wave comes out from beneath its own
+      // loading ramp. The tail hangs east past the landmark instead, which
+      // costs nothing -- that is forest nobody can build in or shoot across.
+      //
       // THE DEPOT BURNS RED, and it is the only thing on this board that does.
       // The settlement's lanterns are the theme's amber and read as somewhere
       // people live; the transport's warning lights are a different colour on
       // purpose, so that at night the two ends of the road say what kind of
       // place they are before a player has read a single label. Per-prop
       // `accent` puts each of these in its own mesh -- see the accent groups in
-      // gl-world -- and the night cycle then drives all of them together.
-      { kind: "exhaust",    x: 1236, y: 116, size: 22, rotation: 0,
-        accent: "255,104,44" },
-      { kind: "exhaust",    x: 1256, y: 148, size: 19, rotation: 0,
-        accent: "255,104,44" },
+      // gl-world -- and the night cycle then drives all of them together. The
+      // depot now takes one of its own: the whole cargo bay is accent-coloured
+      // and emissive, so the thing the player sees down the barrel of the road
+      // is a hot doorway rather than an amber one.
+      { kind: "depot",      x: 1240, y: 178, size: 164, rotation: 0,
+        propId: "enemy-depot", accent: "255,58,22" },
       { kind: "floodlight", x: 1082, y: 132, size: 15, rotation: 0,
         accent: "255,66,40" },
       { kind: "floodlight", x: 1082, y: 232, size: 15, rotation: 0,
@@ -3957,45 +3971,133 @@ function drawModel(ctx, model, theme) {
     ctx.fill();
 
   } else if (model.kind === "depot") {
-    // THE MOBILE WAREHOUSE. Drawn as a hull with a chamfered nose, a ribbed
-    // roof, a freight door opening WEST and a lit interior behind it -- the
-    // enemies walk out of that light, which is why the door is the brightest
-    // thing on this half of the board.
-    var hw = size * 0.62, hh = size * 0.46;
+    // THE MOBILE WAREHOUSE, FROM ABOVE, and it is the same machine the 3D board
+    // builds -- see `mobileDepot` in js/gl/gl-geometry.js, which is the port
+    // this plan is measured off. One unit here is one of that model's own: `u`
+    // is the hull length over its 8.4 units, so every number below is a
+    // coordinate out of the model rather than a fraction of `size` invented for
+    // the flat board, and the two passes cannot drift apart.
+    //
+    // It carries its own ramp, tracks and stacks because the model does. Those
+    // used to be eight separate props parked around it -- eight positions to
+    // keep in step with a hull nobody was going to remember to move them with.
+    var u = size / 8.4;
+    // Running gear first, outboard, so a sliver of track shows past the hull.
+    ctx.fillStyle = "#14110d";
+    for (i = -1; i <= 1; i += 2) {
+      ctx.fillRect(-3.52 * u, i > 0 ? 1.55 * u : -2.25 * u, 7.10 * u, 0.70 * u);
+    }
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.45);
+    ctx.lineWidth = 1.1;
+    for (i = 0; i < 15; i++) {
+      var link = -3.52 * u + 7.10 * u * i / 14;
+      ctx.beginPath();
+      ctx.moveTo(link, -2.25 * u);
+      ctx.lineTo(link, -1.55 * u);
+      ctx.moveTo(link, 1.55 * u);
+      ctx.lineTo(link, 2.25 * u);
+      ctx.stroke();
+    }
+    // The ramp, down out of the door and west onto the road's first point. It
+    // is the only planked thing on this board, which is most of why it reads at
+    // the size a map card draws it.
     ctx.beginPath();
-    ctx.moveTo(-hw, -hh * 0.62);
-    ctx.lineTo(-hw * 0.72, -hh);
-    ctx.lineTo(hw * 0.86, -hh * 0.92);
-    ctx.lineTo(hw, -hh * 0.42);
-    ctx.lineTo(hw, hh * 0.60);
-    ctx.lineTo(hw * 0.68, hh);
-    ctx.lineTo(-hw * 0.70, hh * 0.94);
-    ctx.lineTo(-hw, hh * 0.40);
+    ctx.moveTo(-3.95 * u, -1.00 * u);
+    ctx.lineTo(-6.69 * u, -1.06 * u);
+    ctx.lineTo(-6.69 * u, 1.06 * u);
+    ctx.lineTo(-3.95 * u, 1.00 * u);
+    ctx.closePath();
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.85);
+    ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.5);
+    for (i = 1; i < 5; i++) {
+      var bar = -3.95 * u - 2.74 * u * i / 5;
+      ctx.beginPath();
+      ctx.moveTo(bar, -1.03 * u);
+      ctx.lineTo(bar, 1.03 * u);
+      ctx.stroke();
+    }
+    // The hull: a long plate with both pairs of corners cut off, which is the
+    // one thing that stops it reading as a shipping container.
+    ctx.beginPath();
+    ctx.moveTo(-3.95 * u, -1.20 * u);
+    ctx.lineTo(-3.55 * u, -1.95 * u);
+    ctx.lineTo(3.70 * u, -1.95 * u);
+    ctx.lineTo(4.05 * u, -1.10 * u);
+    ctx.lineTo(4.05 * u, 1.10 * u);
+    ctx.lineTo(3.70 * u, 1.95 * u);
+    ctx.lineTo(-3.55 * u, 1.95 * u);
+    ctx.lineTo(-3.95 * u, 1.20 * u);
     ctx.closePath();
     ctx.fillStyle = theme.metalDark;
     ctx.fill();
     ctx.lineWidth = 2.6;
     ctx.strokeStyle = themeRgba(theme, "panelLine", 0.95);
     ctx.stroke();
-    // Ribs across the roof.
+    // THE BAY IS ROOFED, and from directly overhead that is all there is to
+    // see of it. A lit interior painted here would be a hole in a lid -- the
+    // light belongs at the door, below.
+    ctx.fillStyle = theme.metal;
+    ctx.fillRect(-3.94 * u, -0.95 * u, 2.76 * u, 1.90 * u);
     ctx.lineWidth = 1.4;
-    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.45);
-    for (i = 1; i < 6; i++) {
-      var rib = -hw * 0.7 + (hw * 1.5) * i / 6;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.55);
+    ctx.strokeRect(-3.94 * u, -0.95 * u, 2.76 * u, 1.90 * u);
+    // Deck, superstructure and the forward locker.
+    ctx.fillStyle = theme.metal;
+    ctx.fillRect(-1.20 * u, -1.55 * u, 5.00 * u, 3.10 * u);
+    ctx.strokeRect(-1.20 * u, -1.55 * u, 5.00 * u, 3.10 * u);
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(0.25 * u, -1.00 * u, 2.20 * u, 2.00 * u);
+    ctx.strokeRect(0.25 * u, -1.00 * u, 2.20 * u, 2.00 * u);
+    ctx.fillRect(-1.25 * u, -0.80 * u, 1.30 * u, 1.70 * u);
+    ctx.strokeRect(-1.25 * u, -0.80 * u, 1.30 * u, 1.70 * u);
+    // The two stacks, and they are the warm points on the deck.
+    for (i = 0; i < 2; i++) {
       ctx.beginPath();
-      ctx.moveTo(rib, -hh * 0.88);
-      ctx.lineTo(rib, hh * 0.88);
+      ctx.arc((-1.28 + i * 0.34) * u, -0.72 * u, 0.18 * u, 0, Math.PI * 2);
+      ctx.fillStyle = "#0d0b08";
+      ctx.fill();
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = themeRgba(theme, "accent", 0.75);
       ctx.stroke();
     }
-    // The freight door: a dark bay with a hot interior behind it.
+    // The crane: a pedestal aft and a boom out over the bow. It is the one
+    // thing that breaks the outline, so from above it is the one thing that
+    // says depot rather than tank.
+    ctx.fillStyle = theme.metalDark;
+    ctx.fillRect(-1.14 * u, 0.78 * u, 3.49 * u, 0.34 * u);
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = themeRgba(theme, "panelLine", 0.9);
+    ctx.strokeRect(-1.14 * u, 0.78 * u, 3.49 * u, 0.34 * u);
+    ctx.beginPath();
+    ctx.arc(2.35 * u, 0.95 * u, 0.44 * u, 0, Math.PI * 2);
+    ctx.fillStyle = theme.metal;
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    // THE FREIGHT DOOR, and it is the brightest thing on this half of the
+    // board because it is where the enemies come from. Seen from overhead it is
+    // the opening itself plus what it throws down the ramp.
+    ctx.fillStyle = themeRgba(theme, "accent", 0.16);
+    ctx.fillRect(-5.60 * u, -1.00 * u, 1.65 * u, 2.00 * u);
     ctx.fillStyle = "rgba(6,5,4,0.92)";
-    ctx.fillRect(-hw * 1.02, -hh * 0.40, size * 0.13, hh * 0.80);
-    ctx.fillStyle = themeRgba(theme, "accent", 0.55);
-    ctx.fillRect(-hw * 0.99, -hh * 0.32, size * 0.06, hh * 0.64);
+    ctx.fillRect(-4.10 * u, -0.98 * u, 0.26 * u, 1.96 * u);
+    ctx.fillStyle = themeRgba(theme, "accent", 0.9);
+    ctx.fillRect(-4.02 * u, -0.90 * u, 0.12 * u, 1.80 * u);
     ctx.lineWidth = 2;
     ctx.strokeStyle = themeRgba(theme, "accent", 0.85);
-    ctx.strokeRect(-hw * 1.02, -hh * 0.40, size * 0.13, hh * 0.80);
-
+    ctx.strokeRect(-4.10 * u, -0.98 * u, 0.26 * u, 1.96 * u);
+    // Headlights, on the splayed cheeks either side of the opening.
+    for (i = -1; i <= 1; i += 2) {
+      ctx.beginPath();
+      ctx.arc(-4.30 * u, i * 1.52 * u, 0.17 * u, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(207,226,255,0.9)";
+      ctx.fill();
+    }
   } else if (model.kind === "depot-ramp") {
     // The plate the enemies walk down. Wider at the bottom, plated, and it
     // meets the road's first point.

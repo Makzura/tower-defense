@@ -739,6 +739,384 @@ var GLGeometry = (function () {
     return builder;
   }
 
+  // THE MOBILE DEPOT, ported from the authored three.js model (Claude Design
+  // project a7f0c2ee, `depot-model.js`) into this renderer's primitives -- plus
+  // `vbox` and `wheel` below, which are the two shapes those primitives cannot
+  // make and which nearly every part of a tracked vehicle turns out to need.
+  //
+  // The source is a tracked transport in metres, y-up, nose at -x: a running
+  // gear of tracks and road wheels, a chamfered armoured hull, a cargo bay lit
+  // from inside, a ramp down out of the bay, a deck carrying a superstructure,
+  // two stacks and a crane. This board is z-up with the prop's own yaw, so the
+  // whole port is one axis swap and one scale:
+  //
+  //     design x (length, door at -x)  ->  local X
+  //     design z (width)               ->  local Y
+  //     design y (up)                  ->  local Z (world z)
+  //
+  // `size` is the HULL LENGTH in board pixels, lamp face to rear rack, which is
+  // 8.4 of the design's units -- so one number sets the whole machine and the
+  // proportions cannot drift apart the way they do when each part carries its
+  // own fraction of `size`.
+  //
+  // WHAT WAS DROPPED, and why it is not missing. The source is built to be
+  // orbited at a metre away: fourteen bolt rows, twenty-six-sided wheels,
+  // twelve sprocket teeth, a hundred and fifty track pads, twenty-five chain
+  // links and two sagging tarps with per-vertex wrinkles. At the size this
+  // board draws it -- two hundred pixels of hull under a camera that is usually
+  // looking at the whole route -- a 0.035-unit bolt is a fifth of a pixel. Every
+  // one of those is either gone or replaced by the one feature it contributes
+  // to the silhouette: the pads became a row of cleats along the track's outer
+  // face, the chains became two straight runs, the tarps became slabs. The
+  // things that survive whole are the things you can still see: the bay and its
+  // light, the ramp, the crane, the stacks, the wheels and the shoulders.
+  function mobileDepot(builder, cx, cy, size, rot, P) {
+    var U = size / 8.4;
+    var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
+
+    var body = P.metal, dark = P.metalDark, ley = P.accent;
+    // Two tones the board's palette does not carry, and both are mixed FROM it
+    // rather than stated, so the machine still belongs to whichever map parks
+    // it. `steel` is the running gear, a value between the hull and its
+    // recesses; `rust` is oxidised iron -- the ramp, the bumper, the drums --
+    // and it is the one hue pulled toward a colour of its own, because a rusted
+    // plate that is merely a darker olive reads as a shadow rather than as
+    // rust.
+    var steel = mix(body, dark, 0.42);
+    var rust = mix(body, hex("#6a4830"), 0.62);
+    // The tarps are the one thing on the machine that is not steel, and `panel`
+    // alone made them read as green plastic sheeting -- it is a GROUND colour
+    // on this board. Pulled most of the way to the source's khaki canvas.
+    var canvas = mix(P.panel, hex("#474334"), 0.62);
+    // The headlights are COLD, against a bay that burns -- in their BASE colour,
+    // which is all this renderer will allow. One draw call carries one glow
+    // tint, so every emissive surface in a prop's mesh emits the same hue (see
+    // `accentMeshes` in gl-world), and a white lamp beside a red bay is not a
+    // thing the board can say. So the lens is painted cold and emits at barely
+    // half the bay's rate: by day it reads as the pale point the source has,
+    // and at night it takes the same warm bloom as everything else on the
+    // machine rather than going dark. Hardcoded for the same reason the
+    // floodlight's lamp is -- this is not the board's light, it is the
+    // machine's.
+    var lamp = hex("#cfe2ff");
+
+    function px(X, Y) { return cx + (X * co - Y * si) * U; }
+    function py(X, Y) { return cy + (X * si + Y * co) * U; }
+
+    // A box in the vehicle's own frame, centred on (X, Y, Z), `w` along the
+    // hull, `d` across it, `h` up.
+    function dbox(X, Y, Z, w, d, h, color, emi) {
+      boxAt(builder, px(X, Y), py(X, Y), w * U, d * U, h * U, color,
+        (Z - h / 2) * U, rot, emi);
+    }
+    // The same, turned about the vertical on top of the prop's own rotation --
+    // the source's `rotation.y`, which is what splays the nose cheeks and the
+    // lamp housings out from the door.
+    function ybox(X, Y, Z, w, d, h, yaw, color, emi) {
+      boxAt(builder, px(X, Y), py(X, Y), w * U, d * U, h * U, color,
+        (Z - h / 2) * U, (rot || 0) + yaw, emi);
+    }
+    // A box PITCHED about the across-axis and ROLLED about the along-axis,
+    // which `boxAt` cannot do at all -- it only ever turns about z. The glacis,
+    // the ramp, the crane boom and every chamfer on the hull's shoulders are
+    // this, and without it the machine is a stack of upright slabs.
+    function vbox(X, Y, Z, w, d, h, pitch, roll, color, emi) {
+      var cp = Math.cos(pitch), sp = Math.sin(pitch);
+      var cr = Math.cos(roll), sr = Math.sin(roll);
+      // Length, width and normal in the vehicle frame, right-handed (L x W = N).
+      var L = [cp, 0, sp];
+      var W = [-sp * sr, cr, cp * sr];
+      var N = [-sp * cr, -sr, cp * cr];
+      var hw = w / 2, hd = d / 2, hh = h / 2;
+      function p(a, b, c) {
+        var dx = L[0] * a + W[0] * b + N[0] * c;
+        var dy = L[1] * a + W[1] * b + N[1] * c;
+        var dz = L[2] * a + W[2] * b + N[2] * c;
+        return [px(X + dx, Y + dy), py(X + dx, Y + dy), (Z + dz) * U];
+      }
+      var a1 = p(-hw, -hd, hh), b1 = p(hw, -hd, hh);
+      var c1 = p(hw, hd, hh), d1 = p(-hw, hd, hh);
+      var e1 = p(-hw, -hd, -hh), f1 = p(hw, -hd, -hh);
+      var g1 = p(hw, hd, -hh), h1 = p(-hw, hd, -hh);
+      builder.quad(a1, b1, c1, d1, color, emi);
+      builder.quad(e1, f1, b1, a1, color, emi);
+      builder.quad(g1, h1, d1, c1, color, emi);
+      builder.quad(f1, g1, c1, b1, color, emi);
+      builder.quad(h1, e1, a1, d1, color, emi);
+      builder.quad(h1, g1, f1, e1, color, emi);
+    }
+    // A wheel: a disc whose axle runs ACROSS the hull. `frustum` stands upright
+    // and `barrel` pins its axis one radius off the ground, so neither of them
+    // can make the one shape a tracked vehicle is mostly made of.
+    function wheel(X, Y, Z, r, w, verts, color) {
+      var hd = w / 2, i;
+      var capA = [px(X, Y - hd), py(X, Y - hd), Z * U];
+      var capB = [px(X, Y + hd), py(X, Y + hd), Z * U];
+      var prevA = null, prevB = null;
+      for (i = 0; i <= verts; i++) {
+        var a = Math.PI * 2 * i / verts;
+        var rx = X + Math.cos(a) * r, rz = (Z + Math.sin(a) * r) * U;
+        var A = [px(rx, Y - hd), py(rx, Y - hd), rz];
+        var B = [px(rx, Y + hd), py(rx, Y + hd), rz];
+        if (prevA) {
+          builder.quad(prevA, prevB, B, A, color);
+          builder.tri(capB, B, prevB, color);
+          builder.tri(capA, prevA, A, color);
+        }
+        prevA = A; prevB = B;
+      }
+    }
+    // A louvred vent: a recessed frame with slats tipped out of it. Four of
+    // these carry the whole "this thing has engines in it" read.
+    function louvre(X0, X1, Z0, Z1, Y, n, color) {
+      var s = Y < 0 ? -1 : 1;
+      dbox((X0 + X1) / 2, Y, (Z0 + Z1) / 2, X1 - X0, 0.07, Z1 - Z0, dark);
+      for (var i = 0; i < n; i++) {
+        var z = Z0 + ((i + 0.5) / n) * (Z1 - Z0);
+        vbox((X0 + X1) / 2, Y + s * 0.05, z, X1 - X0 - 0.09, 0.06,
+          (Z1 - Z0) / n * 0.62, 0, s * 0.38, color);
+      }
+    }
+
+    var s, i, x, z;
+
+    /* ---- running gear -------------------------------------------------- */
+    // The track is a closed band in the source, extruded with a hole in it. A
+    // hole nothing can see through is geometry nobody looks at: this is the
+    // same silhouette as a solid run between two round ends.
+    var TX0 = -3.52, TX1 = 3.58, TR = 0.52, TZ = 0.52;
+    for (s = -1; s <= 1; s += 2) {
+      var ty = s * 1.67;
+      dbox((TX0 + TX1) / 2, ty, TZ, TX1 - TX0, 0.50, TR * 2, steel);
+      wheel(TX0, ty, TZ, TR, 0.50, 10, steel);
+      wheel(TX1, ty, TZ, TR, 0.50, 10, steel);
+      // Cleats along the outer face: the track pads, at the only scale they
+      // still read at.
+      for (i = 0; i < 15; i++) {
+        x = TX0 + (TX1 - TX0) * i / 14;
+        dbox(x, s * 1.955, TZ, 0.17, 0.09, TR * 2 - 0.04,
+          i % 5 === 2 ? rust : dark);
+      }
+      // Sprocket teeth, rear. Eight of the source's twelve, which is all the
+      // cog you can see when the tooth is three pixels across.
+      for (i = 0; i < 8; i++) {
+        var ta = Math.PI * 2 * i / 8;
+        vbox(TX1 + Math.cos(ta) * 0.46, s * 1.66, TZ + Math.sin(ta) * 0.46,
+          0.16, 0.42, 0.20, ta, 0, dark);
+      }
+      // Road wheels, inside the band.
+      for (i = 0; i < 7; i++) {
+        wheel(-2.92 + i * 1.0, ty, TZ, 0.385, 0.56, 8, dark);
+        wheel(-2.92 + i * 1.0, ty, TZ, 0.19, 0.60, 6, i % 3 === 1 ? rust : body);
+      }
+      dbox(0.03, s * 1.40, TZ, 7.10, 0.06, 0.95, dark);
+      // The fender skirt lip, and it is what keeps the hull from looking as if
+      // it is resting ON the tracks rather than over them.
+      dbox(0.10, s * 1.66, 1.28, 7.60, 0.62, 0.12, body);
+    }
+    dbox(0.10, 0, 0.42, 7.40, 2.60, 0.30, dark);
+
+    /* ---- hull ---------------------------------------------------------- */
+    // ONE OUTER SKIN THE WHOLE LENGTH. The source extrudes a closed section for
+    // the rear five metres and a pair of half sections for the bay, but both
+    // share the same outer profile -- a narrow skirt, a full-width waist and a
+    // chamfer in at the shoulder. Built once here and run end to end; only what
+    // fills the CENTRE differs, and that is what makes the bay a hole.
+    var HX = 0.05, HL = 8.00;               // -3.95 .. 4.05
+    for (s = -1; s <= 1; s += 2) {
+      dbox(HX, s * 1.125, 0.80, HL, 0.35, 0.50, body);
+      vbox(HX, s * 1.625, 1.175, HL, 0.70, 0.16, 0, s * 0.367, body);
+      dbox(HX, s * 1.450, 1.825, HL, 1.00, 1.05, body);
+      vbox(HX, s * 1.775, 2.525, HL, 0.50, 0.16, 0, -s * 0.7854, body);
+    }
+    dbox(1.45, 0, 1.625, 5.20, 1.90, 2.15, body);      // the closed rear body
+    dbox(-2.55, 0, 2.50, 2.80, 1.90, 0.40, body);      // bay roof
+    dbox(-2.55, 0, 0.925, 2.80, 1.90, 0.75, body);     // bay floor deck
+
+    /* ---- the cargo bay, and it is the reason this thing is on the board -- */
+    // Every surface inside the opening is the accent, emissive, so the bay is
+    // lit from within rather than painted bright: it survives being in shadow,
+    // and the enemies that walk out of it come out of a light source.
+    var BX = -2.56, BL = 2.76;
+    dbox(BX, 0, 1.325, BL, 1.90, 0.06, ley, EMI);
+    dbox(BX, 0, 2.295, BL, 1.90, 0.05, ley, EMI * 0.35);
+    for (s = -1; s <= 1; s += 2) {
+      dbox(BX, s * 0.925, 1.80, BL, 0.05, 1.00, ley, EMI * 0.35);
+      for (i = 0; i < 4; i++) {
+        x = -3.60 + i * 0.68;
+        dbox(x, s * 0.86, 1.80, 0.10, 0.07, 1.00, ley, EMI * 0.6);
+      }
+    }
+    for (i = 0; i < 4; i++) {
+      dbox(-3.60 + i * 0.68, 0, 2.25, 0.10, 1.72, 0.07, ley, EMI * 0.6);
+      dbox(-3.60 + i * 0.68, 0, 1.37, 0.08, 1.80, 0.05, ley, EMI * 0.6);
+    }
+    // The blast door at the far end of the bay: the brightest face on the
+    // board, and the thing a player actually sees down the barrel of the road.
+    dbox(-1.20, 0, 1.80, 0.10, 1.86, 1.00, ley, EMI);
+    for (i = 0; i < 3; i++) dbox(-1.25, 0, 1.45 + i * 0.34, 0.13, 1.50, 0.09, ley, EMI);
+
+    /* ---- the opening, the nose and the lamps ---------------------------- */
+    dbox(-4.00, 0, 2.40, 0.16, 2.34, 0.22, dark);
+    dbox(-4.00, 0, 1.22, 0.20, 2.34, 0.20, rust);
+    vbox(-4.05, 0, 0.85, 0.50, 2.00, 0.34, 0.50, 0, body);
+    vbox(-3.90, 0, 2.62, 0.34, 2.50, 0.30, -0.25, 0, body);
+    for (s = -1; s <= 1; s += 2) {
+      dbox(-4.00, s * 1.10, 1.80, 0.16, 0.30, 1.50, dark);
+      ybox(-3.90, s * 1.62, 2.00, 0.90, 0.34, 1.15, s * 0.34, body);
+      ybox(-3.80, s * 1.66, 1.15, 0.70, 0.30, 0.70, s * 0.30, body);
+      ybox(-4.24, s * 1.52, 2.16, 0.30, 0.36, 0.34, s * 0.34, dark);
+      ybox(-4.40, s * 1.47, 2.16, 0.06, 0.28, 0.26, s * 0.34, lamp, EMI * 0.55);
+      dbox(-4.05, s * 1.50, 2.42, 0.50, 0.10, 0.09, dark);
+    }
+    // The crew box, on one side only. An asymmetry you can read from above is
+    // worth more than four symmetrical fittings you cannot.
+    vbox(-3.05, -1.86, 2.42, 1.50, 0.50, 0.62, 0.06, 0, body);
+    dbox(-3.20, -2.08, 2.52, 0.85, 0.10, 0.14, ley, EMI);
+    dbox(-3.15, -2.00, 2.66, 1.00, 0.30, 0.10, dark);
+    louvre(-2.65, -2.35, 2.22, 2.55, -2.02, 3, body);
+
+    /* ---- deck ----------------------------------------------------------- */
+    dbox(1.30, 0, 2.72, 5.00, 3.10, 0.08, body);
+    dbox(1.35, 0, 2.95, 2.20, 2.00, 0.46, body);
+    vbox(0.15, 0, 2.94, 0.50, 1.90, 0.42, -0.42, 0, body);
+    dbox(1.00, -0.35, 3.20, 0.80, 0.80, 0.08, dark);
+    frustum(builder, px(2.05, 0.25), py(2.05, 0.25), 0.42 * U, 0.42 * U,
+      0.16 * U, body, 3.17 * U, 8);
+    frustum(builder, px(2.05, 0.25), py(2.05, 0.25), 0.36 * U, 0.36 * U,
+      0.08 * U, dark, 3.31 * U, 8);
+    louvre(0.70, 1.90, 2.78, 3.12, 1.02, 3, dark);
+    louvre(0.70, 1.90, 2.78, 3.12, -1.02, 3, dark);
+    dbox(-0.60, 0.05, 2.88, 1.30, 1.70, 0.34, body);
+    dbox(-0.60, 0.05, 3.07, 0.90, 1.10, 0.07, dark);
+    dbox(0.35, -0.95, 2.765, 1.10, 0.66, 0.05, rust);
+    dbox(-3.20, 0.60, 2.715, 0.85, 0.90, 0.06, rust);
+    // Stacks.
+    for (i = 0; i < 2; i++) {
+      x = -1.28 + i * 0.34; z = -0.72;
+      frustum(builder, px(x, z), py(x, z), 0.20 * U, 0.17 * U, 0.16 * U, dark, 2.78 * U, 8);
+      frustum(builder, px(x, z), py(x, z), 0.135 * U, 0.135 * U, 0.45 * U, dark, 2.98 * U, 8);
+      frustum(builder, px(x, z), py(x, z), 0.10 * U, 0.085 * U, 1.00 * U, dark, 2.85 * U, 8);
+      frustum(builder, px(x, z), py(x, z), 0.09 * U, 0.12 * U, 0.12 * U, steel, 3.84 * U, 8);
+    }
+    // A spare barrel stowed on the forward deck, and the cable coil beside it.
+    segment(builder, px(-2.85, -1.10), py(-2.85, -1.10), 2.86 * U,
+      px(-1.15, -1.10), py(-1.15, -1.10), 2.86 * U, 0.14 * U, body);
+    dbox(-2.60, -1.10, 2.76, 0.14, 0.34, 0.30, dark);
+    dbox(-1.50, -1.10, 2.76, 0.14, 0.34, 0.30, dark);
+    frustum(builder, px(-1.85, 0.90), py(-1.85, 0.90), 0.36 * U, 0.28 * U,
+      0.11 * U, dark, 2.76 * U, 10);
+
+    /* ---- crane ----------------------------------------------------------- */
+    // The one part of this machine that breaks the roof line, and the reason it
+    // reads as a depot rather than as a tank. Kept whole.
+    var BOOM = 3.50, BANG = 0.30;
+    var bX = 2.35, bZ = 3.45, bY = 0.95;
+    var tX = bX - Math.cos(BANG) * BOOM, tZ = bZ + Math.sin(BANG) * BOOM;
+    frustum(builder, px(bX, bY), py(bX, bY), 0.44 * U, 0.36 * U, 0.52 * U, body, 2.70 * U, 10);
+    frustum(builder, px(bX, bY), py(bX, bY), 0.32 * U, 0.32 * U, 0.16 * U, dark, 3.18 * U, 10);
+    dbox(bX, bY, 3.45, 0.46, 0.54, 0.40, body);
+    dbox(bX, bY, 3.74, 0.18, 0.18, 0.62, body);
+    dbox(bX, bY, 4.06, 0.30, 0.26, 0.10, dark);
+    vbox((bX + tX) / 2, bY, (bZ + tZ) / 2, BOOM, 0.34, 0.30, -BANG, 0, body);
+    vbox(bX - Math.cos(BANG) * BOOM * 0.45 - 0.05, bY,
+      bZ + Math.sin(BANG) * BOOM * 0.45 + 0.26, BOOM * 0.86, 0.26, 0.11, -BANG, 0, dark);
+    for (i = 0; i < 3; i++) {
+      var wt = 0.20 + i * 0.28;
+      vbox(bX - Math.cos(BANG) * BOOM * wt, bY,
+        bZ + Math.sin(BANG) * BOOM * wt + 0.16, 0.08, 0.20, 0.40,
+        -BANG + (i % 2 ? 0.5 : -0.5), 0, dark);
+    }
+    dbox(tX, bY, tZ, 0.30, 0.34, 0.30, dark);
+    segment(builder, px(bX, bY), py(bX, bY), 4.02 * U, px(tX, bY), py(tX, bY),
+      tZ * U, 0.03 * U, dark);
+    segment(builder, px(tX - 0.11, bY), py(tX - 0.11, bY), (tZ - 0.07) * U,
+      px(tX - 0.11, bY), py(tX - 0.11, bY), (tZ - 1.38) * U, 0.03 * U, dark);
+    dbox(tX - 0.11, bY, tZ - 1.55, 0.20, 0.20, 0.30, rust);
+
+    /* ---- sides ----------------------------------------------------------- */
+    for (s = -1; s <= 1; s += 2) {
+      var sy = s * 1.97;
+      louvre(2.00, 3.10, 1.55, 2.25, sy, 4, body);
+      dbox(0.55, sy, 1.72, 1.00, 0.14, 0.60, body);
+      dbox(0.55, sy, 2.05, 1.05, 0.18, 0.09, dark);
+      dbox(-0.65, s * 1.95, 1.90, 0.66, 0.06, 0.66, dark);
+      dbox(-0.65, sy, 1.90, 0.55, 0.10, 0.55, body);
+      dbox(3.30, sy, 1.42, 0.50, 0.22, 0.10, dark);
+      dbox(1.75, sy, 1.85, 0.12, 0.10, 1.10, body);
+      dbox(-1.25, sy, 1.85, 0.12, 0.10, 1.10, body);
+      dbox(2.20, s * 1.92, 2.42, 2.20, 0.09, 0.09, dark);
+      dbox(-2.20, s * 1.40, 2.76, 0.12, 0.12, 0.20, dark);
+      dbox(3.40, s * 1.40, 2.76, 0.12, 0.12, 0.20, dark);
+      // A fuel drum strapped to each rear quarter.
+      segment(builder, px(3.03, s * 1.50), py(3.03, s * 1.50), 2.50 * U,
+        px(3.87, s * 1.50), py(3.87, s * 1.50), 2.50 * U, 0.24 * U, rust);
+      dbox(3.45, s * 1.50, 2.50, 0.10, 0.56, 0.34, dark);
+    }
+    // The tarps. Slabs, not cloth -- the source's wrinkles are a millimetre
+    // deep and this board draws the whole vehicle in two hundred pixels.
+    dbox(0.35, 2.00, 2.05, 1.60, 0.06, 1.00, canvas);
+    dbox(0.35, 1.90, 2.53, 1.70, 0.14, 0.09, dark);
+    dbox(3.35, -0.50, 2.80, 1.35, 1.15, 0.06, canvas);
+    dbox(3.35, -0.25, 2.86, 1.45, 0.09, 0.05, dark);
+
+    /* ---- rear ------------------------------------------------------------ */
+    dbox(4.08, 0, 1.90, 0.12, 3.60, 1.50, body);
+    dbox(4.14, 0, 1.90, 0.08, 1.60, 0.90, dark);
+    for (i = 0; i < 4; i++) {
+      vbox(4.19, 0, 1.60 + i * 0.22, 0.06, 1.50, 0.10, 0.30, 0, body);
+    }
+    for (s = -1; s <= 1; s += 2) {
+      dbox(4.14, s * 0.50, 2.45, 0.24, 0.30, 0.30, dark);
+      dbox(4.14, s * 1.15, 2.10, 0.24, 0.30, 0.30, dark);
+      dbox(4.20, s * 1.00, 1.28, 0.30, 0.22, 0.22, rust);
+      dbox(4.18, s * 1.50, 2.55, 0.14, 0.20, 0.20, dark);
+    }
+    dbox(4.20, 0, 1.22, 0.24, 2.60, 0.22, rust);
+    dbox(4.24, 0, 1.90, 0.18, 1.20, 0.70, dark);
+    for (i = 0; i < 3; i++) dbox(4.32, 0, 1.68 + i * 0.24, 0.10, 1.10, 0.14, rust);
+
+    /* ---- the ramp, and where the enemies come from ----------------------- */
+    // Hinged at the sill and down to the dirt inside its own length, exactly as
+    // the source has it. `u` runs out from the hinge along the bed and `v` is
+    // clear of it, which is the source's ramp-group local frame with the sign
+    // of x flipped -- so the plank spacing and the rail offsets below are its
+    // numbers, not new ones.
+    //
+    // WHERE THE TOE LANDS IS A GAMEPLAY FACT, not a composition one, and it is
+    // why the depot is parked where maps.js parks it. Enemies are drawn
+    // standing on the flat board, so anything the route crosses UNDER the bed
+    // walks through it: the toe has to sit at or west of the route's first
+    // point, and the machine hangs east off it.
+    var RL = 3.00, RA = Math.asin(1.22 / RL);
+    var rc = Math.cos(RA), rs = Math.sin(RA);
+    var HGX = -3.95, HGZ = 1.24;                       // the hinge, at the sill
+    function ramp(u, v, Y, w, d, h, color, tilt) {
+      vbox(HGX - u * rc - v * rs, Y, HGZ - u * rs + v * rc, w, d, h,
+        RA + (tilt || 0), 0, color);
+    }
+    ramp(RL / 2, 0, 0, RL, 2.00, 0.10, rust);
+    for (i = 0; i < 6; i++) {
+      ramp(RL / 2, 0.09, -0.79 + i * 0.317, RL - 0.10, 0.24, 0.08,
+        i % 2 ? rust : dark);
+    }
+    for (i = 0; i < 4; i++) ramp(0.35 + i * 0.78, 0.12, 0, 0.10, 1.96, 0.10, dark);
+    for (s = -1; s <= 1; s += 2) ramp(RL / 2, 0.11, s * 1.03, RL, 0.12, 0.22, dark);
+    ramp(0.06, 0.02, 0, 0.20, 2.10, 0.20, dark);
+    ramp(RL - 0.05, -0.02, 0, 0.30, 1.98, 0.06, rust, 0.12);
+
+    // The chains off the nose to the ramp head. Two runs, not twenty-five
+    // links: at three pixels a link the sag is the only thing that survives,
+    // and a two-segment kink says sag.
+    for (s = -1; s <= 1; s += 2) {
+      dbox(-4.10, s * 1.30, 2.50, 0.16, 0.16, 0.16, dark);
+      segment(builder, px(-4.10, s * 1.30), py(-4.10, s * 1.30), 2.46 * U,
+        px(-4.62, s * 1.24), py(-4.62, s * 1.24), 1.52 * U, 0.045 * U, dark);
+      segment(builder, px(-4.62, s * 1.24), py(-4.62, s * 1.24), 1.52 * U,
+        px(-5.05, s * 1.18), py(-5.05, s * 1.18), 1.06 * U, 0.045 * U, dark);
+    }
+  }
+
   function scenery(builder, kind, cx, cy, size, rot, P, model) {
     model = model || {};
     var r = size / 2;
@@ -1194,62 +1572,16 @@ var GLGeometry = (function () {
         sphere(builder, cx, cy, size * 0.22, ley, size * 1.70, 8, 6, EMI);
         break;
 
-      case "depot": {
-        // MASS FIRST. The first version was a slab: correct proportions, no
-        // weight. What a warehouse on wheels needs is a chassis you can see
-        // UNDER it, a hull that overhangs that chassis, and enough vertical
-        // steps that the eye reads three storeys rather than one prism.
-        // THE MOBILE WAREHOUSE. Not a box: a hull with a chamfered nose, a
-        // ribbed roof, a stepped upper deck, a stack and a freight door with a
-        // lit interior behind it. The door is the brightest thing on this half
-        // of the board because that is where the enemies come from.
-        var dw = size * 0.62, dd = size * 0.46, dh = size * 0.52;
-        // The chassis: a narrower deck the hull sits ON, lifted clear of the
-        // dirt so the running gear has somewhere to be and the machine reads as
-        // parked rather than buried.
-        var lift = size * 0.20;
-        boxAt(builder, cx, cy, dw * 1.86, dd * 1.70, lift, body, 0, rot);
-        for (var cr = -1; cr <= 1; cr += 2) {
-          boxAt(builder, cx + Math.cos(rot + Math.PI / 2) * dd * 1.62 * cr,
-            cy + Math.sin(rot + Math.PI / 2) * dd * 1.62 * cr,
-            dw * 1.94, dd * 0.22, lift * 0.80, dark, lift * 0.10, rot);
-        }
-        boxAt(builder, cx, cy, dw * 2, dd * 2, dh, dark, lift, rot);
-        // Chamfered nose, west-facing, built from two shrinking blocks.
-        for (var no = 0; no < 2; no++) {
-          boxAt(builder, cx - dw * (0.92 + no * 0.16), cy,
-            dw * 0.30, dd * (1.7 - no * 0.5), dh * (0.92 - no * 0.18), dark,
-            lift + dh * (0.04 + no * 0.08), rot);
-        }
-        // Ribbed roof.
-        for (var rb = 0; rb < 7; rb++) {
-          boxAt(builder, cx - dw + (dw * 2) * (rb + 0.5) / 7, cy,
-            dw * 0.10, dd * 2.06, dh * 0.10, body, lift + dh, rot);
-        }
-        // Stepped upper deck and a cab at the back.
-        boxAt(builder, cx + dw * 0.30, cy, dw * 0.90, dd * 1.30, dh * 0.42, dark,
-          lift + dh * 1.06, rot);
-        boxAt(builder, cx + dw * 0.86, cy, dw * 0.34, dd * 0.80, dh * 0.34, body,
-          lift + dh * 1.48, rot);
-        // Gantry rails over the deck, and a hoist on them: loading gear, so
-        // the thing reads as a WAREHOUSE and not merely a container.
-        for (var gr = -1; gr <= 1; gr += 2) {
-          segment(builder, cx - dw * 0.70,
-            cy + Math.cos(rot) * dd * 0.86 * gr, lift + dh * 1.48,
-            cx + dw * 0.50, cy + Math.cos(rot) * dd * 0.86 * gr,
-            lift + dh * 1.48, size * 0.030, body);
-        }
-        boxAt(builder, cx - dw * 0.24, cy, dw * 0.22, dd * 0.90, dh * 0.20,
-          body, lift + dh * 1.30, rot);
-        segment(builder, cx - dw * 0.24, cy, lift + dh * 1.30,
-          cx - dw * 0.24, cy, lift + dh * 0.70, size * 0.016, body);
-        // THE FREIGHT DOOR: a recess in the west face, lit from inside.
-        boxAt(builder, cx - dw * 1.02, cy, dw * 0.10, dd * 0.86, dh * 0.72,
-          hex("#0a0806"), lift + dh * 0.02, rot);
-        boxAt(builder, cx - dw * 0.96, cy, dw * 0.04, dd * 0.70, dh * 0.58,
-          ley, lift + dh * 0.06, rot, EMI);
+      case "depot":
+        // THE MOBILE WAREHOUSE, and every part of it -- tracks, ramp,
+        // stacks, crane and the lit bay the enemies walk out of -- is one
+        // prop. It used to be nine: a slab here plus a separate ramp, five
+        // wheels lying on the dirt beside it and two stacks planted in the
+        // ground, each with its own size and position, which is nine numbers
+        // to keep in step and a machine that came apart the moment anybody
+        // moved it. See `mobileDepot` for the port this is built from.
+        mobileDepot(builder, cx, cy, size, rot, P);
         break;
-      }
 
       case "depot-ramp": {
         // The plate the enemies walk down, in three shallow steps so it meets

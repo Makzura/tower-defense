@@ -4161,15 +4161,38 @@ behind. The fall's length is chosen so it FINISHES inside the frame — a sheet
 that leaves the bottom of the screen reads as cut off, not as water going into
 nothing.
 
-**A prop may own its own light, and exactly one does.** `accent: "r,g,b"` on a
+**AND A PROP MAY NOT HOLD ANYTHING OVER THE ROUTE.** Enemies are drawn standing
+on the flat board — `groundHeightAt` lifts a body onto *terrain*, and a prop is
+not terrain — so authored geometry that spans the walked line at body height is
+geometry the bodies walk through. Ironwood's depot is the case that found it: its
+loading ramp is hinged at a sill 1.2 hull-units up and drops to the dirt over its
+own length, which makes it a plate held over whatever is beneath it, and the
+route's first point sat under the middle of it. **The fix is placement, not
+geometry** — `x` is chosen so the ramp's toe lands ON the route's first point and
+the machine hangs east off it, past the landmark, into forest nobody can build in
+or shoot across. Anything with a ramp, a raised deck, a gantry or an arch over
+the road owes the same answer, and "it misses the ground" is not it.
+
+**A prop may own its own light.** `accent: "r,g,b"` on a
 model overrides the board's accent for that prop. It needs a **separate draw
 call**, not just a different vertex colour: emission in the shader is
 `uGlowTint * vEmi` — one tint per draw — so the whole board pass emits in the
 map's accent and a violet-painted prop would still add orange light. Props that
 declare `accent` are split out of the board mesh into `accentMeshes`, grouped by
 colour, and drawn immediately after it under their own tint. The forest's
-`casket` at the route's first point is the only user: its violet is the point
-precisely because it is not the camp's ember.
+`casket` at the route's first point was the first user: its violet is the point
+precisely because it is not the camp's ember. Ironwood's floodlights and — since
+2026-08-27 — the depot itself are the rest.
+
+**ONE TINT PER DRAW IS A LIMIT INSIDE A PROP TOO, and that is not obvious until
+it bites.** Every emissive surface in a prop's mesh emits the colour its group
+was drawn under, so **a prop cannot carry two lights**. The depot's source model
+has cold white headlights either side of a bay that burns red, and the board may
+have one or the other. What it does instead is paint the lens cold and emit at
+barely half the bay's rate: the base colour carries it by day and the lens takes
+the same bloom as the rest of the machine by night. The alternative is a second
+prop at the same position, which is exactly the coupling that model was brought
+in to delete.
 
 And the matching trap, paid for twice: **light falling on the ground is painted
 in the GROUND's colour and carried entirely by emission.** Painting the stain

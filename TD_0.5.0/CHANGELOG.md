@@ -13,6 +13,73 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The enemy depot is the authored model now, and it is one prop
+instead of nine.** Ironwood Frontier's spawn was a slab with a lit slot in the
+west face, and parked around it were a separate ramp, five wheels lying on the
+dirt and two stacks planted in the ground beside the machine they belonged to.
+Nine positions and nine sizes to keep in step, and a transport that came apart
+the moment anybody moved it. It is now `mobileDepot` in `js/gl/gl-geometry.js`:
+a port of the authored three.js model (Claude Design project a7f0c2ee,
+`depot-model.js`), which carries its own tracks, road wheels, ramp, stacks and
+crane.
+
+The port itself is one axis swap and one scale — the source is metres, y-up,
+nose at -x, so design x is the hull, design z is the beam and design y is world
+z. `size` is the HULL LENGTH in authored pixels over the model's own 8.4 units,
+so one number sets the whole machine and the proportions cannot drift the way
+they do when every part carries its own fraction of `size`.
+
+**Two primitives were missing and both are now local to that file.** `vbox` is a
+box PITCHED about the beam and ROLLED about the hull — `boxAt` only ever turns
+about the vertical, and without it the glacis, the ramp, the crane boom and
+every chamfer on the shoulders are upright slabs. `wheel` is a disc whose axle
+runs across the hull: `frustum` stands upright and `barrel` pins its axis one
+radius off the ground, so neither can make the one shape a tracked vehicle is
+mostly made of. The old `wheel` prop is the evidence — it was a `frustum` lying
+flat, which is a drum on its side, not a road wheel.
+
+**What was dropped is recorded in the function header, because "it is missing"
+and "it was three tenths of a pixel" look identical in a diff.** The source is
+built to be orbited at a metre: fourteen bolt rows, twenty-six-sided wheels, a
+hundred and fifty track pads, twenty-five chain links, per-vertex tarp wrinkles.
+At two hundred pixels of hull under a camera usually framing the whole route, a
+0.035-unit bolt is a fifth of a pixel. Each of those is gone or replaced by the
+one feature it contributes to the silhouette.
+
+**WHERE THE DEPOT IS PARKED IS A GAMEPLAY FACT, and it is the only number here
+that was not read off the model.** Enemies are drawn standing on the flat board,
+so anything the route crosses UNDER the ramp bed walks straight through it. The
+bed comes down 6.69 hull-units west of centre, so `x` is whatever puts the toe
+on the route's first point — (1109, 178) against a first point of (1110, 180)
+at this size — and the tail hangs east past the landmark instead. That costs
+nothing: it is forest nobody can build in or shoot across. **The landmark
+polygon is untouched**, so no tower gained or lost a spot and no sight line
+moved; the visual sits inside a bubble that was already much larger than the
+machine it wrapped.
+
+**One draw call carries one glow tint, so the headlights cannot be white while
+the bay is red.** Every emissive surface in a prop's mesh emits the tint its
+accent group was drawn with (see `accentMeshes` in `gl-world.js`), and the depot
+now takes an accent of its own so the whole cargo bay burns — which is what the
+board's own note has said since the night cycle landed. The lens is painted cold
+and emits at barely half the bay's rate: by day it reads as the pale point the
+source has, and at night it takes the same warm bloom as everything else on the
+machine rather than going dark. Two lights would mean two props, which is the
+thing this change just deleted eight of.
+
+The flat board's pass was rewritten to match and is measured in the SAME model
+units — `u = size / 8.4` — so the two cannot drift. It shows the door rather
+than the bay, because **the bay is roofed**: a lit interior painted into a
+top-down plan is a hole in a lid.
+
+`AGENTS.md` gains both rules in its board-scenery section: **nothing over the
+route**, and **one tint per prop**. Neither was written down, and both cost a
+rebuild to find.
+
+`wheel`, `exhaust` and `depot-ramp` now have no caller on any board. They are
+left in `SCENERY_KINDS` and in both switches rather than removed in the same
+edit as the thing that replaced them.
+
 **2026-08-27 — The world has a clock: a deterministic day/night cycle with a
 real sky.** Visual only. No combat bonus, no enemy or tower modifier, no wave or
 economy effect, and a test asserts it: the same run at midnight and at noon
