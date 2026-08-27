@@ -13,6 +13,57 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — Ironwood's dirt is calmer, not flat.** Keeping every source face
+fixed the rectangular replacement, but the full small-scale height noise made
+the road more wrinkled than the game's broad low-poly surfaces. Only the five
+continuous top bands now keep 68% of that micro-relief around their normal bed
+height. Stones and moss remain fully three-dimensional. The adjustment fades
+out before the outer shoulder seam, and a source comparison confirms both soil
+side meshes remain coordinate-for-coordinate identical; the 53 shared vertices
+on each edge still meet exactly. Width, route shape and gameplay are unchanged.
+
+**2026-08-27 — Ironwood now walks on the authored forest path.** The old 3D
+road was the generic three-quad ribbon: one flat brown surface and two hard
+vertical kerbs, appropriate for the six manufactured boards and visibly a
+debug strip through this forest. Claude Design's
+`ironwood_forest_path_moduleS.glb` replaces it on Ironwood only, bringing its
+packed-earth bands, lighter worn centre, moss shoulders, soil sides and sparse
+embedded stones into the actual battlefield.
+
+This could not be a runtime GLB load: the game must still open through
+`file://`, with no fetch and no build step. The source is tracked under `glb/`.
+Its 25 688 triangles are four already-bent instances of the same 6 422-triangle
+module, and the straight module is kept beside it as the coordinates from which
+to bend onto the game's route. The dependency-free `tools/glb_to_path.py`
+verifies that relationship and writes the classic-script asset
+`js/gl/ironwood-path.js`. It performs **no simplification whatsoever**. Both
+shipping pages load that generated script before `gl-world.js`.
+
+Nor is the result a row of rotated props. Rigid rectangles leave triangular
+holes outside curves, and hiding those holes by overlapping them recreates the
+zoom-out z-fighting just removed from the ground. The generated builder instead
+bends every source vertex along the live `GamePath`, reads its width profile at
+that exact distance, preserves the module's matching repeat seams and emits no
+internal end caps. The surface remains one continuous mesh following the same
+route enemies walk, while the first and last caps alone close it.
+
+The first integration made two destructive approximations: it reduced the
+6 422-face module to 1 270 faces and compressed its varied surface into a thin
+band near the top. In the game that read as a textured rectangle, not the 3D
+terrain Design supplied. Both operations are gone. Every source triangle ships,
+and every source Y coordinate is scaled by the same measured ratio. At the new
+route width the dirt is about 28.44 px wide and its highest authored vertex is
+about 2.25 px above the floor; the full dirt, stone, moss and side-skirt relief
+between those bounds remains intact. The depot's metal ramp is higher, so its
+authored toe is continued into one smooth 40 u.l. dirt descent; the visible mesh
+and height field use the exact same profile.
+
+The road itself is now the requested **25% wider**, declared as Ironwood's
+constant `scale: 1.25` route profile rather than as a render-only transform.
+Enemy lanes, build clearance, the 2D preview, the 3D module and the height field
+therefore agree on its edge. Walking speed, route length and wave timing do not
+change; all non-Ironwood maps retain the generic road verbatim.
+
 **2026-08-27 — A tower is clicked where it is drawn.** Not a bug that was
 introduced; a promise that was quietly dropped in the 2D→3D move and never
 picked back up. `screenToWorld` casts the cursor at the GROUND PLANE, which is

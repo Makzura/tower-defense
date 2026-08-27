@@ -7007,7 +7007,7 @@ test("the forest's pace is a property of the road, and the clock is measured " +
     "and a slow still halves it");
 });
 
-test("width and pace are opt-in, and every other board takes neither",
+test("route width and pace stay opt-in, including Ironwood's constant width",
     function (t) {
   var h = harness.boot();
   var g = h.game;
@@ -7019,7 +7019,7 @@ test("width and pace are opt-in, and every other board takes neither",
   // same clearance.
   var plain = 0;
   Maps.LIST.forEach(function (map) {
-    if (map.id === "test") return;
+    if (map.id === "test" || map.id === "ironwood-frontier") return;
     plain++;
     var route = Maps.routesOf(map)[0];
     t.eq(Maps.profileOf(route), null, map.id + " declares no profile");
@@ -7043,8 +7043,64 @@ test("width and pace are opt-in, and every other board takes neither",
       Maps.referenceLengthUl() / report.shortestLengthUl,
       map.id + " still takes grace off its length");
   });
-  t.eq(plain, Maps.LIST.length - 1,
-    "every board but the test one declares nothing (" + plain + ")");
+  t.eq(plain, Maps.LIST.length - 2,
+    "only the test board and Ironwood declare a route profile (" + plain +
+    " plain boards)");
+
+  // Ironwood is deliberately 25% wider for the whole route. This is gameplay
+  // geometry, not a visual scale on its authored mesh: the same lookup drives
+  // enemy lanes, placement clearance, the 2D road, the 3D path and terrain.
+  var ironwood = Maps.byId("ironwood-frontier");
+  var ironRoute = Maps.routesOf(ironwood)[0];
+  var ironProfile = Maps.profileOf(ironRoute);
+  t.ok(!!ironProfile && !!ironProfile.width,
+    "Ironwood declares its wider road in the route profile");
+  t.eq(ironProfile.pace, null, "and does not change enemy pace");
+  var ironPath = new g.GamePath(Maps.toWorld(ironRoute.points), ironProfile);
+  t.eq(ironPath.hasWidthProfile(), true, "the live Ironwood path owns that width");
+  t.near(ironPath.widthScaleAt(0), 1.25, 0.0001,
+    "Ironwood starts exactly 25% wider");
+  t.near(ironPath.widthScaleAt(ironPath.length * 0.5), 1.25, 0.0001,
+    "and remains exactly 25% wider through the middle");
+  t.near(ironPath.widthScaleAt(ironPath.length), 1.25, 0.0001,
+    "and through the end");
+  t.eq(ironPath.paceScaleAt(ironPath.length * 0.4), 1,
+    "the wider dirt road keeps the original walking speed");
+  t.near(g.roadHalfWidthAt(ironPath, ironPath.length * 0.4),
+    g.ul(21.875) * 1.25 / 2, 0.0001,
+    "placement reads the same 25% wider edge");
+
+  var ironReport = Maps.analyse(ironwood);
+  t.eq(ironReport.crossingSeconds,
+    ironReport.shortestLengthUl / g.Enemy.BASE_SPEED_ULPS,
+    "the width profile does not alter Ironwood's crossing time");
+  t.eq(ironReport.graceRatio,
+    Maps.referenceLengthUl() / ironReport.shortestLengthUl,
+    "or its length-based grace");
+
+  // The visual asset keeps the full Claude Design topology, not a low-poly
+  // ribbon wearing similar colours. The S source is four exact 6,422-face
+  // instances; one instance is what gets repeated and bent over the live route.
+  var emitted = 0, minZ = Infinity, maxZ = -Infinity;
+  var pathLift = g.IronwoodPath.liftFor(ironPath, g.ul(21.875));
+  var pathStats = g.IronwoodPath.build({ tri: function (a, b, c) {
+    emitted++;
+    [a, b, c].forEach(function (point) {
+      minZ = Math.min(minZ, point[2]);
+      maxZ = Math.max(maxZ, point[2]);
+    });
+  } }, ironPath, g.ul(21.875), pathLift);
+  t.eq(pathStats.sourceTriangles, 25688,
+    "the complete four-instance S source is recognised");
+  t.eq(pathStats.moduleTriangles, 6422,
+    "every triangle in one authored module survives import");
+  t.near(pathStats.surfaceRelief, 0.68, 0.0001,
+    "only the noisy top bands are calmed to the agreed middle ground");
+  t.eq(emitted, pathStats.triangles,
+    "the builder reports every triangle it actually emits");
+  t.near(minZ, 0, 0.0001, "the authored soil sides still reach the floor");
+  t.near(maxZ, pathLift, 0.0001,
+    "the highest authored relief survives at its natural scale");
 
   // And the kerb lights are opt-in the same way, for the same reason: a
   // facility with a lit floor grid does not need its road outlined, and a

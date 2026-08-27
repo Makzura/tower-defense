@@ -206,7 +206,7 @@ Maps.routesOf = function (map) {
 };
 
 // What the road DOES along this route, in the shape GamePath takes, or null
-// when it does nothing -- which is six of the seven boards. One function, so
+// when it does nothing -- which is six of the eight boards. One function, so
 // the three places that build a GamePath cannot disagree about where a
 // profile lives. See the profile block at the bottom of js/path.js.
 Maps.profileOf = function (route) {
@@ -534,6 +534,13 @@ Maps.LIST.push({
   curvedRoad: true,
   blurb: ["A logging road through old ironwood.",
           "The depot rolled in overnight."],
+
+  // The authored dirt module needs more breathing room than the old painted
+  // ribbon. This is a REAL route width rather than a render-only scale: enemy
+  // lanes, build clearance, both road renderers and the height field all read
+  // the same constant profile, so the visible edge never lies about where a
+  // tower may stand. 1.25 is the owner's requested +25%.
+  width: [{ at: 0, scale: 1.25 }],
 
   // Fine-detail decals, the last pass over the floor. On the sci-fi boards
   // these are runes and sigils; here they are what a working forest leaves
@@ -2803,7 +2810,7 @@ for (var environmentIndex = 0; environmentIndex < Maps.LIST.length;
   environmentMap.theme = environment.theme;
   environmentMap.zones = environment.zones;
   environmentMap.models = environment.models;
-  // Optional, and absent on six of the seven boards. `drawEnvironment` and the
+  // Optional, and absent on seven of the eight boards. `drawEnvironment` and the
   // 3D mesh both test for it rather than assuming one.
   environmentMap.river = environment.river || null;
 }
@@ -5497,8 +5504,9 @@ Maps.buildableSpot = function (gamePaths, x, y, clearancePx) {
   for (var i = 0; i < gamePaths.length; i++) {
     var hit = gamePaths[i].closestToPoint(x, y);
     // `clearancePx` is the rule on a road at its NOMINAL width, which is the
-    // only width six of the seven boards have. Where a route declares a width
-    // profile the road's own half-width takes the place of the nominal one --
+    // width the six profile-free boards have. Where a route declares a width
+    // profile -- variable on the test board, constant +25% on Ironwood -- the
+    // road's own half-width takes the place of the nominal one --
     // the same substitution `buildClearanceOn` makes in js/game.js, spelled
     // here in terms of the number this function is handed so that the caller
     // does not have to know which tower it is measuring with.
@@ -5568,7 +5576,7 @@ Maps.analyse = function (map) {
   // THE MAP'S OWN GEOMETRY, if it has any.
   //
   // Until 2026-08-26 this measurement assumed every board was a polyline on an
-  // empty floor, and for six of the seven it still is: `geo.any` is false for
+  // empty floor, and for seven of the eight it still is: `geo.any` is false for
   // them, every test below short-circuits, and their scores and tiers are
   // byte-identical to what they were. A test pins that, because a silent drift
   // in the old numbers would rewrite the difficulty labels on maps nobody
@@ -5686,7 +5694,7 @@ Maps.analyse = function (map) {
   // the grace exactly as cutting the route would.
   //
   // Taken from the length itself on every route that declares no pace profile,
-  // which is six of the seven: `crossingSeconds * BASE_SPEED` is the same
+  // which is seven of the eight: `crossingSeconds * BASE_SPEED` is the same
   // number through two more floating point operations, and a board's published
   // score is not the place to move a last decimal for nothing.
   var pacedRoute = gamePaths.some(function (p) {

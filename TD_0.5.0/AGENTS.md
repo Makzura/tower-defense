@@ -499,6 +499,10 @@ js/gl/ironwood-ground.js Ironwood Frontier's deterministic visual ground skin:
                      into its vertices, plus sparse low-poly tufts. It writes
                      no gameplay height, collision, placement or targeting
                      data and deliberately owns no tree geometry
+js/gl/ironwood-path.js GENERATED from the authored forest-road GLBs: their packed
+                     earth, worn centre, moss shoulders, side soil and embedded
+                     stones, kept at full resolution and bent tile-by-tile
+                     along Ironwood's live GamePath and width profile
 js/gl/gl-models.js  the model registry the generated js/gl/models/*.js register
                      into; expands per-triangle data to per-vertex once, lazily
 js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
@@ -557,6 +561,11 @@ tools/blender/enemy_normal.py, enemy_swarm.py, enemy_brute.py, enemy_hive.py,
 tools/blender/export_mesh.py Blender -> js/gl/models/*.js. Groups geometry by
                      animated ancestor, and by `_world_fixed_child` for
                      anything bolted to the map
+tools/glb_to_path.py `glb/ironwood_forest_path_moduleS.glb` plus its straight
+                     `ironwood_forest_path_module.glb` reference -> generated
+                     `js/gl/ironwood-path.js`. It unbends the four S instances,
+                     preserves every triangle and the exact repeat seams; no
+                     GLB is loaded at runtime
 tools/blender/td_mesh.py the same primitive vocabulary WITHOUT Blender, emitting
                      export_mesh's exact contract. Geometry is authored in WORLD
                      space here and `parent` picks the animated group -- it is
@@ -4349,6 +4358,51 @@ only integration seam is the guarded `IronwoodGround.build` call in
 `gl-world.js`, plus the identical classic-script entry in `index.html` and
 `sandbox.html`. This separation is what lets either asset family be revised
 without overwriting the other.
+
+**IRONWOOD'S ROAD IS AN AUTHORED MODULE BENT ALONG THE REAL ROUTE**
+(2026-08-27). `glb/ironwood_forest_path_moduleS.glb` is the source from Claude
+Design: four already-bent instances, each with twelve named pieces for the
+packed dirt, lighter worn centre, moss shoulders, soil skirts, end caps,
+embedded stones and moss clumps. Its 25 688 triangles are four exact instances
+of the 6 422-triangle straight module kept beside it as
+`ironwood_forest_path_module.glb`. The browser reads neither binary.
+`tools/glb_to_path.py` verifies that relationship, unbends the instances and
+writes `js/gl/ironwood-path.js`, a classic script that still runs from
+`file://`. **There is no vertex clustering, decimation or face removal.**
+
+The module is **not** placed as a chain of rigid rectangles. Every source
+vertex carries a cross-road and along-road coordinate; `IronwoodPath.build`
+maps the latter to `GamePath.pointAt`/`tangentAt` and the former to the route's
+live `widthScaleAt`. The visible dirt therefore follows the same curved centre
+line and the same chokepoint/plaza widths that enemies, placement and the height
+field use. Its two authored end cross-sections are identical and the importer
+keeps their original coordinates exact. Internal caps are omitted, so adjacent
+modules share an edge rather than overlapping at nearly equal depth; that is
+the z-fighting invariant. Only the first and last caps close the full route.
+
+The GLB is a **thin dirt bed, not a seven-pixel manufactured deck**. Its source
+height/width ratio is preserved: at the current scale the requested +25% width
+is about 28.44 px and the highest authored vertex is about 2.25 px above the
+floor. Separate stones and moss keep their full authored Y. The five continuous
+dirt/shoulder bands retain **68%** of their small height variation around the
+source bed at Y 0.31: enough real relief to catch light, without the dense
+wrinkling reading unlike the rest of the game's broad low-poly planes. This
+compression fades smoothly back to 100% across the outer 0.25 source units, so
+every vertex shared with the left/right side meshes is untouched. The two side
+meshes themselves are never transformed and still descend all the way to the
+floor. Never flatten the top, change those sides, replace them with a second
+wide slab or stretch them back to `ROAD_LIFT = 7`: each destroys the model
+Design supplied.
+
+The +25% is declared as Ironwood's constant route profile (`scale: 1.25`), not
+as a transform on the model. Enemy lanes, build clearance, the 2D road, the 3D
+module and the height field therefore all use the same wider edge. The depot's
+metal ramp ends above this thin dirt bed, so `gl-world.js` derives its toe from
+`GLGeometry.depotWalkway` and applies one short 40 u.l. smooth descent to both
+the visible road and the height field. `gl-world.js` chooses this builder only
+for `ironwood-frontier`; every other map still goes through
+`GLGeometry.road` byte-for-byte as before. Rebuild the generated file after
+changing the GLB; do not hand-edit it and do not add a runtime GLB loader.
 
 And two scenery kinds: **`conduit`**, a buried cable run laid parallel to the
 road, which is the only prop in the game whose job is to point *along*

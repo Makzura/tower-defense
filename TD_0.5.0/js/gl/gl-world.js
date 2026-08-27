@@ -211,6 +211,7 @@ var World3D = (function () {
     routePaths.forEach(function (p) {
       var pts = roadRibbon(p, roadWidth);
       var flat = roadWidth / 2;
+      var pathLift = roadLiftFor(map, p, roadWidth);
       for (var s = 0; s + 1 < pts.length; s++) {
         var ax = pts[s].x, ay = pts[s].y, bx = pts[s + 1].x, by = pts[s + 1].y;
         var halfA = pts[s].half === undefined ? flat : pts[s].half;
@@ -231,7 +232,7 @@ var World3D = (function () {
             var here = halfA + (halfB - halfA) * t;
             if (qx * qx + qy * qy > here * here) continue;
             var k = j * w + i;
-            if (ROAD_LIFT > data[k]) data[k] = ROAD_LIFT;
+            if (pathLift > data[k]) data[k] = pathLift;
           }
         }
       }
@@ -248,9 +249,10 @@ var World3D = (function () {
     // the height a body stands at and the plank it is drawn beside are one
     // measurement, and two copies of it is how they drift.
     //
-    // Stamped AFTER the road, though highest-wins would do it anyway -- at the
-    // toe the bed is below ROAD_LIFT and the road takes over, which is what
-    // makes the join seamless instead of a step.
+    // Stamped AFTER the road, though highest-wins would do it anyway. Generic
+    // roads are high enough to meet the ramp directly; Ironwood's much thinner
+    // authored dirt continues the ramp height through the short profile below
+    // and eases it down without a vertical step.
     //
     // AND THE BOARD WITHOUT IT IS KEPT, because a ramp is a VEHICLE'S DECK and
     // not ground. A walker coming out of the bay stands on the planks; a flier
@@ -268,6 +270,25 @@ var World3D = (function () {
           ul(m.x / AUTHORED_PX_PER_UL), ul(m.y / AUTHORED_PX_PER_UL),
           ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0
         ).forEach(function (seg) { stampSlope(seg.a, seg.b, seg.half); });
+      });
+
+      // The authored metal ramp ends a little above the thin dirt road. Carry
+      // that last height down through a short earthen run instead of leaving a
+      // vertical step at the depot mouth. The visual path reads the identical
+      // profile in buildMapMesh below, so feet, metal and dirt meet once.
+      routePaths.forEach(function (p) {
+        var entry = roadEntryProfile(map, env, p, roadWidth);
+        if (!entry) return;
+        var pieces = 4;
+        for (var n = 0; n < pieces; n++) {
+          var d0 = entry.start + (entry.end - entry.start) * n / pieces;
+          var d1 = entry.start + (entry.end - entry.start) * (n + 1) / pieces;
+          var a = p.pointAt(d0), b = p.pointAt(d1);
+          a.z = entry.at(d0); b.z = entry.at(d1);
+          var half = roadWidth * Math.max(p.widthScaleAt(d0),
+            p.widthScaleAt(d1)) / 2;
+          stampSlope(a, b, half);
+        }
       });
     }
 
@@ -332,13 +353,56 @@ var World3D = (function () {
     return routePath.ribbon ? routePath.ribbon(roadWidth, ul(13))
       : routePath.points;
   }
-  // How proud of the floor the road ribbon sits. Read by BOTH the mesh and the
-  // height field, so the surface an enemy is drawn standing on is the same
-  // number as the surface that was built under it.
+  // Default height of a manufactured road. Its mesh and the height field read
+  // the same value. Ironwood derives a thinner value from its authored module
+  // below and likewise shares that result between both consumers.
   var ROAD_LIFT = 7;
   // Mirrors js/game.js. Zones are authored in that space and `Maps.routesOf`
   // has already applied it to route points.
   var AUTHORED_PX_PER_UL = 1.04;
+
+  // A manufactured road remains the seven-pixel deck above. Ironwood's source
+  // module is a thin slab whose own height/width ratio is the right one; using
+  // seven on it turns its soil sides into a retaining wall. The generated
+  // asset derives the matching height from its measured GLB bounds and the
+  // route's requested width.
+  function roadLiftFor(map, path, roadWidth) {
+    if (typeof IronwoodPath !== "undefined" && IronwoodPath.owns(map) &&
+        IronwoodPath.liftFor) {
+      return IronwoodPath.liftFor(path, roadWidth);
+    }
+    return ROAD_LIFT;
+  }
+
+  // The one non-flat join on Ironwood: the depot's metal ramp meets the road.
+  // It is derived from the same walkway geometry the height field stamps, not
+  // from a second hand-authored depot coordinate.
+  function roadEntryProfile(map, env, path, roadWidth) {
+    if (!(typeof IronwoodPath !== "undefined" && IronwoodPath.owns(map)) ||
+        !env || !GLGeometry.depotWalkway) return null;
+    var depot = null;
+    for (var i = 0; i < (env.models || []).length; i++) {
+      if (env.models[i] && env.models[i].kind === "depot") {
+        depot = env.models[i]; break;
+      }
+    }
+    if (!depot) return null;
+    var segments = GLGeometry.depotWalkway(
+      ul(depot.x / AUTHORED_PX_PER_UL), ul(depot.y / AUTHORED_PX_PER_UL),
+      ul((depot.size || 44) / AUTHORED_PX_PER_UL), depot.rotation || 0);
+    if (!segments.length) return null;
+    var toe = segments[segments.length - 1].b;
+    var start = path.progressAtPoint(toe.x, toe.y);
+    var end = Math.min(path.length, start + ul(40));
+    var base = roadLiftFor(map, path, roadWidth);
+    function at(distance) {
+      if (distance < start || distance >= end || end <= start) return base;
+      var t = (distance - start) / (end - start);
+      t = t * t * (3 - 2 * t);
+      return toe.z + (base - toe.z) * t;
+    }
+    return { start: start, end: end, base: base, toe: toe, at: at };
+  }
 
   // Which zone kinds are floor. The other nineteen are props -- consoles,
   // pylons, crystals -- and are deliberately absent rather than faked as slabs.
@@ -381,7 +445,7 @@ var World3D = (function () {
   // Two things outside `buildMapMesh` need it and neither can re-derive it:
   // the height field has to sink the channel, and `levelUnder` has to refuse a
   // tower standing in it. Null on every board that declares no river, which is
-  // six of the seven.
+  // seven of the eight.
   var riverBand = null;
 
   // The authored river spec, in world units. `x`, `width`, `banks` and `depth`
@@ -657,13 +721,26 @@ var World3D = (function () {
 
     var roadWidth = ul(ROAD_WIDTH_UL);
     routePaths.forEach(function (p) {
-      // `ribbon` is the route's own points on a board whose road is one width
-      // the whole way -- six of the seven -- and a resampled list carrying a
-      // per-point half-width where the route declares a profile. One call
+      // `ribbon` is the route's own points on the six profile-free boards, and
+      // a resampled list carrying a per-point half-width where a route declares
+      // a profile. One call
       // either way, so a chokepoint is real narrowed tarmac in the mesh and
       // not a marking painted on a road that never changed.
-      GLGeometry.road(g, roadRibbon(p, roadWidth), roadWidth, ROAD_LIFT,
-        P.roadTop, P.roadSide, P.roadGlow);
+      //
+      // IRONWOOD IS THE AUTHORED EXCEPTION. Its Claude Design module is not a
+      // rigid prop laid in straight pieces: IronwoodPath deforms every source
+      // vertex against this exact GamePath, including its live width profile.
+      // That keeps one continuous surface through curves and removes both the
+      // wedge gaps of rotated tiles and the coplanar overlap that z-fights on
+      // zoom-out. Every other map keeps the old manufactured ribbon verbatim.
+      if (typeof IronwoodPath !== "undefined" && IronwoodPath.owns(map)) {
+        var entry = roadEntryProfile(map, env, p, roadWidth);
+        IronwoodPath.build(g, p, roadWidth,
+          entry ? entry.at : roadLiftFor(map, p, roadWidth));
+      } else {
+        GLGeometry.road(g, roadRibbon(p, roadWidth), roadWidth, ROAD_LIFT,
+          P.roadTop, P.roadSide, P.roadGlow);
+      }
     });
 
     // The authored scenery. Each map names nine props and until now the 3D
