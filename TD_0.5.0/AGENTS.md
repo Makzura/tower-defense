@@ -4194,6 +4194,38 @@ Three consequences, and none of them is optional once the ramp is real:
 Anything else with a ramp, a raised deck, a gantry or an arch over the road owes
 the same three answers, and "it misses the ground" is not one of them.
 
+**AND NOTHING GROWS THROUGH A BUILDING.** A board's foliage is placed in bulk
+-- Ironwood plants nine hundred and seventy-three ironwoods -- and until
+2026-08-27 nothing asked whether any of it landed on anything. Thirty-seven
+props stood inside the settlement, through its wall or out of the road, which is
+the one thing a forest border must never do: a player reads a canopy as "I
+cannot build here", and on this board the rule is the landmark and the blockers,
+not the leaves.
+
+**`Maps.sceneryOf(map)` IS WHAT BOTH BOARDS DRAW**, and `map.models` is only
+what the board ASKED for. The flat pass and the mesh builder call it or they
+grow different forests and only one of them is ever checked. It is cached on the
+map, it is deterministic -- a tree is pushed straight out of whatever it is
+stuck in, then round a fan of eight bearings at growing distance -- and it drops
+a prop only when there is nowhere to push it to. On Ironwood: 26 moved, 11
+dropped, 37 overlaps to 0. Test 4e pins it, and it pins the BEFORE count too, so
+it cannot pass by the pass doing nothing.
+
+Two radii per kind, in maps.js. `Maps.SOLID` is how much room a BUILT thing
+takes as a fraction of its `size`; `Maps.CANOPY` is what a GROWN thing needs for
+its trunk and inner crown. Both are read off the builders in gl-geometry.js
+rather than guessed. A kind in neither table is neither an obstacle nor a
+candidate.
+
+**THE RENDERER REGISTERS FOOTPRINTS WITH THE MAP LAYER, not the other way
+round.** `Maps.registerFootprint(kind, fn)` at the bottom of gl-geometry.js: a
+village six hundred pixels across is mostly grass, and only the file that draws
+it knows it is a ring of eight houses rather than a disc. Without a provider the
+kind falls back to its `SOLID` circle, which always clears MORE ground -- so a
+node test with no renderer loaded is conservative rather than wrong. **Register
+it ABOVE the `return`**; below it, it is unreachable and the only symptom is a
+forest cleared to a blanket circle.
+
 **A prop may own its own light.** `accent: "r,g,b"` on a
 model overrides the board's accent for that prop. It needs a **separate draw
 call**, not just a different vertex colour: emission in the shader is

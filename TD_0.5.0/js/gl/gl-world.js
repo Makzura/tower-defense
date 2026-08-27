@@ -655,7 +655,13 @@ var World3D = (function () {
     // and layered over the palette rather than replacing it so everything else
     // about the prop is still the board's.
     var accentGroups = {};
-    ((env && env.models) || []).forEach(function (m) {
+    // `Maps.sceneryOf`, not `env.models`. The authored list is what the board
+    // asked for; this is the same list with nothing growing through a building,
+    // a fence, a gate or the road -- see the foliage pass in maps.js. The flat
+    // board reads the identical call, so the two cannot disagree about where
+    // the forest is.
+    (((typeof Maps !== "undefined" && Maps.sceneryOf && map)
+      ? Maps.sceneryOf(map) : (env && env.models)) || []).forEach(function (m) {
       if (!m || !m.kind) return;
       var into = g, props = P;
       if (m.accent) {

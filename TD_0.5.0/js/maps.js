@@ -559,19 +559,32 @@ Maps.LIST.push({
     { x: 665,  y: 515 }, { x: 560,  y: 445 }, { x: 575,  y: 335 },
     { x: 655,  y: 270 }, { x: 610,  y: 190 }, { x: 480,  y: 175 },
     { x: 375,  y: 235 }, { x: 395,  y: 345 }, { x: 470,  y: 415 },
-    { x: 410,  y: 480 }, { x: 320,  y: 465 }, { x: 300,  y: 410 },
-    { x: 288,  y: 362 }
+    { x: 410,  y: 480 }, { x: 330,  y: 462 }, { x: 300,  y: 420 },
+    { x: 288,  y: 385 }, { x: 280,  y: 362 }, { x: 240,  y: 362 }
   ],
-  // THE LAST TWO POINTS MOVED, and this is the only place the authored spec was
-  // departed from. It asked for (265, 400) then (280, 360) -- and both of those
-  // are INSIDE the settlement's octagon, whose east wall stands at x = 285. The
-  // road therefore ran THROUGH the village and stopped behind the gate, so
-  // enemies walked past the houses to attack the door from the wrong side.
+  // THE TAIL WAS MOVED TWICE, and both times for the same reason: the last
+  // point is the GATE, and a gate is a thing you walk into rather than past.
   //
-  // (300, 410) and (288, 362) approach the same gate from OUTSIDE and stop on
-  // its outer face, inside the authored 330-390 opening. Twelve and twenty
-  // authored pixels of movement, which is inside the tolerance the brief allows,
-  // and the composition is unchanged: same switchback, same final approach.
+  // The authored spec asked for (265, 400) then (280, 360) -- both INSIDE the
+  // settlement's octagon -- so the road ran through the village and stopped
+  // behind the gate, and enemies attacked the door from the wrong side. That
+  // was corrected to (300, 410) then (288, 362), outside the walls.
+  //
+  // 2026-08-27: THE APPROACH IS NOW SQUARE TO THE GATE. Those two points ended
+  // the route heading north-north-west into an east-facing gate, so the wave
+  // arrived at 76 degrees off the opening and finished walking ALONG the gate's
+  // face rather than through it. (330, 462), (300, 420), (288, 385) and
+  // (280, 362) lay a quarter turn that brings the road onto y = 362 and then
+  // straight down the gate axis: the last 40 pixels are dead level with the
+  // opening and the final heading is 178 degrees.
+  //
+  // THE FIRST VERSION OF THAT TURN WENT THROUGH `blocker-o1` BY FIFTY-TWO
+  // PIXELS -- a road drawn straight across a rock that stops bullets. The
+  // corridor WEST of that rock is the only way onto the gate axis from here,
+  // so the turn is laid down it and the village stands back to leave room. The
+  // walked route goes from 1989 to 2025 authored pixels: 1.8 per cent longer,
+  // which is 1.8 per cent more time under fire, and the only balance any of
+  // this touches.
 
   landmarks: [
     {
@@ -594,9 +607,31 @@ Maps.LIST.push({
       // through mesh -- so the settlement refuses building without also making
       // its own defenders blind, which is what a solid hull here would do.
       blocksSight: false,
-      height: 90,
-      points: [[70, 225], [220, 225], [285, 290], [285, 430],
-               [220, 505], [70, 505], [20, 430], [20, 290]]
+      // The beacon on the hall's mast, which is the tallest thing inside the
+      // fence. Documentation rather than a rule while `blocksSight` is false.
+      height: 79,
+      // AN OCTAGON AROUND THE VILLAGE'S ELLIPSE, not the other way round. The
+      // authored settlement (Claude Design a7f0c2ee) has an elliptical
+      // perimeter 512 pixels across the gate axis and 660 along it, centred on
+      // (-16, 362); this is the eight-sided bubble that contains it. The old
+      // octagon was 265 by 280 about (152, 365) and the buildings inside it
+      // were a picture that did not follow it -- half of the west end was empty
+      // no-build ground and the wall runs were generated from these very points
+      // by hand to hide the fact. Now the fence IS the footprint.
+      //
+      // IT REACHES OFF THE WEST EDGE, and that costs nothing: the play
+      // rectangle is 1280 by 720 and everything at x < 0 is apron. What it does
+      // newly refuse is the north-west and south-west corners of the board --
+      // ground a tower could stand on before and could not shoot anything from,
+      // since the nearest road is 150 units away and the reference range is 100.
+      //
+      // THE EAST EDGE STOPS SHORT OF THE GATE, at 286, and test 4d is why: the
+      // route's last point is (288, 362) and it has to stay OUTSIDE these
+      // walls, or the wave is attacking the gate from within the village. The
+      // gate's piers stand two pixels past this line, which is the correct way
+      // round -- a gate is the hole in a wall, not a thing behind it.
+      points: [[-131, 32], [99, 32], [238, 214], [238, 510],
+               [99, 692], [-131, 692], [-272, 510], [-272, 214]]
     }
   ],
 
@@ -2312,33 +2347,61 @@ Maps.ENVIRONMENTS = {
       // answer, and test 22 asserts no prop of those kinds ever comes back.
 
       // --- the settlement ---------------------------------------------------
-      { kind: "townhall",   x: 150, y: 362, size: 66, rotation: 0,    propId: "townhall" },
-      { kind: "house",      x: 78,  y: 268, size: 44, rotation: 0.12, propId: "house-northwest" },
-      { kind: "house",      x: 160, y: 258, size: 46, rotation: -0.08, propId: "house-north" },
-      { kind: "house",      x: 52,  y: 350, size: 42, rotation: 0.2,  propId: "house-west" },
-      { kind: "house",      x: 82,  y: 448, size: 45, rotation: -0.15, propId: "house-southwest" },
-      { kind: "storehouse", x: 178, y: 458, size: 52, rotation: 0.05, propId: "storehouse-south" },
-      { kind: "workshop",   x: 232, y: 300, size: 40, rotation: -0.1, propId: "workshop-east" },
-      { kind: "gate",       x: 285, y: 360, size: 46, rotation: 0,    propId: "settlement-gate" },
-      // THE WALL IS GENERATED FROM THE OCTAGON, one segment per edge, with the
-      // east edge split around the gate's 330-390 opening. It used to be five
-      // hand-placed runs that did not follow the footprint at all: the
-      // settlement read as buildings standing among scattered walls rather than
-      // as a fortified enclosure, which is what it is supposed to be.
-      { kind: "palisade", x: 145, y: 225, size: 150, rotation: 0.0000 },
-      { kind: "palisade", x: 252, y: 258, size: 92, rotation: 0.7854 },
-      { kind: "palisade", x: 285, y: 310, size: 40, rotation: 1.5708 },
-      { kind: "palisade", x: 285, y: 410, size: 40, rotation: 1.5708 },
-      { kind: "palisade", x: 252, y: 468, size: 99, rotation: 2.2849 },
-      { kind: "palisade", x: 145, y: 505, size: 150, rotation: 3.1416 },
-      { kind: "palisade", x: 45, y: 468, size: 90, rotation: -2.1588 },
-      { kind: "palisade", x: 20, y: 360, size: 140, rotation: -1.5708 },
-      { kind: "palisade", x: 45, y: 258, size: 82, rotation: -0.9151 },
-      { kind: "lantern",    x: 258, y: 322, size: 16, rotation: 0 },
-      { kind: "lantern",    x: 258, y: 398, size: 16, rotation: 0 },
-      { kind: "lantern",    x: 110, y: 318, size: 14, rotation: 0 },
-      { kind: "barrel",     x: 208, y: 392, size: 15, rotation: 0.6 },
-      { kind: "barrel",     x: 216, y: 408, size: 14, rotation: 2.2 },
+      //
+      // ONE PROP, AND IT USED TO BE TWENTY-FOUR: a hall, four houses, a
+      // storehouse, a workshop, a gate, nine wall runs, three lanterns and two
+      // barrels, each with its own position and size, and a palisade that was
+      // generated from the landmark octagon by hand because otherwise it did
+      // not follow the footprint at all. It is now the authored Ironwood
+      // village (Claude Design project a7f0c2ee, `ironwood-village.html`),
+      // which carries its own perimeter, gate, hall, eight houses, yard fences,
+      // street and plaza -- see `ironwoodVillage` in gl-geometry.js. The ring
+      // is DERIVED there, walked around the source's own ellipse, so it cannot
+      // fall out of step with a footprint the way nine hand-placed runs did.
+      //
+      // `size` IS THE ENCLOSURE'S LONG SPAN in authored pixels, north to south,
+      // over the source's 63.0 units. 660 puts a 69-pixel house beside a stump
+      // that is 58 to 80 across, a 193-pixel town hall and a beacon 177 up.
+      //
+      // AND IT IS AS BIG AS THIS BOARD WILL TAKE. The village runs y = 32 to
+      // y = 692 against a 720-pixel board, so the next size up has its north
+      // and south walls off the top and bottom of the world.
+      //
+      // THE LIMIT IS THE ARRANGEMENT, NOT THE MODEL, and it is worth writing
+      // down because the obvious next request is "bigger houses". The source
+      // rings eight houses around an ellipse nine and a half house-widths
+      // across; a house twice a stump's width therefore needs an enclosure
+      // about thirteen hundred pixels long, which is wider than the board and
+      // twice its height. Scaling the houses up inside a fixed ring does not
+      // work either -- they are already fourteen units apart on a ring where a
+      // house is eleven across, so 1.3x has them touching each other and the
+      // fence. Bigger houses than this means FEWER of them, or a tighter ring,
+      // and both of those are changes to the arrangement rather than to the
+      // scale.
+      //
+      // AND `x` PUTS THE GATE ON THE ROUTE'S LAST POINT. The gate piers' outer
+      // face stands 24.46 units out along the gate axis, which is 256 pixels at
+      // this size, so -16 lands it on x = 240 -- the route's last point,
+      // (240, 362). The clear opening between the piers is 66 pixels and the
+      // road is 22, so the tarmac runs through it with room either side and the
+      // wave stops against the closed leaves, which is what that last point has
+      // meant on this board since it was authored.
+      //
+      // IT STANDS 48 PIXELS FURTHER BACK than the squared approach first put
+      // it, and the reason is `blocker-o1` -- the 48-radius rock at (365, 405).
+      // A road that turns onto the gate axis any further east turns INSIDE that
+      // rock. The village is set back far enough that the corridor between the
+      // rock and its own east wall takes a road with the same two and a half
+      // pixels of daylight the rest of this route already runs at.
+      { kind: "village", x: -16, y: 362, size: 660, rotation: 0,
+        propId: "human-settlement" },
+      // The hall's beacon and the gate's lower lens are CYAN, and the board's
+      // one accent is the settlement's own amber. One draw call carries one
+      // emitted colour, so the cold gear is a second prop at the same place and
+      // size, reading the same layout table -- there is nothing here to keep in
+      // step, because the two entries are the same four numbers.
+      { kind: "village-signals", x: -16, y: 362, size: 660, rotation: 0,
+        accent: "79,224,255" },
 
       // --- the depot --------------------------------------------------------
       //
@@ -2744,6 +2807,203 @@ for (var environmentIndex = 0; environmentIndex < Maps.LIST.length;
   // 3D mesh both test for it rather than assuming one.
   environmentMap.river = environment.river || null;
 }
+
+// --- NOTHING GROWS THROUGH A BUILDING ---------------------------------------
+//
+// A board's foliage is placed in bulk -- Ironwood alone plants nine hundred and
+// seventy-three ironwoods around its clearing -- and until now nothing ever
+// asked whether any of them landed on something. Several did. Trees stood
+// inside the settlement, through its wall and out of the road, which is the one
+// thing a forest border must never do: a player reads a canopy as "I cannot
+// build here", and on this board the rule is the landmark and the blockers,
+// not the leaves.
+//
+// TWO RADII AND ONE PASS. `SOLID` is how much room a BUILT thing takes, as a
+// fraction of its own `size`; `CANOPY` is how much a GROWN thing needs for its
+// trunk and inner crown. A kind in neither table is neither an obstacle nor a
+// candidate -- `ridge` is the distant hills and is three thousand units away,
+// and it is not consulted for either.
+//
+// The numbers are read off the builders in js/gl/gl-geometry.js rather than
+// guessed: an ironwood's buttresses reach `size * 0.21` and its nearest canopy
+// mass sits about `size * 0.55` out, so 0.55 is the trunk plus the crown that
+// would visibly overhang a roof; a fern is a rosette of fronds at half its
+// size; a deadfall is a log lying `size * 0.6` either way.
+// A KIND MAY ANSWER WITH ITS REAL SHAPE INSTEAD OF A CIRCLE, and the two that
+// matter do. The renderer registers these at load time, because the only place
+// that knows how long a depot's hull is or where a village's houses stand is
+// the file that draws them -- see the bottom of js/gl/gl-geometry.js.
+//
+// WITHOUT A PROVIDER the kind falls back to its `SOLID` circle, which is always
+// the more conservative answer: it clears MORE ground, never less. That is the
+// state a node test runs in, and it is why the tests below assert "nothing
+// overlaps" rather than a count.
+Maps.FOOTPRINTS = {};
+Maps.registerFootprint = function (kind, fn) { Maps.FOOTPRINTS[kind] = fn; };
+
+Maps.SOLID = {
+  // The settlement and the transport are the two big ones, and both hand back
+  // a real footprint instead of a blanket circle -- see `keepOutOf`.
+  village: 0.5, depot: 0.62, floodlight: 0.5,
+  townhall: 0.7, house: 0.7, storehouse: 0.7, workshop: 0.7,
+  palisade: 0.5, "palisade-gate": 0.7, gate: 0.7, lantern: 0.3, barrel: 0.4,
+  watchtower: 0.6, wreck: 0.6, barricade: 0.7, sandbags: 0.7, spikes: 0.6,
+  fence: 0.7, bridge: 0.8, casket: 0.6, conduit: 0.6, platform: 0.55,
+  antenna: 0.5, server: 0.5, reactor: 0.6, console: 0.5, pylon: 0.5,
+  tank: 0.5, vent: 0.5, holo: 0.5, battery: 0.5, coil: 0.5,
+  "depot-ramp": 0.5, wheel: 0.5, exhaust: 0.4
+};
+Maps.CANOPY = {
+  ironwood: 0.55, tree: 0.4, snag: 0.35, stump: 0.4, log: 0.6,
+  brush: 0.5, fern: 0.5, deadfall: 0.6, mossrock: 0.5, trunk: 0.6
+};
+// Daylight between the two, in authored pixels, and the half-width of the band
+// kept clear either side of the route. The road itself is 21.9 authored pixels
+// wide; this is that plus a shoulder, because a trunk touching the kerb still
+// reads as growing out of the tarmac.
+Maps.FOLIAGE_CLEARANCE = 6;
+Maps.ROAD_CLEARANCE = 18;
+
+// EVERY CIRCLE A TREE MAY NOT STAND IN, in authored pixels.
+//
+// The village and the depot are asked for their own shape rather than wrapped
+// in one circle: a settlement six hundred pixels across is mostly grass, and a
+// blanket disc would clear a third of the forest to plant nothing. `village`
+// answers with a circle per house, per wall panel, per yard and per patch of
+// scraped ground, all derived from the same layout the model is drawn from.
+Maps.keepOutOf = function (map) {
+  var out = [], i, j;
+  var models = map.models || [];
+  for (i = 0; i < models.length; i++) {
+    var m = models[i];
+    var fraction = Maps.SOLID[m.kind];
+    if (fraction === undefined) continue;
+    var provider = Maps.FOOTPRINTS[m.kind];
+    var detail = provider
+      ? provider(m.x, m.y, m.size || 44, m.rotation || 0)
+      : null;
+    if (detail) { for (j = 0; j < detail.length; j++) out.push(detail[j]); continue; }
+    out.push({ x: m.x, y: m.y, r: (m.size || 44) * fraction });
+  }
+  // The gameplay solids. A rock or a stump is authored geometry a bullet stops
+  // against, so a tree inside one is the same lie as a tree inside a wall.
+  (map.blockers || []).forEach(function (bl) {
+    if (bl.shape === "circle") out.push({ x: bl.x, y: bl.y, r: bl.radius });
+    else if (bl.shape === "capsule") {
+      out.push({ x: bl.a.x, y: bl.a.y, r: bl.radius });
+      out.push({ x: (bl.a.x + bl.b.x) / 2, y: (bl.a.y + bl.b.y) / 2, r: bl.radius });
+      out.push({ x: bl.b.x, y: bl.b.y, r: bl.radius });
+    } else if (bl.points) {
+      var cx = 0, cy = 0, far = 0;
+      bl.points.forEach(function (pt) { cx += pt[0]; cy += pt[1]; });
+      cx /= bl.points.length; cy /= bl.points.length;
+      bl.points.forEach(function (pt) {
+        far = Math.max(far, Math.hypot(pt[0] - cx, pt[1] - cy));
+      });
+      out.push({ x: cx, y: cy, r: far });
+    }
+  });
+  (map.platforms || []).forEach(function (pf) {
+    out.push({ x: pf.x, y: pf.y, r: pf.radius });
+  });
+  // THE ROUTE, as a chain of discs down the middle of the road. Sampled rather
+  // than treated as segments because a disc chain is the same test as
+  // everything else above and the route is only a few dozen points long once
+  // it is walked.
+  Maps.routesOf(map).forEach(function (route) {
+    var pts = route.points || [];
+    for (i = 0; i + 1 < pts.length; i++) {
+      var ax = pts[i].x, ay = pts[i].y, bx = pts[i + 1].x, by = pts[i + 1].y;
+      var span = Math.hypot(bx - ax, by - ay);
+      var steps = Math.max(1, Math.ceil(span / Maps.ROAD_CLEARANCE));
+      for (j = 0; j <= steps; j++) {
+        var t = j / steps;
+        out.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t,
+                   r: Maps.ROAD_CLEARANCE });
+      }
+    }
+  });
+  return out;
+};
+
+// THE BOARD'S SCENERY, WITH NOTHING GROWING OUT OF ANYTHING.
+//
+// Cached on the map, because it is the same answer every time and both passes
+// ask for it -- `drawEnvironment` here and the mesh builder in gl-world. They
+// have to be given the SAME list or the flat board and the 3D one disagree
+// about where the forest is.
+//
+// A tree that overlaps is PUSHED OUT FIRST and only dropped if there is nowhere
+// to push it to. The push is deterministic -- straight out from whatever it is
+// standing in, then a fan of eight bearings at growing distance -- so a board
+// looks the same on every load and a diff of this file is a diff of the forest.
+Maps.sceneryOf = function (map) {
+  if (map._scenery) return map._scenery;
+  var keep = Maps.keepOutOf(map);
+  var pad = Maps.FOLIAGE_CLEARANCE;
+  var out = [], moved = 0, removed = 0, k, a;
+
+  // How far inside a keep-out this point sits, and which way is out. Returns
+  // null when it is clear of every one of them.
+  function worst(x, y, radius) {
+    var deepest = null, depth = 0;
+    for (var c = 0; c < keep.length; c++) {
+      var kx = keep[c].x - x, ky = keep[c].y - y;
+      var need = keep[c].r + radius + pad;
+      var d = Math.hypot(kx, ky);
+      if (d >= need) continue;
+      if (need - d > depth) { depth = need - d; deepest = { dx: -kx, dy: -ky, d: d, need: need }; }
+    }
+    return deepest;
+  }
+
+  (map.models || []).forEach(function (m) {
+    var fraction = Maps.CANOPY[m.kind];
+    if (fraction === undefined) { out.push(m); return; }
+    var radius = (m.size || 44) * fraction;
+    var hit = worst(m.x, m.y, radius);
+    if (!hit) { out.push(m); return; }
+    // Straight out of the deepest overlap first: one push usually does it,
+    // and it is the move that disturbs the composition least.
+    var away = Math.hypot(hit.dx, hit.dy) || 1;
+    var ux = hit.dx / away, uy = hit.dy / away;
+    var reach = radius * 3 + 40;
+    for (k = 1; k <= 6; k++) {
+      var push = (hit.need - hit.d) + k * (radius * 0.5 + 6);
+      if (push > reach) break;
+      for (a = 0; a < 8; a++) {
+        // The outward normal, then a fan either side of it.
+        var turn = ((a + 1) >> 1) * (a % 2 ? 1 : -1) * 0.55;
+        var cs = Math.cos(turn), sn = Math.sin(turn);
+        var nx = m.x + (ux * cs - uy * sn) * push;
+        var ny = m.y + (ux * sn + uy * cs) * push;
+        if (worst(nx, ny, radius)) continue;
+        var shifted = {};
+        for (var key in m) if (Object.prototype.hasOwnProperty.call(m, key)) shifted[key] = m[key];
+        shifted.x = Math.round(nx * 100) / 100;
+        shifted.y = Math.round(ny * 100) / 100;
+        out.push(shifted);
+        moved++;
+        return;
+      }
+    }
+    // Nowhere to stand. A gap in a treeline reads as a clearing; a tree in a
+    // roof reads as a bug.
+    removed++;
+  });
+
+  map._scenery = out;
+  map._sceneryReport = { total: (map.models || []).length, moved: moved,
+                         removed: removed, keepOuts: keep.length };
+  return out;
+};
+
+// What the pass above did, for the tests and for anybody wondering where a tree
+// went. Runs the pass if it has not run.
+Maps.foliageReport = function (map) {
+  Maps.sceneryOf(map);
+  return map._sceneryReport;
+};
 
 Maps.DEFAULT_ID = "ironwood-frontier";
 
@@ -3211,6 +3471,15 @@ function drawRiver(ctx, river, theme, height) {
   ctx.globalAlpha = 1;
 }
 
+// THE BLOB UNDER A PROP, and it is sized off `size` like everything else --
+// which is fine for a 40-pixel barrel and absurd for a 660-pixel village. At
+// that size the ellipse is a 540-radius stain over a third of the board.
+//
+// The three props that carry their own ground opt out: the village lays a
+// plaza, a street and a yard per house, and the depot lays a ramp. A prop that
+// draws its own footing does not want a second one painted under it.
+var NO_MACHINE_SHADOW = { village: 1, "village-signals": 1, depot: 1 };
+
 function drawMachineShadow(ctx, size) {
   ctx.beginPath();
   ctx.ellipse(size * 0.1, size * 0.26, size * 0.82, size * 0.45,
@@ -3240,7 +3509,7 @@ function drawModel(ctx, model, theme) {
   ctx.rotate(model.rotation || 0);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  drawMachineShadow(ctx, size);
+  if (!NO_MACHINE_SHADOW[model.kind]) drawMachineShadow(ctx, size);
 
   if (model.kind === "reactor") {
     for (i = 0; i < 8; i++) {
@@ -4338,6 +4607,88 @@ function drawModel(ctx, model, theme) {
       ctx.fillStyle = "rgba(" + glow + ",0.85)";
       ctx.fill();
     }
+  } else if (model.kind === "village") {
+    // THE SETTLEMENT, FROM ABOVE, and it is drawn from the SAME plan the 3D
+    // board builds: `GLGeometry.villagePlan` answers where every wall panel,
+    // house and yard stands, so the flat board and the mesh cannot disagree
+    // about the shape of a village neither of them authored. Without a
+    // renderer loaded there is no plan to draw and the prop is skipped rather
+    // than faked -- a made-up village is worse than none.
+    //
+    // Drawn in WORLD coordinates: the plan is already placed, and this function
+    // has translated to the model's origin, so it is undone for the duration.
+    var plan = (typeof GLGeometry !== "undefined" && GLGeometry.villagePlan)
+      ? GLGeometry.villagePlan(0, 0, size, 0) : null;
+    if (plan) {
+      var slab = function (q, fill, line) {
+        ctx.save();
+        ctx.translate(q.x, q.y);
+        ctx.rotate(q.a);
+        ctx.fillStyle = fill;
+        ctx.fillRect(-q.d / 2, -q.w / 2, q.d, q.w);
+        if (line) {
+          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = line;
+          ctx.strokeRect(-q.d / 2, -q.w / 2, q.d, q.w);
+        }
+        ctx.restore();
+      };
+      var disc = function (c, r, fill) {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = fill;
+        ctx.fill();
+      };
+      // scraped ground first, then the walls, then what stands on it
+      var dirt = themeRgba(theme, "panelLine", 0.30);
+      for (i = 0; i < plan.ground.length; i++) disc(plan.ground[i].p, plan.ground[i].r, dirt);
+      disc(plan.plaza.p, plan.plaza.r, themeRgba(theme, "panelLine", 0.38));
+      slab(plan.street, dirt, null);
+      var wallLine = themeRgba(theme, "panelLine", 0.95);
+      for (i = 0; i < plan.walls.length; i++) slab(plan.walls[i], theme.metalDark, wallLine);
+      for (i = 0; i < plan.yards.length; i++) slab(plan.yards[i], theme.metalDark, null);
+      for (i = 0; i < plan.posts.length; i++) slab(plan.posts[i], theme.metalDark, null);
+      slab(plan.hall, theme.metal, wallLine);
+      slab({ x: plan.hall.x, y: plan.hall.y, a: plan.hall.a,
+             w: plan.hall.w * 0.6, d: plan.hall.d * 0.66 }, theme.metalDark, wallLine);
+      for (i = 0; i < plan.houses.length; i++) {
+        slab(plan.houses[i], theme.metal, wallLine);
+        // the lit gable end, which is the only warm thing in a house this size
+        var hq = plan.houses[i];
+        ctx.save();
+        ctx.translate(hq.x, hq.y);
+        ctx.rotate(hq.a);
+        ctx.fillStyle = themeRgba(theme, "accent", 0.75);
+        ctx.fillRect(-hq.d / 2 - 1, -hq.w * 0.22, 3, hq.w * 0.44);
+        ctx.restore();
+      }
+      // THE GATE, and it is the brightest thing here because it is what the
+      // route ends on.
+      slab(plan.gate, theme.metalDark, themeRgba(theme, "accent", 0.9));
+      ctx.save();
+      ctx.translate(plan.gate.x, plan.gate.y);
+      ctx.rotate(plan.gate.a);
+      ctx.fillStyle = themeRgba(theme, "accent", 0.85);
+      ctx.fillRect(-1.5, -plan.gate.w * 0.22, 3, plan.gate.w * 0.44);
+      ctx.restore();
+    }
+
+  } else if (model.kind === "village-signals") {
+    // The beacon on the hall's mast and the gate's cold lens. Two points of a
+    // colour this board has nowhere else, which is the whole reason they are
+    // their own prop -- see the model note in gl-geometry.js.
+    var sp = (typeof GLGeometry !== "undefined" && GLGeometry.villagePlan)
+      ? GLGeometry.villagePlan(0, 0, size, 0) : null;
+    if (sp) {
+      [[sp.hall.x, sp.hall.y, size * 0.014], [sp.gate.x, sp.gate.y, size * 0.010]]
+        .forEach(function (pt) {
+          ctx.beginPath();
+          ctx.arc(pt[0], pt[1], pt[2], 0, Math.PI * 2);
+          ctx.fillStyle = themeRgba(theme, "accent", 0.95);
+          ctx.fill();
+        });
+    }
+
   } else if (model.kind === "barrel") {
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.34, 0, Math.PI * 2);
@@ -4696,9 +5047,10 @@ Maps.drawEnvironment = function (ctx, map) {
   if (!theme.wild) {
     ctx.strokeStyle = themeRgba(theme, "accent", 0.19);
     ctx.lineWidth = 3;
-    for (var trunk = 0; trunk < map.models.length - 1; trunk += 2) {
-      var from = map.models[trunk];
-      var to = map.models[trunk + 1];
+    var pairs = Maps.sceneryOf(map);
+    for (var trunk = 0; trunk < pairs.length - 1; trunk += 2) {
+      var from = pairs[trunk];
+      var to = pairs[trunk + 1];
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, from.y);
@@ -4721,8 +5073,12 @@ Maps.drawEnvironment = function (ctx, map) {
   // screen" test, and 800 units past the board is well beyond anything the flat
   // camera shows at any zoom it allows.
   var cullW = VIEW_WIDTH / scale, cullH = VIEW_HEIGHT / scale;
-  for (var modelIndex = 0; modelIndex < map.models.length; modelIndex++) {
-    var mdl = map.models[modelIndex];
+  // `sceneryOf`, not `map.models`: the authored list is what a board ASKED for
+  // and this is what fits on it -- see the foliage pass. Both boards read the
+  // same call or the flat one grows trees the 3D one has already moved.
+  var scenery = Maps.sceneryOf(map);
+  for (var modelIndex = 0; modelIndex < scenery.length; modelIndex++) {
+    var mdl = scenery[modelIndex];
     var pad = 800 + (mdl.size || 0);
     if (mdl.x < -pad || mdl.y < -pad ||
         mdl.x > cullW + pad || mdl.y > cullH + pad) continue;

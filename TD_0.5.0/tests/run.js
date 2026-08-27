@@ -5228,6 +5228,46 @@ test("4d  the route ends OUTSIDE the settlement, at the gate", function (t) {
     "and it lands inside the gate's 330-390 opening (y = " + last.y + ")");
 });
 
+test("4e  the forest never grows through a building, a fence or the road",
+function (t) {
+  var h = ironwood();
+  var Maps = h.game.Maps;
+  var map = Maps.byId("ironwood-frontier");
+  var keep = Maps.keepOutOf(map);
+  t.ok(keep.length > 40, "the board has a keep-out set (" + keep.length + ")");
+
+  // THE AUTHORED LIST IS NOT CLEAN, and that is the point: the foliage is
+  // placed in bulk and nobody ever asked it where the buildings were.
+  function overlaps(list) {
+    var hits = 0;
+    list.forEach(function (m) {
+      var fraction = Maps.CANOPY[m.kind];
+      if (fraction === undefined) return;
+      var radius = (m.size || 44) * fraction;
+      for (var i = 0; i < keep.length; i++) {
+        var d = Math.hypot(keep[i].x - m.x, keep[i].y - m.y);
+        if (d < keep[i].r + radius + Maps.FOLIAGE_CLEARANCE) { hits++; return; }
+      }
+    });
+    return hits;
+  }
+  t.ok(overlaps(map.models) > 0,
+    "the authored forest has props standing in things (" + overlaps(map.models) + ")");
+  t.eq(overlaps(Maps.sceneryOf(map)), 0, "and the drawn one has none");
+
+  // Moved, not merely deleted: a gap in a treeline reads as a clearing, so the
+  // pass pushes first and only drops what has nowhere to go.
+  var report = Maps.foliageReport(map);
+  t.ok(report.moved > 0, "some were pushed clear (" + report.moved + ")");
+  t.ok(report.moved + report.removed < map.models.length * 0.1,
+    "and it is a trim, not a clear-fell (" + (report.moved + report.removed) + ")");
+
+  // BOTH BOARDS READ THE SAME LIST. The flat pass and the mesh builder call
+  // `sceneryOf`; if one of them went back to `map.models` the two would grow
+  // different forests and only one of them would be checked here.
+  t.eq(Maps.sceneryOf(map), Maps.sceneryOf(map), "the answer is cached, not recomputed");
+});
+
 test("5  ordinary ground is still freely buildable", function (t) {
   var h = ironwood();
   // This is not a fixed-slot map: clear dirt away from the road takes a tower

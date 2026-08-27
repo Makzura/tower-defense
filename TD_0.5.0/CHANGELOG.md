@@ -13,6 +13,101 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The settlement is the authored Ironwood village, and nothing
+grows through it any more.** Two jobs in one edit, because the second one only
+became findable once the first landed.
+
+**The village.** The placeholder was twenty-four props -- a hall, four houses, a
+storehouse, a workshop, a gate, nine wall runs, three lanterns and two barrels
+-- and its palisade was generated from the landmark octagon BY HAND, because
+otherwise it did not follow the footprint at all. It is now the authored village
+(Claude Design project a7f0c2ee, `ironwood-village.html`), ported into
+`ironwoodVillage` in gl-geometry.js from the four models it assembles: the
+house, the town hall, the fence section and the double-leaf gate.
+
+**THE ARRANGEMENT IS DERIVED, NOT TRANSCRIBED**, and that is the whole reason it
+is one prop. The source walks an ellipse at equal arc length and drops a fence
+panel per step; it lists eight house spots and turns each entrance toward the
+plaza with one line of trig. `villageWalls` walks the same ellipse and
+`ironwoodVillage` turns the same houses, so the ring is re-derived at any size
+instead of being twenty-seven authored positions that go stale the first time
+anybody changes one number.
+
+**One plan, three readers.** `GLGeometry.villagePlan` answers where every wall
+panel, house, yard and patch of scraped ground stands, in board units. The mesh
+builds from the layout, the flat board draws its plan from it, and the foliage
+pass keeps the forest out of circles derived from it. Any two of those computed
+separately is a village whose walls are in three places.
+
+**`vboxAt` came out of the depot and became a primitive.** A roof plane, a shed
+roof, an entry canopy, a lean-to and a wheelchair ramp are all a box tipped out
+of the vertical, and `boxAt` only ever turns about z -- so all of them were
+upright slabs until it existed. `vtri` is new too: a house gable is a triangle,
+and two stacked boxes read as a staircase where a gable has to read as a point.
+
+**What was dropped is in the function headers.** Forty quoin stones at three
+pixels, twelve cladding planks at half a pixel, every bolt, every window
+mullion, and two hundred chain-link diamonds per fence panel at a sixth of a
+pixel each. The posts went the other way and are drawn THICKER than the source:
+at 0.095 units they vanish, and a fence with no posts is a ribbon.
+
+**The gate is square to the route now, and the route moved to make it so.** The
+last two authored points ended the walk heading north-north-west into an
+east-facing gate, so the wave arrived 76 degrees off the opening and finished
+walking ALONG the gate's face. Four points lay a quarter turn onto y = 362 and
+run the last forty pixels dead level with the opening. The first version of that
+turn went through `blocker-o1` -- the 48-radius rock at (365, 405) -- by
+fifty-two pixels, so the corridor west of that rock is where the turn is laid
+and the village stands back far enough to leave room for it. **The walked route
+goes from 1989 to 2025 authored pixels: 1.8 per cent longer, 1.8 per cent more
+time under fire, and the only balance any of this touches.**
+
+**Size 660 is the board's limit, not a taste.** The source rings eight houses
+around an ellipse nine and a half house-widths across, so a house twice a
+stump's width needs an enclosure thirteen hundred pixels long -- wider than the
+board and twice its height. At 660 the village already runs y = 32 to y = 692
+against a 720-pixel board and a house is 69 pixels beside stumps of 58 to 80.
+Bigger houses than that means FEWER of them or a tighter ring, which is a change
+to the arrangement rather than to the scale.
+
+**NOTHING GROWS THROUGH A BUILDING ANY MORE, and thirty-seven things did.**
+Ironwood plants nine hundred and seventy-three ironwoods around its clearing and
+nothing had ever asked whether any of them landed on anything. Trees stood
+inside the settlement, through its wall and out of the road -- which is the one
+thing a forest border must never do, because a player reads a canopy as "I
+cannot build here" and on this board the rule is the landmark and the blockers,
+not the leaves.
+
+`Maps.SOLID` and `Maps.CANOPY` are two radii per kind, read off the builders
+rather than guessed. `Maps.keepOutOf` collects every circle a tree may not stand
+in -- props, blockers, platforms and the route sampled down its middle -- and
+`Maps.sceneryOf` walks the foliage once, PUSHES each offender out along the way
+it is stuck and only drops the ones with nowhere to go. Deterministic: straight
+out first, then a fan of eight bearings at growing distance, so the board looks
+the same on every load. On Ironwood that is 26 moved and 11 dropped out of 1060,
+and the overlap count goes 37 to 0. Test 4e pins both halves.
+
+**The renderer registers its own footprints with the map layer**, rather than
+the map layer sniffing for a renderer: `Maps.registerFootprint("village", ...)`
+at the bottom of gl-geometry.js, because the only file that knows a village is a
+ring of eight houses rather than a disc is the one that draws it. Without a
+provider the kind falls back to its `SOLID` circle, which always clears MORE
+ground -- the state a node test runs in. That registration sat BELOW the
+`return` for one commit, where it is unreachable, and the only symptom was a
+forest cleared to a blanket circle instead of to the buildings.
+
+**And the blob under a prop is sized off `size`,** which is fine for a 40-pixel
+barrel and absurd for a 660-pixel village: the ellipse came out with a
+540-pixel radius and stained a third of the flat board. The village and the
+depot lay their own ground -- a plaza, a street, a yard per house, a ramp -- so
+they opt out of it.
+
+The landmark octagon follows the fence instead of the fence following the
+octagon. It reaches off the west edge, which costs nothing, and it newly refuses
+the north-west and south-west corners of the board -- ground a tower could stand
+on before and could not shoot anything from, the nearest road being 150 units
+away against a reference range of 100.
+
 **2026-08-27 — The depot is twice the size, and the wave now walks down its
 ramp instead of through it.** Same model as this morning; two things were wrong
 with it on the board. It read small against the settlement at the other end of

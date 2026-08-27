@@ -332,6 +332,43 @@ var GLGeometry = (function () {
     return builder;
   }
 
+  // A BOX THAT IS NOT UPRIGHT. `boxAt` only ever turns about z, and a roof
+  // plane, a ramp bed, a glacis, a hull chamfer and a shed's fall are all a box
+  // tipped out of the vertical -- so every one of them came out as an upright
+  // slab until this existed.
+  //
+  // Centred on (cx, cy, cz) in world units, `sx` along its own length, `sy`
+  // across it and `sz` up; pitched about the cross-axis, rolled about the
+  // length axis, and then turned `yaw` about the vertical like everything else
+  // on the board. The frame is right-handed (L x W = N) so the winding below
+  // matches `boxAt` face for face.
+  function vboxAt(builder, cx, cy, cz, sx, sy, sz, pitch, roll, yaw, color, emi) {
+    var cp = Math.cos(pitch), sp = Math.sin(pitch);
+    var cr = Math.cos(roll), sr = Math.sin(roll);
+    var cw = Math.cos(yaw || 0), sw = Math.sin(yaw || 0);
+    function turn(v) { return [v[0] * cw - v[1] * sw, v[0] * sw + v[1] * cw, v[2]]; }
+    var L = turn([cp, 0, sp]);
+    var W = turn([-sp * sr, cr, cp * sr]);
+    var N = turn([-sp * cr, -sr, cp * cr]);
+    var hw = sx / 2, hd = sy / 2, hh = sz / 2;
+    function p(a, b, c) {
+      return [cx + L[0] * a + W[0] * b + N[0] * c,
+              cy + L[1] * a + W[1] * b + N[1] * c,
+              cz + L[2] * a + W[2] * b + N[2] * c];
+    }
+    var a1 = p(-hw, -hd, hh), b1 = p(hw, -hd, hh);
+    var c1 = p(hw, hd, hh), d1 = p(-hw, hd, hh);
+    var e1 = p(-hw, -hd, -hh), f1 = p(hw, -hd, -hh);
+    var g1 = p(hw, hd, -hh), h1 = p(-hw, hd, -hh);
+    builder.quad(a1, b1, c1, d1, color, emi);
+    builder.quad(e1, f1, b1, a1, color, emi);
+    builder.quad(g1, h1, d1, c1, color, emi);
+    builder.quad(f1, g1, c1, b1, color, emi);
+    builder.quad(h1, e1, a1, d1, color, emi);
+    builder.quad(h1, g1, f1, e1, color, emi);
+    return builder;
+  }
+
   // A SQUARE PRISM BETWEEN TWO POINTS IN SPACE, which is the one shape the
   // three primitives above cannot make: `frustum` and `cylinder` stand upright
   // and `boxAt` only ever turns about z. A leaning trunk, a branch reaching up
@@ -410,6 +447,7 @@ var GLGeometry = (function () {
     house: 1, townhall: 1, storehouse: 1, workshop: 1,
     "palisade-gate": 1, palisade: 1, lantern: 1,
     depot: 1, "depot-ramp": 1, wheel: 1, exhaust: 1, floodlight: 1,
+    village: 1, "village-signals": 1,
     // Neither of these stands on a floor either, and for the same reason as
     // the two below: a gate straddles the ROAD, so a milled plinth under its
     // centre would be a plinth in the middle of the tarmac, and a cable run
@@ -812,6 +850,26 @@ var GLGeometry = (function () {
     ];
   }
 
+  // WHERE THE DEPOT IS SOLID, for the same foliage pass. A chain of discs down
+  // the hull rather than one big circle: the machine is eight units long and
+  // four wide, so a circle around it would clear sixty pixels of forest either
+  // side of a vehicle that is not there.
+  function depotFootprint(cx, cy, size, rot) {
+    var U = size / DEPOT.UNITS;
+    var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
+    var out = [], i;
+    for (i = 0; i <= 6; i++) {
+      var X = -4.3 + i * (8.6 / 6);
+      out.push({ x: cx + X * co * U, y: cy + X * si * U, r: 2.1 * U });
+    }
+    // and the ramp, which is the part that reaches out over the road
+    for (i = 1; i <= 3; i++) {
+      var rX = -4.3 - i * 0.8;
+      out.push({ x: cx + rX * co * U, y: cy + rX * si * U, r: 1.2 * U });
+    }
+    return out;
+  }
+
   function mobileDepot(builder, cx, cy, size, rot, P) {
     var U = size / DEPOT.UNITS;
     var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
@@ -858,34 +916,12 @@ var GLGeometry = (function () {
       boxAt(builder, px(X, Y), py(X, Y), w * U, d * U, h * U, color,
         (Z - h / 2) * U, (rot || 0) + yaw, emi);
     }
-    // A box PITCHED about the across-axis and ROLLED about the along-axis,
-    // which `boxAt` cannot do at all -- it only ever turns about z. The glacis,
-    // the ramp, the crane boom and every chamfer on the hull's shoulders are
-    // this, and without it the machine is a stack of upright slabs.
+    // The glacis, the ramp, the crane boom and every chamfer on the hull's
+    // shoulders are a box tipped out of the vertical -- see `vboxAt`, in the
+    // vehicle's own frame.
     function vbox(X, Y, Z, w, d, h, pitch, roll, color, emi) {
-      var cp = Math.cos(pitch), sp = Math.sin(pitch);
-      var cr = Math.cos(roll), sr = Math.sin(roll);
-      // Length, width and normal in the vehicle frame, right-handed (L x W = N).
-      var L = [cp, 0, sp];
-      var W = [-sp * sr, cr, cp * sr];
-      var N = [-sp * cr, -sr, cp * cr];
-      var hw = w / 2, hd = d / 2, hh = h / 2;
-      function p(a, b, c) {
-        var dx = L[0] * a + W[0] * b + N[0] * c;
-        var dy = L[1] * a + W[1] * b + N[1] * c;
-        var dz = L[2] * a + W[2] * b + N[2] * c;
-        return [px(X + dx, Y + dy), py(X + dx, Y + dy), (Z + dz) * U];
-      }
-      var a1 = p(-hw, -hd, hh), b1 = p(hw, -hd, hh);
-      var c1 = p(hw, hd, hh), d1 = p(-hw, hd, hh);
-      var e1 = p(-hw, -hd, -hh), f1 = p(hw, -hd, -hh);
-      var g1 = p(hw, hd, -hh), h1 = p(-hw, hd, -hh);
-      builder.quad(a1, b1, c1, d1, color, emi);
-      builder.quad(e1, f1, b1, a1, color, emi);
-      builder.quad(g1, h1, d1, c1, color, emi);
-      builder.quad(f1, g1, c1, b1, color, emi);
-      builder.quad(h1, e1, a1, d1, color, emi);
-      builder.quad(h1, g1, f1, e1, color, emi);
+      vboxAt(builder, px(X, Y), py(X, Y), Z * U, w * U, d * U, h * U,
+        pitch, roll, rot || 0, color, emi);
     }
     // A wheel: a disc whose axle runs ACROSS the hull. `frustum` stands upright
     // and `barrel` pins its axis one radius off the ground, so neither of them
@@ -1157,6 +1193,732 @@ var GLGeometry = (function () {
       segment(builder, px(-4.62, s * 1.24), py(-4.62, s * 1.24), 1.52 * U,
         px(-5.05, s * 1.18), py(-5.05, s * 1.18), 1.06 * U, 0.045 * U, dark);
     }
+  }
+
+  // ================= THE IRONWOOD VILLAGE =================
+  //
+  // Ported from the authored three.js models (Claude Design project a7f0c2ee:
+  // `village-model.js` and the four it assembles -- `house-model.js`,
+  // `townhall-model.js`, `fence-model.js`, `build-kit.js`).
+  //
+  // THE ARRANGEMENT IS DERIVED, NOT TRANSCRIBED. The source walks an ellipse at
+  // equal arc length and drops a fence panel per step; it lists eight house
+  // spots and turns each entrance toward the plaza with one line of trig. All
+  // of that is reproduced here as CODE rather than as twenty-seven authored
+  // positions in maps.js, because a transcribed ring is a ring that drifts the
+  // first time anybody changes the size, and because the whole point of
+  // importing this village is that it IS that arrangement.
+  //
+  // Axes. The source is metres, y-up, and its gate faces -Z. This board is
+  // z-up with a prop yaw, so the village's own plan is
+  //
+  //     design -z  ->  plan +x   (out through the gate)
+  //     design +x  ->  plan +y
+  //     design +y  ->  world z
+  //
+  // and a three.js `rotation.y` of `ry` is a plan yaw of `-ry` -- the one sign
+  // that is easy to get wrong and impossible to see wrong, because a village
+  // whose houses all face the wrong way still looks like a village.
+  //
+  // `size` is the enclosure's LONG span (across the gate axis) in board pixels
+  // over the source's own 63.0 units, so one number sets the whole settlement
+  // and nothing inside it can drift out of proportion.
+  var VILLAGE = {
+    UNITS: 63.03,          // measured span of the assembled source, design x
+    A: 31, B: 24,          // perimeter ellipse semi-axes
+    FENCE_S: 1.6,          // the fence kit is built small and scaled up
+    HALL_S: 1.5,
+    GATE_FACE: 24.46,      // design -z of the gate piers' outer face
+    PANEL_TARGET: 5.8,     // arc length the source aims each panel at
+    HOUSES: [
+      [-15.5, -12.5, 0.22], [-20.5, -1.5, -0.16], [-15.6, 10.6, 0.3],
+      [-5.5, 16.0, -0.26], [7.0, 16.5, 0.18], [16.5, 9.5, -0.2],
+      [20.5, -2.0, 0.24], [15.0, -13.0, -0.28]
+    ],
+    YARDS: [
+      [-12.0, -16.4, 0.35], [-10.6, -15.0, 0.35], [-9.2, -13.6, 0.35],
+      [10.4, 14.0, -0.55], [12.0, 12.9, -0.55]
+    ],
+    POSTS: [[-13.0, -17.2, 0.35], [-8.2, -12.7, 0.35], [13.1, 12.1, -0.55]],
+    GROUND: [[-13, -9, 3.6, 0.3], [13.5, -8.5, 3.2, -0.4], [-14, 6, 3.4, 0.8],
+             [14, 6.5, 3.0, -0.7], [-4, 13, 3.2, 0.2], [6, 13.5, 3.0, -0.2]]
+  };
+
+  // The perimeter, walked at equal arc length exactly as the source walks it.
+  // Cached: the sample table is three thousand points and the answer only
+  // depends on constants.
+  var villageWallCache = null;
+  function villageWalls() {
+    if (villageWallCache) return villageWallCache;
+    var A = VILLAGE.A, B = VILLAGE.B, N = 600, i;
+    var sx = [], sy = [], cum = [0];
+    for (i = 0; i <= N; i++) {
+      var t = (i / N) * Math.PI * 2 - Math.PI / 2;
+      sx.push(A * Math.cos(t)); sy.push(B * Math.sin(t));
+      if (i) cum.push(cum[i - 1] + Math.hypot(sx[i] - sx[i - 1], sy[i] - sy[i - 1]));
+    }
+    var L = cum[N];
+    function at(s) {
+      s = ((s % L) + L) % L;
+      var lo = 0, hi = N;
+      while (hi - lo > 1) { var m = (lo + hi) >> 1; if (cum[m] <= s) lo = m; else hi = m; }
+      var f = (s - cum[lo]) / ((cum[hi] - cum[lo]) || 1);
+      return [sx[lo] + (sx[hi] - sx[lo]) * f, sy[lo] + (sy[hi] - sy[lo]) * f];
+    }
+    var s0 = 5.4 * VILLAGE.FENCE_S, s1 = L - s0;
+    var panels = Math.round((s1 - s0) / VILLAGE.PANEL_TARGET);
+    var seg = (s1 - s0) / panels;
+    var out = [];
+    for (i = 0; i < panels; i++) {
+      var p0 = at(s0 + i * seg), p1 = at(s0 + (i + 1) * seg);
+      out.push({
+        // design (x, z) midpoint, and the three.js yaw the source gives it
+        x: (p0[0] + p1[0]) / 2, z: (p0[1] + p1[1]) / 2,
+        ry: Math.atan2(-(p1[1] - p0[1]), p1[0] - p0[0]),
+        len: (seg + 0.07) / VILLAGE.FENCE_S,
+        variant: i % 11 === 5 ? 2 : i % 7 === 3 ? 1 : 0      // damaged / braced / straight
+      });
+    }
+    villageWallCache = out;
+    return out;
+  }
+
+  // A PLACED, SCALED, TURNED COPY OF THE SOURCE'S OWN COORDINATE SYSTEM.
+  //
+  // Every builder below is transcribed straight off the design file and takes
+  // its numbers in the source's (x, y-up, z), so a reader can diff the two.
+  // This is the only place the axis swap happens.
+  function vframe(cx, cy, unit, rot) {
+    return { x: cx, y: cy, u: unit, r: rot, co: Math.cos(rot), si: Math.sin(rot) };
+  }
+  function vchild(F, dx, dz, ry, scale) {
+    // The source places a child with `position.set(x, 0, z); rotation.y = ry`.
+    var px = -dz, py = dx;
+    return vframe(F.x + (px * F.co - py * F.si) * F.u,
+                  F.y + (px * F.si + py * F.co) * F.u,
+                  F.u * (scale === undefined ? 1 : scale), F.r - (ry || 0));
+  }
+
+  // The source's `K.box(name, w, h, d, mat, x, y, z)`, minus the name, in the
+  // same argument order so the transcription is checkable line by line.
+  function vbx(b, F, w, h, d, color, x, y, z, emi) {
+    var px = -z, py = x;
+    boxAt(b, F.x + (px * F.co - py * F.si) * F.u, F.y + (px * F.si + py * F.co) * F.u,
+      d * F.u, w * F.u, h * F.u, color, (y - h / 2) * F.u, F.r, emi);
+  }
+  // Tipped: the source's `rotation.x` is a pitch about the plan's cross-axis
+  // and its `rotation.z` is a roll about the plan's long axis. Both signs are
+  // derived in the header note above, not guessed.
+  function vbxt(b, F, w, h, d, color, x, y, z, rotX, rotZ, emi) {
+    var px = -z, py = x;
+    vboxAt(b, F.x + (px * F.co - py * F.si) * F.u, F.y + (px * F.si + py * F.co) * F.u,
+      y * F.u, d * F.u, w * F.u, h * F.u, rotX || 0, rotZ || 0, F.r, color, emi);
+  }
+  // The source's `K.cyl(name, rt, rb, h, seg, mat, x, y, z)`, standing up.
+  function vcy(b, F, rt, rb, h, seg, color, x, y, z, emi) {
+    var px = -z, py = x;
+    frustum(b, F.x + (px * F.co - py * F.si) * F.u, F.y + (px * F.si + py * F.co) * F.u,
+      rb * F.u, rt * F.u, h * F.u, color, (y - h / 2) * F.u, seg, emi);
+  }
+  // The source's `K.beam` / `K.rod`: a prism between two points in its space.
+  function vbm(b, F, from, to, r, color, emi) {
+    function w(p) {
+      var px = -p[2], py = p[0];
+      return [F.x + (px * F.co - py * F.si) * F.u, F.y + (px * F.si + py * F.co) * F.u, p[1] * F.u];
+    }
+    var a = w(from), c = w(to);
+    segment(b, a[0], a[1], a[2], c[0], c[1], c[2], r * F.u, color, emi);
+  }
+  // The one shape the kit has and this renderer does not: a triangular prism.
+  // The houses' gables are this and nothing else, and two stacked boxes read as
+  // a staircase where a gable has to read as a point.
+  function vtri(b, F, za, ya, zb, yb, zc, yc, x0, depth, color) {
+    function w(z, y, x) {
+      var px = -z, py = x;
+      return [F.x + (px * F.co - py * F.si) * F.u, F.y + (px * F.si + py * F.co) * F.u, y * F.u];
+    }
+    var x1 = x0 + depth;
+    var a0 = w(za, ya, x0), b0 = w(zb, yb, x0), c0 = w(zc, yc, x0);
+    var a1 = w(za, ya, x1), b1 = w(zb, yb, x1), c1 = w(zc, yc, x1);
+    b.tri(a0, c0, b0, color); b.tri(a1, b1, c1, color);
+    b.quad(a0, b0, b1, a1, color);
+    b.quad(b0, c0, c1, b1, color);
+    b.quad(c0, a0, a1, c1, color);
+  }
+
+  // The palette, once. The source's ten materials against the board's own, so
+  // a village dropped on another map is still that map's village -- everything
+  // here is mixed FROM the theme except the two hues the theme has no word for.
+  function villagePaint(P) {
+    return {
+      stone: P.rock,
+      stoneLight: mix(P.rock, hex("#8f8b7e"), 0.55),
+      stoneDark: P.rockDark,
+      timber: mix(P.metal, hex("#4c3826"), 0.6),
+      plank: mix(P.metal, hex("#7a6247"), 0.55),
+      roof: mix(P.metalDark, hex("#525c66"), 0.5),
+      iron: P.metalDark,
+      steel: mix(P.metalDark, hex("#5f6a72"), 0.45),
+      rust: mix(P.metal, hex("#6b4a31"), 0.62),
+      wire: mix(P.metalDark, P.metal, 0.45),
+      dirt: mix(P.rockDark, hex("#6d5e48"), 0.55),
+      dirtPale: mix(P.rockDark, hex("#7b6c53"), 0.6),
+      lamp: P.accent
+    };
+  }
+
+  // --- the village house -----------------------------------------------
+  //
+  // Transcribed from `house-model.js`. What is gone is what a 31-pixel plinth
+  // cannot show: forty quoin stones at three pixels, twelve cladding planks at
+  // half a pixel, every bolt, every window mullion, the rafter tails and the
+  // roof ribs. What stays is the massing, the roof, the stone tower and mast
+  // that give this house its silhouette, and every LIT surface -- the windows
+  // are the whole reason a village reads as inhabited from across a board.
+  function villageHouse(b, F, C) {
+    var WX = 2.9, WZ = 2.3, WT = 3.0, EAVE_Z = 3.1, EAVE_Y = 2.16, RIDGE = 5.5;
+    var i, sx, sz;
+
+    vbx(b, F, 6.6, 0.5, 5.3, C.stone, 0, 0.25, 0);
+    vbx(b, F, 6.9, 0.14, 5.6, C.stone, 0, 0.5, 0);
+    vbx(b, F, 3.6, 0.45, 2.1, C.stone, 1.6, 0.24, -3.3);
+    vbx(b, F, WX * 2, WT - 0.5, WZ * 2, C.stone, 0, (WT + 0.5) / 2, 0);
+
+    for (sx = -1; sx <= 1; sx += 2) {
+      for (sz = -1; sz <= 1; sz += 2) {
+        vbx(b, F, 0.34, WT - 0.45, 0.34, C.timber, sx * (WX - 0.02), 1.75, sz * (WZ - 0.02));
+      }
+      vbx(b, F, 0.3, 0.3, WZ * 2 + 0.16, C.timber, sx * (WX + 0.03), WT - 0.16, 0);
+      vbx(b, F, 0.22, 0.24, WZ * 2 + 0.08, C.timber, sx * (WX + 0.03), 1.62, 0);
+    }
+    for (sz = -1; sz <= 1; sz += 2) {
+      vbx(b, F, WX * 2 + 0.18, 0.3, 0.3, C.timber, 0, WT - 0.16, sz * (WZ + 0.02));
+      vbx(b, F, WX * 2 + 0.1, 0.24, 0.22, C.timber, 0, 1.62, sz * (WZ + 0.02));
+    }
+
+    // gable walls, and they are triangles or they are nothing
+    vtri(b, F, -WZ, WT, WZ, WT, 0, RIDGE, -WX - 0.04, 0.36, C.plank);
+    vtri(b, F, -WZ, WT, WZ, WT, 0, RIDGE, WX - 0.32, 0.36, C.plank);
+    for (sx = -1; sx <= 1; sx += 2) {
+      var gx = sx * (WX + 0.06);
+      vbx(b, F, 0.26, 0.26, 2.9, C.timber, gx, WT + 0.62, 0);
+      vbx(b, F, 0.24, RIDGE - WT - 0.7, 0.24, C.timber, gx, (RIDGE + WT + 0.62) / 2 - 0.1, 0);
+      for (sz = -1; sz <= 1; sz += 2) {
+        vbm(b, F, [sx * (WX + 0.52), EAVE_Y - 0.12, sz * (EAVE_Z + 0.04)],
+                  [sx * (WX + 0.52), RIDGE + 0.22, 0], 0.16, C.timber);
+      }
+    }
+
+    var run = EAVE_Z, rise = RIDGE - EAVE_Y;
+    var slope = Math.hypot(run, rise), pitch = Math.atan2(rise, run);
+    for (sz = -1; sz <= 1; sz += 2) {
+      // The source builds each roof plane in a child kit tipped by `rotation.x`;
+      // one tipped slab is the same plane with none of the bookkeeping.
+      vbxt(b, F, 7.2, 0.16, slope, C.roof, 0, (RIDGE + EAVE_Y) / 2, sz * run / 2, sz * pitch, 0);
+      vbx(b, F, 7.35, 0.28, 0.2, C.timber, 0, EAVE_Y - 0.06, sz * (EAVE_Z + 0.02));
+    }
+    vbx(b, F, 7.3, 0.22, 0.6, C.roof, 0, RIDGE + 0.12, 0);
+    vbx(b, F, 7.4, 0.2, 0.24, C.timber, 0, RIDGE - 0.12, 0);
+
+    // stone tower, chimney and mast -- the one part that breaks the roof line
+    vbx(b, F, 1.62, 6.5, 1.62, C.stone, 2.5, 3.62, 0.3);
+    vbx(b, F, 1.86, 0.3, 1.86, C.stone, 2.5, 7.02, 0.3);
+    vbx(b, F, 1.72, 0.22, 1.72, C.stone, 2.5, 5.55, 0.3);
+    vbx(b, F, 0.6, 0.62, 0.6, C.stone, 2.16, 7.44, 0.62);
+    vcy(b, F, 0.17, 0.19, 0.34, 8, C.iron, 2.16, 7.88, 0.62);
+    vbx(b, F, 0.06, 0.5, 0.62, C.iron, 1.67, 3.55, 0.3);
+    vbx(b, F, 0.06, 0.5, 0.4, C.lamp, 1.66, 4.5, 0.3, EMI);
+    vbx(b, F, 0.3, 0.24, 0.3, C.iron, 2.98, 7.2, 0.3);
+    vcy(b, F, 0.06, 0.07, 2.4, 6, C.iron, 2.98, 8.32, 0.3);
+    vcy(b, F, 0.02, 0.05, 0.42, 6, C.iron, 2.98, 9.7, 0.3);
+
+    // entry porch on the -X gable end
+    var CX = -WX - 0.04, canopyRun = 1.7, canopyDrop = 0.72;
+    var canopySlope = Math.hypot(canopyRun, canopyDrop);
+    var canopyTilt = Math.atan2(canopyDrop, canopyRun);
+    vbxt(b, F, canopySlope, 0.14, 3.3, C.roof,
+      CX - canopySlope / 2 * Math.cos(canopyTilt), 2.98 - canopySlope / 2 * Math.sin(canopyTilt),
+      -0.5, 0, canopyTilt);
+    for (i = 0; i < 2; i++) {
+      var cz = i ? 1.3 : -1.45;
+      vbm(b, F, [CX - 0.05, 1.95, -0.5 + cz], [CX - canopyRun + 0.15, 2.42, -0.5 + cz], 0.16, C.timber);
+    }
+    vbx(b, F, 0.12, 2.1, 1.08, C.plank, CX - 0.02, 1.6, -0.65);
+    vbx(b, F, 0.06, 0.3, 0.52, C.lamp, CX - 0.12, 2.42, -0.65, EMI);
+    vbx(b, F, 0.5, 0.12, 1.5, C.stone, CX - 0.2, 0.55, -0.65);
+    vbx(b, F, 0.06, 0.92, 0.86, C.lamp, CX - 0.03, 1.78, 0.85, EMI);
+    vbx(b, F, 0.28, 0.12, 1.24, C.timber, CX - 0.12, 1.24, 0.85);
+    vbx(b, F, 0.06, 0.8, 0.74, C.lamp, CX - 0.03, 3.82, 0.1, EMI);
+    vbx(b, F, 0.26, 0.12, 1.1, C.timber, CX - 0.1, 3.32, 0.1);
+    // the lantern by the door
+    vbx(b, F, 0.42, 0.1, 0.1, C.iron, CX - 0.24, 2.62, -1.72);
+    vbx(b, F, 0.19, 0.24, 0.19, C.lamp, CX - 0.42, 2.44, -1.72, EMI);
+    for (i = 0; i < 3; i++) {
+      var sh = 0.44 - i * 0.14;
+      vbx(b, F, 0.46, sh, 1.9, C.stone, CX - 0.42 - i * 0.46, sh / 2, -0.65);
+    }
+    for (sz = -1; sz <= 1; sz += 2) {
+      var rz = -0.65 + sz * 1.05;
+      vbx(b, F, 0.15, 1.0, 0.15, C.timber, CX - 0.25, 0.95, rz);
+      vbm(b, F, [CX - 0.18, 1.42, rz], [CX - 1.58, 0.9, rz], 0.11, C.timber);
+    }
+
+    // lean-to porch on the -Z long face
+    var lRun = 2.05, lDrop = 0.72, lSlope = Math.hypot(lRun, lDrop);
+    vbxt(b, F, 3.5, 0.14, lSlope, C.roof, 1.65, 2.82 - lDrop / 2, -WZ - lRun / 2,
+      -Math.atan2(lDrop, lRun), 0);
+    for (i = 0; i < 2; i++) {
+      var ppx = i ? 3.05 : 0.25;
+      vbx(b, F, 0.26, 1.9, 0.26, C.timber, ppx, 1.4, -4.2);
+      vbx(b, F, 0.36, 0.14, 0.36, C.iron, ppx, 0.52, -4.2);
+    }
+    vbx(b, F, 3.5, 0.24, 0.26, C.timber, 1.65, 2.28, -4.2);
+    vbx(b, F, 2.7, 1.1, 0.16, C.plank, 1.65, 1.03, -4.14);
+    vbx(b, F, 2.9, 0.14, 0.3, C.timber, 1.65, 1.63, -4.14);
+    vbx(b, F, 0.85, 0.8, 0.8, C.plank, 2.75, 0.9, -3.35);
+    vbx(b, F, 0.9, 0.08, 0.85, C.timber, 2.75, 1.34, -3.35);
+
+    // the fittings and windows that face out of the ring
+    vbx(b, F, 0.44, 0.6, 0.24, C.iron, -1.35, 1.95, -WZ - 0.12);
+    vbx(b, F, 0.6, 0.6, 0.06, C.lamp, -0.35, 2.28, -WZ - 0.04, EMI);
+    vbx(b, F, 0.8, 0.82, 0.06, C.lamp, 0.8, 2.05, WZ + 0.04, EMI);
+    vbx(b, F, 0.5, 0.9, 0.09, C.plank, 0.1, 2.05, WZ + 0.1);
+    vbx(b, F, 1.0, 1.3, 0.12, C.plank, -1.6, 1.15, WZ + 0.05);
+    vbx(b, F, 0.06, 0.68, 0.62, C.lamp, WX + 0.04, 2.15, -1.35, EMI);
+    vbx(b, F, 0.12, 0.9, 1.6, C.plank, WX + 0.14, 3.5, -0.3);
+    // the log pile against the rear wall
+    vbx(b, F, 0.16, 0.14, 1.2, C.timber, -2.55, 0.86, WZ - 0.15);
+    for (i = 0; i < 4; i++) {
+      vbm(b, F, [-2.35 + (i % 2) * 0.34, 1.02 + Math.floor(i / 2) * 0.3, WZ - 0.7],
+                [-2.35 + (i % 2) * 0.34, 1.02 + Math.floor(i / 2) * 0.3, WZ + 0.4], 0.14, C.timber);
+    }
+  }
+
+  // --- the town hall ----------------------------------------------------
+  //
+  // Transcribed from `townhall-model.js`. The massing, the pilasters, the
+  // entrance, the roofs, the frame on top and the mast are all here; the stone
+  // joint lines, the window mullions, the scaffold and every bolt are not --
+  // none of them is a pixel wide at the size this board draws a settlement.
+  // The BEACON is deliberately absent: it is the one part of this building
+  // whose light is not the village's amber, so it is its own prop.
+  function villageHall(b, F, C) {
+    var FZ = -3.2, i, sx;
+
+    vbx(b, F, 12.3, 0.42, 9.5, C.stone, 0.05, 0.21, 0.4);
+    vbx(b, F, 12.6, 0.14, 9.8, C.stoneLight, 0.05, 0.42, 0.4);
+    vbx(b, F, 7.2, 4.9, 6.4, C.stone, 0, 2.85, 0);
+    vbx(b, F, 4.9, 1.8, 5.2, C.stone, -0.2, 6.2, 0);
+    vbx(b, F, 2.6, 3.2, 5.6, C.stone, -4.8, 2.0, 0.2);
+    vbx(b, F, 2.3, 3.6, 5.2, C.stone, 4.65, 2.2, 0.4);
+    vbx(b, F, 3.4, 2.6, 1.6, C.stone, 1.2, 1.7, 4.0);
+    vbx(b, F, 7.34, 0.16, 6.54, C.stoneLight, 0, 2.6, 0);
+    vbx(b, F, 5.04, 0.16, 5.34, C.stoneLight, -0.2, 5.35, 0);
+    vbx(b, F, 5.2, 0.22, 5.5, C.stoneLight, -0.2, 7.05, 0);
+
+    // pilasters: shaft, base and cap. Eight on the walls, two on the flanks.
+    var pil = [['fl', -3.15, FZ - 0.25, 4.95, 0.82, 0.5], ['fml', -1.45, FZ - 0.25, 4.95, 0.82, 0.5],
+               ['fmr', 1.45, FZ - 0.25, 4.95, 0.82, 0.5], ['fr', 3.15, FZ - 0.25, 4.95, 0.82, 0.5],
+               ['lw', -4.8, -3.1, 3.2, 0.7, 0.45], ['rw', 4.65, -2.85, 3.6, 0.7, 0.45],
+               ['bl', -3.15, 3.45, 4.95, 0.82, 0.5], ['br', 3.15, 3.45, 4.95, 0.82, 0.5]];
+    for (i = 0; i < pil.length; i++) {
+      var p = pil[i], pw = p[4], pd = p[5], ph = p[3];
+      vbx(b, F, pw, ph, pd, C.stoneLight, p[1], 0.42 + ph / 2, p[2]);
+      vbx(b, F, pw + 0.22, 0.5, pd + 0.16, C.stoneLight, p[1], 0.65, p[2]);
+      vbx(b, F, pw + 0.16, 0.3, pd + 0.12, C.stoneLight, p[1], 0.42 + ph - 0.1, p[2]);
+    }
+    for (sx = -1; sx <= 1; sx += 2) {
+      vbx(b, F, 0.5, 4.95, 0.8, C.stoneLight, sx * 3.85, 2.9, -1.1);
+      vbx(b, F, 0.62, 0.3, 0.96, C.stoneLight, sx * 3.85, 5.22, -1.1);
+    }
+
+    // entrance: terrace, ramp, doors, lintel and awning
+    vbx(b, F, 3.9, 1.2, 1.9, C.stone, 0, 0.6, -4.1);
+    vbx(b, F, 4.15, 0.12, 2.1, C.stoneLight, 0, 1.2, -4.1);
+    var rampRun = 1.9, rampRise = 1.2, rampLen = Math.hypot(rampRun, rampRise);
+    vbxt(b, F, 2.8, 0.14, rampLen, C.plank, 0, 1.26 - rampRise / 2, -5.05 - rampRun / 2,
+      -Math.atan2(rampRise, rampRun), 0);
+    vbx(b, F, 2.7, 2.9, 0.3, C.stone, 0, 2.65, FZ - 0.1);
+    for (sx = -1; sx <= 1; sx += 2) {
+      vbx(b, F, 1.24, 2.6, 0.16, C.timber, sx * 0.64, 2.5, FZ - 0.32);
+      vbx(b, F, 1.28, 0.14, 0.22, C.iron, sx * 0.64, 3.5, FZ - 0.36);
+      vbx(b, F, 1.28, 0.14, 0.22, C.iron, sx * 0.64, 1.4, FZ - 0.36);
+    }
+    vbx(b, F, 3.2, 0.42, 0.62, C.stoneLight, 0, 4.05, FZ - 0.24);
+    vbx(b, F, 0.5, 0.6, 0.66, C.stoneLight, 0, 4.1, FZ - 0.3);
+    var awRun = 1.75, awDrop = 0.5, awLen = Math.hypot(awRun, awDrop);
+    vbxt(b, F, 3.6, 0.12, awLen, C.roof, 0, 4.55 - awDrop / 2, FZ - 0.2 - awRun / 2,
+      -Math.atan2(awDrop, awRun), 0);
+    for (sx = -1; sx <= 1; sx += 2) {
+      vbm(b, F, [sx * 1.5, 3.8, FZ - 0.22], [sx * 1.5, 4.4, FZ - 1.5], 0.14, C.timber);
+    }
+    vbx(b, F, 1.7, 0.14, 0.52, C.plank, -2.9, 0.86, -4.1);
+    for (sx = -1; sx <= 1; sx += 2) vbx(b, F, 0.18, 0.44, 0.46, C.stone, -2.9 + sx * 0.66, 0.62, -4.1);
+
+    // windows: the glass and the sill, which is all of one that survives
+    var win = [['z', FZ - 0.06, -2.3, 2.5, 1.15, 1.05], ['z', FZ - 0.06, 2.3, 2.5, 1.15, 1.05],
+               ['z', -2.66, -1.15, 6.15, 1.05, 0.95], ['z', -2.66, 0.9, 6.15, 1.05, 0.95],
+               ['z', -3.11, -4.8, 2.2, 1.0, 0.9], ['x', 5.85, 0.4, 2.3, 1.0, 0.9],
+               ['z', 3.26, -1.6, 2.6, 1.1, 1.0], ['x', -6.15, 0.6, 2.1, 0.9, 0.85]];
+    for (i = 0; i < win.length; i++) {
+      var q = win[i], depth = q[1], u = q[2], v = q[3], ww = q[4], wh = q[5];
+      var back = depth - (depth < 0 ? -1 : 1) * 0.06;
+      if (q[0] === 'z') {
+        vbx(b, F, ww, wh, 0.07, C.lamp, u, v, depth, EMI);
+        vbx(b, F, ww + 0.5, 0.13, 0.3, C.stoneLight, u, v - wh / 2 - 0.2, back);
+      } else {
+        vbx(b, F, 0.07, wh, ww, C.lamp, depth, v, u, EMI);
+        vbx(b, F, 0.3, 0.13, ww + 0.5, C.stoneLight, back, v - wh / 2 - 0.2, u);
+      }
+    }
+
+    // roofs
+    var eaveZ = -3.5, eaveY = 6.55, ridgeY = 8.45, ridgeZ = 0.3;
+    var fRun = ridgeZ - eaveZ, fRise = ridgeY - eaveY;
+    var fSlope = Math.hypot(fRun, fRise), fPitch = Math.atan2(fRise, fRun);
+    vbxt(b, F, 5.6, 0.14, fSlope, C.roof, -0.2, (ridgeY + eaveY) / 2, (ridgeZ + eaveZ) / 2, -fPitch, 0);
+    vbx(b, F, 5.8, 0.24, 0.26, C.timber, -0.2, ridgeY - 0.14, ridgeZ);
+    vbx(b, F, 5.7, 0.18, 0.5, C.roof, -0.2, ridgeY + 0.1, ridgeZ);
+    var bRun = 3.6, bRise = 2.05, bSlope = Math.hypot(bRun, bRise), bPitch = Math.atan2(bRise, bRun);
+    // The rear plane is open rafters with two patches wired over it -- the one
+    // place this building admits it is half repaired.
+    for (i = 0; i < 6; i++) {
+      vbxt(b, F, 0.14, 0.18, bSlope, C.timber, -0.2 + (-2.2 + i * 0.88), ridgeY - bRise / 2,
+        ridgeZ + bRun / 2, bPitch, 0);
+    }
+    vbxt(b, F, 1.9, 0.1, 1.3, C.roof, -1.95, ridgeY - bRise / 2 + 0.12, ridgeZ + bRun / 2 + 0.55, bPitch, 0);
+    vbxt(b, F, 1.6, 0.1, 1.0, C.roof, 1.4, ridgeY - bRise / 2 + 0.12, ridgeZ + bRun / 2 - 0.4, bPitch, 0);
+    // wing sheds, each a slab tipped along its own fall
+    vbxt(b, F, Math.hypot(3.2, 0.9), 0.13, 5.9, C.roof, -5.0, 3.6, 0.2, 0, Math.atan2(-0.9, -3.2));
+    vbxt(b, F, Math.hypot(3.1, 0.9), 0.13, 5.5, C.roof, 4.95, 4.0, 0.4, 0, Math.atan2(-0.9, 3.1));
+    vbxt(b, F, 2.1, 0.11, 1.15, C.roof, -4.6, 3.12 - 0.5 * Math.sin(0.3), -3.35 - 0.5 * Math.cos(0.3), -0.3, 0);
+    vbx(b, F, 3.6, 0.5, 0.4, C.stoneLight, 1.2, 3.25, 4.6);
+
+    // the timber frame standing on the upper block
+    for (sx = -1; sx <= 1; sx += 2) {
+      for (i = -1; i <= 1; i += 2) {
+        vbx(b, F, 0.2, 2.0, 0.2, C.timber, -0.2 + sx * 2.35, 8.05, i * 2.45);
+      }
+      vbx(b, F, 4.9, 0.2, 0.2, C.timber, -0.2, 8.95, sx * 2.45);
+      vbx(b, F, 0.2, 0.2, 5.1, C.timber, -0.2 + sx * 2.35, 8.95, 0);
+      vbm(b, F, [-2.45, 7.15, sx * 2.45], [-0.6, 8.9, sx * 2.45], 0.16, C.timber);
+    }
+    vbx(b, F, 2.4, 0.12, 0.3, C.plank, 1.4, 9.02, -1.2);
+    vbx(b, F, 0.3, 0.12, 2.0, C.plank, -2.1, 9.02, 0.8);
+
+    // the mast, minus the beacon on top of it
+    var mx = -2.35, mz = 1.5, my0 = 7.1, my1 = 9.85;
+    var legs = [[-0.21, -0.21], [0.21, -0.21], [0.21, 0.21], [-0.21, 0.21]];
+    for (i = 0; i < 4; i++) {
+      vbm(b, F, [mx + legs[i][0], my0, mz + legs[i][1]],
+                [mx + legs[i][0] * 0.5, my1, mz + legs[i][1] * 0.5], 0.058, C.iron);
+    }
+    for (i = 0; i < 5; i++) {
+      var my = my0 + 0.4 + i * 0.6, mt = 0.21 * (1 - ((my - my0) / (my1 - my0)) * 0.5);
+      vbx(b, F, mt * 2.1, 0.05, 0.05, C.iron, mx, my, mz - mt);
+      vbx(b, F, 0.05, 0.05, mt * 2.1, C.iron, mx + mt, my, mz);
+    }
+    vbx(b, F, 0.72, 0.3, 0.72, C.iron, mx, 7.05, mz);
+    vcy(b, F, 0.52, 0.52, 0.13, 10, C.iron, mx, 9.05, mz);
+    vbm(b, F, [mx + 0.18, 9.2, mz], [mx + 0.6, 9.35, mz - 0.1], 0.045, C.iron);
+    vcy(b, F, 0.44, 0.06, 0.3, 8, C.iron, mx + 0.6, 9.4, mz - 0.1);
+    vcy(b, F, 0.025, 0.025, 1.5, 4, C.iron, mx + 0.4, 9.9, mz - 0.28);
+    var guys = [[-2.55, 7.2, -2.45], [2.15, 7.2, 2.45], [-2.55, 7.2, 2.45]];
+    for (i = 0; i < 3; i++) vbm(b, F, [mx, my1 - 0.3, mz], guys[i], 0.03, C.iron);
+
+    // utility, doors and the yard clutter at ground level
+    vbx(b, F, 1.7, 1.9, 1.35, C.stone, 4.9, 1.37, -4.3);
+    vbx(b, F, 1.85, 0.16, 1.5, C.iron, 4.9, 2.4, -4.3);
+    vcy(b, F, 0.1, 0.1, 0.75, 8, C.iron, 5.5, 2.7, -4.3);
+    for (i = 0; i < 3; i++) {
+      var stepH = 0.42 - i * 0.13;
+      vbx(b, F, 1.6, stepH, 0.44, C.stone, -4.6, stepH / 2, -3.3 - i * 0.46);
+    }
+    vbx(b, F, 1.05, 2.1, 0.14, C.timber, -4.6, 1.5, -3.14);
+    vbx(b, F, 1.5, 0.28, 0.4, C.stoneLight, -4.6, 2.75, -3.2);
+    vbx(b, F, 1.3, 2.2, 0.14, C.timber, 1.2, 1.5, 4.86);
+    vbx(b, F, 0.9, 0.85, 0.85, C.plank, -5.4, 0.85, -3.7);
+    vbx(b, F, 0.7, 0.66, 0.7, C.plank, -5.55, 0.75, -2.4);
+    vbx(b, F, 1.4, 0.16, 0.55, C.timber, 5.45, 0.5, 2.1);
+    for (i = 0; i < 2; i++) {
+      vbm(b, F, [5.45, 0.86, 1.45 + i * 0.62], [5.45, 0.86, 2.11 + i * 0.62], 0.26, C.plank);
+    }
+  }
+
+  // The hall's cyan gear, in its own call because it is drawn under its own
+  // glow tint. See the note in AGENTS.md: one draw carries one emitted colour,
+  // so a village whose windows are amber cannot also have a cyan beacon unless
+  // the beacon is a second prop. Both read the same layout table, so the two
+  // cannot come apart the way eight hand-placed positions do.
+  function villageHallSignals(b, F, C, cyan) {
+    var mx = -2.35, mz = 1.5, FZ = -3.2, sx;
+    vcy(b, F, 0.24, 0.28, 0.22, 10, C.iron, mx, 10.02, mz);
+    vcy(b, F, 0.21, 0.21, 0.34, 10, cyan, mx, 10.26, mz, EMI);
+    vcy(b, F, 0.28, 0.2, 0.14, 10, C.iron, mx, 10.5, mz);
+    vcy(b, F, 0.03, 0.02, 0.7, 6, C.iron, mx, 10.9, mz);
+    for (sx = -1; sx <= 1; sx += 2) {
+      vbx(b, F, 0.22, 0.94, 0.08, C.iron, sx * 1.45, 2.5, FZ - 0.49);
+      vbx(b, F, 0.12, 0.8, 0.07, cyan, sx * 1.45, 2.5, FZ - 0.53, EMI);
+      vbx(b, F, 0.2, 0.64, 0.08, C.iron, sx * 3.15, 1.9, FZ - 0.49);
+      vbx(b, F, 0.1, 0.5, 0.07, cyan, sx * 3.15, 1.9, FZ - 0.53, EMI);
+    }
+    vbx(b, F, 0.78, 0.9, 0.08, C.iron, 4.9, 1.5, -4.96);
+    vbx(b, F, 0.6, 0.72, 0.08, cyan, 4.9, 1.5, -4.99, EMI);
+  }
+
+  // --- the perimeter fence ----------------------------------------------
+  //
+  // `fenceSection` from the source, at village LOD. THE CHAIN LINK IS A PANEL,
+  // not a mesh: the source draws every diamond as a 21-millimetre beam and at
+  // this size one wire is a sixth of a pixel, so two hundred of them per panel
+  // cost a hundred draws to render nothing. One thin slab in the wire colour is
+  // what a chain-link fence looks like from thirty metres, which is where this
+  // camera is. The posts are the opposite case and are drawn THICKER than the
+  // source: at 0.095 they would vanish, and a fence with no posts is a ribbon.
+  function fencePanel(b, F, C, len, variant) {
+    var TOP = 2.06, RAIL_HI = 1.9, RAIL_LO = 0.6;
+    var i;
+    vbx(b, F, len, 0.17, 0.58, C.stone, 0, 0.085, 0);
+    vbx(b, F, len - 0.06, 0.29, 0.5, C.stone, 0, 0.305, 0);
+    vbx(b, F, len - 0.02, 0.05, 0.53, C.stoneLight, 0, 0.42, 0);
+    for (i = -1; i <= 1; i += 2) {
+      var px = i * (len / 2 - 0.06);
+      vbx(b, F, 0.19, TOP - 0.4, 0.19, C.steel, px, (TOP + 0.4) / 2, 0);
+      vbx(b, F, 0.24, 0.07, 0.24, C.rust, px, TOP + 0.02, 0);
+      vbx(b, F, 0.25, 0.1, 0.25, C.rust, px, 0.62, 0);
+      vbx(b, F, 0.2, 0.16, 0.55, C.rust, px, 0.34, 0);
+      // the barbed arm, leaning outward over the approach
+      vbm(b, F, [px, TOP - 0.02, 0], [px, TOP + 0.4, -0.2], 0.07, C.steel);
+    }
+    vbx(b, F, len - 0.1, 0.1, 0.1, C.steel, 0, RAIL_HI, 0);
+    vbx(b, F, len - 0.1, 0.09, 0.09, C.steel, 0, RAIL_LO, 0);
+    // the mesh, and the tear in it
+    var mh = RAIL_HI - RAIL_LO - 0.06, mc = (RAIL_HI + RAIL_LO) / 2;
+    if (variant === 2) {
+      vbx(b, F, (len - 0.22) * 0.62, mh, 0.05, C.wire, -(len - 0.22) * 0.19, mc, 0);
+      vbxt(b, F, (len - 0.22) * 0.34, 0.05, mh - 0.34, C.wire, (len - 0.22) * 0.3, mc - 0.16, 0.06, 0, 1.15);
+      vbx(b, F, 0.9, 0.72, 0.06, C.steel, (len - 0.22) * 0.16, mc - 0.18, 0.06);
+      vbm(b, F, [-len / 2 + 0.16, 0.52, -0.1], [len / 2 - 0.34, 1.62, -0.1], 0.11, C.timber);
+    } else {
+      vbx(b, F, len - 0.22, mh, 0.05, C.wire, 0, mc, 0);
+      if (variant === 1) {
+        vbm(b, F, [-len / 2 + 0.14, 0.56, -0.09], [len / 2 - 0.5, 1.5, -0.09], 0.09, C.steel);
+        vbx(b, F, 0.42, 0.5, 0.06, C.rust, -0.1, 1.32, 0.07);
+      }
+    }
+    for (i = 0; i < 3; i++) {
+      vbx(b, F, len - 0.06, 0.035, 0.035, C.wire, 0, TOP + 0.1 + i * 0.15, -0.05 - i * 0.085);
+    }
+  }
+
+  function fenceEndPost(b, F, C) {
+    var TOP = 2.06;
+    vbx(b, F, 0.62, 0.17, 0.62, C.stone, 0, 0.085, 0);
+    vbx(b, F, 0.54, 0.31, 0.54, C.stone, 0, 0.315, 0);
+    vbx(b, F, 0.58, 0.05, 0.58, C.stoneLight, 0, 0.43, 0);
+    vbx(b, F, 0.22, TOP - 0.36, 0.22, C.steel, 0, (TOP + 0.44) / 2, 0);
+    vbx(b, F, 0.27, 0.07, 0.27, C.rust, 0, TOP + 0.06, 0);
+    vbx(b, F, 0.22, 0.16, 0.3, C.rust, 0, 0.36, 0);
+    vbx(b, F, 0.13, 0.5, 0.11, C.rust, 0.06, 1.28, 0);
+    vbm(b, F, [0, TOP, 0], [0.2, TOP + 0.42, -0.16], 0.07, C.steel);
+  }
+
+  // --- the gate ---------------------------------------------------------
+  //
+  // `buildGate` from the source: two piers, two flanking returns, two leaves
+  // closed across the opening, and the wire over the head. This is the piece
+  // the whole board points at -- it is the last thing on the route and the
+  // thing the enemies are walking a mile of forest to reach -- so it keeps more
+  // of its detail than anything else in the village.
+  function villageGate(b, F, C) {
+    var HALF = 2.2, LEAF = 2.1, GTOP = 2.3, PTOP = 2.6, sx, i, hy;
+    for (sx = -1; sx <= 1; sx += 2) {
+      var Pf = vchild(F, sx * (HALF + 0.32), 0, 0, 1);
+      var pcx = sx * 0.3;
+      vbx(b, Pf, 0.86, 0.2, 0.95, C.stone, pcx + sx * 0.01, 0.1, 0);
+      vbx(b, Pf, 0.8, 0.5, 0.82, C.stone, pcx, 0.45, 0);
+      vbx(b, Pf, 0.86, 0.06, 0.88, C.stoneLight, pcx, 0.73, 0);
+      vbx(b, Pf, 0.24, PTOP - 0.7, 0.24, C.steel, 0, (PTOP + 0.7) / 2, 0);
+      vbx(b, Pf, 0.29, 0.08, 0.29, C.rust, 0, PTOP + 0.02, 0);
+      vbx(b, Pf, 0.28, 0.18, 0.3, C.rust, 0, 0.82, 0);
+      vbx(b, Pf, 0.25, 0.12, 0.26, C.rust, 0, 1.72, 0);
+      for (i = 0; i < 2; i++) {
+        hy = i ? 2.02 : 0.9;
+        vbx(b, Pf, 0.26, 0.19, 0.27, C.rust, 0, hy + 0.2, 0);
+      }
+      vbm(b, Pf, [0, PTOP - 0.04, 0], [sx * 0.26, PTOP + 0.5, -0.18], 0.09, C.steel);
+      // the short return that ties the gate into the wall
+      fencePanel(b, vchild(F, sx * (HALF + 1.85), 0, 0, 1), C, 2.0, sx < 0 ? 1 : 0);
+    }
+    // the leaves, closed across the opening
+    for (sx = -1; sx <= 1; sx += 2) {
+      var Lf = vchild(F, sx * HALF, 0, 0, 1);
+      var dir = -sx, lcx = dir * LEAF / 2;
+      vbx(b, Lf, 0.15, GTOP - 0.36, 0.15, C.steel, dir * 0.07, (GTOP + 0.36) / 2, 0);
+      vbx(b, Lf, 0.14, GTOP - 0.36, 0.14, C.steel, dir * (LEAF - 0.06), (GTOP + 0.36) / 2, 0);
+      vbx(b, Lf, LEAF, 0.12, 0.11, C.steel, lcx, GTOP - 0.06, 0);
+      vbx(b, Lf, LEAF, 0.11, 0.1, C.steel, lcx, 0.42, 0);
+      vbx(b, Lf, LEAF - 0.2, 0.07, 0.07, C.steel, lcx, 1.24, -0.03);
+      vbm(b, Lf, [dir * 0.12, 0.5, -0.06], [dir * (LEAF - 0.16), GTOP - 0.22, -0.06], 0.075, C.steel);
+      vbx(b, Lf, LEAF - 0.22, GTOP - 0.62, 0.05, C.wire, lcx, (GTOP + 0.42) / 2 - 0.02, 0);
+      for (i = 0; i < 2; i++) {
+        hy = i ? 2.02 : 0.9;
+        vbx(b, Lf, 0.3, 0.13, 0.13, C.rust, dir * 0.17, hy, 0);
+      }
+    }
+    vbx(b, F, 0.62, 0.16, 0.13, C.rust, 0, 1.3, -0.11);
+    vbx(b, F, 0.24, 0.26, 0.18, C.rust, 0, 1.3, -0.16);
+    for (i = 0; i < 3; i++) {
+      vbx(b, F, (HALF + 0.32) * 2, 0.035, 0.035, C.wire, 0, PTOP + 0.1 + i * 0.14, -0.06 - i * 0.06);
+    }
+    vbx(b, F, 0.34, 0.62, 0.24, C.steel, HALF + 0.32, 1.45, -0.23);
+    vbx(b, F, 0.4, 0.07, 0.3, C.rust, HALF + 0.32, 1.79, -0.23);
+  }
+
+  // The gate's own two-colour signal head, in the cyan pass.
+  function villageGateSignals(b, F, C, cyan) {
+    var HALF = 2.2;
+    vbx(b, F, 0.19, 0.19, 0.07, C.lamp, HALF + 0.32, 1.58, -0.38, EMI);
+    vbx(b, F, 0.19, 0.19, 0.07, cyan, HALF + 0.32, 1.34, -0.38, EMI);
+  }
+
+  // --- the settlement ---------------------------------------------------
+  //
+  // `signals` picks the pass: the amber village, or the cyan gear that has to
+  // be drawn under its own tint.
+  function ironwoodVillage(b, cx, cy, size, rot, P, signals) {
+    var U = size / VILLAGE.UNITS;
+    var C = villagePaint(P);
+    var cyan = hex("#4fe0ff");
+    var F = vframe(cx, cy, U, rot || 0);
+    var walls = villageWalls(), i;
+
+    if (signals) {
+      villageHallSignals(b, vchild(F, 0.2, 0.5, 0.05, VILLAGE.HALL_S), C, cyan);
+      villageGateSignals(b, vchild(F, 0, -(VILLAGE.B - 0.3), 0, VILLAGE.FENCE_S), C, cyan);
+      return;
+    }
+
+    // GROUND FIRST, and it is the thing that says people live here rather than
+    // camp here: a street off the gate, a plaza in front of the hall and a
+    // scraped yard by every house. The source lays them a few centimetres
+    // proud; here they are a real slab, because a decal at 0.1 px z-fights the
+    // forest floor it is painted on.
+    vbx(b, F, 6.8, 0.22, 22, C.dirt, 0, 0.11, -13.5);
+    vcy(b, F, 10.2, 10.2, 0.18, 24, C.dirt, 0, 0.09, -2.5);
+    vcy(b, F, 9.4, 9.4, 0.22, 24, C.dirtPale, 0, 0.11, -2.5);
+    for (i = 0; i < VILLAGE.GROUND.length; i++) {
+      var g = VILLAGE.GROUND[i];
+      vcy(b, F, g[2], g[2], 0.16, 12, C.dirt, g[0], 0.08, g[1]);
+    }
+
+    for (i = 0; i < walls.length; i++) {
+      var w = walls[i];
+      fencePanel(b, vchild(F, w.x, w.z, w.ry, VILLAGE.FENCE_S), C, w.len, w.variant);
+    }
+    villageGate(b, vchild(F, 0, -(VILLAGE.B - 0.3), 0, VILLAGE.FENCE_S), C);
+    villageHall(b, vchild(F, 0.2, 0.5, 0.05, VILLAGE.HALL_S), C);
+
+    for (i = 0; i < VILLAGE.HOUSES.length; i++) {
+      var h = VILLAGE.HOUSES[i];
+      // The source turns each entrance toward the plaza and then nudges it, so
+      // the ring is a ring and not a wheel of identical spokes.
+      var d = Math.hypot(h[0], h[1] + 1);
+      var face = Math.atan2(-(h[1] + 1) / d, h[0] / d) + h[2];
+      villageHouse(b, vchild(F, h[0], h[1], face, 1), C);
+    }
+    for (i = 0; i < VILLAGE.YARDS.length; i++) {
+      var y = VILLAGE.YARDS[i];
+      fencePanel(b, vchild(F, y[0], y[1], y[2], VILLAGE.FENCE_S), C, 1.25, 0);
+    }
+    for (i = 0; i < VILLAGE.POSTS.length; i++) {
+      var pp = VILLAGE.POSTS[i];
+      fenceEndPost(b, vchild(F, pp[0], pp[1], pp[2], VILLAGE.FENCE_S), C);
+    }
+  }
+
+  // THE VILLAGE AS A PLAN, in board units: where every piece stands, how big it
+  // is and which way it faces.
+  //
+  // ONE ANSWER, THREE READERS. The 3D builder above draws from the layout, the
+  // flat board in maps.js draws its plan from this, and the foliage pass keeps
+  // the forest out of the circles derived from it. Any two of those computed
+  // separately is a village whose walls are in three places.
+  function villagePlan(cx, cy, size, rot) {
+    var U = size / VILLAGE.UNITS;
+    var F = vframe(cx, cy, U, rot || 0);
+    var walls = villageWalls(), i;
+    function at(dx, dz) {
+      var px = -dz, py = dx;
+      return { x: F.x + (px * F.co - py * F.si) * F.u,
+               y: F.y + (px * F.si + py * F.co) * F.u };
+    }
+    function piece(dx, dz, ry, w, d) {
+      var p = at(dx, dz);
+      // A three.js `rotation.y` of `ry` is a plan yaw of `-ry`; `w` runs across
+      // the piece and `d` along the plan's x, which is the source's -z.
+      p.a = F.r - (ry || 0); p.w = w * F.u; p.d = d * F.u;
+      return p;
+    }
+    var plan = { unit: F.u, rot: F.r, walls: [], houses: [], yards: [], posts: [], ground: [] };
+    for (i = 0; i < walls.length; i++) {
+      plan.walls.push(piece(walls[i].x, walls[i].z, walls[i].ry,
+        walls[i].len * VILLAGE.FENCE_S, 0.62 * VILLAGE.FENCE_S));
+    }
+    plan.gate = piece(0, -(VILLAGE.B - 0.3), 0, 16.2 * VILLAGE.FENCE_S / 1.6, 1.7);
+    plan.hall = piece(0.2, 0.5, 0.05, 12.6 * VILLAGE.HALL_S, 9.8 * VILLAGE.HALL_S);
+    for (i = 0; i < VILLAGE.HOUSES.length; i++) {
+      var h = VILLAGE.HOUSES[i];
+      var dd = Math.hypot(h[0], h[1] + 1);
+      plan.houses.push(piece(h[0], h[1],
+        Math.atan2(-(h[1] + 1) / dd, h[0] / dd) + h[2], 6.9, 9.4));
+    }
+    for (i = 0; i < VILLAGE.YARDS.length; i++) {
+      plan.yards.push(piece(VILLAGE.YARDS[i][0], VILLAGE.YARDS[i][1], VILLAGE.YARDS[i][2],
+        1.25 * VILLAGE.FENCE_S, 0.62 * VILLAGE.FENCE_S));
+    }
+    for (i = 0; i < VILLAGE.POSTS.length; i++) {
+      plan.posts.push(piece(VILLAGE.POSTS[i][0], VILLAGE.POSTS[i][1], 0, 1.0, 1.0));
+    }
+    plan.plaza = { p: at(0, -2.5), r: 10.4 * F.u };
+    plan.street = piece(0, -13.5, 0, 6.8, 22);
+    for (i = 0; i < VILLAGE.GROUND.length; i++) {
+      var g = VILLAGE.GROUND[i];
+      plan.ground.push({ p: at(g[0], g[1]), r: g[2] * F.u });
+    }
+    return plan;
+  }
+
+  // WHERE THE VILLAGE IS SOLID, for the foliage pass in maps.js: the same plan
+  // reduced to circles a tree may not stand in. Derived rather than restated,
+  // so a tree is cleared from where the buildings ARE.
+  function villageFootprint(cx, cy, size, rot) {
+    var plan = villagePlan(cx, cy, size, rot), out = [], i;
+    function ring(list, pad) {
+      for (var k = 0; k < list.length; k++) {
+        out.push({ x: list[k].x, y: list[k].y,
+                   r: Math.max(list[k].w, list[k].d) * 0.5 + (pad || 0) * plan.unit });
+      }
+    }
+    ring(plan.houses, 0.6);
+    ring(plan.walls, 0);
+    ring(plan.yards, 0);
+    ring(plan.posts, 0);
+    out.push({ x: plan.hall.x, y: plan.hall.y, r: Math.max(plan.hall.w, plan.hall.d) * 0.5 });
+    out.push({ x: plan.gate.x, y: plan.gate.y, r: 8.6 * plan.unit });
+    out.push({ x: plan.plaza.p.x, y: plan.plaza.p.y, r: plan.plaza.r });
+    for (i = 0; i < plan.ground.length; i++) {
+      out.push({ x: plan.ground[i].p.x, y: plan.ground[i].p.y, r: plan.ground[i].r + 0.4 * plan.unit });
+    }
+    // The street, sampled along its own length rather than wrapped in a disc.
+    for (i = 0; i <= 6; i++) {
+      var t = -2.5 - i * 3.6;
+      var px = -t, py = 0;
+      out.push({ x: cx + (px * Math.cos(plan.rot) - py * Math.sin(plan.rot)) * plan.unit,
+                 y: cy + (px * Math.sin(plan.rot) + py * Math.cos(plan.rot)) * plan.unit,
+                 r: 3.6 * plan.unit });
+    }
+    return out;
   }
 
   function scenery(builder, kind, cx, cy, size, rot, P, model) {
@@ -1623,6 +2385,25 @@ var GLGeometry = (function () {
         // to keep in step and a machine that came apart the moment anybody
         // moved it. See `mobileDepot` for the port this is built from.
         mobileDepot(builder, cx, cy, size, rot, P);
+        break;
+
+      case "village":
+        // THE IRONWOOD SETTLEMENT, and it is one prop for the same reason the
+        // depot is: the arrangement -- an ellipse of fence panels walked at
+        // equal arc length, eight houses turned toward the plaza, a hall in the
+        // middle of it -- IS the model. Twenty-seven authored wall positions in
+        // maps.js would be twenty-seven numbers to keep in step with a ring
+        // nobody can re-derive. See `ironwoodVillage`.
+        ironwoodVillage(builder, cx, cy, size, rot, P, false);
+        break;
+
+      case "village-signals":
+        // The hall's beacon and the gate's cyan lens, declared at the SAME
+        // position and size as the village and drawn from the same layout
+        // table. It is a second prop only because one draw call carries one
+        // emitted colour (AGENTS.md, "one tint per draw is a limit inside a
+        // prop too") and this village's windows are amber.
+        ironwoodVillage(builder, cx, cy, size, rot, P, true);
         break;
 
       case "depot-ramp": {
@@ -2393,6 +3174,20 @@ var GLGeometry = (function () {
     return builder;
   }
 
+  // THE MAP LAYER ASKS THE RENDERER HOW BIG A MODEL IS, not the other way
+  // round. `Maps.sceneryOf` keeps the forest out of the built things, and the
+  // only file that knows a village is a ring of eight houses rather than a disc
+  // is this one. Registered rather than imported so maps.js keeps working --
+  // more conservatively -- in a node test that never loads a renderer.
+  //
+  // BEFORE THE RETURN, not after it. It sat below for one commit, where it is
+  // unreachable, and the only symptom was a forest cleared to a blanket circle
+  // instead of to the buildings.
+  if (typeof Maps !== "undefined" && Maps.registerFootprint) {
+    Maps.registerFootprint("village", villageFootprint);
+    Maps.registerFootprint("depot", depotFootprint);
+  }
+
   return {
     Builder: Builder,
     hex: hex,
@@ -2410,6 +3205,9 @@ var GLGeometry = (function () {
     segment: segment,
     scenery: scenery,
     depotWalkway: depotWalkway,
+    depotFootprint: depotFootprint,
+    villagePlan: villagePlan,
+    villageFootprint: villageFootprint,
     river: river,
     SCENERY_KINDS: ["antenna", "server", "reactor", "console", "pylon",
                     "tank", "vent", "holo", "battery", "coil",
@@ -2425,6 +3223,8 @@ var GLGeometry = (function () {
                     "house", "townhall", "storehouse", "workshop",
                     "palisade-gate", "palisade", "lantern",
                     "depot", "depot-ramp", "wheel", "exhaust", "floodlight",
+                    // The settlement, in two passes -- see the switch.
+                    "village", "village-signals",
                     // The crossing and what is buried at the other end of the
                     // road. Neither is a facility part and neither is timber
                     // the camp cut -- they are the two things on this board
@@ -2434,4 +3234,5 @@ var GLGeometry = (function () {
                     // between them.
                     "conduit"]
   };
+
 })();
