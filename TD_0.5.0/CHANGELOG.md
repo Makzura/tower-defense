@@ -13,6 +13,57 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — A shot stops at what it was aimed at, and nothing else; the red
+patches have one outline between them.** The follow-up to the entry below, and
+the second half of the same report. With the eye repaired the Arcane Sniper on a
+stump aimed and fired — and every round died on the frame it left the muzzle.
+
+**`PierceBullet` has no `owner` field.** It is not in its opts and never was, so
+the terrain sweep in its `update` passed `undefined` and ran at eye height 0
+whatever the tower stood on. Measured on the first step of a real shot from the
+tallest stump: **stopped by `stump-p3` at t = 0.000** — the stump under the
+tower's own feet. The homing `Bullet` did carry its owner and was correct; the
+two had disagreed since the day the first stump was drawn, and nothing said so,
+because the only test on it built its shooter by hand and gave it the field.
+
+**The owner's ruling is to delete the collision rather than thread the owner
+through**: terrain decides what a tower may ACQUIRE and nothing after that. So
+`js/bullet.js` no longer knows what a map is, `terrainHit` is gone from game.js
+with its two call sites, and `Effects.terrainImpact` — the mark that answered
+"why did nothing happen" — went with them. Threading the owner would have fixed
+one instance; this deletes the class, and the property it buys is stronger than
+the one it replaces: "a tower can never see what it cannot shoot" used to be an
+agreement between two mechanisms, and is now a fact about having one.
+
+**The consequence, stated because it is real and deliberate:** a piercing round
+walks its whole line, cover included, so it can reach a body its tower could not
+have acquired through. Same family as the Warbringer's blast and the Sniper's B5
+ritual, both of which already reach behind cover. Test 15 pins both halves.
+
+Three tests in the bullets-and-terrain group asserted the opposite rule and are
+rewritten rather than deleted — the shot's behaviour on a line through a rock
+still has to be pinned, it is the answer that moved. **24 is renamed**, because
+a test whose name still described the old rule would be the stale copy this repo
+keeps getting bitten by. 14 keeps its subject, tunnelling, against a BODY: the
+enemy sweep is the same segment test it always was and an endpoint test would
+still miss a body at 14 000 u.l./s.
+
+**And the red overlay's outlines are the UNION's outlines now.** One fill fixed
+the brighter overlap yesterday and left the other half standing: stroking a
+compound path strokes every subpath, so a patch's boundary running through
+another patch was still a line drawn across the middle of one continuous hidden
+area, and a player reads a line as a rule. Canvas cannot union two paths, so
+this goes the other way: before stroking a patch, clip away every other patch
+with `(a huge rectangle + that patch)` under the even-odd rule, which is exactly
+"everywhere except that patch", and let successive clips intersect. Measured on
+the real canvas: a point on an internal seam now reads (232, 64, 53, 87) —
+identical to the plain fill beside it — while the outer boundary still reads
+(251, 107, 91, 179); before, that seam read (249, 105, 91, 179).
+
+Test 27 is the report end to end: an Arcane Sniper on the tallest stump, through
+the real loop, landing damage — and it pins the arithmetic that used to stop it,
+so nothing can sweep a shot against terrain again without going red.
+
 **2026-08-27 — A tower on a stump could not shoot, and the red said so twice
 over.** The owner's report, on Ironwood: put a tower on a stump and it cannot
 fire, half its range ring is red, the red patches stack darker where they

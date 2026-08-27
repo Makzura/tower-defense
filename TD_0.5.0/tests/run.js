@@ -5474,7 +5474,16 @@ function (t) {
 
 group("Ironwood Frontier — bullets and terrain");
 
-test("13  a homing bullet dies on terrain and releases its claim", function (t) {
+// A SHOT DOES NOT COLLIDE WITH THE MAP (2026-08-27, at the owner's ruling).
+// Terrain decides what a tower may ACQUIRE and nothing else. These three tests
+// asserted the opposite until that date -- a round that stopped on the rock,
+// a rail shot that could not tunnel one, a pierce line that ended at cover --
+// and they are rewritten rather than deleted, because the shot's behaviour on
+// the line through a rock is still a thing that has to be pinned; it is the
+// answer that moved.
+
+test("13  a homing bullet flies through terrain to the body it was aimed at",
+function (t) {
   var h = ironwood();
   var line = acrossO5(h);
   var target = new h.game.Enemy(h.game.path, 5000);
@@ -5489,34 +5498,34 @@ test("13  a homing bullet dies on terrain and releases its claim", function (t) 
 
   var hpBefore = target.health;
   for (var i = 0; i < 400 && !b.dead; i++) b.update(1 / 60);
-  t.eq(b.dead, true, "it died on the way");
-  t.eq(target.health, hpBefore, "without touching the enemy behind the rock");
-  t.eq(claimed, 0, "and gave the claim back, so the tower will fire again");
+  t.eq(b.dead, true, "the round is spent");
+  t.ok(target.health < hpBefore, "on the body behind the boulder, which it reached");
+  t.eq(claimed, 0, "and the claim came back, exactly as it does on any hit");
 });
 
-test("14  a 14 000 u.l./s rail shot cannot tunnel through a boulder", function (t) {
+test("14  a 14 000 u.l./s rail shot still cannot tunnel past a BODY",
+function (t) {
   var h = ironwood();
   var line = acrossO5(h);
-  // One step at this speed covers far more than the boulder is wide, which is
-  // exactly the case an endpoint test samples straight over.
+  // One step at this speed covers far more than a body is wide. Terrain is no
+  // longer swept, but the ENEMY sweep is the same segment test it always was,
+  // and it is the half of test 14 that survives the ruling: an endpoint test
+  // would sample either side of this enemy and report a clean flight.
   var b = new h.game.PierceBullet({
     x: line.ax, y: line.ay, angle: 0,
-    damage: 500, speedUlps: 14000, pierce: 99,
+    damage: 500, speedUlps: 14000, pierce: 0,
     maxTravelPx: 100000, owner: null
   });
-  var behind = new h.game.Enemy(h.game.path, 9000);
-  behind.pos = { x: line.bx, y: line.by };
+  var midway = new h.game.Enemy(h.game.path, 9000);
+  midway.pos = { x: (line.ax + line.bx) / 2, y: line.ay };
 
-  var hp = behind.health;
-  b.update(1 / 60, [behind]);
-  t.eq(b.dead, true, "the shot stopped");
-  t.eq(behind.health, hp, "and never reached the body behind the rock");
-  t.ok(b.x < line.bx, "it died short of it (" + Math.round(b.x) + " < " +
-    Math.round(line.bx) + ")");
+  var hp = midway.health;
+  b.update(1 / 60, [midway]);
+  t.ok(midway.health < hp, "the body on the line took the shot");
+  t.eq(b.dead, true, "and a shot with no pierce stopped on it");
 });
 
-test("15  a pierce shot damages what is in front of cover and nothing behind it",
-function (t) {
+test("15  a pierce shot walks its whole line, cover included", function (t) {
   var h = ironwood();
   var line = acrossO5(h);
   var infront = new h.game.Enemy(h.game.path, 9000);
@@ -5533,8 +5542,13 @@ function (t) {
   b.update(1 / 60, [infront, behind]);
 
   t.ok(infront.health < frontHp, "the body in front took the shot");
-  t.eq(behind.health, backHp, "the body behind did not");
-  t.eq(b.dead, true, "and the shot stopped at the rock rather than carrying on");
+  t.ok(behind.health < backHp, "and so did the one behind the boulder");
+  // This is the consequence the ruling buys and it is worth stating in a test
+  // rather than only in prose: a piercing round REACHES a body its tower could
+  // not have ACQUIRED through. Same family as the Warbringer's blast.
+  t.eq(h.run("Targeting.hasSightTo({x:" + line.ax + ",y:" + line.ay +
+    "},{pos:{x:" + line.bx + ",y:" + line.by + "}})"), false,
+    "which no tower standing there could have picked as a target");
 });
 
 group("Ironwood Frontier — measurement and lifecycle");
@@ -5781,7 +5795,8 @@ function (t) {
     "the same tower up on a stump can");
 });
 
-test("24  a shot obeys the same rule its shooter's eye does", function (t) {
+test("24  terrain decides what may be fired AT, and nothing after that",
+function (t) {
   var h = ironwood();
   var g = h.game;
   var geo = g.Maps.geometryOf(g.currentMap);
@@ -5791,30 +5806,47 @@ test("24  a shot obeys the same rule its shooter's eye does", function (t) {
   var lx = (log.a.x + log.b.x) / 2, ly = (log.a.y + log.b.y) / 2;
   var tall = geo.platforms.filter(function (p) { return p.id === "stump-p3"; })[0];
 
-  // A tower that can SEE something it cannot SHOOT is the worst possible pair
-  // of rules, so terrainHit takes the same height the sight predicate does.
-  t.ok(!!g.terrainHit(lx - 120, ly, lx + 120, ly, 0),
-    "a round fired from the floor stops on the log");
-  t.eq(g.terrainHit(lx - 120, ly, lx + 120, ly, tall.height), null,
-    "one fired from the tallest stump passes over it");
+  // TERRAIN DECIDES WHAT MAY BE FIRED AT, AND NOTHING AFTER THAT.
+  //
+  // This test used to pin the other arrangement -- `terrainHit` taking the same
+  // eye height the sight predicate does, so a tower could never see what it
+  // could not shoot. That held as an agreement between two rules, and the two
+  // did NOT agree: `PierceBullet` never carried an `owner`, so its sweep ran at
+  // eye height 0 whatever the tower stood on and an Arcane Sniper on a stump
+  // had every round killed by the stump under its own feet. There is one rule
+  // now, so there is nothing left for a second one to drift from, and
+  // `terrainHit` is gone with the collision it served.
+  t.eq(h.run("typeof terrainHit"), "undefined",
+    "nothing in the game asks where a shot meets the map any more");
 
-  // AND THROUGH THE REAL PROJECTILE, which is where it actually has to hold:
-  // the height reaches the sweep off the bullet's OWNER, so a round leaving a
-  // tower on a stump has to carry its shooter's elevation with it.
+  // The half that DID survive, through the real predicate: sight still refuses.
+  var shooter = { x: lx - 120, y: ly, groundHeight: 0 };
+  var target = { x: lx + 120, y: ly };
+  t.eq(g.RangeFilter.sightClear(shooter, target), false,
+    "a tower on the floor still cannot acquire across the log");
+  shooter.groundHeight = tall.height;
+  t.eq(g.RangeFilter.sightClear(shooter, target), true,
+    "and one up on a stump still can");
+
+  // AND THROUGH THE REAL PROJECTILE. Whatever the shooter is standing on, a
+  // round that was fired arrives -- which is what makes the acquisition rule
+  // above the whole of the rule rather than half of it.
   function fire(owner) {
-    var target = new g.Enemy(g.path, 5000);
-    target.pos = { x: lx + 130, y: ly };
-    target.reserveDamage = function () {};
-    target.releaseDamage = function () {};
-    var b = new g.Bullet(lx - 130, ly, target, 40, null, owner, 0);
-    var hp = target.health;
+    var body = new g.Enemy(g.path, 5000);
+    body.pos = { x: lx + 130, y: ly };
+    body.reserveDamage = function () {};
+    body.releaseDamage = function () {};
+    var b = new g.Bullet(lx - 130, ly, body, 40, null, owner, 0);
+    var hp = body.health;
     for (var i = 0; i < 400 && !b.dead; i++) b.update(1 / 60);
-    return { died: b.dead, hit: target.health < hp };
+    return { died: b.dead, hit: body.health < hp };
   }
-  var fromDirt = fire({ x: lx - 130, y: ly, groundHeight: 0 });
-  t.eq(fromDirt.hit, false, "a real round from the floor never arrives");
-  var fromStump = fire({ x: lx - 130, y: ly, groundHeight: tall.height });
-  t.eq(fromStump.hit, true, "the same round from the tallest stump does");
+  t.eq(fire({ x: lx - 130, y: ly, groundHeight: 0 }).hit, true,
+    "a real round fired from the floor arrives");
+  t.eq(fire({ x: lx - 130, y: ly, groundHeight: tall.height }).hit, true,
+    "and so does one fired from the tallest stump");
+  t.eq(fire(null).hit, true,
+    "and so does one whose owner never said where it was standing");
 });
 
 test("25  every buildable tower gets the eye and the reach of the stump it stands on",
@@ -5893,6 +5925,42 @@ function (t) {
     "of exactly the arc its RESOLVED stats carry");
   t.eq(cone.aim, ls.core.aimRad, "pointed where the player aimed it");
   t.eq(cone.inner, 0, "and no deadzone, which is what cone mode means");
+});
+
+test("27  a tower on a stump actually lands its shots, through the real loop",
+function (t) {
+  var h = ironwood();
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var tallest = geo.platforms.reduce(function (a, b) {
+    return (a && a.height > b.height) ? a : b;
+  }, null);
+  h.run("cash = 1000000; enemies.length = 0; waveIndex = WAVES.length;");
+
+  var x = tallest.x + tallest.radius * 0.3;
+  var y = tallest.y + tallest.radius * 0.1;
+  var ls = new g.LongshotTower(x, y, g.nearestPathTo(x, y).path);
+  g.addTower(ls);
+  h.spawnAt(200, 4000);
+  h.step(20);
+
+  // THE WHOLE REPORT, end to end: it aims, it fires, and the rounds arrive.
+  // Every part of this was already true except the last -- the Sniper acquired
+  // correctly and had each shot killed on the frame it left the muzzle, because
+  // PierceBullet carries no `owner` and the deleted terrain sweep therefore ran
+  // at eye height 0 while the tower stood 25 up. Measured on the first step of
+  // a real shot from here: blocked by `stump-p3` at t = 0.000.
+  t.ok(ls.damageDealt > 0,
+    "an Arcane Sniper on the tallest stump lands damage (" +
+    Math.round(ls.damageDealt) + ")");
+
+  // And the arithmetic that used to kill it, kept as the thing that must stay
+  // false: nothing in the game may sweep a shot against terrain again.
+  t.eq(h.run("typeof terrainHit"), "undefined", "no shot meets the map any more");
+  var step = g.ul(g.Bullet.BASE_SPEED_ULPS) / 60;
+  var old = g.MapGeometry.firstHit(geo.sightBlockers, x, y, x + step, y, 0, 0);
+  t.ok(old && old.shape.id === tallest.id && old.t === 0,
+    "a sweep at eye zero would still stop it dead on its own stump");
 });
 
 

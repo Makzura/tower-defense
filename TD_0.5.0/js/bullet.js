@@ -37,21 +37,31 @@
 // and always have: a gunner claims 1 on a brute even though armor eats all of
 // it. Making pierce the one source that claimed post-mitigation damage would
 // give it a different meaning on one tower than on the other four.
-// WHERE A SHOT MEETS THE MAP, or null when it does not -- and null instantly on
-// the six boards that have no terrain, which is a function-exists check rather
-// than a shape loop.
+// A SHOT DOES NOT COLLIDE WITH THE MAP AT ALL (2026-08-27, at the owner's
+// instruction). Terrain decides what a tower may ACQUIRE and nothing else; once
+// a round is in the air it flies to what it was aimed at. There was a `terrain`
+// helper here calling the game's `terrainHit`, and both call sites are gone.
 //
-// Routed through the game's own `terrainHit` rather than reaching for the map
-// here: bullet.js has never known what a map is, and the one place that knows
-// which list terrain lives in should stay one place.
-// `from` is the tower that fired, and all this takes from it is how high the
-// ground under it is: a round leaving a tower on a stump passes over anything
-// shorter than the stump, exactly as that tower's eye does. One rule, so a
-// tower can never be able to SEE something it cannot SHOOT.
-function terrain(ax, ay, bx, by, from) {
-  if (typeof terrainHit !== "function") return null;
-  return terrainHit(ax, ay, bx, by, (from && from.groundHeight) || 0);
-}
+// **The rule is unchanged in what it was FOR, and stronger in how it holds.**
+// The old pairing was "the round obeys the same rule its shooter's eye does",
+// so that a tower could never see something it could not shoot. That is a
+// property two separate tests had to keep agreeing about; now there is one
+// test, because there is one rule. A tower that acquires a body hits it.
+//
+// **What made it urgent is that the two DID disagree, silently, from the day
+// the first stump was drawn.** `PierceBullet` never carried an `owner` -- the
+// field is not in its opts -- so its `terrain()` call passed `undefined` and
+// the sweep ran at eye height 0 whatever the tower was standing on. An Arcane
+// Sniper on a stump therefore acquired correctly, fired, and had every round
+// killed on the frame it left the muzzle by the stump under its own feet.
+// Threading the owner through would have fixed that one instance; deleting the
+// collision deletes the class.
+//
+// The consequence to know: a piercing round now walks its line through cover,
+// so it can reach a body its tower could not have ACQUIRED through. That is the
+// same family as the Warbringer's blast and the Sniper's B5 ritual, both of
+// which already reach behind cover on purpose -- a consequence of a shot that
+// already landed, never a choice of target.
 
 function Bullet(x, y, target, damage, onHit, owner, defenseFlatPierce) {
   this.x = x;
@@ -110,30 +120,12 @@ Bullet.prototype.update = function (dt) {
     return dealt;
   }
 
-  // TERRAIN, ON THE SEGMENT ABOUT TO BE FLOWN, not on the point about to be
-  // landed on. A homing round at 900 u.l./s covers fifteen units in a step; a
-  // point test would sample either side of a boulder and never inside it.
-  //
-  // The claim is released on the way out. A claim is a reservation on damage
-  // that has not landed, and this one never will -- leaving it held would make
-  // the tower think that enemy is already spoken for and refuse to shoot it
-  // again, which reads as the tower going quiet for no reason.
-  var nx = this.x + (dx / distance) * step;
-  var ny = this.y + (dy / distance) * step;
-  var hit = terrain(this.x, this.y, nx, ny, this.owner);
-  if (hit) {
-    this.x = hit.x;
-    this.y = hit.y;
-    this.dead = true;
-    this.release();
-    if (typeof Effects !== "undefined" && Effects.terrainImpact) {
-      Effects.terrainImpact(hit.x, hit.y);
-    }
-    return 0;
-  }
-
-  this.x = nx;
-  this.y = ny;
+  // Nothing between here and the target can stop this round -- see the note on
+  // terrain at the top of this file. The only two exits a homing bullet has are
+  // the one above (it arrived) and losing its target, and both release the
+  // claim, which is the invariant target claiming rests on.
+  this.x += (dx / distance) * step;
+  this.y += (dy / distance) * step;
   return 0;
 };
 
@@ -310,18 +302,10 @@ PierceBullet.prototype.update = function (dt, enemies) {
   var hitRadius = ul(PierceBullet.HIT_RADIUS_UL);
   var segLen2 = step * step;
 
-  // TERRAIN IS SWEPT ON THE SAME SEGMENT, FOR THE SAME REASON THE ENEMIES ARE.
+  // NO TERRAIN SWEEP. A shot does not collide with the map -- see the note at
+  // the top of this file. This used to measure where along the step a rock sat
+  // and drop every candidate past it; the whole line is live now.
   //
-  // A rail shot at 14 000 u.l./s covers about 240 px in a step. Testing the
-  // endpoint against a rock would sample one side of it and then the other and
-  // report a clean flight both times -- the shot tunnels. Piercing does not
-  // mean piercing terrain: the round goes through bodies and stops at the rock.
-  //
-  // `stopT` is where along THIS step the rock is, in the same parameter the
-  // enemy candidates below are measured in, so the comparison is direct.
-  var obstacle = terrain(fromX, fromY, this.x, this.y, this.owner);
-  var stopT = obstacle ? obstacle.t : 1;
-
   // Gather first, then apply IN ORDER ALONG THE SHOT. Array order is spawn
   // order, which is meaningless here -- and with a long sweep the falloff
   // would otherwise charge the far enemy full damage and the near one the
@@ -343,12 +327,6 @@ PierceBullet.prototype.update = function (dt, enemies) {
     var nearX = ex - this.dirX * step * t;
     var nearY = ey - this.dirY * step * t;
     if (nearX * nearX + nearY * nearY > hitRadius * hitRadius) continue;
-
-    // ONLY WHAT IS IN FRONT OF THE ROCK. An enemy standing behind cover is not
-    // a candidate at all -- it is never claimed, never damaged, and never
-    // counted in the falloff, which would otherwise weaken the shot on bodies
-    // it never reached.
-    if (t > stopT) continue;
 
     candidates.push({ enemy: candidate, t: t });
   }
@@ -393,20 +371,8 @@ PierceBullet.prototype.update = function (dt, enemies) {
     if (this.hitCount > this.pierce) this.dead = true;
   }
 
-  // THE ROCK STOPS IT, after everything in front of the rock has been resolved.
-  // Placed here rather than before the loop so a shot that reaches two bodies
-  // and then a boulder still pays out on both -- "stopped by cover" is not
-  // "wasted".
-  if (obstacle && !this.dead) {
-    this.x = obstacle.x;
-    this.y = obstacle.y;
-    this.dead = true;
-    if (typeof Effects !== "undefined" && Effects.terrainImpact) {
-      Effects.terrainImpact(obstacle.x, obstacle.y);
-    }
-  }
-
-  // Out of range, or off the map entirely.
+  // Out of range, or off the map entirely -- which are now the only two things
+  // that end a piercing shot besides spending its pierce.
   if (this.travelled >= this.maxTravelPx) this.dead = true;
   if (this.x < -50 || this.x > VIEW_WIDTH + 50 ||
       this.y < -50 || this.y > VIEW_HEIGHT + 50) {

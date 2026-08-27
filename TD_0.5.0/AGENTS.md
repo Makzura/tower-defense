@@ -417,7 +417,11 @@ js/enemy.js         Enemy: the twenty-one-type roster, movement, lane offsets
                      (scaled by the road's own width),
                      health, armor/defense, camo, flight, per-type sprite size,
                      timed slows, hover hit test, damage reporting
-js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces)
+js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces).
+                     Neither knows what a map is: a shot does not collide with
+                     terrain, so the only things that end one are arriving,
+                     losing its target, spending its pierce and running out of
+                     range
 js/systems/tower-stats.js  the ONE vocabulary every tower reports its numbers
                      in: damage, range, attack speed, DPS, lifetime totals
 js/systems/tower-health.js towers have HP and DIE at zero. init/damage/
@@ -1990,9 +1994,34 @@ asks a question about a battlefield has to go through `js/systems/map-geometry.j
 
 | list | refuses building | blocks sight | stops bullets |
 |---|---|---|---|
-| `blockers` | yes | yes | yes |
-| `landmarks` | yes | only if `blocksSight` | only if `blocksSight` |
-| `platforms` | no — they are the BEST ground | yes | yes |
+| `blockers` | yes | yes | **no** |
+| `landmarks` | yes | only if `blocksSight` | **no** |
+| `platforms` | no — they are the BEST ground | yes | **no** |
+
+**NOTHING STOPS A BULLET** (2026-08-27, at the owner's instruction). That column
+read "yes / only if `blocksSight` / yes" until then. Terrain decides what a
+tower may ACQUIRE and nothing after that: once a round is in the air it flies to
+what it was aimed at. `js/bullet.js` no longer looks at the map at all, and
+`terrainHit` — the game's "where does this shot first meet the map" — is gone
+with its two call sites, as is `Effects.terrainImpact`, the mark it fired.
+
+**The pairing this replaces was the right idea and did not hold.** The old rule
+was "a round obeys the same rule its shooter's eye does", so that a tower could
+never see what it could not shoot — a property two separate mechanisms had to
+keep agreeing about. They did not agree: `PierceBullet` has no `owner` field, so
+its terrain sweep ran at eye height 0 whatever the tower was standing on, and an
+Arcane Sniper on a stump acquired correctly, fired, and had every round killed on
+the frame it left the muzzle by the stump under its own feet. Measured on the
+first step of a real shot from the tallest stump: **stopped by `stump-p3` at
+t = 0.000**. One rule cannot drift from itself, which is the argument for
+deleting the collision rather than threading the owner through.
+
+**The consequence, and it is deliberate: a piercing round walks its whole line,
+cover included**, so it can reach a body its tower could not have ACQUIRED
+through. That is the same family as the Warbringer's blast and the Sniper's B5
+ritual, both of which already reach behind cover — a consequence of a shot that
+already landed, never a choice of target. Test 15 pins it, and pins that no
+tower standing there could have picked that body.
 
 **EVERY SOLID DECLARES A HEIGHT, and a line is only stopped by something
 standing higher than the eye that cast it.** `MapGeometry.clears` is the whole
@@ -2001,10 +2030,9 @@ boards behave exactly as they always did: everything stops everything.
 
 A tower's eye height is `groundHeight` — the height of the ground under it, zero
 on dirt and the stump's top on a stump — read once at construction and carried on
-the tower. `RangeFilter.sightClear` passes it to the injected predicate;
-`bullet.js` passes the SHOOTER'S to `terrainHit`. Those two must never disagree:
-a tower that can see something it cannot shoot is the worst possible pair of
-rules, and one test fires a real round to say so.
+the tower. `RangeFilter.sightClear` passes it to the injected predicate, and that
+is now the only place it is used for sight: a shot does not test terrain at all
+(see below), so there is no second rule left to disagree with this one.
 
 **EVERY TOWER TYPE MUST SET `groundHeight`, AND TWO OF THE FIVE DID NOT UNTIL
 2026-08-27.** `LongshotTower` and `BeamTower` never declared the field, and both
@@ -2166,6 +2194,23 @@ paints a placement rule goes in `drawPlacementFeedback`, which is called from th
   rule arriving where it always belonged. Measured off the real canvas: a
   single-covered pixel and a double-covered one now read byte-identical
   (216, 88, 88, 98); before, the second read (221, 81, 77, **152**).
+- **And the OUTLINE is the union's outline.** One fill fixed the brighter
+  overlap and left the other half of the same mistake standing: stroking a
+  compound path strokes every subpath, so the boundary of a patch running
+  THROUGH another patch was still a visible line across the middle of one
+  continuous hidden area — and a player reads a line as a rule. Canvas has no
+  union of paths, so it goes the other way round: before stroking patch *i*,
+  clip away every other patch, one at a time, with `(a huge rectangle + patch
+  j)` under the **even-odd** rule — which is exactly "everywhere except patch
+  j", because the rectangle counts once outside it and twice inside — and
+  successive `clip()` calls intersect. What survives of patch *i*'s outline is
+  precisely the part of it on the union's edge. The rectangle is enormous rather
+  than viewport-sized because this runs inside whatever transform the caller is
+  in, and it is O(n²) clips in a number that is at most twelve. Measured: a
+  point on an internal seam now reads (232, 64, 53, 87), identical to the plain
+  fill beside it, while a point on the outer boundary still reads
+  (251, 107, 91, 179); before, the seam read (249, 105, 91, **179**) — the
+  stroke, in the middle of the patch.
 - **Clipped to the reach, whatever shape that is.** Red means *inside my reach
   and I cannot see into it*, so painting it right round the circle on an Arcane
   Sniper covering a 24 degree arc claims blind spots in ground it was never going
@@ -7665,7 +7710,8 @@ no mechanic was moved to match the description.
 | Shared footprint | 11.25 u.l. radius — Warbringer and Rifleman both take it from here | `Tower.FOOTPRINT_RADIUS_UL` |
 | Elevation | one number per tower, read once at construction: what it sees OVER and +1% reach per 1.6 u.l. **Every one of the five types carries it** — the two adapters did not until 2026-08-27 | `groundHeightUnder`, `elevatedRangePx`, `RangeFilter.sightClear` |
 | Tower reach shape | `{ radius, inner, aim, arcRad, full }` — the one reconciliation of the Warbringer's wedge, the Sniper's cone and everything else's circle. Read by the renderer AND by the blind-spot clip | `towerReach` in js/tower.js |
-| Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack) and clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
+| Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack), the outline is the UNION's outline (no seams through the middle) and the whole layer is clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
+| What stops a shot | arriving, losing its target, spending its pierce, running out of range. **Not terrain** — sight gates acquisition and nothing gates the round | `js/bullet.js` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |
 | Pierce hit radius | 12 u.l. | `PierceBullet.HIT_RADIUS_UL` |
 | Warbringer range | 37.5 u.l. base, 62.5 at A5, **77.5 at full B** (B2 +15, B4 +10, B5 +15, additive on the base) | `Smasher.BASE_RANGE_UL`, `rangeBonusUl` in `Smasher.UPGRADES` |

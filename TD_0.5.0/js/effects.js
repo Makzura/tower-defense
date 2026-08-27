@@ -114,6 +114,11 @@ var Effects = (function () {
     }
   }
 
+  // `terrainImpact` stood here and marked where a round died on a rock. Rounds
+  // do not die on rocks any more (2026-08-27 -- see the note at the top of
+  // js/bullet.js), so the mark had nothing left to explain and went with the
+  // collision rather than staying as an effect nothing fires.
+
   // A visible point of contact for area damage. `kind` is presentation data
   // only and doubles as the VisualModels effect id, so a future skin pack can
   // replace Warbringer and arcane impacts independently.
@@ -126,17 +131,6 @@ var Effects = (function () {
   // needs a second endpoint, which x/y/radius cannot express. Two reserved
   // keys -- `life` overrides how long it lasts, `particles: false` suppresses
   // the debris burst, which a clean energy beam should not throw.
-  // A SHOT THAT DIED ON A ROCK, marked where it died.
-  //
-  // Small and short on purpose. Its whole job is to answer "why did nothing
-  // happen" -- a round that vanishes silently against a boulder reads as the
-  // tower misfiring, and a player who cannot see the cover cannot learn to
-  // build around it. It is the same particle machinery as every other impact,
-  // so it costs what those cost and is culled by the same cap.
-  function terrainImpact(x, y) {
-    aoeImpact(x, y, 9, "terrain", { life: 0.26 });
-  }
-
   function aoeImpact(x, y, radius, kind, extra) {
     if (aoeImpacts.length >= MAX_AOE_IMPACTS) aoeImpacts.shift();
     kind = kind || "area";
@@ -465,7 +459,6 @@ var Effects = (function () {
     earthquake: earthquake,
     beginWorld: beginWorld,
     aoeImpact: aoeImpact,
-    terrainImpact: terrainImpact,
 
     update: function (dt) {
       var i;

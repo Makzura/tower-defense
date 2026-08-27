@@ -1830,25 +1830,26 @@ function applyMapOcclusion() {
     mapSightBlockers = null;
     return;
   }
-  var shapes = geo.sightBlockers;
-  mapSightBlockers = shapes;
+  mapSightBlockers = geo.sightBlockers;
   RangeFilter.setOcclusion(function (ax, ay, bx, by, eyeHeight) {
-    return MapGeometry.clearLine(shapes, ax, ay, bx, by, eyeHeight);
+    return MapGeometry.clearLine(mapSightBlockers, ax, ay, bx, by, eyeHeight);
   });
 }
 
-// The same list, for the two callers that need the CONTACT POINT rather than a
-// yes/no: bullets, which have to stop at the near face and leave a mark there.
-// Null when the map has none, so a bullet's hot path is a null check.
+// THE ACTIVE MAP'S SIGHT SHAPES, and the one place that knows which list
+// terrain lives in. Null when the map has none, which is what keeps the six
+// bare boards on a null check rather than a shape loop.
+//
+// The predicate above closes over this GLOBAL rather than over the array it was
+// built from, deliberately: a predicate holding the previous map's shapes after
+// a route change is a board with invisible rocks on it, and reading the global
+// makes that unrepresentable rather than merely unlikely.
+//
+// `terrainHit` used to sit here, returning the CONTACT POINT for the two bullet
+// families. Both call sites went on 2026-08-27 when a shot stopped colliding
+// with the map at all (see the note at the top of js/bullet.js), and it went
+// with them rather than staying as a function with no caller.
 var mapSightBlockers = null;
-
-// Where a shot from A to B first meets terrain, or null. Used by both bullet
-// families; kept here rather than in bullet.js so there is one place that knows
-// which list terrain lives in.
-function terrainHit(ax, ay, bx, by, eyeHeight) {
-  if (!mapSightBlockers) return null;
-  return MapGeometry.firstHit(mapSightBlockers, ax, ay, bx, by, 0, eyeHeight);
-}
 
 function startRun(map) {
   loadMap(map);
@@ -5338,22 +5339,58 @@ function drawSightShadows(tx, ty, reach, eyeHeight) {
     ctx.clip();
   }
 
-  ctx.beginPath();
-  for (i = 0; i < screened.length; i++) {
-    ctx.moveTo(screened[i][0][0], screened[i][0][1]);
-    for (k = 1; k < screened[i].length; k++) {
-      ctx.lineTo(screened[i][k][0], screened[i][k][1]);
-    }
+  function addRing(ring) {
+    ctx.moveTo(ring[0][0], ring[0][1]);
+    for (var n = 1; n < ring.length; n++) ctx.lineTo(ring[n][0], ring[n][1]);
     ctx.closePath();
   }
+
+  ctx.beginPath();
+  for (i = 0; i < screened.length; i++) addRing(screened[i]);
   // STRONG ENOUGH TO READ ON A DARK BOARD. At 0.20 over forest floor this was
   // there and invisible, which is the same as not being there: the whole point
   // is that a player can see the cover before they spend $900 shooting into it.
   ctx.fillStyle = "rgba(232,64,52,0.34)";
   ctx.fill();
+
+  // THE OUTLINE IS THE UNION'S OUTLINE, and the seams inside it are not edges.
+  //
+  // One fill stopped the overlaps reading brighter, and left the other half of
+  // the same mistake standing: stroking the compound path draws every subpath,
+  // so the boundary of a patch that runs THROUGH another patch was still a
+  // visible line across the middle of one continuous hidden area. A player
+  // reads a line as a rule, and there is no rule there.
+  //
+  // Canvas has no union of paths, so this takes it the other way round: before
+  // stroking patch i, clip away every OTHER patch. `(a huge rectangle + patch
+  // j)` under the even-odd rule is exactly "everywhere except patch j" -- the
+  // rectangle counts once outside it and twice inside -- and successive clip()
+  // calls intersect, so the stack ends up as "outside every other patch". What
+  // survives of patch i's outline is precisely the part of it that is on the
+  // union's edge.
+  //
+  // The rectangle is enormous rather than the canvas, because this runs inside
+  // whichever transform the caller is in (the 2D board is drawn under the
+  // quake's shake) and a viewport-sized rectangle would be the wrong rectangle
+  // there. It is O(n^2) clips in the number of patches, which is at most twelve
+  // on the only board that has any, and only while a tower is being asked about.
+  var BIG = 1e5;
   ctx.strokeStyle = "rgba(255,118,102,0.55)";
   ctx.lineWidth = 1.5;
-  ctx.stroke();
+  for (i = 0; i < screened.length; i++) {
+    ctx.save();
+    for (k = 0; k < screened.length; k++) {
+      if (k === i) continue;
+      ctx.beginPath();
+      ctx.rect(-BIG, -BIG, BIG * 2, BIG * 2);
+      addRing(screened[k]);
+      ctx.clip("evenodd");
+    }
+    ctx.beginPath();
+    addRing(screened[i]);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 

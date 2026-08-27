@@ -352,7 +352,22 @@ var BASELINE = [
     // adapter goes red on 25 (measured: 100% of rays out of a Sniper blocked
     // against 17.5% with it), and reading the cone's arc off anything but the
     // resolved stats goes red on 26.
-    file: "tests/run.js", pass: 191, fail: 0,
+    //
+    // 192 on 2026-08-27, from 191: A SHOT NO LONGER COLLIDES WITH THE MAP.
+    // 27 is the owner's report end to end -- an Arcane Sniper on the tallest
+    // stump, through the real loop, landing damage -- and it also pins the
+    // arithmetic that used to stop it: a sweep at eye zero still reports the
+    // tower's own stump at t = 0.000, which is what killed every round on the
+    // frame it left the muzzle, because PierceBullet carries no `owner`.
+    //
+    // THREE NAMES IN THIS GROUP CHANGED MEANING RATHER THAN COUNT, so a diff
+    // of failing names is not what shows this: 13, 15 and 24 asserted that a
+    // round stops at a rock and now assert that it does not. 24 is renamed
+    // ("terrain decides what may be fired AT") because a test whose name still
+    // described the old rule would be the stale copy this file exists to stop.
+    // 14 keeps its number and its subject -- tunnelling -- against a BODY,
+    // which is the half of it that survives the ruling.
+    file: "tests/run.js", pass: 192, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
