@@ -770,8 +770,50 @@ var GLGeometry = (function () {
   // face, the chains became two straight runs, the tarps became slabs. The
   // things that survive whole are the things you can still see: the bay and its
   // light, the ramp, the crane, the stacks, the wheels and the shoulders.
+  // THE FIVE NUMBERS BOTH PASSES NEED, hoisted out of the builder below.
+  // `mobileDepot` draws the ramp and `depotWalkway` tells the height field
+  // where its surface is, and a second copy of the hinge is how the plank a
+  // body stands on and the plank it is drawn beside come apart. Design units;
+  // both scale them by `size / DEPOT.UNITS`.
+  var DEPOT = {
+    UNITS: 8.4,                              // hull length, lamp face to rack
+    BAY_BACK: -1.18, BAY_HALF: 0.95,         // the bay's inner end, and its beam
+    FLOOR_Z: 1.355,                          // the lit bay floor, top face
+    HINGE_X: -3.95, HINGE_Z: 1.24,           // the ramp's hinge, on the sill
+    RAMP_LEN: 3.00, RAMP_DROP: 1.22, RAMP_HALF: 1.00,
+    TREAD: 0.13                              // plank tops, clear of the bed
+  };
+
+  // WHAT COMES OUT OF THE DEPOT HAS TO WALK ON IT.
+  //
+  // The bay floor and the ramp bed, as a two-segment walkway in board units,
+  // for `buildHeightField` in gl-world to stamp. Bodies are drawn at the height
+  // the field gives them, and a prop contributes nothing to it -- so without
+  // this the ramp is a plate the spawn walks THROUGH, and the choice is between
+  // an enemy standing on bare dirt inside a lit bay and one coming out from
+  // under its own loading ramp. It is the only prop on any board that is also
+  // terrain, and it is one because it is the only prop the route runs INTO.
+  function depotWalkway(cx, cy, size, rot) {
+    var U = size / DEPOT.UNITS;
+    var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
+    var a = Math.asin(DEPOT.RAMP_DROP / DEPOT.RAMP_LEN);
+    var rc = Math.cos(a), rs = Math.sin(a);
+    function at(X, Z) {
+      return { x: cx + X * co * U, y: cy + X * si * U, z: Z * U };
+    }
+    var head = at(DEPOT.HINGE_X - DEPOT.TREAD * rs,
+                  DEPOT.HINGE_Z + DEPOT.TREAD * rc);
+    return [
+      { a: at(DEPOT.BAY_BACK, DEPOT.FLOOR_Z), b: head, half: DEPOT.BAY_HALF * U },
+      { a: head,
+        b: at(DEPOT.HINGE_X - DEPOT.RAMP_LEN * rc - DEPOT.TREAD * rs,
+              DEPOT.HINGE_Z - DEPOT.RAMP_LEN * rs + DEPOT.TREAD * rc),
+        half: DEPOT.RAMP_HALF * U }
+    ];
+  }
+
   function mobileDepot(builder, cx, cy, size, rot, P) {
-    var U = size / 8.4;
+    var U = size / DEPOT.UNITS;
     var co = Math.cos(rot || 0), si = Math.sin(rot || 0);
 
     var body = P.metal, dark = P.metalDark, ley = P.accent;
@@ -1088,9 +1130,9 @@ var GLGeometry = (function () {
     // standing on the flat board, so anything the route crosses UNDER the bed
     // walks through it: the toe has to sit at or west of the route's first
     // point, and the machine hangs east off it.
-    var RL = 3.00, RA = Math.asin(1.22 / RL);
+    var RL = DEPOT.RAMP_LEN, RA = Math.asin(DEPOT.RAMP_DROP / RL);
     var rc = Math.cos(RA), rs = Math.sin(RA);
-    var HGX = -3.95, HGZ = 1.24;                       // the hinge, at the sill
+    var HGX = DEPOT.HINGE_X, HGZ = DEPOT.HINGE_Z;      // the hinge, at the sill
     function ramp(u, v, Y, w, d, h, color, tilt) {
       vbox(HGX - u * rc - v * rs, Y, HGZ - u * rs + v * rc, w, d, h,
         RA + (tilt || 0), 0, color);
@@ -2367,6 +2409,7 @@ var GLGeometry = (function () {
     boxAt: boxAt,
     segment: segment,
     scenery: scenery,
+    depotWalkway: depotWalkway,
     river: river,
     SCENERY_KINDS: ["antenna", "server", "reactor", "console", "pylon",
                     "tank", "vent", "holo", "battery", "coil",

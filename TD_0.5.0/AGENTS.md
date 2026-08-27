@@ -4161,17 +4161,38 @@ behind. The fall's length is chosen so it FINISHES inside the frame — a sheet
 that leaves the bottom of the screen reads as cut off, not as water going into
 nothing.
 
-**AND A PROP MAY NOT HOLD ANYTHING OVER THE ROUTE.** Enemies are drawn standing
-on the flat board — `groundHeightAt` lifts a body onto *terrain*, and a prop is
-not terrain — so authored geometry that spans the walked line at body height is
-geometry the bodies walk through. Ironwood's depot is the case that found it: its
+**A PROP MAY NOT HOLD ANYTHING OVER THE ROUTE — unless it is also TERRAIN, and
+exactly one is.** Bodies are drawn standing on the height field, and a prop
+contributes nothing to it, so authored geometry that spans the walked line at
+body height is geometry the bodies walk through. Ironwood's depot found it: its
 loading ramp is hinged at a sill 1.2 hull-units up and drops to the dirt over its
-own length, which makes it a plate held over whatever is beneath it, and the
-route's first point sat under the middle of it. **The fix is placement, not
-geometry** — `x` is chosen so the ramp's toe lands ON the route's first point and
-the machine hangs east off it, past the landmark, into forest nobody can build in
-or shoot across. Anything with a ramp, a raised deck, a gantry or an arch over
-the road owes the same answer, and "it misses the ground" is not it.
+own length, and the route's first point sat under the middle of it.
+
+**`GLGeometry.depotWalkway` is the answer, and it is the only prop surface on any
+board that is stamped into `buildHeightField`.** It returns the bay floor and the
+ramp bed as two segments in board units, from the SAME table `mobileDepot` builds
+the planks from — the stumps' rule, applied to a vehicle: the height a body
+stands at and the surface it is drawn beside are one measurement, and two copies
+of it is how they drift. The wave then appears in the depot's doorway, walks down
+fifty units of ramp and steps off onto the road.
+
+Three consequences, and none of them is optional once the ramp is real:
+
+- **`x` is decided by the ramp**, not by the footprint. The bed has to lie on the
+  route's first straight or it hangs over a corner with the road turning out from
+  under it, and the hinge has to land on the route's first point or the wave
+  appears somewhere other than the door.
+- **A ramp is a VEHICLE'S DECK, not ground, and a flier is not standing on it.**
+  `f.terrain` is the field a moment before the depot was written into it, and
+  `groundHeightAt(x, y, true)` reads it. Without that, a Wisp's cruising height
+  stacks on top of fifty units of ramp and it flies out through the depot's roof.
+- **You cannot build on it**, and that falls out rather than being ruled:
+  `levelUnder` refuses a footprint that straddles a height change, and a slope
+  straddles everywhere. It is a small patch either side of the road at the mouth
+  of the ramp, and it is the right answer — that is the enemy's loading ramp.
+
+Anything else with a ramp, a raised deck, a gantry or an arch over the road owes
+the same three answers, and "it misses the ground" is not one of them.
 
 **A prop may own its own light.** `accent: "r,g,b"` on a
 model overrides the board's accent for that prop. It needs a **separate draw

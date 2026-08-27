@@ -13,6 +13,59 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The depot is twice the size, and the wave now walks down its
+ramp instead of through it.** Same model as this morning; two things were wrong
+with it on the board. It read small against the settlement at the other end of
+the road, and the spawn stood on the dirt at the FOOT of the ramp, because a
+prop contributes nothing to the height field and a body that walked any further
+up the bed would have walked through it.
+
+`size` 164 → 328, which is a 154-pixel beam and a 160-pixel roof line. The
+landmark's declared height follows it from 120 to 160; the figure is honest
+rather than load-bearing, since the tallest eye on this board is a stump at 24
+and anything above zero already stops everything.
+
+**`GLGeometry.depotWalkway` is new, and it is the only prop surface on any board
+that `buildHeightField` stamps.** It returns the bay floor and the ramp bed as
+two segments in board units, off the same `DEPOT` table `mobileDepot` builds the
+planks from — the stumps' rule applied to a vehicle: the height a body stands at
+and the plank it is drawn beside are ONE measurement. `stampSlope` beside
+`stampRect` writes a band whose height runs end to end instead of held flat. At a
+six-unit cell a fifty-unit drop over a hundred and twenty comes out as a
+two-and-a-half-unit staircase, which at this scale is a slope.
+
+**The wave appears in the DOORWAY, not inside the bay, and that is a size
+argument.** Inside was the nicer picture and it does not survive the roster: the
+bay's interior is 0.97 hull-units, 36 pixels at this size, and the boss is 26
+pixels of RADIUS. Every large body of a run would have stood with its head
+through the roof. On the threshold the lit bay is behind it and the only thing
+overhead is the door frame at 89. `x` = 1266 is what puts the hinge on the
+route's first point, and the far end falls out of it: the bed reaches 6.73
+hull-units west, so the toe lands at 1003, inside the first straight, which runs
+to (980, 180) before bending south.
+
+**A RAMP IS A VEHICLE'S DECK AND A FLIER IS NOT STANDING ON IT.** `f.terrain`
+keeps the field as it was a moment before the depot was written into it, and
+`groundHeightAt(x, y, true)` reads it — passed `e.isFlying` at the one call that
+draws a body. Without it a Wisp's 55 units of cruising lift stack on top of 53
+units of bay floor and it leaves through the depot's roof; with it, it comes out
+of the opening at 62, which is the middle of the doorway. Hover types are NOT
+excluded: a Shieldbearer floats eight units over whatever it is over, and over
+the ramp that is the ramp.
+
+**One gameplay consequence, and it is not a bug.** `levelUnder` refuses a
+footprint that straddles a height change and a slope straddles everywhere, so the
+ramp's own footprint no longer takes a tower. Outside the landmark that is a
+patch about 42 by 20 either side of the road at the mouth of the ramp. It is the
+right answer — that is the enemy's loading ramp — and it is the only placement
+this change moves. `Maps.groundHeightAt`, which is what a tower's elevation and
+reach are actually measured from, reads the authored platforms and never this
+field, so no tower gained range or sight.
+
+The public `World3D.groundHeightAt` dropped the new third argument for one
+commit, which made every probe of the second layer answer with the first. It
+passes through now.
+
 **2026-08-27 — The enemy depot is the authored model now, and it is one prop
 instead of nine.** Ironwood Frontier's spawn was a slab with a lit slot in the
 west face, and parked around it were a separate ramp, five wheels lying on the

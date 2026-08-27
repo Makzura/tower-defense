@@ -579,8 +579,11 @@ Maps.LIST.push({
       shape: "polygon",
       blocksSight: true,
       // Nothing on this board sees over a transport this size, and that is the
-      // point of parking it across the road's mouth.
-      height: 120,
+      // point of parking it across the road's mouth. 160 is the drawn roof
+      // line of the model in js/gl/gl-geometry.js; the figure is honest rather
+      // than load-bearing, since the tallest eye on this board is a stump at
+      // 24 and everything above zero already stops everything.
+      height: 160,
       points: [[1080, 70], [1235, 88], [1270, 132], [1270, 250],
                [1228, 280], [1110, 285], [1045, 235], [1045, 135]]
     },
@@ -2349,18 +2352,30 @@ Maps.ENVIRONMENTS = {
       // from this board rather than left to double up under the new hull.
       //
       // `size` IS THE HULL LENGTH IN AUTHORED PIXELS, nose to tail, and it sets
-      // the whole machine -- 164 puts a 77-pixel beam and an 80-pixel roof line
-      // under the landmark's 120 of sight blocking.
+      // the whole machine: 328 gives a 154-pixel beam and a 160-pixel roof
+      // line, which is the height the landmark declares.
       //
-      // AND `x` IS DECIDED BY THE RAMP, not by the footprint. The bed comes
-      // down 6.69 hull-units west of centre, so at this size the toe lands on
-      // (1109, 178) -- the route's first point at (1110, 180), give or take two
-      // pixels.
-      // Enemies are drawn standing on the flat board, so anything the route
-      // crosses UNDER the bed walks through it: put the machine any further
-      // west and the first body of every wave comes out from beneath its own
-      // loading ramp. The tail hangs east past the landmark instead, which
-      // costs nothing -- that is forest nobody can build in or shoot across.
+      // AND `x` PUTS THE RAMP'S HEAD ON THE ROUTE'S FIRST POINT, which is the
+      // one number here that is not read off the model. `depotWalkway` writes
+      // the bay floor and the ramp bed into the height field (see
+      // `buildHeightField` in gl-world), so a body is DRAWN on the planks and
+      // walks down them instead of through them: the wave appears in the
+      // doorway with the lit bay behind it, descends fifty units of ramp and
+      // steps off onto the road. 1266 is what puts the hinge on (1110, 180).
+      //
+      // IN THE DOORWAY RATHER THAN INSIDE THE BAY, and that is a size argument
+      // rather than a taste one. The bay's interior is 0.97 hull-units, 36
+      // pixels here, and the boss is 26 pixels of RADIUS -- park the spawn
+      // inside and every large body of the run stands with its head through the
+      // roof. On the threshold the opening is behind it and the only thing
+      // overhead is the door frame at 89.
+      //
+      // The far end is then fixed too: the bed reaches 6.73 hull-units west, so
+      // the toe lands at 1003 -- inside the route's first straight, which runs
+      // to (980, 180) before bending south. A bed that crossed that bend would
+      // hang over the corner with the road turning out from under it. The tail
+      // runs east past the landmark, which costs nothing: that is forest nobody
+      // can build in or shoot across.
       //
       // THE DEPOT BURNS RED, and it is the only thing on this board that does.
       // The settlement's lanterns are the theme's amber and read as somewhere
@@ -2372,7 +2387,7 @@ Maps.ENVIRONMENTS = {
       // depot now takes one of its own: the whole cargo bay is accent-coloured
       // and emissive, so the thing the player sees down the barrel of the road
       // is a hot doorway rather than an amber one.
-      { kind: "depot",      x: 1240, y: 178, size: 164, rotation: 0,
+      { kind: "depot",      x: 1266, y: 180, size: 328, rotation: 0,
         propId: "enemy-depot", accent: "255,58,22" },
       { kind: "floodlight", x: 1082, y: 132, size: 15, rotation: 0,
         accent: "255,66,40" },

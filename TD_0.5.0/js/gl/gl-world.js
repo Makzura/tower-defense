@@ -113,6 +113,31 @@ var World3D = (function () {
       }
     }
 
+    // A RAMP, not a slab: the same band the road is stamped as, but with the
+    // height running from one end to the other instead of held flat. The cell
+    // grid is 6 units, so a bed dropping fifty over a hundred and twenty comes
+    // out as a two-and-a-half-unit staircase, which at this scale is a slope.
+    function stampSlope(a, b, half) {
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len2 = dx * dx + dy * dy;
+      var i0 = Math.max(0, Math.floor((Math.min(a.x, b.x) - half - minX) / HEIGHT_CELL));
+      var i1 = Math.min(w - 1, Math.ceil((Math.max(a.x, b.x) + half - minX) / HEIGHT_CELL));
+      var j0 = Math.max(0, Math.floor((Math.min(a.y, b.y) - half - minY) / HEIGHT_CELL));
+      var j1 = Math.min(h - 1, Math.ceil((Math.max(a.y, b.y) + half - minY) / HEIGHT_CELL));
+      for (var j = j0; j <= j1; j++) {
+        for (var i = i0; i <= i1; i++) {
+          var px = minX + (i + 0.5) * HEIGHT_CELL, py = minY + (j + 0.5) * HEIGHT_CELL;
+          var t = len2 ? ((px - a.x) * dx + (py - a.y) * dy) / len2 : 0;
+          t = t < 0 ? 0 : (t > 1 ? 1 : t);
+          var qx = px - (a.x + dx * t), qy = py - (a.y + dy * t);
+          if (qx * qx + qy * qy > half * half) continue;
+          var z = a.z + (b.z - a.z) * t;
+          var k = j * w + i;
+          if (z > data[k]) data[k] = z;
+        }
+      }
+    }
+
     // Zones, using the SAME tops the geometry above emits, so the height an
     // actor stands at and the surface it is standing on cannot drift apart.
     ((env && env.zones) || []).forEach(function (z) {
@@ -212,19 +237,59 @@ var World3D = (function () {
       }
     });
 
+    // THE DEPOT'S RAMP IS TERRAIN, and it is the only prop on any board that
+    // is. Every other prop is a picture a body walks past; this one is the
+    // thing the route runs OUT OF, so the bay floor and the ramp bed have to be
+    // ground or the spawn stands on bare dirt inside a lit bay and then walks
+    // through its own loading ramp on the way out.
+    //
+    // The surface comes from `GLGeometry.depotWalkway` rather than from numbers
+    // restated here, for the same reason the stumps read the platforms table:
+    // the height a body stands at and the plank it is drawn beside are one
+    // measurement, and two copies of it is how they drift.
+    //
+    // Stamped AFTER the road, though highest-wins would do it anyway -- at the
+    // toe the bed is below ROAD_LIFT and the road takes over, which is what
+    // makes the join seamless instead of a step.
+    //
+    // AND THE BOARD WITHOUT IT IS KEPT, because a ramp is a VEHICLE'S DECK and
+    // not ground. A walker coming out of the bay stands on the planks; a flier
+    // coming out of it does not, and lifting one off the bed puts a Wisp's
+    // cruising height on top of a fifty-unit ramp and flies it out through the
+    // depot's own roof. `f.terrain` is this field a moment before the depot was
+    // written into it, and `groundHeightAt(x, y, true)` is what reads it.
+    var depots = ((env && env.models) || []).filter(function (m) {
+      return m && m.kind === "depot";
+    });
+    if (depots.length && typeof GLGeometry !== "undefined" && GLGeometry.depotWalkway) {
+      f.terrain = new Float32Array(data);
+      depots.forEach(function (m) {
+        GLGeometry.depotWalkway(
+          ul(m.x / AUTHORED_PX_PER_UL), ul(m.y / AUTHORED_PX_PER_UL),
+          ul((m.size || 44) / AUTHORED_PX_PER_UL), m.rotation || 0
+        ).forEach(function (seg) { stampSlope(seg.a, seg.b, seg.half); });
+      });
+    }
+
     return f;
   }
 
   // The height of the surface under (x, y). Presentation only -- nothing in the
   // simulation reads it, and every distance the game measures is still flat.
-  function groundHeightAt(x, y) {
+  // `ignoreDeck` asks for the GROUND under the point rather than the surface: the
+  // board without the depot's loading ramp written into it. Only a flier wants
+  // that, and only because a ramp is a vehicle's deck and it is not standing on
+  // it -- see the note beside the stamp in `buildHeightField`. Every board with
+  // no depot on it has no second layer and the flag costs a null check.
+  function groundHeightAt(x, y, ignoreDeck) {
     var f = heightField;
     if (!f) return 0;
     var i = Math.floor((x - f.minX) / HEIGHT_CELL);
     var j = Math.floor((y - f.minY) / HEIGHT_CELL);
     if (i < 0) i = 0; else if (i >= f.w) i = f.w - 1;
     if (j < 0) j = 0; else if (j >= f.h) j = f.h - 1;
-    return f.data[j * f.w + i];
+    var src = (ignoreDeck && f.terrain) ? f.terrain : f.data;
+    return src[j * f.w + i];
   }
 
   // Does a footprint sit on ONE level? A tower straddling a deck edge ends up
@@ -2139,7 +2204,7 @@ var World3D = (function () {
       // A flier rides above its own path point; a walker sits on it. Read once
       // here so the mesh branch and the sphere branch cannot drift apart, and
       // so the sphere types that are still fliers rise too.
-      var lift = groundHeightAt(e.pos.x, e.pos.y) + bodyLift(e, radius);
+      var lift = groundHeightAt(e.pos.x, e.pos.y, e.isFlying) + bodyLift(e, radius);
       // BUILT ONCE PER RENDERED FRAME, DELIBERATELY OUTSIDE THE CAMO LOOP.
       // `strikeOf` is written to be idempotent within a frame -- the latch
       // moves only when the drive RISES -- but relying on that where hoisting
@@ -5405,7 +5470,12 @@ var World3D = (function () {
     // a tower bridging a deck edge is half planted and half in mid-air, and
     // that is a picture no amount of shading fixes. Both answer safely when
     // there is no 3D board at all, so the 2D fallback keeps its old behaviour.
-    groundHeightAt: function (x, y) { return enabled ? groundHeightAt(x, y) : 0; },
+    // `ignoreDeck` passes straight through: a caller asking what a FLIER is over
+    // wants the ground, not the depot's ramp. Dropped here for one commit, which
+    // made every probe of the second layer answer with the first.
+    groundHeightAt: function (x, y, ignoreDeck) {
+      return enabled ? groundHeightAt(x, y, ignoreDeck) : 0;
+    },
     // The board's height field itself, read-only, for a test that has to prove
     // a scenery change did not move a build spot. The PICTURE not changing is
     // not that proof -- placement reads this, never the screen.
