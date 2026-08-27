@@ -13,7 +13,9 @@
 //
 //   attack   swings at the nearest tower in reach, and    (attackTowers,
 //            optionally (`facesTarget`) stops to turn      beginAttackPosture)
-//            toward it, strike, and turn back first
+//            toward it, strike, and turn back first --
+//            or (`lunge`) dives onto it, and             (resolveAttack)
+//            (`selfDestructs`) dies of the impact
 //   shield   a pool that soaks damage first, and what     (takeDamage,
 //            breaking it does to the enemy                breakShield)
 //   revive   gets back up once, at full health            (tryRevive)
@@ -237,6 +239,12 @@ function Enemy(path, health, typeId, overrides) {
   this.healTimer = 0;
   this.healFlash = 0;
 
+  // Scratch, written by a distance-sorted support pulse and read by its sort
+  // one line later. Declared HERE rather than sprung on the instance mid-pulse
+  // so every body has the same shape from birth; it means nothing between
+  // pulses and nothing reads it outside supportCandidates.
+  this.supportDistance2 = 0;
+
   // Health that has been HEALED BACK, and which damage-led mechanics have
   // therefore already counted once. It sits on top of `health`, so it is the
   // first thing a blow takes off and is not reported twice. See takeDamage.
@@ -284,6 +292,22 @@ function Enemy(path, health, typeId, overrides) {
   // always the one that was announced.
   this.windUpTimer = 0;
   this.windUpAttack = null;
+
+  // THE TOWER A COMMITTED WIND-UP IS AIMED AT, or null.
+  //
+  // An ordinary wind-up freezes the SPEC and re-resolves the TARGET when it
+  // lands -- the Tyrant telegraphs "an aimed shot" and picks whichever tower
+  // has the highest DPS at the moment the shot goes off, which is right for a
+  // move whose whole character is "it picks your best one".
+  //
+  // A spec carrying `commitsTarget` freezes both. The Sapper telegraphs AT one
+  // tower for 1.1 s in front of the player; re-resolving would mean the cue
+  // pointed at one tower and a different one went dark, and it would wreck the
+  // rule that two Sappers telegraphing the same tower resolve to one disable
+  // and one fizzle. A committed target that is gone, sold, destroyed, already
+  // disabled or immune when the clock runs out resolves to NOTHING -- the
+  // cycle is spent and no effect lands. See resolveAttack.
+  this.windUpTarget = null;
   this.shockwaveFlash = 0;           // cosmetic, for a leap's landing
   this.attackBeam = null;            // cosmetic, {x, y, life} -- where a shot went
 
@@ -341,6 +365,21 @@ function Enemy(path, health, typeId, overrides) {
   // Movement slow. One slow at a time, never stacked -- see applySlow.
   this.slowMultiplier = 1;           // 1 = full speed, 0.35 = 65% slowed
   this.slowTimer = 0;                // seconds of slow remaining
+
+  // Movement HASTE -- the mirror image of the slow above, and the Herald's
+  // whole mechanic (2026-08-27). One haste at a time, never stacked: the
+  // strongest applies and an equal one refreshes its duration. See applyHaste.
+  //
+  // IT IS A TIMED MULTIPLIER AND NOT A WRITE ONTO ANYTHING PERMANENT, which is
+  // the entire reason it cannot introduce speed drift. `speedScale` is what a
+  // Bulwark's broken shield moves and it never comes back; `speedUlps` is what
+  // the TYPE walks at. This is neither -- currentSpeedUlps multiplies by it,
+  // and update() puts it back to exactly 1 when the timer expires, so any
+  // number of pulses over any number of minutes leaves a body walking at
+  // precisely the pace it was born with.
+  this.hasteMultiplier = 1;          // 1 = unhastened, 1.3 = +30%
+  this.hasteTimer = 0;               // seconds of haste remaining
+  this.hasteFlash = 0;               // cosmetic, 1 -> 0, set when a pulse lands
 
   // A TIMED movement stun (2026-07-30, for the Warbringer's B5 earthquake).
   // Distinct from all three of the other ways an enemy can be stopped, and
@@ -633,14 +672,13 @@ Enemy.TYPES = {
   // a filler wave -- 250 remaining health against a 100 HP base means letting
   // it through ends the run, so wave 11 asks whether the board has been built.
   //
-  // (Wave 11 is its only appearance, and one body walks in. The wave-11 row in
-  // EASY_WAVES overrides the 250 UPWARDS, so the figures below are the type's
-  // floor rather than what arrives -- read the override off that row, not from
-  // here. Neither the body count per difficulty nor the override value is
-  // repeated in this paragraph any more: the first died when the Normal and
-  // Hard derivations were deleted on 2026-08-12 and EASY_WAVES became the only
-  // schedule, and the second is a schedule number that moves independently of
-  // this type.)
+  // (It walks in once per campaign: wave 11 of Easy and wave 14 of Normal, one
+  // body each. NEITHER schedule overrides its health, which makes this row the
+  // only place the 250 lives -- and both waves record at length why raising it
+  // turns a check into a wall. Read the wave numbers off the schedules in
+  // js/game.js rather than from here; a type row that lists its own appearances
+  // is a list that goes stale on the next retune, which this paragraph has
+  // already been twice.)
   midboss: {
     id: "midboss",
     displayName: "Midboss",
@@ -952,11 +990,14 @@ Enemy.TYPES = {
   // asked to look at them before anything was built around them -- and were
   // fitted into the schedule afterwards.
   //
-  // The wave numbers are NOT repeated here: read them off EASY_WAVES in
-  // js/game.js, which is the only schedule. The list that used to sit here was
-  // wrong twice over -- it credited a Normal and a Hard that no longer exist
-  // (those derivations were deleted on 2026-08-12), and it gave each type a
-  // single wave when the Shieldbearer alone appears in several.
+  // The wave numbers are NOT repeated here: read them off EASY_WAVES and
+  // NORMAL_WAVES in js/game.js. The list that used to sit here was wrong twice
+  // over -- it credited a Normal and a Hard that were DERIVED by multiplier and
+  // have since been deleted (2026-08-12), and it gave each type a single wave
+  // when the Shieldbearer alone appears in several. There are two authored
+  // schedules again as of 2026-08-27 and the argument is unchanged: the index
+  // derives every appearance, per difficulty, and a list here would be a third
+  // copy.
   //
   // Nothing carries `sandboxOnly` any more. The flag still works and is still
   // the way to park a type in the index and the sandbox, but the test "every
@@ -1204,6 +1245,369 @@ Enemy.TYPES = {
     isCamo: true,
     armor: 5,
     defense: 20
+  },
+
+  // --- v0.5.1: THE THREE NORMAL-DIFFICULTY TYPES ---------------------------
+  //
+  // Authored for the Normal schedule (NORMAL_WAVES in js/game.js) and reachable
+  // from the sandbox on either. None of them appears in EASY_WAVES, which is
+  // deliberate and is the whole reason the difficulty layer exists: Easy is
+  // frozen at the thirty-five waves and 830 bodies it has always had, and a new
+  // type that showed up in it would be a retune of a schedule nobody asked to
+  // retune.
+  //
+  // ALL THREE ARE DATA. Between them they use three mechanic blocks -- one new
+  // (`deathEffect`) and two that already existed and grew a field (`support`
+  // gained `haste` and `eligible`; `attack` gained `disable` and
+  // `commitsTarget`). NOTHING in js/, js/systems/ or js/gl/ branches on the
+  // strings "herald", "sapper" or "volatile". A test reads the source and says
+  // so, because the file's founding promise -- no type has behaviour of its own
+  // -- is exactly the thing three new types at once would quietly break.
+
+  // THE HERALD. It does not fight and it does not tank: it makes everything
+  // around it arrive sooner.
+  //
+  // Every 8 s it hands +30% movement speed for 4 s to as many as eight nearby
+  // eligible allies within 160 u.l. What that costs the player is the ONE
+  // resource a tower defense board cannot buy more of -- time in the circle.
+  // A body moving at 1.3x spends 23% less of its life under fire, and a
+  // Herald in the middle of a swarm applies that to eight of them at once.
+  //
+  // WHY IT IS SLOW (0.55x, 27.5 u.l./s -- slower than a Brute). It has to be
+  // the thing left BEHIND by what it hastes, so the player watches the wave
+  // pull away from the body that is doing it. A fast Herald would be one more
+  // runner in the crowd; a slow one is an argument for shooting the support,
+  // which is the lesson wave 27 of Easy teaches with the Shieldbearer and this
+  // type asks again at a different mechanic.
+  //
+  // ELIGIBILITY IS WRITTEN AS PROPERTIES, NEVER AS A LIST OF IDS. See
+  // `eligible` below and Enemy.supportEligible: flying bodies, every rung of
+  // the Fractal ladder, anything wearing a boss banner (the Midboss, the
+  // Vanguard and the Tyrant) and other Heralds are all excluded by a FLAG each
+  // of those types already carried. Hasting a boss is a balance decision
+  // nobody made; hasting a Fractal root would compound through five
+  // generations; and a pair of Heralds hasting each other would be a support
+  // type that is hardest to catch exactly when there are most of them.
+  //
+  // HASTE NEVER STACKS. Enemy.applyHaste takes the strongest and refreshes on
+  // an equal one -- the same rule applySlow follows, pointed the other way --
+  // and the multiplier is a TIMED FIELD read by currentSpeedUlps rather than
+  // anything written onto `speedUlps` or `speedScale`. That is what makes
+  // repeated pulses incapable of leaving permanent speed behind: the field
+  // goes back to exactly 1 when the timer expires, whatever happened to it.
+  herald: {
+    id: "herald",
+    displayName: "Herald",
+    description: "A slow standard-bearer that hastens the bodies around it. Every 8 s it grants up to eight nearby ground allies +30% speed for 4 s. It cannot hasten fliers, Fractal Slimes, bosses or other Heralds.",
+    health: 100,
+    bounty: 120,
+    speedMultiplier: 0.55,          // 27.5 u.l./s -- half a pace, deliberately
+    color: { r: 198, g: 122, b: 246 },
+    outlineWidth: 4,
+    sizeScale: 1.15,
+    laneSpread: 0.35,
+    support: {
+      intervalSeconds: 8,
+      targets: 8,
+      reachUl: 160,
+      // NEAREST, and the tie-break is `laneIndex` -- the spawn counter every
+      // body carries (Enemy.nextLaneIndex). Two bodies at the same distance is
+      // not a hypothetical: a salvo of Swarm 0.13 s apart puts several within a
+      // float of each other, and "whichever the sort happened to produce" is
+      // not a schedule. The counter is unique, monotonic and already
+      // deterministic across a restart (Enemy.resetLanes), so it is the tie
+      // break that costs nothing to have.
+      pick: "nearest",
+      haste: { speedMultiplier: 1.3, seconds: 4 },
+      eligible: {
+        excludeFlying: true,        // Aether Wisp, Healer
+        excludeFractal: true,       // every tier AND every descendant
+        excludeBanner: true,        // Midboss, Vanguard, Tyrant
+        excludeSameType: true       // itself, and every other Herald
+      },
+      // A straight cord, like the Healer's: this AIMS at the bodies it picks
+      // rather than lobbing something over to them, and the mark's whole job
+      // is to name which eight. 1.2 s against an eight-second interval.
+      tether: { seconds: 1.2, color: { r: 214, g: 158, b: 255 } }
+    }
+  },
+
+  // THE SAPPER. It never damages a tower; it switches one off.
+  //
+  // Every 8 s it looks for the nearest living, vulnerable tower within 90 u.l.,
+  // STOPS for 1.1 s in plain sight of it, and -- if both of them are still
+  // there and the tower is still vulnerable -- disables it for 2 s. Then that
+  // tower is immune to every Sapper on the board for 4 s after it comes back.
+  //
+  // THE IMMUNITY IS THE WHOLE DESIGN. Without it, three Sappers walking
+  // together would hold one tower silent permanently, which is not a threat the
+  // player can answer with anything but "do not build there". With it, the
+  // worst any number of Sappers can do to one tower is a 2-in-6 duty cycle, and
+  // what they actually buy is the ATTENTION of the guns near the road while a
+  // heavier wave crosses. The 1.1 s telegraph is the fairness half: a Sapper
+  // standing still is a Sapper you were given time to kill.
+  //
+  // IT COMMITS TO ITS TARGET (`commitsTarget`), which is the one thing that
+  // separates this from every other attack in the file. An ordinary wind-up
+  // re-resolves against the board when it lands, so a Tyrant whose chosen tower
+  // died mid-telegraph simply hits the next one. That would make a Sapper's
+  // telegraph a lie -- the cue points at one tower and something else goes
+  // dark -- and it would break the simultaneous-resolution rule below. A
+  // committed attack whose target is gone, sold, destroyed, already disabled or
+  // immune FIZZLES: it consumes its cycle and does nothing.
+  //
+  // AND THAT FIZZLE IS HOW SIMULTANEOUS SAPPERS RESOLVE. Two of them may
+  // telegraph the same vulnerable tower; the main loop walks `enemies` in
+  // order, so the earlier body resolves first, disables the tower and stamps
+  // the immunity, and the later one then finds its committed target disabled
+  // and fizzles -- WITHOUT refreshing or extending the stun, because it never
+  // reaches TowerHealth.stun at all. Deterministic, and it needs no
+  // arbitration code: it falls out of the order the loop already has.
+  //
+  // NO DAMAGE, DELIBERATELY. `damage` is absent rather than 0 -- the same
+  // never-materialise-a-default rule the wave data follows -- and resolveAttack
+  // reads `spec.damage > 0`, so nothing is dealt. A Sapper that also chipped a
+  // tower's health would be a worse Angry; what it is instead is the only enemy
+  // in the game whose answer is redundancy rather than firepower.
+  sapper: {
+    id: "sapper",
+    displayName: "Sapper",
+    description: "A saboteur that deals no damage. Every 8 s it stops for 1.1 s beside the nearest tower within 90 u.l. and shuts it down for 2 s; that tower is then immune to Sappers for 4 s.",
+    health: 45,
+    bounty: 60,
+    speedMultiplier: 0.8,           // 40 u.l./s
+    color: { r: 96, g: 226, b: 214 },
+    outlineWidth: 3,
+    sizeScale: 1,
+    laneSpread: 0.5,
+    attack: {
+      reachUl: 90,
+      intervalSeconds: 8,           // and the timer starts FULL, so the first
+                                    // cycle is 8 s too -- see the constructor
+      windUpSeconds: 1.1,           // it STOPS for this; currentSpeedUlps
+      commitsTarget: true,
+      disable: {
+        seconds: 2,
+        immuneSeconds: 4,           // AFTER it recovers, so 2 + 4 = 6 s of
+                                    // invalidity from the moment it goes dark
+        immunityKey: "sapper"
+      }
+    }
+  },
+
+  // THE VOLATILE. Tiny, fast, cheap -- and it does not wait to be killed.
+  //
+  // IT DIVES (2026-08-27, at the owner's instruction: "they jump into the
+  // closest tower to them, dealing the same amount of damage as when they
+  // originally died. the explosion on death is kept, but its range is
+  // increased"). The moment a tower is within 75 u.l. it leaps onto that
+  // tower, hits it for 13, and dies of the impact -- and the death then arms
+  // the charge exactly as a death by gunfire does, on the tower it landed on.
+  // So a Volatile that reaches your guns costs 13 on the nose plus 13 to
+  // everything within 60 u.l. a second later, and the ONLY way to pay less
+  // than that is to kill it out on the road before it is in range.
+  //
+  // RETUNED THE SAME DAY, at the owner's instruction: "8 HP, 1.5x faster,
+  // range to jump reduced to 75 UL, range of their aoe explosion reduced to
+  // 60UL ... they should also deal 13 damage instead of 20". Every one of
+  // those pushes the same way. It went from a body you had to spend real fire
+  // on to one that ALMOST ANY SHOT KILLS -- 8 points is under a single
+  // Warbringer round -- and in exchange it arrives at 75 u.l./s, closes from
+  // half the distance it used to, and blows a hole a quarter the old area. The
+  // threat is no longer that one is hard to stop; it is that they come at you
+  // faster than a slow gun can re-aim, and what stops them is RATE OF FIRE
+  // rather than damage.
+  //
+  // 1.5x IS NOT THE TOP OF THE ROSTER and is not meant to be -- a Fast and a
+  // Camo Fast both run 1.75, and a Vanguard settles there. What 1.5 buys is
+  // the gap to everything that ATTACKS: the Angry crawls at 0.7 and the
+  // Sapper at 0.8, so among the bodies a player has to answer with placement
+  // rather than with raw damage, this one arrives roughly twice as fast as
+  // anything else.
+  //
+  // THE DIVE REACHES FURTHER THAN THE BLAST, and since that retune those are
+  // two different numbers on purpose. It crosses 75 u.l. to reach a tower and
+  // then only takes 60 with it, so the tower it dived into is always inside
+  // its own blast while a neighbour 70 u.l. behind that one is not. Spacing
+  // now buys something it did not buy when the two were one number: a second
+  // gun far enough back is out of the explosion even though the first was
+  // close enough to be dived at.
+  //
+  // BOTH HALVES ARE GENERIC BLOCKS, which is the rule this file opens by
+  // stating. `lunge` and `selfDestructs` are read off the SPEC by
+  // resolveAttack, never off a type id, so a second diver is another row here
+  // and no code at all -- the same arrangement `facesTarget`, `leap`,
+  // `commitsTarget` and `deathEffect` already have.
+  //
+  // `intervalSeconds: 0` IS NOT A PLACEHOLDER. attackTimer starts at the
+  // spec's interval (see the constructor), so a positive one would make the
+  // body walk past a tower for that long before it was allowed to dive. It
+  // dies on its first and only swing, so a cooldown has nothing left to time.
+  //
+  // Killing one leaves a hazard where it fell. One second later the hazard
+  // detonates for exactly 13 damage to every LIVING TOWER within 60 u.l. It
+  // does not stun, it does not touch the base, and it does not touch other
+  // enemies -- which is what makes "a Volatile explosion never triggers another
+  // Volatile explosion" a fact about the shape of the effect rather than a
+  // special case somebody remembered to write.
+  //
+  // A LEAK STILL LEAVES NOTHING, and it is now a rarer thing to see: the
+  // hazard is created in game.js's end-of-life sweep, on the `dead` branch
+  // only, and a dive is a `dead`. A body that walks all the way into the base
+  // past every tower costs its remaining health and nothing else -- and at
+  // 8 points that leak is now nearly free, which is the other half of the
+  // retune: the punishment for a Volatile has moved almost entirely onto the
+  // towers it reaches.
+  //
+  // A DIVE PAYS ITS BOUNTY, because a dive is a death and the `dead` branch is
+  // where this game pays. That is deliberate rather than overlooked: making a
+  // self-destruct a THIRD fate beside `dead` and `leaked` would have bought a
+  // $25 difference with a second place that decides what a body is worth, and
+  // the player who let it in has already paid 26 points of tower health for
+  // the privilege.
+  //
+  // THE BOUNTY IS UNCHANGED AT 25, and against 8 health that is deliberate
+  // rather than an oversight left behind by the retune. It is the best
+  // cash-per-point on the roster by a wide margin, and it has to be: the
+  // answer to a Volatile wave is to kill every one of them EARLY, and a game
+  // that asks for that should pay for it. See Enemy.bountyOf for how a wave's
+  // health override rescales it, which is what keeps the late-campaign
+  // Volatiles from paying this rate on a bigger body.
+  //
+  // THE HAZARD IS NOT AN ENEMY. It lives in its own list (js/systems/hazards.js)
+  // and never in `enemies`, so it cannot hold a wave open, cannot hold the
+  // victory screen away, and pays nothing -- the bounty, the score, the kill
+  // credit, the death burst and the death sound all happen once, at the
+  // death, in the one place this game decides an enemy's fate exactly once.
+  volatile: {
+    id: "volatile",
+    displayName: "Volatile",
+    description: "A tiny, very fast runner that dives into the nearest tower within 75 u.l., dealing 13 damage on impact and dying of it. One second later the charge it leaves deals 13 more to every tower within 60 u.l. It has only 8 health, so almost any shot stops one -- if a gun is pointing at it in time. Leaking into the base leaves nothing behind.",
+    health: 8,                      // almost any single shot kills one
+    bounty: 25,
+    speedMultiplier: 1.5,           // 75 u.l./s. Not the fastest thing on the
+                                    // road -- a Fast is 1.75 -- but by a wide
+                                    // margin the fastest that acts on towers
+    color: { r: 190, g: 240, b: 62 },
+    outlineWidth: 2,
+    sizeScale: 0.9,
+    laneSpread: 0.8,
+    attack: {
+      damage: 13,                   // the same 13 the charge deals
+      reachUl: 75,                  // how far it will cross to reach a tower
+      intervalSeconds: 0,           // see above -- it never gets a second swing
+      lunge: true,                  // move ONTO the tower, then hit it
+      selfDestructs: true           // and die of the impact
+    },
+    deathEffect: {
+      hazard: {
+        kind: "volatile-blast",
+        fuseSeconds: 1,
+        radiusUl: 60,               // SHORTER than the dive -- see above
+        towerDamage: 13
+      }
+    }
+  },
+
+  // --- THE DINOMECH -- Normal's wave-40 finale ------------------------------
+  //
+  // 2026-08-28, at the owner's instruction: an enemy called `dinomech` with
+  // 45 000 hit points, standing at the end of a Normal campaign extended from
+  // thirty-five waves to forty. It is the second boss on the roster and it is
+  // deliberately NOT a second Tyrant.
+  //
+  // WHAT IT IS NOT, and every absence here is load-bearing:
+  //
+  //   NO `shield`   -- 45 000 means 45 000. `waveEffectiveHealth` multiplies a
+  //                    type's shield ratio into the wave total, so a shell of
+  //                    any size would make the authored figure a lie the moment
+  //                    anybody quoted it.
+  //   NO `revive`   -- same arithmetic, same reason.
+  //   NO `phases`   -- and this is the one that matters most. The Tyrant's roar
+  //                    calls in forty bodies, three Healers, three Shieldbearers
+  //                    and two Hives among them. Wave 40 is specified as a wave
+  //                    with no support of any kind in it, and a phase block is
+  //                    the only way this type could have put one there. There is
+  //                    nothing for `checkPhases` to enter.
+  //   NO `support`  -- it helps nothing and nothing helps it.
+  //
+  // So its effective health is exactly its health, its half-way mark changes
+  // nothing about it, and what the player has to bring is sustained damage for
+  // as long as it takes. That IS the fight: the Tyrant asks whether the board
+  // has DEPTH, and this one asks whether it has THROUGHPUT.
+  //
+  // IT BREAKS TOWERS WHERE THE TYRANT SILENCES THEM. Two attacks in a pool it
+  // cycles deterministically (`attackIndex`, never Math.random), and the split
+  // between them is the same shape as the Tyrant's -- one blow that picks the
+  // board's single best gun wherever it stands, one that takes a whole corner:
+  //
+  //   RAIL      60 damage and a 2.5 s stun to the highest-DPS tower on the
+  //             board, every 14 s, after a 1.4 s wind-up. No `reachUl`, so it
+  //             is the whole map, exactly as the Tyrant's aimed shot is.
+  //   STOMP     it crouches for 2 s, jumps 70 u.l. up the road and lands with a
+  //             140 u.l. shockwave for 90 damage. NO STUN AT ALL, deliberately:
+  //             a tower caught by this is meant to be REBUILT, not waited out,
+  //             and stacking a second silence on top of the rail would make the
+  //             fight a lockout rather than a race.
+  //
+  // Both stop it dead for their wind-up (`currentSpeedUlps` enforces it), which
+  // is what keeps a heavy blow fair and is also the only thing that makes 45 000
+  // hit points crossable at all inside a wave with no ceiling.
+  //
+  // SPEED 0.25 -- 12.5 u.l./s, the slowest body in the game, under the Tyrant's
+  // 15. It crosses the reference route in about two and a half minutes if
+  // nothing stops it, and wave 40 authors no `duration`, so the run is decided
+  // by whether the board out-damages it rather than by a clock.
+  //
+  // BOUNTY 6000. Twice the Tyrant's and a seventh of its own health, where the
+  // Tyrant pays six tenths of its own -- deliberately under-priced per point,
+  // because wave 40 is the last wave in the schedule and there is nothing left
+  // to buy. It is paid so the final kill still reads as a kill; it is not a
+  // purse anybody can spend.
+  //
+  // NO MESH. There is no js/gl/models/enemy-dinomech.js, so `enemyModel` finds
+  // nothing and the 3D board draws it as an untextured sphere at sizeScale 2.6
+  // -- the documented fallback for every unmodelled type. That is a known
+  // visual gap and it is recorded in AGENTS.md rather than hidden here; adding
+  // a body is a modelling job with its own gates, not a side effect of a
+  // schedule change.
+  dinomech: {
+    id: "dinomech",
+    displayName: "Dinomech",
+    description: "The Normal campaign's final boss: 45 000 hit points of walking siege frame, with no shield, no second life and no phase change. It rails the board's single best tower for 60 and a 2.5 s stun, and stomps for 90 across a 140 u.l. landing with no stun at all. Nothing heals it, nothing shields it, and it calls nothing in -- what it asks for is sustained damage, for as long as it takes.",
+    health: 45000,
+    bounty: 6000,
+    speedMultiplier: 0.25,          // 12.5 u.l./s -- slower than the Tyrant
+    color: { r: 214, g: 132, b: 54 },
+    outlineWidth: 7,
+    sizeScale: 2.6,
+    laneSpread: 0,                  // dead centre; it more than fills the road
+    showHealthBanner: true,
+    // No armor and no defense, for the Tyrant's reason: 45 000 is meant to be a
+    // wall you grind, not a wall that also taxes every shot that reaches it.
+    attacks: [{
+      id: "rail",
+      windUpSeconds: 1.4,
+      intervalSeconds: 14,
+      // NO reachUl -- a missing reach is the whole map, the same reading
+      // attackCandidates gives the Tyrant's aimed shot.
+      target: "highestDps",
+      targets: 1,
+      damage: 60,
+      stunSeconds: 2.5
+    }, {
+      id: "stomp",
+      windUpSeconds: 2,
+      intervalSeconds: 14,
+      reachUl: 240,                 // how far a tower may be and still be worth
+                                    // jumping at
+      damage: 90,
+      // Deliberately no stunSeconds. See the note above.
+      leap: {
+        distanceUl: 70,
+        radiusUl: 140
+      }
+    }]
   }
 };
 
@@ -1506,7 +1910,11 @@ Enemy.prototype.currentSpeedUlps = function () {
   // posture clearing to null) gives it back.
   if (this.attackPosture) return 0;
 
-  var speed = this.speedUlps * this.slowMultiplier * this.speedScale;
+  // The haste multiplier sits beside the slow one and is applied the same way:
+  // a body that is both slowed and hastened gets both, which is the honest
+  // answer and the only one that keeps `applySlow` meaning what it says.
+  var speed = this.speedUlps * this.slowMultiplier * this.speedScale *
+    this.hasteMultiplier;
 
   // A `sprint` block: faster over the OPENING STRETCH of the road, and then
   // never again. Keyed on progress rather than on a timer, deliberately -- it
@@ -1583,6 +1991,19 @@ Enemy.prototype.update = function (dt) {
     }
   }
 
+  // The Herald's haste, aged on this body's own clock and RESET TO EXACTLY 1
+  // when it lapses -- never decayed towards 1, which is how a repeated timed
+  // multiplier leaves permanent drift behind. It is aged BEFORE the movement
+  // below, exactly as the slow above is, so a haste that expires this step
+  // does not buy one more hastened frame.
+  if (this.hasteTimer > 0) {
+    this.hasteTimer -= dt;
+    if (this.hasteTimer <= 0) {
+      this.hasteTimer = 0;
+      this.hasteMultiplier = 1;
+    }
+  }
+
   // Regeneration put on by a Healer. Ticked HERE rather than by the Healer
   // itself, which is what makes it survive the Healer's death: the heal is a
   // four-second effect on this body, not a beam somebody has to keep holding.
@@ -1643,6 +2064,9 @@ Enemy.prototype.update = function (dt) {
   }
   if (this.healFlash > 0) {
     this.healFlash = Math.max(0, this.healFlash - dt * 2);
+  }
+  if (this.hasteFlash > 0) {
+    this.hasteFlash = Math.max(0, this.hasteFlash - dt * 2);
   }
   if (this.stunFlash > 0) {
     this.stunFlash = Math.max(0, this.stunFlash - dt * 1.5);
@@ -1819,9 +2243,46 @@ Enemy.prototype.splitOnDeath = function () {
 // supporter's own body is a candidate like any other, which is why a wounded
 // Healer will top itself up and why the Shieldbearer is usually one of the ten
 // it shields.
+// WHO A SUPPORT PULSE MAY LAND ON, stated as PROPERTIES rather than as a list
+// of type ids.
+//
+// The Herald's exclusions are the reason this exists, and every one of them is
+// read off a flag the excluded type already carried for its own reasons:
+//
+//   excludeFlying    `isFlying` -- the Aether Wisp and the Healer. A Herald
+//                    that hastened the air would make the split-coverage waves
+//                    (16, 33) one question instead of two.
+//   excludeFractal   `fractal` -- every rung AND every descendant, because a
+//                    cascade is one type row. Hasting a T4 root would compound
+//                    through 341 bodies off one pulse.
+//   excludeBanner    `showHealthBanner` -- the Midboss, the Vanguard and the
+//                    Tyrant, which is exactly the set of bodies whose pacing is
+//                    a designed fight rather than a walk. The Vanguard already
+//                    sprints at 175 u.l./s; +30% on top of that is a number
+//                    nobody chose.
+//   excludeSameType  itself and every other body of its own type. A pair of
+//                    Heralds hastening each other would make the support type
+//                    hardest to catch precisely when there are most of them.
+//
+// A LIST OF IDS WOULD HAVE BEEN WRONG TWICE OVER: it would go stale the day a
+// second flier or a second boss lands, and it would put the three new type ids
+// into shared behaviour code, which is the one thing this file's header
+// forbids. `Enemy.TYPES` gains a row; this function does not change.
+Enemy.supportEligible = function (source, candidate, rule) {
+  if (!rule) return true;
+  var type = candidate.type;
+  if (rule.excludeFlying && type.isFlying) return false;
+  if (rule.excludeFractal && type.fractal) return false;
+  if (rule.excludeBanner && type.showHealthBanner) return false;
+  if (rule.excludeSameType && candidate.typeId === source.typeId) return false;
+  return true;
+};
+
 Enemy.prototype.supportCandidates = function (spec, enemies) {
   var out = [];
   var reachPx = spec.reachUl === undefined ? Infinity : ul(spec.reachUl);
+  var origin = this.pos;
+  var byDistance = spec.pick === "nearest";
 
   for (var i = 0; i < enemies.length; i++) {
     var e = enemies[i];
@@ -1847,15 +2308,40 @@ Enemy.prototype.supportCandidates = function (spec, enemies) {
     // is untouched. A supporter aimed at others now never lands on itself, and
     // one aimed at itself still does.
     if (e === this) continue;
-    if (reachPx !== Infinity) {
-      var dx = e.pos.x - this.pos.x;
-      var dy = e.pos.y - this.pos.y;
-      if (dx * dx + dy * dy > reachPx * reachPx) continue;
+    // The spec's own eligibility rule, if it carries one. Everything without
+    // an `eligible` block behaves exactly as it did before this existed.
+    if (!Enemy.supportEligible(this, e, spec.eligible)) continue;
+    if (reachPx !== Infinity || byDistance) {
+      var dx = e.pos.x - origin.x;
+      var dy = e.pos.y - origin.y;
+      var d2 = dx * dx + dy * dy;
+      if (reachPx !== Infinity && d2 > reachPx * reachPx) continue;
+      // Parked on the candidate for the sort below, and ONLY for a spec that
+      // sorts by distance -- a Healer picks the most wounded and has no reach,
+      // so it would be a field written onto every body on the road for nothing.
+      if (byDistance) e.supportDistance2 = d2;
     }
     out.push(e);
   }
 
-  if (spec.pick === "mostMissingHealth") {
+  if (spec.pick === "nearest") {
+    // NEAREST FIRST, AND THE TIE-BREAK IS THE SPAWN COUNTER.
+    //
+    // Two bodies at an identical distance is not a hypothetical here: a salvo
+    // of Swarm 0.13 s apart puts several of them within a float of each other
+    // of a Herald walking beside the column, and a `.sort()` with ties left in
+    // it is decided by whatever the engine does with equal elements -- which is
+    // not required to be stable and is emphatically not a schedule.
+    //
+    // `laneIndex` is Enemy.nextLaneIndex()'s value: unique per body, monotonic
+    // in spawn order, and already reset by restartGame() through
+    // Enemy.resetLanes, so it costs nothing to have and makes the pick
+    // reproducible run to run.
+    out.sort(function (a, b) {
+      return (a.supportDistance2 - b.supportDistance2) ||
+        (a.laneIndex - b.laneIndex);
+    });
+  } else if (spec.pick === "mostMissingHealth") {
     // MISSING health, not lowest health: a 200 HP Healer at 150 is worth more
     // of a heal than a 4 HP normal at 1, and "whoever your board has just spent
     // its shots on" is the enemy this is meant to describe. Ties break on the
@@ -1910,6 +2396,12 @@ Enemy.prototype.supportAllies = function (dt, enemies) {
   for (var i = 0; i < picked.length; i++) {
     if (spec.shield > 0) picked[i].grantShield(spec.shield, spec.stacks !== false);
     if (spec.heal) picked[i].applyHeal(spec.heal.perSecond, spec.heal.seconds);
+    // The Herald's block. Read the same way as the two above -- "does this
+    // spec ask for one" -- so a supporter that grants shields AND haste would
+    // need no new branch here.
+    if (spec.haste) {
+      picked[i].applyHaste(spec.haste.speedMultiplier, spec.haste.seconds);
+    }
     // A CORD PER BODY HELPED, if this supporter's spec asks for them. Recorded
     // rather than drawn, because the pulse resolves in the simulation and the
     // two boards draw it in their own space -- and because `picked` is thrown
@@ -1967,6 +2459,41 @@ Enemy.prototype.applyHeal = function (perSecond, seconds) {
   this.healTimer = seconds;
 };
 
+// Put HASTE on this enemy: `multiplier` times its walking speed, for
+// `seconds`.
+//
+// TAKEN, NEVER STACKED -- the strongest applies, an equal one refreshes the
+// duration, and a weaker one cannot dilute what is already running. That is
+// applySlow's rule pointed the other way, and it is what the Herald's brief
+// means by "haste never stacks; another pulse only refreshes its duration":
+// two Heralds pulsing the same Swarm make the +30% LAST rather than compound
+// into +69%, so "+30% for 4 s" stays a number the index can state truthfully
+// however many of them are on the road.
+//
+// IT SURVIVES THE HERALD. The timer is on the body that was hastened and is
+// aged by that body's own update(), so killing the source mid-pulse does not
+// take the speed back -- the same shape as a Healer's regeneration, and for
+// the same reason: this is an effect on the target, not a beam somebody has to
+// keep holding.
+//
+// AND IT LEAVES NOTHING BEHIND. See `hasteMultiplier` in the constructor: the
+// field is reset to exactly 1, never decayed towards it, so no number of
+// pulses can accumulate a permanent fraction of speed.
+Enemy.prototype.applyHaste = function (multiplier, seconds) {
+  if (!(multiplier > 1) || !(seconds > 0)) return;
+  if (multiplier < this.hasteMultiplier) return;   // weaker: ignore completely
+  this.hasteMultiplier = multiplier;
+  this.hasteTimer = seconds;
+  this.hasteFlash = 1;
+};
+
+// Is this body running on a Herald's pulse right now? Its own predicate
+// because both renderers ask it and so do the tests, and none of them should
+// have to know which of two fields carries the answer.
+Enemy.prototype.isHastened = function () {
+  return this.hasteTimer > 0 && this.hasteMultiplier > 1;
+};
+
 // Restore health, clamped at this body's maximum.
 //
 // Everything restored is banked in `healedHealth`, which is what stops the
@@ -1991,6 +2518,318 @@ Enemy.prototype.heal = function (amount) {
 Enemy.attacksOf = function (type) {
   if (type.attacks) return type.attacks;
   return type.attack ? [type.attack] : [];
+};
+
+// --- WHAT MAKES A TYPE DIFFERENT FROM A NORMAL, AS DATA --------------------
+//
+// One ordered list of TRAITS per type. Each row is an id, a short label, a
+// sentence of detail carrying this type's own numbers, the colour that names
+// it, and -- for the ones a card is entitled to lead with -- the single-line
+// BADGE the index prints.
+//
+// TWO READERS, ONE LIST, and that is the whole reason this lives here rather
+// than in either of them. `drawEnemySidebar` in js/game.js shows every trait a
+// hovered body carries; `enemyBadge` in js/codex.js shows the FIRST one with a
+// badge, which is exactly what the index has always printed. Written twice
+// those would be two copies of "what is distinctive about this enemy", and a
+// second copy of a table like this one is a copy that quietly stops matching
+// the roster the first time a type is retuned -- the failure this file's
+// founding rule (nothing branches on which type an enemy is) exists to avoid,
+// one level up.
+//
+// ORDER IS THE CONTRACT. It runs most-defining first -- can I even shoot it,
+// then does it shoot back, then what it does for the wave around it, then what
+// it does when hurt, then the plating -- and the codex's badge is a first-match
+// walk down it. The badge strings and colours below are the ones that file
+// printed before this existed, verbatim and in the same order, so the index
+// reads exactly as it did.
+//
+// READS BLOCKS, NEVER IDS. A new type carrying `attack` and `deathEffect` gets
+// both rows with nothing edited here; a new MECHANIC is one more `add()` below
+// and one more row on screen, which is the same bargain the nine mechanics at
+// the top of this file already offer.
+//
+// Takes a type id, an `Enemy.TYPES` row, or the codex's own enemy model -- that
+// model copies every block off the type under the same names, so all three are
+// the same object as far as this function is concerned.
+Enemy.TRAIT_COLORS = {
+  air: "rgba(160,225,255,0.95)",
+  camo: "rgba(190,255,205,0.9)",
+  tower: "rgba(255,224,120,0.95)",
+  disable: "rgba(140,240,230,0.95)",
+  blast: "rgba(215,255,120,0.95)",
+  attack: "rgba(255,150,100,0.95)",
+  haste: "rgba(212,160,255,0.95)",
+  brood: "rgba(150,230,190,0.95)",
+  split: "rgba(132,255,192,0.95)",
+  heal: "rgba(150,240,180,0.95)",
+  ownShield: "rgba(255,205,130,0.95)",
+  shield: "rgba(170,225,255,0.95)",
+  // A pool the body wears itself, which is NOT the colour of a shield it hands
+  // to somebody else -- the index has always drawn those two apart.
+  shieldPool: "rgba(150,225,245,0.95)",
+  revive: "rgba(255,236,170,0.95)",
+  // The plating rows, and the only colour here that no badge uses: armor and
+  // defense are things a body HAS rather than things it DOES, and they read as
+  // a stat line rather than as a warning.
+  plate: "rgba(206,216,236,0.92)"
+};
+
+Enemy.traitsOf = function (source) {
+  var type = typeof source === "string" ? Enemy.typeOf(source) : source;
+  var C = Enemy.TRAIT_COLORS;
+  var out = [];
+
+  function add(id, label, detail, color, badge) {
+    out.push({ id: id, label: label, detail: detail, color: color,
+               badge: badge || null });
+  }
+
+  // "within 47.5 u.l.", or nothing at all for a spec that has no reach --
+  // never "within undefined u.l.", which is what a materialised default would
+  // have printed for the Tyrant's board-wide aimed shot.
+  function within(spec) {
+    return spec.reachUl === undefined ? "" : " within " + spec.reachUl + " u.l.";
+  }
+
+  // "u.l." ENDS IN A FULL STOP OF ITS OWN, so a sentence that finishes on a
+  // reach must not be handed a second one -- "within 47.5 u.l.." is what a
+  // blind `+ "."` produced, on every attacking type in the roster.
+  function sentence(text) {
+    return /[.!?]$/.test(text) ? text : text + ".";
+  }
+
+  function plural(n, word) {
+    return n + " " + word + (n === 1 ? "" : "s");
+  }
+
+  // TWO IFS, NOT AN IF/ELSE, even though no type on the roster is both. A body
+  // that flew AND could not be seen would be two separate problems for the
+  // player and would need two rows to say so; the badge still leads with
+  // flight, because flight is first in the list.
+  if (type.isFlying) {
+    add("flying", "Flies",
+      "No ground-only tower can touch it. Answering it takes a tower with " +
+      "explicit air reach.",
+      C.air, "FLYING — needs air reach");
+  }
+  if (type.isCamo) {
+    add("camo", "Camouflaged",
+      "Invisible to every tower without camo detection — they shoot straight " +
+      "past it.",
+      C.camo, "CAMO — needs detection");
+  }
+
+  // ONE ROW PER ATTACK SPEC, through the same resolver attackTowers reads, so
+  // the Tyrant's pool and the Angry's single swing come out the same shape.
+  //
+  // THE BADGE BELONGS TO THE FIRST SPEC ONLY. The index has one line and has
+  // always described `attacks[0]`; a second spec is still a row in the sidebar,
+  // it just does not get to claim the headline.
+  var attacks = Enemy.attacksOf(type);
+  for (var i = 0; i < attacks.length; i++) {
+    var a = attacks[i];
+    var lead = (i === 0);
+    if (a.target === "highestDps") {
+      add("attack-best", "Hunts your best tower",
+        (a.damage || 0) + " damage" +
+        (a.stunSeconds ? " and a " + a.stunSeconds + " s stun" : "") +
+        " to the highest-DPS tower on the whole board, every " +
+        a.intervalSeconds + " s. Distance does not protect it.",
+        C.tower, lead ? "HUNTS YOUR BEST TOWER" : null);
+    } else if (a.stunSeconds) {
+      add("attack-stun", a.damage ? "Stuns your towers" : "Silences your towers",
+        sentence((a.damage ? a.damage + " damage and a " : "A ") + a.stunSeconds +
+          " s stun every " + a.intervalSeconds + " s" + within(a)),
+        C.tower, lead ? "STUNS YOUR TOWERS" : null);
+    } else if (a.disable) {
+      add("attack-disable", "Shuts towers down",
+        "Deals no damage. Every " + a.intervalSeconds + " s it stops" +
+        (a.windUpSeconds ? " for " + a.windUpSeconds + " s" : "") +
+        " beside a tower" + within(a) + " and switches it off for " +
+        a.disable.seconds + " s; that tower is then immune for " +
+        a.disable.immuneSeconds + " s, so several of them cannot hold one " +
+        "tower silent.",
+        C.disable, lead ? "SHUTS TOWERS DOWN — NO DAMAGE" : null);
+    } else if (a.lunge && a.selfDestructs) {
+      add("attack-dive", "Dives into towers",
+        "The moment a tower is" + (within(a) || " in reach") +
+        " it lands on the nearest one for " + (a.damage || 0) +
+        " and dies of the impact. It gets one dive, and a dive is a death.",
+        C.blast, lead ? "DIVES IN AND EXPLODES" : null);
+    } else {
+      add("attack", "Attacks your towers",
+        sentence((a.damage || 0) + " damage every " + a.intervalSeconds + " s" +
+          within(a) +
+          (a.leap ? "; leaps " + a.leap.distanceUl + " u.l. and catches a " +
+            a.leap.radiusUl + " u.l. area" : "")),
+        C.attack, lead ? "ATTACKS YOUR TOWERS" : null);
+    }
+  }
+
+  if (type.deathEffect && type.deathEffect.hazard) {
+    var hazard = type.deathEffect.hazard;
+    add("death-charge", "Explodes where it dies",
+      "Killing it arms a charge on the spot: " + hazard.towerDamage +
+      " damage to every tower within " + hazard.radiusUl + " u.l., " +
+      hazard.fuseSeconds + " s later. A leak leaves nothing.",
+      C.blast, "EXPLODES WHERE IT DIES");
+  }
+
+  // The support block. Haste is checked first because a haste spec carries
+  // neither a heal nor a shield, so the two branches under it would say
+  // nothing at all about a Herald.
+  var support = type.support;
+  if (support && support.haste) {
+    var gain = Math.round((support.haste.speedMultiplier - 1) * 100);
+    add("haste", "Hastens the wave",
+      "Every " + support.intervalSeconds + " s it gives +" + gain +
+      "% speed for " + support.haste.seconds + " s to the " + support.targets +
+      " nearest eligible allies within " + support.reachUl +
+      " u.l. Haste never stacks; a second pulse only refreshes it.",
+      C.haste, "HASTENS THE WAVE — $0");
+  }
+
+  if (type.spawns) {
+    var brood = Enemy.typeOf(type.spawns.type).displayName;
+    add("brood", "Seeds a brood",
+      "Spawns " + type.spawns.count + " " + brood + " every " +
+      type.spawns.intervalSeconds + " s" +
+      (type.spawns.shieldRatio
+        ? ", each behind " + type.spawns.shieldRatio + "× its own health in shield"
+        : "") +
+      (type.spawns.noBounty ? ", and not one of them pays a bounty" : "") + ".",
+      C.brood, "BROOD: SHIELDED, $0");
+  }
+
+  if (type.fractal) {
+    add("fractal", "Splits when it dies",
+      "T" + type.fractal.minTier + "–T" + type.fractal.maxTier + ", each tier " +
+      type.fractal.healthMultiplier + "× the health of the one below. Every " +
+      "tier above T" + type.fractal.minTier + " dies into " +
+      type.fractal.splitCount + " copies of the tier under it.",
+      C.split, "SPLITS INTO FOUR LOWER TIERS");
+  }
+
+  if (support && support.heal) {
+    add("heal", "Heals the wounded",
+      "Every " + support.intervalSeconds + " s it puts " +
+      support.heal.perSecond + " HP/s for " + support.heal.seconds +
+      " s on the " + support.targets + " most wounded enemies. Healed health " +
+      "pays nothing, so it undoes work you were already paid for.",
+      C.heal, "HEALS WOUNDED — $0");
+  }
+
+  // A shield it keeps for itself and a shield it hands out are different
+  // threats, and `pick` is what separates them -- the same field
+  // supportAllies reads to choose who gets it.
+  if (support && support.shield && support.pick === "self") {
+    add("self-shield", "Reshields itself",
+      "Every " + support.intervalSeconds + " s it takes " + support.shield +
+      " shield back" +
+      (support.stacks ? "" : ", refreshed to " + support.shield +
+        " rather than piled up") +
+      ". A board that cannot clear that inside " + support.intervalSeconds +
+      " s never reaches the body under it.",
+      C.ownShield, "RESHIELDS ITSELF — $0");
+  } else if (support && support.shield) {
+    add("wave-shield", "Shields the wave",
+      "Every " + support.intervalSeconds + " s it puts " + support.shield +
+      " shield on the " + support.targets + " " +
+      (support.pick === "strongest" ? "strongest" : "nearest") + " enemies" +
+      (support.stacks ? ", and it stacks" : "") + ". Shielded health pays nothing.",
+      C.shield, "SHIELDS THE WAVE — $0");
+  }
+
+  if (type.sprint) {
+    add("sprint", "Sprints the opening",
+      type.sprint.speedMultiplier + "× speed for the first " +
+      type.sprint.untilUl + " u.l. of road — measured along the route, not on " +
+      "a timer — then it settles to its own pace.",
+      C.ownShield, "SPRINTS THE OPENING");
+  }
+
+  if (type.shield) {
+    var onBreak = type.shield.onBreak;
+    add("shield", "Starts behind a shield",
+      type.shield.ratio + "× its own health in shield, and that pool empties " +
+      "first" +
+      (onBreak && onBreak.speedMultiplier
+        ? ". Breaking it multiplies its speed by " + onBreak.speedMultiplier +
+          ", so have the damage ready for what comes out"
+        : "") + ".",
+      C.shieldPool, onBreak ? "SHIELD → DOUBLE SPEED" : null);
+  }
+
+  if (type.revive) {
+    add("revive", "Gets back up",
+      "Killing it is not the end: it stands again " +
+      plural(type.revive.times, "time") + " at " +
+      Math.round(type.revive.healFraction * 100) + "% health" +
+      (type.revive.roots ? ", rooted where it fell." : "."),
+      C.revive, "GETS BACK UP ONCE");
+  }
+
+  // --- what it HAS, rather than what it does ------------------------------
+  //
+  // None of these carry a badge, and that is not an oversight: the index has
+  // one headline line and it belongs to an ability. Plating is a number the
+  // card prints in its own stat block, and here it is a row like any other,
+  // because a player pointing at a Camo Heavy needs to be told that seeing it
+  // and hurting it are two different purchases.
+  if (type.armor) {
+    add("armor", "Plated",
+      type.armor + " flat armor comes off every hit before it lands, with no " +
+      "damage floor — anything hitting for " + type.armor +
+      " or less does literally nothing to it.",
+      C.plate, null);
+  }
+
+  if (type.defense) {
+    add("defense", "Hardened",
+      type.defense + "% off every source of damage, evenly. It taxes " +
+      "everything and blocks nothing outright.",
+      C.plate, null);
+  }
+
+  if (type.aoeDamageReduction) {
+    add("aoe-resist", "Resists area damage",
+      Math.round(type.aoeDamageReduction * 100) +
+      "% less from attacks tagged as area damage. Piercing and ordinary shots " +
+      "land in full.",
+      C.plate, null);
+  }
+
+  // Phase changes, described from the blocks the phase itself carries rather
+  // than from a sentence written for the one type that has them.
+  if (type.phases) {
+    for (var p = 0; p < type.phases.length; p++) {
+      var phase = type.phases[p];
+      var gains = [];
+      if (phase.shield) gains.push(phase.shield + " shield");
+      if (phase.speedMultiplier) gains.push(phase.speedMultiplier + "× speed");
+      if (phase.attackIntervalMultiplier) gains.push("faster attacks");
+      if (phase.addAttack) gains.push("a second attack");
+      if (phase.summon) {
+        var called = 0;
+        var groups = phase.summon.groups || [];
+        for (var g = 0; g < groups.length; g++) called += groups[g].count;
+        gains.push(called + " more bodies called in");
+      }
+      add("phase", "Changes at " +
+        Math.round(phase.atHealthFraction * 100) + "% health",
+        gains.length
+          ? "It takes " + gains.join(", ") + "."
+          : "Its behaviour changes.",
+        C.tower, null);
+    }
+  }
+
+  if (type.noBounty) {
+    add("no-bounty", "Pays nothing", "Killing one is worth $0.", C.plate, null);
+  }
+
+  return out;
 };
 
 // --- facing posture -----------------------------------------------------
@@ -2086,6 +2925,43 @@ Enemy.towerDps = function (tower) {
   return tower.attackDamage() * tower.attacksPerSecond();
 };
 
+// CAN THIS ATTACK'S DISABLE LAND ON THIS TOWER RIGHT NOW.
+//
+// Two states make a tower an invalid target for a `disable` attack, and they
+// are different facts that happen to overlap:
+//
+//   ALREADY DISABLED -- `TowerHealth.isStunned`. A silent tower is nothing to
+//   silence, and re-disabling one would let a second Sapper extend the first
+//   one's work into a permanent lockout.
+//   STILL IMMUNE -- `TowerHealth.isSuppressed(tower, key)`. The window a tower
+//   is given after it comes back, so a tower can never be held down by weight
+//   of numbers. The stamp covers the disable itself as well, which is why the
+//   first of the two checks is belt to the second's braces rather than
+//   redundant: a Tyrant's stun disables a tower without stamping anything, and
+//   a Sapper must not walk into that either.
+//
+// It reads the KEY off the spec, so a future second disabling type gets its own
+// immunity pool by writing a different string in its data rather than by
+// sharing this one, and no id appears anywhere in here.
+Enemy.towerAcceptsDisable = function (tower, disable) {
+  if (typeof TowerHealth === "undefined") return true;
+  if (TowerHealth.isStunned(tower)) return false;
+  return !TowerHealth.isSuppressed(tower, disable.immunityKey);
+};
+
+// Is a committed target still worth resolving against? Membership in `towers`
+// is the test that covers SELLING -- sellTower splices the array and the object
+// itself is otherwise perfectly intact, so a check on the tower alone would
+// disable something that is no longer on the board.
+Enemy.prototype.committedTargetValid = function (spec, tower, towers) {
+  if (!tower) return false;
+  if (towers.indexOf(tower) === -1) return false;
+  if (tower.isDestroyed && tower.isDestroyed()) return false;
+  if (tower.isSummon && !tower.enemyTargetable) return false;
+  if (spec.disable && !Enemy.towerAcceptsDisable(tower, spec.disable)) return false;
+  return true;
+};
+
 // The towers an attack would hit, best first. `spec.target` picks the ordering:
 // "highestDps" for the boss's aimed shot, nearest for everything else.
 Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
@@ -2114,6 +2990,13 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
     // cannot hurt. The one exception says so itself: a fused monster blub sets
     // `enemyTargetable`.
     if (t.isSummon && !t.enemyTargetable) continue;
+    // A `disable` spec skips towers that are already dark or still immune.
+    // Filtering HERE rather than at the moment of resolution is what makes
+    // "the Sapper continues moving without consuming its cycle" true: with no
+    // valid tower in reach the candidate list is empty, attackTowers never
+    // commits, and the timer is left expired so it acts the instant one
+    // becomes vulnerable.
+    if (spec.disable && !Enemy.towerAcceptsDisable(t, spec.disable)) continue;
     var dx = t.x - origin.x;
     var dy = t.y - origin.y;
     var d = dx * dx + dy * dy;
@@ -2148,6 +3031,14 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
 //   damage/stunSeconds   independent -- an attack may carry either or both
 //   leap            { distanceUl, radiusUl } -- jump forward, then hit
 //                   everything within radiusUl of where it LANDED
+//   lunge           jump ONTO the tower it is about to hit (its `pos` becomes
+//                   the tower's) and hit that one. Off the road, which only a
+//                   body that is about to leave the board may do -- see the
+//                   branch in resolveAttack
+//   selfDestructs   the body dies of the blow, but only if the blow connected.
+//                   Composes with everything above: it is read after the hits
+//                   have landed, so a lunging self-destructor arms its
+//                   `deathEffect` on the tower it dived into
 //   facesTarget     stop, turn to face what it is about to hit, strike, turn
 //                   back -- see beginAttackPosture. Composes with
 //                   windUpSeconds (turn, THEN wind up, THEN strike); a spec
@@ -2164,7 +3055,21 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
 // silence when only one can. `reachUl` omitted means the whole map, which is
 // how the Tyrant's aimed shot guarantees there is always something to step to.
 Enemy.prototype.attackTowers = function (dt, towers) {
-  if (!this.attacks.length || this.dead || this.leaked) return null;
+  if (!this.attacks.length) return null;
+  if (this.dead || this.leaked) {
+    // A BODY THAT DIED MID-TELEGRAPH CANCELS IT, here rather than in a sweep.
+    // Nothing downstream reads these fields off a corpse today, but the
+    // renderers read `windUpTarget` to draw the telegraph line and an enemy is
+    // not removed until the end of the step it dies in -- so a Sapper killed
+    // during its 1.1 s would otherwise paint one more frame of a threat that
+    // is over. Guarded so it costs nothing on the ordinary path.
+    if (this.windUpTimer > 0) {
+      this.windUpTimer = 0;
+      this.windUpAttack = null;
+      this.windUpTarget = null;
+    }
+    return null;
+  }
 
   // Mid posture: turning, striking or turning back (see currentSpeedUlps,
   // which is why it is standing still for all of it). Nothing else this
@@ -2182,8 +3087,10 @@ Enemy.prototype.attackTowers = function (dt, towers) {
     if (this.windUpTimer > 0) return null;
     this.windUpTimer = 0;
     var committed = this.windUpAttack;
+    var committedTarget = this.windUpTarget;
     this.windUpAttack = null;
-    return this.resolveAttack(committed, towers);
+    this.windUpTarget = null;
+    return this.resolveAttack(committed, towers, committedTarget);
   }
 
   this.attackTimer -= dt;
@@ -2247,9 +3154,20 @@ Enemy.prototype.attackTowers = function (dt, towers) {
   if (spec.windUpSeconds > 0) {
     this.windUpTimer = spec.windUpSeconds;
     this.windUpAttack = spec;
+    // A COMMITTED SPEC ALSO FREEZES ITS TARGET. Everything else re-resolves
+    // when the wind-up lands; see `windUpTarget` in the constructor for why
+    // the Sapper cannot.
+    this.windUpTarget = spec.commitsTarget ? candidates[0].tower : null;
     return null;                     // it lands when the wind-up runs out
   }
-  return this.resolveAttack(spec, towers);
+  // A COMMITTED SPEC WITH NO WIND-UP still resolves against the tower it just
+  // chose rather than re-picking one line later. Nothing in the roster is
+  // shaped that way today -- the Sapper's whole point is the 1.1 s telegraph --
+  // and the alternative is a resolveAttack that finds `committed` undefined and
+  // silently does nothing, which is the kind of quiet no-op that survives a
+  // review.
+  return this.resolveAttack(spec, towers,
+    spec.commitsTarget ? candidates[0].tower : undefined);
 };
 
 // LASERS OUT OF ITS EYES, AND A BLAST WHERE THEY LAND (2026-08-19, at the
@@ -2310,7 +3228,7 @@ Enemy.prototype.emitEyeBeam = function (spec, tower) {
 };
 
 // Land an attack that has finished winding up (or had no wind-up).
-Enemy.prototype.resolveAttack = function (spec, towers) {
+Enemy.prototype.resolveAttack = function (spec, towers, committed) {
   if (!spec) return null;
   this.attackFlash = 1;
 
@@ -2330,6 +3248,57 @@ Enemy.prototype.resolveAttack = function (spec, towers) {
     this.lastBlastRadiusUl = spec.leap.radiusUl;
     hits = this.attackCandidates(spec, towers, spec.leap.radiusUl);
     // A shockwave takes EVERYTHING it reaches. `targets` is for aimed attacks.
+  } else if (spec.lunge) {
+    // JUMP INTO THE TOWER, then hit it. The opposite of a leap in the one way
+    // that matters: a leap goes FORWARD ALONG THE ROAD by a fixed distance and
+    // hurts whatever happens to be near where it came down, while a lunge
+    // picks a tower first and puts the body ON it.
+    //
+    // OFF THE PATH, and that is the point. `progress` is deliberately left
+    // alone -- `pos` is written directly, so the body is standing on a tower
+    // and not on the road. Every other move in this game keeps that invariant;
+    // this one gets to break it because the very next thing that happens to a
+    // lunging body is `selfDestructs` below, and it is swept out of `enemies`
+    // at the end of this same step. Nothing ever asks it to walk again.
+    //
+    // WHAT READS THE MOVED POSITION, and why the move has to come before the
+    // death rather than after it: game.js's end-of-life sweep hands `pos` to
+    // Hazards.fromDeath and to Effects.enemyKilled. So the charge is armed on
+    // the tower it dived into, and the death burst plays there -- both for
+    // free, with no case in either about who moved and when.
+    hits = this.attackCandidates(spec, towers, spec.reachUl)
+      .slice(0, spec.targets || 1);
+    if (hits.length) {
+      // COPIED, never aliased: `pos` is replaced wholesale by positionAt()
+      // every step, and holding the tower's own object would hand a mutable
+      // point to something that is about to be treated as this body's.
+      this.pos = { x: hits[0].tower.x, y: hits[0].tower.y };
+      this.attackFlash = 1;
+    }
+    this.lastBlastRadiusUl = 0;
+  } else if (spec.commitsTarget) {
+    // A COMMITTED ATTACK HAS EXACTLY ONE TARGET AND MAY HAVE NONE.
+    //
+    // This is where a Sapper's telegraph is honoured or discarded, and the
+    // discard is the interesting half. `committedTargetValid` says no when the
+    // tower was sold, destroyed, is already dark, or is still inside its
+    // post-recovery immunity -- and the attack then FIZZLES: no disable, no
+    // stun refresh, no fallback to the next tower along. The cycle is already
+    // spent (attackTimer was reset at commit), which is what makes two Sappers
+    // telegraphing the same tower cost the player one disable and not two.
+    //
+    // The order that decides which of them wins is the order the main loop
+    // walks `enemies` in, and that is deliberate rather than incidental: it is
+    // the same order every other per-enemy effect in this game resolves in, it
+    // is stable across a restart because the list is rebuilt in spawn order,
+    // and it needs no arbitration code of its own.
+    hits = this.committedTargetValid(spec, committed, towers)
+      ? [{ tower: committed, d: 0, dps: Enemy.towerDps(committed) }]
+      : [];
+    if (hits.length && !spec.eyeBeam) {
+      this.attackBeam = { x: hits[0].tower.x, y: hits[0].tower.y, life: 1 };
+    }
+    this.lastBlastRadiusUl = 0;
   } else {
     hits = this.attackCandidates(spec, towers, spec.reachUl)
       .slice(0, spec.targets || 1);
@@ -2358,6 +3327,17 @@ Enemy.prototype.resolveAttack = function (spec, towers) {
     if (spec.stunSeconds > 0 && typeof TowerHealth !== "undefined") {
       TowerHealth.stun(target, spec.stunSeconds);
     }
+    // A `disable` is a stun PLUS the promise that the tower gets a rest
+    // afterwards. Both halves go through TowerHealth, which is the one place
+    // all five tower types come through, and the immunity is stamped for the
+    // disable AND the recovery window together -- so "still disabled" and
+    // "just recovered" are one span of invalidity rather than two states
+    // somebody has to remember to check in the right order.
+    if (spec.disable && typeof TowerHealth !== "undefined") {
+      TowerHealth.stun(target, spec.disable.seconds);
+      TowerHealth.suppress(target, spec.disable.immunityKey,
+        spec.disable.seconds + spec.disable.immuneSeconds);
+    }
   }
 
   // A SHOCKWAVE STUNS SUMMONS, AND ONLY STUNS THEM.
@@ -2382,6 +3362,28 @@ Enemy.prototype.resolveAttack = function (spec, towers) {
       if (sdx * sdx + sdy * sdy > wave * wave) continue;
       TowerHealth.stun(summon, spec.stunSeconds);
     }
+  }
+
+  // AND IT DIES OF THE BLOW IT JUST LANDED.
+  //
+  // `dead` and not takeDamage(this.health): a self-destruct is not damage. It
+  // has no source to credit, it must not be soaked by a shield, mitigated by
+  // defense, denied by a revive or reported to lifesteal and Siphon charges as
+  // work some tower performed. Setting the flag says exactly what happened and
+  // nothing more.
+  //
+  // ONLY IF IT CONNECTED. An attack that found no tower in reach never
+  // committed (attackTowers leaves the timer expired and tries again next
+  // step), so a body cannot blow itself up over an empty stretch of road.
+  //
+  // EVERYTHING ELSE ABOUT THE DEATH IS ALREADY WRITTEN. game.js's end-of-life
+  // sweep is the one place this game decides a body's fate, and it reads this
+  // flag: the bounty, the kill credit, the death burst, the death sound, a
+  // `fractal` split and the `deathEffect` hazard all follow from it, in that
+  // one place, exactly as they do for a death by gunfire.
+  if (spec.selfDestructs && hits.length) {
+    this.health = 0;
+    this.dead = true;
   }
 
   return hits.length ? hits[0].tower : null;
@@ -3372,6 +4374,64 @@ Enemy.prototype.draw = function (ctx, options) {
     ctx.arc(x, y, radius + 5 + this.healFlash * 3, 0, Math.PI * 2);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "rgba(130,240,160,0.9)";
+    ctx.stroke();
+  }
+
+  // Being HASTENED: a violet ring at the feet and a pair of chevrons trailing
+  // it (2026-08-27, the Herald). Exactly the same argument the heal ring above
+  // makes -- a body arriving sooner than the board expected has to be
+  // something the player saw a cause for, or it reads as the wave being
+  // mistimed. Drawn off the TIMER rather than the flash, because the effect
+  // runs for four seconds and outlives the pulse that granted it, and it
+  // outlives the Herald too.
+  if (this.hasteTimer > 0 && this.hasteMultiplier > 1) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(214,158,255," +
+      (0.55 + 0.35 * this.hasteFlash).toFixed(3) + ")";
+    ctx.stroke();
+    var hv = this.headingVec();
+    if (hv) {
+      ctx.lineWidth = 2;
+      for (var hc = 1; hc <= 2; hc++) {
+        var hb = radius * (1.7 + hc * 0.7);
+        ctx.strokeStyle = "rgba(214,158,255," + (0.62 - hc * 0.2).toFixed(3) + ")";
+        ctx.beginPath();
+        ctx.moveTo(x - hv.x * hb - hv.y * radius * 0.45,
+          bodyY - hv.y * hb + hv.x * radius * 0.45);
+        ctx.lineTo(x - hv.x * (hb - radius * 0.5),
+          bodyY - hv.y * (hb - radius * 0.5));
+        ctx.lineTo(x - hv.x * hb + hv.y * radius * 0.45,
+          bodyY - hv.y * hb - hv.x * radius * 0.45);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // TELEGRAPHING A SABOTAGE: a line to the tower this body has committed to,
+  // thickening as its wind-up runs out (2026-08-27, the Sapper). The 1.1 s it
+  // stands still is the fairness half of the mechanic and it is worth nothing
+  // if the player cannot see which tower it is standing still AT.
+  //
+  // Gated on `windUpAttack.disable` rather than on the type, so a wind-up that
+  // is not a sabotage -- the Tyrant's aimed shot -- draws nothing here.
+  if (this.windUpTimer > 0 && this.windUpTarget && this.windUpAttack &&
+      this.windUpAttack.disable) {
+    var charge = Math.max(0, Math.min(1,
+      1 - this.windUpTimer / (this.windUpAttack.windUpSeconds || 1)));
+    ctx.beginPath();
+    ctx.moveTo(x, bodyY);
+    ctx.lineTo(this.windUpTarget.x, this.windUpTarget.y);
+    ctx.lineWidth = 1 + charge * 2.4;
+    ctx.strokeStyle = "rgba(96,226,214," + (0.35 + 0.55 * charge).toFixed(3) + ")";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(this.windUpTarget.x, this.windUpTarget.y,
+      (this.windUpTarget.footprintPx || 12) * (2.2 - charge * 1.05),
+      0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(96,226,214," + (0.5 + 0.5 * charge).toFixed(3) + ")";
     ctx.stroke();
   }
 

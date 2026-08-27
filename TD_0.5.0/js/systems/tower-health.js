@@ -137,6 +137,66 @@ var TowerHealth = (function () {
     return true;
   }
 
+  // --- suppression: a timed immunity, by KIND (2026-08-27) -----------------
+  //
+  // The Sapper's rule is "after it recovers, the tower is immune to every
+  // Sapper for four seconds", and that is a different quantity from the stun
+  // above in two ways: it OUTLIVES the stun, and it belongs to a source rather
+  // than to the tower. A single boolean would have said "immune to everything",
+  // which is a much bigger promise than anyone made.
+  //
+  // So it is a bag of named timers on the tower, keyed by whatever string the
+  // attack spec supplies (`disable.immunityKey`). A second disabling enemy type
+  // that wanted its own pool writes a different key in its DATA; it needs no
+  // code here, and nothing in this file knows what a Sapper is.
+  //
+  // IT LIVES ON THE TOWER, which is what makes cleanup free. Selling splices
+  // the tower out of `towers`, destruction filters it out, and restartGame()
+  // empties the array outright -- in all three cases the timers go with the
+  // object, so there is no registry anywhere that could outlive the run and
+  // hand a fresh board a stale immunity.
+  //
+  // The bag is created lazily and only on towers something has actually
+  // suppressed, so a board that never meets a Sapper carries no extra field.
+  function suppress(tower, kind, seconds) {
+    if (!kind || !(seconds > 0)) return;
+    if (!tower.suppression) tower.suppression = {};
+    // LONGEST WINS, the same rule stun() follows and for the same reason: two
+    // sources landing in the same second must never make the effect shorter
+    // than one of them would have.
+    if (!(tower.suppression[kind] > 0) || seconds > tower.suppression[kind]) {
+      tower.suppression[kind] = seconds;
+    }
+  }
+
+  function isSuppressed(tower, kind) {
+    return !!(tower.suppression && tower.suppression[kind] > 0);
+  }
+
+  function suppressionRemaining(tower, kind) {
+    if (!tower.suppression || !(tower.suppression[kind] > 0)) return 0;
+    return tower.suppression[kind];
+  }
+
+  // Age every named timer on one tower.
+  //
+  // CALLED FOR EVERY TOWER EVERY STEP, AND BEFORE tickStun -- which is the
+  // whole reason it is a separate function rather than a line inside that one.
+  // tickStun returns true for a disabled tower and the main loop `continue`s on
+  // it, so an immunity aged inside the tower's own update would freeze for
+  // exactly as long as the tower was dark and the four seconds would start
+  // late. It is not "the tower doing something"; it is time passing.
+  function tickSuppression(tower, dt) {
+    var bag = tower.suppression;
+    if (!bag) return;
+    for (var kind in bag) {
+      if (!Object.prototype.hasOwnProperty.call(bag, kind)) continue;
+      if (!(bag[kind] > 0)) continue;
+      bag[kind] -= dt;
+      if (bag[kind] <= 0) bag[kind] = 0;
+    }
+  }
+
   // The panel/codex row. Kept here rather than in tower-stats.js because it
   // is the only stat row that can read as an ALERT -- see drawInspection.
   function label(tower) {
@@ -158,6 +218,10 @@ var TowerHealth = (function () {
     stun: stun,
     isStunned: isStunned,
     tickStun: tickStun,
+    suppress: suppress,
+    isSuppressed: isSuppressed,
+    suppressionRemaining: suppressionRemaining,
+    tickSuppression: tickSuppression,
     label: label,
     fraction: fraction
   };

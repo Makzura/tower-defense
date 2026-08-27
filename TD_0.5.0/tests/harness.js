@@ -54,18 +54,37 @@ function gameScripts() {
 function stubContext() {
   var state = {};
 
+  // THE TWO FUNCTIONS ARE BUILT ONCE, NOT PER ACCESS, and that is a
+  // performance fact rather than tidiness (2026-08-27).
+  //
+  // Every unrecognised property on this proxy is a drawing call -- `beginPath`,
+  // `fillRect`, `arc`, `stroke` -- and the game makes tens of thousands of them
+  // per suite. Returning a fresh closure from the `get` trap allocated one
+  // function object PER CALL, which made this stub the largest single source of
+  // garbage in the whole run and drove the heap through repeated full
+  // mark-compacts. One shared no-op behaves identically (both return
+  // `undefined`) and allocates nothing.
+  //
+  // Why that is worth writing down: node v24 has a GC bug in
+  // `ClearStaleLeftTrimmedPointerVisitor` that this suite could reach --
+  // SIGSEGV inside `MarkCompactCollector::MarkRoots`, intermittently, with no
+  // JavaScript stack and no failing test name, so the suite simply stops
+  // REPORTING. Every mark-compact is a chance to hit it, so cutting the garbage
+  // that forces them is the lever this file actually has. See the note in
+  // tools/ci-check.js about a suite that dies quietly.
+  var noop = function () {};
+  var measureText = function (text) {
+    var size = 13;
+    var match = /(\d+(?:\.\d+)?)px/.exec(state.font || "");
+    if (match) size = parseFloat(match[1]);
+    return { width: String(text).length * size * 0.55 };
+  };
+
   return new Proxy(state, {
     get: function (target, key) {
-      if (key === "measureText") {
-        return function (text) {
-          var size = 13;
-          var match = /(\d+(?:\.\d+)?)px/.exec(target.font || "");
-          if (match) size = parseFloat(match[1]);
-          return { width: String(text).length * size * 0.55 };
-        };
-      }
+      if (key === "measureText") return measureText;
       if (key in target) return target[key];
-      return function () {};
+      return noop;
     },
     set: function (target, key, value) {
       target[key] = value;
@@ -75,10 +94,41 @@ function stubContext() {
 }
 
 
+// EACH GAME FILE IS READ AND COMPILED ONCE, NOT ONCE PER BOOT.
+//
+// A suite boots the whole game into a fresh `vm` context up to two hundred
+// times, and every boot used to `readFileSync` and re-parse all ~190 scripts --
+// several megabytes of source through the tokeniser per boot, for source that
+// cannot have changed since the process started. A `vm.Script` is compiled once
+// and may be run in any number of contexts, which is exactly the shape of this
+// problem.
+//
+// It is a SPEED fix and a STABILITY one, and the second is why it is worth a
+// paragraph. All that re-parsing is garbage, and every full mark-compact it
+// forces is a chance to hit the GC crash node v24 has in
+// `ClearStaleLeftTrimmedPointerVisitor` -- SIGSEGV inside V8 with no JavaScript
+// stack and no failing test name, so the suite stops REPORTING rather than
+// starts failing. See the canvas-stub note below and the load-time validation
+// note in js/game.js: three separate places where the cost of doing avoidable
+// work two hundred times was paid in reliability rather than in seconds.
+//
+// Keyed on the relative path, which is what `gameScripts()` returns, so the
+// cache and the script list cannot disagree about what a file is.
+var scriptCache = {};
+
+function compiled(src) {
+  if (!scriptCache[src]) {
+    var file = nodePath.join(ROOT, src);
+    scriptCache[src] = new vm.Script(fs.readFileSync(file, "utf8"),
+      { filename: src });
+  }
+  return scriptCache[src];
+}
+
 // Boots a fresh game. Every returned helper drives the game through its own
 // public entry points -- real event handlers, the real update() -- so a test
 // exercises the same code the browser does.
-function boot(mapId) {
+function boot(mapId, difficultyId) {
   var canvasListeners = {};
   var windowListeners = {};
   var ctx = stubContext();
@@ -108,8 +158,7 @@ function boot(mapId) {
 
   vm.createContext(sandbox);
   gameScripts().forEach(function (src) {
-    var file = nodePath.join(ROOT, src);
-    vm.runInContext(fs.readFileSync(file, "utf8"), sandbox, { filename: src });
+    compiled(src).runInContext(sandbox);
   });
 
   // Every tower owned and in the bar, before init() reads the loadout.
@@ -150,17 +199,41 @@ function boot(mapId) {
       api.click(r.x + r.w / 2, r.y + r.h / 2);
     },
 
-    // Start a run by clicking a map card, exactly as a player does. boot()
-    // calls this itself, so a test only needs it to switch routes mid-suite.
-    chooseMap: function (id) {
+    // Start a run by clicking a map card AND THEN A DIFFICULTY CARD, exactly as
+    // a player does. boot() calls this itself, so a test only needs it to
+    // switch routes mid-suite.
+    //
+    // THE SECOND CLICK ARRIVED 2026-08-27 with the difficulty step, and it is
+    // here rather than in each caller for the reason this helper exists at all:
+    // "start a run the way a player does" is one idea, the chooser is now two
+    // beats of it, and forty call sites should not have to learn that. A
+    // `difficultyId` may be passed; omitted, it takes the game's own default,
+    // which is Easy -- so every fixture written before this behaves exactly as
+    // it did.
+    chooseMap: function (id, difficultyId) {
       var list = sandbox.Maps.LIST;
       for (var i = 0; i < list.length; i++) {
         if (list[i].id !== id) continue;
         var r = sandbox.mapCardRect(i);
         api.click(r.x + r.w / 2, r.y + r.h / 2);
+        api.chooseDifficulty(difficultyId || sandbox.DEFAULT_DIFFICULTY_ID);
         return list[i];
       }
       throw new Error("harness: no such map '" + id + "'");
+    },
+
+    // Click a difficulty card on the step the chooser hands off to. Resolved by
+    // ID rather than by index for slotOf's reason: an index is a thing that
+    // silently means something else the day the table grows.
+    chooseDifficulty: function (id) {
+      var list = sandbox.DIFFICULTIES;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id !== id) continue;
+        var r = sandbox.difficultyCardRect(i);
+        api.click(r.x + r.w / 2, r.y + r.h / 2);
+        return list[i];
+      }
+      throw new Error("harness: no such difficulty '" + id + "'");
     },
     move: function (x, y) { canvasListeners.mousemove({ clientX: x, clientY: y }); },
     leave: function () { canvasListeners.mouseleave(); },
@@ -438,7 +511,7 @@ function boot(mapId) {
   // test it directly.
   api.pressPlay();
   if (mapId !== null) {
-    api.chooseMap(mapId || sandbox.Maps.DEFAULT_ID);
+    api.chooseMap(mapId || sandbox.Maps.DEFAULT_ID, difficultyId);
 
     // AND THEN START THE RUN, skipping the ten-second opening pause.
     //

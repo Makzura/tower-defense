@@ -13,6 +13,654 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — Normal runs to forty waves, and ends on the Dinomech.**
+
+At the owner's instruction: extend the separately authored Normal campaign from
+thirty-five waves to forty, and add a twenty-fifth enemy called `dinomech` with
+45 000 hit points to end it. Easy is untouched, nothing was added to the
+dependency list (there is none), and every new figure is authored data.
+
+**WAVES 1–35 DID NOT MOVE, AND ONE FIELD IN THEM DID.** Same groups, same
+counts, same `health` overrides, same `at` and `interval` on every one of them —
+1 000 roots and 39 139 effective HP, exactly as before. What wave 35 gained is a
+`duration`, because a wave with something after it must have a ceiling and
+`validateWaveTimelines` rejects a missing one anywhere but the last slot. That
+is the whole diff inside the first thirty-five waves, and a test states it as
+its own assertion rather than leaving it implied by a composition table that
+would pass just as happily if act VI had been paid for by trimming act V.
+
+**ACT VI IS FIVE WAVES AND 321 ROOTS: 54 / 68 / 102 / 66 / 31.**
+
+- **36–38, the money convoys.** 2 / 4 / 6 Colossi as readable columns, filled
+  between with Brutes, Armored, Normals, Fast and Swarm. Nothing in any of the
+  three can take a tower off the map: no Sappers, no Volatiles, no supports, no
+  Hives, no Fractals, no camo, no flight, no bosses and no unpaid spawn. They
+  pay **$3 185 / $4 471 / $7 292** all in — one meaningful late-game tier, then
+  one or two, then two or three or a rebuild — and the rise is bought entirely
+  with authored counts and `health` overrides through `Enemy.bountyOf`, which is
+  the economy rule the whole schedule already lives under. **No new currency, no
+  loot drop and no per-wave reward adjustment was needed**: the existing
+  arithmetic already delivered a strictly increasing payout, so nothing was
+  added to force one.
+- **39, the Royal Legion.** Three Tyrants at 8 s, 28 s and 50 s, eight Colossi,
+  and a support court interleaved with the payload it exists to prop up. 28 300
+  authored effective HP — inside the 28 000–32 000 the owner asked for, and
+  deliberately under wave 40's single body: this wave is the tactical peak and
+  not the damage peak.
+- **40, the Dinomech.** One body, twelve seconds alone, then Swarm and Fast at
+  12 s, 32 s and 55 s that overtake it and briefly steal a "first"-mode lock. No
+  `duration`, so there is no wave 41 to time out into.
+
+**THE TYRANTS ARE THREE INDEPENDENT FIGHTS AND THAT NEEDED NO CODE.**
+`phasesEntered`, `attackIndex`, `attacks` and the roar's shield are per-instance,
+and `enterPhase` has COPIED every spec off `Enemy.TYPES` since 2026-08-01 rather
+than mutating it — a trap that was closed for a completely different reason and
+is what makes three of them on one road correct by construction. Their summons
+inherit wave 39 through `spawnMinions`, the same door a Hive's brood uses. A test
+drives all three, kills one, roars another, and asserts the type row is untouched
+afterwards.
+
+**THE DINOMECH IS DEFINED BY WHAT IT DOES NOT CARRY.** No `shield`, no `revive`,
+no `phases`, no `support`, no `spawns`, no armor and no defense — so
+`waveEffectiveHealth` reads exactly 45 000 and that is exactly what has to come
+off. Every one of those blocks would have made the number the schedule states
+smaller than the number the player removes, and `phases` in particular is the
+only way this type could have put a Healer or a Shieldbearer into a wave
+specified to have none. What it does have is a pool of two attacks it cycles: a
+board-wide rail at the highest-DPS tower (60 damage, a 2.5 s stun, every 14 s,
+1.4 s wind-up) and a stomp (90 damage across a 140 u.l. landing after a 70 u.l.
+jump, 2 s wind-up) that carries **no stun at all**. That split is the character:
+the Tyrant silences your best tower, the Dinomech breaks the corner it lands in,
+and stacking a second silence on the second attack would have made the fight a
+lockout rather than a race.
+
+It has **no mesh**, so the 3D board draws it as the fallback sphere. That is a
+known visual gap, recorded in `AGENTS.md` rather than hidden: building a body is
+a modelling job with its own gates and is not a side effect of a schedule change.
+
+**FINALITY COMES OFF `WAVES.length`, AND THAT WAS ALREADY TRUE.** No consumer
+changed. The readout's FINAL WAVE state, `waveTimeRemaining`'s null,
+`waveSendReady`'s index refusal, `waveControlsShown`, the run-over screen's
+denominator, `allWavesDeployed`, the victory test, the index's Difficulties tab,
+the sandbox's wave picker and `difficultySummary` all read the active schedule's
+length and none of them reads a wave number — so the two campaigns being
+different lengths needed exactly one data edit and no code. The reason this is
+worth writing down is that Normal's wave 35 still holds a Tyrant, a T5 Fractal
+Slime and the heaviest overrides in the first half of the campaign, which is
+precisely the shape that invites a future reader to treat "contains a boss" as
+"is the end". Two behavioural tests now hold the halves: wave 35 hands over to 36
+and cannot win the run, and wave 40 opens no transition and cannot create a
+wave 41.
+
+**THE CEILINGS ARE MEASURED, AND TWO OF THEM MOVED BECAUSE OF IT.** Headless, 40
+maxed towers, all seven routes. Wave 35 clears in 40.8–144.2 s, so its ceiling is
+170 rather than the 150 that left Twin Confluence six seconds of slack. Wave 39
+is eliminated in 81–141 s on five boards and **264 s on `mana-coil`**, whose
+3 510 u.l. road is the floor under any wave carrying a 15 u.l./s Tyrant — 190 and
+240 were both tried and both cut it off with a boss still standing, so it is 290.
+An idle second earns nothing in this game, so a ceiling nobody reaches costs the
+schedule nothing while one that fires early hands a losing player the next wave
+on top of the one they are losing. **This is measurement and not the
+retuning-by-simulation the top of `AGENTS.md` forbids**: no wave's composition
+came out of it.
+
+**AND THE 45 000 IS BEATABLE, WITH THE THRESHOLD WHERE IT SHOULD BE.** At 40
+maxed towers the boss dies at 139–221 s with zero leak on all five single-road
+routes; at 30 it dies with zero leak on four and 534–561 points on two; at 25,
+20 and 15 it reaches the base with 1 700, 15 700 and 23 700 points still on it.
+The winning boards this project records run 60–70 towers. **`twin-confluence` is
+the exception and it is the one playtest risk worth stating**: it mirrors every
+arrival onto both roads, so wave 40 sends two Dinomechs — 90 000 points — and a
+40-tower board loses one into the base. That is the map's standing property
+rather than anything this act introduced, and it is the first place to look if
+the finale is reported as unfair.
+
+**A CORRECTION THAT CAME OUT OF PINNING SOMETHING NOBODY HAD.** `AGENTS.md` has
+said Normal is **39 507** effective HP since the day it landed. It is **39 139**,
+and was on that day too. No test asserted it either way, so nothing could catch
+it; the prose was wrong and the schedule was always right. It is pinned now, off
+the game's own `waveEffectiveHealth`. The 39 507 in the 2026-08-27 entry below is
+left as written — this file is history — and the figure is corrected in
+`AGENTS.md`, which is the file that is meant to be true now.
+
+Suites: `run.js` 161 → 175 (fourteen added, three names corrected because their
+titles had become false), `content.test.js` 281 → 282. Nothing removed, nothing
+newly failing. `node tools/ci-check.js` clean.
+
+**2026-08-27 — Hover an enemy and the left column tells you what it is.**
+
+At the owner's request: *"when hovering an enemy, add a side bar with their
+name, and any special attributes if they have some (camo, or if they attack,
+anything distinctive)"*.
+
+**THE READOUT OVER THE BODY ONLY EVER ANSWERED ONE QUESTION.** It is a figure
+and two strips pinned to something that is walking, sized so it does not swallow
+the enemy wearing it, and there was never room in it for a second sentence. So
+the whole roster's *behaviour* was readable only in the index — on a screen the
+run is not on. A player watching a Sapper stop beside their best tower had
+nowhere to ask what it was about to do, and the answer ("it will switch that
+tower off for two seconds and then it is immune for four") is exactly the kind
+of thing that decides where the next tower goes.
+
+The sidebar answers *what it is*: the type's name with its own colour chip, the
+live HP figure and bars, the speed it is doing **this instant**, what killing
+this one pays, and one row per trait it carries — each row a short label and a
+sentence with that type's own numbers in it. `enemySidebarModel` →
+`enemySidebarLayout` → `drawEnemySidebar` in `js/game.js`, split the way
+`enemyHoverLabel` already was so a test can read back the text the player sees
+rather than only asserting that the frame did not throw.
+
+**Drawn as screen-space interface, which is what makes it one piece of code.**
+Everything anchored to an enemy in this project has to be drawn twice — once in
+the 2D world block and once in gl-world's overlay pass — because the two
+renderers put a body in different places. This is anchored to the canvas, so the
+3D board (which is the board every ordinary load actually runs) got it for free
+with no edit to `js/gl/gl-world.js` at all.
+
+**The speed row is the one that pays for itself.** It reads
+`currentSpeedUlps()`, which is where a Herald's haste, a frost slow, a
+Vanguard's opening sprint, a route's pace profile and a Bulwark whose shield has
+just broken are *already* summed. So the row reports all five without knowing
+that any of them exist — verified in the browser, where a Fast pulled in by the
+Tyrant's roar read 131 u.l./s against its type's 87.5, and a Bulwark read 90 the
+moment its shield went.
+
+**AND IT IS DELIBERATELY NOT IN `overInterfaceChrome`.** The inspection panel
+is, and that rule is safe there because a selected tower stays selected. This
+panel exists only *while* an enemy is hovered, so the same rule would have
+oscillated at frame rate: hover a body, the panel appears under the cursor, the
+cursor is now "on interface", the hover is cancelled, the panel vanishes, the
+hover returns. It is not clickable, so it costs nothing to leave out of that
+list. It is drawn *before* the inspection panel and the build bar, because both
+of those are things the player clicked and is still using.
+
+### `Enemy.traitsOf` — one list, because the second copy is the one that rots
+
+The chain that decides what is distinctive about an enemy already existed: it
+was seventeen `if`s at the top of `js/codex.js`, producing the index's one-line
+badge. Writing the sidebar's version beside it would have been a second copy of
+the same table, and a second copy of a roster-shaped table is the copy that
+silently stops matching the roster after the next retune.
+
+So the list moved to `js/enemy.js` as **one ordered array of traits per type** —
+id, short label, a sentence of detail, the colour that names it, and, for the
+rows a card may lead with, the badge string. The sidebar shows every row;
+`enemyBadge` is now a four-line first-match walk down the same list. **The
+index's output is byte-identical**: all fourteen badge strings and their colours
+were diffed against the old chain across all twenty-four types before the old
+one was deleted, and a test now pins each of them **by type**, so reordering the
+roster cannot quietly reassign one.
+
+Ordering is the contract, because the badge is a first-match walk: can I even
+shoot it → does it shoot back (one row per spec from `Enemy.attacksOf`, badge on
+the first) → what it leaves when it dies → what it does for the wave around it →
+what it does when hurt → its plating. Plating carries **no** badge, which is why
+an Armored's card still reads "STANDARD — no special ability" exactly as it did:
+the index has one headline line and it belongs to an ability. In the sidebar
+those rows exist, which is the point — a player pointing at a Camo Heavy is told
+that seeing it and hurting it are two separate purchases.
+
+**A real defect fell out of writing it.** `u.l.` ends in a full stop of its own,
+and appending one to a sentence that finishes on a reach produced "20 damage
+every 2.5 s within 47.5 u.l.." — on *every* attacking type in the roster. Fixed
+with a `sentence()` guard, and a test now walks all twenty-four types looking
+for the doubled stop rather than trusting the next author to notice.
+
+**Headroom, the enemy-side twin of the tower panel's warning.** The floor is
+`BAR_Y - 12` and the tallest case is the Camo Heavy's three rows at **468 of the
+614 px** available — measured in the real browser, not in the stub canvas, whose
+`measureText` estimate runs about 10% wide. Detail sentences wrap to six lines
+because the Bulwark's and the Sapper's both run to five, and a cap of four had
+been ellipsising "…have the damage ready for what comes out", which is the half
+of that sentence worth reading. A trait that will not fit is **dropped and
+counted** rather than clipped; a test walks the whole roster and fails if any
+panel reaches the bar or drops a row, so the number above cannot go stale
+quietly.
+
+`tests/content.test.js` 271 → 281.
+
+**2026-08-27 — A pause button, and a way into the middle of a schedule.**
+
+At the owner's instruction: *"add a pause button in game (Sandbox and normal
+runs), as well as allowing the user to pick a specific wave he wants to play out
+in sandbox mode, after choosing the normal or easy wave schedule."*
+
+**THE PAUSE BUTTON REVERSES A 2026-07-28 DECISION, and it is worth being exact
+about which half.** That day a permanent `Menu` control was built beside the
+build bar and taken back out the same day, and `AGENTS.md` has said ever since
+that there is deliberately no HUD button for the pause menu: it *"spent screen
+space all run to be used once and sat one stray click away from ending a
+twenty-wave game"*. A test asserted no such button existed.
+
+The half that was load-bearing is still true. The old button was one click from
+*leaving*; this one is one click from the *menu*, and `Back to main menu` inside
+it is still a second deliberate click that Escape or Resume undoes for free. The
+half that was costing something was that nothing on screen said a run could be
+stopped at all — the one control a player never has to be told about was the one
+control they had to already know about. The test now pins the property that
+actually mattered (`exitButtonRect` is still undefined: no one-click exit).
+
+**One flag, two ways in.** `pauseButtonRect()` sets the same `paused` the
+Escape handler sets, so there is no second pause implementation to disagree
+with the first about what freezes. It works in the sandbox for free and for the
+usual reason: the workbench runs `js/game.js` underneath in full and this is a
+button on the game's own HUD, not a sandbox control.
+
+It joins the left end of the bottom-right chrome row — **pause · mixer ·
+auto-send · speed** — each rectangle anchored off the one to its right, so the
+one 8 px gap describes the whole row and widening any button slides the ones
+left of it. The row now spans x=962..1256 against a build bar ending at x=875.
+A test sweeps the chain for overlap and for clearance from the bar, because a
+chain of derived rectangles is exactly the arrangement where widening one
+button quietly slides another under something else. It is drawn under the same
+guard the mixer is (`!paused && !gameOver && !victory`), which is precisely when
+`onClick` can reach it — a button drawn where it is not clickable is the trap
+`waveSendAvailable` exists to avoid — and it is in `overInterfaceChrome`, so
+the build preview does not offer to place a tower underneath it.
+
+No lit state, unlike the two buttons beside it. Speed and mute are settings you
+can be wrong about without noticing; pause is a door, and the moment it has been
+used the screen is covered by the menu it opens.
+
+**THE SANDBOX CAN NOW START A SCHEDULE ON ANY WAVE OF IT.** The workbench
+already chose *which* campaign to run (2026-08-27, earlier the same day) and
+then always ran it from wave 1 — so seeing wave 27 meant sitting through
+twenty-six waves, which at 20x is still minutes of watching waves nobody asked
+about. The sidebar now carries a wave dropdown under the schedule picker, and
+two buttons:
+
+- **Play this wave** runs that wave and then parks the scheduler. Whatever it
+  put on the road keeps walking; nothing further arrives. "Play out" means watch
+  it through, not freeze it.
+- **Play from here** starts the campaign at that wave and carries on into the
+  rest of it.
+
+The dropdown is built from `WAVES` and labelled with the game's own
+`waveSummary()` — the same function the on-canvas banner uses — so the line you
+pick from is the line the banner shows, and a schedule edit reaches this list
+with nothing to remember. Same derive-don't-copy rule the enemy-type picker and
+the Fractal tier row already follow.
+
+**The park is checked OUTSIDE the scheduler, not with a flag inside it.**
+Whichever of the three gates closes the wave — deployed and cleared, wiped out,
+or the ceiling — it ends by moving `waveIndex` off the wave, so one comparison
+in the sandbox's existing `updateWaves` wrapper catches all three. A gate flag
+in `js/game.js` would have been a fourth thing for the gates to keep in step, on
+a schedule the shipping game never parks.
+
+**Parking is not winning.** It parks with `waveIndex = WAVES.length`, this
+file's long-standing idiom for "nothing left to deploy", and leaves
+`allWavesDeployed` false — `js/game.js` states that only the scheduler
+exhausting itself may set that flag, because the victory test reads it. Without
+that, clearing a solo wave 7 on an empty board would raise the victory overlay.
+A test pins it, and fails by name when the flag is set on the park.
+
+**Three things a shortcut must not do, and does not.** It does not silently do
+nothing when the schedule checkbox is unticked — it ticks the box, so the
+sidebar never shows one thing while the board does another. It does not survive
+a schedule change: a wave number only means something inside one campaign, so
+switching difficulty rebuilds the list and drops a pending solo request, exactly
+as it already resets the wave counter. And it sets `waveOnClockIndex = -1`, so
+re-picking the wave already on the cursor announces itself again rather than
+starting in silence.
+
+**Twelve new checks in `tests/sandbox.smoke.js` and four new tests in
+`tests/run.js`**, all mutation-verified: disabling the park, dropping the
+`soloWave` reset on a schedule change, setting `allWavesDeployed` on the park,
+disabling the pause click and overlapping the chrome row each fail by name.
+Suite totals: run.js 157 -> 161 passing, 0 failing; sandbox.smoke.js still
+clean.
+
+**2026-08-27 — Volatiles close the wave.**
+
+At the owner's instruction: *"in every wave there are volatiles, make them come
+out last."*
+
+All six Volatile groups in the campaign moved to the tail of their waves. They
+were interleaved with everything else; now every other group has finished
+arriving before the first diver steps out.
+
+| wave | volatiles were | volatiles are | last other arrival | ceiling |
+|---|---|---|---|---|
+| 20 | 1.5 s, 8.5 s | **14 s, 20 s** | 12.05 s | 58 s |
+| 26 | 4 s, 10 s | **14 s, 20 s** | 11.91 s | 88 s |
+| 31 | 1.5 s, 9.5 s | **18 s, 24 s** | 16.00 s | 80 s |
+
+Each wave keeps its two pulses of four with a real gap between them, rather than
+being merged into one block of eight — the gap is a beat to re-aim, which is
+worth more against a 75 u.l./s diver than it was against the old 55.
+
+**IT IS A RULE NOW, NOT THREE AUTHORED COINCIDENCES.** A test walks every
+schedule in `DIFFICULTIES` and fails if any wave's first Volatile leaves before
+another group has *finished* arriving — the last body of the others, not the
+first, since a group that merely starts earlier but trickles for twenty seconds
+would still be arriving underneath the divers. It counts the waves it checked
+(3) so it cannot pass by finding no Volatiles at all, and that was verified by
+mutation: putting wave 20's first pulse back at 1.5 s fails it by name. A second
+test pins the ceiling margin, because moving six groups to the tail of their
+waves is exactly the edit that pushes a last spawn past `duration`.
+
+**WHAT THE ORDERING COSTS AND WHAT IT BUYS**, wave by wave, because it is not
+the same trade in all three:
+
+- **Wave 20** pays the most. Its lesson was a diver crossing at 75 u.l./s while
+  every gun in reach was busy on something worth less; a quieter road is easier
+  to focus. What it gains is that the eight arrive *together*, into a board whose
+  cooldowns are wherever the river left them — a question about rate of fire,
+  asked once. The river has not cleared when they come: the last specks leave at
+  12.05 s and are still walking at 14 s, and the divers run them down from
+  behind.
+- **Wave 26** pays almost nothing. Three Hives are still seeding brood on their
+  own seven-second clocks long after the authored groups run dry, so the divers
+  cross a road full of hatchlings regardless.
+- **Wave 31 is improved.** Simultaneous, its three pressures competed for the
+  same guns and diluted each other. Sequenced they compound: the Angries spend
+  20 a swing softening the cluster, the third Sapper goes dark at 16 s, and the
+  divers leave at 18 s into a board that is short hit points and one gun down —
+  and a dark tower is exactly what they land on, since a hazard is a radius and
+  does not care that its target cannot shoot back.
+
+Nothing else moved: same bodies, same health, same totals (300 / 1 154 / 831),
+same act body counts. **Easy is untouched** — it has no Volatiles, which the new
+test treats as vacuously true rather than as a reason to skip it.
+
+**2026-08-27 — The Volatile retuned: a glass diver.**
+
+At the owner's instruction: *"8 HP, 1.5x faster, range to jump reduced to 75
+UL, range of their aoe explosion reduced to 60UL"* and *"they should also deal
+13 damage instead of 20"*.
+
+| | before | after |
+|---|---|---|
+| Health | 20 | **8** |
+| Speed | ×1.1 (55 u.l./s) | **×1.5 (75 u.l./s)** |
+| Dive range | 120 u.l. | **75 u.l.** |
+| Blast radius | 120 u.l. | **60 u.l.** |
+| Damage (dive *and* charge) | 20 | **13** |
+| Bounty | 25 | 25 — unchanged |
+
+Every one of those pushes the same way. It stopped being a body you spend fire
+on: 8 points is under a single Warbringer round, so **almost any shot kills
+one**. In exchange it arrives half again as fast, and a tower that let one
+through pays 26 instead of 40. The question a Volatile wave asks is no longer
+*can you kill this* — it is **is anything pointed at it yet**. The answer is
+rate of fire and placement, never damage.
+
+**THE DIVE NOW REACHES FURTHER THAN THE BLAST, and that gap is a feature.** It
+crosses 75 u.l. to reach a tower and takes only 60 with it, so the tower it
+dived into is always inside its own blast while a second gun set 70 u.l. back
+behind the first is not. When the two numbers were one, spacing bought nothing;
+now it buys the neighbour. The invariant asserted in the tests flipped from
+"one number, not two that drift apart" to "the dive reaches further than the
+blast", and there is a test for exactly that gap.
+
+**THE DAMAGE IS STILL ONE NUMBER FOR BOTH HALVES.** 13 on the dive and 13 on
+the charge, asserted as equal rather than as two 13s, because "the same amount
+of damage as when they originally died" is the sentence the dive was built
+from.
+
+**THE BOUNTY DID NOT MOVE, deliberately.** $25 against 8 health is the best
+cash-per-point on the roster by a wide margin, and it has to be: the answer to
+a Volatile wave is to kill every one of them early, and a game that asks for
+that should pay for it.
+
+**THE TWO CAMPAIGN OVERRIDES WERE RESCALED WITH THE TYPE** — wave 26's `26 →
+10` and wave 31's `30 → 12`. Both were authored as ratios against the roster
+body (1.3× and 1.5×) and both still are; what moved underneath them was the
+roster, 20 → 8. Holding 26 and 30 would have left those waves' Volatiles at
+3.25× and 3.75× a fresh one — a different enemy from the one wave 20 teaches
+and the one the index describes. Bounty follows health through `Enemy.bountyOf`
+on its own, which is the economy rule the schedule already lives under. **This
+was a judgment call, not part of the instruction**, and it is two numbers to
+revert if the tougher late-campaign variants were wanted.
+
+Wave HP totals move with them: **20: 396 → 300**, **26: 1 282 → 1 154**, **31:
+975 → 831**. Act totals are body counts and are unchanged. **Easy is untouched**
+— the Volatile is Normal-only.
+
+The badge also changed: `ATTACKS YOUR TOWERS` (which the generic `attack` block
+had claimed from the more specific death-charge line) is now **`DIVES IN AND
+EXPLODES`**, read off the same `lunge`/`selfDestructs` pair, because what
+changes how it has to be *answered* is that it comes to the tower and does not
+survive the trip.
+
+**2026-08-27 — The Volatile dives.**
+
+At the owner's instruction: *"they jump into the closest tower to them, dealing
+the same amount of damage as when they originally died. the explosion on death
+is kept, but its range is increased."*
+
+The Volatile no longer waits to be shot. The moment a tower is within **120
+u.l.** it dives onto the nearest one, deals **20** — the same 20 its charge
+deals — and **dies of the impact**. The explosion is unchanged in every respect
+but reach: the death still arms a charge, the fuse is still 1 s, the damage is
+still exactly 20 once to every living tower in range, there is still no stun and
+it still touches towers only. The radius went from **45 u.l. to 120 u.l.**
+
+So a Volatile that reaches your guns now costs the board **40** — 20 on the nose
+and 20 across the blast — and one killed out on the road before it is in range
+costs nothing at all. That is the same lesson the type was authored for, with
+the gap between the two answers widened: it charges POSITION, and where the guns
+are is the only lever that changes the bill.
+
+*(The brief said the old radius was 90. It was 45 in the code. 120 is the number
+that was asked for either way, so 120 is what shipped.)*
+
+**TWO NEW GENERIC ATTACK-SPEC FLAGS, NOT A VOLATILE BRANCH.** `js/enemy.js`
+opens by promising that no type has behaviour of its own, and a test reads every
+file under `js/` to enforce it, so both halves are data:
+
+- **`lunge`** — resolveAttack writes the body's `pos` to the tower it picked, so
+  it hits from ON the tower rather than from the road. This is the only move in
+  the game that leaves the path, and it is allowed exactly because the body is
+  swept out of `enemies` at the end of the same step: nothing ever asks it to
+  walk again. `progress` is deliberately untouched.
+- **`selfDestructs`** — sets `dead`, and only if the swing connected. `dead`
+  rather than `takeDamage(health)` because a self-destruct is not damage: no
+  shield soaks it, no defense mitigates it, no revive denies it, and no tower is
+  credited for work it did not do. An attack that found nothing in reach never
+  committed, so a body cannot blow itself up over empty road.
+
+Everything else about the death was already written. game.js's end-of-life sweep
+is the one place this game decides a body's fate, and it reads that one flag —
+so the bounty, the kill credit, the death burst, the death sound and the
+`deathEffect` charge all follow from it, in that one place, exactly as they do
+for a death by gunfire. Because `pos` was moved before the flag was set, the
+charge is armed **on the tower it dived into** and the burst plays there, both
+with no case in either about who moved and when.
+
+**A DIVE PAYS ITS BOUNTY**, deliberately. A dive is a death and the `dead`
+branch is where this game pays; making a self-destruct a third fate beside
+`dead` and `leaked` would have bought a $25 difference with a second place that
+decides what a body is worth. The player who let one in has already paid 40
+points of tower health.
+
+**IT WILL NOT DIVE INTO A BLUB.** The dive picks its target through
+`attackCandidates` like every other attack, so the Summoner's blubs are excluded
+for free — the owner's brief that they cannot be targeted needed no new code.
+
+**Five tests** under *"the Volatile"*, all through the real entry points: the
+dive itself, the 120 u.l. edge from both sides, the dive-as-death (bounty, kill
+credit, and the charge armed on the tower), the shot-down case that proves
+killing one early still costs the board nothing, and the blub it must not touch.
+The index card prints the dive and — checked by name — never prints the "every
+0 s" that its zero cooldown would otherwise have produced.
+
+**2026-08-27 — A second campaign: Normal, and the three types it exists for.**
+
+At the owner's instruction: a complete, separately authored Normal difficulty at
+an exact 35-wave schedule, three new enemy types, and a difficulty step the
+player reaches *after* choosing a route.
+
+**EASY IS UNTOUCHED, AND THAT IS THE FIRST CONSTRAINT.** `EASY_WAVES` is
+byte-identical: 35 waves, 830 authored roots, 24 141 scheduled / 25 939
+effective HP, $2 594 of clear bounty, $22 987 of kill bounty, the same timings,
+the same overrides, the same twenty-one types. Nothing in this change edits it,
+and a test now checks it by name rather than through the active `WAVES`, because
+the failure this change makes easy is a second schedule landing on top of the
+first.
+
+**NORMAL IS AUTHORED, NOT DERIVED, AND THE TEST FOR THAT IS THE POINT OF THE
+FEATURE.** Three difficulties existed here between 2026-07-30 and 2026-08-12 and
+were deleted: `buildDifficultyWaves` scaled Easy by constants, the owner had
+forgotten the modes existed, and the concept went with them — because a schedule
+that is a multiple of another schedule asks the same questions in the same order
+and just takes longer to answer. So `NORMAL_WAVES` is 35 waves written out in
+full, 1 000 authored roots, all twenty-four types, and *"Normal is authored, not
+derived from Easy and not an alias of it"* checks four things a derivation
+cannot survive: no object in common at any depth; no constant ratio reproducing
+one schedule's bodies, effective HP, clear bounty or kill bounty from the
+other's; not one of the thirty-five waves sharing a roster with Easy's wave of
+that number; and the source of `NORMAL_WAVES` never naming `EASY_WAVES` at all.
+Self-tested by pointing one at the other: red on every clause.
+
+The shape is five acts of seven waves — **158 / 174 / 213 / 212 / 243** bodies,
+pinned, because the act totals are the curve and a retune that holds the 1 000
+while moving bodies between them is a different campaign wearing the same total.
+Normal is 39 507 effective HP against Easy's 25 939, but the per-wave ratio runs
+from 0.6× to 4.9×, which is the arithmetic saying the same thing the test does.
+
+**THREE NEW TYPES, EACH CHARGING A RESOURCE EASY NEVER CHARGES FOR.** All three
+are Normal-only, and all three are DATA — nothing in `js/` compares against the
+strings `herald`, `sapper` or `volatile`, and a test reads every file under
+`js/` and fails on any comparison that does.
+
+- **Herald** (100 HP, 120 bounty, ×0.55, 1.15 size, wave 6). Every 8 s it gives
+  **+30% speed for 4 s** to the **eight nearest** eligible allies within
+  **160 u.l.** It charges TIME: a body at 1.3× spends 23% less of its life under
+  fire. It uses the existing `support` block, which grew `haste` and `eligible`.
+  Eligibility is written as PROPERTIES and never as a list of ids — `isFlying`,
+  `fractal`, `showHealthBanner` and same-type — which is why it excludes every
+  Fractal *descendant* as well as every rung, and why the Midboss, the Vanguard
+  and the Tyrant are covered by one flag they already carried. Haste never
+  stacks (strongest wins, equal refreshes — `applySlow`'s rule pointed the other
+  way), it survives the Herald's death because it is on the target's own clock,
+  and it is a TIMED MULTIPLIER reset to exactly 1 rather than decayed towards
+  it, which is what makes forty pulses leave no permanent speed behind. Tested
+  at forty pulses on an awkward step size.
+- **Sapper** (45 HP, 60 bounty, ×0.8, wave 13). Every 8 s it finds the nearest
+  valid tower within **90 u.l.**, stops and telegraphs for **1.1 s**, and — if
+  both are still valid — **disables it for 2 s**. No damage at all: the spec
+  authors none, absent rather than zero. The tower is then **immune to every
+  Sapper for 4 s after it recovers**, which is the whole design: without it,
+  three Sappers hold one gun silent forever. It uses the existing `attack`
+  block, which grew `disable` and `commitsTarget` — and the commitment is the
+  one thing that separates this from every other attack in the file. An ordinary
+  wind-up re-resolves its target when it lands; a committed one does not, so a
+  telegraph is never a lie and two Sappers on one tower resolve deterministically
+  in enemy order: the first disables, the second finds it dark, fizzles, and
+  consumes its cycle without refreshing or extending the stun. That falls out of
+  the order the main loop already walks `enemies` in, and needed no arbitration
+  code. Cancels cleanly when the target is sold, destroyed or already immune, and
+  when the Sapper itself dies mid-telegraph.
+- **Volatile** (20 HP, 25 bounty, ×1.1, 0.9 size, wave 20). Killed in combat it
+  leaves a charge at the exact death position; **1 s** later it deals exactly
+  **20** damage once to every living tower within **45 u.l.** *(raised to 120
+  u.l. later the same day, and the type gained a dive — see the entry above.)*
+  It charges
+  POSITION. Leaking leaves nothing, so the cheap answer and the safe answer are
+  different answers. A blast touches TOWERS ONLY, which makes "a Volatile
+  explosion never triggers another" a fact about the shape of the effect rather
+  than a special case — there is no chain to bound at any density.
+
+**A NEW SYSTEM: `js/systems/hazards.js`.** A generic death-effect/hazard list,
+read off a type's `deathEffect` block and knowing no type ids. It is SIMULATION
+rather than presentation — towers lose real hit points to it — so it is stepped
+from `update()` and inherits the pause, the 1×/2×/3× toggle and the beam's
+rewind for free. **A hazard is not an enemy**: it is never in `enemies`, so it
+cannot hold a wave open, cannot hold the victory screen away, and pays nothing.
+The bounty, the score, the kill credit, the burst and the sound all happen once,
+at the combat death, in the one place this game decides a fate exactly once.
+`restartGame()` clears the list, which covers restart, route change and return
+to menu together.
+
+**`TowerHealth` grew a second timed state.** `suppress` / `isSuppressed` /
+`suppressionRemaining` / `tickSuppression` — named immunities, keyed by whatever
+string the attack spec supplies. A single boolean would have said "immune to
+everything", which is a much bigger promise than anyone made. It lives on the
+tower, so selling, destruction and a restart clean it up by taking the object
+with them; there is no registry to outlive a run. It is ticked BEFORE the stun
+check in the main loop, because the stun check `continue`s and the four seconds
+are time passing rather than the tower doing something.
+
+**THE SELECTION FLOW IS ROUTE FIRST, THEN DIFFICULTY**, which is what was asked
+for. A fifth value of `screen` (`"difficulty"`), inert by default because
+`update()` tests `screen !== "play"` rather than listing screens. Cards are cut
+from the same salvaged plate the route cards are, take their accent from
+`TIER_COLOURS` in its own order, and state four numbers all DERIVED from the
+schedule. Keys: 1–2, the difficulty's own initial, Escape back to the routes.
+Restart preserves the difficulty — "restart" means play this route again, and a
+player who chose Normal and lost did not ask to be put back on Easy. Nothing is
+saved: `MetaProgress` still holds four fields.
+
+**THE INDEX GREW A THIRD TAB.** *Difficulties*, with a sub-tab per schedule,
+previewing all thirty-five waves — roster, bodies, effective HP, reward and
+window — every column walked off the game's own resolvers. Previewing is not
+selecting: the index is reached from the title menu, where there is no run to
+change. And every enemy card now carries **one wave row per difficulty**, which
+is how the guide says that the Herald, the Sapper and the Volatile are Normal
+only; a single merged list would tell a player on Easy to look for a Herald that
+is not there.
+
+**THE SANDBOX PICKS THE SCHEDULE TOO**, through the game's own `setDifficulty`
+rather than by swapping `WAVES` itself — which would have skipped the cache
+drop and deployed the old schedule's wave 1. The dropdown is built from
+`DIFFICULTIES`, so a third would appear with nothing edited.
+
+**Cues, because three invisible mechanics read as three bugs.** A hastened body
+wears a violet ring and trailing chevrons; a Herald's pulse throws a tether per
+target, which needed no renderer code at all because the mark is declared on the
+type. A Sapper's telegraph is a thickening line to the tower it committed to
+with a ring closing onto the footprint; a disabled tower keeps the stun mark and
+gains a teal band; an immune one gets a dashed band and nothing else. A charge
+draws its true blast radius from the first frame — a ring that grew would be a
+lie about where the danger is — with the fuse as a sweeping arc and a core that
+quickens. Both renderers, off the same fields.
+
+**Tests: run.js 139 → 157, content.test.js 225 → 263**, plus four sandbox smoke
+checks. Nothing was removed. Four existing content assertions moved and each is
+the feature: `attack` is now `["angry", "sapper"]`, `support` gains `"herald"`,
+the Normal's "highest campaign HP" is 36 because the ceiling is taken across
+every schedule, and the number-key chooser test became two beats. `run.js`'s
+"every enemy type is scheduled" now walks every difficulty, which it had to:
+that is a question about the game, not about one schedule.
+
+**No Hard, and no placeholder for one.** A third entry is a third fully authored
+array plus its own card; an empty one now would recreate the exact state that
+got the concept deleted in the first place.
+
+**AND ONE THING THAT WAS NOT IN THE ASK, because the change surfaced it.** With
+the second schedule in, `tests/content.test.js` began dying **eight runs in
+forty** with SIGSEGV inside V8's own mark-compact
+(`ClearStaleLeftTrimmedPointerVisitor`) — no JavaScript stack, no failing test
+name, and the process gone partway through, so the suite stopped REPORTING
+rather than started failing. **`tools/ci-check.js` caught it** for exactly the
+reason its header gives: it asserts the FAIL lines it scraped match the count
+the suite reported about itself, so a truncated read shows as
+`NO SUMMARY LINE`. A gate that only counted failures would have called it clean.
+
+Bisected to the load-time work, then fixed in four places, none of which changes
+what any test asserts:
+
+- **`js/game.js` validates the ACTIVE schedule at load and each other one when
+  it is selected.** Checking every campaign at load expands 1 830 bodies into
+  arrival objects and sorts seventy lists — free in a browser that evaluates the
+  file once, not free in a harness that evaluates it two hundred times.
+  `tests/run.js` covers every schedule explicitly, so the coverage is unchanged.
+- **The harness's canvas stub returns one shared no-op** instead of a fresh
+  closure per property access. Every drawing call goes through that proxy, so
+  the old form allocated a function object per `beginPath()`. It also cut the
+  content suite's wall clock by about four fifths.
+- **Each game file is compiled once** (`vm.Script`, cached by path) and run in
+  every context, instead of being re-read and re-parsed per boot.
+- **Read-only tests share a booted game** — `readOnlyBoot()` and
+  `schedulesBoot()`. By USE, never by convenience: anything that places, spawns,
+  steps or clicks still boots its own.
+
+0 crashes in 60 content runs, 0 in 20 core runs and 14 consecutive clean gates
+afterwards. The V8 bug is still there; what changed is that this suite no longer
+does enough avoidable work to reach it.
+
 **2026-08-26 — The test board is redrawn, and the road stops being one width.**
 
 At the owner's instruction: the map was *"too linear and boring"* — a winding

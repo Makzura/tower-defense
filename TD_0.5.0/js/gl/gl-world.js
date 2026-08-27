@@ -3520,6 +3520,12 @@ var World3D = (function () {
     // is: what the player's own board is doing is never buried by what the road
     // is doing.
     drawSupportTethers(ctx, state);
+    // The v0.5.1 road marks, under the player's own shots for the same reason
+    // the tethers are: what the board is doing is never buried by what the road
+    // is doing.
+    drawHasteMarks(ctx, state);
+    drawSabotage(ctx, state);
+    drawHazards(ctx, state);
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
     // hardware that fired it and under the cosmetic burst layer. The death
@@ -3746,6 +3752,193 @@ var World3D = (function () {
     return { x: from.x + (to.x - from.x) * t,
              y: from.y + (to.y - from.y) * t - lift * bow,
              scale: from.scale + (to.scale - from.scale) * t };
+  }
+
+  // --- THE v0.5.1 ROAD MARKS: haste, sabotage and a live charge ------------
+  //
+  // Three cues for three mechanics that are otherwise INVISIBLE, which is the
+  // whole reason they need drawing: a hastened body simply walks a bit
+  // quicker, a telegraphing Sapper simply stands still, a disabled tower
+  // simply stops, and a fuse burning on the road looks like nothing at all.
+  // Every one of those reads as a bug rather than as a mechanic without a mark.
+  //
+  // NOTHING HERE IS SIMULATION AND NOTHING IS READ BACK. Every value comes off
+  // a field the simulation already keeps for its own reasons -- `hasteTimer`,
+  // `windUpTarget`, `TowerHealth.suppressionRemaining`, a hazard's own fuse --
+  // and the same fields drive the 2D fallback in Enemy.prototype.draw, so
+  // neither renderer knows about the other.
+  //
+  // THE PULSE ITSELF NEEDED NO CODE AT ALL. A Herald's `support.tether` block
+  // puts a cord on every body it hastens through drawSupportTethers above,
+  // exactly as the Healer's and the Shieldbearer's do -- which is the payoff of
+  // declaring the mark on the TYPE rather than in a renderer.
+
+  // A HASTENED BODY. A bright ring at its feet plus two chevrons trailing it,
+  // and the ring breathes so a crowd of them does not read as one flat wash.
+  //
+  // AT THE FEET AND NOT OVER THE HEAD, deliberately: haste is about the
+  // ground being crossed, the health bar already owns the airspace above a
+  // body, and a Swarm at 0.55 scale has no head worth marking.
+  var HASTE_RGB = "214,158,255";
+
+  function drawHasteMarks(ctx, state) {
+    for (var i = 0; i < state.enemies.length; i++) {
+      var e = state.enemies[i];
+      if (!e.isHastened || !e.isHastened()) continue;
+      var r = e.radiusPx ? e.radiusPx() : 11;
+      // Breathing, not blinking: a sine on the shared clock, so every hastened
+      // body on the board pulses together and it reads as one effect.
+      var beat = 0.55 + 0.45 * Math.sin((state.now || 0) * 6.5);
+      drawGroundRing(ctx, e.pos.x, e.pos.y, r * 1.5,
+        "rgba(" + HASTE_RGB + "," + (0.55 + 0.35 * beat).toFixed(3) + ")",
+        "rgba(" + HASTE_RGB + ",0.10)");
+
+      // Two chevrons BEHIND it, pointing the way it is going. `headingVec` is
+      // the road's own tangent at this body, so they lie along the lane rather
+      // than along the screen.
+      var heading = e.headingVec && e.headingVec();
+      if (!heading) continue;
+      for (var k = 1; k <= 2; k++) {
+        var back = r * (1.7 + k * 0.7);
+        var at = project(e.pos.x - heading.x * back, e.pos.y - heading.y * back,
+          bodyLift(e, r) + r * 0.4);
+        if (!at) continue;
+        var tip = project(e.pos.x - heading.x * (back - r * 0.55),
+          e.pos.y - heading.y * (back - r * 0.55), bodyLift(e, r) + r * 0.4);
+        if (!tip) continue;
+        beam(ctx, at, tip, HASTE_RGB, 2 * at.scale,
+          (0.7 - k * 0.22) * beat, 0.5);
+      }
+    }
+  }
+
+  // A SAPPER'S TELEGRAPH, and the two states a tower can be in because of one.
+  //
+  // The colour is the Sapper's own body colour, read off its type row rather
+  // than typed here, so the line and the thing throwing it are the same green.
+  var SAP_RGB = "96,226,214";
+
+  function drawSabotage(ctx, state) {
+    var i;
+
+    // 1 -- THE TELEGRAPH. A line from a body that has committed a `disable`
+    // attack to the tower it committed to, thickening as the 1.1 s runs out,
+    // with a tightening ring on the target. `windUpTarget` is set ONLY by a
+    // spec carrying `commitsTarget`, so nothing else in the game draws this
+    // and no id is checked to decide it.
+    for (i = 0; i < state.enemies.length; i++) {
+      var e = state.enemies[i];
+      var target = e.windUpTarget;
+      if (!target || !(e.windUpTimer > 0)) continue;
+      var spec = e.windUpAttack;
+      if (!spec || !spec.disable) continue;
+
+      var full = spec.windUpSeconds || 1;
+      // 0 at the start of the telegraph, 1 at the moment it resolves. The cue
+      // has to ARRIVE rather than fade, because what it is counting down to is
+      // the thing the player is being given time to prevent.
+      var charge = Math.max(0, Math.min(1, 1 - e.windUpTimer / full));
+
+      var r = e.radiusPx ? e.radiusPx() : 11;
+      var from = project(e.pos.x, e.pos.y, bodyLift(e, r) + enemyTop(e) * 0.5);
+      var to = project(target.x, target.y, (target.footprintPx || 12) * 0.8);
+      if (!from || !to) continue;
+      beam(ctx, from, to, SAP_RGB, (1 + charge * 2.4) * from.scale,
+        0.35 + 0.55 * charge, 0.5);
+      // The ring closes onto the footprint as the charge fills, so where it
+      // ends up is exactly what is about to go dark.
+      drawGroundRing(ctx, target.x, target.y,
+        (target.footprintPx || 12) * (2.2 - charge * 1.05),
+        "rgba(" + SAP_RGB + "," + (0.5 + 0.5 * charge).toFixed(3) + ")", null, 2);
+    }
+
+    if (typeof TowerHealth === "undefined") return;
+
+    // 2 and 3 -- DISABLED, and IMMUNE, which are two states and get two marks.
+    //
+    // A disabled tower already wears the stun mark above (ring, countdown arc,
+    // orbiting sparks) and that is right -- it IS stunned, and one silence
+    // should look like every other silence. What is added here is the outer
+    // teal band that says WHO silenced it, and it is drawn only while the
+    // tower is actually dark.
+    //
+    // An immune tower is not silenced at all and must not look as though it is:
+    // it gets a thin dashed band and nothing else. The difference between the
+    // two on screen is the difference between "this gun is out" and "this gun
+    // cannot be taken out again yet", which is the whole of what a player needs
+    // from these four seconds.
+    for (i = 0; i < state.towers.length; i++) {
+      var t = state.towers[i];
+      var left = TowerHealth.suppressionRemaining(t, "sapper");
+      if (!(left > 0)) continue;
+      var radius = (t.footprintPx || 12) + 12;
+      if (TowerHealth.isStunned(t)) {
+        drawGroundRing(ctx, t.x, t.y, radius,
+          "rgba(" + SAP_RGB + ",0.9)", "rgba(" + SAP_RGB + ",0.12)", 2.5);
+        continue;
+      }
+      // IMMUNE. Dashed, because a broken ring reads as a lapsed guard rather
+      // than an active effect -- and it fades as the window closes, which is
+      // the only thing the player wants to know about it.
+      var fade = Math.min(1, left / 4);
+      ctx.save();
+      if (ctx.setLineDash) ctx.setLineDash([5, 5]);
+      drawGroundRing(ctx, t.x, t.y, radius,
+        "rgba(" + SAP_RGB + "," + (0.25 + 0.35 * fade).toFixed(3) + ")", null, 1.5);
+      if (ctx.setLineDash) ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  // A LIVE CHARGE ON THE ROAD, and its danger radius.
+  //
+  // Two things have to be legible and they are different questions: HOW LONG
+  // (the fuse) and HOW FAR (the radius). So the radius is a ring drawn at the
+  // blast's true reach from the first frame -- it does not grow, because a
+  // growing ring would be a lie about where the danger is until the last
+  // instant -- and the fuse is an arc sweeping round that same ring plus a core
+  // that brightens and quickens.
+  //
+  // AFTER IT GOES OFF the hazard is held for its afterglow and drawn as a
+  // fading flash. Effects.aoeImpact draws the burst itself; this is the mark
+  // that was already there letting go.
+  var HAZARD_RGB = "214,255,96";
+
+  function drawHazards(ctx, state) {
+    var list = state.hazards;
+    if (!list || !list.length) return;
+    for (var i = 0; i < list.length; i++) {
+      var h = list[i];
+      var reach = ul(h.radiusUl);
+      if (h.detonated) {
+        var glowLeft = Math.max(0, h.afterglow) /
+          (typeof Hazards !== "undefined" ? Hazards.AFTERGLOW_SECONDS : 0.35);
+        drawGroundRing(ctx, h.x, h.y, reach,
+          "rgba(255,244,190," + (0.85 * glowLeft).toFixed(3) + ")",
+          "rgba(255,236,150," + (0.30 * glowLeft).toFixed(3) + ")", 3);
+        continue;
+      }
+      // The fuse, 0 -> 1.
+      var burnt = Math.max(0, Math.min(1,
+        1 - h.fuse / (h.fuseTotal || 1)));
+      drawGroundRing(ctx, h.x, h.y, reach,
+        "rgba(" + HAZARD_RGB + "," + (0.35 + 0.45 * burnt).toFixed(3) + ")",
+        "rgba(" + HAZARD_RGB + "," + (0.06 + 0.12 * burnt).toFixed(3) + ")", 2);
+      drawGroundArc(ctx, h.x, h.y, reach - 3,
+        -Math.PI / 2, -Math.PI / 2 + burnt * Math.PI * 2,
+        "rgba(255,250,210,0.95)", 3);
+
+      // The charge itself, sitting where the body fell. It quickens as the
+      // fuse burns -- the frequency is a function of `burnt`, so the ticking
+      // gets faster rather than merely brighter, which is the read every fuse
+      // in every medium has.
+      var core = project(h.x, h.y, 6);
+      if (!core) continue;
+      var tick = 0.5 + 0.5 * Math.sin((state.now || 0) * (8 + burnt * 26));
+      glow(ctx, core, (5 + burnt * 5) * core.scale,
+        "rgba(255,250,200," + (0.55 + 0.45 * tick).toFixed(3) + ")",
+        0.8 + 0.2 * tick);
+    }
   }
 
   function drawSupportTethers(ctx, state) {
