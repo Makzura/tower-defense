@@ -271,6 +271,12 @@
 <script src="js/towers/long-range-dps.config.js"></script>
 <script src="js/systems/stat-resolver.js"></script>
 <script src="js/systems/crosspath.js"></script>
+<!-- THE WORLD CLOCK AND WHAT IT LOOKS LIKE. Before game.js, which ticks the
+     cycle from its fixed step, and before gl-world.js, which reads the
+     composed result off the render state. Neither of these two files knows
+     what a tower is; nothing that knows what a tower is owns the time. -->
+<script src="js/systems/environment-cycle.js"></script>
+<script src="js/systems/environment-lighting.js"></script>
 <script src="js/systems/map-geometry.js"></script>
 <script src="js/systems/range-filter.js"></script>
 <script src="js/systems/pierce.js"></script>
@@ -326,6 +332,9 @@
 <script src="js/gl/gl-renderer.js"></script>
 <script src="js/gl/gl-camera.js"></script>
 <script src="js/gl/gl-geometry.js"></script>
+<!-- The sky pass. Before gl-world.js, which creates it on the first outdoor
+     frame and hands it the composed environment. -->
+<script src="js/gl/gl-sky.js"></script>
 <script src="js/gl/gl-parts.js"></script>
 <script src="js/gl/gl-models.js"></script>
 <script src="js/gl/gl-world.js"></script>

@@ -2349,10 +2349,21 @@ Maps.ENVIRONMENTS = {
       { kind: "wheel",      x: 1252, y: 254, size: 24, rotation: 0 },
       { kind: "wheel",      x: 1096, y: 108, size: 24, rotation: 0 },
       { kind: "wheel",      x: 1196, y: 96,  size: 26, rotation: 0 },
-      { kind: "exhaust",    x: 1236, y: 116, size: 22, rotation: 0 },
-      { kind: "exhaust",    x: 1256, y: 148, size: 19, rotation: 0 },
-      { kind: "floodlight", x: 1082, y: 132, size: 15, rotation: 0 },
-      { kind: "floodlight", x: 1082, y: 232, size: 15, rotation: 0 }
+      // THE DEPOT BURNS RED, and it is the only thing on this board that does.
+      // The settlement's lanterns are the theme's amber and read as somewhere
+      // people live; the transport's warning lights are a different colour on
+      // purpose, so that at night the two ends of the road say what kind of
+      // place they are before a player has read a single label. Per-prop
+      // `accent` puts each of these in its own mesh -- see the accent groups in
+      // gl-world -- and the night cycle then drives all of them together.
+      { kind: "exhaust",    x: 1236, y: 116, size: 22, rotation: 0,
+        accent: "255,104,44" },
+      { kind: "exhaust",    x: 1256, y: 148, size: 19, rotation: 0,
+        accent: "255,104,44" },
+      { kind: "floodlight", x: 1082, y: 132, size: 15, rotation: 0,
+        accent: "255,66,40" },
+      { kind: "floodlight", x: 1082, y: 232, size: 15, rotation: 0,
+        accent: "255,66,40" }
     ]
   },
 
@@ -4327,6 +4338,193 @@ Maps.drawSolids = function (ctx, map, theme) {
     ctx.strokeStyle = "#8a734d";
     ctx.stroke();
   });
+};
+
+// --- the hour of the day, on the flat board -------------------------------
+//
+// The 3D pass has a real sky shader; this is its opposite number, and the two
+// read the SAME composed environment off the SAME render state. They do not
+// have to look identical -- one is a perspective board with a dome over it and
+// the other is a top-down plan -- but they must never disagree about what time
+// it is, which is why neither of them computes a phase.
+
+// Linear light out of EnvironmentLighting, display sRGB into canvas. The 3D
+// shader makes this conversion in its last line; canvas has no shader, so it
+// happens here, once, for the same reason.
+function displayRgb(linear) {
+  function c(v) {
+    return Math.max(0, Math.min(255, Math.round(Math.pow(Math.max(v, 0), 1 / 2.2) * 255)));
+  }
+  return "rgb(" + c(linear[0]) + "," + c(linear[1]) + "," + c(linear[2]) + ")";
+}
+
+// A DETERMINISTIC STAR FIELD, BUILT ONCE. A fixed seed, a fixed count, cached
+// on first use -- so the stars are in the same place on every frame, every
+// reload and every machine, and nothing is generated in a draw call.
+var starField2D = null;
+function stars2D() {
+  if (starField2D) return starField2D;
+  var seed = 20260827, out = [];
+  function rnd() {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  }
+  for (var i = 0; i < 150; i++) {
+    out.push({ x: rnd(), y: rnd() * 0.62, r: 0.5 + rnd() * 1.2,
+               mag: 0.25 + rnd() * 0.75 });
+  }
+  starField2D = out;
+  return out;
+}
+
+// THE BACKGROUND, WHICH IS NOW A SKY on a board that has one. Drawn before the
+// map, so what survives is the strip around the edges -- which is exactly
+// where a sky is visible from directly above.
+//
+// A board with no horizon keeps its authored void, byte for byte: six of the
+// eight routes are decks inside a facility and a sunrise over a reactor hall
+// is not atmosphere, it is a mistake.
+Maps.drawSky = function (ctx, map, env, width, height) {
+  var theme = Maps.themeOf(map);
+  if (!env || !theme || !theme.horizon) {
+    ctx.fillStyle = Maps.backgroundColor(map);
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
+  var grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, displayRgb(env.sky.zenith));
+  grad.addColorStop(0.62, displayRgb(env.sky.band));
+  grad.addColorStop(1, displayRgb(env.sky.horizon));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  var starAmount = env.sky.starIntensity;
+  if (starAmount > 0.01) {
+    var field = stars2D();
+    ctx.save();
+    for (var i = 0; i < field.length; i++) {
+      var st = field[i];
+      ctx.globalAlpha = st.mag * starAmount;
+      ctx.fillStyle = "#dce6ff";
+      ctx.beginPath();
+      ctx.arc(st.x * width, st.y * height, st.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // The moon, on the same arc the 3D pass puts it on: its east-west component
+  // is the direction's x, and its height is the direction's z. One body, one
+  // path, two renderers.
+  if (env.moon.disc > 0.01) {
+    var mx = (0.5 + env.moon.dir[0] * 0.42) * width;
+    var my = (0.62 - env.moon.dir[2] * 0.52) * height;
+    ctx.save();
+    ctx.globalAlpha = env.moon.disc;
+    var halo = ctx.createRadialGradient(mx, my, 0, mx, my, height * 0.10);
+    halo.addColorStop(0, "rgba(210,222,250,0.55)");
+    halo.addColorStop(1, "rgba(210,222,250,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(mx, my, height * 0.10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#e6ecfb";
+    ctx.beginPath();
+    ctx.arc(mx, my, height * 0.022, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // And the sun, which is the same body on the opposite side of the arc.
+  if (env.sun.disc > 0.01) {
+    var sx = (0.5 + env.sun.dir[0] * 0.42) * width;
+    var sy = (0.62 - env.sun.dir[2] * 0.52) * height;
+    ctx.save();
+    ctx.globalAlpha = env.sun.disc;
+    var sunHalo = ctx.createRadialGradient(sx, sy, 0, sx, sy, height * 0.16);
+    sunHalo.addColorStop(0, "rgba(255,238,198,0.62)");
+    sunHalo.addColorStop(1, "rgba(255,238,198,0)");
+    ctx.fillStyle = sunHalo;
+    ctx.beginPath();
+    ctx.arc(sx, sy, height * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = displayRgb(env.sun.colour);
+    ctx.beginPath();
+    ctx.arc(sx, sy, height * 0.028, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+};
+
+// THE WORLD, AT THE HOUR IT IS. Drawn INSIDE the camera transform and before
+// any interface, which is what keeps the HUD out of it.
+//
+// A MULTIPLY, not an opaque wash. A flat blue rectangle at 40% alpha is what
+// most 2D games do for night and it destroys exactly the thing a tower defence
+// board needs: the contrast between a road and the ground beside it, and
+// between an enemy and what it is walking on. Multiplying by a desaturated
+// blue darkens everything in proportion to what it already was, so the road
+// stays lighter than the dirt and a bright enemy stays bright.
+//
+// The warm sources then come back on top in `lighter`, which is what a lamp
+// does to a dark scene: it adds, it does not un-darken.
+Maps.drawEnvironmentTint = function (ctx, map, env) {
+  var theme = Maps.themeOf(map);
+  if (!env || !theme || !theme.horizon) return;
+  var night = env.cycle.nightAmount;
+  var scale = UNIT_LENGTH / AUTHORED_AT_PX_PER_UL;
+  var w = VIEW_WIDTH / scale, h = VIEW_HEIGHT / scale;
+
+  ctx.save();
+  ctx.scale(scale, scale);
+
+  if (night > 0.004) {
+    // Never fully dark: the floor of this multiply is what "night remains
+    // readable" is worth in the flat renderer.
+    var k = 1 - night * 0.62;
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "rgb(" + Math.round(255 * k * 0.92) + "," +
+      Math.round(255 * k * 0.96) + "," + Math.round(255 * Math.min(1, k * 1.12)) + ")";
+    // Generously past the board on every side: the camera can pan, and a tint
+    // that stops at the board edge is a visible rectangle.
+    ctx.fillRect(-w, -h, w * 3, h * 3);
+    ctx.globalCompositeOperation = "lighter";
+
+    // THE SETTLEMENT: warm, low, inhabited. Every lantern and every window on
+    // the board, from the props the map already authored -- there is no second
+    // list of light positions to fall out of step with the buildings.
+    var warm = night * 0.55;
+    (map.models || []).forEach(function (m) {
+      var lamp = m.kind === "lantern" ? 46
+        : (m.kind === "house" || m.kind === "townhall" ||
+           m.kind === "storehouse" || m.kind === "workshop") ? 40
+        : (m.kind === "palisade-gate") ? 30 : 0;
+      if (!lamp) return;
+      var g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, lamp);
+      g.addColorStop(0, "rgba(255,186,96," + (warm * 0.55).toFixed(3) + ")");
+      g.addColorStop(1, "rgba(255,186,96,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, lamp, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // THE DEPOT: cold, red, industrial, and it does not look welcoming. Same
+    // treatment, opposite temperature -- the two ends of the road have to read
+    // as different kinds of place before a player reads a single label.
+    (map.models || []).forEach(function (m) {
+      var red = m.kind === "floodlight" ? 54 : (m.kind === "exhaust" ? 34 : 0);
+      if (!red) return;
+      var g2 = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, red);
+      g2.addColorStop(0, "rgba(255,86,54," + (warm * 0.50).toFixed(3) + ")");
+      g2.addColorStop(1, "rgba(255,86,54,0)");
+      ctx.fillStyle = g2;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, red, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  ctx.restore();
 };
 
 Maps.drawEnvironment = function (ctx, map) {

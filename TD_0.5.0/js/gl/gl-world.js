@@ -41,6 +41,16 @@ var World3D = (function () {
   var uiCanvas = null;
 
   var mapMesh = null;
+  // Created on the first outdoor frame and kept. `undefined` means "not tried
+  // yet"; `null` means "tried and this context cannot", which is not an error
+  // worth retrying sixty times a second.
+  var sky;
+
+  function mixTriple(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            a[2] + (b[2] - a[2]) * t];
+  }
   // PROPS THAT DO NOT GLOW IN THE BOARD'S COLOUR, as their own meshes.
   //
   // Emission is `uGlowTint * vEmi` -- ONE tint per draw call, not per vertex --
@@ -365,6 +375,7 @@ var World3D = (function () {
       metalDark: hex(t.metalDark, "#132733"),
       // Solid blockers. Falls back to the machine colours, so the six boards
       // that have never had a rock on them are byte identical.
+      horizon: !!t.horizon,
       rock: hex(t.rock, t.metal || "#263f4c"),
       rockDark: hex(t.rockDark, t.panel || "#123848"),
       // Distant hills. Default to the old near-black so nothing that has not
@@ -1741,24 +1752,91 @@ var World3D = (function () {
     // the whole picture. The theme's own background is the colour the board
     // says its void is, which is the answer that was there all along.
     var fog = mapPalette && mapPalette.fog;
-    renderer.begin(vp, fog ? fog.clear : null);
+
+    // THE ENVIRONMENT THIS FRAME IS LIT BY, and it arrives in the render state
+    // like everything else. This function never advances a clock and never
+    // computes a phase: game.js's fixed step owns the time and hands the
+    // composed result down. A renderer that ticks the sky is a sky that runs
+    // at frame rate and speeds up on a fast machine.
+    //
+    // OUTDOOR BOARDS ONLY. Six of the eight routes are decks inside a facility;
+    // a sunrise over a reactor hall is not atmosphere, it is a mistake. A board
+    // opts in by declaring a horizon, which is the same flag that already says
+    // "this board has a sky rather than a void". Everything else keeps the
+    // authored rig, byte for byte.
+    var env = state.environment || null;
+    var outdoor = !!(mapPalette && mapPalette.horizon) && !!env;
+    if (outdoor) {
+      renderer.setLighting({
+        keyDir: env.light.keyDir,
+        fillDir: env.light.fillDir,
+        ambient: env.light.ambient,
+        fillColor: env.light.fillColour,
+        keyColor: env.light.keyColour,
+        keyStrength: env.light.keyStrength
+      });
+    } else {
+      renderer.resetLighting();
+    }
+
+    renderer.begin(vp, outdoor ? env.sky.horizon : (fog ? fog.clear : null));
+
+    // THE SKY, before anything else and behind everything. Its own program and
+    // its own depth state; `rebind` hands the context back.
+    if (outdoor) {
+      // `renderer.gl` -- this module has no `gl` of its own, and the first
+      // version of this line reached for a bare one. It resolved to something
+      // on the global object rather than throwing, so GLSky.create built a Sky
+      // against the wrong context: it compiled, it linked, every uniform
+      // location came back valid, and it drew nothing. The board still looked
+      // right, because the CLEAR colour is the sky's own horizon colour -- so
+      // the gradient, the band, the sun, the moon and the stars were all
+      // missing behind a background that was exactly the right shade.
+      if (sky === undefined) sky = GLSky.create(renderer.gl);
+      if (sky) {
+        sky.draw(camera, env, glCanvas.height ? glCanvas.width / glCanvas.height : 1);
+        renderer.rebind();
+      }
+    }
     // SET ONCE PER FRAME, BEFORE ANYTHING IS DRAWN, so the board, the towers,
     // the bodies and the projectiles all stand in the same air. `begin` has
     // just restored clear air, so a board with no fog needs no call and cannot
     // inherit the last board's weather.
-    if (fog) renderer.setFog(fog.color, fog.density, fog.height);
+    //
+    // AND THE AIR FOLLOWS THE SKY. Mist is lit by whatever is lighting
+    // everything else: at noon it is a pale haze, at midnight it is the deep
+    // blue of the horizon behind it. Blending toward the sky's own horizon
+    // colour is what stops a board fading into yesterday's daylight at 3am.
+    if (fog) {
+      var fogColour = fog.color;
+      var fogDensity = fog.density;
+      if (outdoor) {
+        fogColour = mixTriple(fog.color, env.sky.horizon, env.fogSkyMix);
+        fogDensity = fog.density * env.fogDensityScale;
+      }
+      renderer.setFog(fogColour, fogDensity, fog.height);
+    }
     // The board's scenery carries its own emission, so the map pass is drawn
     // with the glow driven. Constant, not animated: these are installations
     // that are simply switched on, and a breathing board would pull the eye off
     // the things that actually change. Reset immediately so a tower that does
     // not set its own glow cannot inherit the board's.
-    renderer.setGlow(1, mapPalette ? mapPalette.accent : null);
+    //
+    // THE MULTIPLIER IS THE WHOLE NIGHT-LIGHTING MECHANISM. The map mesh is
+    // static and is built once; animating a lantern by rebuilding a hundred
+    // thousand triangles would be absurd. `uGlow` already scales every emissive
+    // vertex in the pass, so a settlement's windows come up at dusk and go out
+    // at dawn for the cost of one uniform. Reset to 0 immediately after, so a
+    // tower that sets no glow of its own cannot inherit the board's -- which is
+    // also what keeps a tower's charge and firing glow entirely its own.
+    var sceneryGlow = outdoor ? env.sceneryEmissive : 1;
+    renderer.setGlow(sceneryGlow, mapPalette ? mapPalette.accent : null);
     renderer.draw(mapMesh, 0, 0, 0, 0, 1);
     // The board's own exceptions, each under the light it declared. Same
     // static geometry and the same fog; only the tint of what it emits is its
     // own. See `accentMeshes` for why this cannot be one draw call.
     for (var am = 0; am < accentMeshes.length; am++) {
-      renderer.setGlow(1, accentMeshes[am].tint);
+      renderer.setGlow(sceneryGlow, accentMeshes[am].tint);
       renderer.draw(accentMeshes[am].mesh, 0, 0, 0, 0, 1);
     }
     renderer.setGlow(0, null);

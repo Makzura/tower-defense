@@ -1863,6 +1863,10 @@ function openMapSelect() {
 function openMenu() {
   screen = "menu";
   paused = false;
+  // The run is over as far as the world is concerned: no clock on the title
+  // screen. Victory and game over do NOT call this -- they freeze the board
+  // they finished on, and the sky is part of that board.
+  if (typeof EnvironmentCycle !== "undefined") EnvironmentCycle.end();
   // A klaxon that followed the player out of a losing run and onto the title
   // screen would be a warning about a base that no longer exists.
   Sound.stopAlert();
@@ -1908,6 +1912,13 @@ function restartGame() {
   enemies = [];
   towers = [];
   bullets = [];
+
+  // A NEW RUN OPENS AT THE SAME MORNING, always. restartGame is the one place
+  // every start goes through -- a fresh run, a restart from the result screen,
+  // a route change in the sandbox -- so putting it here is what makes "leaving
+  // and starting another run does not leak phase" true by construction rather
+  // than by remembering to reset in four places.
+  if (typeof EnvironmentCycle !== "undefined") EnvironmentCycle.begin();
 
   cash = STARTING_CASH;
   baseHp = BASE_MAX_HP;
@@ -3241,6 +3252,15 @@ function update(dt) {
     return;
   }
 
+  // THE SOLAR CLOCK, first, on the same fixed step as everything else.
+  //
+  // It is here rather than in a renderer for one reason and it is the whole
+  // design: this line is already gated on the run being active, unpaused, not
+  // over and not rewinding, and it is already called more often at 2x and 3x.
+  // So the sky freezes with the board, accelerates with the board and does not
+  // exist on the menu, and none of that had to be written into the cycle.
+  if (typeof EnvironmentCycle !== "undefined") EnvironmentCycle.update(dt);
+
   updateWaves(dt);
 
   var i;
@@ -4386,6 +4406,28 @@ function hoveredRecruitOnBoard() {
   return recruitAt(worldMouse.x, worldMouse.y);
 }
 
+// WHAT THE WORLD IS LIT BY RIGHT NOW.
+//
+// Inside a run it is the live cycle; anywhere else -- the title screen, the map
+// cards, a model viewer -- it is the authored idle morning, which is what stops
+// a preview inheriting whatever time it happened to be when the player quit.
+function environmentForRender() {
+  if (typeof EnvironmentCycle === "undefined" ||
+      typeof EnvironmentLighting === "undefined") return null;
+  var cycle = (screen === "play") ? EnvironmentCycle.state()
+                                  : EnvironmentCycle.idleState();
+  return EnvironmentLighting.of(cycle);
+}
+
+// The fixed daytime a map CARD is drawn under. Never the live phase: a card is
+// a picture of a place, and a player choosing a route at 3am should not be
+// shown eight thumbnails of a dark forest.
+function thumbnailEnvironment() {
+  if (typeof EnvironmentCycle === "undefined" ||
+      typeof EnvironmentLighting === "undefined") return null;
+  return EnvironmentLighting.compose(EnvironmentCycle.stateAt(0.22), []);
+}
+
 function worldRenderState() {
   // The build ghost, on exactly the same terms drawBuildPreview() uses -- the
   // armed type, the cursor actually being over the map, and `blockReason` for
@@ -4413,6 +4455,11 @@ function worldRenderState() {
   return {
     map: currentMap, paths: paths,
     towers: towers, enemies: enemies, bullets: bullets,
+    // THE COMPOSED ENVIRONMENT, resolved once per frame, here. Both renderers
+    // read this and neither reads EnvironmentCycle directly -- which is what
+    // makes "2D and WebGL receive the same snapshot" a fact about the code
+    // rather than a thing to keep checking.
+    environment: environmentForRender(),
     buildGhost: ghost,
     inspected: inspected, aimingTower: aimingTower, worldMouse: worldMouse,
     // Recomputed per frame rather than passing the stored `hoveredEnemy`,
@@ -4444,9 +4491,16 @@ function draw() {
     screen === "play";
   if (showing3D) {
     ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  } else if (screen === "play" && typeof Maps !== "undefined" &&
+      Maps.backgroundColor) {
+    // THE FLAT BOARD GETS THE SAME SKY, from the same snapshot. It is a
+    // top-down view, so most of this is covered by the board itself -- what
+    // shows is the strip around the edges, which is exactly where a sky
+    // belongs. Drawn before the world so the map paints over it.
+    Maps.drawSky(ctx, currentMap, environmentForRender(),
+      VIEW_WIDTH, VIEW_HEIGHT);
   } else {
-    ctx.fillStyle = (screen === "play" && typeof Maps !== "undefined" &&
-      Maps.backgroundColor) ? Maps.backgroundColor(currentMap) : "#1c1e26";
+    ctx.fillStyle = "#1c1e26";
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   }
 
@@ -4551,6 +4605,16 @@ function draw() {
   for (i = 0; i < actors.length; i++) actors[i].actor.draw(ctx);
 
   for (i = 0; i < bullets.length; i++) bullets[i].draw(ctx);
+
+  // THE HOUR OF THE DAY, ON THE WORLD AND NOTHING ELSE.
+  //
+  // Inside the camera transform and before the interface, which is the whole
+  // reason it is HERE and not over the finished frame: the HUD, the panels and
+  // the menus must never be tinted by the weather. A run at midnight is a dark
+  // board with a legible interface on top of it, not a dark screen.
+  if (typeof Maps !== "undefined" && Maps.drawEnvironmentTint) {
+    Maps.drawEnvironmentTint(ctx, currentMap, environmentForRender());
+  }
 
   // Bars are interface attached to world actors, so they run as their own pass
   // and stay readable over every body regardless of depth order.
@@ -8683,8 +8747,11 @@ function drawMapThumbnail(map, box) {
     ctx.scale(1, -1);
   }
 
-  ctx.fillStyle = Maps.backgroundColor ? Maps.backgroundColor(map) : "#1c1e26";
-  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  // A CARD IS A PICTURE OF A PLACE, not a clock. Fixed late morning, always --
+  // a player choosing a route at three in the morning should not be offered
+  // eight thumbnails of a dark forest, and a card that changed while they
+  // looked at it would read as a bug.
+  Maps.drawSky(ctx, map, thumbnailEnvironment(), VIEW_WIDTH, VIEW_HEIGHT);
 
   if (typeof Maps.drawEnvironment === "function") Maps.drawEnvironment(ctx, map);
 

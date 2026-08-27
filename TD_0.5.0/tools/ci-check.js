@@ -315,7 +315,21 @@ var BASELINE = [
     // in MapGeometry goes red on 23 and 24; dropping the stumps from the sight
     // list goes red on 23; re-authoring one blocker prop goes red on 22; and
     // taking the shooter's elevation off the bullet goes red on 24.
-    file: "tests/run.js", pass: 167, fail: 0,
+    // 187 on 2026-08-27, from 167: TWENTY tests for the day/night cycle, in
+    // three groups. The clock (E1-E9) is pinned against the real loop where
+    // the claim is about the game -- pause, speed, restart, leaving a run --
+    // and against the module directly where it is about arithmetic. E8 is the
+    // one worth knowing about: it hands the cycle three and a half days in a
+    // single call and counts the crossings, because a before/after phase
+    // comparison passes every other test in the group and silently drops five
+    // of those six events.
+    //
+    // The light (E10-E15) is about continuity rather than beauty: E10 samples
+    // twenty-four hundred phases and asserts no channel steps, which is what a
+    // band edge used as a switch would break immediately. E20 asserts the
+    // whole system is decoration -- the same run at midnight and at noon kills
+    // the same enemies for the same money.
+    file: "tests/run.js", pass: 187, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

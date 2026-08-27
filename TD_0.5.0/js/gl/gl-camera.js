@@ -792,6 +792,18 @@ OrbitCamera.prototype.update = function (dt) {
 // the lens. Eight number comparisons against three matrix builds is not a close
 // contest, and it cannot go stale -- `_recomputeBasis()` rewrites `_eye`
 // whenever yaw, pitch or distance change, so a moved camera always misses.
+// THE THREE AXES THE VIEW IS BUILT ON, for anything that needs to rebuild a
+// view ray without inverting a matrix. The sky pass is the caller: it wants a
+// world direction per pixel, and taking it from the same basis the projection
+// is built from is what stops the sky and the ground disagreeing about which
+// way is up.
+OrbitCamera.prototype.basis = function () {
+  return { forward: [this._fwd[0], this._fwd[1], this._fwd[2]],
+           right: [this._right[0], this._right[1], this._right[2]],
+           up: [this._up[0], this._up[1], this._up[2]],
+           eye: [this._eye[0], this._eye[1], this._eye[2]] };
+};
+
 OrbitCamera.prototype.viewProjection = function () {
   var e = this._eye, t = this.target, aspect = this.aspect();
   var c = this._vpKey;

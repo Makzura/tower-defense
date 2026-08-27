@@ -71,6 +71,12 @@ function GLRenderer(canvas) {
     "uniform vec3 uAmbient;\n" +
     "uniform vec3 uFillColor;\n" +
     "uniform float uKeyStrength;\n" +
+    // THE KEY HAS A COLOUR NOW. It was `vec3(key)` -- white, always -- which is
+    // correct for a facility deck under a fixed rig and wrong the moment the
+    // light in the sky is a sun that rises amber, goes neutral at noon and is
+    // replaced by a cold moon. Authored default is white, so a board that never
+    // touches it renders exactly as it did.
+    "uniform vec3 uKeyColor;\n" +
     // How hard this instance's emissive materials are being driven, 0 at rest.
     // The weapon's own coils, arc core, aperture and breech orb ARE the charge
     // effect now, so a tower winding up to fire hands its cycle straight to
@@ -93,7 +99,7 @@ function GLRenderer(canvas) {
     "  vec3 n = normalize(vNrm);\n" +
     "  float key = max(dot(n, uKeyDir), 0.0) * uKeyStrength;\n" +
     "  float fill = max(dot(n, uFillDir), 0.0);\n" +
-    "  vec3 lit = vCol * (uAmbient + vec3(key) + uFillColor * fill);\n" +
+    "  vec3 lit = vCol * (uAmbient + uKeyColor * key + uFillColor * fill);\n" +
     // Emission is ADDED, not multiplied: a glowing surface emits whether or
     // not the sun reaches it, which is the whole difference between a lamp and
     // a bright paint. Driven in linear, so the sRGB conversion below carries it
@@ -138,6 +144,7 @@ function GLRenderer(canvas) {
     ambient: gl.getUniformLocation(this.program, "uAmbient"),
     fillColor: gl.getUniformLocation(this.program, "uFillColor"),
     keyStrength: gl.getUniformLocation(this.program, "uKeyStrength"),
+    keyColor: gl.getUniformLocation(this.program, "uKeyColor"),
     glow: gl.getUniformLocation(this.program, "uGlow"),
     glowTint: gl.getUniformLocation(this.program, "uGlowTint"),
     alpha: gl.getUniformLocation(this.program, "uAlpha"),
@@ -209,6 +216,19 @@ function GLRenderer(canvas) {
   this.ambient = [0.125, 0.142, 0.180];
   this.fillColor = [0.075, 0.110, 0.155];
   this.keyStrength = 1.02;
+  this.keyColor = [1, 1, 1];
+
+  // AUTHORED DEFAULTS, NOT CONSTANTS. Everything above is now the rig a board
+  // gets when nobody sets one -- the model viewers, the tower previews, the map
+  // cards and any board with no environment. `setLighting` overrides it per
+  // frame and `resetLighting` puts it back, on exactly the reasoning `setFog`
+  // uses two functions below: a preview must never inherit the last run's
+  // midnight.
+  this._defaultLighting = {
+    keyDir: this.keyDir.slice(), fillDir: this.fillDir.slice(),
+    ambient: this.ambient.slice(), fillColor: this.fillColor.slice(),
+    keyStrength: this.keyStrength, keyColor: this.keyColor.slice()
+  };
 
   gl.enable(gl.DEPTH_TEST);
   gl.depthFunc(gl.LEQUAL);
@@ -295,6 +315,7 @@ GLRenderer.prototype.begin = function (viewProj, clearColor) {
   gl.uniform3fv(this.uniform.ambient, this.ambient);
   gl.uniform3fv(this.uniform.fillColor, this.fillColor);
   gl.uniform1f(this.uniform.keyStrength, this.keyStrength);
+  gl.uniform3fv(this.uniform.keyColor, this.keyColor);
   this.setGlow(0, null);
   this.setFade(1);
   // CLEAR AIR IS THE DEFAULT OF THE RENDERER, not a promise each caller makes
@@ -304,6 +325,45 @@ GLRenderer.prototype.begin = function (viewProj, clearColor) {
   this.setFog(null, 0, 0);
   this.drawCalls = 0;
   this.triangles = 0;
+};
+
+// THE RIG THIS FRAME IS LIT BY. Every field is optional and anything absent
+// keeps whatever is standing, so a caller may move the sun without restating
+// the ambient. Directions are normalised here rather than trusted, because a
+// direction that is not unit length silently scales the light it carries.
+//
+// Called BEFORE begin(): begin uploads whatever is set. That ordering is not a
+// nicety -- a uniform write needs the program current, and begin is where it
+// becomes current.
+GLRenderer.prototype.setLighting = function (rig) {
+  if (!rig) return this;
+  if (rig.keyDir) this.keyDir = this._normalize(rig.keyDir);
+  if (rig.fillDir) this.fillDir = this._normalize(rig.fillDir);
+  if (rig.ambient) this.ambient = rig.ambient.slice();
+  if (rig.fillColor) this.fillColor = rig.fillColor.slice();
+  if (rig.keyColor) this.keyColor = rig.keyColor.slice();
+  if (typeof rig.keyStrength === "number") this.keyStrength = rig.keyStrength;
+  return this;
+};
+
+// Back to the authored daylight. What every preview outside a run gets, and
+// what a board with no environment renders under.
+GLRenderer.prototype.resetLighting = function () {
+  var d = this._defaultLighting;
+  this.keyDir = d.keyDir.slice();
+  this.fillDir = d.fillDir.slice();
+  this.ambient = d.ambient.slice();
+  this.fillColor = d.fillColor.slice();
+  this.keyStrength = d.keyStrength;
+  this.keyColor = d.keyColor.slice();
+  return this;
+};
+
+// Re-select the world program after another pass has borrowed the context --
+// the sky draws through its own program and has to hand it back.
+GLRenderer.prototype.rebind = function () {
+  this.gl.useProgram(this.program);
+  return this;
 };
 
 // Ley teal by default -- the colour every emissive material on these models

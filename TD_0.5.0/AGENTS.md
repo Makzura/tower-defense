@@ -1884,6 +1884,84 @@ u.l., named `*_UL` or `*_ULPS`.
 
 ---
 
+## The world has a clock, and it is a VISUAL system with a public state
+
+`js/systems/environment-cycle.js` owns one fact: how far through the day the
+board is. `js/systems/environment-lighting.js` turns that into colours. The
+renderers read the result. Those are three jobs and they are three files,
+because the moment phase arithmetic appears inside `gl-world.js` there are two
+answers to "what time is it" and they drift.
+
+**IT IS DECORATION, TODAY.** No combat bonus, no enemy or tower modifier, no
+wave or economy effect touches it, and a test asserts that: the same run at
+midnight and at noon kills the same enemies for the same money. The state is
+public so that a future gameplay system can ask; nothing asks yet.
+
+**TIME COMES FROM THE FIXED STEP.** `EnvironmentCycle.update(dt)` is called from
+one line in `update()` in game.js and from nowhere else. That line is already
+gated on the run being active, unpaused, not over and not rewinding, and it is
+already called more often at 2x and 3x — so pause freezes the sky, speed
+accelerates it, and the menu has no clock, and NONE of that is written in the
+cycle. There is no `Date.now()` in either file and there must never be one: a
+wall clock makes the same run render differently on a slow machine.
+
+**A renderer must never call `update()`.** A sky that ticks in `drawWorld` runs
+at frame rate and speeds up on a fast machine.
+
+| | |
+|---|---|
+| `CYCLE_SECONDS` | 480 simulated seconds — one eight-minute day |
+| `START_PHASE` | 0.10, and every run and restart begins there |
+| phase 0.00 / 0.25 / 0.50 / 0.75 | sunrise · noon · sunset · midnight |
+| day / night | `[0, 0.5)` and `[0.5, 1)` — half-open, so exactly one is true at every phase including both crossings |
+| events | `sunrise`, `sunset`, `cycle`, each exactly once per crossing |
+
+**Crossings are WALKED, not compared.** A step can be enormous — a test hands it
+three and a half days — and a before/after phase comparison silently keeps the
+last crossing and loses the other five. `fireCrossings` counts every half turn
+in the interval, in order.
+
+**Nothing interpolates on a band edge.** `visualPhase` ("dawn", "day", "dusk",
+"night") names a LOOK and is used by diagnostics; every colour is a continuous
+function of the sun's height and of the daylight ramp. One test samples two
+thousand four hundred phases and asserts no channel steps.
+
+**The key light swaps bodies where both are dark.** Sun and moon are exact
+opposites, so mixing their directions is degenerate. Instead both ramp from zero
+with the same `smoothstep` on their own elevation — so at the horizon both carry
+zero strength, the key may change body, and ambient and fill carry the twilight
+across that moment. A test pins that the key is dark at the swap.
+
+**Modifiers are a seam, and the list is empty.** A future eclipse or storm
+provides an id, a priority, a weight, tags and target values; composition is
+sorted by priority then by stable id, and each field blends from what the
+composition holds toward the target. A modifier CANNOT touch the solar state:
+`solarPeriod` is astronomy, `activeEnvironmentTags` is weather, and the composed
+lighting is the result. An eclipse may make noon black; it may not make noon
+night. Do not add eclipse content until something asks for it.
+
+**Only boards that declare a horizon get any of this.** Six of the eight routes
+are decks inside a facility and a sunrise over a reactor hall is a mistake, so
+`theme.horizon` opts a board in and everything else keeps the authored rig byte
+for byte. `GLRenderer.setLighting` / `resetLighting` are the seam, on exactly
+the reasoning `setFog` already used: a preview must never inherit the last run's
+midnight.
+
+**The map's night lights are ONE UNIFORM.** `uGlow` already scales every
+emissive vertex in the map pass, so the settlement's windows come up at dusk for
+the cost of a float. Never rebuild the static mesh to animate a lantern. It is
+reset to 0 immediately after, which is also what keeps a tower's own charge and
+firing glow entirely its own.
+
+**The HUD is never tinted.** In 3D the world is lit and the interface is drawn
+after it; in 2D the tint is applied INSIDE the camera transform and before any
+interface. A dark board with a legible interface, never a dark screen.
+
+**Map cards are a fixed late morning** and never the live phase: a player
+choosing a route at 3am should not be offered eight thumbnails of a dark forest.
+
+---
+
 ## A map may have SOLID scenery, and Ironwood Frontier is the first that does
 
 Every other route in this game is a polyline on an empty floor: the scenery is a

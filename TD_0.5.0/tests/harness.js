@@ -64,6 +64,15 @@ function stubContext() {
           return { width: String(text).length * size * 0.55 };
         };
       }
+      // A GRADIENT IS AN OBJECT, not a call that returns nothing. Canvas hands
+      // back a CanvasGradient and the caller then talks to it; a stub that
+      // returned undefined crashed the moment the environment pass started
+      // painting skies, which is a hole in the stub rather than a bug in the
+      // thing being tested. Records nothing, accepts everything, like the rest.
+      if (key === "createLinearGradient" || key === "createRadialGradient" ||
+          key === "createPattern") {
+        return function () { return { addColorStop: function () {} }; };
+      }
       if (key in target) return target[key];
       return function () {};
     },

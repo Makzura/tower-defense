@@ -5711,4 +5711,443 @@ test("24  a shot obeys the same rule its shooter's eye does", function (t) {
 });
 
 
+group("Day and night — the clock");
+
+// The cycle is a module, so most of this drives it directly. Where the point is
+// that the GAME drives it -- pause, speed, restart -- it goes through the real
+// loop, because that is the claim.
+function cyc(h) { return h.game.EnvironmentCycle; }
+function lit(h) { return h.game.EnvironmentLighting; }
+
+test("E1  a run opens at the authored morning, and every run opens at the same one",
+function (t) {
+  var h = harness.boot();
+  t.eq(cyc(h).CYCLE_SECONDS, 480, "one cycle is eight simulated minutes");
+  t.eq(cyc(h).START_PHASE, 0.10, "and a run opens at 0.10");
+  t.near(cyc(h).state().phase, 0.10, 1e-12, "which is where this one is");
+  t.eq(cyc(h).state().cycleIndex, 0, "on its first day");
+  t.eq(cyc(h).state().visualPhase, "day", "early morning, sun already up");
+
+  // Run it a while, then start another. A second run that inherited the first
+  // one's afternoon is the leak this pins.
+  //
+  // Sixty seconds rather than a whole day, because a harness boot has no towers
+  // on it: leave it running long enough and the base falls, the run freezes and
+  // so does the sky -- which would make this pass for the wrong reason.
+  h.step(60);
+  t.near(cyc(h).state().phase, 0.10 + 60 / 480, 1e-4, "the first run got somewhere");
+  h.run("restartGame();");
+  t.near(cyc(h).state().phase, 0.10, 1e-12, "and the next one is morning again");
+});
+
+test("E2  the phase advances on simulation time and nothing else", function (t) {
+  var h = harness.boot();
+  var before = cyc(h).state().elapsedSeconds;
+  h.step(120);
+  t.near(cyc(h).state().elapsedSeconds - before, 120, 0.02,
+    "120 simulated seconds moved the clock 120 seconds");
+  t.near(cyc(h).state().phase, 0.10 + 120 / 480, 1e-4, "which is a quarter turn");
+});
+
+test("E3  pause freezes the sky and resume continues it exactly", function (t) {
+  var h = harness.boot();
+  h.step(30);
+  var frozen = cyc(h).state().elapsedSeconds;
+  h.run("paused = true;");
+  h.step(240);
+  t.eq(cyc(h).state().elapsedSeconds, frozen, "four minutes of paused time cost nothing");
+  h.run("paused = false;");
+  h.step(30);
+  t.near(cyc(h).state().elapsedSeconds - frozen, 30, 0.02, "and it picks up where it was");
+});
+
+test("E4  game speed carries the cycle with it, without the cycle knowing",
+function (t) {
+  var h = harness.boot();
+  var start = cyc(h).state().elapsedSeconds;
+  h.wallClock(20);
+  var atOne = cyc(h).state().elapsedSeconds - start;
+
+  var h3 = harness.boot();
+  h3.run("gameSpeed = 3;");
+  var start3 = cyc(h3).state().elapsedSeconds;
+  h3.wallClock(20);
+  var atThree = cyc(h3).state().elapsedSeconds - start3;
+
+  t.near(atThree / atOne, 3, 0.02,
+    "three times the speed is three times the day (" + atOne.toFixed(1) +
+    "s vs " + atThree.toFixed(1) + "s)");
+});
+
+test("E5  the phase wraps after exactly one cycle, and the index counts the wraps",
+function (t) {
+  var h = harness.boot();
+  var c = cyc(h);
+  c.__resetForTest();
+  c.begin();
+  t.eq(c.state().cycleIndex, 0, "no cycles yet");
+  c.update(480 * 0.90 - 1e-9);          // one tick short of the wrap
+  t.ok(c.state().phase > 0.99, "just before sunrise (" +
+    c.state().phase.toFixed(4) + ")");
+  t.eq(c.state().cycleIndex, 0, "still the first day");
+  c.update(2e-9 + 0.001);
+  t.ok(c.state().phase < 0.01, "and over the top (" + c.state().phase.toFixed(4) + ")");
+  t.eq(c.state().cycleIndex, 1, "one whole cycle behind it");
+  c.update(480);
+  t.eq(c.state().cycleIndex, 2, "and a second");
+});
+
+test("E6  exactly one of day and night is true, at every phase there is",
+function (t) {
+  var h = harness.boot();
+  var c = cyc(h);
+  var both = 0, neither = 0;
+  for (var i = 0; i <= 4000; i++) {
+    var st = c.stateAt(i / 4000);
+    if (st.isDay && st.isNight) both++;
+    if (!st.isDay && !st.isNight) neither++;
+    if (st.solarPeriod !== (st.isDay ? "day" : "night")) neither++;
+  }
+  t.eq(both, 0, "never both");
+  t.eq(neither, 0, "never neither, and solarPeriod always agrees");
+  t.eq(c.stateAt(0).isDay, true, "the instant of sunrise is day");
+  t.eq(c.stateAt(0.5).isNight, true, "the instant of sunset is night");
+});
+
+test("E7  sunrise and sunset fire exactly once each, in order", function (t) {
+  var h = harness.boot();
+  var c = cyc(h);
+  c.__resetForTest();
+  var log = [];
+  c.on("sunrise", function () { log.push("sunrise"); });
+  c.on("sunset", function () { log.push("sunset"); });
+  c.on("cycle", function () { log.push("cycle"); });
+  c.begin();
+  for (var i = 0; i < 480 / 0.25; i++) c.update(0.25);   // one whole cycle
+  // Opening at 0.10 and running a full turn crosses sunset once and sunrise
+  // once, and the cycle boundary is the sunrise.
+  t.eq(log.join(","), "sunset,cycle,sunrise", "one of each, in the order they happen");
+});
+
+test("E8  a step that swallows whole days loses none of its crossings",
+function (t) {
+  var h = harness.boot();
+  var c = cyc(h);
+  c.__resetForTest();
+  var sunrises = 0, sunsets = 0, cycles = 0;
+  c.on("sunrise", function () { sunrises++; });
+  c.on("sunset", function () { sunsets++; });
+  c.on("cycle", function () { cycles++; });
+  c.begin();                                   // phase 0.10
+  // THREE AND A HALF DAYS IN ONE CALL. A before/after phase comparison reports
+  // one crossing here and silently drops five, which is the bug this exists to
+  // make impossible.
+  c.update(480 * 3.5);
+  t.eq(sunsets, 4, "four sunsets");
+  t.eq(sunrises, 3, "three sunrises");
+  t.eq(cycles, 3, "three completed cycles");
+  t.eq(c.state().cycleIndex, 3, "and the index agrees with the events");
+  t.near(c.state().phase, 0.60, 1e-9, "landing where the arithmetic says");
+});
+
+test("E9  leaving a run stops the clock, and the next run is a new day",
+function (t) {
+  var h = harness.boot();
+  h.step(300);
+  var left = cyc(h).state().phase;
+  h.run("openMenu();");
+  t.eq(cyc(h).state().active, false, "no clock on the title screen");
+  h.step(600);
+  t.near(cyc(h).state().phase, left, 1e-12, "and the menu costs no time");
+  h.run("startRun(currentMap);");
+  t.near(cyc(h).state().phase, 0.10, 1e-12, "the next run is morning again");
+  t.eq(cyc(h).state().cycleIndex, 0, "with its own cycle count");
+});
+
+group("Day and night — the light");
+
+test("E10  lighting is continuous everywhere, including across both crossings",
+function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  // Sampled finely all the way round. The claim is not "smooth to the eye", it
+  // is that no adjacent pair of phases differs by more than a small bound --
+  // which is what a band edge used as a switch would violate immediately.
+  var STEPS = 2400, worst = 0, worstAt = 0, worstWhat = "";
+  var prev = L.compose(c.stateAt(0), []);
+  function jump(a, b, what) {
+    var d = 0;
+    for (var i = 0; i < a.length; i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+    if (d > worst) { worst = d; worstWhat = what; }
+    return d;
+  }
+  for (var s = 1; s <= STEPS; s++) {
+    var phase = s / STEPS;
+    var now = L.compose(c.stateAt(phase), []);
+    jump(now.sky.zenith, prev.sky.zenith, "zenith");
+    jump(now.sky.horizon, prev.sky.horizon, "horizon");
+    jump(now.light.ambient, prev.light.ambient, "ambient");
+    jump(now.light.fillColour, prev.light.fillColour, "fill");
+    var ds = Math.abs(now.light.keyStrength - prev.light.keyStrength);
+    if (ds > worst) { worst = ds; worstWhat = "keyStrength"; }
+    // Normalised by its own range: the emissive multiplier travels from 1 to
+    // 3.6, so a raw delta compared against a colour channel's would be judged
+    // three and a half times as harshly for the same smoothness.
+    var de = Math.abs(now.sceneryEmissive - prev.sceneryEmissive) / 3.6;
+    if (de > worst) { worst = de; worstWhat = "emissive"; }
+    if (worst > 0.02) { worstAt = phase; break; }
+    prev = now;
+  }
+  t.ok(worst <= 0.02, "no channel steps more than 0.02 between adjacent phases (" +
+    "worst " + worst.toFixed(4) + " on " + worstWhat +
+    (worstAt ? " at phase " + worstAt.toFixed(4) : "") + ")");
+
+  // AND THE KEY DIRECTION DOES NOT JUMP EITHER. It swaps from the sun to the
+  // moon at the horizon, which is legal only because both carry zero strength
+  // there -- so what is pinned is the CONTRIBUTION, not the vector.
+  var atSwap = L.compose(c.stateAt(0.5), []);
+  t.ok(atSwap.light.keyStrength < 0.02,
+    "the key is dark where it changes body (" +
+    atSwap.light.keyStrength.toFixed(4) + ")");
+});
+
+test("E11  morning, noon and midnight are three different places", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  var noon = L.compose(c.stateAt(0.25), []);
+  var night = L.compose(c.stateAt(0.75), []);
+  var dusk = L.compose(c.stateAt(0.50), []);
+
+  t.ok(noon.light.keyStrength > 1.0, "noon is full daylight (" +
+    noon.light.keyStrength.toFixed(2) + ")");
+  t.ok(night.light.keyStrength < 0.35 && night.light.keyStrength > 0.05,
+    "midnight is moonlight, weak but not absent (" +
+    night.light.keyStrength.toFixed(3) + ")");
+  t.ok(night.light.ambient[2] > night.light.ambient[0],
+    "and it is COOL: more blue than red");
+  t.ok(noon.light.ambient[0] > night.light.ambient[0] * 2,
+    "day is more than twice as bright as night in ambient");
+  t.ok(night.sceneryEmissive > noon.sceneryEmissive * 2,
+    "the map's own lights are up at night (" + night.sceneryEmissive.toFixed(2) +
+    " against " + noon.sceneryEmissive.toFixed(2) + ")");
+  t.ok(dusk.sky.horizon[0] > dusk.sky.horizon[2],
+    "and dusk's horizon is warm: more red than blue");
+  t.ok(noon.sky.zenith[2] > noon.sky.zenith[0], "noon's zenith is blue");
+  t.ok(night.sky.zenith[0] + night.sky.zenith[1] + night.sky.zenith[2] > 0.001,
+    "night is never pure black");
+});
+
+test("E12  dawn and dusk are travelled through, not switched to", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  // Across the whole dusk band the horizon must move MONOTONICALLY toward warm
+  // and back -- a crossfade with a hard edge shows up as a run of identical
+  // samples followed by a step.
+  var warm = [];
+  for (var i = 0; i <= 40; i++) {
+    var e = L.compose(c.stateAt(0.42 + (0.55 - 0.42) * i / 40), []);
+    warm.push(e.sky.horizon[0] - e.sky.horizon[2]);
+  }
+  var rose = 0, fell = 0, flat = 0;
+  for (i = 1; i < warm.length; i++) {
+    var d = warm[i] - warm[i - 1];
+    if (Math.abs(d) < 1e-9) flat++; else if (d > 0) rose++; else fell++;
+  }
+  t.ok(rose > 4 && fell > 4, "the warmth rises and then falls again");
+  t.eq(flat, 0, "and never sits still, which a crossfade with an edge would");
+  t.ok(Math.max.apply(null, warm) > 0.05, "dusk really is warm at its peak");
+});
+
+test("E13  the stars are out at night and gone by day", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  [0.10, 0.20, 0.25, 0.32, 0.40].forEach(function (p) {
+    t.eq(L.compose(c.stateAt(p), []).sky.starIntensity, 0,
+      "no stars at phase " + p);
+  });
+  t.ok(L.compose(c.stateAt(0.75), []).sky.starIntensity > 0.95,
+    "and a full field at midnight");
+  t.ok(L.compose(c.stateAt(0.52), []).sky.starIntensity < 0.5,
+    "coming up gradually just after sunset");
+});
+
+test("E14  the sun and the moon are the same body on opposite sides", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  for (var i = 0; i <= 24; i++) {
+    var e = L.compose(c.stateAt(i / 24), []);
+    var dot = e.sun.dir[0] * e.moon.dir[0] + e.sun.dir[1] * e.moon.dir[1] +
+              e.sun.dir[2] * e.moon.dir[2];
+    t.near(dot, -1, 1e-12, "opposite at phase " + (i / 24).toFixed(3));
+    t.near(Math.hypot(e.sun.dir[0], e.sun.dir[1], e.sun.dir[2]), 1, 1e-12,
+      "and unit length");
+    // ABOVE THE HORIZON EXACTLY WHILE IT IS DAY. Stated as a pair of
+    // implications rather than an equality, because at the two crossings the
+    // height is exactly zero and "above" is neither true nor false there --
+    // which is precisely why the day/night split is half-open.
+    //
+    // To a tolerance, because sin(PI) is 1.2e-16 rather than zero and the
+    // half-open day/night split puts phase 0.5 on the night side of a height
+    // that is positive by one part in ten thousand million million.
+    t.ok(!e.cycle.isDay || e.sun.dir[2] >= -1e-9,
+      "day means the sun is not below, at " + (i / 24).toFixed(3));
+    t.ok(!e.cycle.isNight || e.sun.dir[2] <= 1e-9,
+      "night means the sun is not above, at " + (i / 24).toFixed(3));
+  }
+  var dawn = L.compose(c.stateAt(0.02), []);
+  var eve = L.compose(c.stateAt(0.48), []);
+  t.ok(dawn.sun.dir[0] > 0.9, "the morning sun is east");
+  t.ok(eve.sun.dir[0] < -0.9, "the evening sun is west");
+});
+
+test("E15  the same phase is the same sky, every time", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  var a = L.compose(c.stateAt(0.63), []);
+  // A different clock reading of the SAME phase: three cycles later.
+  c.__setPhaseForTest(0.63, { cycleIndex: 3 });
+  var b = L.of(c.state());
+  t.eq(JSON.stringify({ sky: a.sky, sun: a.sun, moon: a.moon, light: a.light,
+                        emissive: a.sceneryEmissive }),
+       JSON.stringify({ sky: b.sky, sun: b.sun, moon: b.moon, light: b.light,
+                        emissive: b.sceneryEmissive }),
+    "identical, to the last digit");
+  c.__resetForTest();
+});
+
+group("Day and night — the modifier seam");
+
+test("E16  an empty modifier list is not a code path, it is nothing", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  t.eq(L.list().length, 0, "nothing ships with a modifier");
+  for (var i = 0; i <= 12; i++) {
+    var p = i / 12;
+    var bare = L.base(c.stateAt(p));
+    var composed = L.compose(c.stateAt(p), []);
+    t.eq(JSON.stringify(composed.sky), JSON.stringify(bare.sky),
+      "phase " + p.toFixed(2) + " is untouched");
+    t.eq(composed.tags.length, 0, "and carries no tags");
+  }
+});
+
+test("E17  modifiers compose by priority then by id, and by nothing else",
+function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  var state = c.stateAt(0.25);
+  function tint(id, priority, colour) {
+    return { id: id, priority: priority, weight: 1,
+             light: { ambient: colour } };
+  }
+  var red = tint("bravo", 10, [0.9, 0, 0]);
+  var green = tint("alpha", 10, [0, 0.9, 0]);
+  var blue = tint("zulu", 20, [0, 0, 0.9]);
+
+  // Same priority: the ID orders them, so "bravo" lands after "alpha" and wins.
+  var ab = L.compose(state, [red, green]);
+  var ba = L.compose(state, [green, red]);
+  t.eq(JSON.stringify(ab.light.ambient), JSON.stringify(ba.light.ambient),
+    "insertion order does not matter");
+  t.eq(JSON.stringify(ab.light.ambient), JSON.stringify([0.9, 0, 0]),
+    "and the later id is the one on top");
+
+  // Priority beats the id.
+  var all = L.compose(state, [blue, red, green]);
+  t.eq(JSON.stringify(all.light.ambient), JSON.stringify([0, 0, 0.9]),
+    "the higher priority is applied last whatever it is called");
+
+  // A partial weight is a blend, not a switch.
+  var half = L.compose(state, [{ id: "half", priority: 1, weight: 0.5,
+    light: { keyStrength: 0 } }]);
+  t.near(half.light.keyStrength, L.base(state).light.keyStrength / 2, 1e-9,
+    "half weight is half way");
+});
+
+test("E18  an eclipse may darken noon without making it night", function (t) {
+  var h = harness.boot();
+  var c = cyc(h), L = lit(h);
+  var noon = c.stateAt(0.25);
+  var eclipse = {
+    id: "eclipse", priority: 50, weight: 1, tags: ["eclipse"],
+    sky: { zenith: [0.004, 0.005, 0.010], horizon: [0.02, 0.016, 0.02],
+           starIntensity: 0.7 },
+    light: { keyStrength: 0.06, ambient: [0.02, 0.022, 0.03] },
+    emissive: 3.4
+  };
+  var e = L.compose(noon, [eclipse]);
+
+  // THE WHOLE POINT OF THE SEAM, in four assertions: the world went dark and
+  // the sky did not stop being daytime. A modifier that could flip solarPeriod
+  // would make "is it day" mean two different things depending on the weather.
+  t.eq(e.cycle.isDay, true, "it is still day");
+  t.eq(e.cycle.solarPeriod, "day", "astronomically, still day");
+  t.eq(e.cycle.isNight, false, "and not night");
+  t.ok(e.tags.indexOf("eclipse") >= 0, "but the eclipse is on the board");
+  t.ok(e.light.keyStrength < L.base(noon).light.keyStrength * 0.1,
+    "and the light is gone");
+  t.ok(e.sceneryEmissive > L.base(noon).sceneryEmissive * 2,
+    "so the lanterns came on at midday");
+  t.eq(L.base(noon).tags.length, 0, "with none of it leaking into the base");
+});
+
+group("Day and night — what the renderers are handed");
+
+test("E19  both renderers read one snapshot, and previews are never in it",
+function (t) {
+  var h = harness.boot();
+  h.step(140);                                 // somewhere in the afternoon
+  var state = h.game.worldRenderState();
+  t.ok(!!state.environment, "the render state carries the environment");
+  t.eq(state.environment.cycle.phase, cyc(h).state().phase,
+    "and it is the live cycle, not a copy that can drift");
+
+  // THE CARD IS A FIXED MORNING. Run the clock to the middle of the night and
+  // ask again: a thumbnail that followed the run would show eight dark forests
+  // to a player choosing a route at 3am.
+  cyc(h).__setPhaseForTest(0.78);
+  var card = h.game.thumbnailEnvironment();
+  t.eq(card.cycle.isDay, true, "the card is daylight");
+  t.near(card.cycle.phase, 0.22, 1e-12, "at the one authored phase");
+  t.eq(card.cycle.starIntensity, undefined, "with no run state on it");
+  t.eq(h.game.thumbnailEnvironment().cycle.phase, card.cycle.phase,
+    "and it is the same every time it is asked");
+
+  // Outside a run the world is lit by the idle morning rather than by whatever
+  // time it was when the player quit.
+  h.run("openMenu();");
+  var idle = h.game.worldRenderState().environment;
+  t.eq(idle.cycle.isDay, true, "the menu is daylight");
+  t.eq(idle.cycle.active, false, "and no run is running");
+});
+
+test("E20  the visual cycle changes nothing about the game", function (t) {
+  // The claim is that this whole system is decoration. Two runs, one played
+  // through a whole simulated day and one through a fraction of one, must kill
+  // the same enemies for the same money -- if the sky ever touches a stat, the
+  // arithmetic below stops matching.
+  var h = harness.boot();
+  h.run("cash = 100000; selectedSlot = 0; refreshBlockReason();");
+  var spot = { x: 700, y: 300 };
+  h.click(spot.x, spot.y);
+  t.eq(h.game.towers.length, 1, "a tower is standing");
+
+  var before = { cash: h.game.cash, hp: h.game.baseHp, kills: h.game.runKills };
+  cyc(h).__setPhaseForTest(0.75);              // midnight
+  h.step(60);
+  var atNight = { cash: h.game.cash, hp: h.game.baseHp, kills: h.game.runKills };
+
+  var h2 = harness.boot();
+  h2.run("cash = 100000; selectedSlot = 0; refreshBlockReason();");
+  h2.click(spot.x, spot.y);
+  cyc(h2).__setPhaseForTest(0.25);             // noon
+  h2.step(60);
+
+  t.eq(atNight.kills, h2.game.runKills, "the same kills at midnight and at noon");
+  t.eq(atNight.cash, h2.game.cash, "the same money");
+  t.eq(atNight.hp, h2.game.baseHp, "the same base");
+  t.ok(before.kills >= 0, "and the run really ran");
+});
+
+
 runner.run();

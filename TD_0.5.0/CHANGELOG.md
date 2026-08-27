@@ -13,6 +13,63 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The world has a clock: a deterministic day/night cycle with a
+real sky.** Visual only. No combat bonus, no enemy or tower modifier, no wave or
+economy effect, and a test asserts it: the same run at midnight and at noon
+kills the same enemies for the same money.
+
+Three files, because it is three jobs. `EnvironmentCycle` owns solar time and
+knows nothing about towers. `EnvironmentLighting` turns that into sky, sun,
+moon, fog and light, and composes future modifiers. The renderers read the
+result off `worldRenderState` and never compute a phase — the moment two of them
+derive a sky colour independently they drift.
+
+Eight simulated minutes a cycle, opening at 0.10 — early morning, sun already up
+and still climbing. The clock rides the fixed step and nothing else, so pausing
+freezes the sky, 3x accelerates it and the menu has no clock, none of which is
+written in the cycle: the line it rides was already gated and already called
+more often at speed. There is no wall clock in either file.
+
+Crossings are walked rather than compared. A step can be enormous and a
+before/after phase check keeps the last crossing and loses the rest; one test
+hands the cycle three and a half days in a single call and counts six events.
+
+`js/gl/gl-sky.js` is new: a real pass on its own program, before the world, with
+a gradient, a twilight band that sits just above the skyline, the sun, the moon
+and a star field. The key light has a colour now — it was `vec3(key)`, white,
+always — so dawn rakes amber, noon is neutral and midnight is a weak cool moon
+that still separates silhouettes. `GLRenderer.setLighting` / `resetLighting`
+make the old fixed rig an authored default rather than a constant.
+
+Ironwood Frontier is the demonstration. Its settlement lanterns and windows come
+up at dusk and go out at dawn, driven by ONE uniform — `uGlow` already scales
+every emissive vertex in the map pass, so nothing rebuilds a hundred thousand
+triangles to switch on a lamp. Its depot burns red, on its own per-prop accent,
+so at night the two ends of the road say what kind of place they are before a
+player reads a label.
+
+Three bugs worth recording, all found by probing the framebuffer rather than by
+looking.
+
+The sky compiled, linked, returned valid uniform locations and drew NOTHING: it
+had been built against a bare `gl` that this module does not have, which
+resolved to something on the global object instead of throwing. The board still
+looked right, because the clear colour is the sky's own horizon colour — so the
+gradient, the band, the sun, the moon and the stars were all missing behind a
+background of exactly the right shade. `GLSky.create` no longer swallows its
+errors either.
+
+The star field returned zero everywhere because `smoothstep(0.105, 0.0, d)` is
+UNDEFINED in GLSL when edge0 >= edge1, and this driver's answer is a flat zero.
+And the field it replaced was a 3D lattice a view ray only grazes, which put
+about sixteen stars in a whole sky; it is celled on the dome now, where the hash
+threshold IS the density.
+
+The fog was blending 85% toward the sky, so a sunrise turned every tree on the
+board orange. Mist is lit BY the sky; it does not become it. A fifth of the way.
+
+Twenty tests. Suites 187 / 244 / 74 / 47 / 53, 0 failing.
+
 **2026-08-27 — Ironwood Frontier: five invisible rocks, and a sky that was
 there all along.**
 
