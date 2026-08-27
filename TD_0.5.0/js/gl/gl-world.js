@@ -563,11 +563,16 @@ var World3D = (function () {
     }
 
     var g = new GLGeometry.Builder();
-    flat(g, minX, minY, maxX, maxY, 0, P.terrain);
+    // A CUSTOM GROUND OWNS THE ONLY FLOOR FACE. Drawing the ordinary plane
+    // and then another skin 0.025 above it looks harmless up close, but those
+    // depths collapse together at maximum zoom-out and the whole board
+    // z-fights. One map, one floor surface; every other map keeps its quad.
+    var ownsGround = typeof IronwoodGround !== "undefined" &&
+      IronwoodGround.ownsBase(map);
+    if (!ownsGround) flat(g, minX, minY, maxX, maxY, 0, P.terrain);
 
-    // IRONWOOD'S GROUND IS LAYERED COLOUR, NEVER GAMEPLAY RELIEF. The module
-    // only adds geometry a few hundredths above the existing plane; the height
-    // field below remains the sole source of placement and collision truth.
+    // IRONWOOD'S GROUND IS ONE COLOURED SURFACE, NEVER GAMEPLAY RELIEF. The
+    // height field below remains the sole source of placement and collision.
     // It lives outside gl-geometry so the independently-authored tree family
     // can change without either system overwriting the other.
     if (typeof IronwoodGround !== "undefined") {

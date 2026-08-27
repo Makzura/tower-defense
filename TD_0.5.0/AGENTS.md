@@ -479,10 +479,10 @@ js/gl/gl-geometry.js procedural primitives: ground, road, box, boxAt, sphere,
                      EMISSIVE channel on Builder so runtime geometry can carry a
                      lit surface like an exported model does
 js/gl/ironwood-ground.js Ironwood Frontier's deterministic visual ground skin:
-                     a continuous olive grass field, organic earth and moss
-                     islands, and sparse low-poly tufts. It writes no height,
-                     collision, placement or targeting data and deliberately
-                     does not own any tree geometry
+                     one continuous olive surface with earth and moss blended
+                     into its vertices, plus sparse low-poly tufts. It writes
+                     no gameplay height, collision, placement or targeting
+                     data and deliberately owns no tree geometry
 js/gl/gl-models.js  the model registry the generated js/gl/models/*.js register
                      into; expands per-triangle data to per-vertex once, lazily
 js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
@@ -4128,13 +4128,25 @@ refuses a tower that straddles a slab edge — so bare earth built as a slab wou
 be an invisible no-build ring in open ground. A patch stamps no height and
 cannot move a build spot.
 
-**IRONWOOD'S BASE GROUND HAS FOUR VISUAL LEVELS AND ZERO GAMEPLAY RELIEF**
-(2026-08-27). `js/gl/ironwood-ground.js` lays them into the static board mesh:
-the original z = 0 loam plane, a continuous softly-varied grass skin at 0.025,
-organic worn-earth islands at 0.045, moss at 0.065, and sparse blades rooted at
-0.08. Those offsets only settle the depth test and give the blades a silhouette;
-`buildHeightField` reads none of them, so towers, bodies, shots, collision and
-placement still see the same flat terrain.
+**IRONWOOD'S BASE GROUND HAS FOUR VISUAL MATERIAL READS AND ZERO GAMEPLAY
+RELIEF** (2026-08-27): loam, grass, worn earth and moss, followed by sparse
+blades for silhouette depth. `js/gl/ironwood-ground.js` puts the first four into
+ONE continuous vertex-coloured floor at nominal z = 0; it REPLACES the ordinary
+ground quad on this map rather than sitting above it. Earth and moss are colour
+fields inside those same triangles, never coplanar decals. A deterministic
+micro-relief of at most ±0.675 gives the faces light and depth, and each blade
+roots on that visual surface. `buildHeightField` reads none of this, so towers,
+bodies, shots, collision and placement still see the same flat z = 0 terrain.
+
+**DO NOT STACK FLAT GROUND ISLANDS.** The first pass put every earth polygon at
+0.045 and every moss polygon at 0.065. Islands within each family overlapped at
+exactly equal depth, producing hard camouflage plates at distance and unstable
+texture overlap while zooming. The second pass still failed: one continuous
+skin at z = 0.025 remained above the old z = 0 floor. At maximum zoom-out those
+depths collapsed to the same depth-buffer value and the whole board z-fought.
+There is now exactly ONE floor mesh. New variation must blend into its vertex
+colour or deform that surface; it must never add another ground face above or
+below it.
 
 The skin is **deterministic and Ironwood-only**. Its coverage reaches the full
 outdoor apron so orbiting cannot reveal a decorated rectangle, but fine stains
@@ -4142,8 +4154,9 @@ and tufts concentrate around the playable clearing. The river uses the same
 open band as the floor. Tufts additionally reject the route's real width ribbon
 and `Maps.keepOutOf(map)`, so no blade grows through the road or an authored
 solid. The four rectangular `dirt` zones remain useful authoring envelopes but
-are not drawn as rectangles on this map; they seed overlapping torn-edged earth
-islands instead. All other maps retain their ordinary patch rendering.
+are not drawn as rectangles on this map; they bias a noise-torn earth colour
+field inside the continuous skin instead. All other maps retain their ordinary
+patch rendering.
 
 **KEEP GROUND AND TREES IN DIFFERENT FILES.** The tree family is authored in
 `gl-geometry.js` and assigned in `maps.js`; the ground skin owns neither. The

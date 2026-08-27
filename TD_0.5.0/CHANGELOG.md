@@ -84,10 +84,17 @@ and the assignment 63 ms, both at map load.
 
 **2026-08-27 — Ironwood's flat prototype floor became a layered forest bed.**
 The board keeps its original flat gameplay plane, but the 3D mesh now adds a
-deterministic olive grass skin, organic earth stains, moss flecks and sparse
-low-poly tufts in `js/gl/ironwood-ground.js`. The four large rectangular dirt
-zones now seed torn-edged earth clusters instead of drawing their authoring
-boxes directly. The river remains open, the exact road ribbon and solid scenery
+deterministic olive grass skin, softly blended earth/moss fields and sparse
+low-poly tufts in `js/gl/ironwood-ground.js`. A zoom audit removed the first
+version's coplanar earth and moss islands: same-height faces overlapped into hard
+camouflage plates and unstable texture seams. A second zoom audit found the
+remaining failure: that continuous skin was still only 0.025 above the original
+floor, so far-camera depth precision made the two whole surfaces z-fight. The
+Ironwood skin now REPLACES the floor and is the only ground face. Finer
+tessellation, corrected lattice noise, vertex colour and shallow visual relief
+restore stable texture without another layer. The four large rectangular dirt
+zones bias its organic colour field instead of drawing their authoring boxes
+directly. The river remains open, the exact road ribbon and solid scenery
 remain clear of blades, and no layer writes to the height field, collision,
 placement, targeting or simulation. Ground is isolated from the tree work in
 `gl-geometry.js`/`maps.js`; `gl-world.js` only calls the separate module, and
