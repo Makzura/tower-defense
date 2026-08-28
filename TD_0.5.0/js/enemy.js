@@ -1508,6 +1508,17 @@ Enemy.prototype.currentSpeedUlps = function () {
 
   var speed = this.speedUlps * this.slowMultiplier * this.speedScale;
 
+  // A FARM'S FIELD, and it is a THIRD channel rather than a slow. `applySlow`
+  // takes the strongest and refreshes it, which is right for a timed debuff a
+  // tower applies; a B4/B5 Farm projects a standing field instead, and the
+  // brief asks for it to stack ADDITIVELY with the other kinds. Routing it
+  // through applySlow would have let a Warbringer's 65% swallow it entirely.
+  // Multiplied here so a body under both is slowed by both.
+  if (typeof Farms !== "undefined" && this.pos) {
+    var field = Farms.slowAt(this.pos.x, this.pos.y);
+    if (field > 0) speed *= 1 - field;
+  }
+
   // A `sprint` block: faster over the OPENING STRETCH of the road, and then
   // never again. Keyed on progress rather than on a timer, deliberately -- it
   // is a fact about which part of the MAP the enemy is on, so a slowed sprinter
@@ -2569,9 +2580,21 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
   // It lives here, in the one door every damage source in the game comes
   // through, because the brief is explicit that it raises damage from ALL
   // sources and not just from the tower that applied it.
+  //
+  // A FARM'S FIELD ADDS TO IT RATHER THAN MULTIPLYING IT, which the brief asks
+  // for by name ("ces debuffs se cumulent additivement avec les autres types de
+  // debuffs"). So the two are summed as FRACTIONS and applied once: +100% from
+  // a Summoner and +10% from a Farm is +110%, not +120%. With no farms on the
+  // board the sum is DamageAmp's own multiplier to the float, which is what
+  // keeps every existing figure in the suite where it was.
+  var amp = 0;
   if (typeof DamageAmp !== "undefined") {
-    effective *= DamageAmp.multiplier(this);
+    amp += DamageAmp.multiplier(this) - 1;
   }
+  if (typeof Farms !== "undefined" && this.pos) {
+    amp += Farms.damageAmpAt(this.pos.x, this.pos.y);
+  }
+  if (amp !== 0) effective *= 1 + amp;
 
   // A SHIELD ABSORBS THE WHOLE BLOW. NOTHING SPILLS THROUGH.
   //
@@ -2650,6 +2673,21 @@ Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, dam
   // on the blow that would otherwise have been fatal, and a boss that drops
   // from 51% to dead in one hit still gets its roar.
   this.checkPhases();
+
+  // B5's EXECUTION, and it is deliberately AFTER the blow rather than instead
+  // of it. The brief says "lorsqu'un ennemi situe dans la portee est ATTAQUE",
+  // so a body that walks through the field untouched is never executed; being
+  // hit is what asks the question. The threshold is the higher of 10 HP and 5%
+  // of the body's own maximum, which is why anything with a 10 HP maximum or
+  // less dies to the first hit it takes in there.
+  //
+  // It takes the ORDINARY death path -- health to zero, then the same revive
+  // test -- so a Revenant still gets up, the bounty is still paid once by the
+  // sweep, and nothing about kill credit or effects needs to know this exists.
+  if (this.health > 0 && typeof Farms !== "undefined" && Farms.executes(this)) {
+    this.health = 0;
+    this.executed = true;
+  }
 
   if (this.health <= 0 && !this.tryRevive()) {
     this.dead = true;

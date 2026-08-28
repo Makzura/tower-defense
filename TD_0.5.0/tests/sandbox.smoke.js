@@ -244,7 +244,11 @@ check("every tower type is in the build bar",
   // so a tower added to the game has to be added there too or the workbench
   // stops being a truthful preview of it -- which is exactly what this line is
   // for.
-  sandbox.BUILD_SLOTS[4] === sandbox.BlubTower,
+  sandbox.BUILD_SLOTS[4] === sandbox.BlubTower &&
+  // The Farm took a SIXTH slot on 2026-08-27, and only here: the shipping bar
+  // is still five and the armoury decides which five of the owned types fill
+  // it. A workbench has no coins, so it shows every type there is.
+  sandbox.BUILD_SLOTS[5] === sandbox.FarmTower,
   "slots = " + sandbox.BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; }).join(", "));
 
 // --- the extended speed ladder ---------------------------------------------

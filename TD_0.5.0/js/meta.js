@@ -119,6 +119,26 @@ var MetaProgress = (function () {
       starter: false,
       blurb: "$450 Summoner. It never fires — it plants blubs, whose hit points " +
              "ARE their ammunition, and they shoot for it."
+    },
+    // THE SIXTH TYPE, AND NOT A SIXTH SLOT (2026-08-27). The bar is five and
+    // stays five -- that is a decision about its geometry, its number keys and
+    // MetaProgress.SLOT_COUNT, and nobody has made it. What the armoury already
+    // buys is exactly this case: the loadout picks which five of the owned
+    // types are equipped, so a sixth type needs a catalogue row and nothing
+    // else. The Summoner is the worked example one type earlier.
+    //
+    // Priced between the Summoner (90) and the Siphon (150). It buys an economy
+    // rather than damage, so it is worth more than a body and less than the
+    // run-defining one, and it is deliberately not a first unlock: a fresh
+    // profile that could buy mana production would be a fresh profile that can
+    // win, which is the premise the whole meta loop rests on.
+    {
+      id: "farm",
+      global: "FarmTower",
+      price: 120,
+      starter: false,
+      blurb: "1200 mana Farm. It never fires — it produces mana, grows your " +
+             "base, or links every farm on the board into one dice network."
     }
   ];
 

@@ -615,6 +615,13 @@ var BASELINE = [
   // disturb -- reach, gate, price and global uniqueness.
   { file: "tests/beam.test.js", pass: 47, fail: 0, failing: [] },
   { file: "tests/blub.test.js", pass: 53, fail: 0, failing: [] },
+  // 32 on 2026-08-27, the day the Farm landed. A new suite rather than rows
+  // in an existing one, for the reason blub.test.js is one: an acceptance
+  // list is a document, and one file per tower keeps it readable beside the
+  // brief it came from. The dice are SCRIPTED here -- the network takes a die
+  // through `Farms.setDie` -- so every one of the sixty-two faces across the
+  // three tables is asserted individually rather than sampled.
+  { file: "tests/farm.test.js", pass: 35, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

@@ -13,6 +13,79 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-27 — The Farm: a tower that produces mana, and the first with three
+paths.** A fully specified brief, integrated whole: `js/farm.js`, 1200 mana,
+200 HP, a 35 u.l. footprint, 200 mana a wave, and three five-tier branches.
+
+**The word is mana and only the word.** Every string it puts on screen says
+mana, never gold, cash, coins or a dollar sign. The quantity is the game's
+ordinary `cash` — there is one run currency and inventing a second would be a
+change to the economy rather than to this tower — so `Farms.pay` is the one door
+onto that global. A test reads every panel string and every stat row and fails
+on the sight of a `$`.
+
+**A sixth TYPE, not a sixth slot.** The bar is five and stays five; the armoury
+already picks which five of the owned types are equipped, which is exactly the
+case a sixth type needs. The sandbox shows six because a workbench is a preview
+of the towers rather than of the bar, and it re-derives the bar's width so the
+extra slot is not drawn off the end of one centred for five.
+
+**Path A** adds to the per-wave figure, then REPLACES it with a tick (50/75/150
+every 5 s) driven from `update(dt)` so it runs on the game's clock rather than
+on a wave hook. From A4 the production stops reaching the purse and fills the
+tower's own stock, which clones 5% a wave (capped at 1000, then 3000); A5 invests
+whole 10 000 tranches, ten at a time, at +5% damage, attack speed and range each
+— or five times that for thirty seconds. The incomplete tranche stays stored.
+
+**Path B** raises the base's MAXIMUM every wave and never heals it, which is why
+`baseMaxHp` is run state now while `BASE_MAX_HP` stays the constant a run begins
+at. Its circle pays for kills inside it, several farms stacking in full, and a
+summoned body pays nothing. **Its field is its own channel** rather than a slow
+or a DamageAmp stack: `applySlow` takes the strongest and would have let a
+Warbringer's 65% swallow a Farm's 5%, and the brief asks for these to stack
+additively — so the slow multiplies alongside the timed one and the amplifier is
+SUMMED with DamageAmp's fraction. With no farms on the board that sum is
+DamageAmp's own multiplier to the float, which is what left every existing
+figure in the suite where it was. B5 executes under the higher of 10 HP and 5%,
+asked AFTER the blow: a body that walks through untouched is never executed.
+
+**Path C** links every C3+ farm into one network. B is the sum of the members'
+nominal productions; P is what the dice batter and what the next wave pays,
+without consuming it. A networked farm is never paid twice — its production is
+already inside P. The dice are a seeded xorshift, never `Math.random`, for the
+reason lane offsets are: a run that cannot be replayed cannot be tested.
+
+**A face is a descriptor and the resolver never branches on a number**, so three
+tables differ by their numbers alone and all sixty-two faces are asserted
+individually against a scripted die. **C5's table has twenty-two faces** — the
+brief calls it a D20 and then lists 21 and 22, so the table is the harder
+constraint; recorded rather than quietly reconciled. Its deferred effects
+resolve in the mandated order, and a +2 landing exactly on 8 becomes 9 while a
++1 on 8 is left alone.
+
+**Three defects the suite found, all in this change:** `Farms.network` was
+handed out by reference and `reset()` REBOUND it, so every network figure a
+panel or a test read came from the orphaned object of the previous run;
+`Farms.reset()` did not clear the wave latch, so a second run would silently
+skip its own wave 1; and the surge timer tested a float against zero, which
+`30 - 29.9 - 0.1` never reaches.
+
+**The index screen was two hardcoded columns** and is now laid out from each
+tower's own branch list, inside the same rectangle the two used. A third path
+would otherwise have been two thirds visible with nothing reporting a problem.
+
+**The visual is a placeholder and is meant to look it.** The brief names twelve
+final models — the base, a T1 shared by A1/B1/C1, a T2 shared by A2/B2/C2, and
+one each for A3-A5, B3-B5, C3-C5, with no crosspath ever getting a body of its
+own. None are built. What ships is a canvas glyph reduced to the four shapes
+that read from the top down (platform, cauldron, mana, hood) and gl-world's
+existing stand-in cylinder on the 3D board.
+
+`tests/farm.test.js` is 35 tests: the three paths, the uniqueness rules, the
+field, the executions, the network's persistence, every face of the three
+tables, the deferred C5 ordering, the global sort, the panel fitting above the
+build bar in all five shapes, and the three-column index.
+
 **2026-08-27 — The Warbringer is worth its slot, and its first four tiers cost
 fifty more.** The owner's words: *"il est trop faible, il n'aide pas assez, il
 est trop cher"*, and then the shape of the fix — **the build price does not

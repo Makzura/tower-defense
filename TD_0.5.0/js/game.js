@@ -1451,6 +1451,23 @@ var bullets = [];
 
 var cash = STARTING_CASH;
 var baseHp = BASE_MAX_HP;
+
+// THE BASE'S MAXIMUM IS RUN STATE NOW, not the constant it starts from
+// (2026-08-27, with the Farm). `BASE_MAX_HP` is still where a run begins and
+// is still what the sandbox overrides; this is what the run is CURRENTLY
+// playing with, and a path-B Farm raises it every wave and on every kill in
+// its circle.
+//
+// RAISING THE MAXIMUM DOES NOT HEAL, which the brief is explicit about and
+// which is the whole reason the two are separate variables: a Farm buys the
+// player headroom to repair into, never the repair itself.
+var baseMaxHp = BASE_MAX_HP;
+
+function growBaseMaxHp(amount) {
+  if (!(amount > 0)) return 0;
+  baseMaxHp += amount;
+  return amount;
+}
 var gameOver = false;
 
 // The run is WON when every scheduled wave has fully deployed and the last
@@ -1923,6 +1940,9 @@ function restartGame() {
 
   cash = STARTING_CASH;
   baseHp = BASE_MAX_HP;
+  baseMaxHp = BASE_MAX_HP;
+  // Farms are board state and a network is run state: both die with the run.
+  if (typeof Farms !== "undefined") Farms.reset();
   gameOver = false;
   victory = false;
   allWavesDeployed = false;
@@ -3492,6 +3512,12 @@ function update(dt) {
       runKills++;
       var killBounty = gone.bounty();
       cash += killBounty;
+      // A path-B Farm is paid for a body that dies inside its circle, and
+      // several of them stack in full. Here rather than in takeDamage for
+      // the reason the bounty is here: this sweep is the one place a fate is
+      // decided exactly once. A summoned body pays nothing, the same rule a
+      // Hive's brood already lives under.
+      if (typeof Farms !== "undefined") Farms.onEnemyKilled(gone);
       // Death-created enemies are collected and appended only after this
       // sweep. That gives every parent exactly one payout/removal and prevents
       // newly born children from being visited halfway through the same loop.
@@ -3583,6 +3609,9 @@ function update(dt) {
       // wave to announce and no transition to open: the win is decided by the
       // whole-road check below, on this same step.
       payWaveBounty();
+      // Wave 35 never reaches `endWave`, so this is the only door its farms
+      // have. `deployed` is already the 1-based number.
+      if (typeof Farms !== "undefined") Farms.settleWave(deployed);
     } else {
       endWave(WAVE_CLEAR_DELAY);
     }
@@ -3671,11 +3700,11 @@ function updateLowHealthAlert(dt) {
     return;
   }
 
-  if (!lowHealthActive && baseHp <= BASE_MAX_HP * LOW_HEALTH_FRACTION) {
+  if (!lowHealthActive && baseHp <= baseMaxHp * LOW_HEALTH_FRACTION) {
     lowHealthActive = true;
     lowHealthTimer = 0;
     lowHealthPulse = 0;
-  } else if (lowHealthActive && baseHp > BASE_MAX_HP * LOW_HEALTH_CLEAR_FRACTION) {
+  } else if (lowHealthActive && baseHp > baseMaxHp * LOW_HEALTH_CLEAR_FRACTION) {
     lowHealthActive = false;
     Sound.stopAlert();
     return;
@@ -4065,6 +4094,7 @@ function callNextWave(delaySeconds) {
   // ordinarily a no-op -- kept because the latch makes it free, and because a
   // countdown moved by hand (the sandbox, a fixture) has no gate behind it.
   payWaveBounty();
+  if (typeof Farms !== "undefined") Farms.settleWave(waveIndex);
   return true;
 }
 
@@ -4157,6 +4187,12 @@ function endWave(delaySeconds, overshoot) {
   // ended it, and the latch inside payWaveBounty is what makes a second gate
   // firing on the same step cost nothing.
   payWaveBounty();
+  // And the farms, on the same terms and for the same reason: `settleWave`
+  // is latched on the wave NUMBER, so the three gates plus the two safety
+  // nets cannot pay a wave's production twice. `waveIndex` is still the wave
+  // that just ended at this point -- it is incremented below -- so the
+  // 1-based number the player was shown is waveIndex + 1.
+  if (typeof Farms !== "undefined") Farms.settleWave(waveIndex + 1);
 
   var spent = overshoot > 0 ? overshoot : 0;
   waveIndex++;
@@ -4320,6 +4356,14 @@ function beginWave() {
   // latch makes it free. BEFORE the banner, so the two land in the order the
   // player earned them.
   payWaveBounty();
+  // The same safety net for the farms -- a cursor moved without a gate has not
+  // settled the wave it left -- and then the C network's payout, which is what
+  // "au debut de la vague suivante, le joueur recoit P mana" means. The payment
+  // does not consume P: it is a standing production, not a stock.
+  if (typeof Farms !== "undefined") {
+    Farms.settleWave(waveIndex);
+    Farms.openWave();
+  }
 
   if (typeof Effects !== "undefined") {
     Effects.announce(
@@ -5639,7 +5683,7 @@ function drawStatus() {
   // below where it began, and drops the denominator once it is above -- a
   // "12500 / 100" would just read as broken.
   ctx.textAlign = "left";
-  ctx.fillStyle = baseHp > BASE_MAX_HP * 0.25 ? "#8ce69d" : "#e0736e";
+  ctx.fillStyle = baseHp > baseMaxHp * 0.25 ? "#8ce69d" : "#e0736e";
   ctx.font = "600 24px system-ui, sans-serif";
 
   // THE VISUAL HALF OF THE LOW-HEALTH ALERT. The readout has been red below a
@@ -5657,9 +5701,9 @@ function drawStatus() {
     ctx.fillStyle = "#e0736e";
   }
 
-  ctx.fillText(baseHp > BASE_MAX_HP
+  ctx.fillText(baseHp > baseMaxHp
     ? "Base " + Math.round(baseHp) + " HP"
-    : "Base " + Math.round(baseHp) + " / " + BASE_MAX_HP + " HP", 22, 48);
+    : "Base " + Math.round(baseHp) + " / " + Math.round(baseMaxHp) + " HP", 22, 48);
 
   ctx.fillStyle = "#8cb3e6";
   ctx.font = "600 16px system-ui, sans-serif";

@@ -443,6 +443,12 @@ js/smasher.js       Smasher: melee AoE, two upgrade branches, Path A's
 js/soldier.js       Soldier: the $300 burst/automatic starter, two upgrade
                      branches, and SoldierRecruit -- stop-to-shoot walking
                      units B4 calls in and B5 strengthens; NOT towers
+js/farm.js          FarmTower ("Farm", id `farm`): the 1200-mana tower that
+                     produces MANA instead of damage, and the first with
+                     THREE upgrade paths. Also holds `Farms`, the board-wide
+                     half -- the C network, its dice, the field a body is
+                     standing in, and the three moments game.js calls in at
+                     -- and `FarmDice`, the three tables as DATA
 js/blub.js          BlubTower ("Summoner", id `blub`): the $450 tower that
                      never fires, its ten summon types, the swarm buff, the
                      weakening debuff and Coagulation -- plus Blub, one
@@ -6294,6 +6300,120 @@ already follow. `drawRecruitHover` returns early when `enemyAt` finds anything.
 
 ---
 
+## The Farm — a tower that produces MANA, and the first with three paths
+
+Added 2026-08-27 against a fully specified brief. `js/farm.js`, **1200 mana**,
+id `farm`, constructor `FarmTower`, display name **Farm**. It does not shoot.
+
+**THE WORD IS MANA, AND ONLY THE WORD.** Every string this tower puts on screen
+says mana — never gold, cash, coins or a dollar sign — at the owner's
+instruction. The QUANTITY is the game's ordinary `cash`: there is one run
+currency and inventing a second would be a change to the economy rather than to
+this tower. `Farms.pay` is the one door onto that global and the only place in
+the file that touches it. A test reads every panel string and every stat row and
+fails on the sight of a `$`.
+
+**IT IS THE SIXTH TYPE AND NOT A SIXTH SLOT.** The bar is five and stays five;
+the armoury already picks which five of the owned types are equipped, which is
+exactly the case a sixth type needs. The SANDBOX shows six, because a workbench
+has no coins to spend and is a preview of the towers rather than of the bar — it
+re-derives `BAR_WIDTH`/`BAR_X` after installing its roster so the extra slot is
+not drawn off the end of a bar centred for five.
+
+**A T3 ON ANY BRANCH CAPS BOTH OTHERS AT 2.** The two-branch crosspath rule the
+other four towers share, said for three. The brief settles it from the other
+end: a Farm with a main path at T3+ wears that path's model, and its secondary
+upgrades are T1/T2 only.
+
+### Where its output goes, and when
+
+**`Farms` is the board-wide half** and lives at the bottom of the same file. A
+farm's own upgrades are a farm's business; who is registered, which unique tiers
+are taken, the network, the field and the wave boundary are not. `game.js` says
+only WHEN, at three moments: a wave ending, a wave starting, and a restart.
+
+**`settleWave` is LATCHED ON THE WAVE NUMBER**, exactly as `payWaveBounty` is
+and for the same reason: it is reachable from all three gates plus two safety
+nets, and paying a wave's production twice is the whole risk in a design with
+several doors. **`Farms.reset()` clears that latch**, and forgetting to was a
+real defect the suite caught: a second run would silently skip its own wave 1.
+
+**A3 REPLACES the per-wave figure with a tick** rather than adding to it, and
+the tick is driven from `update(dt)` rather than from a wave hook — so it
+advances at 3× speed and freezes with the run like every other cooldown. From
+A4 production stops reaching the purse at all and fills the tower's own stock,
+which is what the cloning compounds and what A5's investment spends.
+
+### Path B raises a global, so the base's maximum is run state now
+
+`BASE_MAX_HP` is still where a run begins and still what the sandbox overrides.
+**`baseMaxHp` is what the run is currently playing with**, and `growBaseMaxHp`
+is the one door. **Raising the maximum does not heal**, which the brief is
+explicit about and which is the whole reason the two are separate variables: a
+Farm buys headroom to repair into, never the repair.
+
+**THE FIELD IS ITS OWN CHANNEL, not a slow and not a DamageAmp stack.**
+`applySlow` takes the strongest and refreshes it, which is right for a timed
+debuff a tower applies and wrong for a standing field — a Warbringer's 65% would
+have swallowed a Farm's 5% entirely. The brief asks for these to stack
+**additively with the other kinds**, so `js/enemy.js` reads them as a third
+channel: the slow multiplies alongside `slowMultiplier`, and the damage
+amplifier is SUMMED with DamageAmp's fraction and applied once. With no farms on
+the board that sum is DamageAmp's own multiplier to the float, which is what
+keeps every existing figure in the suite where it was.
+
+**B5's execution is asked AFTER the blow, never instead of it.** "Un ennemi
+situé dans la portée est ATTAQUÉ" — a body that walks through untouched is never
+executed; being hit is what asks the question. It takes the ordinary death path,
+so a Revenant still gets up and the bounty is still paid once by the sweep.
+
+### Path C is a network, and its dice are DATA
+
+Every C3+ farm joins one network. **B** is the sum of the members' nominal
+productions; **P** is the permanent figure the dice batter and the next wave
+pays. P starts at B when the network comes into being and never tracks it again
+— a farm joining later raises the baseline a face 8 resets to, and does not undo
+the dice. **A networked farm is never paid twice**: its production is already
+inside B and therefore inside P, so `settleWave` skips it and `openWave` pays P
+once. Paying does not consume P.
+
+**NOTHING HERE USES `Math.random`.** The dice are a seeded xorshift, for the
+reason lane offsets and the Summoner's spawn points are: a run that cannot be
+replayed cannot be tested, and this tower's whole output is decided by dice.
+
+**A FACE IS A DESCRIPTOR, and the resolver never branches on a number.** `flat`,
+`percent`, `worstOf`, `bestOf`, `thenPercent`, `reset`, `double`, the three
+"next gain" charges and `prep` are the whole vocabulary; three tables differ by
+their numbers alone. That is what lets `tests/farm.test.js` walk all sixty-two
+faces individually, with a scripted die rather than a seed.
+
+**C5's TABLE HAS TWENTY-TWO FACES.** The brief calls it a D20 and then lists 21
+and 22, so the table is the harder constraint and the die has 22 sides. It is
+recorded here rather than quietly reconciled.
+
+**The deferred effects are ordered, and the order is mandated because every step
+changes what the next one sees**: a face 13's protections reroll up to three 8s;
+then the +1/+2 land on C5 dice; then a +2 that produces exactly 8 becomes 9 (a
++1 arriving on 8 is left alone, which is the brief's wording); then a previous
+face 22 removes what is still under 9; then what survives is sorted and resolved
+low to high. **Sorting is what C5 buys** — without one on the board the order is
+random, and the "next gain" faces are worth more when the gains after them are
+big.
+
+### The visual is a PLACEHOLDER and is meant to look it
+
+The brief describes a hooded salvager-wizard behind a repaired dark-metal
+cauldron of cyan-violet mana on a compact wood-and-scrap platform, and names
+**twelve** final models: the base, a T1 shared by A1/B1/C1, a T2 shared by
+A2/B2/C2, and one each for A3-A5, B3-B5 and C3-C5. **No crosspath ever gets a
+model of its own** — a Farm with a main path at T3+ wears that path's body and
+its secondary T1/T2 add no overlay. None of the twelve are built. What ships is
+a canvas glyph reduced to the four shapes that read from the top down — platform,
+cauldron, mana, hood — plus gl-world's own stand-in cylinder on the 3D board.
+Do not read either as the design.
+
+---
+
 ## The Summoner — a tower that never fires
 
 Added 2026-08-09 against a fully-specified brief (concept, both upgrade tables,
@@ -7947,7 +8067,13 @@ no mechanic was moved to match the description.
 | Blub removed by hand | selling one through its panel takes it out of the fleet, the pooled HP, the swarm buff and the next merge | `sellTower` -> `Blub.onRemoved` -> `isDestroyed` |
 | Summon clock vs cycle | a tier that shortens an interval clamps the running timer to it -- from applyUpgrade, NEVER from recalcStats | `BlubTower.clampTimersToCycle` |
 | Compact panel actions | `action.compact` — 34 px, two per row, so six action rows still fit | `inspectionLayout` in game.js |
-| Build slots | 5, ALL FIVE FILLED since 2026-08-09: Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner | `BUILD_SLOTS` in game.js |
+| Build slots | 5, and **six TYPES since 2026-08-27**: the armoury picks which five of the owned types are equipped. A sixth SLOT is still an unmade decision | `BUILD_SLOTS` in game.js, `MetaProgress.SLOT_COUNT` |
+| Tower prices, all six | Rifleman $300, Summoner $450, Warbringer $600, Siphon $800, Arcane Sniper $900, **Farm 1200 mana** | each type's `COST` |
+| Farm | 1200 mana, 200 HP, 35 u.l. footprint (25 at C1), no reach until path B. 200 mana a wave | `FarmTower` in js/farm.js |
+| Farm path A | +50/+150 mana a wave, then a TICK that replaces the per-wave figure (50/75/150 every 5 s), a private stock from A4 cloning 5% a wave (cap 1000, then 3000), and A5's investment in whole 10 000 tranches | `FarmTower.UPGRADES`, `produce`, `cloneStock`, `invest` |
+| Farm path B | the base's MAXIMUM grows +15/+35/+100/+100/+200 a wave and never heals; a circle of 150/200/300 u.l. that pays for kills inside it and, from B4, slows and amplifies. B5 executes under the higher of 10 HP and 5% | `baseMaxHp`, `growBaseMaxHp`, `Farms.fieldAt`, `Farms.executes` |
+| Farm path C | every C3+ joins ONE network: B is the sum of nominal productions, P is what the dice batter and what the next wave pays. C3 rolls one d20, C4 two, C5 three d22 | `Farms.network`, `FarmDice` |
+| Farm uniqueness | one B4-or-B5 on the map (not one of each), and one C5 | `unique` on the tier, `Farms.uniqueHolder` |
 | Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 150–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
 | Screens | menu → route chooser (`select`) / index / store → play | `screen` in game.js |
 | Pause menu | Escape only, no HUD button | `paused`, `drawPauseMenu` |
