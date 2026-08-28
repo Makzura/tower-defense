@@ -13,6 +13,59 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — The pause button stops the clock instead of opening a menu.**
+
+At the owner's instruction: the bottom-right pause button should freeze the
+game clock and leave the board playable — hover an enemy, place a tower,
+upgrade one — rather than putting a modal over it.
+
+**TWO STATES, NOT ONE.** The button and Escape shared `paused` since the button
+landed on 2026-08-27, and that was the right call while both meant "a menu is
+up". They mean different things now, so they are different flags. `paused` is
+still the modal, still reached by Escape, still the safety on leaving a run.
+`frozen` is the new one, and the button is the only way to it.
+
+**`frozen` GATES ONE THING.** There is a single `if (frozen) return;` in
+`update()` and no other line in `game.js` reads the flag. That is the entire
+implementation, and the shape of it is the feature: every input path already
+asks about `paused` and none of them asks about this, so hovering, panning,
+zooming, building, selling, inspecting and upgrading kept working without being
+listed anywhere. A control added later inherits the behaviour instead of having
+to remember it, and anything added to `update()` inherits the freeze.
+
+The gate sits below the screen and outcome guards and above the rewind, the
+solar clock and the wave pump — so the sky, the fuses, the hastes and the
+schedule are all stopped by that one line rather than by being asked
+individually. `Hazards`' fuse and the Herald's haste already had tests proving a
+paused run spends none of them; they spend none of a frozen one for the same
+reason.
+
+**INDEPENDENT IN BOTH DIRECTIONS.** Escape over a frozen board opens the menu,
+and Resume closes the menu and leaves the clock where it was. A Resume that
+cleared the freeze would start a clock the player deliberately stopped, which
+is the kind of thing "one flag with two names" gets you.
+
+**A TOGGLE, AND IT HAD TO BE.** The menu had Resume and Escape to leave by. A
+stopped clock puts nothing on screen to click, so a button that only ever froze
+would be a control that could be turned on and not off. Both flags are cleared
+by `restartGame()` and `openMenu()`: a run that opens on a stopped clock looks
+broken from the first frame.
+
+**IT SAYS SO.** The button lights amber and swaps its two bars for a play
+triangle — the glyph says what the press will do, which is what every transport
+control already taught. Above that, a caption reads TIME STOPPED with a line
+about what can still be done. A live-looking board on which nothing moves is
+indistinguishable from a hung one, and the control that did it is 44 px wide in
+a corner. A caption rather than a scrim: dimming the board would fight the whole
+point, which is that the player is looking at it.
+
+Suites 232 / 302 / 74 / 47 / 53, 0 failing, MANIFEST OK. run.js 229 → 232: four
+added and one removed. "the HUD pause button opens the same menu Escape does"
+asserted the old behaviour exactly and could not be repaired, so it was replaced
+by the four that state the new one — including "a frozen board still builds,
+upgrades, inspects and hovers", which is the half that says the player did not
+freeze along with the board.
+
 **2026-08-28 — Normal runs to forty waves, and ends on the Dinomech.**
 
 At the owner's instruction: extend the separately authored Normal campaign from

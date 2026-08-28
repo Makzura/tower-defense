@@ -2729,13 +2729,36 @@ var inspected = null;
 // would charge the player for opening it.
 //
 // The pause menu IS the safety on leaving a run: getting out takes two
-// deliberate actions -- Escape or the pause button, and then a click on "Back
-// to main menu" -- so there is no separate "are you sure?" step and nothing on
-// the HUD that ONE stray click can use to end a run. The button added on
-// 2026-08-27 (see pauseButtonRect) opens this menu and nothing else; it sets
-// the flag below, which is the same flag Escape sets, so there is exactly one
-// pause in this file and two ways to reach it.
+// deliberate actions -- Escape, and then a click on "Back to main menu" -- so
+// there is no separate "are you sure?" step and nothing on the HUD that ONE
+// stray click can use to end a run. Escape is the only way in; the HUD button
+// stops the CLOCK instead, and `frozen` below is why those are two different
+// things rather than two names for one.
 var paused = false;
+
+// THE GAME CLOCK IS STOPPED, AND THE BOARD IS STILL THE PLAYER'S.
+//
+// This is the HUD pause button (2026-08-28, at the owner's instruction), and
+// it is deliberately NOT the pause menu. A modal freezes the simulation by
+// putting a wall in front of it: nothing underneath is clickable, which is
+// right for "I am leaving" and wrong for "hold still while I look at this".
+// Stopping the clock is the second thing, and it is the one a tower defence
+// actually wants -- read what is walking at you, place and upgrade against it,
+// then start time again.
+//
+// So this flag gates exactly ONE thing, `update`, and nothing else in the
+// file reads it. Every input path already asks about `paused` and none of them
+// asks about this, which is not an omission: it is the whole feature. Hovering
+// an enemy, panning, building, selling and upgrading all run through handlers
+// that were already unaware of it, so they keep working here for free rather
+// than by being listed somewhere -- and a control added later inherits that
+// instead of having to remember it.
+//
+// Independent of `paused` in both directions. Escape still opens the menu over
+// a frozen board and closing it leaves the clock where it was, because "am I
+// in a menu" and "is time running" are two questions and answering one with
+// the other is how a resume ends up starting a clock the player stopped.
+var frozen = false;
 
 // Set while a tower is waiting for the player to click a DIRECTION rather
 // than a position -- currently only the Longshot's cone re-aim (spec 5.6).
@@ -2992,6 +3015,7 @@ function chooseDifficulty(id) {
 function openMenu() {
   screen = "menu";
   paused = false;
+  frozen = false;
   // The run is over as far as the world is concerned: no clock on the title
   // screen. Victory and game over do NOT call this -- they freeze the board
   // they finished on, and the sky is part of that board.
@@ -3066,6 +3090,9 @@ function restartGame() {
   aimingTower = null;
   blockReason = null;
   paused = false;
+  // Run state, exactly as the pause is: a run that begins on a stopped clock
+  // is a run that looks broken from the first frame.
+  frozen = false;
 
   // The enemy lane sequence is run state too. It is deterministic on purpose
   // (see Enemy.laneSequence), and resetting it here is what makes run N+1
@@ -3529,14 +3556,18 @@ function onClick(event) {
     return;
   }
 
-  // Pause. Everything above this line has already returned if a modal is up --
-  // the pause menu itself, the loss and victory overlays -- so this cannot be
-  // reached while the run is already stopped, and the button is drawn under
-  // exactly the same condition (see draw()). Sets the same flag Escape sets;
-  // the menu that appears is the same menu, and Resume or Escape leaves it.
+  // Freeze, and unfreeze. Everything above this line has already returned if a
+  // modal is up -- the pause menu itself, the loss and victory overlays -- so
+  // this cannot be reached while the run is already stopped, and the button is
+  // drawn under exactly the same condition (see draw()).
+  //
+  // A TOGGLE, and it has to be one: the button is the only way back out. The
+  // menu had Resume and Escape to leave by, but a stopped clock puts nothing
+  // on screen to click, so a press that only ever froze would be a control
+  // that could be turned on and not off.
   if (pointInRect(p.x, p.y, pauseButtonRect())) {
     Sound.playUIClick();
-    paused = true;
+    frozen = !frozen;
     return;
   }
 
@@ -4558,6 +4589,17 @@ function update(dt) {
   if (screen !== "play") return;
   if (gameOver || victory) return;     // both outcomes freeze the board
   if (paused) return;                  // a menu must not cost the player a leak
+
+  // THE CLOCK IS STOPPED. This is the entire implementation of the HUD pause
+  // button: return before the fixed step does anything, and the board holds.
+  //
+  // It sits here, below the screen and outcome guards, so a frozen run that
+  // somehow reached the menu still resets cleanly, and ABOVE the rewind, the
+  // solar clock and the wave pump -- every one of which advances on `dt` and
+  // every one of which is therefore stopped by this line rather than by
+  // remembering to ask. Anything added to this function inherits the freeze;
+  // anything added to draw() or to an input handler correctly does not.
+  if (frozen) return;
 
   // Time is being rewound (the beam tower's death denial). Everything else is
   // frozen -- no movement, no firing, no spawning -- and only the rewind
@@ -6093,6 +6135,7 @@ function draw() {
   // waveSkipButtonRect and waveControlsShown exist to avoid.
   if (!paused && !gameOver && !victory) {
     drawPauseButton();
+    drawFrozenNotice();
     drawAudioButton();
     drawAudioPanel();
   }
@@ -7519,21 +7562,97 @@ function drawPauseButton() {
   var r = pauseButtonRect();
   var hot = pointInRect(mouse.x, mouse.y, r);
 
-  ctx.fillStyle = "rgba(28,30,38,0.85)";
+  // Lit while the clock is stopped, on the same pattern the auto-send toggle
+  // beside it uses -- tinted panel, accent border, accent glyph -- because it
+  // IS a toggle now and should read as one from the same glance. Amber rather
+  // than that button's green: green beside green would be two lamps saying
+  // different things in the same colour.
+  ctx.fillStyle = frozen ? "rgba(240,205,120,0.20)" : "rgba(28,30,38,0.85)";
   ctx.fillRect(r.x, r.y, r.w, r.h);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = hot ? "rgba(199,209,224,0.55)" : "rgba(199,209,224,0.30)";
+  ctx.strokeStyle = frozen
+    ? "rgba(240,205,120,0.95)"
+    : (hot ? "rgba(199,209,224,0.55)" : "rgba(199,209,224,0.30)");
   ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
 
-  var colour = hot ? "#c7d1e0" : "rgba(199,209,224,0.80)";
+  var colour = frozen
+    ? "#f0cd78"
+    : (hot ? "#c7d1e0" : "rgba(199,209,224,0.80)");
   var cx = r.x + r.w / 2;
   var cy = r.y + r.h / 2;
   var barW = 4;
   var barH = 14;
 
   ctx.fillStyle = colour;
-  ctx.fillRect(cx - barW - 2, cy - barH / 2, barW, barH);
-  ctx.fillRect(cx + 2, cy - barH / 2, barW, barH);
+
+  // The glyph says what the press will DO, not what the state is -- the
+  // convention every transport control in the world already taught the player.
+  // Two bars while time runs (press to stop it), one triangle while it is
+  // stopped (press to start it), and the triangle is the only thing on the HUD
+  // that says the board is being held rather than broken.
+  if (frozen) {
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy - barH / 2);
+    ctx.lineTo(cx + 7, cy);
+    ctx.lineTo(cx - 5, cy + barH / 2);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillRect(cx - barW - 2, cy - barH / 2, barW, barH);
+    ctx.fillRect(cx + 2, cy - barH / 2, barW, barH);
+  }
+}
+
+// A STOPPED CLOCK HAS TO SAY SO.
+//
+// The board still draws, still hovers and still takes towers while it is
+// frozen, which is the point -- and it is also exactly why this is here. A
+// perfectly live-looking board on which nothing moves is indistinguishable
+// from a hung one, and the button that did it is 44 px wide in the corner. So
+// the state is said in words, once, where the eye already is.
+//
+// A caption rather than a scrim: dimming the board would fight the whole
+// feature, which is that the player is looking AT the board.
+function drawFrozenNotice() {
+  if (!frozen) return;
+
+  var text = "TIME STOPPED";
+  var sub = "build, upgrade and look around";
+
+  // ANCHORED TO THE BUTTON THAT DID IT, sitting directly above the chrome row
+  // and right-aligned with it, so the caption and its control read as one
+  // thing. It was centred at the top of the screen first and landed straight
+  // on the instruction strip that is already there -- the top edge is spoken
+  // for, and the middle belongs to the wave banner.
+  //
+  // Off the same rectangle as everything else in the row, so it travels with
+  // the row if a button is ever added to it -- see pauseButtonRect.
+  var speed = speedButtonRect();
+  var pause = pauseButtonRect();
+  var h = 40;
+  var w = speed.x + speed.w - pause.x;
+  var x = pause.x;
+  var y = pause.y - 10 - h;
+
+  ctx.fillStyle = "rgba(28,30,38,0.92)";
+  ctx.fillRect(x, y, w, h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(240,205,120,0.55)";
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.font = "600 13px system-ui, sans-serif";
+  ctx.fillStyle = "#f0cd78";
+  ctx.fillText(text, x + w / 2, y + 14);
+
+  ctx.font = "10px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(199,209,224,0.70)";
+  ctx.fillText(sub, x + w / 2, y + 28);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 }
 
 // The five build slots. A slot knows nothing about gunners specifically -- it

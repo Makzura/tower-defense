@@ -490,7 +490,27 @@ var BASELINE = [
     // rather than trusted as arithmetic: every name on each side is present
     // here, nothing is duplicated, and the two sides overlapped on 139.
     // Both blocks below are kept because both raises are still in this tree.
-    file: "tests/run.js", pass: 229, fail: 0,
+    // ---- 232 on 2026-08-28, the HUD pause button became a clock -----------
+    // 229 -> 232: FOUR added, ONE removed, and the removal is the point. "the
+    // HUD pause button opens the same menu Escape does" asserted the old
+    // behaviour exactly, so it could not be repaired -- the button no longer
+    // opens the menu. What replaced it:
+    //
+    //   "the HUD pause button stops the clock without opening the menu" -- and
+    //     that a SECOND press starts it again, since the button is the only
+    //     way back out of a state that puts nothing else on screen to click.
+    //   "a frozen board still builds, upgrades, inspects and hovers" -- the
+    //     load-bearing one. Everything else here proves the clock stopped;
+    //     this is the half that says the player did not stop with it.
+    //   "Escape still opens the menu over a frozen board, and Resume leaves
+    //     the clock alone" -- the two states are independent in BOTH
+    //     directions, and a Resume that cleared the freeze would start a clock
+    //     the player deliberately stopped.
+    //   "a restart clears the freeze" -- run state, exactly as the pause is.
+    //
+    // "the pause button is dead while a run is over" now reads `frozen` rather
+    // than `paused` and still checks both, which is why it moves no count.
+    file: "tests/run.js", pass: 232, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

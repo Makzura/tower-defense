@@ -55,6 +55,24 @@ window — each one runs until it is wiped out or its `duration` expires, and th
 next is announced three seconds later if you sent it in, five if it ended on
 its own. See the change log.
 
+**The HUD pause button STOPS THE CLOCK; it is not the pause menu.** Two flags,
+two different things, and they are independent in both directions. `paused` is
+the modal menu, reached by **Escape only**: it owns every click, and it is still
+the safety on leaving a run. `frozen` is the bottom-right button (2026-08-28, at
+the owner's instruction): the simulation holds and **the board stays the
+player's** — hover, pan, zoom, build, sell, inspect and upgrade all keep
+working. Escape over a frozen board opens the menu, and Resume closes the menu
+without starting the clock.
+
+`frozen` gates **exactly one thing — `update()` — and nothing else in the file
+reads it.** That is the feature, not an oversight: every input path already asks
+about `paused` and none asks about this, so interaction keeps working without
+being listed anywhere, and a control added later inherits it. Put anything that
+must freeze inside `update()`; anything in `draw()` or an input handler
+correctly does not freeze. Both flags are run state and are cleared by
+`restartGame()` and `openMenu()`. The button is a **toggle** — it is the only
+way back out, because a stopped clock puts nothing else on screen to click.
+
 **Do not retune the schedule by simulation.** The owner asked for that to stop
 on 2026-07-29; its totals are authored to a stated figure. See the note at the
 end of the `WAVES` comment in game.js.
@@ -134,13 +152,13 @@ suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
 Where this file says "the five unit suites" it means these six minus the smoke
 test, and that is a correct count, not a stale one. Name the set a count counts
 before repairing it. These are the current measured results, **re-run
-2026-08-28, with the elevation repair and Normal’s extension to forty
-waves both in**, through
+2026-08-28, with the elevation repair, Normal’s extension to forty waves
+and the HUD pause button all in**, through
 `node tools/ci-check.js`, which is the gate and holds these same numbers as its
 baseline:
 
 ```
-node tests/run.js                 229 pass / 0 fail   core game, schedules, difficulty
+node tests/run.js                 232 pass / 0 fail   core game, schedules, difficulty
 node tests/content.test.js        302 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
@@ -160,7 +178,7 @@ thirty-five waves and twenty-four types), and nothing was removed.
 **Then the forest board merged into Ironwood**: run.js 229 and content
 302 once the elevation repair, the sight shadows and Normal’s forty waves
 were all in one tree.
-`run.js` was 107 on 2026-08-14 and is 229 now. **Do not re-derive the steps
+`run.js` was 107 on 2026-08-14 and is 232 now. **Do not re-derive the steps
 from this document** — every one of them is itemised, by test name and with its
 self-test, in the baseline comment at the top of `tools/ci-check.js`: 108 → 112
 wave identity, → 118 the wave HUD, → 125 the timeline scheduler (eight added,

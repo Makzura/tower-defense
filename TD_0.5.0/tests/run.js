@@ -4472,36 +4472,111 @@ test("the pause menu draws, does not overlap itself, and restart clears it", fun
   t.eq(h.game.paused, false, "restart clears the pause");
 });
 
-// --- the HUD pause button (2026-08-27) -------------------------------------
+// --- the HUD pause button: a clock, not a menu (2026-08-28) ----------------
 //
-// One flag, two ways in. The button sets exactly what Escape sets, so there is
-// no second pause implementation that could disagree with the first about what
-// freezes -- which is why these tests check the button reaches `paused` and
-// then lean on the freeze tests above rather than repeating them.
-test("the HUD pause button opens the same menu Escape does", function (t) {
+// TWO STATES, DELIBERATELY. `paused` is the modal menu and owns every click;
+// `frozen` stops the clock and owns nothing, so the board stays the player's.
+// The button reaches the second and must never reach the first -- that is the
+// whole change, and these tests are about the DIFFERENCE rather than about
+// freezing, which the pause-menu tests above already cover.
+test("the HUD pause button stops the clock without opening the menu", function (t) {
   var h = harness.boot();
   h.placeGunner(w(h, 600), w(h, 505));
   h.step(3);
 
   var r = h.game.pauseButtonRect();
   h.click(r.x + r.w / 2, r.y + r.h / 2);
-  t.eq(h.game.paused, true, "the button pauses");
+  t.eq(h.game.frozen, true, "the button stops the clock");
+  t.eq(h.game.paused, false, "and does NOT put a modal on screen");
 
-  // The board is frozen by the same flag, so it is frozen the same way.
   var progress = h.game.enemies[0].progress;
   h.step(5);
-  t.eq(h.game.enemies[0].progress, progress, "and the run really is stopped");
+  t.eq(h.game.enemies[0].progress, progress, "the board really is held");
 
-  // Escape gets out of a pause the button started -- the two are one state.
-  h.key("Escape");
-  t.eq(h.game.paused, false, "Escape resumes a pause the button began");
+  // A TOGGLE. The button is the only way back, so a second press has to be it.
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, false, "and the same button starts it again");
+  h.step(1);
+  t.ok(h.game.enemies[0].progress > progress, "time moves once it is running");
+});
 
-  // And the button gets in again from a pause Escape started.
+// THE LOAD-BEARING TEST. Everything above proves the clock stopped; this is
+// the half that says the board did not go with it. A freeze that also froze
+// the player would just be the pause menu without its buttons.
+test("a frozen board still builds, upgrades, inspects and hovers", function (t) {
+  var h = harness.boot();
+  h.run("cash = 100000");
+  h.placeGunner(w(h, 600), w(h, 505));
+  h.step(3);
+
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "clock stopped");
+
+  // Build. A second tower goes down on a held board.
+  var before = h.game.towers.length;
+  h.placeGunner(w(h, 700), w(h, 420));
+  t.eq(h.game.towers.length, before + 1, "a tower can be placed while frozen");
+
+  // Inspect, by clicking the one just built.
+  var tower = h.game.towers[h.game.towers.length - 1];
+  h.click(tower.x, tower.y);
+  t.eq(h.game.inspected, tower, "and clicked to inspect");
+
+  // Upgrade, through the same entry point the panel's buttons use.
+  var paths = tower.upgradePaths ? tower.upgradePaths() : null;
+  if (paths && paths.length) {
+    var id = paths[0].id;
+    var reason = h.run("buyUpgrade(towers[towers.length - 1], '" + id + "')");
+    t.eq(reason, null, "and upgraded, with the clock still stopped");
+  }
+
+  // Hover an enemy. The pointer is re-asked outside update(), which is what
+  // makes this work at all -- see the note on `frozen`. Aimed through the
+  // inverse of screenToWorld rather than at raw world numbers, so the test
+  // survives a camera that is not sitting at zoom 1 dead centre.
+  var e = h.game.enemies[0];
+  var cam = h.game.camera;
+  var sx = (e.pos.x - cam.x) * cam.zoom + h.game.VIEW_WIDTH / 2;
+  var sy = (e.visualBodyY() - cam.y) * cam.zoom + h.game.VIEW_HEIGHT / 2;
+  h.move(sx, sy);
+  t.eq(h.game.hoveredEnemy, e, "and an enemy still answers the cursor");
+
+  // None of that quietly started time again.
+  t.eq(h.game.frozen, true, "and the clock is still stopped afterwards");
+  t.eq(h.game.paused, false, "with no modal anywhere near it");
+
+  h.draw();
+  t.ok(true, "a frozen board draws, notice and all");
+});
+
+// The two states are independent in BOTH directions, which is the bit that is
+// easy to get wrong: a Resume that cleared the freeze would start a clock the
+// player stopped on purpose.
+test("Escape still opens the menu over a frozen board, and Resume leaves the clock alone", function (t) {
+  var h = harness.boot();
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "frozen");
+
   h.key("Escape");
-  t.eq(h.game.paused, true, "Escape pauses");
+  t.eq(h.game.paused, true, "Escape still reaches the menu");
+  t.eq(h.game.frozen, true, "and the freeze is untouched by it");
+
   var resume = h.game.resumeButtonRect();
   h.click(resume.x + resume.w / 2, resume.y + resume.h / 2);
-  t.eq(h.game.paused, false, "Resume closes it either way");
+  t.eq(h.game.paused, false, "Resume closes the menu");
+  t.eq(h.game.frozen, true, "and does NOT start the clock the player stopped");
+});
+
+test("a restart clears the freeze", function (t) {
+  var h = harness.boot();
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "frozen");
+
+  h.run("restartGame()");
+  t.eq(h.game.frozen, false, "a new run does not begin on a stopped clock");
 });
 
 test("the pause button consumes its click and does not build under itself", function (t) {
@@ -4517,7 +4592,7 @@ test("the pause button consumes its click and does not build under itself", func
   h.click(r.x + r.w / 2, r.y + r.h / 2);
 
   t.eq(h.game.towers.length, towers, "nothing was placed underneath it");
-  t.eq(h.game.paused, true, "the press did what it was for");
+  t.eq(h.game.frozen, true, "the press did what it was for");
 });
 
 // The row grew a fourth button, and every one of them is anchored off the one
@@ -4560,11 +4635,12 @@ test("the pause button is dead while a run is over", function (t) {
 
   h.run("gameOver = true");
   h.click(r.x + r.w / 2, r.y + r.h / 2);
-  t.eq(h.game.paused, false, "a lost run cannot be paused from the HUD");
+  t.eq(h.game.frozen, false, "a lost run cannot be frozen from the HUD");
+  t.eq(h.game.paused, false, "and nothing opened a menu either");
 
   h.run("gameOver = false; victory = true");
   h.click(r.x + r.w / 2, r.y + r.h / 2);
-  t.eq(h.game.paused, false, "nor a won one");
+  t.eq(h.game.frozen, false, "nor a won one");
 
   // And it draws in every one of those states without throwing, which is what
   // says the guard in draw() matches the guard in onClick.
