@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 var Codex = (function () {
-  var tab = "towers";        // "towers" | "enemies"
+  var tab = "towers";        // "towers" | "enemies" | "difficulties"
   var towerIndex = 0;        // which roster tower is open
   var enemyIndex = 0;        // which enemy's detail panel is open
   var pick = null;           // { branch, tier } -- the upgrade being previewed
@@ -218,31 +218,49 @@ var Codex = (function () {
   function buildEnemyModels() {
     return Object.keys(Enemy.TYPES).map(function (id) {
       var type = Enemy.TYPES[id];
-      var waves = [];
       var maxHp = type.health;
       var maxTier = type.fractal ? type.fractal.defaultTier : null;
 
-      // Walked per GROUP, not per wave, since v0.4.7 -- a mixed wave contains
-      // two or three types and each of them has to be able to say it appears
-      // there. `waves` therefore no longer tiles the schedule one-to-one; a
-      // wave shows up in as many lists as it has types, which is the honest
-      // answer to "where do I meet this".
+      // WHERE THE PLAYER MEETS IT, PER DIFFICULTY (2026-08-27).
       //
-      // One schedule to walk. This used to loop DIFFICULTY_ORDER and build a
-      // list per difficulty, because several enemies were reachable only in
-      // Normal or Hard; those derived schedules are gone (2026-08-12) and
-      // EASY_WAVES is the campaign, so the guide walks it directly.
-      EASY_WAVES.forEach(function (wave, i) {
-        var listed = false;
-        waveGroups(wave).forEach(function (g) {
-          if ((g.type || Enemy.DEFAULT_TYPE) !== id) return;
-          if (!listed) { waves.push(i + 1); listed = true; }
-          maxHp = Math.max(maxHp, Enemy.healthOf(g.type, g.health, g.tier));
-          if (type.fractal && g.tier !== undefined) {
-            maxTier = Math.max(maxTier, g.tier);
-          }
+      // There are two authored schedules now and a type may be in one, both or
+      // neither -- the Herald, the Sapper and the Volatile are Normal only, and
+      // a card that answered "where do I meet this" with a single list would
+      // either lie about Easy or hide Normal entirely.
+      //
+      // So `appearances` is one entry per difficulty, in the table's own order,
+      // and `waves` is the UNION -- which is what the compact list row prints
+      // and what "is this type scheduled anywhere at all" asks. Neither is
+      // written down: both are walked off DIFFICULTIES, so a retune of either
+      // schedule moves this screen with no edit here, and a third difficulty
+      // would appear as a third row on every card.
+      var appearances = DIFFICULTIES.map(function (difficulty) {
+        var list = [];
+        difficulty.waves.forEach(function (wave, i) {
+          var listed = false;
+          waveGroups(wave).forEach(function (g) {
+            if ((g.type || Enemy.DEFAULT_TYPE) !== id) return;
+            if (!listed) { list.push(i + 1); listed = true; }
+            // THE CEILINGS ARE TAKEN ACROSS EVERY SCHEDULE, deliberately.
+            // "Highest campaign HP" and the Fractal ladder's top rung are
+            // claims about the game and not about one difficulty, and Normal
+            // sends heavier overrides than Easy on most types.
+            maxHp = Math.max(maxHp, Enemy.healthOf(g.type, g.health, g.tier));
+            if (type.fractal && g.tier !== undefined) {
+              maxTier = Math.max(maxTier, g.tier);
+            }
+          });
+        });
+        return { id: difficulty.id, name: difficulty.name, waves: list };
+      });
+
+      var waves = [];
+      appearances.forEach(function (entry) {
+        entry.waves.forEach(function (n) {
+          if (waves.indexOf(n) === -1) waves.push(n);
         });
       });
+      waves.sort(function (a, b) { return a - b; });
 
       var speed = Enemy.BASE_SPEED_ULPS * type.speedMultiplier;
 
@@ -335,10 +353,14 @@ var Codex = (function () {
         support: type.support || null,
         sprint: type.sprint || null,
         noBounty: !!type.noBounty,
+        // The Volatile's block, carried into the guide as data off the type
+        // like every block above it.
+        deathEffect: type.deathEffect || null,
         // What killing one at its roster health pays. Enemy.bountyOf is the
         // same resolver the till and scaled waves use.
         bounty: type.noBounty ? 0 : Enemy.bountyOf(type.id),
-        waves: waves
+        waves: waves,
+        appearances: appearances
       };
     });
   }
@@ -349,8 +371,23 @@ var Codex = (function () {
   // inspectionLayout follow: one function per rectangle, so what is drawn and
   // what is clickable can never disagree.
 
+  // THREE TABS SINCE 2026-08-27, and the row is CENTRED ON HOWEVER MANY THERE
+  // ARE rather than laid out from a fixed left edge -- so adding the
+  // Difficulties tab moved the other two under the heading instead of pushing
+  // them off it, and a fourth would do the same. `TABS` is the one list; the
+  // drawing, the click test and the geometry all walk it.
+  var TABS = [
+    { id: "towers", label: "Towers" },
+    { id: "enemies", label: "Enemies" },
+    { id: "difficulties", label: "Difficulties" }
+  ];
+  var TAB_W = 180;
+  var TAB_GAP = 20;
+
   function tabRect(i) {
-    return { x: VIEW_WIDTH / 2 - 190 + i * 200, y: 78, w: 180, h: 38 };
+    var total = TABS.length * TAB_W + (TABS.length - 1) * TAB_GAP;
+    return { x: (VIEW_WIDTH - total) / 2 + i * (TAB_W + TAB_GAP),
+             y: 78, w: TAB_W, h: 38 };
   }
 
   function towerCardRect(i) {
@@ -398,6 +435,13 @@ var Codex = (function () {
     enemyModels = buildEnemyModels();
     enemyIndex = 0;
     enemyScroll = 0;
+    scheduleScroll = 0;
+    // THE PREVIEW OPENS ON WHATEVER THE PLAYER LAST SELECTED TO PLAY, which is
+    // the one piece of state on this screen that is worth carrying in from
+    // outside it: somebody who has just chosen Normal and come to read about it
+    // should not have to click Normal again. It is a COPY, not a reference --
+    // browsing the index never changes which schedule a run would use.
+    previewDifficultyId = selectedDifficultyId;
     pick = null;
     // THE MODAL DIES WITH THE SCREEN. Every other piece of state here is reset
     // on entry and the viewer was not, so leaving the index with one open and
@@ -425,8 +469,29 @@ var Codex = (function () {
       return;
     }
 
-    if (pointInRect(x, y, tabRect(0))) { tab = "towers"; return; }
-    if (pointInRect(x, y, tabRect(1))) { tab = "enemies"; pick = null; return; }
+    for (var ti = 0; ti < TABS.length; ti++) {
+      if (!pointInRect(x, y, tabRect(ti))) continue;
+      tab = TABS[ti].id;
+      // Switching away from the towers tab drops the tier preview, so coming
+      // back does not open on a card the player has forgotten choosing.
+      if (tab !== "towers") pick = null;
+      return;
+    }
+
+    if (tab === "difficulties") {
+      for (var si = 0; si < DIFFICULTIES.length; si++) {
+        if (!pointInRect(x, y, difficultyTabRect(si))) continue;
+        if (DIFFICULTIES[si].id !== previewDifficultyId) {
+          previewDifficultyId = DIFFICULTIES[si].id;
+          // A different schedule is a different list, so the old scroll
+          // position means nothing on it. Same reasoning as the enemy tab
+          // resetting its scroll on open().
+          scheduleScroll = 0;
+        }
+        return;
+      }
+      return;
+    }
 
     if (tab === "enemies") {
       // THE MODEL IS THE DOOR. Clicking the body in the detail panel opens the
@@ -487,11 +552,10 @@ var Codex = (function () {
   // --- drawing -------------------------------------------------------------
 
   function drawTabs(ctx) {
-    ["Towers", "Enemies"].forEach(function (label, i) {
-      var r = tabRect(i);
-      var active = (i === 0) === (tab === "towers");
+    TABS.forEach(function (entry, i) {
       // Same control the armoury's tabs and the Back button are cut from.
-      drawAshControl(r, label.toUpperCase(), { active: active });
+      drawAshControl(tabRect(i), entry.label.toUpperCase(),
+        { active: tab === entry.id });
     });
   }
 
@@ -800,6 +864,12 @@ var Codex = (function () {
     // is motion with nothing to act on, the same reason the board's wheel is
     // dead while the pause menu is up.
     if (viewer) return;
+    if (tab === "difficulties") {
+      if (!pointInRect(x, y, scheduleViewport())) return;
+      scheduleScroll += deltaY;
+      clampScheduleScroll();
+      return;
+    }
     if (tab !== "enemies") return;
     if (!pointInRect(x, y, enemyListViewport())) return;
     enemyScroll += deltaY;
@@ -811,33 +881,30 @@ var Codex = (function () {
   }
 
   // The badge line: the ONE property that most changes how this enemy has to
-  // be ANSWERED, rather than how much of it there is. A chain rather than a
-  // stack -- there is room for exactly one line -- and the order is "can I
-  // shoot it" before "does it shoot back" before "what does it do for the
-  // enemies around it" before what it does when hurt.
+  // be ANSWERED, rather than how much of it there is. There is room for
+  // exactly one line, and the order is "can I shoot it" before "does it shoot
+  // back" before "what does it do for the enemies around it" before what it
+  // does when hurt.
+  //
+  // THE CHAIN MOVED TO `Enemy.traitsOf` (js/enemy.js) and this is now a
+  // first-match walk down it. It used to be seventeen `if`s written out here,
+  // and it was about to be copied a second time: the in-game enemy sidebar
+  // (drawEnemySidebar in js/game.js) asks the same question of the same blocks
+  // and wants EVERY answer rather than the first one. Two copies of "what is
+  // distinctive about this enemy" is two things to retune and one of them
+  // silently going stale, so the list is one list and each row carries the
+  // badge string it is entitled to print. Rows with no badge -- armor,
+  // defense, area resistance, phases -- are skipped here, because a headline
+  // belongs to an ability rather than to plating, which the card prints in its
+  // own stat block anyway.
+  //
+  // The strings and colours are unchanged, and a test in tests/content.test.js
+  // pins each one against the type it belongs to.
   function enemyBadge(model) {
-    if (model.isFlying) return ["FLYING — needs air reach", "rgba(160,225,255,0.95)"];
-    if (model.isCamo) return ["CAMO — needs detection", "rgba(190,255,205,0.9)"];
-    if (model.attack && model.attack.target === "highestDps")
-      return ["HUNTS YOUR BEST TOWER", "rgba(255,224,120,0.95)"];
-    if (model.attack && model.attack.stunSeconds)
-      return ["STUNS YOUR TOWERS", "rgba(255,224,120,0.95)"];
-    if (model.attack) return ["ATTACKS YOUR TOWERS", "rgba(255,150,100,0.95)"];
-    if (model.spawns) return ["BROOD: SHIELDED, $0", "rgba(150,230,190,0.95)"];
-    if (model.fractal) return ["SPLITS INTO FOUR LOWER TIERS", "rgba(132,255,192,0.95)"];
-    // The support types. A shield that stacks and a heal are different
-    // threats and get different lines: one makes the wave harder to start on,
-    // the other makes it harder to finish.
-    if (model.support && model.support.heal)
-      return ["HEALS WOUNDED — $0", "rgba(150,240,180,0.95)"];
-    if (model.support && model.support.shield && model.support.pick === "self")
-      return ["RESHIELDS ITSELF — $0", "rgba(255,205,130,0.95)"];
-    if (model.support && model.support.shield)
-      return ["SHIELDS THE WAVE — $0", "rgba(170,225,255,0.95)"];
-    if (model.sprint) return ["SPRINTS THE OPENING", "rgba(255,205,130,0.95)"];
-    if (model.shield && model.shield.onBreak)
-      return ["SHIELD → DOUBLE SPEED", "rgba(150,225,245,0.95)"];
-    if (model.revive) return ["GETS BACK UP ONCE", "rgba(255,236,170,0.95)"];
+    var traits = Enemy.traitsOf(model);
+    for (var i = 0; i < traits.length; i++) {
+      if (traits[i].badge) return [traits[i].badge, traits[i].color];
+    }
     return null;
   }
 
@@ -853,6 +920,15 @@ var Codex = (function () {
   // to be graceful.
   function enemyBehaviourRow(model, narrow) {
     var a = model.attack;
+    // A ONE-SHOT DIVER FIRST, because every row below it is phrased as a RATE
+    // ("... every N s") and a body that dies on its only swing has no rate to
+    // print. Read off the spec's own flags, so a second diver needs no edit
+    // here -- and a diver that somehow kept living would fall through to the
+    // ordinary damage row below and read correctly there too.
+    if (a && a.selfDestructs) {
+      return [narrow ? "Dives in" : "Dives into towers for",
+        a.damage + " within " + a.reachUl + " u.l."];
+    }
     if (a && a.stunSeconds && a.damage) {
       return [narrow ? "Hits towers" : "Hits towers for",
         a.damage + " +" + a.stunSeconds + "s stun / " + a.intervalSeconds + " s"];
@@ -860,9 +936,20 @@ var Codex = (function () {
     if (a && a.stunSeconds) {
       return ["Silences towers", a.stunSeconds + "s / " + a.intervalSeconds + " s"];
     }
+    if (a && a.disable) {
+      return ["Disables towers",
+        a.disable.seconds + "s / " + a.intervalSeconds + " s"];
+    }
     if (a) {
       return [narrow ? "Hits towers" : "Hits towers for",
         a.damage + " every " + a.intervalSeconds + " s"];
+    }
+
+    if (model.deathEffect && model.deathEffect.hazard) {
+      var hazard = model.deathEffect.hazard;
+      return ["Death charge",
+        hazard.towerDamage + " in " + hazard.radiusUl + " u.l. after " +
+        hazard.fuseSeconds + " s"];
     }
 
     if (model.spawns) {
@@ -878,6 +965,11 @@ var Codex = (function () {
     // Everything a support pulse does, derived from the block rather than
     // written out per type -- retune the interval and this follows.
     var s = model.support;
+    if (s && s.haste) {
+      return ["Hastens ×" + (s.targets || 1),
+        "+" + Math.round((s.haste.speedMultiplier - 1) * 100) + "% for " +
+        s.haste.seconds + "s / " + s.intervalSeconds + " s"];
+    }
     if (s && s.heal) {
       return ["Heals ×" + (s.targets || 1),
         s.heal.perSecond + "/s for " + s.heal.seconds + " s / " +
@@ -1351,9 +1443,42 @@ var Codex = (function () {
     return spec.groups.reduce(function (sum, group) { return sum + group.count; }, 0);
   }
 
-  function attackDescription(attack) {
+  function attackDescription(attack, model) {
     var target = attack.target === "highestDps"
       ? "the highest-DPS tower" : "nearby towers";
+
+    // A DIVE IS A ONE-SHOT, and the sentence below is built around a RATE.
+    // A spec that kills its own body on the first swing has no interval to
+    // print, so it gets its own sentence -- returned early, exactly as the
+    // disable does one paragraph down, and driven off the spec's generic flags
+    // rather than off any type id.
+    if (attack.selfDestructs) {
+      return "The moment a tower is within " + attack.reachUl +
+        " u.l. it dives onto the nearest one, deals " + (attack.damage || 0) +
+        " damage to it, and dies of the impact. It gets no second dive, and " +
+        "a dive is a death: it pays its bounty and leaves behind whatever " +
+        "its death leaves.";
+    }
+
+    // A DISABLE IS NOT A DAMAGE ATTACK, and the card must not open by saying it
+    // hits for 0. Read off the spec's own `disable` block, so a second
+    // saboteur type would print correctly with nothing edited here.
+    if (attack.disable && !(attack.damage > 0)) {
+      var d = attack.disable;
+      var text = "Deals NO damage. Every " + attack.intervalSeconds +
+        " s it stops beside the nearest valid tower";
+      if (attack.reachUl !== undefined) text += " within " + attack.reachUl + " u.l.";
+      if (attack.windUpSeconds) {
+        text += ", telegraphs for " + attack.windUpSeconds + " s";
+      }
+      text += ", then shuts it down for " + d.seconds + " s. A disabled tower " +
+        "cannot fire and its cooldown does not advance. That tower is then " +
+        "immune to every " + ((model && model.name) || "one of these") +
+        " for " + d.immuneSeconds + " s after it recovers, so several of them " +
+        "cannot hold one tower silent.";
+      return text;
+    }
+
     var text = "Attacks " + target + " for " + (attack.damage || 0) +
       " damage every " + attack.intervalSeconds + " s";
     if (attack.stunSeconds) text += " and stuns for " + attack.stunSeconds + " s";
@@ -1366,6 +1491,8 @@ var Codex = (function () {
     }
     return text + ".";
   }
+
+
 
   function enemyDescriptions(model) {
     var lines = [];
@@ -1387,7 +1514,7 @@ var Codex = (function () {
     }
 
     model.attacks.forEach(function (attack) {
-      lines.push(attackDescription(attack));
+      lines.push(attackDescription(attack, model));
       hasMechanic = true;
     });
 
@@ -1433,7 +1560,31 @@ var Codex = (function () {
     }
 
     var support = model.support;
-    if (support && support.heal) {
+    // THE HERALD'S PULSE. Checked before heal/shield because a haste spec
+    // carries neither, so the two branches below would say nothing at all.
+    if (support && support.haste) {
+      var gain = Math.round((support.haste.speedMultiplier - 1) * 100);
+      lines.push("Every " + support.intervalSeconds + " s, gives +" + gain +
+        "% movement speed for " + support.haste.seconds + " s to the " +
+        support.targets + " nearest eligible allies within " +
+        support.reachUl + " u.l.");
+      // The exclusions, read off the same `eligible` block the mechanic reads
+      // rather than written out, so the card cannot claim a rule the game does
+      // not enforce.
+      var barred = [];
+      var rule = support.eligible || {};
+      if (rule.excludeSameType) barred.push("other " + model.name + "s");
+      if (rule.excludeFlying) barred.push("fliers");
+      if (rule.excludeFractal) barred.push("Fractal Slimes and their splits");
+      if (rule.excludeBanner) barred.push("bosses and the Midboss");
+      if (barred.length) {
+        lines.push("It cannot hasten itself, " + barred.join(", ") + ".");
+      }
+      lines.push("Haste never stacks: a second pulse refreshes the " +
+        support.haste.seconds + " s rather than compounding the speed, and it " +
+        "keeps running if the source dies. It leaves no permanent speed behind.");
+      hasMechanic = true;
+    } else if (support && support.heal) {
       lines.push("Every " + support.intervalSeconds + " s, heals the " +
         support.targets + " most wounded enemies for " + support.heal.perSecond +
         " HP/s over " + support.heal.seconds + " s.");
@@ -1444,6 +1595,22 @@ var Codex = (function () {
       lines.push("Every " + support.intervalSeconds + " s, gives " + support.shield +
         " shield to " + supportTarget + (support.stacks ? "; grants stack." :
           "; this refreshes instead of stacking."));
+      hasMechanic = true;
+    }
+
+    // THE VOLATILE'S CHARGE. Read off the generic `deathEffect` block, so a
+    // second type with a different fuse or radius prints its own numbers.
+    if (model.deathEffect && model.deathEffect.hazard) {
+      var hz = model.deathEffect.hazard;
+      lines.push("However it dies in combat -- shot down, or on its own " +
+        "dive -- it leaves a live charge where it fell. " +
+        hz.fuseSeconds + " s later the charge deals " + hz.towerDamage +
+        " damage once to every living tower within " + hz.radiusUl +
+        " u.l. It does not stun and it cannot hurt other enemies, so one " +
+        "charge can never set off another.");
+      lines.push("Leaking into the base leaves no charge at all, and the " +
+        "charge itself is not an enemy: it pays nothing, and it holds neither " +
+        "the wave nor the victory screen open.");
       hasMechanic = true;
     }
 
@@ -1629,9 +1796,19 @@ var Codex = (function () {
       ["Defense", model.defense + "%"],
       ["AoE reduction", Math.round(model.aoeDamageReduction * 100) + "%"],
       ["Body size", model.sizeScale + "×"],
-      ["Visibility", enemyVisibility(model)],
-      ["Campaign waves", model.waves.length ? model.waves.join(", ") : "Sandbox only"]
+      ["Visibility", enemyVisibility(model)]
     ];
+
+    // ONE ROW PER DIFFICULTY, in the table's own order. A single "Campaign
+    // waves" line was honest while there was one schedule; with two it would
+    // have to either merge them -- which tells the player nothing about which
+    // campaign to look in -- or silently pick one. The Herald, the Sapper and
+    // the Volatile are Normal-only and this row is the whole of how the guide
+    // says so.
+    model.appearances.forEach(function (entry) {
+      rows.push([entry.name + " waves",
+        entry.waves.length ? entry.waves.join(", ") : "—"]);
+    });
     if (model.fractal) {
       rows.splice(2, 0, ["Tier range",
         "T" + model.fractal.minTier + "–T" + model.fractal.maxTier +
@@ -1680,6 +1857,208 @@ var Codex = (function () {
     });
   }
 
+  // --- the Difficulties tab (2026-08-27) -----------------------------------
+  //
+  // Two SUB-tabs, one per difficulty, each previewing that difficulty's whole
+  // thirty-five-wave schedule: what arrives, how many, how tough, what it pays
+  // and how long its window is.
+  //
+  // NOTHING ON IT IS WRITTEN DOWN. Every row is walked off the schedule through
+  // the game's own resolvers -- `waveSummary` for the roster line, `waveCount`,
+  // `waveEffectiveHealth`, `waveReward` and `waveTimeline` for the numbers --
+  // so it is the same arithmetic the banner, the payout and the scheduler use.
+  // Retune a wave and this screen follows; there is no copy to go stale, which
+  // is the property every other tab on this screen already has.
+  //
+  // IT IS A PREVIEW AND NOT A SELECTOR. Reading about Normal here does not
+  // select it: `previewDifficultyId` is separate from `selectedDifficultyId`,
+  // and the only thing that writes the latter is `setDifficulty`. The index is
+  // reached from the title menu, where there is no run to change, and a screen
+  // that quietly changed what the next run plays would be a trap.
+  // NULL UNTIL open(), NOT `DEFAULT_DIFFICULTY_ID`. This module's body runs at
+  // load, and index.html loads js/codex.js BEFORE js/game.js -- so reading a
+  // game.js global here throws before the game has a chance to start. Every
+  // reader goes through previewDifficulty(), which falls back to the first
+  // entry, and open() writes the real value the moment the screen exists.
+  var previewDifficultyId = null;
+
+  var SCHED_X = 24;
+  var SCHED_Y = 186;
+  // A FUNCTION AND NOT A CONSTANT, for previewDifficultyId's reason one line up:
+  // this module's body runs before js/game.js has declared VIEW_WIDTH, so any
+  // top-level `var` that reads a game.js global throws at load.
+  function schedWidth() { return VIEW_WIDTH - 48; }
+  var SCHED_ROW_H = 40;
+  var SCHED_ROW_GAP = 3;
+  var SCHED_VISIBLE_ROWS = 11;
+  var SCHED_H = SCHED_VISIBLE_ROWS * (SCHED_ROW_H + SCHED_ROW_GAP) - SCHED_ROW_GAP;
+
+  // Pixels scrolled off the top, for the enemy list's reason: a wheel notch
+  // that moved a whole row would overshoot on a trackpad.
+  var scheduleScroll = 0;
+
+  function difficultyTabRect(i) {
+    return { x: SCHED_X + i * 190, y: 132, w: 178, h: 34 };
+  }
+
+  function previewDifficulty() {
+    return (previewDifficultyId && difficultyOf(previewDifficultyId)) ||
+      DIFFICULTIES[0];
+  }
+
+  function scheduleViewport() {
+    return { x: SCHED_X, y: SCHED_Y, w: schedWidth(), h: SCHED_H };
+  }
+
+  // One row per wave, derived. The `duration` column prints FINAL for the wave
+  // that authors none rather than a 0 or a materialised default -- the same
+  // never-materialise-a-default rule the readout follows during a run, and here
+  // it is the only thing on screen that says which wave ends the campaign.
+  function scheduleRows() {
+    var waves = previewDifficulty().waves;
+    return waves.map(function (wave, i) {
+      var events = waveTimeline(wave);
+      return {
+        number: i + 1,
+        summary: waveSummary(wave),
+        count: waveCount(wave),
+        health: Math.round(waveEffectiveHealth(wave)),
+        reward: waveReward(wave, i + 1),
+        duration: wave.duration,
+        lastSpawn: events.length ? events[events.length - 1].time : 0
+      };
+    });
+  }
+
+  function scheduleScrollMax() {
+    var rows = DIFFICULTIES.length ? previewDifficulty().waves.length : 0;
+    var content = rows * (SCHED_ROW_H + SCHED_ROW_GAP) - SCHED_ROW_GAP;
+    return Math.max(0, content - SCHED_H);
+  }
+
+  function clampScheduleScroll() {
+    scheduleScroll = Math.max(0, Math.min(scheduleScrollMax(), scheduleScroll));
+  }
+
+  // Screen space, scroll already applied -- the same rule enemyCardRect
+  // follows, so what is drawn and what is hit-tested are one rectangle.
+  function scheduleRowRect(i) {
+    return {
+      x: SCHED_X,
+      y: SCHED_Y + i * (SCHED_ROW_H + SCHED_ROW_GAP) - scheduleScroll,
+      w: schedWidth(),
+      h: SCHED_ROW_H
+    };
+  }
+
+  function drawDifficultiesTab(ctx) {
+    var difficulty = previewDifficulty();
+    var rows = scheduleRows();
+
+    // The sub-tabs.
+    for (var i = 0; i < DIFFICULTIES.length; i++) {
+      drawAshControl(difficultyTabRect(i), DIFFICULTIES[i].name.toUpperCase(),
+        { active: DIFFICULTIES[i].id === previewDifficultyId });
+    }
+
+    // The totals, on one line beside the sub-tabs. Summed off the rows above
+    // rather than computed a second way, so the strip and the table can never
+    // disagree.
+    var bodies = 0, health = 0, reward = 0;
+    rows.forEach(function (row) {
+      bodies += row.count; health += row.health; reward += row.reward;
+    });
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillStyle = "#ecdece";
+    ctx.fillText(rows.length + " waves  ·  " + bodies + " enemies  ·  " +
+      health + " effective HP  ·  $" + reward + " in rewards",
+      SCHED_X + schedWidth(), difficultyTabRect(0).y + 17);
+
+    // Column headings, outside the clip so a scrolled row cannot paint over
+    // them (the enemy list's arrangement, and for the same reason).
+    ctx.font = "600 10px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(186,158,140,0.55)";
+    ctx.textAlign = "left";
+    ctx.fillText("WAVE", SCHED_X + 14, SCHED_Y - 10);
+    ctx.fillText("COMPOSITION", SCHED_X + 96, SCHED_Y - 10);
+    ctx.textAlign = "right";
+    ctx.fillText("BODIES", SCHED_X + schedWidth() - 330, SCHED_Y - 10);
+    ctx.fillText("EFF. HP", SCHED_X + schedWidth() - 240, SCHED_Y - 10);
+    ctx.fillText("REWARD", SCHED_X + schedWidth() - 150, SCHED_Y - 10);
+    ctx.fillText("WINDOW", SCHED_X + schedWidth() - 20, SCHED_Y - 10);
+
+    var view = scheduleViewport();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(view.x, view.y, view.w, view.h);
+    ctx.clip();
+
+    var tier = TIER_COLOURS[difficulty.id] || TIER_COLOURS.hard;
+    rows.forEach(function (row, i) {
+      var r = scheduleRowRect(i);
+      if (r.y + r.h < view.y || r.y > view.y + view.h) return;
+
+      var hot = pointInRect(mouse.x, mouse.y, r) &&
+        pointInRect(mouse.x, mouse.y, view);
+      // The LAST wave gets the accent, because "there is no wave after this"
+      // is the one structural fact a table of thirty-five rows cannot say by
+      // being a table.
+      var last = i === rows.length - 1;
+      drawAshPlate(r, {
+        accent: last ? tier.rgb : ASH_EMBER, quiet: true, cut: 8,
+        live: last ? 0.55 : (hot ? 0.35 : 0),
+        fill: i % 2 ? "rgba(20,16,20,0.88)" : "rgba(26,20,24,0.88)"
+      });
+
+      ctx.textBaseline = "middle";
+      var mid = r.y + r.h / 2;
+
+      ctx.textAlign = "left";
+      ctx.font = "600 14px system-ui, sans-serif";
+      ctx.fillStyle = last ? tier.text : "#f6d9b4";
+      ctx.fillText(String(row.number), r.x + 14, mid);
+
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(219,231,245,0.84)";
+      ctx.fillText(fitText(ctx, row.summary, schedWidth() - 460), r.x + 96, mid);
+
+      ctx.textAlign = "right";
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = "#ecdece";
+      ctx.fillText(String(row.count), r.x + r.w - 330, mid);
+      ctx.fillText(String(row.health), r.x + r.w - 240, mid);
+      ctx.fillText("$" + row.reward, r.x + r.w - 150, mid);
+      ctx.fillStyle = row.duration === undefined
+        ? tier.text : "rgba(186,158,140,0.8)";
+      ctx.fillText(row.duration === undefined ? "FINAL"
+        : (row.duration + " s"), r.x + r.w - 20, mid);
+    });
+
+    ctx.restore();
+
+    // The scrollbar, drawn OUTSIDE the clip and hard against the viewport's
+    // right edge: it is the only thing on screen saying the list continues.
+    var max = scheduleScrollMax();
+    if (max > 0) {
+      var trackX = view.x + view.w + 6;
+      ctx.fillStyle = "rgba(240,150,78,0.12)";
+      ctx.fillRect(trackX, view.y, 5, view.h);
+      var thumbH = Math.max(28, view.h * (view.h / (view.h + max)));
+      var thumbY = view.y + (view.h - thumbH) * (scheduleScroll / max);
+      ctx.fillStyle = "rgba(255,190,130,0.55)";
+      ctx.fillRect(trackX, thumbY, 5, thumbH);
+    }
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(186,158,140,0.6)";
+    ctx.fillText(difficulty.blurb + "  ·  Scroll for the rest of the schedule.",
+      SCHED_X + 4, view.y + view.h + 12);
+  }
+
   function drawEnemiesTab(ctx) {
     drawEnemyList(ctx);
     drawEnemyDetail(ctx, enemyModels[enemyIndex] || enemyModels[0]);
@@ -1702,6 +2081,7 @@ var Codex = (function () {
 
     drawTabs(ctx);
     if (tab === "towers") drawTowersTab(ctx);
+    else if (tab === "difficulties") drawDifficultiesTab(ctx);
     else drawEnemiesTab(ctx);
 
     // Last, over everything, because it is a modal: the index underneath keeps
@@ -1762,9 +2142,27 @@ var Codex = (function () {
     enemyVisibleRows: function () { return ENEMY_VISIBLE_ROWS; },
     enemyScrollMax: enemyScrollMax,
     enemyDetailRect: enemyDetailRect,
+    difficultyTabRect: difficultyTabRect,
+    scheduleViewport: scheduleViewport,
+    scheduleRowRect: scheduleRowRect,
+    scheduleScrollMax: scheduleScrollMax,
+    scheduleRows: scheduleRows,
+    // The prose and the list row a type's card carries, by id. Exported for the
+    // suite: a card that goes stale is a card nobody notices, and the only way
+    // to catch that is to read what it would actually print.
+    describe: function (id) {
+      var model = (enemyModels || []).filter(function (m) { return m.id === id; })[0];
+      return model ? enemyDescriptions(model) : [];
+    },
+    behaviourRowFor: function (id) {
+      var model = (enemyModels || []).filter(function (m) { return m.id === id; })[0];
+      return model ? enemyBehaviourRow(model, false) : [];
+    },
     state: function () {
       return { tab: tab, towerIndex: towerIndex, enemyIndex: enemyIndex,
-        enemyScroll: enemyScroll, pick: pick };
+        enemyScroll: enemyScroll, pick: pick,
+        previewDifficultyId: previewDifficultyId,
+        scheduleScroll: scheduleScroll };
     },
     models: function () {
       return { towers: towerModels, enemies: enemyModels };

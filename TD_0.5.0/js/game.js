@@ -972,6 +972,1007 @@ var EASY_WAVES = [
   ] }
 ];
 
+// ---------------------------------------------------------------------------
+// NORMAL -- a SECOND campaign, authored from nothing. FORTY waves.
+// ---------------------------------------------------------------------------
+//
+// 2026-08-28. FORTY waves, 1 321 authored root enemies, all twenty-five types.
+// (Roots: a Hive's brood, a Fractal Slime's descendants and a Tyrant's roar are
+// born at run time and are counted here exactly as they are counted in
+// EASY_WAVES -- not at all.)
+//
+// IT WAS 35 WAVES / 1 000 ROOTS UNTIL 2026-08-28, when the owner asked for it
+// to run to forty. Waves 1-35 are exactly what they were -- same groups, same
+// counts, same overrides, same timings -- with ONE field added anywhere in
+// them: wave 35 gained a `duration`, because a wave with something after it has
+// to have a ceiling. Act VI (36-40) is 321 new roots and the new true finale.
+// **EASY IS NOT TOUCHED AT ALL**: it is still 35 waves and 830 roots, and a
+// test states that as its own assertion rather than leaving it implied.
+//
+// **IT IS NOT DERIVED FROM EASY AND MUST NEVER BECOME SO.** No multiplier is
+// applied to Easy's counts, health, bounties, intervals, durations or spawn
+// rates anywhere in this file, and a test in tests/run.js proves it two ways:
+// it checks that the two arrays share no object identity at any depth, and it
+// checks that no single ratio -- of bodies, of effective HP, of clear bounty or
+// of kill bounty -- reproduces one from the other. That test exists because
+// this repository has had derived difficulties before: `buildDifficultyWaves`
+// scaled Easy by a constant, the owner had forgotten the modes existed, and the
+// whole concept was deleted on 2026-08-12 for exactly that reason. A schedule
+// that is a multiple of another schedule is not a difficulty; it is the same
+// campaign with the numbers turned up, and the thing that makes Normal worth
+// playing is that it asks different questions in a different order.
+//
+// WHAT IT ASKS THAT EASY DOES NOT. Three types are scheduled here and nowhere
+// else -- the Herald (wave 6), the Sapper (13) and the Volatile (20) -- and
+// each one attacks a resource Easy never charges the player for:
+//
+//   the HERALD    charges TIME. Every 8 s it gives eight nearby ground bodies
+//                 +30% speed for 4 s, so a board tuned to kill a column in the
+//                 seconds it spends in one circle stops killing it.
+//   the SAPPER    charges REDUNDANCY. It telegraphs for 1.1 s and switches a
+//                 tower off for 2 s, then that tower is immune for 4 s. A
+//                 board that answers everything with one very good gun learns
+//                 what a board is.
+//   the VOLATILE  charges POSITION, and since 2026-08-27 it collects. It
+//                 dives into the nearest tower within 75 u.l. for 13 and dies
+//                 of the impact, and the charge that death leaves takes 13
+//                 more off every tower within 60 u.l. a second later. Leaking
+//                 one leaves nothing at all. So a board that lets one reach it
+//                 pays 26, a board that kills one out on the road pays
+//                 nothing, and the only lever that decides which is where the
+//                 guns are. Retuned the same day to 8 health at 1.5x: the
+//                 question it asks is no longer "can you kill this" but "is
+//                 anything pointed at it yet".
+//
+// THE SHAPE, in five acts of seven waves. The act totals are pinned by a test
+// because they are the curve, and a retune that holds the 1 000 while moving
+// bodies between acts is a different campaign wearing the same total:
+//
+//   I    1-7    158 bodies   the vocabulary: five stock types, then the Herald
+//   II   8-14   174          camo, armor, the shield, the first Sapper, the Midboss
+//   III  15-21  213          the support types, the Fractal ladder, the Volatile,
+//                            and the Vanguard on the end of it
+//   IV   22-28  212          the specialist checks -- pure camo, pure air, the
+//                            Colossus, the Nursery
+//   V    29-35  243          two Colossi, the Regeneration Engine, the kill-zone,
+//                            T4, and the Tyrant
+//   VI   36-40  321          three money convoys, the Royal Legion, the Dinomech
+//
+// ACT VI IS FIVE WAVES, NOT SEVEN, and that is deliberate rather than a total
+// that did not divide: the five acts above are the campaign's teaching curve
+// and this one is its ending. The five-act totals are still pinned exactly as
+// they were, and act VI is pinned separately, so neither can absorb the other.
+//
+// WAVES 1-39 EACH CARRY A `duration` AND WAVE 40 DELIBERATELY DOES NOT, which
+// is the repository's true-final-wave contract: the absence is the data saying
+// there is nothing after it, and validateWaveTimelines rejects a missing
+// ceiling anywhere else. **THE CONTRACT MOVED OFF WAVE 35 ON 2026-08-28** --
+// finality is a property of the ACTIVE SCHEDULE'S LENGTH and never of what a
+// wave contains, so a wave holding a Tyrant is not final for holding one. Every ceiling here clears its own wave's last arrival
+// by a wide margin, and the shipping validator is run over this array at load
+// exactly as it is over Easy's.
+//
+// NO GLOBAL MULTIPLIER OF ANY KIND. Health overrides are authored per group and
+// they are the only lever used; a group's bounty follows its health through
+// Enemy.bountyOf, which is the economy rule Easy already lives under, so the
+// purse scales with what is actually on the road rather than by a number typed
+// beside it.
+var NORMAL_WAVES = [
+  // --- ACT I, 1-7: the vocabulary. 158 bodies. ---------------------------
+  //
+  // Normal opens harder than Easy does and it opens WIDER, not heavier: wave 1
+  // is twelve bodies of two types against Easy's five of one. Nothing in the
+  // first five waves carries a health override at all -- the lesson each wave
+  // teaches is the type, and a scaled body teaches the same lesson more slowly.
+  { duration: 34, groups: [                                       // 40 HP
+    { at: 0, count: 5, interval: 0.9 },
+    { at: 6, count: 3, interval: 0.9 },
+    { at: 9, count: 4, interval: 0.6, type: "fast" }
+  ] },
+  { duration: 36, groups: [                                       // 82 HP
+    { at: 0, count: 6, interval: 0.8 },
+    { at: 3, count: 6, interval: 1.1, type: "slow" },
+    { at: 6, count: 4, interval: 0.7 }
+  ] },
+  // The swarm arrives at 3 rather than at 7, and it arrives INSIDE a pair of
+  // Fast salvos rather than alone. The question is still rate and not damage;
+  // what is new is that the rate has to be spent on two speeds at once.
+  { duration: 32, groups: [                                       // 34 HP
+    { at: 0,   count: 10, interval: 0.16, type: "swarm" },
+    { at: 2.5, count: 4,  interval: 0.35, type: "fast" },
+    { at: 4,   count: 8,  interval: 0.16, type: "swarm" },
+    { at: 6.5, count: 4,  interval: 0.35, type: "fast" }
+  ] },
+  { duration: 38, groups: [                                       // 80 HP
+    { at: 0, count: 6, interval: 0.5 },
+    { at: 2, count: 4, interval: 0.8, type: "armored" },
+    { at: 5, count: 6, interval: 0.5 },
+    { at: 7, count: 4, interval: 0.8, type: "armored" }
+  ] },
+  { duration: 40, groups: [                                       // 96 HP
+    { at: 0, count: 4,  interval: 1,    type: "slow", health: 9 },
+    { at: 2, count: 12, interval: 0.18, type: "swarm" },
+    { at: 5, count: 4,  interval: 1,    type: "slow", health: 9 },
+    { at: 8, count: 6,  interval: 0.4,  type: "fast" }
+  ] },
+  // --- 6: THE HERALD'S INTRODUCTION, and the earliest new type. ----------
+  //
+  // Two of them, at 1 s and 8 s, with fourteen Normals and eight Fasts threaded
+  // around them -- a body arriving every second or so for the whole window, so
+  // there is always something inside the 160 u.l. a pulse reaches. That is the
+  // authoring rule for this type and it is not decoration: a Herald with an
+  // empty road beside it is a 100 HP body that walks slowly, and the player
+  // would never learn what it does.
+  //
+  // It is EARLY on purpose. The Herald is the one new type whose answer is not
+  // a purchase -- you cannot buy anything that stops a haste -- so it belongs
+  // where the player still has room to be surprised by it. What it costs here
+  // is small; what it teaches is which body to shoot first, which waves 12, 16,
+  // 21, 27, 32, 34 and 35 all charge for later.
+  { duration: 44, groups: [                                       // 272 HP
+    { at: 0,  count: 5, interval: 0.7 },
+    { at: 1,  count: 1, interval: 1,    type: "herald" },
+    { at: 4,  count: 4, interval: 0.45, type: "fast" },
+    { at: 6,  count: 5, interval: 0.7 },
+    { at: 8,  count: 1, interval: 1,    type: "herald" },
+    { at: 10, count: 4, interval: 0.45, type: "fast" },
+    { at: 12, count: 4, interval: 0.7 }
+  ] },
+  // The act closes on the first wave that is three types deep and the first
+  // that scales anything: thirty-four bodies, two of them tanky enough to need
+  // more than one pass.
+  { duration: 46, groups: [                                       // 204 HP
+    { at: 0,   count: 6,  interval: 0.9,  type: "slow",    health: 10 },
+    { at: 1.5, count: 12, interval: 0.16, type: "swarm",   health: 2 },
+    { at: 4,   count: 5,  interval: 0.8,  type: "armored", health: 6 },
+    { at: 8,   count: 6,  interval: 0.9,  type: "slow",    health: 10 },
+    { at: 11,  count: 5,  interval: 0.8,  type: "armored", health: 6 }
+  ] },
+
+  // --- ACT II, 8-14: the purchases. 174 bodies. ---------------------------
+  //
+  // Every wave in this act asks for something the player has to have BOUGHT:
+  // an answer to a body that shoots back (8), detection (9), a weapon that
+  // hits for more than 5 (10), air reach (11), burst for a shield (12),
+  // redundancy (13) and all of it at once (14).
+  { duration: 46, groups: [                                       // 210 HP
+    { at: 0, count: 7, interval: 0.55, health: 7 },
+    { at: 2, count: 4, interval: 1.2,  type: "angry" },
+    { at: 7, count: 7, interval: 0.55, health: 7 },
+    { at: 9, count: 4, interval: 1.2,  type: "angry" }
+  ] },
+  // --- 9: THE FIRST CAMO CHECK, and it is END TO END. --------------------
+  //
+  // Camo Normals AND Camo Fasts, nothing else. The rule is the Smasher's, and
+  // it is the same rule Easy's waves 14/18/28 live under: its swing damages
+  // whatever it physically reaches but it will not TURN towards something it
+  // cannot see, so one visible ground body in a camo wave would let a
+  // detectionless board clear the whole thing as collateral and the check
+  // would evaporate. Both groups are camo, so there is nothing to start
+  // swinging at.
+  //
+  // Eighty points against a 100 HP base: a player with no detection leaks the
+  // whole wave and lives, which is what a warning is. Waves 22 and 28 are where
+  // it bites, at 666 and 1 080.
+  { duration: 40, groups: [                                       // 80 HP
+    { at: 0, count: 4, interval: 0.8,  type: "camo_normal", health: 6 },
+    { at: 3, count: 4, interval: 0.35, type: "camo_fast",   health: 4 },
+    { at: 6, count: 4, interval: 0.8,  type: "camo_normal", health: 6 },
+    { at: 9, count: 4, interval: 0.35, type: "camo_fast",   health: 4 }
+  ] },
+  // Bulwarks and the first Brutes together: a shell to burst through and a
+  // body that ignores anything under 5 damage, in one wave, so "more damage"
+  // and "damage ready at the right moment" are asked side by side.
+  { duration: 48, groups: [                                       // 432 HP
+    { at: 0,   count: 7, interval: 0.35, type: "fast",     health: 5 },
+    { at: 1.5, count: 3, interval: 1.2,  type: "shielded", health: 14 },
+    { at: 5,   count: 1, interval: 2,    type: "brute",    health: 55 },
+    { at: 7,   count: 7, interval: 0.35, type: "fast",     health: 5 },
+    { at: 9,   count: 3, interval: 1.2,  type: "shielded", health: 14 },
+    { at: 12,  count: 1, interval: 2,    type: "brute",    health: 55 }
+  ] },
+  // --- 11: THE AERIAL WARNING. Three Wisps, and a wall of ground. --------
+  //
+  // The owner's direction, verbatim: "only three Wisps embedded in a grounded
+  // formation". This is NOT the pure-air check -- that is wave 24 -- and the
+  // difference is the whole point of scheduling both. Three flyers inside
+  // twenty-seven grounded bodies do not end a run and cannot be answered by
+  // accident; they are the sentence "you will need to be able to shoot upward",
+  // said early enough to be a shopping note rather than a bill.
+  //
+  // The Shieldbearer at 3 s is the second thing this wave is for. It lands
+  // while fourteen Armored are still deploying, so its first pulse at 13 s has
+  // a wave to put plating on rather than a road it has outlived -- which is the
+  // authoring rule every supporter in this schedule follows.
+  { duration: 52, groups: [                                       // 298 HP
+    { at: 0,   count: 7, interval: 0.6, type: "armored",      health: 8 },
+    { at: 1.5, count: 6, interval: 0.3, type: "fast",         health: 6 },
+    { at: 3,   count: 1, interval: 3,   type: "shieldbearer", health: 90 },
+    { at: 5,   count: 3, interval: 2.5, type: "flying",       health: 8 },
+    { at: 7,   count: 7, interval: 0.6, type: "armored",      health: 8 },
+    { at: 9,   count: 6, interval: 0.3, type: "fast",         health: 6 }
+  ] },
+  // Heralds again, this time on a body worth hastening: twenty Swarm and six
+  // Bulwarks. A hastened Bulwark is the tempo trap arriving sooner than the
+  // board is ready for, which is the first time the two mechanics compound.
+  { duration: 50, groups: [                                       // 548 HP
+    { at: 0,   count: 10, interval: 0.15, type: "swarm",    health: 3 },
+    { at: 1,   count: 1,  interval: 1,    type: "herald" },
+    { at: 2.5, count: 3,  interval: 1.1,  type: "shielded", health: 16 },
+    { at: 6,   count: 10, interval: 0.15, type: "swarm",    health: 3 },
+    { at: 8,   count: 1,  interval: 1,    type: "herald" },
+    { at: 9.5, count: 3,  interval: 1.1,  type: "shielded", health: 16 }
+  ] },
+  // --- 13: THE SAPPER'S INTRODUCTION. ------------------------------------
+  //
+  // Three of them, spread at 4, 10 and 15 s rather than sent together, and that
+  // spacing IS the lesson. A Sapper disables one tower for two seconds and then
+  // that tower is immune for four, so three arriving at once is one disable and
+  // two fizzles -- the mechanic's own rule making the crowd version of it
+  // harmless. Three arriving apart is three separate two-second holes in the
+  // board, which is what the player has to answer.
+  //
+  // The Angries beside them are the reason the holes matter: a tower that is
+  // switched off is a tower that is not shooting the thing shooting it.
+  { duration: 54, groups: [                                       // 423 HP
+    { at: 0,  count: 8, interval: 0.5, health: 9 },
+    { at: 2,  count: 4, interval: 1.1, type: "angry",  health: 18 },
+    { at: 4,  count: 1, interval: 2,   type: "sapper" },
+    { at: 7,  count: 8, interval: 0.5, health: 9 },
+    { at: 9,  count: 4, interval: 1.1, type: "angry",  health: 18 },
+    { at: 10, count: 1, interval: 2,   type: "sapper" },
+    { at: 15, count: 1, interval: 2,   type: "sapper" }
+  ] },
+  // The act's boss. NO HEALTH OVERRIDE ON THE MIDBOSS, for the reason Easy's
+  // wave 11 records at length: 250 against a 100 HP base is a check a
+  // well-built board passes outright and a thin one survives on ten points,
+  // and every raise past that is a wall rather than a check. What Normal adds
+  // is the escort -- two Shieldbearers stacking plating onto it, which is a
+  // question about which body to shoot rather than about how much damage the
+  // board has.
+  { duration: 62, groups: [                                       // 662 HP
+    { at: 0,   count: 8, interval: 0.3, type: "fast",         health: 7 },
+    { at: 1.5, count: 5, interval: 0.7, type: "armored",      health: 10 },
+    { at: 3,   count: 1, interval: 3,   type: "shieldbearer", health: 100 },
+    { at: 5,   count: 1, interval: 1,   type: "midboss" },
+    { at: 8,   count: 8, interval: 0.3, type: "fast",         health: 7 },
+    { at: 9.5, count: 5, interval: 0.7, type: "armored",      health: 10 },
+    { at: 12,  count: 1, interval: 3,   type: "shieldbearer", health: 100 }
+  ] },
+
+  // --- ACT III, 15-21: the mechanics. 213 bodies. ------------------------
+  { duration: 56, groups: [                                       // 702 HP
+    { at: 0,  count: 5, interval: 0.32, type: "fast",     health: 9 },
+    { at: 1,  count: 2, interval: 2.4,  type: "brute",    health: 65 },
+    { at: 4,  count: 4, interval: 1.3,  type: "revenant", health: 22 },
+    { at: 9,  count: 5, interval: 0.32, type: "fast",     health: 9 },
+    { at: 10, count: 2, interval: 2.4,  type: "brute",    health: 65 },
+    { at: 13, count: 4, interval: 1.3,  type: "revenant", health: 22 }
+  ] },
+  // --- 16: THE SPLIT-COVERAGE TEST. --------------------------------------
+  //
+  // The owner's direction: "ten Wisps while Heralds accelerate only the
+  // Hive/Swarm ground formation."
+  //
+  // THE WORD THAT MATTERS IS "ONLY", AND IT IS ENFORCED BY THE MECHANIC RATHER
+  // THAN BY THE SCHEDULE. A Herald's `eligible` block excludes flying bodies
+  // (js/enemy.js), so the ten Aether Wisps in this wave cannot be hastened at
+  // any spacing, in any order, however close a Herald walks to them. The wave
+  // is therefore two clocks running at once: the air arrives at its own pace
+  // and the ground arrives faster than it should, and a board that has spent
+  // everything on one of them fails the other.
+  //
+  // Compare wave 11, which is the same roster idea inverted -- three Wisps
+  // inside a ground wave, as a warning. This is the bill.
+  { duration: 70, groups: [                                       // 760 HP
+    { at: 0,  count: 1,  interval: 5,    type: "hive",   health: 190 },
+    { at: 1,  count: 10, interval: 0.14, type: "swarm",  health: 4 },
+    { at: 2,  count: 1,  interval: 1,    type: "herald" },
+    { at: 4,  count: 5,  interval: 0.6,  type: "flying", health: 10 },
+    { at: 6,  count: 1,  interval: 5,    type: "hive",   health: 190 },
+    { at: 7,  count: 10, interval: 0.14, type: "swarm",  health: 4 },
+    { at: 9,  count: 1,  interval: 1,    type: "herald" },
+    { at: 12, count: 5,  interval: 0.6,  type: "flying", health: 10 }
+  ] },
+  // The Fractal ladder opens at T2 rather than at T0. Normal has no room for
+  // the two rungs Easy spends teaching the mechanic gently -- a T2 is 16 points
+  // that become 21 bodies, which is a coverage question the moment it lands,
+  // and there are two of them. NO `health` ON A FRACTAL GROUP, ever: the type
+  // discards it and only the accounting would move. See the ladder note above.
+  { duration: 62, groups: [                                       // 416 HP
+    { at: 0,   count: 8, interval: 0.55, type: "armored", health: 18 },
+    { at: 1.5, count: 8, interval: 0.14, type: "swarm",   health: 6 },
+    { at: 4,   count: 1, interval: 2,    type: "fractal_slime", tier: 2 },
+    { at: 7,   count: 8, interval: 0.55, type: "armored", health: 18 },
+    { at: 9,   count: 8, interval: 0.14, type: "swarm",   health: 6 },
+    { at: 12,  count: 1, interval: 2,    type: "fractal_slime", tier: 2 }
+  ] },
+  // --- 18: FIELD SURGERY. ------------------------------------------------
+  //
+  // The owner's direction: "Brutes absorb sustained fire, Angry enemies stop to
+  // attack towers, and Healers sustain whichever durable body is wounded."
+  //
+  // Twenty bodies and every one of them is doing a job. The Brutes are the
+  // durable body -- 5 flat armor, 75 HP, nothing under 6 damage touches them --
+  // and they are what the board has to spend time on. The Angries are what
+  // makes standing still expensive while it does. The Healers pick the THREE
+  // MOST WOUNDED bodies on the road, which after ten seconds of fire is
+  // whichever Brutes the board has been working on, and put 60 points back into
+  // each of them for nothing.
+  //
+  // THE HEALERS ARE AT 4 s AND 12 s, INSIDE THE WAVE. A Healer behind its own
+  // wave is a Healer propping up nothing; the pulse has to land while there is
+  // something wounded to land on, and the first Brute is under fire long before
+  // the first pulse at 12 s. The counter is BURST -- 15 HP/s outrun, not
+  // out-lasted -- and the wave is small enough that a board which has it wins
+  // cleanly and one that does not never finishes a single Brute.
+  { duration: 66, groups: [                                       // 1218 HP
+    { at: 0,   count: 3, interval: 2.2, type: "brute",  health: 75 },
+    { at: 1.5, count: 6, interval: 1,   type: "angry",  health: 24 },
+    { at: 4,   count: 1, interval: 3,   type: "healer", health: 240 },
+    { at: 8,   count: 3, interval: 2.2, type: "brute",  health: 75 },
+    { at: 9.5, count: 6, interval: 1,   type: "angry",  health: 24 },
+    { at: 12,  count: 1, interval: 3,   type: "healer", health: 240 }
+  ] },
+  // --- 19: ARMORED HOSPITAL. ---------------------------------------------
+  //
+  // The owner's direction: "interleave Shieldbearers and Healers with the
+  // payload rather than spawning support last."
+  //
+  // So the order down the column is armor, a Shieldbearer, Bulwarks, a Healer,
+  // and then the same four again -- support arriving BETWEEN the things it
+  // supports, twice, on two separate clocks. A Shieldbearer stacks 20 points of
+  // free plating onto the ten strongest bodies every ten seconds; a Healer puts
+  // 60 back into the three most wounded every eight. Neither of those raises a
+  // single bounty, so this wave gets more expensive for exactly as long as the
+  // player answers the payload instead of the support.
+  { duration: 70, groups: [                                       // 1376 HP
+    { at: 0,   count: 7, interval: 0.5, type: "armored",      health: 14 },
+    { at: 1.5, count: 1, interval: 3,   type: "shieldbearer", health: 110 },
+    { at: 3,   count: 4, interval: 1.1, type: "shielded",     health: 20 },
+    { at: 5,   count: 1, interval: 3,   type: "healer",       health: 240 },
+    { at: 7,   count: 7, interval: 0.5, type: "armored",      health: 14 },
+    { at: 8.5, count: 1, interval: 3,   type: "shieldbearer", health: 110 },
+    { at: 10,  count: 4, interval: 1.1, type: "shielded",     health: 20 },
+    { at: 12,  count: 1, interval: 3,   type: "healer",       health: 240 }
+  ] },
+  // --- 20: THE VOLATILE'S INTRODUCTION. ----------------------------------
+  //
+  // Eight of them at their roster 8 HP -- no override, because the first
+  // sighting of a mechanic should be the mechanic and not a scaled version of
+  // it -- BEHIND a river of Swarm.
+  //
+  // BEHIND, not inside, since 2026-08-27. They used to be interleaved with the
+  // specks; the owner moved every Volatile group in the campaign to the tail of
+  // its wave, so what the player meets here is a river first and then a closing
+  // volley of divers. The lesson survives the move and changes character:
+  //
+  //   WHAT WAS LOST is the targeting competition -- a diver crossing at
+  //   75 u.l./s while every gun in reach is busy on something worth less. The
+  //   road is quieter when they come now, so they are easier to focus.
+  //   WHAT WAS GAINED is that they arrive TOGETHER, into a board whose
+  //   cooldowns are wherever the river left them, and 8 points of health is
+  //   nothing to a gun that is ready and everything to one that is not. Eight
+  //   divers in one span is a question about RATE OF FIRE, asked once.
+  //
+  // The bodies that get through dive into the nearest tower within 75 u.l. for
+  // 13 and blow for 13 more across 60 -- up to 208 points of tower damage
+  // spread across a cluster. The answer is not more damage. It is where the
+  // guns are and how fast they re-aim, which are the two levers this game gives
+  // the player that no upgrade sells.
+  //
+  // The river has NOT cleared the road when they arrive, which is what keeps
+  // the wave from resolving as two separate fights: the last specks step out at
+  // 12.05 s and are still walking when the first diver leaves at 14 s -- and at
+  // 75 u.l./s the divers run them down from behind.
+  { duration: 58, groups: [                                       // 300 HP
+    { at: 0,   count: 9, interval: 0.14, type: "swarm",    health: 6 },
+    { at: 4,   count: 4, interval: 0.35, type: "fast",     health: 16 },
+    { at: 7,   count: 9, interval: 0.14, type: "swarm",    health: 6 },
+    { at: 11,  count: 4, interval: 0.35, type: "fast",     health: 16 },
+    // THE VOLATILES CLOSE THE WAVE (2026-08-27, at the owner's instruction:
+    // "in every wave there are volatiles, make them come out last"). Every
+    // other group has finished arriving before the first one steps out, in
+    // this wave and in the two others that carry them.
+    // The river finishes arriving at 12.05 s; the first diver steps out at 14.
+    { at: 14,  count: 4, interval: 0.9,  type: "volatile" },
+    { at: 20,  count: 4, interval: 0.9,  type: "volatile" }
+  ] },
+  // The act closes on the Vanguard, thirteen waves earlier than Easy sends
+  // one, and it arrives INSIDE the swarm at 3 s while the specks are still
+  // pouring out at 0.13. It sprints the first 400 u.l. at 175 u.l./s, it
+  // refreshes 100 points of shield every seven seconds, and two Shieldbearers
+  // stack another 40 onto it from the back of the map every ten. The Heralds
+  // cannot touch it -- `excludeBanner` -- which is deliberate: 175 u.l./s is
+  // already the fastest thing in the game and +30% on top of it is a number
+  // nobody chose.
+  { duration: 80, groups: [                                       // 1662 HP
+    { at: 0,   count: 12, interval: 0.13, type: "swarm",        health: 5 },
+    { at: 0.8, count: 1,  interval: 3,    type: "shieldbearer", health: 130 },
+    { at: 2,   count: 1,  interval: 1,    type: "herald" },
+    { at: 3,   count: 1,  interval: 1,    type: "boss_fast",    health: 900 },
+    { at: 4,   count: 7,  interval: 0.3,  type: "fast",         health: 13 },
+    { at: 7,   count: 12, interval: 0.13, type: "swarm",        health: 5 },
+    { at: 8,   count: 1,  interval: 3,    type: "shieldbearer", health: 130 },
+    { at: 9,   count: 1,  interval: 1,    type: "herald" },
+    { at: 11,  count: 7,  interval: 0.3,  type: "fast",         health: 13 }
+  ] },
+
+  // --- ACT IV, 22-28: the specialist checks. 212 bodies. -----------------
+  //
+  // Three of these seven waves are single-answer questions -- 22 and 28 are
+  // camo end to end, 24 is air end to end -- and the four between them are the
+  // heaviest mixed waves the campaign has sent so far. The act is where a board
+  // that has only ever bought damage runs out of road.
+  { duration: 64, groups: [                                       // 666 HP  ALL CAMO
+    { at: 0,   count: 6, interval: 0.8,  type: "camo_normal", health: 20 },
+    { at: 1.5, count: 3, interval: 1.5,  type: "camo_heavy",  health: 55 },
+    { at: 4,   count: 4, interval: 0.32, type: "camo_fast",   health: 12 },
+    { at: 7,   count: 6, interval: 0.8,  type: "camo_normal", health: 20 },
+    { at: 9,   count: 3, interval: 1.5,  type: "camo_heavy",  health: 55 },
+    { at: 11,  count: 4, interval: 0.32, type: "camo_fast",   health: 12 }
+  ] },
+  // The Sapper's second outing, and the first where it is not the point of the
+  // wave. Ten Bulwarks and twelve Angries are the wave; the three Sappers are
+  // two seconds of silence each, taken from whichever tower is doing the most
+  // work at the moment they arrive.
+  { duration: 72, groups: [                                       // 1419 HP
+    { at: 0,   count: 6, interval: 0.5, health: 22 },
+    { at: 1.5, count: 5, interval: 1.1, type: "shielded", health: 22 },
+    { at: 3,   count: 6, interval: 1,   type: "angry",    health: 30 },
+    { at: 5,   count: 1, interval: 2,   type: "sapper" },
+    { at: 8,   count: 6, interval: 0.5, health: 22 },
+    { at: 9.5, count: 5, interval: 1.1, type: "shielded", health: 22 },
+    { at: 11,  count: 6, interval: 1,   type: "angry",    health: 30 },
+    { at: 12,  count: 1, interval: 2,   type: "sapper" },
+    { at: 16,  count: 1, interval: 2,   type: "sapper" }
+  ] },
+  // --- 24: THE SKY, AND NOTHING ELSE. ------------------------------------
+  //
+  // Eighteen Aether Wisps in three salvos and not one thing on the ground. Pure
+  // for the Smasher's reason again, pointed at the other mechanic: it will not
+  // turn towards a body it cannot target, so one grounded escort here would let
+  // a board with no air reach clear the wave by accident.
+  //
+  // 288 points against a 100 HP base. Unlike wave 11's warning, this one ends
+  // the run for a board that never bought upward reach -- which is the shape
+  // Easy's wave 24 has at 90 points, said in a campaign where the player has
+  // had thirteen waves of notice.
+  { duration: 52, groups: [                                       // 288 HP  PURE
+    { at: 0, count: 6, interval: 0.4,  type: "flying", health: 16 },
+    { at: 4, count: 6, interval: 0.35, type: "flying", health: 16 },
+    { at: 8, count: 6, interval: 0.3,  type: "flying", health: 16 }
+  ] },
+  // --- 25: WALKING FORTRESS. ---------------------------------------------
+  //
+  // The owner's direction: "Shieldbearers repeatedly protect the Colossus while
+  // Healers restore exposed health."
+  //
+  // The Colossus is 550 points of plain health at 17.5 u.l./s -- the simplest
+  // body in the game and the one that gives support the most to work with. A
+  // Shieldbearer picks the ten STRONGEST bodies on the road and this is the
+  // strongest thing on it by a factor of sixteen, so every ten seconds it takes
+  // another 20 points of free plating; a Healer picks the three most WOUNDED,
+  // which after a minute of fire is the Colossus again. The two supporters are
+  // therefore aimed at the same body from opposite ends, and the wave is the
+  // clearest statement in the campaign of why support is shot first.
+  //
+  // The Shieldbearer is two and a half seconds AHEAD of the Colossus so the
+  // spike walks in already propped up, and the second pair arrives six seconds
+  // behind it so the propping does not stop.
+  { duration: 85, groups: [                                       // 1918 HP
+    { at: 0,   count: 6, interval: 0.75, type: "slow",         health: 34 },
+    { at: 1.5, count: 4, interval: 0.65, type: "armored",      health: 20 },
+    { at: 3,   count: 1, interval: 2.5,  type: "shieldbearer", health: 140 },
+    { at: 5,   count: 1, interval: 1,    type: "colossus" },
+    { at: 7,   count: 1, interval: 2.5,  type: "healer",       health: 260 },
+    { at: 9,   count: 6, interval: 0.75, type: "slow",         health: 34 },
+    { at: 10,  count: 4, interval: 0.65, type: "armored",      health: 20 },
+    { at: 11,  count: 1, interval: 2.5,  type: "shieldbearer", health: 140 },
+    { at: 14,  count: 1, interval: 2.5,  type: "healer",       health: 260 }
+  ] },
+  // Three Hives, two Shieldbearers and eight Volatiles. The Hives seed fifteen
+  // shielded, unpaid hatchlings every seven seconds; the Shieldbearers plate
+  // whatever is strongest, which while three Hives live means the Hives; and
+  // the Volatiles are what stops the player answering all of it by building a
+  // wall of guns beside the road -- each one that gets through picks a gun out
+  // of that wall, dives into it, and blows up on top of it.
+  //
+  // THE VOLATILES COME LAST HERE TOO (2026-08-27), and this is the wave where
+  // that costs the least: the Hives are still seeding brood on their own
+  // seven-second clocks long after the last authored group has run dry, so a
+  // diver leaving at 14 s is still crossing a road full of hatchlings. The
+  // targeting competition the ordering gives up in wave 20 is simply not the
+  // groups' to give up here.
+  //
+  // THEIR OVERRIDE WAS RESCALED WITH THE TYPE (2026-08-27), 26 -> 10. It was
+  // authored at 1.3x the roster body and it is still 1.3x the roster body;
+  // what moved underneath it was the roster, from 20 health to 8. Holding 26
+  // would have left this wave's Volatiles at 3.25x a fresh one, which is a
+  // different enemy from the one wave 20 taught and the one the index
+  // describes. The bounty follows the health through Enemy.bountyOf on its
+  // own, which is the economy rule this schedule already lives under.
+  { duration: 88, groups: [                                       // 1154 HP
+    { at: 0,   count: 1, interval: 5,    type: "hive",         health: 210 },
+    { at: 1,   count: 8, interval: 0.13, type: "swarm",        health: 6 },
+    { at: 2,   count: 1, interval: 3,    type: "shieldbearer", health: 150 },
+    { at: 3.5, count: 1, interval: 5,    type: "hive",         health: 210 },
+    { at: 6,   count: 8, interval: 0.13, type: "swarm",        health: 6 },
+    { at: 7,   count: 1, interval: 5,    type: "hive",         health: 210 },
+    { at: 8.5, count: 1, interval: 3,    type: "shieldbearer", health: 150 },
+    { at: 11,  count: 8, interval: 0.13, type: "swarm",        health: 6 },
+    // THE VOLATILES CLOSE THE WAVE (2026-08-27, at the owner's instruction:
+    // "in every wave there are volatiles, make them come out last"). Every
+    // other group has finished arriving before the first one steps out, in
+    // this wave and in the two others that carry them.
+    // Last authored arrival is 11.91 s. THE ROAD IS NOT EMPTY BEHIND IT, which
+    // is what keeps this wave's version of the rule honest: three Hives are
+    // still seeding brood on their own seven-second clocks long after the
+    // groups have run dry, so the divers arrive into traffic anyway.
+    { at: 14,  count: 4, interval: 0.9,  type: "volatile",     health: 10 },
+    { at: 20,  count: 4, interval: 0.9,  type: "volatile",     health: 10 }
+  ] },
+  // T3: 64 points of root that become 85 bodies. It enters at 18 s, on an
+  // emptying road -- the rest of the wave is done at 15.6 s -- so the cascade
+  // resolves against the board rather than on top of thirty-two other things.
+  // That is the same beat Easy's wave 25 buys for the same rung, and it is
+  // bought here with an absolute `at` rather than with a gap that drifts.
+  { duration: 90, groups: [                                       // 1192 HP
+    { at: 0,   count: 8, interval: 0.3, type: "fast",    health: 18 },
+    { at: 1.5, count: 8, interval: 0.6, type: "armored", health: 22 },
+    { at: 3,   count: 1, interval: 1,   type: "herald" },
+    { at: 4,   count: 4, interval: 1.2, type: "angry",   health: 36 },
+    { at: 8,   count: 8, interval: 0.3, type: "fast",    health: 18 },
+    { at: 9.5, count: 8, interval: 0.6, type: "armored", health: 22 },
+    { at: 11,  count: 1, interval: 1,   type: "herald" },
+    { at: 12,  count: 4, interval: 1.2, type: "angry",   health: 36 },
+    { at: 18,  count: 1, interval: 1,   type: "fractal_slime", tier: 3 }
+  ] },
+  // The camo blackout. Detection alone answers the Normals and the Fasts and
+  // does nothing at all about eight Camo Heavies behind 5 flat armor and 20%
+  // defense -- seeing it and hurting it are two separate purchases, and this is
+  // the wave that charges for both. All camo, so the Smasher rule holds.
+  { duration: 70, groups: [                                       // 1080 HP  ALL CAMO
+    { at: 0,   count: 6, interval: 0.85, type: "camo_normal", health: 30 },
+    { at: 1.5, count: 4, interval: 1.5,  type: "camo_heavy",  health: 75 },
+    { at: 5,   count: 3, interval: 0.32, type: "camo_fast",   health: 20 },
+    { at: 8,   count: 6, interval: 0.85, type: "camo_normal", health: 30 },
+    { at: 9.5, count: 4, interval: 1.5,  type: "camo_heavy",  health: 75 },
+    { at: 13,  count: 3, interval: 0.32, type: "camo_fast",   health: 20 }
+  ] },
+
+  // --- ACT V, 29-35: the finale. 243 bodies. -----------------------------
+  { duration: 95, groups: [                                       // 3156 HP
+    { at: 0,   count: 7, interval: 0.9, type: "shielded",     health: 28 },
+    { at: 1.5, count: 1, interval: 2.5, type: "shieldbearer", health: 160 },
+    { at: 3,   count: 1, interval: 1,   type: "colossus" },
+    { at: 5,   count: 1, interval: 2.5, type: "healer",       health: 280 },
+    { at: 8,   count: 7, interval: 0.9, type: "shielded",     health: 28 },
+    { at: 9.5, count: 1, interval: 2.5, type: "shieldbearer", health: 160 },
+    { at: 11,  count: 1, interval: 1,   type: "colossus" },
+    { at: 13,  count: 1, interval: 2.5, type: "healer",       health: 280 }
+  ] },
+  // --- 30: THE REGENERATION ENGINE, the hardest non-boss support wave. ----
+  //
+  // Eight supporters in thirty bodies: three Hives seeding fifteen shielded
+  // hatchlings every seven seconds, three Shieldbearers stacking 20 points onto
+  // the ten strongest every ten, and two Healers putting 60 back into the three
+  // most wounded every eight. Ten Revenants underneath all of it, each of which
+  // gets up once at full health and then parks in a tower's circle soaking
+  // shots meant for the wave behind it.
+  //
+  // NOT ONE POINT OF ANY OF THAT IS PAID FOR. A shield pays nothing, healed
+  // health pays nothing, a brood pays nothing, and a Revenant's first life pays
+  // nothing -- so this wave's declared 2 714 points is the floor, and how far
+  // above it the real figure lands is decided entirely by how long the player
+  // leaves the eight support bodies alive. It is the hardest non-boss wave in
+  // the schedule and it is hard in a way no health column can show.
+  //
+  // FOURTEEN GROUPS, INTERLEAVED. The engine is running before the first
+  // supporter lands; the supporters arrive between the Hives rather than behind
+  // all three; the Revenants come in three waves so their revivals are spread
+  // rather than simultaneous. Aggregate composition: 3 Hives, 3 Shieldbearers,
+  // 2 Healers, 10 Revenants, 12 Swarm.
+  { duration: 105, groups: [                                      // 2714 HP + broods + free shield
+    { at: 0,  count: 1, interval: 5,    type: "hive",         health: 230 },
+    { at: 1,  count: 4, interval: 0.13, type: "swarm",        health: 7 },
+    { at: 2,  count: 1, interval: 3,    type: "shieldbearer", health: 180 },
+    { at: 3,  count: 1, interval: 5,    type: "hive",         health: 230 },
+    { at: 4,  count: 4, interval: 1.2,  type: "revenant",     health: 40 },
+    { at: 5,  count: 1, interval: 2.5,  type: "healer",       health: 300 },
+    { at: 6,  count: 4, interval: 0.13, type: "swarm",        health: 7 },
+    { at: 7,  count: 1, interval: 3,    type: "shieldbearer", health: 180 },
+    { at: 8,  count: 1, interval: 5,    type: "hive",         health: 230 },
+    { at: 9,  count: 3, interval: 1.2,  type: "revenant",     health: 40 },
+    { at: 10, count: 1, interval: 2.5,  type: "healer",       health: 300 },
+    { at: 11, count: 4, interval: 0.13, type: "swarm",        health: 7 },
+    { at: 12, count: 1, interval: 3,    type: "shieldbearer", health: 180 },
+    { at: 14, count: 3, interval: 1.2,  type: "revenant",     health: 40 }
+  ] },
+  // --- 31: KILL-ZONE PUNISHMENT. -----------------------------------------
+  //
+  // The owner's direction: "Sappers, Angry and Volatiles pressure the same
+  // tower clusters."
+  //
+  // All three of the things that happen TO a board rather than past it, aimed
+  // at the same guns -- and since 2026-08-27 aimed at them IN ORDER rather than
+  // in one window. The Angries stop and hit towers for 20 apiece; the Sappers
+  // switch one off for two seconds at 4, 12 and 16 s; and THEN the Volatiles
+  // dive into whatever is standing nearest the road for 13 and leave a
+  // 13-point charge on top of it. Nothing here is a health check -- 831 points
+  // is the lightest wave in the act -- and a board that has been built as one
+  // dense cluster beside the best stretch of road can lose towers to it
+  // outright.
+  //
+  // THIS IS THE WAVE THE NEW ORDERING HELPS. Simultaneous, the three pressures
+  // competed for the same guns and diluted each other. Sequenced, they COMPOUND:
+  // the Angries spend 20 a swing softening the cluster, the third Sapper goes
+  // dark at 16 s, and the divers leave at 18 s into a board that is short hit
+  // points and one gun down -- and a dark tower is exactly the tower they will
+  // land on, because a hazard is a radius and does not care that its target
+  // cannot shoot back.
+  //
+  // THE VOLATILE OVERRIDE WAS RESCALED WITH THE TYPE (2026-08-27), 30 -> 12,
+  // holding the 1.5x this wave authored against a roster that went from 20 to
+  // 8. See wave 26 for the argument; it is the same one.
+  //
+  // The Sappers matter MORE here than in 13 or 23 for a reason that is not in
+  // the composition: two seconds of a tower being dark is two seconds of
+  // Angries hitting it unanswered, and the immunity window that stops three
+  // Sappers stacking on one tower is exactly what spreads them across three.
+  { duration: 80, groups: [                                       // 831 HP
+    { at: 0,   count: 7, interval: 0.28, type: "fast",     health: 20 },
+    { at: 3,   count: 4, interval: 1.1,  type: "angry",    health: 40 },
+    { at: 4,   count: 1, interval: 2,    type: "sapper" },
+    { at: 8,   count: 7, interval: 0.28, type: "fast",     health: 20 },
+    { at: 11,  count: 4, interval: 1.1,  type: "angry",    health: 40 },
+    { at: 12,  count: 1, interval: 2,    type: "sapper" },
+    { at: 16,  count: 1, interval: 2,    type: "sapper" },
+    // THE VOLATILES CLOSE THE WAVE (2026-08-27, at the owner's instruction:
+    // "in every wave there are volatiles, make them come out last"). Every
+    // other group has finished arriving before the first one steps out, in
+    // this wave and in the two others that carry them.
+    // THIS IS THE WAVE THE ORDER HELPS MOST. The Angries have already taken
+    // 20 a swing out of the cluster and the third Sapper goes in at 16 s, so
+    // the divers arrive at a board that is short hit points and may be one
+    // gun down -- and the tower that is dark is the one they will land on.
+    { at: 18,  count: 4, interval: 0.85, type: "volatile", health: 12 },
+    { at: 24,  count: 4, interval: 0.85, type: "volatile", health: 12 }
+  ] },
+  // T4: 256 points of root, 1 280 to clear, and 256 terminal one-point bodies
+  // against a 100 HP base -- the wave that asks whether the board can WIPE
+  // rather than snipe. It lands at 17 s, three seconds after the last Brute, on
+  // a road that is otherwise emptying. The two Heralds are on the escort and
+  // cannot touch the slime: `excludeFractal` covers every tier AND every
+  // descendant, so one pulse cannot compound through 341 bodies.
+  { duration: 100, groups: [                                      // 1608 HP
+    { at: 0,  count: 7, interval: 0.55, type: "armored", health: 26 },
+    { at: 1,  count: 8, interval: 0.13, type: "swarm",   health: 8 },
+    { at: 2,  count: 3, interval: 2,    type: "brute",   health: 110 },
+    { at: 3,  count: 1, interval: 1,    type: "herald" },
+    { at: 8,  count: 7, interval: 0.55, type: "armored", health: 26 },
+    { at: 9,  count: 8, interval: 0.13, type: "swarm",   health: 8 },
+    { at: 10, count: 3, interval: 2,    type: "brute",   health: 110 },
+    { at: 11, count: 1, interval: 1,    type: "herald" },
+    { at: 17, count: 1, interval: 1,    type: "fractal_slime", tier: 4 }
+  ] },
+  // The last coverage wave, and the one that asks both questions at once:
+  // twelve flyers the board must be able to reach upward for, and twelve camo
+  // bodies it must be able to see. Nothing here is visible AND grounded, so the
+  // Smasher rule survives a wave that is not pure camo -- a detectionless,
+  // ground-bound swing has nothing in it to start on. Four Camo Heavies at 60
+  // points apiece are what makes it a bill rather than a checklist.
+  { duration: 75, groups: [                                       // 852 HP
+    { at: 0,  count: 6, interval: 0.4, type: "flying",     health: 28 },
+    { at: 2,  count: 4, interval: 0.3, type: "camo_fast",  health: 22 },
+    { at: 4,  count: 2, interval: 1.6, type: "camo_heavy", health: 85 },
+    { at: 7,  count: 6, interval: 0.4, type: "flying",     health: 28 },
+    { at: 9,  count: 4, interval: 0.3, type: "camo_fast",  health: 22 },
+    { at: 11, count: 2, interval: 1.6, type: "camo_heavy", health: 85 }
+  ] },
+  // --- 34: TWO VANGUARDS, TWELVE SECONDS APART. --------------------------
+  //
+  // The owner's direction: "Wave 34's Vanguards must arrive approximately 12
+  // seconds apart." They are at 3 s and 15 s, which is exactly twelve, and the
+  // number is authored as two absolute `at` values rather than as a gap
+  // appended to whatever ran above them -- so re-timing any other group in this
+  // wave cannot silently move it.
+  //
+  // TWELVE SECONDS IS THE POINT AND NOT A SPACING. A Vanguard refreshes 100
+  // points of shield every seven seconds, so the second one walks in while the
+  // first is on its second refresh: a board that can remove one inside twelve
+  // seconds fights them one at a time, and a board that cannot fights both.
+  // Everything else in the wave -- the swarm they sprint through, the Herald on
+  // the escort, the Shieldbearers stacking another 40 onto whichever of them is
+  // strongest, the single Healer -- is cover for that one question.
+  { duration: 115, groups: [                                      // 4062 HP
+    { at: 0,  count: 11, interval: 0.13, type: "swarm",        health: 9 },
+    { at: 1,  count: 1,  interval: 3,    type: "shieldbearer", health: 190 },
+    { at: 2,  count: 1,  interval: 1,    type: "herald" },
+    { at: 3,  count: 1,  interval: 1,    type: "boss_fast",    health: 1200 },
+    { at: 4,  count: 6,  interval: 0.28, type: "fast",         health: 24 },
+    { at: 6,  count: 3,  interval: 1.2,  type: "angry",        health: 46 },
+    { at: 8,  count: 1,  interval: 2.5,  type: "healer",       health: 320 },
+    { at: 10, count: 11, interval: 0.13, type: "swarm",        health: 9 },
+    { at: 12, count: 1,  interval: 3,    type: "shieldbearer", health: 190 },
+    { at: 13, count: 1,  interval: 1,    type: "herald" },
+    { at: 15, count: 1,  interval: 1,    type: "boss_fast",    health: 1200 },
+    { at: 16, count: 6,  interval: 0.28, type: "fast",         health: 24 },
+    { at: 18, count: 3,  interval: 1.2,  type: "angry",        health: 46 }
+  ] },
+  // --- 35: THE FINALE. ---------------------------------------------------
+  //
+  // NO `duration`, and the absence is the data: there is no wave 36 to time out
+  // into, so there is no ceiling, no Send button and no countdown. The run ends
+  // when the last scheduled body has spawned and the road -- descendants,
+  // broods and summons included -- is empty. It is the only wave in either
+  // schedule authored this way, and validateWaveTimelines permits it only in
+  // the last slot.
+  //
+  // THE TYRANT WALKS IN AT 13 s OF A 30 s DEPLOY, at 43% of it -- the same
+  // placement Easy's finale gives it and for the same reason: a boss at the head
+  // of a wave is a duel, and a boss in the middle of one is a wave you have to
+  // keep answering with a boss in the way. Its roar package is UNTOUCHED; every
+  // figure in it is data on the `boss` row in js/enemy.js (1000 shield, x1.35
+  // speed, intervals x0.75, the leap unlocked, and 40 bodies at 1.5x called in),
+  // and this schedule neither overrides its health nor adds a phase.
+  //
+  // THE T5 IS LAST, at 30 s -- seventeen seconds behind the Tyrant and three
+  // and a half behind the final Bulwark, on a stage the wave has cleared for
+  // it. 1 024 points of root that become 6 144 points across six generations
+  // and end in 1 024 one-point bodies, against a 100 HP base.
+  //
+  // AND THERE ARE NO SAPPERS IN IT. Sapper plus Tyrant is reserved for Hard,
+  // which does not exist and is not being built here. A Sapper switching towers
+  // off while the Tyrant is already silencing the best one is a compounding
+  // lockout, and Normal's finale is a wave you fight rather than one you watch.
+  //
+  // The two Heralds are on the escort, at 4 s and 11 s. They cannot haste the
+  // Tyrant (`excludeBanner`), the T5 (`excludeFractal`) or the eight Wisps
+  // (`excludeFlying`) -- so what they accelerate is exactly the twenty-six
+  // Normals, six Angries and six Bulwarks the player has to clear while the
+  // boss crosses.
+  //
+  // AND IT NOW CARRIES A `duration`, WHICH IT DID NOT UNTIL 2026-08-28. Wave 35
+  // was the last wave of this schedule and authored no ceiling, because the
+  // absence is what says "there is nothing after this". There is now: the
+  // campaign runs to forty. The wave's last authored arrival is the T5 at 30 s,
+  // so a 170 s ceiling clears it by two minutes and twenty seconds -- which is
+  // what a board that is actually winning needs to take the Tyrant apart AND
+  // unwind six generations of cascade before the convoys start arriving on top
+  // of it. MEASURED rather than picked: forty maxed towers clear this wave in
+  // 41-82 s on the five single-road boards, 128 s on mana-coil and 144 s on
+  // Twin Confluence, which mirrors all fifty bodies onto both of its roads. 170
+  // is the worst of those plus twenty-five seconds. Nothing about the wave's
+  // composition or its group timing moved; the only new field is the ceiling,
+  // and the finale's contract moved with it to wave 40.
+  { duration: 170, groups: [                                      // 8304 HP
+    { at: 0,  count: 13, interval: 0.35, health: 36 },
+    { at: 2,  count: 4,  interval: 0.5,  type: "flying",   health: 26 },
+    { at: 4,  count: 1,  interval: 1,    type: "herald" },
+    { at: 6,  count: 13, interval: 0.35, health: 36 },
+    { at: 8,  count: 4,  interval: 0.5,  type: "flying",   health: 26 },
+    { at: 11, count: 1,  interval: 1,    type: "herald" },
+    { at: 13, count: 1,  interval: 1,    type: "boss" },
+    { at: 16, count: 6,  interval: 1.1,  type: "angry",    health: 48 },
+    { at: 19, count: 6,  interval: 1.5,  type: "shielded", health: 36 },
+    { at: 30, count: 1,  interval: 1,    type: "fractal_slime", tier: 5 }
+  ] },
+
+  // --- ACT VI, 36-40: THE MARCH. 321 bodies. -------------------------------
+  //
+  // 2026-08-28, at the owner's instruction: extend Normal from thirty-five
+  // waves to forty. Waves 1-35 are untouched, byte for byte, apart from the one
+  // `duration` wave 35 had to grow so that something can follow it -- and Easy
+  // is not touched at all.
+  //
+  // THE ACT HAS A SHAPE AND IT IS NOT "MORE OF ACT V". Act V ends on a boss and
+  // a cascade; this one opens on three waves that GIVE money back, peaks on the
+  // hardest formation in the game, and ends on one body with forty-five
+  // thousand hit points:
+  //
+  //   36-38  THE CONVOYS. Armour, escorts and nothing else. No Sappers, no
+  //          Volatiles, no supports, no Hives, no Fractals, no camo, no flight,
+  //          no bosses and no unpaid spawn. They are here to REFUND the board
+  //          that survived act V, and they pressure a weak one purely by weight
+  //          -- there is no mechanic in any of the three that can take a tower
+  //          off the map. Payouts rise 3185 -> 4471 -> 7292, which is one
+  //          meaningful late-game tier, then one or two, then two or three (or
+  //          a substantial rebuild); see waveKillBounty and waveBounty, which
+  //          are what those figures are read off. Nothing here is a new
+  //          currency and no per-wave reward is typed in: the rise is bought
+  //          entirely with authored counts and `health` overrides, through the
+  //          bounty rule the whole schedule already lives under.
+  //   39     THE ROYAL LEGION -- the tactical peak, and mechanically the
+  //          hardest wave in either campaign. Three Tyrants twenty seconds
+  //          apart, eight Colossi, and a full support court interleaved with
+  //          the payload it exists to prop up.
+  //   40     THE DINOMECH. One body, no support, no summons, no ceiling.
+  //
+  // THE COLOSSUS PROGRESSION IS 2 / 4 / 6 / 8 across 36, 37, 38 and 39, and it
+  // is the spine of the act: the same tank, two more of it every wave, so the
+  // player can read their own throughput off how much longer each convoy takes
+  // than the last one.
+
+  // --- 36: FIRST CONVOY. 54 bodies, 3612 effective HP, ~$3185 all in. ------
+  //
+  // Two Colossi as two readable COLUMNS -- one at 0 s and one at 22 s -- with
+  // the ordinary bodies filling the gap between them rather than arriving in a
+  // clump around them. That spacing is the whole authoring rule for these three
+  // waves: a tank the player can see coming, a lane of escort to chew through
+  // while it walks, then the next tank. Nothing overlaps by accident and
+  // nothing here is trying to destroy a tower.
+  //
+  // The ceiling is 95 s against a last arrival at 42.25 s -- generous by more
+  // than fifty seconds, which is what "a money wave" means in a game where idle
+  // seconds earn nothing: the window cannot be farmed, so a long one costs the
+  // schedule nothing and buys the player room to spend.
+  { duration: 95, groups: [                                       // 3612 HP
+    { at: 0,  count: 1,  interval: 1,    type: "colossus", health: 700 },
+    { at: 1,  count: 8,  interval: 0.7,                   health: 40 },
+    { at: 5,  count: 8,  interval: 0.9,  type: "armored",  health: 40 },
+    { at: 10, count: 3,  interval: 1.6,  type: "brute",    health: 90 },
+    { at: 16, count: 6,  interval: 0.45, type: "fast",     health: 26 },
+    { at: 22, count: 1,  interval: 1,    type: "colossus", health: 700 },
+    { at: 23, count: 10, interval: 0.7,                   health: 40 },
+    { at: 28, count: 8,  interval: 0.9,  type: "armored",  health: 40 },
+    { at: 34, count: 3,  interval: 1.6,  type: "brute",    health: 90 },
+    { at: 40, count: 6,  interval: 0.45, type: "fast",     health: 26 }
+  ] },
+
+  // --- 37: SECOND CONVOY. 68 bodies, 5752 effective HP, ~$4471 all in. -----
+  //
+  // Four Colossi, so four columns rather than two, and the Fast salvos of wave
+  // 36 are replaced by Swarm: the same job -- fill the gap -- asked of rate
+  // instead of of coverage. The Brutes come in pairs behind every column now,
+  // which is what turns "a tank walked past" into "a tank walked past and the
+  // things behind it were still standing".
+  { duration: 105, groups: [                                      // 5752 HP
+    { at: 0,  count: 1,  interval: 1,    type: "colossus", health: 750 },
+    { at: 1,  count: 10, interval: 0.6,                   health: 44 },
+    { at: 5,  count: 2,  interval: 1.5,  type: "brute",    health: 100 },
+    { at: 8,  count: 10, interval: 0.8,  type: "armored",  health: 44 },
+    { at: 12, count: 1,  interval: 1,    type: "colossus", health: 750 },
+    { at: 14, count: 8,  interval: 0.2,  type: "swarm",    health: 12 },
+    { at: 18, count: 2,  interval: 1.5,  type: "brute",    health: 100 },
+    { at: 24, count: 1,  interval: 1,    type: "colossus", health: 750 },
+    { at: 25, count: 10, interval: 0.6,                   health: 44 },
+    { at: 30, count: 2,  interval: 1.5,  type: "brute",    health: 100 },
+    { at: 33, count: 10, interval: 0.8,  type: "armored",  health: 44 },
+    { at: 38, count: 1,  interval: 1,    type: "colossus", health: 750 },
+    { at: 40, count: 8,  interval: 0.2,  type: "swarm",    health: 12 },
+    { at: 44, count: 2,  interval: 1.5,  type: "brute",    health: 100 }
+  ] },
+
+  // --- 38: THIRD CONVOY. 102 bodies, 9024 effective HP, ~$7292 all in. -----
+  //
+  // Six Colossi, in three PAIRS rather than six columns -- the escalation from
+  // 37 is not only "two more", it is that a column is now two bodies wide and
+  // the wave carries every filler type at once: Normals, Armored, Brutes, Fast
+  // AND Swarm. It is the biggest single wave in either campaign at 102 bodies
+  // and it is still, by construction, a wave nothing in it can silence a tower
+  // with.
+  { duration: 120, groups: [                                      // 9024 HP
+    { at: 0,  count: 2,  interval: 2,    type: "colossus", health: 800 },
+    { at: 1,  count: 12, interval: 0.55,                  health: 48 },
+    { at: 4,  count: 12, interval: 0.7,  type: "armored",  health: 48 },
+    { at: 8,  count: 3,  interval: 1.4,  type: "brute",    health: 110 },
+    { at: 12, count: 9,  interval: 0.35, type: "fast",     health: 30 },
+    { at: 16, count: 2,  interval: 2,    type: "colossus", health: 800 },
+    { at: 18, count: 10, interval: 0.18, type: "swarm",    health: 14 },
+    { at: 22, count: 12, interval: 0.55,                  health: 48 },
+    { at: 26, count: 4,  interval: 1.4,  type: "brute",    health: 110 },
+    { at: 30, count: 12, interval: 0.7,  type: "armored",  health: 48 },
+    { at: 36, count: 2,  interval: 2,    type: "colossus", health: 800 },
+    { at: 38, count: 9,  interval: 0.35, type: "fast",     health: 30 },
+    { at: 42, count: 10, interval: 0.18, type: "swarm",    health: 14 },
+    { at: 46, count: 3,  interval: 1.4,  type: "brute",    health: 110 }
+  ] },
+
+  // --- 39: THE ROYAL LEGION. 66 bodies, 28 300 effective HP. ---------------
+  //
+  // THREE TYRANTS, at 8 s, 28 s and 50 s -- twenty and twenty-two seconds
+  // apart, and never together. That spacing is the wave: a board that can
+  // remove one inside twenty seconds fights them one at a time, and a board
+  // that cannot fights two and then three. They are authored as three separate
+  // one-body groups at three absolute `at` values, so re-timing anything else
+  // in the wave cannot silently collapse them onto each other.
+  //
+  // EACH TYRANT IS ITS OWN STATE. `phasesEntered`, `attackIndex`, `attacks` and
+  // the shield the roar conjures all live on the INSTANCE -- `enterPhase`
+  // COPIES every spec off Enemy.TYPES rather than mutating it, which is the
+  // trap that section of AGENTS.md is about -- so one roaring, one dying and
+  // one still walking are three independent fights sharing a road. Their
+  // summons inherit wave 39 through `spawnMinions`, exactly as a Hive's brood
+  // and a Fractal's children do.
+  //
+  // 3600 EACH RATHER THAN THE STOCK 5000, and the override is the point: three
+  // stock Tyrants are 15 000 points of boss on their own, which is a third of
+  // the wave-40 body and would make 39 the sustained-damage check instead of
+  // the tactical one. At 3600 each the roar still fires at 1800, the roar
+  // package itself is untouched (it is data on the type), and the wave's
+  // authored total lands at 28 300 -- comfortably under the 45 000 that
+  // follows it, which is the relationship this act is built on.
+  //
+  // SUPPORT IS INTERLEAVED WITH ITS PAYLOAD, never parked behind it: the first
+  // Shieldbearer/Healer pair lands at 18-19 s with the Revenants they are there
+  // to keep standing, the Heralds at 38 s with the Swarm they accelerate, and
+  // the second pair at 60 s with the second Bulwark screen. A supporter that
+  // arrives after its wave props up nothing.
+  //
+  // The ceiling is 290 s, by a long way the longest in either schedule, and
+  // that is MEASURED rather than picked. A Tyrant walks at 15 u.l./s and the
+  // third one enters at 50 s, so the floor under this wave is how long the last
+  // boss takes to reach the guns -- which on mana-coil's 3 510 u.l. road is
+  // most of four minutes whatever the board does. Forty maxed towers eliminate
+  // this wave in 81-141 s on five boards and in 264 s on mana-coil; 190 and
+  // 240 were both tried and both cut mana-coil off with a Tyrant still
+  // carrying points. An idle second earns nothing in this game, so a ceiling
+  // nobody reaches costs the schedule exactly nothing, while one that fires
+  // early hands the player the 45 000 on top of an unfinished boss wave.
+  { duration: 290, groups: [                                      // 28 300 HP
+    // 0 s -- two Colossi, and the first half of the Bulwark screen with them.
+    { at: 0,  count: 2,  interval: 3,    type: "colossus",     health: 1050 },
+    { at: 1,  count: 4,  interval: 1.2,  type: "shielded",     health: 70 },
+    // 8 s -- TYRANT 1, alone, into a wave that is already moving.
+    { at: 8,  count: 1,  interval: 1,    type: "boss",         health: 3600 },
+    // 18 s -- the first support pair, with the Revenants it exists for.
+    { at: 18, count: 2,  interval: 2,    type: "shieldbearer", health: 280 },
+    { at: 19, count: 2,  interval: 2.5,  type: "healer",       health: 450 },
+    { at: 20, count: 6,  interval: 0.9,  type: "revenant",     health: 110 },
+    // 28 s -- TYRANT 2, and two more Colossi behind it.
+    { at: 28, count: 1,  interval: 1,    type: "boss",         health: 3600 },
+    { at: 29, count: 2,  interval: 3,    type: "colossus",     health: 1050 },
+    // 38 s -- the Heralds, the rest of the Healers, and the Swarm they hasten.
+    { at: 38, count: 3,  interval: 4,    type: "herald",       health: 220 },
+    { at: 39, count: 2,  interval: 2.5,  type: "healer",       health: 450 },
+    { at: 40, count: 10, interval: 0.2,  type: "swarm",        health: 18 },
+    // 50 s -- TYRANT 3, with the remaining four Colossi.
+    { at: 50, count: 1,  interval: 1,    type: "boss",         health: 3600 },
+    { at: 51, count: 4,  interval: 3,    type: "colossus",     health: 1050 },
+    // 60 s on -- the rest of the screen, behind everything it has to survive.
+    { at: 60, count: 2,  interval: 2,    type: "shieldbearer", health: 280 },
+    { at: 62, count: 8,  interval: 1.2,  type: "shielded",     health: 70 },
+    { at: 66, count: 6,  interval: 0.9,  type: "revenant",     health: 110 },
+    { at: 70, count: 10, interval: 0.2,  type: "swarm",        health: 18 }
+  ] },
+
+  // --- 40: THE DINOMECH. THE TRUE FINALE. ----------------------------------
+  //
+  // NO `duration`, and the absence is the data -- exactly the contract wave 35
+  // held until this act was written. There is no wave 41 to time out into, so
+  // there is no ceiling, no Send button and no countdown; the run ends on the
+  // whole-road victory test once the boss and every distraction body with it is
+  // gone. `validateWaveTimelines` permits a missing ceiling in the last slot
+  // only, which is what stops a phantom wave 41 from ever being reachable.
+  //
+  // A CLEAN TWELVE-SECOND ENTRANCE. The boss is the only thing on the road
+  // until 12 s: 45 000 hit points, alone, walking at 12.5 u.l./s, so the player
+  // sees exactly what they are being asked for before anything distracts them.
+  //
+  // AND THE DISTRACTIONS ARE DISTRACTIONS, not a second formation. Three
+  // deployments -- 12 s, 32 s, 55 s -- of Swarm and Fast and nothing else. Both
+  // types are far quicker than the boss (65 and 87.5 u.l./s against 12.5), so
+  // they are spawned BEHIND it and overtake it on the road, which is what makes
+  // them briefly steal a "first"-mode tower's lock. Thirty bodies and 768
+  // points between them, against the boss's 45 000: they are a targeting
+  // problem for a few seconds each and never a wall.
+  //
+  // NOTHING IN THIS WAVE HEALS, SHIELDS, HASTENS OR SILENCES. No Healer, no
+  // Shieldbearer, no Herald, no Sapper, no Hive, no Fractal and no flier -- and
+  // the boss itself carries no `phases`, so there is no roar to call any of them
+  // in either. The 45 000 the player has to remove is the 45 000 the schedule
+  // says, start to finish.
+  { groups: [                                                     // 45 768 HP
+    { at: 0,  count: 1,  interval: 1,    type: "dinomech" },
+    { at: 12, count: 10, interval: 0.25, type: "swarm", health: 20 },
+    { at: 12, count: 4,  interval: 0.5,  type: "fast",  health: 34 },
+    { at: 32, count: 8,  interval: 0.25, type: "swarm", health: 20 },
+    { at: 32, count: 4,  interval: 0.5,  type: "fast",  health: 34 },
+    { at: 55, count: 4,  interval: 0.5,  type: "fast",  health: 34 }
+  ] }
+];
+
 // A wave's groups. Every wave carries `groups` since the timeline rewrite --
 // the flat single-group form is gone, along with the `wave.groups || [wave]`
 // fallback that reconciled the two. A wave that reaches here without `groups`
@@ -1196,12 +2197,100 @@ function waveReward(wave, waveNumber) {
     waveEscalatingReward(waveNumber);
 }
 
-// The campaign has ONE schedule. There were three -- Easy, plus a Normal and a
-// Hard derived from it by scaling count, health and the spacing fields of the
-// day, and adding
-// extra groups -- and the derivation is gone (2026-08-12): they were unfinished
-// placeholders, and EASY_WAVES is the only source of truth.
+// ---------------------------------------------------------------------------
+// DIFFICULTY -- which of the two authored schedules a run plays.
+// ---------------------------------------------------------------------------
+//
+// 2026-08-27. Two entries, each pointing at a schedule that was WRITTEN OUT in
+// full: EASY_WAVES (35 waves / 830 roots, untouched since 2026-08-20) and
+// NORMAL_WAVES (40 waves / 1 321 roots, authored from nothing above).
+//
+// **THIS IS A SELECTOR AND NOT A DERIVATION, AND THE DISTINCTION IS THE WHOLE
+// HISTORY OF THIS FEATURE.** Three difficulties existed here between
+// 2026-07-30 and 2026-08-12 and were deleted: `buildDifficultyWaves` took Easy
+// and multiplied its counts, health and spacing by constants, `difficultyGroup`
+// bolted an extra group onto some waves, and the owner had forgotten the modes
+// existed at all -- because a schedule that is a multiple of another schedule
+// asks the same questions in the same order and simply takes longer to answer.
+// Nothing in this block scales anything. `waves` is a reference to an authored
+// array, `setDifficulty` swaps which one `WAVES` names, and there is no third
+// code path anywhere in the game.
+//
+// NO HARD, AND NO PLACEHOLDER FOR ONE. The list is what exists. A third entry
+// is a third fully authored array plus its own card, and adding an empty one
+// now would recreate exactly the state that got the concept deleted.
+//
+// `blurb` and `detail` are for the chooser card and the index; nothing derives
+// from them and nothing else in the game reads this table except
+// `setDifficulty`, the chooser, the index and the sandbox picker.
+var DIFFICULTIES = [
+  {
+    id: "easy",
+    name: "Easy",
+    blurb: "The authored campaign. Twenty-one types, one lesson at a time.",
+    detail: "35 waves · 830 enemies",
+    waves: EASY_WAVES
+  },
+  {
+    id: "normal",
+    name: "Normal",
+    blurb: "A second campaign, forty waves long. It ends on the Dinomech.",
+    detail: "40 waves · 1 321 enemies",
+    waves: NORMAL_WAVES
+  }
+];
+
+var DEFAULT_DIFFICULTY_ID = "easy";
+
+// Which one is selected. It is NOT run state: restartGame() does not clear it,
+// because "restart" means play this route again and a player who chose Normal
+// and lost did not ask to be put back on Easy. It is not saved either --
+// MetaProgress still holds four fields and nothing else, and a difficulty
+// remembered across sessions is a decision nobody has made.
+var selectedDifficultyId = DEFAULT_DIFFICULTY_ID;
+
+// The ACTIVE schedule. Everything in the game that reads a schedule reads this
+// name -- the scheduler, the readout, the banner, the reward, the victory test,
+// the sandbox -- so there is exactly one thing to move when the selection
+// changes, and no consumer anywhere has to know a difficulty exists.
+//
+// It still starts on Easy, which is what makes every fixture written before
+// this block behave exactly as it did.
 var WAVES = EASY_WAVES;
+
+// Look a difficulty up, or null. Deliberately NOT loud like Enemy.typeOf: this
+// one is reached from a saved-looking string and from the sandbox's dropdown,
+// and the callers below all want to fall back rather than throw.
+function difficultyOf(id) {
+  for (var i = 0; i < DIFFICULTIES.length; i++) {
+    if (DIFFICULTIES[i].id === id) return DIFFICULTIES[i];
+  }
+  return null;
+}
+
+function activeDifficulty() {
+  return difficultyOf(selectedDifficultyId) || DIFFICULTIES[0];
+}
+
+// Choose one. Returns the difficulty actually selected -- an unknown id falls
+// back to the default rather than leaving `WAVES` pointing at nothing.
+//
+// IT DROPS THE DERIVED TIMELINE, and that line is load-bearing. `waveIndex` is
+// almost always 0 when this is called, and activeWaveEvents() caches the
+// expanded event list KEYED ON THAT INDEX -- so switching schedule without
+// clearing the cache would leave wave 1 of Normal deploying wave 1 of Easy's
+// bodies until the cursor happened to move. Same reason restartGame() calls it.
+function setDifficulty(id) {
+  var picked = difficultyOf(id) || difficultyOf(DEFAULT_DIFFICULTY_ID);
+  selectedDifficultyId = picked.id;
+  WAVES = picked.waves;
+  resetWaveTimeline();
+  // The schedule that just became the one that matters, checked now rather than
+  // at load -- see assertScheduleDeployable for why the load-time pass covers
+  // the active schedule only.
+  assertScheduleDeployable(WAVES, picked.name);
+  return picked;
+}
 
 function scheduleEnemyCount(schedule) {
   var total = 0;
@@ -1639,9 +2728,13 @@ var inspected = null;
 // do. Freezing is not a convenience -- a menu that let enemies keep walking
 // would charge the player for opening it.
 //
-// The pause menu IS the safety on leaving a run: getting out takes Escape and
-// then a deliberate click on "Back to main menu", so there is no separate
-// "are you sure?" step and nothing on the HUD that one stray click can hit.
+// The pause menu IS the safety on leaving a run: getting out takes two
+// deliberate actions -- Escape or the pause button, and then a click on "Back
+// to main menu" -- so there is no separate "are you sure?" step and nothing on
+// the HUD that ONE stray click can use to end a run. The button added on
+// 2026-08-27 (see pauseButtonRect) opens this menu and nothing else; it sets
+// the flag below, which is the same flag Escape sets, so there is exactly one
+// pause in this file and two ways to reach it.
 var paused = false;
 
 // Set while a tower is waiting for the player to click a DIRECTION rather
@@ -1861,6 +2954,41 @@ function openMapSelect() {
   screen = "select";
 }
 
+// --- the difficulty step (2026-08-27) ---------------------------------------
+//
+// ROUTE FIRST, THEN DIFFICULTY, which is the order the owner asked for: "the
+// difficulty must be selected by the player after he selects the map he wants
+// to play". So the chooser hands off to this screen instead of starting a run,
+// and this screen is what calls startRun.
+//
+// IT IS A SCREEN AND NOT AN OVERLAY, like every other value of `screen`:
+// nothing behind it runs (`update()` tests `screen !== "play"`, so any new
+// value is inert by default) and nothing behind it is clickable. The two things
+// it holds are the map that was just picked and the difficulty that has been
+// chosen before, which is what `pendingMap` is for -- a run cannot be started
+// from here without one, and the Back button puts the player on the chooser
+// with nothing half-committed.
+//
+// It deliberately does NOT sit on the loss overlay's "Choose another route",
+// which goes back to the chooser and therefore comes through here again: a
+// player changing route is a player changing their mind about the run, and
+// re-confirming a difficulty they already chose costs one click and cannot be
+// got wrong.
+var pendingMap = null;
+
+function openDifficultySelect(map) {
+  pendingMap = map;
+  screen = "difficulty";
+}
+
+// Take the choice and go. Returns the difficulty actually started, so the
+// sandbox and the tests can read it back without inspecting a global.
+function chooseDifficulty(id) {
+  var picked = setDifficulty(id);
+  if (pendingMap) startRun(pendingMap);
+  return picked;
+}
+
 function openMenu() {
   screen = "menu";
   paused = false;
@@ -1947,6 +3075,13 @@ function restartGame() {
   // Global one-per-game state belongs to the RUN, so a restart clears it.
   if (typeof DeathDenial !== "undefined") DeathDenial.reset();
   if (typeof HealingLedger !== "undefined") HealingLedger.reset();
+  // Pending death hazards are run state, and the most dangerous kind: a fuse
+  // armed by a Volatile in the run that just ended would otherwise detonate
+  // under towers placed in the run that just began. restartGame() is the door
+  // every exit takes -- Restart, Choose another route, Main menu, and the
+  // sandbox's map switcher -- so clearing it here covers all of them.
+  if (typeof Hazards !== "undefined") Hazards.reset();
+
   // Cosmetic state is run state too -- a restart must not inherit the old
   // run's particles.
   if (typeof Effects !== "undefined") Effects.reset();
@@ -2305,7 +3440,26 @@ function onClick(event) {
     var card = mapCardAt(p.x, p.y);
     if (card !== null) {
       Sound.playUIClick();
-      startRun(Maps.LIST[card]);
+      // The route is chosen; the difficulty is the next question, not this
+      // one. See openDifficultySelect.
+      openDifficultySelect(Maps.LIST[card]);
+    }
+    return;
+  }
+
+  // The difficulty step owns every click while it is up, exactly as the
+  // chooser above it does.
+  if (screen === "difficulty") {
+    if (pointInRect(p.x, p.y, backButtonRect())) {
+      Sound.playUIClick();
+      openMapSelect();
+      return;
+    }
+    for (var d = 0; d < DIFFICULTIES.length; d++) {
+      if (!pointInRect(p.x, p.y, difficultyCardRect(d))) continue;
+      Sound.playUIClick();
+      chooseDifficulty(DIFFICULTIES[d].id);
+      return;
     }
     return;
   }
@@ -2372,6 +3526,17 @@ function onClick(event) {
   if (pointInRect(p.x, p.y, speedButtonRect())) {
     Sound.playUIClick();
     cycleGameSpeed();
+    return;
+  }
+
+  // Pause. Everything above this line has already returned if a modal is up --
+  // the pause menu itself, the loss and victory overlays -- so this cannot be
+  // reached while the run is already stopped, and the button is drawn under
+  // exactly the same condition (see draw()). Sets the same flag Escape sets;
+  // the menu that appears is the same menu, and Resume or Escape leaves it.
+  if (pointInRect(p.x, p.y, pauseButtonRect())) {
+    Sound.playUIClick();
+    paused = true;
     return;
   }
 
@@ -2715,7 +3880,33 @@ function onKeyDown(event) {
       return;
     }
     var pick = parseInt(event.key, 10);
-    if (pick >= 1 && pick <= Maps.LIST.length) startRun(Maps.LIST[pick - 1]);
+    if (pick >= 1 && pick <= Maps.LIST.length) {
+      openDifficultySelect(Maps.LIST[pick - 1]);
+    }
+    return;
+  }
+
+  // The difficulty step owns the keyboard while it is up. Number keys pick a
+  // card, and each difficulty's INITIAL is the second way in -- E and N, which
+  // is the same pair the deleted 2026-07-30 chooser used and the pair players
+  // typed. Derived from the table rather than typed here, so a third
+  // difficulty would bring its own letter with it.
+  if (screen === "difficulty") {
+    if (event.key === "Escape") {
+      openMapSelect();
+      return;
+    }
+    var slot = parseInt(event.key, 10);
+    if (slot >= 1 && slot <= DIFFICULTIES.length) {
+      chooseDifficulty(DIFFICULTIES[slot - 1].id);
+      return;
+    }
+    var letter = (event.key || "").toLowerCase();
+    for (var di = 0; di < DIFFICULTIES.length; di++) {
+      if (DIFFICULTIES[di].id.charAt(0) !== letter) continue;
+      chooseDifficulty(DIFFICULTIES[di].id);
+      return;
+    }
     return;
   }
 
@@ -3196,6 +4387,32 @@ function autoSkipButtonRect() {
   return { x: speed.x - 8 - 104, y: speed.y, w: 104, h: speed.h };
 }
 
+// The PAUSE button, at the left end of the same bottom-right row: pause,
+// mixer, auto-send, speed.
+//
+// The pause menu itself is older than this button and was reachable by Escape
+// alone. That is fine on a keyboard and invisible without one -- nothing on
+// screen said the run could be stopped, so the one control that costs a player
+// nothing to find was the one control they had to already know about. It is
+// the same argument autoSkipButtonRect makes about a toggle that only exists
+// for three seconds at a time, pointed at a control that never appeared at all.
+//
+// Escape is unchanged and still does exactly this. Two ways in, one state
+// (`paused`), one menu -- the button sets the flag the key already sets, so
+// there is no second pause implementation to disagree with the first.
+//
+// Anchored off the mixer's rectangle, which is anchored off the auto-send's,
+// which is anchored off the speed button's: one number (8) describes the whole
+// row's spacing and moving any button moves the ones to its left with it. The
+// row now spans x=962..1256, and the build bar ends at x=875, so there is still
+// clear air between the two -- see the note on BAR_WIDTH.
+var PAUSE_BUTTON_W = 44;
+
+function pauseButtonRect() {
+  var audio = audioButtonRect();
+  return { x: audio.x - 8 - PAUSE_BUTTON_W, y: audio.y, w: PAUSE_BUTTON_W, h: audio.h };
+}
+
 // Is there anything left for the wave controls to control? After the last wave
 // has deployed there is nothing to send and nothing to automate, so both
 // buttons go away.
@@ -3223,6 +4440,7 @@ function waveControlsShown() {
 function overInterfaceChrome(x, y) {
   if (slotAt(x, y) >= 0) return true;
   if (pointInRect(x, y, speedButtonRect())) return true;
+  if (pointInRect(x, y, pauseButtonRect())) return true;
   if (pointInRect(x, y, audioButtonRect())) return true;
   if (audioPanelOpen && pointInRect(x, y, audioPanelRect())) return true;
   if (waveControlsShown() && pointInRect(x, y, autoSkipButtonRect())) return true;
@@ -3399,6 +4617,30 @@ function update(dt) {
   // the path, this needs the board. See Enemy.prototype.attackTowers.
   for (i = 0; i < enemies.length; i++) enemies[i].attackTowers(dt, towers);
 
+  // WHAT A DEATH LEFT ON A FUSE (the Volatile's charge), stepped HERE -- after
+  // the enemies have moved and swung, and BEFORE the destroyed-tower sweep
+  // below.
+  //
+  // That placement is the same argument the enemy attacks above make: a tower
+  // that a detonation destroys this step must not also get a shot off, or the
+  // blast that killed it would still be paid for. It is also why hazards are
+  // simulation rather than an Effects mark -- towers lose real hit points to
+  // them, and Effects is one-way by rule.
+  //
+  // The fuse advances on `dt`, so it is frozen by the pause menu, by the menu
+  // screen, by a loss and by the beam's rewind, and it runs three times as fast
+  // at 3x for the same reason everything else does: speed is how many fixed
+  // steps frame() hands us, never a scaled step.
+  if (typeof Hazards !== "undefined") {
+    var blasts = Hazards.update(dt, towers);
+    if (blasts && typeof Effects !== "undefined" && Effects.aoeImpact) {
+      for (i = 0; i < blasts.length; i++) {
+        Effects.aoeImpact(blasts[i].x, blasts[i].y, ul(blasts[i].radiusUl),
+          blasts[i].kind, { life: 0.5 });
+      }
+    }
+  }
+
   // Sweep out anything the swings destroyed. filter() preserves order, so the
   // towers array stays sorted by pathProgress -- the invariant the whole
   // target-claiming scheme rests on (see AGENTS.md). Doing it as one sweep
@@ -3451,8 +4693,19 @@ function update(dt) {
     //
     // Enforced HERE, in the one place all four tower types come through,
     // rather than inside each of them. See TowerHealth.tickStun for why.
-    if (typeof TowerHealth !== "undefined" && TowerHealth.tickStun(towers[i], dt)) {
-      continue;
+    if (typeof TowerHealth !== "undefined") {
+      // Named immunities age FIRST and unconditionally, because they are time
+      // passing rather than the tower doing something. A Sapper's four seconds
+      // of post-recovery immunity overlaps its own two seconds of silence, so
+      // ticking it inside the branch below -- which is skipped for exactly as
+      // long as the tower is dark -- would start the four seconds late and
+      // leave the tower vulnerable again the instant it woke up.
+      TowerHealth.tickSuppression(towers[i], dt);
+      // A STUNNED tower does nothing at all this step -- and that includes its
+      // cooldown, which is why this is a `continue` and not a flag passed into
+      // update(). A stun that let cooldowns keep ticking would be half absorbed
+      // by whatever the tower was already waiting on.
+      if (TowerHealth.tickStun(towers[i], dt)) continue;
     }
     // The return is captured BEFORE cash is touched, deliberately.
     // `cash += tower.update(...)` reads cash first, then runs update -- so any
@@ -3497,6 +4750,14 @@ function update(dt) {
       // newly born children from being visited halfway through the same loop.
       var divided = gone.splitOnDeath();
       if (divided) splitChildren = splitChildren.concat(divided);
+      // WHAT THIS BODY LEAVES BEHIND, if its type declares a `deathEffect`.
+      //
+      // On the `dead` branch and nowhere else, which is the whole of "a leak
+      // creates no hazard" and "a revive creates none yet": `leaked` is the
+      // other branch, and `dead` is only set once tryRevive() has refused. The
+      // hazard is not an enemy and joins no list the wave or the victory test
+      // reads -- see js/systems/hazards.js.
+      if (typeof Hazards !== "undefined") Hazards.fromDeath(gone);
       if (typeof Effects !== "undefined") {
         Effects.enemyKilled(gone, killBounty);
       }
@@ -4027,13 +5288,42 @@ function validateWaveTimelines(schedule) {
 //
 // It throws rather than warning: this file opens off `file://` with no console
 // anyone is looking at, and a warning nobody reads is the same as no check.
-(function () {
-  var problems = validateWaveTimelines(WAVES);
-  if (problems.length) {
-    throw new Error("wave schedule is not deployable:\n  " +
-      problems.join("\n  "));
-  }
-})();
+//
+// THE ACTIVE SCHEDULE AT LOAD, AND EACH OTHER ONE THE MOMENT IT IS SELECTED
+// (`assertScheduleDeployable`, called from `setDifficulty`). Both halves matter
+// and they are checked at different times on purpose:
+//
+//   at load    the schedule a run would start on, before anything can run;
+//   on select  the schedule that just became the one that matters.
+//
+// **VALIDATING EVERY SCHEDULE AT LOAD WAS TRIED AND TAKEN BACK OUT**, and the
+// reason is not style. `waveTimeline` EXPANDS a wave into one object per body
+// and sorts the result, so checking both campaigns costs 1 830 short-lived
+// objects and 70 sorts every time this file is evaluated. That is free in a
+// browser, which evaluates it once -- and it is not free in `tests/harness.js`,
+// which boots the whole game into a fresh `vm` context ~180 times per suite.
+// Measured: doubling this work took node v24 from 0 crashes in 40 runs to 6,
+// SIGSEGV inside V8's own mark-compact (`ClearStaleLeftTrimmedPointerVisitor`),
+// with no JavaScript stack and no failing test name -- the suite simply stops
+// reporting, which reads downstream as an improvement. See the note on the
+// canvas stub in tests/harness.js, which is the other half of the same lesson.
+//
+// **THE COVERAGE IS NOT LOST**: `tests/run.js`'s "both schedules are
+// deployable, and wave 35 is the only one without a ceiling" runs
+// `validateWaveTimelines` over every entry in `DIFFICULTIES`, so a ceiling
+// authored short in an unselected campaign fails the gate rather than waiting
+// for a player to pick it.
+//
+// It throws rather than warning: this file opens off `file://` with no console
+// anyone is looking at, and a warning nobody reads is the same as no check.
+function assertScheduleDeployable(schedule, label) {
+  var problems = validateWaveTimelines(schedule);
+  if (!problems.length) return;
+  throw new Error((label ? label + ": " : "") +
+    "wave schedule is not deployable:\n  " + problems.join("\n  "));
+}
+
+assertScheduleDeployable(WAVES, activeDifficulty().name);
 
 // Bring the next wave in early by shortening the TRANSITION in front of it.
 // Returns whether there was a transition to shorten.
@@ -4558,6 +5848,10 @@ function worldRenderState() {
     // makes "2D and WebGL receive the same snapshot" a fact about the code
     // rather than a thing to keep checking.
     environment: environmentForRender(),
+    // Live death hazards, for the renderers only. Handed over as the module's
+    // own array rather than copied -- the same arrangement `towers` and
+    // `enemies` already have here -- and nothing that draws it writes to it.
+    hazards: (typeof Hazards !== "undefined") ? Hazards.active() : [],
     buildGhost: ghost,
     inspected: inspected, aimingTower: aimingTower, worldMouse: worldMouse,
     // Recomputed per frame rather than passing the stored `hoveredEnemy`,
@@ -4609,6 +5903,11 @@ function draw() {
 
   if (screen === "select") {
     drawMapSelect();
+    return;
+  }
+
+  if (screen === "difficulty") {
+    drawDifficultySelect();
     return;
   }
 
@@ -4675,6 +5974,12 @@ function draw() {
   if (typeof Effects !== "undefined" && Effects.drawGround) {
     Effects.drawGround(ctx);
   }
+  // Live death charges go on the GROUND, under every actor: what they mark is a
+  // patch of road, and a mark painted over the bodies standing in it would read
+  // as being attached to one of them. The 3D board draws the same two things
+  // (the reach ring and the fuse arc) in its own overlay layer off the same
+  // fields -- see drawHazards in js/gl/gl-world.js.
+  drawHazardMarks();
 
   var i;
   // A tower paints its reach ONLY when the player has asked about it: the one
@@ -4717,6 +6022,7 @@ function draw() {
   // Bars are interface attached to world actors, so they run as their own pass
   // and stay readable over every body regardless of depth order.
   for (i = 0; i < towers.length; i++) drawTowerHealth(towers[i]);
+  drawSabotageMarks();
 
   // The red wash and the blind spots, under the ghost that reads them.
   drawPlacementFeedback();
@@ -4765,6 +6071,14 @@ function draw() {
   drawBossBar();
 
   // Interface last, so nothing on the map is drawn over it.
+  //
+  // The enemy sidebar goes BEFORE the inspection panel and the build bar. Both
+  // of those are things the player CLICKED and are still using; this one
+  // follows the cursor and is gone the moment it moves off the body. When they
+  // overlap -- the panel clamps to x=12 for a tower near the left edge, which
+  // is the sidebar's own column -- the thing that was asked for on purpose is
+  // the thing that has to stay readable.
+  drawEnemySidebar();
   drawInspection();
   drawBuildBar();
   drawSpeedButton();
@@ -4778,6 +6092,7 @@ function draw() {
   // a live-looking control on screen that swallows nothing -- the same trap
   // waveSkipButtonRect and waveControlsShown exist to avoid.
   if (!paused && !gameOver && !victory) {
+    drawPauseButton();
     drawAudioButton();
     drawAudioPanel();
   }
@@ -5491,6 +6806,104 @@ function drawSightShadows(tx, ty, reach, eyeHeight) {
   ctx.restore();
 }
 
+// --- the v0.5.1 road marks, 2D fallback -------------------------------------
+//
+// The 3D board draws these in js/gl/gl-world.js (drawHazards, drawSabotage) and
+// this is the flat renderer's version of the same two facts, off the same
+// fields. Neither knows about the other; both are one-way, and a game with no
+// renderer at all plays identically, which is the standing rule for anything
+// cosmetic in this project.
+
+// A LIVE CHARGE AND ITS DANGER RADIUS.
+//
+// The radius ring is drawn at the blast's TRUE reach from the first frame and
+// does not grow: a ring that expanded into its final size would be a lie about
+// where the danger is right up until the instant it stops being one, and the
+// whole point of a one-second fuse is that the player is given that second to
+// move a decision, not to guess a distance. The fuse is the arc sweeping round
+// it, plus a core that quickens rather than merely brightens.
+function drawHazardMarks() {
+  if (typeof Hazards === "undefined") return;
+  var list = Hazards.active();
+  var now = lastTime / 1000;
+  for (var i = 0; i < list.length; i++) {
+    var h = list[i];
+    var reach = ul(h.radiusUl);
+
+    if (h.detonated) {
+      var left = Math.max(0, h.afterglow) / Hazards.AFTERGLOW_SECONDS;
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, reach, 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,244,190," + (0.85 * left).toFixed(3) + ")";
+      ctx.stroke();
+      continue;
+    }
+
+    var burnt = Math.max(0, Math.min(1, 1 - h.fuse / (h.fuseTotal || 1)));
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, reach, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(214,255,96," + (0.06 + 0.12 * burnt).toFixed(3) + ")";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(214,255,96," + (0.35 + 0.45 * burnt).toFixed(3) + ")";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, reach - 3, -Math.PI / 2,
+      -Math.PI / 2 + burnt * Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(255,250,210,0.95)";
+    ctx.stroke();
+
+    var tick = 0.5 + 0.5 * Math.sin(now * (8 + burnt * 26));
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, 3 + burnt * 3, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,250,200," + (0.55 + 0.45 * tick).toFixed(3) + ")";
+    ctx.fill();
+  }
+}
+
+// DISABLED, AND IMMUNE -- two states, two marks.
+//
+// A disabled tower is stunned, so it already wears whatever this renderer
+// gives a stunned tower; the teal band added here is the half that says WHO
+// silenced it. An immune tower is not silenced at all and gets a DASHED band
+// instead, because a broken ring reads as a guard that has lapsed rather than
+// an effect that is running -- which is exactly the difference between "this
+// gun is out" and "this gun cannot be taken out again yet".
+//
+// The telegraph line itself belongs to the SAPPER and is drawn by
+// Enemy.prototype.draw, beside the body throwing it.
+function drawSabotageMarks() {
+  if (typeof TowerHealth === "undefined") return;
+  for (var i = 0; i < towers.length; i++) {
+    var t = towers[i];
+    var left = TowerHealth.suppressionRemaining(t, "sapper");
+    if (!(left > 0)) continue;
+    var radius = (t.footprintPx || 12) + 12;
+
+    if (TowerHealth.isStunned(t)) {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, radius, 0, Math.PI * 2);
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "rgba(96,226,214,0.9)";
+      ctx.stroke();
+      continue;
+    }
+
+    var fade = Math.min(1, left / 4);
+    ctx.save();
+    if (ctx.setLineDash) ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, radius, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(96,226,214," + (0.25 + 0.35 * fade).toFixed(3) + ")";
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawBuildPreview() {
   var type = selectedType();
   if (!type) return;                       // nothing armed, nothing to preview
@@ -6091,6 +7504,36 @@ function drawSpeedButton() {
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
+}
+
+// The pause button: two bars, drawn rather than typed for the same reason the
+// mixer's speaker cone and the speed button's chevrons are -- this HUD is all
+// shapes, and a glyph would depend on the system font having it.
+//
+// It has no lit state. Speed and mute are settings you can be WRONG about
+// without noticing, so both of those buttons shout when they are not at their
+// default; pause is not a setting, it is a door, and the moment it has been
+// used the screen is entirely covered by the menu it opens. There is nothing
+// for an indicator to tell anybody.
+function drawPauseButton() {
+  var r = pauseButtonRect();
+  var hot = pointInRect(mouse.x, mouse.y, r);
+
+  ctx.fillStyle = "rgba(28,30,38,0.85)";
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = hot ? "rgba(199,209,224,0.55)" : "rgba(199,209,224,0.30)";
+  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+  var colour = hot ? "#c7d1e0" : "rgba(199,209,224,0.80)";
+  var cx = r.x + r.w / 2;
+  var cy = r.y + r.h / 2;
+  var barW = 4;
+  var barH = 14;
+
+  ctx.fillStyle = colour;
+  ctx.fillRect(cx - barW - 2, cy - barH / 2, barW, barH);
+  ctx.fillRect(cx + 2, cy - barH / 2, barW, barH);
 }
 
 // The five build slots. A slot knows nothing about gunners specifically -- it
@@ -8715,6 +10158,160 @@ function drawBackButton() {
   drawAshControl(backButtonRect(), "\u2190 MENU", {});
 }
 
+// --- the difficulty step ----------------------------------------------------
+//
+// Interface chrome, so pixels are correct here: anchored to the 1280x720
+// viewport like the map cards and the build bar, not to anything in the world.
+//
+// ONE FUNCTION PER RECTANGLE, which is this file's standing rule and the reason
+// the drawing and the click test cannot disagree about where a card is -- the
+// same arrangement `slotRect`, `mapCardRect` and `inspectionLayout` have.
+//
+// The row is CENTRED ON HOWEVER MANY THERE ARE rather than laid out from a
+// fixed left edge, so a third difficulty would sit under the middle of the
+// heading instead of hanging off one side. Nothing about the geometry knows
+// there are two.
+var DIFFICULTY_CARD_W = 380;
+var DIFFICULTY_CARD_H = 300;
+var DIFFICULTY_CARD_GAP = 40;
+var DIFFICULTY_CARD_Y = 210;
+
+function difficultyCardRect(i) {
+  var n = DIFFICULTIES.length;
+  var total = n * DIFFICULTY_CARD_W + (n - 1) * DIFFICULTY_CARD_GAP;
+  return {
+    x: (VIEW_WIDTH - total) / 2 + i * (DIFFICULTY_CARD_W + DIFFICULTY_CARD_GAP),
+    y: DIFFICULTY_CARD_Y,
+    w: DIFFICULTY_CARD_W,
+    h: DIFFICULTY_CARD_H
+  };
+}
+
+function difficultyCardAt(x, y) {
+  for (var i = 0; i < DIFFICULTIES.length; i++) {
+    if (pointInRect(x, y, difficultyCardRect(i))) return i;
+  }
+  return null;
+}
+
+// The four numbers a card states about its schedule, all DERIVED from the
+// schedule itself. Nothing about a difficulty's difficulty is typed anywhere:
+// retune a wave and the card follows, which is the same property the map cards
+// have with `Maps.analyse` and the index has with `Enemy.TYPES`.
+function difficultySummary(difficulty) {
+  var waves = difficulty.waves;
+  var bodies = 0, health = 0, types = {};
+  for (var i = 0; i < waves.length; i++) {
+    bodies += waveCount(waves[i]);
+    health += waveEffectiveHealth(waves[i]);
+    var groups = waveGroups(waves[i]);
+    for (var g = 0; g < groups.length; g++) {
+      types[groups[g].type || Enemy.DEFAULT_TYPE] = true;
+    }
+  }
+  return {
+    waves: waves.length,
+    bodies: bodies,
+    health: Math.round(health),
+    types: Object.keys(types).length
+  };
+}
+
+function drawDifficultySelect() {
+  drawSelectBackdrop();
+  drawBackButton();
+
+  drawAshHeading("CHOOSE YOUR TRIAL",
+    pendingMap ? ("ROUTE  \u00b7  " + pendingMap.name.toUpperCase())
+               : "SELECT A DIFFICULTY", 40);
+
+  for (var i = 0; i < DIFFICULTIES.length; i++) drawDifficultyCard(i);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
+  drawMenuText("CLICK A TRIAL, OR PRESS 1 - " + DIFFICULTIES.length,
+    VIEW_WIDTH / 2, DIFFICULTY_CARD_Y + DIFFICULTY_CARD_H + 22, 1.4);
+  ctx.textAlign = "left";
+}
+
+// A difficulty card: the same salvaged plate the route cards and every control
+// on these screens are cut from, so the two steps of the chooser read as one
+// screen in two beats rather than as two designs.
+//
+// THE ACCENT IS `TIER_COLOURS` IN ORDER -- ley-teal, bone, ember -- which is
+// the palette the route cards already use to say easy/normal/hard, and it is an
+// ORDER rather than three arbitrary hues (see the 2026-08-26 theme note). A
+// difficulty and a route of the same weight therefore wear the same colour, and
+// the player learns one scale rather than two.
+function drawDifficultyCard(i) {
+  var difficulty = DIFFICULTIES[i];
+  var r = difficultyCardRect(i);
+  var hot = difficultyCardAt(mouse.x, mouse.y) === i;
+  var active = difficulty.id === selectedDifficultyId;
+  // The band is looked up by the difficulty's OWN id, which is why the ids
+  // match `TIER_COLOURS`'s keys. A difficulty whose id is not a band falls
+  // back to the hottest one rather than to no colour at all.
+  var tier = TIER_COLOURS[difficulty.id] || TIER_COLOURS.hard;
+
+  drawAshPlate(r, {
+    accent: tier.rgb,
+    live: hot ? 0.9 : (active ? 0.4 : 0),
+    cut: 16
+  });
+
+  // Hotkey, top-left, the same convention a build slot and a route card use.
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
+  drawMenuText(String(i + 1), r.x + 14, r.y + 12, 1.2);
+
+  ctx.textAlign = "center";
+  ctx.font = "30px " + MENU_DISPLAY_FONT;
+  ctx.fillStyle = hot ? "#ffe6c4" : "#f6d9b4";
+  drawMenuText(difficulty.name.toUpperCase(), r.x + r.w / 2, r.y + 40, 3.2);
+
+  ctx.font = "10px " + MENU_TECH_FONT;
+  ctx.fillStyle = "rgb(" + tier.rgb + ")";
+  drawMenuText(difficulty.detail.toUpperCase(), r.x + r.w / 2, r.y + 82, 1.6);
+
+  // The blurb, wrapped by the same helper the index uses so a longer line
+  // cannot run out of the plate.
+  ctx.textAlign = "left";
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(" + ASH_BONE + ",0.78)";
+  var blurb = wrapText(ctx, difficulty.blurb, r.w - 44, 3);
+  for (var b = 0; b < blurb.length; b++) {
+    ctx.fillText(blurb[b], r.x + 22, r.y + 108 + b * 19);
+  }
+
+  // The measured stats. DERIVED (see difficultySummary), never authored, so a
+  // card cannot advertise a schedule the game does not have.
+  var s = difficultySummary(difficulty);
+  var rows = [
+    ["Waves", String(s.waves)],
+    ["Enemies", String(s.bodies)],
+    ["Effective HP", String(s.health)],
+    ["Enemy types", String(s.types)]
+  ];
+  for (var k = 0; k < rows.length; k++) {
+    var y = r.y + 180 + k * 24;
+    ctx.textAlign = "left";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.62)";
+    ctx.fillText(rows[k][0], r.x + 22, y);
+    ctx.textAlign = "right";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillStyle = "#ecdece";
+    ctx.fillText(rows[k][1], r.x + r.w - 22, y);
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
 function drawMapSelect() {
   drawSelectBackdrop();
   drawBackButton();
@@ -9158,6 +10755,301 @@ function drawEnemyHover() {
     ctx.fillRect(barX, sY,
       barW * Math.max(0, Math.min(1, e.shield / e.shieldMax)), BAR_H);
   }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
+// --- THE ENEMY SIDEBAR ----------------------------------------------------
+//
+// 2026-08-27, at the owner's request: "when hovering an enemy, add a side bar
+// with their name, and any special attributes if they have some (camo, or if
+// they attack, anything distinctive)".
+//
+// THE READOUT OVER THE BODY ANSWERS ONE QUESTION -- how much is left -- and
+// there is no room in it for a second. It is a figure and a bar pinned to
+// something that is walking, sized so it does not swallow the enemy wearing
+// it. That left the whole roster's BEHAVIOUR readable only in the index, on a
+// screen the run is not on: a player watching a Sapper stop beside their best
+// tower had nowhere to ask what it was about to do without leaving the board.
+//
+// So the left column answers WHAT IT IS. The name, the numbers that are true
+// of this particular body right now, and one row per trait it carries -- read
+// off `Enemy.traitsOf`, which is the same list the index's badge line walks, so
+// the two cannot end up describing the same enemy differently.
+//
+// SCREEN SPACE, DRAWN WITH THE INTERFACE, which is what makes it work on both
+// boards with one copy. Everything anchored to an enemy has to be drawn twice
+// in this project -- once in the 2D world block and once in js/gl/gl-world.js's
+// overlay pass -- because the two renderers put a body in different places.
+// This is anchored to the CANVAS, so there is one of it and the 3D board gets
+// it for free.
+//
+// IT IS NOT IN `overInterfaceChrome`, DELIBERATELY, and that is the one
+// non-obvious thing about it. The inspection panel is in that list: pointing at
+// it is not pointing at the board. That rule is safe there because a selected
+// tower STAYS selected. This panel exists only WHILE an enemy is hovered, so
+// the same rule would oscillate -- hover a body, the panel appears under the
+// cursor, the cursor is now "on interface", the hover is cancelled, the panel
+// vanishes, the hover comes back, at whatever rate the frame runs. It is not
+// clickable, so it eats nothing by staying out of that list.
+var ENEMY_SIDEBAR_X = 22;
+// Clear of the wave readout and the Send button above it (waveSkipButtonRect
+// ends at y=130) whether or not those are on screen. A top that moved with a
+// button which comes and goes between waves would make the panel jump.
+var ENEMY_SIDEBAR_Y = 146;
+var ENEMY_SIDEBAR_W = 258;
+var ENEMY_SIDEBAR_PAD = 12;
+
+// WHAT THE SIDEBAR SAYS, split from the drawing so a test can read it back.
+// The stub canvas records nothing, so anything left inside a draw() is
+// untestable -- the same split `enemyHoverLabel` already has, for the same
+// reason.
+//
+// Live numbers come off the BODY (its health, the speed it is moving at this
+// instant, what killing this one pays); the trait rows come off its TYPE. That
+// split is the useful one: a hasted Normal and a still one are different
+// readings of the same enemy, and both are Normals.
+function enemySidebarModel(e) {
+  var type = e.type;
+
+  // A fractal's tier is the most important thing about it -- a T5 and a T0 are
+  // the same type and a thousand-fold difference in what is in front of you --
+  // so it goes in the name rather than in a row underneath.
+  var name = type.displayName +
+    (e.fractalTier === null || e.fractalTier === undefined
+      ? "" : " T" + e.fractalTier);
+
+  var stats = [
+    // The speed it is doing NOW, not the type's. This is the one line that
+    // reports a Herald's haste, a frost slow, a Vanguard's opening sprint and
+    // a Bulwark whose shield has just gone, and it reports all four without
+    // knowing that any of them exist -- currentSpeedUlps is where that sum is
+    // taken, and it is taken once.
+    ["Speed", Math.round(e.currentSpeedUlps()) + " u.l./s"],
+    ["Bounty", "$" + formatCash(e.bounty())]
+  ];
+
+  var traits = Enemy.traitsOf(type);
+  if (!traits.length) {
+    // SAID OUT LOUD RATHER THAN LEFT BLANK. An empty space under the numbers
+    // reads as "the panel did not finish", and the player cannot tell it apart
+    // from a trait row that failed to draw. A Normal genuinely has nothing, and
+    // knowing that is worth a line.
+    traits = [{
+      id: "plain",
+      label: "Nothing special",
+      detail: "No plating, no shield, and it does nothing to your towers. " +
+        "It walks, and at the end of the road it costs you its health.",
+      color: "rgba(199,209,224,0.75)",
+      badge: null
+    }];
+  }
+
+  return {
+    name: name,
+    color: type.color,
+    hp: enemyHoverLabel(e),
+    bars: enemySidebarBars(e),
+    stats: stats,
+    traits: traits
+  };
+}
+
+// Health, then shield under it: the same two strips in the same order the body
+// wears over its own head, because a reading learnt in one place has to mean
+// the same thing in the other.
+function enemySidebarBars(e) {
+  var bars = [{ frac: e.health / e.maxHealth, color: "#61d973" }];
+  if (e.shieldMax > 0) {
+    bars.push({ frac: e.shield / e.shieldMax, color: "#8fdcf0" });
+  }
+  return bars;
+}
+
+// The panel as a flat display list, each entry carrying its own height. Layout
+// sums them and the drawing walks the same array, so the box can never be a
+// different size from what goes in it -- the arrangement `inspectionLayout` and
+// `tooltipLines` both use.
+//
+// `context` is needed because the detail sentences are WRAPPED, and wrapping is
+// measured rather than guessed.
+function enemySidebarLayout(context, model) {
+  var pad = ENEMY_SIDEBAR_PAD;
+  var innerW = ENEMY_SIDEBAR_W - pad * 2;
+  var lines = [{ kind: "title", text: model.name, h: 24 }];
+
+  lines.push({ kind: "hp", text: model.hp, h: 17 });
+  model.bars.forEach(function (bar) {
+    lines.push({ kind: "bar", frac: bar.frac, color: bar.color, h: 9 });
+  });
+
+  lines.push({ kind: "gap", h: 6 });
+  model.stats.forEach(function (stat) {
+    lines.push({ kind: "stat", text: stat[0], value: stat[1], h: 16 });
+  });
+
+  // THE FLOOR IS THE BUILD BAR, not the bottom of the canvas -- the same
+  // ceiling the inspection panel respects, and for the same reason: a panel
+  // drawn through the bar is a panel with its last rows behind five tower
+  // buttons. A trait that will not fit is DROPPED and counted rather than
+  // clipped, because half a sentence about what an enemy does is worse than an
+  // honest "there is more here" (see the headroom warning in AGENTS.md).
+  var floor = BAR_Y - 12;
+  var used = ENEMY_SIDEBAR_Y + pad * 2;
+  lines.forEach(function (line) { used += line.h; });
+
+  context.font = "11px system-ui, sans-serif";
+  var shown = 0;
+  var pending = [];
+  for (var i = 0; i < model.traits.length; i++) {
+    var trait = model.traits[i];
+    var block = [{ kind: "rule", h: 11 },
+                 { kind: "trait", text: trait.label, color: trait.color, h: 17 }];
+    // SIX LINES, MEASURED RATHER THAN GUESSED. The Bulwark's and the Sapper's
+    // sentences both run to five at this width, and `wrapText` ellipsises the
+    // last line it is allowed -- so a cap of four turned "have the damage ready
+    // for what comes out" into "…", which is the one half of that sentence
+    // worth reading. The worst case on the roster is the Camo Heavy's three
+    // rows, which at this cap ends 20 px clear of the build bar; anything
+    // worse is caught by the floor check below rather than by this number.
+    wrapText(context, trait.detail, innerW, 6).forEach(function (text) {
+      block.push({ kind: "detail", text: text, h: 14 });
+    });
+
+    var cost = 0;
+    block.forEach(function (line) { cost += line.h; });
+    // The dropped-count line has to fit too, or reporting the overflow would
+    // itself overflow.
+    if (used + cost + (i === model.traits.length - 1 ? 0 : 15) > floor) break;
+
+    pending = pending.concat(block);
+    used += cost;
+    shown++;
+  }
+
+  lines = lines.concat(pending);
+  if (shown < model.traits.length) {
+    lines.push({ kind: "more",
+      text: "+" + (model.traits.length - shown) + " more in the index", h: 15 });
+  }
+
+  var h = pad * 2;
+  lines.forEach(function (line) { h += line.h; });
+
+  return { x: ENEMY_SIDEBAR_X, y: ENEMY_SIDEBAR_Y, w: ENEMY_SIDEBAR_W, h: h,
+           pad: pad, color: model.color, lines: lines };
+}
+
+function drawEnemySidebar() {
+  // Exactly the enemy the ring is drawn on. `hoveredOnBoard` is the one
+  // predicate behind the ring, the 3D overlay and this panel, so the three
+  // cannot end up pointing at different bodies -- and it is re-asked every
+  // frame rather than read off the stored `hoveredEnemy`, which goes stale the
+  // instant the thing under the cursor dies.
+  var e = hoveredOnBoard();
+  if (!e) return;
+
+  var card = enemySidebarLayout(ctx, enemySidebarModel(e));
+  var innerW = card.w - card.pad * 2;
+  var left = card.x + card.pad;
+  var right = card.x + card.w - card.pad;
+
+  ctx.fillStyle = "rgba(14,16,23,0.95)";
+  ctx.fillRect(card.x, card.y, card.w, card.h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,215,110,0.55)";
+  ctx.strokeRect(card.x + 0.5, card.y + 0.5, card.w - 1, card.h - 1);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  var y = card.y + card.pad;
+
+  card.lines.forEach(function (line) {
+    if (line.kind === "title") {
+      // The type's own colour, as a chip beside the name. It is the same ink
+      // the body, the codex swatch and the kill burst are drawn in, so the
+      // panel and the thing on the road are visibly the same enemy -- which is
+      // the question a fixed panel on the far side of the screen has that a
+      // readout pinned to the body does not.
+      var c = card.color;
+      ctx.fillStyle = "rgb(" + c.r + "," + c.g + "," + c.b + ")";
+      ctx.fillRect(left, y + 4, 10, 12);
+      ctx.font = "600 16px system-ui, sans-serif";
+      ctx.fillStyle = "#ffd76e";
+      ctx.fillText(fitText(ctx, line.text, innerW - 16), left + 16, y + 2);
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "hp") {
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = "#c7d1e0";
+      ctx.fillText(line.text, left, y + 2);
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "bar") {
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(left, y, innerW, 6);
+      ctx.fillStyle = line.color;
+      ctx.fillRect(left, y, innerW * Math.max(0, Math.min(1, line.frac)), 6);
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "stat") {
+      // Value right, label left, exactly as the inspection panel sets its own
+      // stat rows -- so a long label is what gets clipped, never the number.
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.62)";
+      ctx.fillText(line.text, left, y + 1);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#c7d1e0";
+      ctx.fillText(line.value, right, y + 1);
+      ctx.textAlign = "left";
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "rule") {
+      ctx.beginPath();
+      ctx.moveTo(left, y + line.h / 2 + 0.5);
+      ctx.lineTo(right, y + line.h / 2 + 0.5);
+      ctx.strokeStyle = "rgba(255,215,110,0.18)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "trait") {
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = line.color;
+      ctx.fillText(fitText(ctx, line.text, innerW), left, y + 2);
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "detail") {
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.82)";
+      ctx.fillText(line.text, left, y + 1);
+      y += line.h;
+      return;
+    }
+
+    if (line.kind === "more") {
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(199,209,224,0.5)";
+      ctx.fillText(line.text, left, y + 2);
+      y += line.h;
+      return;
+    }
+
+    y += line.h;                     // "gap", and anything a future row adds
+  });
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";

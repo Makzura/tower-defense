@@ -246,13 +246,23 @@ test("the roster matches the agreed numbers", function (t) {
   t.eq(Enemy.TYPES.angry.attack.intervalSeconds, 2.5, "every 2.5 s");
   t.ok(Enemy.TYPES.angry.attack.reachUl > 0, "with a reach in u.l.");
 
-  // Exactly one type fights back. If a second is ever added this should be
-  // updated rather than deleted -- the point is that attacking is opt-in
-  // DATA, not something every enemy quietly gained.
+  // THREE types fight back. Updated rather than deleted on 2026-08-27 when the
+  // Sapper landed and again the same day when the Volatile gained its dive,
+  // which is what this assertion asks for by existing: the point is that
+  // attacking is opt-in DATA, not something every enemy quietly gained, so the
+  // list growing has to be a deliberate edit and never a surprise.
+  //
+  // The three do very different things with the same block, which is the block
+  // doing its job: the Angry deals 20 damage and nothing else, the Sapper deals
+  // NO damage and carries a `disable` instead, and the Volatile deals 20 once
+  // and dies of it.
   var attackers = Object.keys(Enemy.TYPES).filter(function (id) {
     return !!Enemy.TYPES[id].attack;
   });
-  t.deep(attackers, ["angry"], "only the angry type attacks towers");
+  t.deep(attackers, ["angry", "sapper", "volatile"],
+    "the Angry, the Sapper and the Volatile are the types that act on towers");
+  t.eq(Enemy.TYPES.sapper.attack.damage, undefined,
+    "and the Sapper's spec authors no damage at all -- absent, not zero");
 
   // v0.4.7. Four more -- three gated behind the midboss, plus the boss at 35.
   t.eq(Enemy.TYPES.shielded.health, 12, "Bulwark health");
@@ -291,17 +301,32 @@ test("the roster matches the agreed numbers", function (t) {
   t.deep(withBlock("fractal"), ["fractal_slime"],
     "only the Fractal Slime divides on death");
   t.deep(withBlock("noBounty"), [], "and NO type pays nothing -- that is a per-spawn property");
-  t.deep(withBlock("showHealthBanner"), ["midboss", "boss", "boss_fast"],
-    "three types wear the banner: the midboss at 11, the Tyrant at 35, " +
-    "and the unscheduled Vanguard");
+  t.deep(withBlock("showHealthBanner"),
+    ["midboss", "boss", "boss_fast", "dinomech"],
+    "four types wear the banner: the midboss at 11, the Tyrant, the Vanguard, " +
+    "and the Dinomech that ends Normal at wave 40");
+  // STILL ONLY THE TYRANT. The Dinomech is a boss with no phase at all, which
+  // is what keeps its 45 000 exactly 45 000 -- there is no roar to conjure a
+  // shield or call a support court in.
   t.deep(withBlock("phases"), ["boss"], "and only the Tyrant changes mid-fight");
+  t.eq(Enemy.TYPES.dinomech.health, 45000, "the Dinomech is 45 000 flat");
+  t.eq(Enemy.TYPES.dinomech.shield, undefined, "behind no shield");
+  t.eq(Enemy.TYPES.dinomech.revive, undefined, "with no second life");
+  t.eq(Enemy.attacksOf(Enemy.TYPES.dinomech).length, 2,
+    "and a pool of two attacks it cycles");
 
   // v0.4.9's block, held to the same standard: support is opt-in DATA, and if
   // one of these lists grows by accident that is a type that silently gained
   // an ability.
-  t.deep(withBlock("support"), ["shieldbearer", "healer", "boss_fast"],
-    "three types help the enemies around them");
+  t.deep(withBlock("support"), ["shieldbearer", "healer", "boss_fast", "herald"],
+    "four types help the enemies around them");
   t.deep(withBlock("sprint"), ["boss_fast"], "and only the fast boss sprints");
+
+  // v0.5.1's block, held to the same standard. `deathEffect` is the generic
+  // hazard structure and exactly one type carries one -- a second would be a
+  // second data block and no code, which is the property being pinned.
+  t.deep(withBlock("deathEffect"), ["volatile"],
+    "and only the Volatile leaves something behind when it dies");
 });
 
 
@@ -4163,6 +4188,196 @@ test("an overkilled enemy reads 0, never negative", function (t) {
   t.eq(h.run("enemyHoverLabel(enemies[0])"), "0 / 3 HP", "but the label clamps");
 });
 
+group("the enemy sidebar and the trait list behind it");
+
+// `Enemy.traitsOf` is the one list of "what is distinctive about this enemy".
+// The sidebar shows all of it and the index's badge line shows the first row
+// carrying a badge, so these tests are what stops the two drifting apart --
+// which is the whole reason the chain was lifted out of js/codex.js.
+
+test("a type's traits are read off its BLOCKS, in defining order", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+
+  var camo = Enemy.traitsOf("camo_heavy").map(function (trait) { return trait.id; });
+  t.deep(camo, ["camo", "armor", "defense"],
+    "seeing it comes before hurting it, and both are on the card");
+
+  var volatile_ = Enemy.traitsOf("volatile").map(function (trait) { return trait.id; });
+  t.deep(volatile_, ["attack-dive", "death-charge"],
+    "the dive and the charge it leaves are two separate facts");
+
+  // ONE ROW PER ATTACK SPEC, and the Dinomech is the first type in the roster
+  // whose whole pool is authored on the TYPE rather than half-added by a phase
+  // -- so it is the first body the sidebar shows two attack rows for.
+  var dino = Enemy.traitsOf("dinomech").map(function (trait) { return trait.id; });
+  t.deep(dino, ["attack-best", "attack"],
+    "the rail that hunts your best tower, then the stomp that takes a corner");
+  t.eq(Enemy.traitsOf("dinomech")[1].detail.indexOf("leaps 70 u.l.") !== -1, true,
+    "and the stomp row states the leap it is (" +
+    Enemy.traitsOf("dinomech")[1].detail + ")");
+
+  t.deep(Enemy.traitsOf("normal"), [],
+    "and a plain Normal carries nothing at all");
+});
+
+test("traitsOf takes an id, a type row or the codex's model", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var type = Enemy.TYPES.sapper;
+  var model = { attacks: Enemy.attacksOf(type) };   // what the index builds
+
+  var fromId = Enemy.traitsOf("sapper")[0];
+  t.eq(Enemy.traitsOf(type)[0].detail, fromId.detail, "a type row reads the same");
+  t.eq(Enemy.traitsOf(model)[0].detail, fromId.detail,
+    "and so does anything carrying the same blocks");
+});
+
+test("every badge the index prints comes off the trait list", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+
+  // The pairs the codex chain used to spell out. Pinned by TYPE rather than by
+  // position in the list, so reordering the roster cannot silently reassign one.
+  var expected = {
+    flying: "FLYING — needs air reach",
+    healer: "FLYING — needs air reach",
+    camo_heavy: "CAMO — needs detection",
+    boss: "HUNTS YOUR BEST TOWER",
+    sapper: "SHUTS TOWERS DOWN — NO DAMAGE",
+    volatile: "DIVES IN AND EXPLODES",
+    angry: "ATTACKS YOUR TOWERS",
+    herald: "HASTENS THE WAVE — $0",
+    hive: "BROOD: SHIELDED, $0",
+    fractal_slime: "SPLITS INTO FOUR LOWER TIERS",
+    shieldbearer: "SHIELDS THE WAVE — $0",
+    boss_fast: "RESHIELDS ITSELF — $0",
+    shielded: "SHIELD → DOUBLE SPEED",
+    revenant: "GETS BACK UP ONCE",
+    // The Dinomech's pool leads with the rail, which picks the board's single
+    // best gun -- the same first-spec-only rule the Tyrant's badge follows. Its
+    // stomp is a second ROW in the sidebar and does not get the headline.
+    dinomech: "HUNTS YOUR BEST TOWER"
+  };
+
+  Object.keys(expected).forEach(function (id) {
+    var badges = Enemy.traitsOf(id).filter(function (trait) { return trait.badge; });
+    t.eq(badges.length ? badges[0].badge : null, expected[id], id + "'s badge line");
+  });
+
+  // Plating never claims the headline: the index has one line and it belongs to
+  // an ability, which is what the armored types' badges being null encodes.
+  t.eq(Enemy.traitsOf("armored").filter(function (x) { return x.badge; }).length, 0,
+    "20% defense is a stat row, not a badge");
+  t.eq(Enemy.traitsOf("normal").length, 0, "and a Normal has no line to print");
+});
+
+test("no detail sentence ends in a doubled full stop", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+
+  // "u.l." ends in a full stop of its own, and every attacking type in the
+  // roster read "... within 47.5 u.l.." until the detail lines stopped
+  // appending one blindly.
+  var bad = [];
+  Object.keys(Enemy.TYPES).forEach(function (id) {
+    Enemy.traitsOf(id).forEach(function (trait) {
+      if (/\.\.$/.test(trait.detail)) bad.push(id + ": " + trait.detail);
+      if (!/[.!?]$/.test(trait.detail)) bad.push(id + " (unfinished): " + trait.detail);
+    });
+  });
+  t.deep(bad, [], "every trait detail is one finished sentence");
+});
+
+test("the sidebar names the body and lists what it does", function (t) {
+  var h = harness.boot();
+  h.run("enemies = []");
+  var e = h.run("new Enemy(path, undefined, 'sapper')");
+  h.game.enemies.push(e);
+
+  var model = h.run("enemySidebarModel(enemies[0])");
+  t.eq(model.name, "Sapper", "its display name, which the old readout never said");
+  t.eq(model.hp, "45 / 45 HP", "the same figure the readout over its head gives");
+  t.eq(model.traits.length, 1, "one trait");
+  t.eq(model.traits[0].label, "Shuts towers down", "and it is the one that matters");
+
+  // Live, off the body -- not the type's authored numbers.
+  t.eq(model.stats[0][0], "Speed");
+  t.eq(model.stats[0][1], Math.round(e.currentSpeedUlps()) + " u.l./s",
+    "the speed it is doing this instant, so haste and slows show");
+  t.eq(model.stats[1][1], "$" + h.run("formatCash(enemies[0].bounty())"),
+    "and what killing THIS one pays");
+});
+
+test("a fractal's tier is part of its name", function (t) {
+  var h = harness.boot();
+  h.run("enemies = []");
+  h.game.enemies.push(h.run("new Enemy(path, undefined, 'fractal_slime', { tier: 4 })"));
+
+  t.eq(h.run("enemySidebarModel(enemies[0])").name, "Fractal Slime T4",
+    "a T4 and a T0 are the same type and nothing like the same problem");
+});
+
+test("a body with nothing special says so out loud", function (t) {
+  var h = harness.boot();
+  h.run("enemies = []");
+  h.game.enemies.push(h.run("new Enemy(path, undefined, 'normal')"));
+
+  var traits = h.run("enemySidebarModel(enemies[0])").traits;
+  t.eq(traits.length, 1, "one row, not an empty space under the numbers");
+  t.eq(traits[0].id, "plain", "which says there is nothing rather than nothing at all");
+});
+
+test("a shielded body gets the second strip, in the same order as its head",
+  function (t) {
+    var h = harness.boot();
+    h.run("enemies = []");
+    h.game.enemies.push(h.run("new Enemy(path, undefined, 'shielded')"));
+
+    var model = h.run("enemySidebarModel(enemies[0])");
+    t.eq(model.bars.length, 2, "health, then shield");
+    t.eq(model.hp, "12 / 12 HP + 24 shield", "and the figure states both pools");
+  });
+
+test("no type's sidebar reaches the build bar", function (t) {
+  var h = harness.boot();
+  var floor = h.run("BAR_Y") - 12;
+  var over = [];
+
+  Object.keys(h.game.Enemy.TYPES).forEach(function (id) {
+    h.run("enemies = []");
+    h.game.enemies.push(h.run("new Enemy(path, undefined, '" + id + "')"));
+    var card = h.run("enemySidebarLayout(ctx, enemySidebarModel(enemies[0]))");
+    if (card.y + card.h > floor) over.push(id + " ends at " + (card.y + card.h));
+
+    // Nothing may be silently clipped either: a trait that will not fit is
+    // dropped and COUNTED, and today nothing is dropped at all.
+    card.lines.forEach(function (line) {
+      if (line.kind === "more") over.push(id + " dropped a trait: " + line.text);
+    });
+  });
+
+  t.deep(over, [], "every type fits above the bar with its whole trait list");
+});
+
+test("hovering a body draws its sidebar and changes nothing", function (t) {
+  var h = harness.boot();
+  h.run("enemies = []");
+  var e = h.spawnAt(300, 9);
+  e.takeDamage(4);
+
+  h.move(e.pos.x, e.pos.y);
+  h.draw();
+
+  t.eq(e.health, 5, "health untouched by the panel");
+  t.eq(e.incomingDamage, 0, "and no claim invented");
+
+  // Off the board: the panel is gone, and drawing without one must not throw.
+  h.move(h.game.BAR_X + 10, h.game.BAR_Y + 10);
+  h.draw();
+  t.eq(h.run("hoveredOnBoard()"), null, "nothing hovered over the build bar");
+});
+
 group("maps: the routes and the chooser");
 
 // Play the scripted OPENING -- the original two waves -- on `mapId` with
@@ -4607,14 +4822,32 @@ test("the enemy tab covers the roster with derived wave appearances", function (
     if (!e.waves.length) unscheduled.push(e.id);
     e.waves.forEach(function (n) { seen[n] = true; });
   });
-  t.eq(Object.keys(seen).length, h.game.WAVES.length,
-    "every wave in the schedule is claimed by at least one type");
+  // ACROSS EVERY SCHEDULE, because `model.waves` is the UNION of the
+  // per-difficulty lists and the two campaigns are no longer the same length:
+  // Easy is 35 waves and Normal is 40. The claim is still "no wave anywhere is
+  // unaccounted for", stated against the longest schedule rather than against
+  // whichever one happens to be active.
+  var longest = 0;
+  h.game.DIFFICULTIES.forEach(function (d) {
+    longest = Math.max(longest, d.waves.length);
+  });
+  t.eq(longest, 40, "the longest campaign is Normal's forty waves");
+  t.eq(Object.keys(seen).length, longest,
+    "every wave of every schedule is claimed by at least one type");
   t.deep(unscheduled, [], "and no type is left off the schedule");
 
-  // And the late-campaign scaling shows: a stock normal is 4 HP, the finale
-  // sends 30 HP normals, and the guide must say so.
+  // And the late-campaign scaling shows: a stock normal is 4 HP, and the guide
+  // must say what the heaviest scheduled one is.
+  //
+  // 36, NOT 30, SINCE 2026-08-27, and the change is the feature rather than a
+  // drift. The ceiling is taken across EVERY authored schedule, because
+  // "highest campaign HP" is a claim about the game and not about one
+  // difficulty: Easy's finale sends 30 HP Normals and Normal's sends 36.
+  //
+  // 48 SINCE 2026-08-28, from 36: Normal's third money convoy (wave 38) sends
+  // its Normals at 48, and the ceiling is taken across every schedule.
   var normal = enemies.filter(function (e) { return e.id === "normal"; })[0];
-  t.eq(normal.maxHp, 30, "the normal's late-campaign ceiling is derived");
+  t.eq(normal.maxHp, 48, "the normal's late-campaign ceiling is derived");
 
   // The v0.4.7 mechanics are carried into the guide as data off the type, so a
   // retune shows there with no edit -- the same arrangement `attack` has.
@@ -4635,12 +4868,22 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   var boss = enemies.filter(function (e) { return e.id === "boss"; })[0];
   t.eq(boss.health, 5000, "the Tyrant is in the guide too");
   t.eq(boss.attack.stunSeconds, 2, "with what it actually does to towers");
-  t.deep(boss.waves, [35], "and where the player meets it");
+  t.deep(boss.waves, [35, 39], "and where the player meets it");
+  // PER DIFFICULTY, which is what the detail panel prints one row of each. The
+  // union above is what the compact list row shows and what "is this scheduled
+  // at all" asks; these are what a player reads before choosing a campaign.
+  t.deep(appearanceOf(boss, "easy"), [35], "wave 35 of Easy");
+  t.deep(appearanceOf(boss, "normal"), [35, 39],
+    "and waves 35 and 39 of Normal, which sends three of them in the second");
 
   var colossus = enemies.filter(function (e) { return e.id === "colossus"; })[0];
   t.eq(colossus.health, 550, "the new tank's HP reaches the guide");
   t.eq(colossus.bounty, 250, "with its authored bounty");
-  t.deep(colossus.waves, [29], "and its campaign appearance");
+  t.deep(colossus.waves, [25, 29, 36, 37, 38, 39],
+    "and its campaign appearances, both schedules");
+  t.deep(appearanceOf(colossus, "easy"), [29], "Easy sends one, in wave 29");
+  t.deep(appearanceOf(colossus, "normal"), [25, 29, 36, 37, 38, 39],
+    "Normal sends one in 25, two in 29, and then 2/4/6/8 across act VI");
 
   var fractal = enemies.filter(function (e) { return e.id === "fractal_slime"; })[0];
   t.eq(fractal.health, 4, "Fractal Slime is listed at its base T1 health");
@@ -4653,8 +4896,264 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   t.eq(fractal.maxTier, 5, "the guide derives the highest campaign tier");
   t.eq(fractal.maxHp, 1024, "and derives that T5's 1024 HP");
   t.eq(fractal.fractal.splitCount, 4, "the split block reaches the guide");
-  t.deep(fractal.waves, [16, 17, 22, 25, 33, 35],
-    "with one wave per rung of the ladder, in ascending order");
+  t.deep(appearanceOf(fractal, "easy"), [16, 17, 22, 25, 33, 35],
+    "with one wave per rung of Easy's ladder, in ascending order");
+  t.deep(appearanceOf(fractal, "normal"), [17, 27, 32, 35],
+    "and Normal's four rungs, which open at T2 rather than at T0");
+
+  // THE THREE NORMAL-ONLY TYPES, and the row that says so. A card that printed
+  // one merged wave list would tell a player on Easy to look for a Herald that
+  // is not there.
+  ["herald", "sapper", "volatile", "dinomech"].forEach(function (id) {
+    var model = enemies.filter(function (e) { return e.id === id; })[0];
+    t.ok(!!model, id + " is in the guide");
+    t.deep(appearanceOf(model, "easy"), [], id + " appears nowhere in Easy");
+    t.ok(appearanceOf(model, "normal").length > 0,
+      id + " appears in Normal (" + appearanceOf(model, "normal").join(", ") + ")");
+  });
+
+  // THE DINOMECH, whose whole card is one number. It is the fourth Normal-only
+  // type and the only one the player meets exactly once.
+  var dino = enemies.filter(function (e) { return e.id === "dinomech"; })[0];
+  t.eq(dino.health, 45000, "45 000 HP on the card");
+  t.eq(dino.maxHp, 45000, "and the campaign never scales it up or down");
+  t.deep(appearanceOf(dino, "normal"), [40], "wave 40 of Normal and nowhere else");
+});
+
+// The per-difficulty wave list off a codex model, by difficulty id.
+function appearanceOf(model, difficultyId) {
+  for (var i = 0; i < model.appearances.length; i++) {
+    if (model.appearances[i].id === difficultyId) return model.appearances[i].waves;
+  }
+  throw new Error("no appearance row for '" + difficultyId + "'");
+}
+
+
+// ---------------------------------------------------------------------------
+// THE INDEX CARDS FOR THE THREE NEW TYPES, AND THE DIFFICULTIES TAB.
+//
+// A mechanic the player cannot look up is a mechanic they have to reverse
+// engineer from a board they are losing. These check that the cards state the
+// numbers the mechanics actually run on -- and they check the numbers against
+// `Enemy.TYPES` rather than against literals, so a retune moves the assertion
+// and the card together and neither can be updated without the other.
+// ---------------------------------------------------------------------------
+
+test("the index explains the Herald, with the numbers it actually runs on",
+function (t) {
+  var h = readOnlyBoot();
+  h.run("Codex.open()");
+  var enemies = h.run("Codex.models()").enemies;
+  var herald = enemies.filter(function (e) { return e.id === "herald"; })[0];
+  t.ok(!!herald, "the Herald has a card");
+
+  var spec = h.game.Enemy.TYPES.herald.support;
+  t.eq(herald.health, 100, "100 HP on the card");
+  t.eq(herald.bounty, 120, "and its 120 bounty");
+  t.eq(herald.support.haste.speedMultiplier, spec.haste.speedMultiplier,
+    "the haste reaches the guide off the type");
+
+  var text = h.run("Codex.describe('herald')").join(" ");
+  t.ok(text.indexOf("+30%") !== -1, "the card states the +30%");
+  t.ok(text.indexOf("8 s") !== -1, "the eight-second cadence");
+  t.ok(text.indexOf("4 s") !== -1, "the four-second duration");
+  t.ok(text.indexOf("8 nearest") !== -1, "the cap of eight");
+  t.ok(text.indexOf("160 u.l.") !== -1, "and the 160 u.l. reach");
+  t.ok(text.indexOf("never stacks") !== -1, "that it never stacks");
+  t.ok(text.indexOf("cannot hasten") !== -1, "and what it cannot touch");
+  t.ok(text.indexOf("fliers") !== -1 && text.indexOf("Fractal") !== -1 &&
+    text.indexOf("bosses") !== -1, "naming every excluded kind");
+
+  t.eq(h.run("Codex.behaviourRowFor('herald')").join(" | "),
+    "Hastens ×8 | +30% for 4s / 8 s", "and the list row says it compactly");
+});
+
+test("the index explains the Sapper, and does not call it a damage attack",
+function (t) {
+  var h = readOnlyBoot();
+  h.run("Codex.open()");
+  var enemies = h.run("Codex.models()").enemies;
+  var sapper = enemies.filter(function (e) { return e.id === "sapper"; })[0];
+  t.ok(!!sapper, "the Sapper has a card");
+  t.eq(sapper.health, 45, "45 HP on the card");
+  t.eq(sapper.bounty, 60, "and its 60 bounty");
+
+  var text = h.run("Codex.describe('sapper')").join(" ");
+  t.ok(text.indexOf("NO damage") !== -1, "the card says it deals no damage");
+  t.ok(text.indexOf("0 damage") === -1,
+    "and never prints it as an attack that hits for zero");
+  t.ok(text.indexOf("8 s") !== -1, "the eight-second cadence");
+  t.ok(text.indexOf("90 u.l.") !== -1, "the 90 u.l. reach");
+  t.ok(text.indexOf("1.1 s") !== -1, "the 1.1 s telegraph");
+  t.ok(text.indexOf("2 s") !== -1, "the two-second shutdown");
+  t.ok(text.indexOf("4 s") !== -1, "the four seconds of immunity after it");
+  t.ok(text.indexOf("cooldown does not advance") !== -1,
+    "and what being disabled costs a tower");
+});
+
+test("the index explains the Volatile's charge, its fuse and its radius",
+function (t) {
+  var h = readOnlyBoot();
+  h.run("Codex.open()");
+  var enemies = h.run("Codex.models()").enemies;
+  var vol = enemies.filter(function (e) { return e.id === "volatile"; })[0];
+  t.ok(!!vol, "the Volatile has a card");
+  t.eq(vol.health, 8, "8 HP on the card");
+  t.eq(vol.bounty, 25, "and its 25 bounty");
+  t.eq(vol.deathEffect.hazard.radiusUl, 60, "the hazard block reaches the guide");
+
+  var text = h.run("Codex.describe('volatile')").join(" ");
+  t.ok(text.indexOf("1 s later") !== -1, "the one-second fuse");
+  t.ok(text.indexOf("13 damage") !== -1, "the 13 damage");
+  t.ok(text.indexOf("60 u.l.") !== -1, "the 60 u.l. blast radius");
+  t.ok(text.indexOf("75 u.l.") !== -1, "and the 75 u.l. dive it does not share");
+  t.ok(text.indexOf("does not stun") !== -1, "that it does not stun");
+  t.ok(text.indexOf("set off another") !== -1, "that it cannot chain");
+  t.ok(text.indexOf("Leaking") !== -1, "and that a leak leaves nothing");
+
+  // AND THE DIVE, which is the half a card that only described the charge
+  // would have quietly dropped. The interval is 0 and must never be printed:
+  // "every 0 s" is exactly the sentence the early return in attackDescription
+  // exists to prevent.
+  t.ok(text.indexOf("dives onto the nearest") !== -1, "the dive itself");
+  t.ok(text.indexOf("dies of the impact") !== -1, "that the dive kills it");
+  t.eq(text.indexOf("every 0 s"), -1, "and no zero-second cooldown anywhere");
+});
+
+// THE DINOMECH -- Normal's wave-40 finale, added 2026-08-28 with the extension
+// from thirty-five waves to forty. Its card is checked against `Enemy.TYPES`
+// rather than against literals, like the three above it, so a retune moves the
+// assertion and the card together.
+//
+// WHAT THIS TEST IS REALLY GUARDING is the set of things the type does NOT
+// carry. 45 000 is the whole of the fight, and every mechanic it might have
+// had -- a shield, a second life, a roar that calls a support court -- would
+// have made the number the schedule states smaller than the number the player
+// has to remove.
+test("the index explains the Dinomech, and it is 45 000 and nothing else",
+function (t) {
+  var h = readOnlyBoot();
+  h.run("Codex.open()");
+  var enemies = h.run("Codex.models()").enemies;
+  var dino = enemies.filter(function (e) { return e.id === "dinomech"; })[0];
+  t.ok(!!dino, "the Dinomech has a card");
+
+  var T = h.game.Enemy.TYPES.dinomech;
+  t.eq(dino.health, T.health, "the card's health is the type's");
+  t.eq(T.health, 45000, "which is 45 000");
+  t.eq(T.showHealthBanner, true, "it wears a boss banner");
+  t.eq(T.speedMultiplier, 0.25, "and walks slower than the Tyrant's 0.3");
+  t.ok(T.speedMultiplier < h.game.Enemy.TYPES.boss.speedMultiplier,
+    "which makes it the slowest body in the game");
+
+  // THE ABSENCES, each one a reason the 45 000 is exactly 45 000.
+  t.eq(T.shield, undefined, "no shield block");
+  t.eq(T.revive, undefined, "no revive block");
+  t.eq(T.phases, undefined, "no phases, so no roar and no called-in court");
+  t.eq(T.support, undefined, "no support block");
+  t.eq(T.spawns, undefined, "no spawns block");
+  t.eq(T.armor || 0, 0, "no flat armor");
+  t.eq(T.defense || 0, 0, "and no percentage defense");
+
+  var text = h.run("Codex.describe('dinomech')").join(" ");
+  t.ok(text.indexOf("45 000") !== -1, "the card states the 45 000");
+  t.ok(text.indexOf("60 damage") !== -1, "the rail's damage");
+  t.ok(text.indexOf("2.5 s") !== -1, "and its stun");
+  t.ok(text.indexOf("90 damage") !== -1, "the stomp's damage");
+  t.ok(text.indexOf("140 u.l.") !== -1, "and the area it lands across");
+  t.eq(text.indexOf("every 0 s"), -1, "and no zero-second cooldown anywhere");
+});
+
+test("every enemy card carries a per-difficulty wave row", function (t) {
+  var h = readOnlyBoot();
+  h.run("Codex.open()");
+  var enemies = h.run("Codex.models()").enemies;
+  enemies.forEach(function (model) {
+    t.eq(model.appearances.length, h.game.DIFFICULTIES.length,
+      model.id + " has a row per difficulty");
+  });
+});
+
+test("the index has a Difficulties tab with a sub-tab per schedule", function (t) {
+  var h = harness.boot();
+  h.run("Codex.open()");
+  t.eq(h.run("Codex.state()").tab, "towers", "it opens on Towers");
+
+  var tab = h.run("Codex.tabRect(2)");
+  h.click(tab.x + tab.w / 2, tab.y + tab.h / 2);
+  t.eq(h.run("Codex.state()").tab, "difficulties", "the third tab opens");
+  h.draw();
+  t.ok(true, "and it draws");
+
+  // IT OPENS ON WHATEVER IS SELECTED TO PLAY, which is the one piece of state
+  // worth carrying in from outside the screen.
+  t.eq(h.run("Codex.state()").previewDifficultyId, h.game.selectedDifficultyId,
+    "previewing the difficulty the player last chose");
+
+  // The sub-tabs switch which schedule is previewed -- and previewing is NOT
+  // selecting: the index is reached from the title menu, where there is no run
+  // to change, and a screen that quietly changed the next run would be a trap.
+  var sub = h.run("Codex.difficultyTabRect(1)");
+  h.click(sub.x + sub.w / 2, sub.y + sub.h / 2);
+  t.eq(h.run("Codex.state()").previewDifficultyId, "normal", "Normal is previewed");
+  t.eq(h.game.selectedDifficultyId, "easy", "and nothing was selected by reading");
+  t.eq(h.game.WAVES, h.game.EASY_WAVES, "the active schedule is untouched");
+  h.draw();
+  t.ok(true, "the Normal schedule draws");
+});
+
+test("the schedule preview is derived from the schedule it previews",
+function (t) {
+  var h = harness.boot();
+  h.run("Codex.open()");
+  var tab = h.run("Codex.tabRect(2)");
+  h.click(tab.x + tab.w / 2, tab.y + tab.h / 2);
+
+  ["easy", "normal"].forEach(function (id, i) {
+    var sub = h.run("Codex.difficultyTabRect(" + i + ")");
+    h.click(sub.x + sub.w / 2, sub.y + sub.h / 2);
+    var rows = h.run("Codex.scheduleRows()");
+    var schedule = h.run("difficultyOf('" + id + "').waves");
+
+    t.eq(rows.length, schedule.length,
+      id + ": one row per wave (" + schedule.length + ")");
+    t.eq(schedule.length, id === "easy" ? 35 : 40,
+      id + ": and the schedule is the length it should be");
+    var bodies = 0;
+    rows.forEach(function (row, n) {
+      bodies += row.count;
+      // Every column is the game's own arithmetic over the same wave -- the
+      // banner's summary, the scheduler's count, the payout's reward -- so the
+      // preview cannot state a schedule the game does not have.
+      t.eq(row.count, h.game.waveCount(schedule[n]), id + " wave " + (n + 1) + " count");
+      t.eq(row.summary, h.game.waveSummary(schedule[n]),
+        id + " wave " + (n + 1) + " roster");
+      t.eq(row.reward, h.game.waveReward(schedule[n], n + 1),
+        id + " wave " + (n + 1) + " reward");
+    });
+    t.eq(bodies, id === "easy" ? 830 : 1321, id + ": the right total");
+
+    // THE FINAL WAVE PRINTS A STATE WHERE THE WINDOW GOES, never a number. The
+    // last wave of a schedule authors no `duration` and that absence is the
+    // data saying there is nothing after it -- the same rule the in-run readout
+    // follows. WHICH wave that is comes from the SCHEDULE'S LENGTH and never
+    // from what the wave contains: it is Easy's 35 and Normal's 40, and Normal's
+    // own wave 35 -- which still holds a Tyrant -- carries an ordinary ceiling.
+    var last = rows.length - 1;
+    t.eq(rows[last].duration, undefined,
+      id + ": wave " + rows.length + " carries no ceiling");
+    for (var k = 0; k < last; k++) {
+      t.ok(rows[k].duration > rows[k].lastSpawn,
+        id + " wave " + (k + 1) + "'s window outlasts its own tail");
+    }
+    if (id === "normal") {
+      t.ok(rows[34].duration > 0,
+        "and Normal's wave 35 prints a window now that 36-40 follow it");
+    }
+  });
+
+  // The list scrolls, because neither schedule fits eleven rows.
+  t.ok(h.run("Codex.scheduleScrollMax()") > 0, "and the list scrolls");
 });
 
 // The roster became a SCROLLING VIEWPORT on 2026-08-01, at the owner's request
@@ -4789,11 +5288,137 @@ test("clicking a card starts that route, on a ten-second countdown", function (t
     "the readout counts it down: " + h.run("waveStatusText()"));
 });
 
-test("the number keys pick a route too", function (t) {
+// THE NUMBER KEYS PICK A ROUTE, AND THEN THE DIFFICULTY STEP ASKS ITS OWN
+// QUESTION (2026-08-27). Before that step existed, `3` started a run outright;
+// now it commits the route and hands off, and the run begins on the second
+// press. The keyboard therefore has to reach both halves or the chooser is
+// mouse-only for anyone who was using it.
+test("the number keys pick a route, and then a difficulty", function (t) {
   var h = harness.boot(null);
   h.key("3");
-  t.eq(h.game.currentMap.id, h.game.Maps.LIST[2].id, "key 3 picks the third card");
-  t.eq(h.game.screen, "play", "and starts it");
+  t.eq(h.game.screen, "difficulty",
+    "key 3 commits the route and opens the difficulty step rather than starting");
+  t.eq(h.game.pendingMap.id, h.game.Maps.LIST[2].id, "holding the third card");
+
+  h.key("2");
+  t.eq(h.game.currentMap.id, h.game.Maps.LIST[2].id, "the second press starts it");
+  t.eq(h.game.screen, "play", "on the route the first press chose");
+  t.eq(h.game.selectedDifficultyId, h.game.DIFFICULTIES[1].id,
+    "at the difficulty the second press chose");
+  t.eq(h.game.WAVES, h.game.NORMAL_WAVES, "and that schedule is the active one");
+});
+
+// THE INITIAL IS THE OTHER WAY IN, and it is derived from the id rather than
+// typed, so a third difficulty brings its own letter.
+test("a difficulty's initial picks it too, and Escape goes back to the routes",
+function (t) {
+  var h = harness.boot(null);
+  h.key("1");
+  t.eq(h.game.screen, "difficulty", "the route is committed");
+
+  h.key("Escape");
+  t.eq(h.game.screen, "select", "Escape backs out to the chooser");
+
+  h.key("1");
+  h.key("n");
+  t.eq(h.game.screen, "play", "N starts the run");
+  t.eq(h.game.selectedDifficultyId, "normal", "on Normal");
+});
+
+
+test("the difficulty step draws, and its cards hit-test where they are drawn",
+function (t) {
+  var h = harness.boot(null);
+  var card = h.game.mapCardRect(0);
+  h.click(card.x + card.w / 2, card.y + card.h / 2);
+  t.eq(h.game.screen, "difficulty", "the step is up");
+
+  h.draw();
+  t.ok(true, "and a full frame draws without throwing");
+
+  var rects = [];
+  for (var i = 0; i < h.game.DIFFICULTIES.length; i++) {
+    var r = h.game.difficultyCardRect(i);
+    rects.push(r);
+    t.eq(h.game.difficultyCardAt(r.x + r.w / 2, r.y + r.h / 2), i,
+      "centre of card " + i);
+    t.eq(h.game.difficultyCardAt(r.x - 6, r.y + r.h / 2), null,
+      "just left of card " + i);
+    t.ok(r.x >= 0 && r.x + r.w <= h.game.VIEW_WIDTH,
+      "card " + i + " is on the canvas");
+    t.ok(r.y + r.h < h.game.VIEW_HEIGHT,
+      "card " + i + " fits above the bottom edge");
+  }
+
+  // No two cards overlap, and none of them sits under the Back button -- the
+  // same two things the route cards are checked for, and for the same reason:
+  // a control drawn where another is clickable is a control that half-works.
+  for (var a = 0; a < rects.length; a++) {
+    for (var b = a + 1; b < rects.length; b++) {
+      t.ok(rects[a].x + rects[a].w <= rects[b].x ||
+           rects[b].x + rects[b].w <= rects[a].x,
+        "cards " + a + " and " + b + " do not overlap");
+    }
+    var back = h.game.backButtonRect();
+    t.ok(rects[a].y > back.y + back.h, "card " + a + " clears the Back button");
+  }
+
+  // AND THE CARD'S NUMBERS ARE THE SCHEDULE'S. Nothing about a difficulty's
+  // difficulty is typed on a card: retune a wave and the card follows.
+  h.game.DIFFICULTIES.forEach(function (difficulty) {
+    var summary = h.game.difficultySummary(difficulty);
+    var bodies = 0, types = {};
+    difficulty.waves.forEach(function (wave) {
+      bodies += h.game.waveCount(wave);
+      h.game.waveGroups(wave).forEach(function (g) {
+        types[g.type || h.game.Enemy.DEFAULT_TYPE] = true;
+      });
+    });
+    t.eq(summary.waves, difficulty.waves.length, difficulty.name + ": wave count");
+    t.eq(summary.bodies, bodies, difficulty.name + ": body count is derived");
+    t.eq(summary.types, Object.keys(types).length,
+      difficulty.name + ": type count is derived");
+  });
+});
+
+test("a board carrying all three new mechanics draws a full frame", function (t) {
+  var h = harness.boot("rune-circuit", "normal");
+  h.run("cash = 100000");
+  var spot = h.game.Maps.bestSpots(h.game.currentMap, 1)[0];
+  var tower = h.placeGunner(spot.x, spot.y);
+
+  // A hastened body, a Sapper mid-telegraph, a disabled tower, an immune one
+  // and a live charge -- every cue this change added, on the board at once.
+  var hastened = h.spawnAt(h.game.path.length * 0.3, undefined, "swarm");
+  hastened.applyHaste(1.3, 4);
+
+  var sapper = h.spawnAt(h.game.path.length * 0.4, undefined, "sapper");
+  sapper.pos = { x: tower.x + h.game.ul(40), y: tower.y };
+  sapper.attackTowers(8.1, h.game.towers);
+  t.ok(sapper.windUpTimer > 0, "a Sapper is telegraphing");
+
+  h.run("TowerHealth.suppress(towers[0], 'sapper', 6); TowerHealth.stun(towers[0], 2);");
+  var charge = new h.game.Enemy(h.game.path, undefined, "volatile");
+  charge.pos = { x: tower.x + h.game.ul(20), y: tower.y };
+  h.game.Hazards.fromDeath(charge);
+  t.eq(h.game.Hazards.count(), 1, "a charge is ticking");
+
+  h.draw();
+  t.ok(true, "the whole board draws with every new cue live");
+
+  // And again once the charge has gone off, which is the afterglow branch --
+  // a different path through both renderers.
+  h.step(1.1);
+  h.draw();
+  t.ok(true, "and again on the frame after it detonates");
+
+  // And once the tower is merely immune rather than dark, which is the third
+  // of the three sabotage states.
+  h.step(1.2);
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "the tower has recovered");
+  t.eq(h.game.TowerHealth.isSuppressed(tower, "sapper"), true, "and is immune");
+  h.draw();
+  t.ok(true, "the immune state draws too");
 });
 
 test("card hit tests agree with where the cards are drawn", function (t) {
@@ -5021,6 +5646,15 @@ test("every result-screen button is clickable exactly where it is drawn", functi
   t.eq(h.run("(function () { var r = resultButtonAt(" + (top.x - 6) + ", " +
     (top.y + top.h / 2) + "); return r ? r.id : null; })()"), null,
     "six pixels to the left of the first button is not the first button");
+});
+
+test("the two loss-screen buttons do not overlap", function (t) {
+  var h = harness.boot();
+  var a = h.game.restartButtonRect();
+  var b = h.game.changeMapButtonRect();
+
+  t.ok(a.x + a.w <= b.x, "restart ends before change-map begins");
+  t.ok(b.x + b.w <= h.game.VIEW_WIDTH, "change-map stays on the canvas");
 });
 
 test("switching routes clears towers built on the old one", function (t) {
@@ -6534,6 +7168,1046 @@ test("adding the Soldier moved nothing on the towers that already existed", func
   t.ok(h.game.STARTING_CASH > cheapest, "the opening stake still beats the cheapest tower");
 });
 
+
+
+// ---------------------------------------------------------------------------
+// THE THREE NORMAL-DIFFICULTY TYPES (2026-08-27)
+//
+// Herald, Sapper and Volatile. Every one of them is built out of a mechanic
+// BLOCK on the type row, and the standing rule this file's roster test already
+// enforces applies to all three: nothing in js/ branches on the strings
+// "herald", "sapper" or "volatile". These tests exercise the MECHANICS through
+// the real entry points -- Enemy.prototype.supportAllies, attackTowers,
+// resolveAttack, Hazards.update and the game's own update() -- so passing here
+// means the board behaves the same way.
+// ---------------------------------------------------------------------------
+
+// A SINGLE BOOTED GAME, SHARED BY THE TESTS THAT ONLY READ DATA.
+//
+// Most tests need a fresh board because they change one. A test that asks what
+// `Enemy.TYPES.herald.health` is, or what the index would print, changes
+// nothing -- and a boot is not free: it builds a whole `vm` context that lives
+// until the process ends, and this suite already makes over two hundred of
+// them. Two hundred contexts is enough garbage to force repeated full
+// mark-compacts, and every one of those is a chance to hit the GC crash node
+// v24 has in `ClearStaleLeftTrimmedPointerVisitor` (see tests/harness.js).
+//
+// So: read-only tests share one. Anything that places a tower, spawns a body,
+// steps the clock or clicks still boots its own -- the sharing is by USE, never
+// by convenience.
+var sharedReadOnly = null;
+function readOnlyBoot() {
+  if (!sharedReadOnly) sharedReadOnly = harness.boot();
+  return sharedReadOnly;
+}
+
+group("the Herald");
+
+// A board of ordinary bodies parked along the road at known distances from a
+// Herald, so "the eight nearest within 160 u.l." is a question with an obvious
+// right answer. Returns { herald, bodies } with the bodies in the order they
+// were created (which is also their laneIndex order -- the pick's tie-break).
+function heraldBoard(h, count, typeId, spacingUl) {
+  var Enemy = h.game.Enemy;
+  var herald = new Enemy(h.game.path, undefined, "herald");
+  herald.pos = { x: 0, y: 0 };
+  var bodies = [];
+  for (var i = 0; i < count; i++) {
+    var body = new Enemy(h.game.path, undefined, typeId || "normal");
+    // Placed by hand rather than by walking the road: this is a test about a
+    // radius, and a road that bends would make "distance" a different question
+    // from the one the mechanic asks.
+    body.pos = { x: h.game.ul(spacingUl === undefined ? 10 : spacingUl) * (i + 1),
+                 y: 0 };
+    bodies.push(body);
+  }
+  return { herald: herald, bodies: bodies, all: [herald].concat(bodies) };
+}
+
+test("the Herald's numbers are the ones that were asked for", function (t) {
+  var h = readOnlyBoot();
+  var T = h.game.Enemy.TYPES.herald;
+  t.eq(T.health, 100, "100 base health");
+  t.eq(T.bounty, 120, "120 bounty");
+  t.eq(T.speedMultiplier, 0.55, "0.55x baseline movement speed");
+  t.ok(Math.abs(T.sizeScale - 1.15) < 0.001, "about 1.15x a Normal's size");
+  t.eq(T.support.intervalSeconds, 8, "a pulse every 8 s");
+  t.eq(T.support.targets, 8, "up to eight allies");
+  t.eq(T.support.reachUl, 160, "within 160 u.l.");
+  t.eq(T.support.haste.speedMultiplier, 1.3, "+30% movement speed");
+  t.eq(T.support.haste.seconds, 4, "for 4 s");
+  t.eq(T.support.pick, "nearest", "picking the nearest");
+});
+
+test("a Herald pulses every eight seconds, and not before", function (t) {
+  var h = harness.boot();
+  var board = heraldBoard(h, 3);
+
+  // The timer starts FULL, like every other support type's: a supporter that
+  // pulsed the instant it walked in would give the player nothing to react to.
+  t.eq(board.herald.supportTimer, 8, "the first cycle is a full eight seconds");
+
+  var pulsed = board.herald.supportAllies(7.9, board.all);
+  t.eq(pulsed, null, "nothing at 7.9 s");
+  t.eq(board.bodies[0].isHastened(), false, "and nobody is moving faster");
+
+  pulsed = board.herald.supportAllies(0.2, board.all);
+  t.ok(pulsed && pulsed.length === 3, "the pulse lands at 8.1 s");
+  t.eq(board.bodies[0].isHastened(), true, "and the allies are hastened");
+  t.eq(board.herald.supportTimer, 8, "with the next cycle a full eight again");
+});
+
+test("a pulse reaches 160 u.l. and no further", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var herald = new Enemy(h.game.path, undefined, "herald");
+  herald.pos = { x: 0, y: 0 };
+
+  var inside = new Enemy(h.game.path, undefined, "normal");
+  inside.pos = { x: h.game.ul(159), y: 0 };
+  var outside = new Enemy(h.game.path, undefined, "normal");
+  outside.pos = { x: h.game.ul(161), y: 0 };
+
+  herald.supportAllies(8, [herald, inside, outside]);
+  t.eq(inside.isHastened(), true, "159 u.l. away is inside the pulse");
+  t.eq(outside.isHastened(), false, "161 u.l. away is outside it");
+});
+
+test("a pulse takes the eight NEAREST, with a deterministic tie-break",
+function (t) {
+  var h = harness.boot();
+  // Twelve bodies at 10, 20, ... 120 u.l. The cap is eight, so the four
+  // furthest must be left out -- and they must be the four furthest, not four
+  // arbitrary ones.
+  var board = heraldBoard(h, 12, "normal", 10);
+  var picked = board.herald.supportAllies(8, board.all);
+  t.eq(picked.length, 8, "eight allies, and eight is the cap");
+
+  var hastened = board.bodies.filter(function (b) { return b.isHastened(); });
+  t.eq(hastened.length, 8, "eight bodies are moving faster");
+  for (var i = 0; i < 12; i++) {
+    t.eq(board.bodies[i].isHastened(), i < 8,
+      "body at " + ((i + 1) * 10) + " u.l. " + (i < 8 ? "is" : "is not") +
+      " in the eight nearest");
+  }
+
+  // THE TIE-BREAK. Four bodies at exactly the same point: the pick has to be
+  // reproducible, and `laneIndex` -- the spawn counter -- is what makes it so.
+  var Enemy = h.game.Enemy;
+  var herald = new Enemy(h.game.path, undefined, "herald");
+  herald.pos = { x: 0, y: 0 };
+  var tied = [];
+  for (var k = 0; k < 4; k++) {
+    var e = new Enemy(h.game.path, undefined, "swarm");
+    e.pos = { x: h.game.ul(30), y: 0 };
+    tied.push(e);
+  }
+  var order = herald.supportCandidates(Enemy.TYPES.herald.support,
+    [herald].concat(tied));
+  t.deep(order.map(function (e) { return e.laneIndex; }),
+    tied.map(function (e) { return e.laneIndex; }),
+    "bodies at an identical distance come back in spawn order, every time");
+});
+
+test("a Herald hastens nothing it is not allowed to", function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+  var herald = new Enemy(h.game.path, undefined, "herald");
+  herald.pos = { x: 0, y: 0 };
+
+  // One of each excluded kind, all well inside the reach, plus one body that
+  // IS eligible so the pulse is not simply empty.
+  var BARRED = ["flying", "healer", "fractal_slime", "midboss", "boss_fast",
+                "boss", "herald"];
+  var board = [herald];
+  var barred = BARRED.map(function (id) {
+    var e = new Enemy(h.game.path, undefined, id);
+    e.pos = { x: h.game.ul(20), y: 0 };
+    board.push(e);
+    return e;
+  });
+  var ok = new Enemy(h.game.path, undefined, "normal");
+  ok.pos = { x: h.game.ul(100), y: 0 };      // FURTHEST, deliberately
+  board.push(ok);
+
+  var picked = herald.supportAllies(8, board);
+  t.eq(picked.length, 1, "one eligible body on the board, and it is the pick");
+  t.eq(picked[0], ok, "even though it is the furthest thing there");
+  t.eq(ok.isHastened(), true, "the ordinary body is hastened");
+  barred.forEach(function (e, i) {
+    t.eq(e.isHastened(), false, BARRED[i] + " is ineligible");
+  });
+  t.eq(herald.isHastened(), false, "and a Herald cannot hasten itself");
+
+  // A FRACTAL DESCENDANT IS ALSO BARRED, which is the half a type-id list
+  // would have got wrong: a split child is the same roster row at a lower tier.
+  var child = new Enemy(h.game.path, undefined, "fractal_slime", { tier: 0 });
+  child.pos = { x: h.game.ul(15), y: 0 };
+  herald.supportTimer = 0;
+  herald.supportAllies(0.1, [herald, child, ok]);
+  t.eq(child.isHastened(), false, "a T0 descendant is ineligible too");
+});
+
+test("haste never stacks; a second pulse only refreshes it", function (t) {
+  var h = harness.boot();
+  var body = h.spawnAt(0, undefined, "swarm");
+  var base = body.currentSpeedUlps();
+
+  body.applyHaste(1.3, 4);
+  var hasted = body.currentSpeedUlps();
+  t.ok(Math.abs(hasted / base - 1.3) < 1e-9, "one pulse is +30%");
+
+  // A second pulse from a second Herald.
+  body.applyHaste(1.3, 4);
+  t.ok(Math.abs(body.currentSpeedUlps() / base - 1.3) < 1e-9,
+    "a second pulse is still +30%, not +69%");
+  t.eq(body.hasteTimer, 4, "and it refreshed the four seconds");
+
+  // Refresh means REFRESH, not extend: half a second in, an equal pulse puts
+  // the timer back to a full four rather than adding four to what was left.
+  body.update(2);
+  t.ok(Math.abs(body.hasteTimer - 2) < 1e-9, "two seconds left");
+  body.applyHaste(1.3, 4);
+  t.eq(body.hasteTimer, 4, "and an equal pulse puts it back to four");
+
+  // A WEAKER PULSE CANNOT DILUTE A STRONGER ONE, the same rule applySlow
+  // follows in the other direction.
+  body.applyHaste(1.1, 9);
+  t.ok(Math.abs(body.currentSpeedUlps() / base - 1.3) < 1e-9,
+    "a weaker haste does not replace a stronger one");
+  t.eq(body.hasteTimer, 4, "and does not extend it either");
+});
+
+test("haste outlives the Herald that granted it", function (t) {
+  var h = harness.boot();
+  var board = heraldBoard(h, 2);
+  board.herald.supportAllies(8, board.all);
+  t.eq(board.bodies[0].isHastened(), true, "hastened");
+
+  // The source dies. The effect is on the TARGET's own clock -- the same shape
+  // as a Healer's regeneration, and for the same reason: this is an effect on
+  // the body, not a beam somebody has to keep holding.
+  board.herald.dead = true;
+  board.bodies[0].update(1);
+  t.eq(board.bodies[0].isHastened(), true, "still hastened a second later");
+  t.ok(Math.abs(board.bodies[0].hasteTimer - 3) < 1e-9, "with three seconds left");
+  board.bodies[0].update(3);
+  t.eq(board.bodies[0].isHastened(), false, "and it lapses on its own clock");
+});
+
+test("repeated haste leaves no permanent speed behind", function (t) {
+  var h = harness.boot();
+  var body = h.spawnAt(0, undefined, "normal");
+  var base = body.currentSpeedUlps();
+
+  // Forty pulses, each fully aged out, at an awkward step size that never
+  // lands on the expiry exactly -- which is precisely the case a multiplier
+  // decayed TOWARDS 1 rather than reset TO 1 would drift on.
+  for (var i = 0; i < 40; i++) {
+    body.applyHaste(1.3, 4);
+    for (var k = 0; k < 63; k++) body.update(0.0667);
+  }
+  t.eq(body.hasteMultiplier, 1, "the multiplier is exactly 1 again");
+  t.eq(body.hasteTimer, 0, "with no timer left");
+  t.eq(body.currentSpeedUlps(), base,
+    "and the body walks at exactly the pace it was born with");
+
+  // And the type row was never touched -- every Herald shares it, so a write
+  // there would speed up every future body of that type, including next run's.
+  t.eq(h.game.Enemy.TYPES.normal.speedMultiplier, 1, "the type row is untouched");
+});
+
+test("haste rides the pause, the speed toggle and a restart", function (t) {
+  var h = harness.boot();
+  var body = h.spawnAt(200, undefined, "normal");
+  body.applyHaste(1.3, 4);
+
+  // PAUSED: update() returns before anything ages, so the four seconds are not
+  // spent while a menu is up. Nothing in the haste code knows the pause exists
+  // -- it is a property of who calls update() -- which is the point.
+  h.run("paused = true");
+  h.step(3);
+  t.ok(Math.abs(body.hasteTimer - 4) < 1e-9, "a paused run spends none of it");
+  h.run("paused = false");
+  h.step(1);
+  t.ok(Math.abs(body.hasteTimer - 3) < 1e-6, "and it resumes on the fixed step");
+
+  // A restart takes the body with it, so there is nothing left to be hastened.
+  h.run("restartGame()");
+  t.eq(h.game.enemies.length, 0, "a restart clears the road");
+});
+
+
+group("the Sapper");
+
+// A Sapper parked beside one tower, with the tower list the game would hand it.
+function sapperAt(h, tower, distanceUl) {
+  var e = new h.game.Enemy(h.game.path, undefined, "sapper");
+  e.pos = { x: tower.x + h.game.ul(distanceUl === undefined ? 40 : distanceUl),
+            y: tower.y };
+  return e;
+}
+
+function sapperTower(h) {
+  h.run("cash = 100000");
+  var spot = h.game.Maps.bestSpots(h.game.currentMap, 1)[0];
+  return h.placeGunner(spot.x, spot.y);
+}
+
+test("the Sapper's numbers are the ones that were asked for", function (t) {
+  var h = readOnlyBoot();
+  var T = h.game.Enemy.TYPES.sapper;
+  t.eq(T.health, 45, "45 base health");
+  t.eq(T.bounty, 60, "60 bounty");
+  t.eq(T.speedMultiplier, 0.8, "0.8x baseline movement speed");
+  t.eq(T.attack.intervalSeconds, 8, "an 8 s cooldown");
+  t.eq(T.attack.reachUl, 90, "a 90 u.l. reach");
+  t.eq(T.attack.windUpSeconds, 1.1, "a 1.1 s telegraph");
+  t.eq(T.attack.disable.seconds, 2, "a 2 s disable");
+  t.eq(T.attack.disable.immuneSeconds, 4, "and 4 s of immunity after recovery");
+  t.eq(T.attack.damage, undefined, "with no damage authored at all");
+  t.eq(T.attack.stunSeconds, undefined, "and no stun of its own");
+});
+
+test("a Sapper telegraphs for 1.1 s, stands still, and then disables",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var sapper = sapperAt(h, tower, 40);
+  var hp = tower.currentHp;
+
+  // THE INITIAL COOLDOWN IS THE FULL EIGHT SECONDS. The timer starts full, so
+  // a Sapper that walks into range does not act on the frame it arrives.
+  t.eq(sapper.attackTimer, 8, "the first cycle is eight seconds");
+  sapper.attackTowers(7.9, [tower]);
+  t.eq(sapper.windUpTimer, 0, "nothing at 7.9 s");
+
+  sapper.attackTowers(0.2, [tower]);
+  t.ok(sapper.windUpTimer > 0, "the telegraph opens at 8.1 s");
+  t.eq(sapper.windUpTarget, tower, "committed to the tower it is standing at");
+  t.eq(sapper.currentSpeedUlps(), 0, "and it stops dead while it telegraphs");
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "the tower is still firing");
+
+  // It resolves at the end of the wind-up and NOT before.
+  sapper.attackTowers(1.0, [tower]);
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "still nothing at 1.0 s in");
+  sapper.attackTowers(0.2, [tower]);
+  t.eq(h.game.TowerHealth.isStunned(tower), true, "the tower goes dark at 1.1 s");
+  t.eq(tower.stunTimer, 2, "for exactly two seconds");
+  t.eq(tower.currentHp, hp, "and it took no damage at all");
+  t.eq(sapper.windUpTarget, null, "the commitment is released");
+  t.eq(sapper.attackTimer, 8, "and the next cycle is another eight seconds");
+});
+
+test("a Sapper looks 90 u.l. and no further", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  var near = sapperAt(h, tower, 89);
+  near.attackTowers(8.1, [tower]);
+  t.ok(near.windUpTimer > 0, "89 u.l. away is in reach");
+
+  var far = sapperAt(h, tower, 91);
+  far.attackTowers(8.1, [tower]);
+  t.eq(far.windUpTimer, 0, "91 u.l. away is not");
+  // AND THE CYCLE IS NOT CONSUMED. The timer is left expired, so it acts the
+  // instant something comes into reach rather than waiting out another eight.
+  t.ok(far.attackTimer <= 0, "and the cycle was not spent looking");
+});
+
+test("a disabled tower cannot fire, and its cooldown does not advance",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  h.spawnAt(h.game.path.length * 0.5, 500, "normal");
+
+  h.run("TowerHealth.stun(towers[0], 2)");
+  var before = tower.cooldown;
+  h.step(1);
+  t.eq(h.game.bullets.length, 0, "a disabled tower fires nothing");
+  t.eq(tower.cooldown, before,
+    "and its cooldown is exactly where it was -- the stun is not absorbed by it");
+  t.ok(Math.abs(tower.stunTimer - 1) < 1e-6, "with a second of silence left");
+});
+
+test("a disabled tower and an immune one are both invalid targets", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var disable = h.game.Enemy.TYPES.sapper.attack.disable;
+
+  // DISABLED.
+  h.run("TowerHealth.stun(towers[0], 2)");
+  t.eq(h.game.Enemy.towerAcceptsDisable(tower, disable), false,
+    "a tower that is already dark cannot be disabled again");
+  var sapper = sapperAt(h, tower, 40);
+  sapper.attackTowers(8.1, [tower]);
+  t.eq(sapper.windUpTimer, 0, "so a Sapper does not even telegraph at it");
+
+  // IMMUNE, and not disabled. The tower is firing perfectly well; it simply
+  // cannot be taken out again yet.
+  h.run("towers[0].stunTimer = 0");
+  h.run("TowerHealth.suppress(towers[0], 'sapper', 4)");
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "the tower is live");
+  t.eq(h.game.Enemy.towerAcceptsDisable(tower, disable), false,
+    "and still an invalid target");
+  var second = sapperAt(h, tower, 40);
+  second.attackTowers(8.1, [tower]);
+  t.eq(second.windUpTimer, 0, "no telegraph at an immune tower");
+});
+
+test("after recovery a tower is immune for four seconds, and then is not",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var sapper = sapperAt(h, tower, 40);
+
+  sapper.attackTowers(8.1, [tower]);
+  sapper.attackTowers(1.1, [tower]);
+  t.eq(tower.stunTimer, 2, "disabled for two seconds");
+  t.ok(Math.abs(h.game.TowerHealth.suppressionRemaining(tower, "sapper") - 6) < 1e-9,
+    "and stamped immune for the two plus four -- six in all");
+
+  // THE IMMUNITY AGES WHILE THE TOWER IS DARK, which is what makes it four
+  // seconds AFTER recovery rather than four seconds of which two are spent
+  // stunned. It is ticked in the main loop before the stun check, precisely
+  // because that check skips the rest of the tower's step.
+  h.step(2.05);
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "it wakes up after two seconds");
+  t.ok(Math.abs(h.game.TowerHealth.suppressionRemaining(tower, "sapper") - 4) < 0.05,
+    "with four seconds of immunity left");
+
+  h.step(3.9);
+  t.eq(h.game.TowerHealth.isSuppressed(tower, "sapper"), true, "still immune");
+  h.step(0.2);
+  t.eq(h.game.TowerHealth.isSuppressed(tower, "sapper"), false,
+    "and vulnerable again four seconds after it recovered");
+});
+
+test("two Sappers on one tower resolve in enemy order: one disable, one fizzle",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  var first = sapperAt(h, tower, 40);
+  var second = sapperAt(h, tower, 41);
+  var board = [tower];
+
+  // Both commit on the same frame, to the same tower -- which is legal and is
+  // the case the fizzle rule exists for.
+  first.attackTowers(8.1, board);
+  second.attackTowers(8.1, board);
+  t.eq(first.windUpTarget, tower, "both telegraph the same tower");
+  t.eq(second.windUpTarget, tower, "at the same moment");
+
+  // And both resolve on the same frame, walked in enemy order -- which is what
+  // the main loop does with `enemies`.
+  first.attackTowers(1.1, board);
+  var stunAfterFirst = tower.stunTimer;
+  second.attackTowers(1.1, board);
+
+  t.eq(stunAfterFirst, 2, "the FIRST one disables the tower");
+  t.eq(tower.stunTimer, 2,
+    "and the second finds it disabled, fizzles, and does not extend the stun");
+  t.ok(Math.abs(h.game.TowerHealth.suppressionRemaining(tower, "sapper") - 6) < 1e-9,
+    "nor refresh the immunity");
+  t.eq(second.attackTimer, 8, "the fizzle still consumes the second one's cycle");
+  t.eq(second.windUpTarget, null, "and releases its commitment");
+});
+
+test("a telegraph cancels cleanly when its target or its owner goes", function (t) {
+  var h = harness.boot();
+
+  // 1 -- THE TARGET IS SOLD MID-TELEGRAPH. Membership in `towers` is the test
+  // that catches this: the object is otherwise perfectly intact.
+  var h1 = harness.boot();
+  var soldTower = sapperTower(h1);
+  var sapper = sapperAt(h1, soldTower, 40);
+  sapper.attackTowers(8.1, [soldTower]);
+  t.eq(sapper.windUpTarget, soldTower, "committed");
+  h1.run("sellTower(towers[0])");
+  t.eq(h1.game.towers.length, 0, "the tower is sold mid-telegraph");
+  sapper.attackTowers(1.1, h1.game.towers);
+  t.eq(sapper.windUpTarget, null, "the telegraph resolves to nothing");
+  t.eq(sapper.attackTimer, 8, "the cycle is spent, and nothing was disabled");
+
+  // 2 -- THE TARGET IS DESTROYED MID-TELEGRAPH. It is still in `towers` until
+  // the sweep, so `isDestroyed` is the half that catches this one.
+  var h2 = harness.boot();
+  var dying = sapperTower(h2);
+  var s2 = sapperAt(h2, dying, 40);
+  s2.attackTowers(8.1, [dying]);
+  dying.currentHp = 0;
+  s2.attackTowers(1.1, [dying]);
+  t.eq(h2.game.TowerHealth.isStunned(dying), false,
+    "a destroyed tower is not disabled on its way out");
+
+  // 3 -- THE SAPPER ITSELF DIES MID-TELEGRAPH. It drops the commitment on the
+  // step it dies rather than carrying a threat the renderers would draw.
+  var h3 = harness.boot();
+  var target = sapperTower(h3);
+  var s3 = sapperAt(h3, target, 40);
+  s3.attackTowers(8.1, [target]);
+  t.ok(s3.windUpTimer > 0, "telegraphing");
+  s3.dead = true;
+  t.eq(s3.attackTowers(1 / 60, [target]), null, "a dead Sapper resolves nothing");
+  t.eq(s3.windUpTarget, null, "and the telegraph is cleared");
+  t.eq(h3.game.TowerHealth.isStunned(target), false, "the tower is untouched");
+});
+
+test("Sapper state dies with the tower and with the run", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  h.run("TowerHealth.suppress(towers[0], 'sapper', 6)");
+  t.eq(h.game.TowerHealth.isSuppressed(tower, "sapper"), true, "immune");
+
+  // SELLING. The immunity lives on the tower object, so it leaves with it --
+  // there is no registry anywhere that could outlive a board.
+  h.run("sellTower(towers[0])");
+  t.eq(h.game.towers.length, 0, "sold");
+
+  // A FRESH TOWER ON THE SAME SPOT IS A FRESH TOWER.
+  var again = sapperTower(h);
+  t.eq(h.game.TowerHealth.isSuppressed(again, "sapper"), false,
+    "a new tower on the same ground is vulnerable");
+
+  // A RESTART, a map change and a return to the menu all go through
+  // restartGame(), which empties `towers` outright.
+  h.run("TowerHealth.suppress(towers[0], 'sapper', 6); restartGame()");
+  t.eq(h.game.towers.length, 0, "a restart takes every tower and its state");
+});
+
+
+group("the Volatile");
+
+test("the Volatile's numbers are the ones that were asked for", function (t) {
+  var h = readOnlyBoot();
+  var T = h.game.Enemy.TYPES.volatile;
+  t.eq(T.health, 8, "8 base health -- under a single Warbringer round");
+  t.eq(T.bounty, 25, "25 bounty, deliberately unchanged by the retune");
+  t.eq(T.speedMultiplier, 1.5, "1.5x baseline movement speed");
+  t.ok(Math.abs(T.sizeScale - 0.9) < 0.001, "about 0.9x a Normal's size");
+  t.eq(T.deathEffect.hazard.fuseSeconds, 1, "a one-second fuse");
+  t.eq(T.deathEffect.hazard.radiusUl, 60, "a 60 u.l. blast");
+  t.eq(T.deathEffect.hazard.towerDamage, 13, "for 13 damage");
+  t.eq(T.deathEffect.hazard.stunSeconds, undefined, "and no stun at all");
+
+  // IT IS THE FASTEST THING THAT ACTS ON TOWERS -- not the fastest body on the
+  // road, which is a Fast at 1.75. Derived from the roster rather than typed,
+  // so it stays a claim about the game instead of a number that goes stale the
+  // next time an attacker is retuned.
+  var fastestOtherAttacker = 0;
+  Object.keys(h.game.Enemy.TYPES).forEach(function (id) {
+    var other = h.game.Enemy.TYPES[id];
+    if (id === "volatile" || !other.attack) return;
+    fastestOtherAttacker = Math.max(fastestOtherAttacker, other.speedMultiplier || 1);
+  });
+  t.ok(fastestOtherAttacker > 0, "there are other attackers to compare against");
+  t.ok(T.speedMultiplier > fastestOtherAttacker * 1.5,
+    "and it closes far faster than any of them, which is what the 8 health buys");
+
+  // THE DIVE AND THE BLAST ARE TWO DIFFERENT NUMBERS, and that is the retune
+  // rather than a drift: it crosses 75 u.l. to reach a tower and then takes
+  // only 60 with it, so a second gun set back behind the first is outside the
+  // explosion even though the first was close enough to be dived at.
+  t.eq(T.attack.damage, 13, "the dive hits for the same 13 the charge does");
+  t.eq(T.attack.damage, T.deathEffect.hazard.towerDamage,
+    "one damage number for both halves -- that pair IS still shared");
+  t.eq(T.attack.reachUl, 75, "it will cross 75 u.l. to reach a tower");
+  t.ok(T.attack.reachUl > T.deathEffect.hazard.radiusUl,
+    "and the dive reaches further than the blast, so spacing buys something");
+  t.eq(T.attack.lunge, true, "it moves onto what it hits");
+  t.eq(T.attack.selfDestructs, true, "and dies of the impact");
+  t.eq(T.attack.intervalSeconds, 0,
+    "with no cooldown -- attackTimer starts at the interval, so a positive " +
+    "one would make it walk past towers before it was allowed to dive");
+});
+
+test("every Volatile in the campaign is the last thing its wave spawns",
+function (t) {
+  var h = readOnlyBoot();
+
+  // ACROSS EVERY SCHEDULE, not just the one that carries them today. The rule
+  // the owner set on 2026-08-27 -- "in every wave there are volatiles, make
+  // them come out last" -- is a claim about the CAMPAIGN, so it is checked
+  // against every entry in DIFFICULTIES. Easy has no Volatiles at all, which
+  // makes it vacuously true there and keeps the test honest the day that
+  // changes.
+  var checked = 0;
+  var problems = [];
+
+  h.game.DIFFICULTIES.forEach(function (difficulty) {
+    difficulty.waves.forEach(function (wave, i) {
+      var firstVolatile = Infinity;
+      var lastOther = -Infinity;
+
+      wave.groups.forEach(function (g) {
+        // A group's last body leaves at `at + (count - 1) * interval`. It is
+        // the LAST of the others that has to clear, not the first: a group
+        // that merely STARTS earlier but trickles for twenty seconds would
+        // still be arriving underneath the divers.
+        var end = g.at + (g.count - 1) * g.interval;
+        if (g.type === "volatile") firstVolatile = Math.min(firstVolatile, g.at);
+        else lastOther = Math.max(lastOther, end);
+      });
+
+      if (firstVolatile === Infinity) return;    // no Volatiles in this wave
+      checked++;
+      if (!(firstVolatile > lastOther)) {
+        problems.push(difficulty.name + " wave " + (i + 1) +
+          ": a Volatile leaves at " + firstVolatile +
+          " s but another group is still arriving at " + lastOther.toFixed(2) + " s");
+      }
+    });
+  });
+
+  t.deep(problems, [], "no wave sends a Volatile before it has finished with " +
+    "everything else");
+  t.eq(checked, 3, "and three waves were actually checked -- 20, 26 and 31 -- " +
+    "so this cannot pass by finding no Volatiles at all");
+});
+
+test("the closing volley still lands inside its wave's ceiling", function (t) {
+  var h = readOnlyBoot();
+
+  // Moving six groups to the tail of their waves is exactly the edit that
+  // pushes a last spawn past its `duration`, which the shipping validator
+  // rejects outright. Asserted here as well as there because THIS is the
+  // change that made it a live risk, and a margin of seconds is worth seeing
+  // rather than inferring from a green validator.
+  var margins = [];
+  h.game.DIFFICULTIES.forEach(function (difficulty) {
+    difficulty.waves.forEach(function (wave, i) {
+      if (!wave.groups.some(function (g) { return g.type === "volatile"; })) return;
+      var ev = h.game.waveTimeline(wave);
+      margins.push(wave.duration - ev[ev.length - 1].time);
+    });
+  });
+
+  t.eq(margins.length, 3, "three waves carry Volatiles");
+  margins.forEach(function (m, i) {
+    t.ok(m > 20, "wave " + i + " still has " + m.toFixed(1) +
+      " s of ceiling after its last diver, which is room to spare");
+  });
+});
+
+// A VOLATILE AT AN EXACT DISTANCE FROM A TOWER, placed rather than walked, the
+// same arrangement sapperAt has and for the same reason: what these tests
+// measure is the dive's geometry, and a body that walked here would be
+// somewhere slightly different every time the road or the lane offset changed.
+//
+// NOT pushed into `enemies`. attackTowers is the real entry point and takes
+// the board directly, so a test that only wants the dive does not also have to
+// out-run the gunner it is diving at.
+function volatileAt(h, tower, distanceUl) {
+  var e = new h.game.Enemy(h.game.path, undefined, "volatile");
+  e.pos = { x: tower.x + h.game.ul(distanceUl), y: tower.y };
+  return e;
+}
+
+// The same body, but ON THE ROAD and on the board, at the point of the path
+// that runs closest to `tower`. For the tests that drive the real update()
+// loop, where a hand-written `pos` does not survive the top of the next step.
+function volatileOnRoadNear(h, tower) {
+  var best = 0;
+  var bestD = Infinity;
+  for (var p = 0; p <= h.game.path.length; p += 2) {
+    var pt = h.game.path.pointAt(p);
+    var d = (pt.x - tower.x) * (pt.x - tower.x) + (pt.y - tower.y) * (pt.y - tower.y);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return h.spawnAt(best, undefined, "volatile");
+}
+
+test("a Volatile dives into the nearest tower, hits it for 13, and dies of it",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var hp = tower.currentHp;
+  var body = volatileAt(h, tower, 60);
+
+  // ONE STEP IS ENOUGH. intervalSeconds is 0, so attackTimer starts expired
+  // and the dive lands on the first step a tower is in reach -- which is the
+  // whole point of authoring it as 0 rather than as a small number.
+  var hit = body.attackTowers(1 / 60, h.game.towers);
+
+  t.eq(hit, tower, "it went for the tower");
+  t.eq(tower.currentHp, hp - 13, "which lost exactly 13");
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "and was not stunned");
+  t.eq(body.dead, true, "the body died of the impact");
+  t.eq(body.health, 0, "at zero health");
+  t.eq(body.leaked, false, "and it is a death, not a leak");
+
+  // ONTO the tower, not merely at it. This is what puts the charge under the
+  // tower a second later rather than back out on the road.
+  t.eq(body.pos.x, tower.x, "it is standing on the tower's x");
+  t.eq(body.pos.y, tower.y, "and on its y");
+});
+
+test("the dive reaches 75 u.l. and no further", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  var far = volatileAt(h, tower, 76);
+  var hp = tower.currentHp;
+  t.eq(far.attackTowers(1 / 60, h.game.towers), null, "76 u.l. is out of reach");
+  t.eq(tower.currentHp, hp, "the tower is untouched");
+  t.eq(far.dead, false,
+    "and nothing blew itself up over an empty stretch of road -- a dive that " +
+    "found no tower never committed, so the body walks on");
+
+  var near = volatileAt(h, tower, 74);
+  t.ok(!!near.attackTowers(1 / 60, h.game.towers), "74 u.l. is inside it");
+  t.eq(tower.currentHp, hp - 13, "and that one lands");
+});
+
+// THE GAP BETWEEN THE TWO RANGES IS A FEATURE, so it gets its own test rather
+// than living only in the two edge tests above. A tower at 70 u.l. is close
+// enough to be dived at and far enough to sit outside the blast that follows,
+// which is the whole of what the retune sold the player: spacing.
+test("a tower can be inside the dive and outside the blast", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var hp = tower.currentHp;
+
+  var body = volatileAt(h, tower, 70);
+  t.eq(body.attackTowers(1 / 60, h.game.towers), tower, "70 u.l. is divable");
+
+  // The charge is armed ON the tower, so THAT tower is always inside its own
+  // blast. What the shorter radius protects is everything behind it -- proved
+  // here by arming a charge at the point the body took off from instead.
+  var second = { x: tower.x + h.game.ul(70), y: tower.y };
+  var hazard = armChargeAt(h, second.x, second.y);
+  t.ok(!!hazard, "a charge where it jumped from");
+  h.step(1.2);
+  t.eq(tower.currentHp, hp - 13,
+    "the tower took the dive and nothing else -- 70 u.l. is outside the 60 " +
+    "u.l. blast, so the reach it was dived from could not also blast it");
+});
+
+test("the dive is a death: it pays, it counts, and it arms the charge ON the " +
+"tower it hit", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var hp = tower.currentHp;
+  var cashBefore = h.game.cash;
+  var killsBefore = h.game.runKills;
+
+  // Through the REAL loop this time, so it has to be WALKED rather than
+  // placed: update() writes `pos` from `progress` at the top of every step, so
+  // a body pushed onto the board with a hand-written `pos` is back on the road
+  // before attackTowers ever sees it. This one is put on the stretch of road
+  // that passes closest to the tower, which is where a Volatile that got this
+  // far would be standing anyway.
+  var body = volatileOnRoadNear(h, tower);
+  h.step(1 / 60);
+
+  t.eq(h.game.enemies.indexOf(body), -1, "the body was swept off the board");
+  t.eq(tower.currentHp, hp - 13, "the tower took the impact");
+  t.eq(h.game.cash - cashBefore, h.game.Enemy.bountyOf("volatile"),
+    "the dive pays its bounty, because a dive is a death and the dead branch " +
+    "is where this game pays");
+  t.eq(h.game.runKills - killsBefore, 1, "and credits one kill");
+
+  t.eq(h.game.Hazards.count(), 1, "and it left a charge");
+  var hazard = h.game.Hazards.active()[0];
+  t.eq(hazard.x, tower.x, "armed on the tower's own x, not back on the road");
+  t.eq(hazard.y, tower.y, "and its y");
+
+  // AND THEN THE SECOND HALF. The explosion is unchanged by the dive: same
+  // fuse, same 13, over 60 u.l. -- and the charge is armed ON the tower, so
+  // the tower dived into is always inside its own blast and pays 26 in all.
+  h.step(1.1);
+  t.eq(tower.currentHp, hp - 26, "a second later the charge takes 13 more");
+});
+
+test("a Volatile shot down out of reach still dies the old way", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var hp = tower.currentHp;
+
+  var body = h.spawnAt(h.game.path.length * 0.05, undefined, "volatile");
+  body.takeDamage(999);
+  h.step(1 / 60);
+
+  t.eq(h.game.Hazards.count(), 1, "the charge is armed where it fell");
+  var hazard = h.game.Hazards.active()[0];
+  t.eq(hazard.x, body.pos.x, "at the exact x it died on, far out on the road");
+  t.ok(Math.hypot(hazard.x - tower.x, hazard.y - tower.y) > h.game.ul(75),
+    "which is further off than it would ever have dived from");
+
+  // Killing it early is the whole reward this change is built around: the
+  // tower pays nothing at all, where letting it in would have cost 40.
+  h.step(1.5);
+  t.eq(tower.currentHp, hp, "and no tower ever paid a point for it");
+});
+
+test("a Volatile does not dive into a Summoner's blub", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  // Blubs live in `towers` so they occupy space and take area stuns, but the
+  // owner's brief is flat that enemies cannot target them -- and the dive
+  // inherits that for free, because it picks through attackCandidates like
+  // every other attack rather than walking `towers` itself.
+  var blub = { x: tower.x, y: tower.y, isSummon: true, currentHp: 50,
+               isDestroyed: function () { return false; },
+               takeDamage: function () { this.hurt = true; } };
+  h.game.towers.length = 0;
+  h.game.towers.push(blub);
+
+  var body = volatileAt(h, blub, 20);
+  t.eq(body.attackTowers(1 / 60, h.game.towers), null, "it found no target");
+  t.eq(blub.hurt, undefined, "the blub was not hit");
+  t.eq(body.dead, false, "and the Volatile is still walking");
+});
+
+// ARM A CHARGE AT AN EXACT POINT, through the same door the death sweep uses.
+//
+// `Hazards.fromDeath` is what update()'s `dead` branch calls, and it reads the
+// body's position at the moment it is called -- so this is the real entry
+// point, placed rather than walked.
+//
+// It is placed rather than walked for a reason worth knowing: a body handed to
+// h.spawnAt is put back on the ROAD by its own update() on the very next step
+// (`this.pos = this.positionAt(this.progress)`), so writing `pos` and then
+// stepping measures a charge at a road point rather than at the point that was
+// written. The integration test below covers the walked case and this covers
+// the geometry.
+function armChargeAt(h, x, y) {
+  var body = new h.game.Enemy(h.game.path, undefined, "volatile");
+  body.pos = { x: x, y: y };
+  return h.game.Hazards.fromDeath(body);
+}
+
+test("the real death sweep arms a charge at the exact death position",
+function (t) {
+  var h = harness.boot();
+  var body = h.spawnAt(h.game.path.length * 0.4, undefined, "volatile");
+  t.eq(h.game.Hazards.count(), 0, "nothing on the road yet");
+
+  body.takeDamage(999);
+  t.eq(body.dead, true, "killed in combat");
+  h.step(1 / 60);                       // the sweep runs inside update()
+
+  t.eq(h.game.Hazards.count(), 1, "one charge, armed by the sweep");
+  var hazard = h.game.Hazards.active()[0];
+  t.eq(hazard.x, body.pos.x, "at the exact x it died on");
+  t.eq(hazard.y, body.pos.y, "and the exact y");
+  t.eq(hazard.kind, "volatile-blast", "carrying the type's own hazard kind");
+});
+
+test("a charge goes off one second later, for exactly 13, exactly once",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var hp = tower.currentHp;
+  var hazard = armChargeAt(h, tower.x + h.game.ul(10), tower.y);
+  t.ok(!!hazard, "a charge is on the road");
+  t.eq(hazard.fuse, 1, "with a second on its fuse");
+
+  h.step(0.9);
+  t.eq(tower.currentHp, hp, "nothing has happened yet");
+  h.step(0.2);
+  t.eq(tower.currentHp, hp - 13, "and then it takes exactly 13");
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "with no stun");
+
+  // ONCE. The hazard is latched on detonation, so however long it lingers for
+  // its afterglow it cannot fire twice.
+  h.step(2);
+  t.eq(tower.currentHp, hp - 13, "and exactly once");
+  t.eq(h.game.Hazards.count(), 0, "the charge is swept afterwards");
+});
+
+test("the blast reaches 60 u.l. and no further", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  armChargeAt(h, tower.x + h.game.ul(59), tower.y);
+  var hp = tower.currentHp;
+  h.step(1.2);
+  t.eq(tower.currentHp, hp - 13, "59 u.l. away is inside the blast");
+
+  armChargeAt(h, tower.x + h.game.ul(61), tower.y);
+  var hp2 = tower.currentHp;
+  h.step(1.2);
+  t.eq(tower.currentHp, hp2, "61 u.l. away is outside it");
+});
+
+test("leaking into the base leaves no charge", function (t) {
+  var h = harness.boot();
+  var body = h.spawnAt(h.game.path.length - 1, undefined, "volatile");
+  var base = h.game.baseHp;
+  h.step(0.5);
+  t.eq(h.game.enemies.indexOf(body), -1, "the body reached the base");
+  t.ok(h.game.baseHp < base, "and cost the base its remaining health");
+  t.eq(h.game.Hazards.count(), 0, "but left nothing behind");
+});
+
+test("a charge cannot set off another charge", function (t) {
+  var h = harness.boot();
+
+  // A Volatile standing INSIDE the blast, rooted so it cannot walk out of it,
+  // and at 2 HP -- so any damage a blast dealt to enemies at all would kill it
+  // and produce a second charge. `rooted` is the same flag a revived Revenant
+  // sets; it is the cheapest way to hold a body on one patch of road.
+  var bystander = h.spawnAt(h.game.path.length * 0.4, undefined, "volatile");
+  bystander.health = 2;
+  bystander.rooted = true;
+  armChargeAt(h, bystander.pos.x, bystander.pos.y);
+  t.eq(h.game.Hazards.count(), 1, "one charge, right on top of it");
+
+  // Past the fuse AND past the spent charge's afterglow, so what is counted at
+  // the end is what is still live rather than what has not been swept yet.
+  h.step(1.6);
+  t.eq(bystander.dead, false, "the bystander is untouched by the blast");
+  t.eq(bystander.health, 2, "at exactly the health it had");
+  t.eq(h.game.Hazards.count(), 0,
+    "and no second charge exists -- a blast touches towers only, so there is " +
+    "no chain to bound at any density");
+});
+
+test("the reward, the kill and the sound all happen once, at the combat death",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var cashBefore = h.game.cash;
+  var killsBefore = h.game.runKills;
+
+  var body = h.spawnAt(h.game.path.length * 0.4, undefined, "volatile");
+  body.takeDamage(999);
+  h.step(1 / 60);
+  t.eq(h.game.Hazards.count(), 1, "the death armed a charge");
+
+  var paid = h.game.cash - cashBefore;
+  t.eq(paid, h.game.Enemy.bountyOf("volatile"), "the bounty is paid at the death");
+  t.eq(h.game.runKills - killsBefore, 1, "and one kill is credited");
+
+  // The detonation a second later pays nothing and kills nothing.
+  h.step(1.5);
+  t.eq(h.game.cash - cashBefore, paid, "the detonation pays nothing more");
+  t.eq(h.game.runKills - killsBefore, 1, "and credits no second kill");
+});
+
+test("a charge is not an enemy: it holds neither the wave nor the win open",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  // Park the cursor past the end of the schedule with the road empty, which is
+  // the state the victory test asks about, and put a live charge on the board.
+  h.run("enemies = []; bullets = []; allWavesDeployed = true;" +
+        "waveIndex = WAVES.length;");
+  armChargeAt(h, tower.x + h.game.ul(60), tower.y);
+  h.step(1 / 60);
+
+  t.eq(h.game.Hazards.count(), 1, "a charge is ticking");
+  t.eq(h.game.enemies.length, 0, "and the road is empty");
+  t.eq(h.game.victory, true, "the run is won with a fuse still burning");
+});
+
+test("a charge obeys the pause and the speed toggle", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var hazard = armChargeAt(h, tower.x + h.game.ul(10), tower.y);
+  var hp = tower.currentHp;
+
+  h.run("paused = true");
+  h.step(3);
+  t.eq(hazard.detonated, false, "a paused run does not burn the fuse");
+  t.eq(tower.currentHp, hp, "and nothing has gone off");
+  t.ok(hazard.fuse > 0.9, "with the fuse where it was");
+
+  h.run("paused = false");
+  // THE SPEED TOGGLE IS NOT A CASE IN THE HAZARD CODE. It is how many fixed
+  // steps frame() runs, so a fuse burns three times as fast at 3x for the same
+  // reason everything else does -- driven through the real loop here, because
+  // step() cannot see gameSpeed by design.
+  h.run("gameSpeed = 3");
+  h.wallClock(0.4);
+  t.eq(hazard.detonated, true, "at 3x, 0.4 s of wall clock spends the second");
+  t.eq(tower.currentHp, hp - 13, "and the blast lands");
+  h.run("gameSpeed = 1");
+});
+
+test("pending charges are cleared by a restart", function (t) {
+  var h = harness.boot();
+  var doomed = sapperTower(h);
+  armChargeAt(h, doomed.x + h.game.ul(10), doomed.y);
+  t.eq(h.game.Hazards.count(), 1, "a charge is armed");
+
+  h.run("restartGame()");
+  t.eq(h.game.Hazards.count(), 0, "and a restart clears it");
+
+  // A fuse that survived would go off under towers placed in the run that
+  // began -- so the run after a restart has to be able to place one and keep it.
+  var fresh = sapperTower(h);
+  var hp = fresh.currentHp;
+  h.step(2);
+  t.eq(fresh.currentHp, hp, "a tower placed afterwards is never touched by it");
+});
+
+
+group("the three new types are DATA, not branches");
+
+test("no shared code branches on herald, sapper or volatile", function (t) {
+  var fs = require("fs");
+  var nodePath = require("path");
+  var root = nodePath.join(__dirname, "..", "js");
+
+  // THE RULE js/enemy.js OPENS BY STATING: no type has behaviour of its own, so
+  // nothing branches on which one an enemy is. Three types at once is exactly
+  // the change that would break it quietly, which is why this reads the source
+  // rather than the behaviour.
+  //
+  // A STRING MAY APPEAR -- in `Enemy.TYPES`, where the id is DECLARED, and in
+  // the wave data, where a group NAMES a type. What may not appear is the id
+  // inside a comparison. So the check is for the comparison forms, and the two
+  // files that legitimately hold the literal are exempted by name with the
+  // reason beside them.
+  var offenders = [];
+  var IDS = ["herald", "sapper", "volatile"];
+
+  function walk(dir) {
+    fs.readdirSync(dir).forEach(function (name) {
+      var full = nodePath.join(dir, name);
+      if (fs.statSync(full).isDirectory()) { walk(full); return; }
+      if (name.slice(-3) !== ".js") return;
+      var rel = nodePath.relative(root, full).replace(/\\/g, "/");
+      var src = fs.readFileSync(full, "utf8");
+      IDS.forEach(function (id) {
+        // Every shape a branch on an id can take: a comparison against a
+        // string, a lookup by that key, or an `indexOf` over a list of them.
+        [
+          '=== "' + id + '"', "=== '" + id + "'",
+          '!== "' + id + '"', "!== '" + id + "'",
+          '== "' + id + '"', "== '" + id + "'",
+          '.indexOf("' + id + '")', ".indexOf('" + id + "')"
+        ].forEach(function (form) {
+          if (src.indexOf(form) !== -1) offenders.push(rel + ": " + form);
+        });
+      });
+    });
+  }
+  walk(root);
+  t.eq(offenders.join(" | "), "",
+    "no file in js/ compares against one of the three new type ids");
+
+  // AND THE MECHANICS ARE DISPATCHED FROM SPECS. Each of the three is read by
+  // asking whether the thing HAS the block, which is what makes a fourth type
+  // with the same mechanic free.
+  var enemySrc = fs.readFileSync(nodePath.join(root, "enemy.js"), "utf8");
+  t.ok(enemySrc.indexOf("if (spec.haste)") !== -1,
+    "haste is applied from `spec.haste`");
+  t.ok(enemySrc.indexOf("if (spec.disable") !== -1,
+    "a disable is applied from `spec.disable`");
+  var hazardSrc = fs.readFileSync(
+    nodePath.join(root, "systems", "hazards.js"), "utf8");
+  t.ok(hazardSrc.indexOf("deathEffect") !== -1,
+    "and a hazard is built from `deathEffect`");
+  IDS.forEach(function (id) {
+    t.eq(hazardSrc.indexOf(id), -1, "js/systems/hazards.js never says '" + id + "'");
+  });
+});
 
 group("selected 0.4.10 flight and map merge");
 
