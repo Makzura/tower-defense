@@ -6613,17 +6613,38 @@ low to high. **Sorting is what C5 buys** — without one on the board the order 
 random, and the "next gain" faces are worth more when the gains after them are
 big.
 
-### The visual is a PLACEHOLDER and is meant to look it
+### Three of the twelve models exist, and they arrived animated
 
-The brief describes a hooded salvager-wizard behind a repaired dark-metal
-cauldron of cyan-violet mana on a compact wood-and-scrap platform, and names
-**twelve** final models: the base, a T1 shared by A1/B1/C1, a T2 shared by
+**Twelve are planned**: the base, a T1 shared by A1/B1/C1, a T2 shared by
 A2/B2/C2, and one each for A3-A5, B3-B5 and C3-C5. **No crosspath ever gets a
 model of its own** — a Farm with a main path at T3+ wears that path's body and
-its secondary T1/T2 add no overlay. None of the twelve are built. What ships is
-a canvas glyph reduced to the four shapes that read from the top down — platform,
-cauldron, mana, hood — plus gl-world's own stand-in cylinder on the 3D board.
-Do not read either as the design.
+its secondary T1/T2 add no overlay.
+
+**Three are built** (2026-08-28, imported from Claude Design): `farm-base` is a
+stone mana well with a crank, a pulley, a rope and a bucket, and a novice
+working it; `farm-t1` is a hand pump with a lever, a piston, a hose and a
+bottle; `farm-t2` is the same pump reinforced with a flywheel and a pressure
+tank. `farmGroup` in gl-world answers with **the highest model that has been
+AUTHORED**, not the highest tier bought, so a T5 farm wears the T2 body until
+its own is built.
+
+**Each carries one authored looping animation** rather than a cycle this project
+solved — 8 s for the well, 7.5 s for the pumps, keyed at 24 fps in the source.
+They are imported whole by `tools/glb_to_animated.py`; see the model-contract
+section for how that differs from `glb_to_model.py`, which synthesises motion
+from a rig and ignores a file's own animation.
+
+**THE ANIMATION RUNS ON THE SIMULATION CLOCK, not `state.now`.**
+`FarmTower.animClock` is accumulated in `update(dt)`, so the well turns three
+times as fast at 3× speed and stops dead when the run freezes — a picture of
+the production it is. `state.now` is `performance.now()`, which is why the
+Summoner's idle keeps chanting over a paused board; do not copy that here. The
+renderer divides `animClock` by the MODEL's own `loopSeconds` and takes the
+remainder, because the model is what knows how long its loop is.
+
+**The 2D fallback is still a placeholder**, and is meant to look it: a canvas
+glyph reduced to the four shapes that read from the top down — platform,
+cauldron, mana, hood. Only the WebGL board has the real bodies.
 
 ---
 
@@ -7362,6 +7383,42 @@ built** — `enemy-fast`, `enemy-shieldbearer`, `enemy-slow`, `enemy-boss`,
 `enemy-shielded` and `enemy-boss_fast` —
 and each cost a row in `export_mesh.py::TARGETS`; see the trap below, which has
 now been sprung six times.
+
+**A SECOND IMPORTER EXISTS, AND IT IS NOT A VARIANT OF THE FIRST.**
+`tools/glb_to_animated.py` imports a `.glb` that carries **its own animation**;
+`glb_to_model.py` imports one that does not and synthesises the motion from a
+rig. The Farm's three models are the only users so far, and they are the only
+files in `glb/` with an `animations` array in them.
+
+The split is a real one rather than tidiness. `glb_to_model.py` answers "what
+should this body do" — a walk cycle that must stay in step with distance
+covered is SOLVED, not authored, and `walk_cycle` inverts the hip rotation to
+prove it. The animated importer answers "what does this file already do": it
+reads the glTF samplers and bakes them into the frame list, and there is nothing
+to solve. A model needing both would be one with an authored idle and a solved
+gait, and there is none.
+
+What it shares it IMPORTS rather than copies: the `.glb` reader, the mesh walk,
+the palette derivation, the axis convention and the emitted format. What it adds
+is grouping by **nearest animated ancestor**, a pivot taken from the node's own
+origin (not from its geometry — that would turn a crank about the middle of the
+crank instead of about its axle), and one field, `loopSeconds`.
+
+**`GLModels.register` COPIES FIELDS EXPLICITLY, so a new one has to be added
+there too.** `loopSeconds` is on that list because `bands` was not for eight
+models — the field shipped, `register` dropped it, every reader took the
+documented fallback, and the whole thing looked like it worked. A missing
+`loopSeconds` fails the same silent way: the animation plays at a default rate
+nobody chose.
+
+**THE TRAP THAT COST A REGENERATION**: `Animation.sample` must fall back to the
+node's AUTHORED value for every channel the animation does not drive. An
+animated node is normally driven on one component — `well_pulley` has a rotation
+channel and nothing else — and rebuilding its local matrix from the animation
+alone drops the translation that puts it up on the beam. The first run did
+exactly that, and the pulley's frame matrix carried a residual shift of -1.44 in
+z, which is its own height. It is checkable in one line: a group animated by a
+pure rotation about its own pivot must have a frame translation of zero.
 
 **TWO PAIRS ARE ONE BODY IMPORTED TWICE, AND THE SECOND IMPORT IS NEVER
 INDEPENDENT OF THE FIRST.** `bulwark_shield.glb` and `bulwark_no_shield.glb` are

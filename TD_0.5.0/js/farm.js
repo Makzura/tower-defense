@@ -72,6 +72,24 @@ function FarmTower(x, y, path) {
   this.stock = 0;
   this.tickTimer = 0;              // counts toward the next A3+ production tick
 
+  // HOW FAR INTO ITS OWN ANIMATION THIS TOWER IS, in simulation seconds.
+  //
+  // The Farm's three models carry an AUTHORED loop rather than a solved cycle
+  // (tools/glb_to_animated.py), and something has to say where in that loop the
+  // crank currently is. It is accumulated HERE, off `update`'s dt, rather than
+  // read from the wall clock in the renderer -- which is what `state.now` is,
+  // and what the Summoner's idle uses. The difference is the whole point: this
+  // one advances on the fixed step, so the well turns three times as fast at 3x
+  // speed and stops dead when the run freezes, exactly like the production it
+  // is a picture of. A crank still turning over a paused board would be the
+  // tower telling the player it is working when it is not.
+  //
+  // Raw seconds, never wrapped: the renderer divides by the model's own
+  // `loopSeconds` and takes the remainder, because the model is what knows how
+  // long its loop is. An hour-long run reaches 3600, which is nowhere near a
+  // double's precision.
+  this.animClock = 0;
+
   // PATH A5's investment, as PERMANENT tranches already spent and a temporary
   // burst that is counted in tranches too. Both are read by `Farms.investment`,
   // which is what a boosted tower asks.
@@ -484,6 +502,10 @@ FarmTower.fmt = function (n, digits) {
 // --- the clock --------------------------------------------------------------
 
 FarmTower.prototype.update = function (dt) {
+  // The animation's clock, first and unconditionally: a farm animates whatever
+  // else it is doing, and it is the one thing here that is true of every tier.
+  this.animClock += dt;
+
   if (this.tempTimer > 0) {
     // A residue, not an equality. `30 - 29.9 - 0.1` is 1.4e-15 in binary
     // floating point, so a surge tested against zero would run for ever --

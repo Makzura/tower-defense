@@ -1097,7 +1097,37 @@ var World3D = (function () {
     else if (id === "longshot") name = "sniper-" + sniperGroup(tower);
     else if (id === "smasher") name = "warbringer-" + warbringerGroup(tower);
     else if (id === "siphon") name = "siphon-" + siphonGroup(tower);
+    else if (id === "farm") name = "farm-" + farmGroup(tower);
     return (name && GLModels.has(name)) ? name : null;
+  }
+
+  // THE FARM'S THREE MODELS, AND WHY A TIER 5 STILL WEARS THE T2 ONE.
+  //
+  // Twelve are planned -- a base, a T1 shared by A1/B1/C1, a T2 shared by
+  // A2/B2/C2, and one per path for T3, T4 and T5 -- and three exist:
+  // `mana_well_base`, `hand_pump_t1` and `reinforced_pump_t2`, imported from
+  // Claude Design on 2026-08-28. So this answers with the highest model that
+  // has been authored rather than the highest tier that has been bought.
+  //
+  // It reads the `hasA1..hasC5` flags rather than a purchase list because that
+  // is how js/farm.js spells its tiers -- the same shape the Warbringer and the
+  // Rifleman use, and unlike the config towers' `core.purchased`.
+  //
+  // THE HIGHEST TIER ON ANY BRANCH WINS, which is the rule every other tower's
+  // group function follows. The Farm's crosspath makes the choice unambiguous:
+  // a T3 anywhere caps both other branches at 2, so two branches can never
+  // disagree about which is the main one.
+  function farmGroup(tower) {
+    var branches = ["A", "B", "C"];
+    var best = 0;
+    for (var b = 0; b < branches.length; b++) {
+      for (var t = 5; t > best; t--) {
+        if (tower["has" + branches[b] + t]) { best = t; break; }
+      }
+    }
+    if (best >= 2) return "t2";
+    if (best >= 1) return "t1";
+    return "base";
   }
 
   // Only the AUTHORED enemies have meshes. EVERY OTHER TYPE IS A SPHERE,
@@ -2164,6 +2194,39 @@ var World3D = (function () {
           var iband = Math.min(bandsAvail - 1, rung);
           var iphase = (((state.now || 0) * 0.30) % 1 + 1) % 1;
           frame = 1 + iband * SUM_CYCLE + Math.floor(iphase * SUM_CYCLE);
+        }
+        // THE FARM RUNS ON THE CLOCK, NOT ON A COOLDOWN.
+        //
+        // It never fires, so it has neither gearPhase nor swingProgress, and
+        // every branch above would leave it on frame 0 -- a still well with a
+        // crank that never turns, which is exactly what the other types' notes
+        // above describe as the silent failure of this format.
+        //
+        // Its motion is an AUTHORED LOOP rather than a cycle this project
+        // solved: one glTF animation per model, imported whole by
+        // tools/glb_to_animated.py. So the frame is simply where the clock is
+        // inside that loop, and `loopSeconds` comes off the MODEL because the
+        // model is what knows how long its own animation lasts. A table here
+        // pairing an id with a duration would be the same number written twice
+        // in two files that are regenerated on different days.
+        //
+        // FRAME 0 IS PART OF THE LOOP HERE, not a rest pose held between
+        // cycles. Nothing about a farm is ever at rest: the reader of frame 0
+        // (the placement ghost, the index screen) gets t = 0 of the loop, which
+        // is a pose the tower really holds.
+        //
+        // THE CLOCK IS THE TOWER'S, NOT `state.now`. `state.now` is
+        // `performance.now()` -- wall time -- so the Summoner's idle above keeps
+        // chanting over a paused board and does not speed up at 3x. A farm's
+        // animation is a picture of its production, so it runs on the same
+        // fixed step the production does: `animClock` is accumulated in
+        // FarmTower.update and therefore freezes and accelerates with the run.
+        if (m && m.frames.length > 1 && t.constructor &&
+            t.constructor.ID === "farm") {
+          var loop = m.loopSeconds > 0 ? m.loopSeconds : 8;
+          var fphase = (((t.animClock || 0) / loop) % 1 + 1) % 1;
+          frame = Math.min(m.frames.length - 1,
+            Math.floor(fphase * m.frames.length));
         }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from

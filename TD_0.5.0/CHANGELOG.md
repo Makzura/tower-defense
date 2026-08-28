@@ -13,6 +13,45 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — The Farm has three real bodies, and they move.** Imported from
+Claude Design: `farm-base` is a stone mana well with a crank, a pulley, a rope,
+a bucket and a novice working it; `farm-t1` is a hand pump with a lever, a
+piston, a hose and a bottle; `farm-t2` is that pump reinforced with a flywheel
+and a pressure tank. Three of the twelve planned, and `farmGroup` answers with
+the highest model that has been AUTHORED rather than the highest tier bought, so
+a T5 farm wears the T2 body until its own exists.
+
+**They arrived with their motion in them**, which nothing in this repo had done
+before: one looping glTF animation each, keyed at 24 fps — 8 s for the well,
+7.5 s for the pumps — on named nodes. So `tools/glb_to_animated.py` is a second
+importer beside `glb_to_model.py`, and not a variant of it: that one answers
+"what should this body do" and solves a cycle, this one answers "what does this
+file already do" and bakes the samplers it finds. It shares the reader, the mesh
+walk, the palette, the axis convention and the format by importing them.
+
+The first export had **no animation at all** (`animations: 0`, `skins: 0`,
+measured on all three), which is why there was a second download. Worth knowing
+before debugging a still model.
+
+**Two things this cost, both worth keeping:**
+
+`GLModels.register` copies fields explicitly, so `loopSeconds` had to be added
+there — the same silent hole `bands` fell into on eight models. And
+`Animation.sample` has to fall back to a node's authored value for every channel
+the animation does not drive: `well_pulley` is keyed on rotation alone, and
+rebuilding its matrix from the animation dropped the translation holding it up
+on the beam, leaving a residual -1.44 in z. Checkable in one line — a group
+turning about its own pivot must have a frame translation of zero.
+
+**The animation runs on the SIMULATION clock.** `FarmTower.animClock` is
+accumulated in `update(dt)`, so the well turns three times as fast at 3× speed
+and stops when the run freezes. `state.now` is `performance.now()` — which is
+why the Summoner's idle keeps chanting over a paused board — and a farm's
+animation is a picture of its production, so it must not do that.
+
+Verified on the real board: 403 pixels of geometry where the tower stands, and
+12 to 25 of them changing every simulated second.
+
 **2026-08-28 — C5 is priced like the thing it is.** The owner's figures,
 applied exactly: 9 000 mana → **250 000**, the sale refunds **none** of it
 (50% → 0%), and its own production comes down from +500 a wave to **+400**.

@@ -60,6 +60,18 @@ var GLModels = (function () {
       // everywhere and any reader would have silently taken the fallback on
       // every body while appearing to work.
       bands: data.bands || null,
+      // HOW LONG THIS MODEL'S OWN LOOP LASTS, in seconds, for a body whose
+      // animation is AUTHORED rather than solved -- the Farm's three imports
+      // (tools/glb_to_animated.py). gl-world divides the world clock by it to
+      // pick a frame; 0 or absent means "this model does not carry a loop",
+      // and every reader of a solved cycle ignores it.
+      //
+      // COPIED EXPLICITLY, and the field above is why that sentence is here:
+      // `bands` shipped on eight models while `register` quietly dropped it,
+      // so every reader took the documented fallback and the whole thing
+      // looked like it worked. A missing `loopSeconds` fails the same way --
+      // the animation plays at a default rate nobody chose.
+      loopSeconds: data.loopSeconds || 0,
       expanded: null,
       gpu: null
     };
