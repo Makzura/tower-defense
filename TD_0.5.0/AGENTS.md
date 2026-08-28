@@ -2463,6 +2463,39 @@ rather than from the gunner specifically.
 
 ## The economy — fixed bounties per kill
 
+### THE CURRENCY IS CALLED **MANA**, and the code still calls it `cash`
+
+Renamed 2026-08-28, at the owner's instruction: *"j'ai décidé de changer
+l'argent pour du mana, donc change s'il te plaît toute instance de argent,
+gold, coins en mana"*. It is a rename of **what the player is shown**, and
+nothing else moved:
+
+* Every player-facing string says *mana*. Prices read `250 mana`, never `$250`;
+  the purse reads `12345 mana`; a refusal reads `not enough mana`; the sell
+  button reads `Sell  600 mana`; the armoury reads `600 MANA IN A RUN`; an
+  enemy's kill bounty reads `3 mana`; the Siphon's A3/A5 read *charges → mana*
+  and *mana → power*.
+* **`cash` is still the variable, `gold` is still an identifier.** `cash`,
+  `formatCash`, `goldGenerated`, `bonusGold`, `charge_to_gold`, `gold_to_power`,
+  `GoldPower`, the sandbox's `lockGold` — all of them stay. They are code and
+  save/config keys, and `gold_to_power` in particular is a CONFIG KEY that
+  appears in `js/towers/beam.config.js`; renaming those buys nothing a player
+  can see and breaks things a player cannot.
+* **THE META COINS ARE A DIFFERENT CURRENCY AND KEPT THEIR NAME.** The armoury
+  still says `META COINS`, still prices towers in `⬡`, and `needs N more coins`
+  is still that sentence. Explicitly excluded by the owner: *"change pas encore
+  les metas coins"*. Anything that spends `MetaProgress.coins()` is coins;
+  anything that spends `cash` is mana.
+* `$` notation survives in THIS document and in code comments as shorthand for
+  a mana figure. It is not shorthand anywhere a player can read.
+
+The sweep that proved it: instrument `CanvasRenderingContext2D.fillText`, walk
+the menu, the board, the armoury and the index, and grep every string the game
+asked the canvas to draw. 679 strings, zero matches for `$`, `gold`, `coins` or
+`cash` outside the meta-coin lines above. Do that again rather than grepping the
+source if you touch this — the armoury draws letter by letter through
+`drawMenuText`, so a source grep and a screen read are different questions.
+
 **Remodelled 2026-07-31.** Ordinary damage never adds cash. Every scheduled
 enemy type has an explicit base `bounty` in `Enemy.TYPES`; when the enemy dies,
 the removal sweep adds `enemy.bounty()` exactly once and passes the same value
@@ -6343,6 +6376,35 @@ the tick is driven from `update(dt)` rather than from a wave hook — so it
 advances at 3× speed and freezes with the run like every other cooldown. From
 A4 production stops reaching the purse at all and fills the tower's own stock,
 which is what the cloning compounds and what A5's investment spends.
+
+**IT KEEPS TWO LIFETIME TOTALS, AND THEY EXIST BECAUSE THE PRODUCTION WAS
+INVISIBLE** (2026-08-28). `manaProduced` and `baseHpProduced` are on the tower,
+they never go down, and the panel prints them. A plain farm pays 200 mana into a
+purse that bounties are already moving, at a wave boundary, with no popup and no
+row — so the owner placed one, watched a run, and reported: *"the tower is
+supposed to produce mana, and it doesn't rn"*. It did, at 200 a wave, measured
+against a farmless run at the same seed. Nothing on the screen said so.
+
+Every door that makes either credits its own farm:
+
+* `produce()` is the one door for mana, so the wave figure, the tick and the
+  stock all land there. **The stocked mana counts as produced** — the stock is
+  where it went, not whether it was made — and `cloneStock` credits its clone
+  too. Spending the stock through A5 does not take it back: a lifetime total is
+  not a balance.
+* A kill in a path-B field credits both totals inside `Farms.onEnemyKilled`.
+* **The C network's payout is SPLIT across its members** by each farm's share of
+  `B`, inside `openWave`. Without that split a C-path farm would read `0 mana
+  produced` for a whole run while paying the player every wave, which is exactly
+  the illusion these totals exist to end.
+* `Effects.farmProduced` puts a `+200 mana` popup over the farm, the same one an
+  enemy's bounty gets, and says `stored` instead when A4 kept it. Presentation
+  only, guarded on `typeof Effects`, and the simulation never reads it back.
+
+`RESULT_TOTAL_LABELS` carries both labels, so they appear on the end-of-run
+screen like any other tower's totals. **`Base HP produced` is shown only on a
+farm with a tier that makes it** — no invented zeroes, the rule that screen is
+built on.
 
 ### Path B raises a global, so the base's maximum is run state now
 

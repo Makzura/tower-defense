@@ -1259,7 +1259,7 @@ function payWaveBounty() {
 
   cash += amount;
   if (typeof Effects !== "undefined") {
-    Effects.announce("Wave " + number + " cleared", "+$" + amount);
+    Effects.announce("Wave " + number + " cleared", "+" + amount + " mana");
   }
   return amount;
 }
@@ -1303,7 +1303,7 @@ var STARTING_CASH = 600;
 var SELL_REFUND_FRACTION = 0.5;
 
 // Cash is a float -- lifesteal ratios, charge multipliers and damage
-// mitigation all produce fractions -- but "$8.454662500000001" is not a
+// mitigation all produce fractions -- but "8.454662500000001 mana" is not a
 // readout. Kept exact internally, shown to at most one decimal, and with no
 // pointless ".0" on whole numbers.
 function formatCash(value) {
@@ -2555,7 +2555,7 @@ function buyUpgrade(tower, id) {
   if (reason) return reason;
 
   var price = tower.upgradeCost(id);
-  if (cash < price) return "not enough cash";
+  if (cash < price) return "not enough mana";
 
   cash -= price;
   tower.applyUpgrade(id);
@@ -3134,7 +3134,7 @@ function whyCannotBuild(x, y, type) {
   }
 
   if (cash < type.COST) {
-    return "not enough cash";
+    return "not enough mana";
   }
 
   if (x < 0 || y < 0 || x > VIEW_WIDTH || y > VIEW_HEIGHT) {
@@ -5671,7 +5671,7 @@ function drawStatus() {
   ctx.fillStyle = "#ffd76e";
   ctx.font = "600 30px system-ui, sans-serif";
   ctx.textBaseline = "top";
-  ctx.fillText("$" + formatCash(cash), VIEW_WIDTH - 24, 16);
+  ctx.fillText(formatCash(cash) + " mana", VIEW_WIDTH - 24, 16);
 
   ctx.fillStyle = "rgba(255,215,110,0.55)";
   ctx.font = "13px system-ui, sans-serif";
@@ -6231,7 +6231,7 @@ function drawBuildBar() {
 
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillStyle = affordable ? "#ffd76e" : "#e0736e";
-    ctx.fillText("$" + type.COST, r.x + r.w / 2, r.y + 68);
+    ctx.fillText(type.COST + " mana", r.x + r.w / 2, r.y + 68);
   }
 
   ctx.textAlign = "left";
@@ -7117,7 +7117,7 @@ function drawInspection() {
   ctx.textBaseline = "middle";
   ctx.font = "600 13px system-ui, sans-serif";
   ctx.fillStyle = hovering ? "#ffd76e" : "#e8b96a";
-  ctx.fillText(fitText(ctx, "Sell  $" + sellValue(t), b.w - 26),
+  ctx.fillText(fitText(ctx, "Sell  " + sellValue(t) + " mana", b.w - 26),
     b.x + b.w / 2, b.y + b.h / 2 + 1);
   drawKeyHint(b, "X", hovering);
 
@@ -9400,9 +9400,17 @@ function resultButtonAt(x, y) {
 // lets through is a lie. A tower that keeps a total nothing else keeps adds its
 // label here; a tower that keeps none simply has no rows, which is the rule
 // this screen is built on -- no invented zeroes.
+//
+// "Mana made" and "Mana generated" match nothing today and did not match
+// anything as "Gold made" / "Gold generated" either -- they are older spellings
+// of a row no tower emits. Kept rather than deleted because an allow-list entry
+// costs nothing and a missing one is a missing line; the Siphon's own total is
+// labelled "Bonus mana" and is deliberately NOT here, which is how it has
+// always been.
 var RESULT_TOTAL_LABELS = [
   "Damage dealt", "Kills", "Healed", "Healing done",
-  "Gold made", "Gold generated", "Blubs summoned", "Recruits sent"
+  "Mana made", "Mana generated", "Mana produced", "Base HP produced",
+  "Blubs summoned", "Recruits sent"
 ];
 
 function resultTowerRows() {
@@ -9444,7 +9452,7 @@ function drawResultScreen() {
     "   ·   wave " + reachedWave() + " of " + WAVES.length +
     "   ·   " + wavesCompleted() + " finished" +
     "   ·   base " + Math.max(0, Math.round(baseHp)) + " HP" +
-    "   ·   $" + Math.round(cash) +
+    "   ·   " + Math.round(cash) + " mana" +
     "   ·   " + runKills + " destroyed", VIEW_WIDTH / 2, 98);
 
   // WHERE THE COINS CAME FROM, read straight off the award. This panel never
@@ -9484,7 +9492,7 @@ function drawResultScreen() {
   for (var ri = 0; ri < rows.length && y < limit; ri++) {
     var r = rows[ri];
     var bits = [];
-    if (r.spent !== null) bits.push("$" + r.spent);
+    if (r.spent !== null) bits.push(r.spent + " mana");
     for (var ei = 0; ei < r.totals.length; ei++) {
       bits.push(r.totals[ei][1] + " " + r.totals[ei][0].toLowerCase());
     }

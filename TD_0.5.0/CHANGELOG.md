@@ -13,6 +13,53 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — The run currency is called MANA everywhere a player can read
+it.** Owner: *"j'ai décidé de changer l'argent pour du mana, donc change s'il te
+plaît toute instance de argent, gold, coins en mana — change pas encore les
+metas coins"*. Prices now read `250 mana` rather than `$250`, the purse reads
+`12345 mana`, a refusal reads `not enough mana`, the sell button reads
+`Sell  600 mana`, the armoury reads `600 MANA IN A RUN`, an enemy's kill bounty
+reads `3 mana`, and the Siphon's A3/A5 read *charges → mana* and *mana → power*.
+
+**The code did not move.** `cash`, `formatCash`, `goldGenerated`, `bonusGold`,
+`charge_to_gold`, `gold_to_power`, `GoldPower`, the sandbox's `lockGold`: all
+kept. They are identifiers and config keys, and `gold_to_power` is read out of
+`js/towers/beam.config.js` — renaming them buys nothing a player can see and
+breaks things a player cannot.
+
+**The meta coins are a different currency and kept their name**, explicitly
+excluded by the owner. `META COINS`, the `⬡` prices and `needs N more coins` are
+untouched. Anything that spends `MetaProgress.coins()` is coins; anything that
+spends `cash` is mana.
+
+Verified by instrumenting `CanvasRenderingContext2D.fillText` in the real game
+and reading back every string it was asked to draw across the menu, the board,
+the armoury and the index: 679 strings, zero matches for `$`, `gold`, `coins` or
+`cash` outside the meta-coin lines. A source grep alone would not have settled
+it — the armoury draws letter by letter through `drawMenuText`. Eleven suite
+assertions that pinned the old `$` spelling were re-pinned.
+
+**2026-08-28 — The Farm keeps two lifetime totals, because its production was
+invisible.** Owner, having placed one and watched a run: *"the tower is supposed
+to produce mana, and it doesn't rn"*. It did — 200 a wave, measured against a
+farmless run at the same seed, in the browser and in the harness. Nothing on the
+screen said so: the payment lands at a wave boundary, into a purse that bounties
+are already moving, with no popup and no row.
+
+`manaProduced` and `baseHpProduced` are on the tower, never go down, and print
+on the panel and on the end-of-run screen. Every door credits its own farm: the
+per-wave figure and the tick through `produce()`, the stock and its clone (mana
+kept is still mana made), a kill in a path-B field, and **the C network's payout
+split across its members by their share of `B`** — without that a C-path farm
+would read zero for a whole run while paying the player every wave. Spending the
+stock through A5 does not take the total back; it is not a balance.
+
+`Effects.farmProduced` also puts a `+200 mana` popup over the farm, the same one
+an enemy's bounty gets, saying `stored` instead when A4 kept it. Presentation
+only, and the simulation never reads it back.
+
+Nine tests, one per door plus the panel, the result screen and the popup.
+
 **2026-08-27 — The Farm: a tower that produces mana, and the first with three
 paths.** A fully specified brief, integrated whole: `js/farm.js`, 1200 mana,
 200 HP, a 35 u.l. footprint, 200 mana a wave, and three five-tier branches.

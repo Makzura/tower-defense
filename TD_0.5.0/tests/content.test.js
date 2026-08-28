@@ -2857,7 +2857,7 @@ test("upgrades cost money and are refused when unaffordable", function (t) {
 
   t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 affordable at 250");
   t.eq(h.game.cash, 50, "cash after A1");
-  t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough cash", "A2 refused at 400");
+  t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough mana", "A2 refused at 400");
   t.eq(s.hasA2, false, "and not granted");
   t.eq(h.game.cash, 50, "no cash taken for a refused upgrade");
 
@@ -3445,14 +3445,14 @@ test("the panel offers the next tier on each branch, with its price", function (
   // prints -- reading them back from Smasher.UPGRADES would assert only that
   // the panel echoes the table it was built from.
   t.eq(buttons[0].label, "Path A → A1", "branch A offers A1");
-  t.eq(buttons[0].detail, "$250", "with its price");
+  t.eq(buttons[0].detail, "250 mana", "with its price");
   t.eq(buttons[1].label, "Path B → B1", "branch B offers B1");
-  t.eq(buttons[1].detail, "$250", "with its price");
+  t.eq(buttons[1].detail, "250 mana", "with its price");
 
   h.run("buyUpgrade(inspected, 'A1')");
   buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[0].label, "Path A → A2", "branch A moves on to A2");
-  t.eq(buttons[0].detail, "$400", "at the next tier's price");
+  t.eq(buttons[0].detail, "400 mana", "at the next tier's price");
   t.eq(buttons[1].label, "Path B → B1", "branch B is unaffected");
 });
 
@@ -3539,12 +3539,12 @@ test("the B button keeps offering B1 and B2 after committing to path A", functio
   h.run("buyUpgrade(inspected, 'A3')");
   var buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[1].label, "Path B → B1", "B1 still available");
-  t.eq(buttons[1].detail, "$250", "at its price");
+  t.eq(buttons[1].detail, "250 mana", "at its price");
 
   h.run("buyUpgrade(inspected, 'B1')");
   buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[1].label, "Path B → B2", "then B2");
-  t.eq(buttons[1].detail, "$450", "at its price");
+  t.eq(buttons[1].detail, "450 mana", "at its price");
 });
 
 test("the locked-out branch is greyed, not removed, and says why", function (t) {
@@ -3602,7 +3602,7 @@ test("each button spells out what the upgrade does", function (t) {
   // carries an HP clause it did not used to. That is the retune showing up in
   // the panel, not the panel changing how it spells things.
   t.eq(buttons[0].label, "Path A → A1", "which tier");
-  t.eq(buttons[0].detail, "$250", "what it costs");
+  t.eq(buttons[0].detail, "250 mana", "what it costs");
   t.eq(buttons[0].effects, "+5 dmg, +5 u.l. range, +0.01 atk/s, +30 HP",
     "A1 sells a little of all three since 2026-08-27, and its range through "
     + "the additive column so a base rise cannot swallow it again");
@@ -3666,7 +3666,7 @@ test("every smasher tier describes itself before it is bought", function (t) {
       t.eq(button.id, branch + tier, branch + tier + " is on offer");
       t.ok(button.effects.length > 0,
         branch + tier + " says what it does: " + button.effects);
-      t.ok(button.detail.indexOf("$") === 0,
+      t.ok(/^\d+ mana$/.test(button.detail),
         branch + tier + " says what it costs: " + button.detail);
       seen.push(button.effects);
 
@@ -3711,7 +3711,7 @@ test("hovering a button opens a card with the whole story", function (t) {
   h.move(button.x + button.w / 2, button.y + button.h / 2);
 
   var card = h.run("hoveredCard(inspectionLayout(inspected)).model");
-  t.eq(card.subtitle, "$250", "what it costs");
+  t.eq(card.subtitle, "250 mana", "what it costs");
 
   var byLabel = {};
   card.changes.forEach(function (c) { byLabel[c.label] = c; });
@@ -3827,10 +3827,10 @@ test("an unaffordable button is shown dead and cannot be clicked through", funct
 
   var b = h.run("inspectionLayout(inspected).upgrades[0]");
   t.eq(b.label, "Path A → A1", "still shows what it would buy");
-  t.eq(b.detail, "$250", "and what that would cost");
+  t.eq(b.detail, "250 mana", "and what that would cost");
   t.eq(b.effects, "+5 dmg, +5 u.l. range, +0.01 atk/s, +30 HP",
     "and what it would do");
-  t.eq(b.enabled, false, "but is not live at $60");
+  t.eq(b.enabled, false, "but is not live at 60 mana");
 
   h.click(b.x + b.w / 2, b.y + b.h / 2);
   t.eq(s.hasA1, false, "clicking it bought nothing");

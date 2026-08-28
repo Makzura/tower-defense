@@ -1201,7 +1201,7 @@ Soldier.prototype.panelActions = function () {
       branch: branch,
       upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : "$" + next.cost,
+      detail: refusal ? refusal : next.cost + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
       enabled: refusal === null && cash >= next.cost,
@@ -1288,7 +1288,7 @@ Soldier.prototype.upgradeCard = function (upgrade, refusal, preview) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  " + upgrade.id,
-    subtitle: refusal ? refusal : "$" + upgrade.cost,
+    subtitle: refusal ? refusal : upgrade.cost + " mana",
     changes: preview.changes,
     abilities: UpgradeEffects.abilities(preview.grants, params),
     note: note

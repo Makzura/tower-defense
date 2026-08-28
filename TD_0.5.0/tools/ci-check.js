@@ -621,7 +621,11 @@ var BASELINE = [
   // brief it came from. The dice are SCRIPTED here -- the network takes a die
   // through `Farms.setDie` -- so every one of the sixty-two faces across the
   // three tables is asserted individually rather than sampled.
-  { file: "tests/farm.test.js", pass: 35, fail: 0, failing: [] },
+  // 35 -> 44 on 2026-08-28: the nine lifetime-total tests (mana produced and
+  // base HP produced, on every door that makes either -- the wave, the tick,
+  // the stock, the clone, a kill in the field, and the C network's split
+  // payout) plus the popup that says a farm paid.
+  { file: "tests/farm.test.js", pass: 44, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

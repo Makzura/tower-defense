@@ -610,8 +610,8 @@ check("the panel shows two upgrade rectangles and no ability yet",
   "actions = " + layout.actions.map(function (s) { return s.action.id; }).join(", "));
 
 check("upgrade buttons quote the config's prices",
-  layout.actions[0].action.detail === "$" + panelTower.core.config.paths.A[0].cost &&
-  layout.actions[1].action.detail === "$" + panelTower.core.config.paths.B[0].cost,
+  layout.actions[0].action.detail === panelTower.core.config.paths.A[0].cost + " mana" &&
+  layout.actions[1].action.detail === panelTower.core.config.paths.B[0].cost + " mana",
   layout.actions[0].action.detail + " / " + layout.actions[1].action.detail);
 
 // --- what an upgrade DOES, before it is bought ------------------------------
@@ -687,7 +687,7 @@ check("hovering an upgrade button produces a card", !!hovered,
   hovered ? hovered.model.title : "nothing under the cursor");
 check("it names the tier and the price",
   hovered.model.title.indexOf("path A tier 1") !== -1 &&
-  hovered.model.subtitle === "$" + panelTower.core.config.paths.A[0].cost,
+  hovered.model.subtitle === panelTower.core.config.paths.A[0].cost + " mana",
   hovered.model.title + "  /  " + hovered.model.subtitle);
 check("it shows what every changed stat becomes, not just the delta",
   hovered.model.changes.length >= 3 &&
@@ -1079,13 +1079,13 @@ var fraction = charger.charge.progressFraction();
 check("the charge bar's fraction is in range", fraction >= 0 && fraction <= 1,
   "progressFraction = " + fraction.toFixed(3));
 
-// Every gold figure now reports cash the A3 ability actually generated.
-check("bonus gold and generated gold are the same paid amount",
+// Every mana figure now reports what the A3 ability actually generated.
+check("bonus mana and generated mana are the same paid amount",
   charger.bonusGold > 0 &&
     Math.abs(charger.bonusGold - charger.goldGenerated) < 0.001,
   "bonus " + charger.bonusGold.toFixed(2));
 
-var bonusRow = charger.statLines().filter(function (r) { return r[0] === "Bonus gold"; });
+var bonusRow = charger.statLines().filter(function (r) { return r[0] === "Bonus mana"; });
 check("the panel row is labelled as the bonus", bonusRow.length === 1,
   charger.statLines().map(function (r) { return r[0]; }).join(", "));
 

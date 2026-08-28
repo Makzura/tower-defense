@@ -3342,7 +3342,7 @@ test("placement is refused on the road, on another tower, and off the map", func
 test("an unaffordable tower is refused", function (t) {
   var h = harness.boot();
   h.run("cash = 0");
-  t.eq(h.run("whyCannotBuild(" + w(h, 600) + ", " + w(h, 505) + ", Tower)"), "not enough cash", "with no cash");
+  t.eq(h.run("whyCannotBuild(" + w(h, 600) + ", " + w(h, 505) + ", Tower)"), "not enough mana", "with no mana");
 });
 
 

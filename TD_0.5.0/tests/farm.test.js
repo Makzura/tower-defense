@@ -40,6 +40,10 @@ function farm(h, x, y, tiers) {
   return f;
 }
 
+// The tick length, read off the constructor rather than restated -- the same
+// rule the rest of the suite follows for every figure it checks.
+function FarmTowerTick(h) { return h.game.FarmTower.TICK_SECONDS; }
+
 function enemyAt(h, x, y, health, typeId) {
   var e = new h.game.Enemy(h.game.path, health, typeId);
   e.pos = { x: x, y: y };
@@ -653,6 +657,160 @@ test("a wave is settled exactly once, however many doors fire", function (t) {
 
   g.Farms.settleWave(2);
   t.eq(g.cash, before + 400, "the next wave pays again");
+});
+
+
+group("Farm — what it has made, for as long as it has stood");
+
+// These exist because the production was INVISIBLE. A plain farm pays 200 mana
+// into a purse that bounties are already moving, at a wave boundary, with no
+// popup and no row -- so the owner placed one, watched a run, and reported that
+// the tower does not produce. It did. Every one of these totals is the evidence
+// that was missing.
+
+test("a plain farm's total is its per-wave figure, wave after wave",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200);
+
+  t.eq(f.manaProduced, 0, "nothing before the first wave settles");
+  g.Farms.settleWave(1);
+  t.eq(f.manaProduced, 200, "one wave's production");
+  g.Farms.settleWave(2);
+  t.eq(f.manaProduced, 400, "and it accumulates rather than reporting the last");
+});
+
+test("a tick farm counts every tick, on the same clock the game runs on",
+function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3"]);
+
+  f.update(FarmTowerTick(h) - 0.01);
+  t.eq(f.manaProduced, 0, "nothing until the tick completes");
+  f.update(0.02);
+  t.eq(f.manaProduced, 50, "then one tick's worth");
+  f.update(FarmTowerTick(h) * 3);
+  t.eq(f.manaProduced, 200, "and three more");
+});
+
+test("a storing farm counts what it stocks, and the clone on top",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4"]);
+
+  var before = g.cash;
+  f.update(FarmTowerTick(h));
+  t.eq(g.cash, before, "the purse gets nothing -- A4 keeps it");
+  t.eq(f.stock > 0, true, "the stock has it instead");
+  t.eq(f.manaProduced, f.stock,
+    "and stocked mana is still mana this tower made");
+
+  f.stock = 1000;
+  f.manaProduced = 1000;
+  var cloned = f.cloneStock();
+  t.eq(cloned, 50, "5% of a thousand");
+  t.eq(f.manaProduced, 1050, "and the clone counts too");
+});
+
+test("investing the stock does not take back what was produced", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  f.produce(30000);
+  t.eq(f.manaProduced, 30000, "produced");
+  t.eq(f.invest(false), null, "three whole tranches are spent");
+  t.eq(f.stock, 0, "the stock is gone");
+  t.eq(f.manaProduced, 30000, "the LIFETIME total is not -- it is not a balance");
+});
+
+test("path B counts the base HP it grew, per wave and per kill", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["B1", "B2"]);
+
+  t.eq(f.baseHpPerWave > 0, true, "B has a per-wave figure to count");
+  g.Farms.settleWave(1);
+  t.eq(f.baseHpProduced, f.baseHpPerWave, "one wave of it");
+
+  var perKill = f.baseHpPerKill;
+  if (perKill > 0) {
+    var e = enemyAt(h, f.x, f.y, 10);
+    g.Farms.onEnemyKilled(e);
+    t.eq(f.baseHpProduced, f.baseHpPerWave + perKill, "and a kill in the field");
+    t.eq(f.manaProduced, 200 + f.manaPerKill, "which pays mana on the same door");
+  }
+});
+
+test("a networked farm's share of P lands on its own total", function (t) {
+  var h = boot();
+  var g = h.game;
+  var a = farm(h, 600, 200, ["C1", "C2", "C3"]);          // nominal 300
+  var b = farm(h, 700, 200, ["C1", "C2", "C3", "C4"]);    // nominal 500
+  t.eq(g.Farms.network.B, 800, "the baseline is the two of them");
+
+  g.Farms.network.P = 800;
+  g.Farms.openWave();
+  t.near(a.manaProduced, 300, 1e-9, "three eighths of the payout");
+  t.near(b.manaProduced, 500, 1e-9, "and five eighths");
+  t.eq(a.manaProduced + b.manaProduced, 800,
+    "the whole payment is attributed and none of it is invented");
+});
+
+test("the panel prints the totals, and no zero it can never move",
+function (t) {
+  var h = boot();
+  var g = h.game;
+
+  var plain = farm(h, 600, 200);
+  var labels = plain.statLines().map(function (r) { return r[0]; });
+  t.ok(labels.indexOf("Mana produced") !== -1, "every farm shows its mana");
+  t.eq(labels.indexOf("Base HP produced"), -1,
+    "a farm with no B tier shows no base HP row: " + labels.join(", "));
+
+  var lab = farm(h, 700, 200, ["B1"]);
+  labels = lab.statLines().map(function (r) { return r[0]; });
+  t.ok(labels.indexOf("Base HP produced") !== -1, "one that makes HP does");
+
+  g.Farms.settleWave(1);
+  var row = lab.statLines().filter(function (r) { return r[0] === "Mana produced"; })[0];
+  t.eq(row[1], "200", "and the number is the total, formatted like every other");
+});
+
+test("the result screen picks both totals up", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["B1"]);
+  g.Farms.settleWave(1);
+
+  var rows = h.run("resultTowerRows()").filter(function (r) {
+    return r.name === "Farm";
+  });
+  t.eq(rows.length, 1, "the farm has a row");
+  var totals = rows[0].totals.map(function (r) { return r[0]; });
+  t.ok(totals.indexOf("Mana produced") !== -1, "with its mana total");
+  t.ok(totals.indexOf("Base HP produced") !== -1, "and its base HP total");
+});
+
+test("production is announced over the tower that made it", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200);
+
+  var seen = [];
+  var real = g.Effects.farmProduced;
+  h.run("Effects.__seen = [];");
+  g.Effects.farmProduced = function (tower, amount, stored) {
+    seen.push({ tower: tower, amount: amount, stored: stored });
+    return real.apply(null, arguments);
+  };
+  g.Farms.settleWave(1);
+  g.Effects.farmProduced = real;
+
+  t.eq(seen.length, 1, "one popup for one payment");
+  t.eq(seen[0].tower, f, "over the farm itself");
+  t.eq(seen[0].amount, 200, "for what it paid");
+  t.eq(seen[0].stored, false, "and it went to the purse, not to a stock");
 });
 
 

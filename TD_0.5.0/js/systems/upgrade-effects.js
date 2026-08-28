@@ -85,8 +85,8 @@ var UpgradeEffects = {
 
     ramp_per_target: "damage ramp",
     def_pierce: "defense pierce",
-    charge_to_gold: "charges → gold",
-    gold_to_power: "gold → power",
+    charge_to_gold: "charges → mana",
+    gold_to_power: "mana → power",
     hp_scaling: "HP scaling",
     lifesteal: "lifesteal",
     slow: "slow",
@@ -191,14 +191,14 @@ var UpgradeEffects = {
     },
     charge_to_gold: {
       text: function (p) {
-        if (!p) return "Damage builds charges that multiply the gold this tower earns.";
+        if (!p) return "Damage builds charges that multiply the mana this tower earns.";
         return "Damage banks charges (first at " + p.firstThreshold + ", each next one " +
-          p.growth + "x bigger) and each charge multiplies this tower's gold, up to x" +
+          p.growth + "x bigger) and each charge multiplies this tower's mana, up to x" +
           p.capTotal + ". Charges drain one per " + p.decaySeconds + " s out of combat.";
       }
     },
     gold_to_power: {
-      text: "The gold in your bank becomes damage: the richer you are, the harder this tower hits and the more each charge pays. It moves both ways."
+      text: "The mana in your bank becomes damage: the richer you are, the harder this tower hits and the more each charge pays. It moves both ways."
     },
     hp_scaling: {
       text: function (p) {

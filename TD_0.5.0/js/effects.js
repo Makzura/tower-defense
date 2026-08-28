@@ -415,9 +415,28 @@ var Effects = (function () {
       }
       popups.push({
         x: enemy.pos.x, y: enemy.pos.y - 18,
-        text: "+$" + cashEarned,
+        text: "+" + cashEarned + " mana",
         lift: lift,
         life: 0.9, maxLife: 0.9
+      });
+    },
+
+    // A FARM PAID. Same popup an enemy's bounty gets, over the tower that made
+    // it, because a Farm's production had no visible sign at all: it lands at
+    // the wave boundary, into a purse that is moving anyway from bounties, and
+    // a player who places one and watches sees nothing happen. Owner, having
+    // done exactly that: "the tower is supposed to produce mana, and it doesn't
+    // rn". It did, at 200 a wave. Nothing said so.
+    //
+    // `stored` says the mana went into the farm's own stock (path A from A4)
+    // rather than into the purse -- the same event, a different destination,
+    // and the player should be able to tell which without opening the panel.
+    farmProduced: function (tower, amount, stored) {
+      if (amount <= 0) return;
+      popups.push({
+        x: tower.x, y: tower.y - 18,
+        text: "+" + Math.round(amount) + (stored ? " stored" : " mana"),
+        life: 1.1, maxLife: 1.1
       });
     },
 

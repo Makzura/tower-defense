@@ -275,7 +275,7 @@
       (currentMap ? currentMap.name + "  ·  " : "") +
       "Base " + Math.round(baseHp) +
       (baseHp > BASE_MAX_HP ? "" : " / " + BASE_MAX_HP) +
-      "  ·  " + formatCash(cash) + " gold" + (lockGold ? " (topped up)" : "") +
+      "  ·  " + formatCash(cash) + " mana" + (lockGold ? " (topped up)" : "") +
       "  ·  " + enemies.length + " enemies  ·  " + towers.length + " towers" +
       (gameOver ? "  ·  BASE DESTROYED" : "");
   }
@@ -631,7 +631,7 @@
       els.lockGold.checked = false;
       els.goldInput.value = value;
       refreshBlockReason();          // affordability just changed
-      log("gold set to " + value);
+      log("mana set to " + value);
       refreshSidebar();
     }
 
@@ -677,7 +677,7 @@
 
     els.lockGold.addEventListener("change", function () {
       lockGold = els.lockGold.checked;
-      log(lockGold ? "gold top-up ON" : "gold top-up OFF");
+      log(lockGold ? "mana top-up ON" : "mana top-up OFF");
     });
 
     // Route switcher. Goes through startRun, the same entry point the chooser
@@ -830,7 +830,7 @@
     // would put a state on the screen that no run can ever reach.
     if (typeof Effects !== "undefined") Effects.reset();
 
-    log("sandbox ready — infinite cash, waves off, base " +
+    log("sandbox ready — infinite mana, waves off, base " +
       BASE_MAX_HP + " HP, speeds " + GAME_SPEEDS.join("/") + "×, map " +
       Math.round(path.length / UNIT_LENGTH) + " u.l. long");
   });

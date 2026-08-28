@@ -97,7 +97,7 @@ var MetaProgress = (function () {
       global: "Soldier",
       price: 0,
       starter: true,
-      blurb: "$300 Rifleman, three shots a burst. Its B path becomes " +
+      blurb: "300-mana Rifleman, three shots a burst. Its B path becomes " +
              "automatic and calls in stop-to-shoot recruits."
     },
     // A COIN PURCHASE, NOT A STARTER, and that was a decision rather than an
@@ -117,7 +117,7 @@ var MetaProgress = (function () {
       global: "BlubTower",
       price: 90,
       starter: false,
-      blurb: "$450 Summoner. It never fires — it plants blubs, whose hit points " +
+      blurb: "450-mana Summoner. It never fires — it plants blubs, whose hit points " +
              "ARE their ammunition, and they shoot for it."
     },
     // THE SIXTH TYPE, AND NOT A SIXTH SLOT (2026-08-27). The bar is five and
@@ -137,7 +137,7 @@ var MetaProgress = (function () {
       global: "FarmTower",
       price: 120,
       starter: false,
-      blurb: "1200 mana Farm. It never fires — it produces mana, grows your " +
+      blurb: "1200-mana Farm. It never fires — it produces mana, grows your " +
              "base, or links every farm on the board into one dice network."
     }
   ];

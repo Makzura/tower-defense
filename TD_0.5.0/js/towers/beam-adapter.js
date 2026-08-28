@@ -483,7 +483,7 @@ BeamTower.prototype.statLines = function () {
     rows.push(["Charges", String(this.charge.charges)]);
     // The bonus, not the total: base income is what any tower earns for that
     // damage, so it says nothing about whether path A is paying off.
-    rows.push(["Bonus gold", TowerStats.formatTotal(this.bonusGold)]);
+    rows.push(["Bonus mana", TowerStats.formatTotal(this.bonusGold)]);
   }
   if (s.flags.lifesteal) {
     rows.push(["Lifesteal", Math.round(s.mechanics.lifesteal.ratio * 100) + "%"]);
@@ -561,7 +561,7 @@ BeamTower.prototype.panelActions = function () {
         enabled = false;
         refusal = gate.reason;
       } else {
-        detail = "$" + cost;
+        detail = cost + " mana";
         enabled = cash >= cost;
       }
     }
@@ -604,7 +604,7 @@ BeamTower.prototype.panelActions = function () {
 
     actions.push({
       id: "passiveGoldPower",
-      label: "Gold → power  ·  +" + bonus + " dmg",
+      label: "Mana → power  ·  +" + bonus + " dmg",
       detail: "tier " + tiers + "  ·  " + GoldPower.perCharge(gold).toFixed(2) +
         "/charge  ·  cap x" + GoldPower.capTotal(gold).toFixed(1),
       // Third line, like every other button in the panel.
@@ -613,7 +613,7 @@ BeamTower.prototype.panelActions = function () {
       readonly: true,
       tone: "passive",
       tooltip: UpgradeEffects.card({
-        title: "Gold → power",
+        title: "Mana → power",
         subtitle: "live, at " + formatCash(gold) + " gold",
         changes: [
           { label: "Bonus damage", from: "", to: "+" + bonus + " dmg", delta: "" },
@@ -655,7 +655,7 @@ BeamTower.prototype.upgradeCard = function (pathName, refusal) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  path " + pathName + " tier " + preview.tier.tier,
-    subtitle: refusal ? refusal : "$" + preview.cost,
+    subtitle: refusal ? refusal : preview.cost + " mana",
     changes: preview.changes,
     abilities: preview.abilities,
     note: note
@@ -679,7 +679,7 @@ BeamTower.prototype.performAction = function (id, context) {
   var gate = this.checkUnlock(pathName);
   if (!gate.ok) return gate.reason;
 
-  if (context.cash < cost) return "not enough cash";
+  if (context.cash < cost) return "not enough mana";
 
   var result = this.purchase(pathName);
   if (!result.ok) return result.reason;

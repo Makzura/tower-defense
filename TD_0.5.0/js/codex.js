@@ -178,7 +178,7 @@ var Codex = (function () {
 
       var entry = {
         id: action.upgradeId,
-        price: action.detail,          // "$850", or the gate's reason
+        price: action.detail,          // "850 mana", or the gate's reason
         effects: action.effects || "",
         reason: action.reason || null,
         // Resolved NOW, not kept as a thunk: the thunk reads the instance,
@@ -675,7 +675,7 @@ var Codex = (function () {
         r.x + 74, r.y + r.h / 2 - 10);
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,215,110,0.75)";
-      ctx.fillText("$" + model.cost, r.x + 74, r.y + r.h / 2 + 10);
+      ctx.fillText(model.cost + " mana", r.x + 74, r.y + r.h / 2 + 10);
     });
 
     var model = towerModels[towerIndex];
@@ -688,7 +688,7 @@ var Codex = (function () {
     ctx.fillText(model.name, 300, 150);
     ctx.font = "600 15px system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,215,110,0.85)";
-    ctx.fillText("$" + model.cost, 300 + ctx.measureText(model.name).width + 60, 156);
+    ctx.fillText(model.cost + " mana", 300 + ctx.measureText(model.name).width + 60, 156);
 
     var statW = 270;
     model.stats.forEach(function (row, i) {
@@ -866,17 +866,17 @@ var Codex = (function () {
     if (model.attack && model.attack.stunSeconds)
       return ["STUNS YOUR TOWERS", "rgba(255,224,120,0.95)"];
     if (model.attack) return ["ATTACKS YOUR TOWERS", "rgba(255,150,100,0.95)"];
-    if (model.spawns) return ["BROOD: SHIELDED, $0", "rgba(150,230,190,0.95)"];
+    if (model.spawns) return ["BROOD: SHIELDED, 0 MANA", "rgba(150,230,190,0.95)"];
     if (model.fractal) return ["SPLITS INTO FOUR LOWER TIERS", "rgba(132,255,192,0.95)"];
     // The support types. A shield that stacks and a heal are different
     // threats and get different lines: one makes the wave harder to start on,
     // the other makes it harder to finish.
     if (model.support && model.support.heal)
-      return ["HEALS WOUNDED — $0", "rgba(150,240,180,0.95)"];
+      return ["HEALS WOUNDED — 0 MANA", "rgba(150,240,180,0.95)"];
     if (model.support && model.support.shield && model.support.pick === "self")
-      return ["RESHIELDS ITSELF — $0", "rgba(255,205,130,0.95)"];
+      return ["RESHIELDS ITSELF — 0 MANA", "rgba(255,205,130,0.95)"];
     if (model.support && model.support.shield)
-      return ["SHIELDS THE WAVE — $0", "rgba(170,225,255,0.95)"];
+      return ["SHIELDS THE WAVE — 0 MANA", "rgba(170,225,255,0.95)"];
     if (model.sprint) return ["SPRINTS THE OPENING", "rgba(255,205,130,0.95)"];
     if (model.shield && model.shield.onBreak)
       return ["SHIELD → DOUBLE SPEED", "rgba(150,225,245,0.95)"];
@@ -934,7 +934,7 @@ var Codex = (function () {
         s.shield + " / " + s.intervalSeconds + " s, stacks"];
     }
 
-    return ["Bounty", "$" + model.bounty];
+    return ["Bounty", model.bounty + " mana"];
   }
 
   function drawEnemiesGridLegacy(ctx) {
@@ -1460,7 +1460,7 @@ var Codex = (function () {
       if (model.spawns.shieldRatio) {
         spawnText += ", each with a " + model.spawns.shieldRatio + "× health shield";
       }
-      if (model.spawns.noBounty) spawnText += " and a $0 bounty";
+      if (model.spawns.noBounty) spawnText += " and no bounty at all";
       lines.push(spawnText + ". Damage to the brood still counts on towers.");
       hasMechanic = true;
     }
@@ -1593,7 +1593,7 @@ var Codex = (function () {
       ctx.fillText(String(model.health) + " HP", r.x + r.w - 84, r.y + 17);
       ctx.font = "600 13px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,215,110,0.9)";
-      ctx.fillText("$" + model.bounty, r.x + r.w - 14, r.y + 17);
+      ctx.fillText(model.bounty + " mana", r.x + r.w - 14, r.y + 17);
 
       // Speed under the money, so the two columns each carry a "how much" and
       // a "how fast" rather than the row being three numbers in a line.
@@ -1665,7 +1665,7 @@ var Codex = (function () {
       ["Base health", model.health + " HP"],
       ["Highest campaign HP", model.maxHp + " HP"],
       ["Starting effective HP", effective + " HP"],
-      ["Kill bounty", "$" + model.bounty],
+      ["Kill bounty", model.bounty + " mana"],
       ["Movement speed", roundStat(model.speed) + " u.l./s (" + model.multiplier + "×)"],
       ["Reference crossing", "~" + Math.round(model.crossing) + " s"],
       ["Flat armor", String(model.armor)],

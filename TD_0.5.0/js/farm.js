@@ -79,6 +79,21 @@ function FarmTower(x, y, path) {
   // the panel can show the player what their own tower threw.
   this.lastRolls = [];
 
+  // WHAT THIS TOWER HAS MADE, for as long as it has stood. Two totals rather
+  // than one because the Farm makes two different things and no tier makes
+  // both in the same way: every tier produces mana (per wave, per tick, per
+  // kill, or into its own stock), and path B's tiers also grow the base's
+  // maximum HP. They exist because production was INVISIBLE: a plain farm pays
+  // 200 mana into the purse at the wave boundary with no popup and no row, so
+  // the only evidence it worked was arithmetic on the purse across a wave.
+  // Owner, having placed one and watched: "the tower is supposed to produce
+  // mana, and it doesn't rn". It did. Nothing said so.
+  //
+  // Lifetime totals, so investing the stock or spending the purse never moves
+  // them, and the result screen picks both up through RESULT_TOTAL_LABELS.
+  this.manaProduced = 0;
+  this.baseHpProduced = 0;
+
   this.aim = -Math.PI / 2;
   this.showRange = false;
 
@@ -466,6 +481,12 @@ FarmTower.prototype.update = function (dt) {
 // mana produit est desormais stocke dans cette Farm" changes.
 FarmTower.prototype.produce = function (amount) {
   if (amount <= 0) return 0;
+  this.manaProduced += amount;
+  // PRESENTATION ONLY, and guarded so the tests -- which run without Effects
+  // on some paths -- and the sandbox behave identically with it and without.
+  if (typeof Effects !== "undefined") {
+    Effects.farmProduced(this, amount, !!this.stores);
+  }
   if (this.stores) {
     this.stock += amount;
     return 0;
@@ -479,6 +500,11 @@ FarmTower.prototype.cloneStock = function () {
   if (!this.stores || this.stock <= 0) return 0;
   var cloned = Math.min(this.stock * 0.05, this.cloneCap);
   this.stock += cloned;
+  // Cloned mana is mana this farm made, so it counts. It does not go through
+  // produce() because it never leaves the stock -- the clone IS the stock
+  // growing -- and routing it there would pay a non-storing farm for a stock
+  // it cannot have.
+  this.manaProduced += cloned;
   return cloned;
 };
 
@@ -610,6 +636,16 @@ FarmTower.prototype.statLines = function () {
     if (this.lastRolls.length) rows.push(["Last roll", this.lastRolls.join(", ")]);
     rows.push(["Network", Math.round(Farms.network.P) + " / " +
       Math.round(Farms.network.B) + " mana"]);
+  }
+
+  // THE LIFETIME TOTALS, last before the health line and always in this order.
+  // Mana is unconditional because every tier makes some; base HP appears only
+  // on a tower that has a tier which makes it, so a farm with no B tier does
+  // not print a zero it can never move (the same no-invented-zeroes rule the
+  // result screen is built on).
+  rows.push(["Mana produced", TowerStats.formatTotal(this.manaProduced)]);
+  if (this.baseHpPerWave > 0 || this.baseHpPerKill > 0 || this.baseHpProduced > 0) {
+    rows.push(["Base HP produced", TowerStats.formatTotal(this.baseHpProduced)]);
   }
 
   rows.push(["Tower HP", TowerHealth.label(this)]);
@@ -1113,6 +1149,11 @@ var Farms = (function () {
       if (!f.covers(enemy.pos.x, enemy.pos.y)) continue;
       mana += f.manaPerKill;
       baseHp += f.baseHpPerKill;
+      // Credited here rather than through produce(): the payment below is one
+      // call for the whole board, and a B-path farm cannot hold A4 anyway (a
+      // T3 on B caps A at 2), so there is no stock for this mana to fall into.
+      f.manaProduced += f.manaPerKill;
+      f.baseHpProduced += f.baseHpPerKill;
     }
     if (mana > 0) pay(mana);
     if (baseHp > 0 && typeof growBaseMaxHp === "function") growBaseMaxHp(baseHp);
@@ -1158,6 +1199,7 @@ var Farms = (function () {
       if (!inNetwork(f)) paid += f.produce(f.producesPerWave());
       cloned += f.cloneStock();
       baseHp += f.baseHpPerWave;
+      f.baseHpProduced += f.baseHpPerWave;
     }
     if (baseHp > 0 && typeof growBaseMaxHp === "function") growBaseMaxHp(baseHp);
 
@@ -1166,9 +1208,28 @@ var Farms = (function () {
   }
 
   // START OF A WAVE. The network pays P, and the payment does not consume it.
+  //
+  // P belongs to the network, not to any one farm, so it is SPLIT across the
+  // members for the lifetime totals -- by each farm's share of B, which is the
+  // only per-farm number the network is built out of. Without this a C-path
+  // farm would read "0 mana produced" for a whole run while paying the player
+  // every wave, which is precisely the illusion these totals exist to end.
   function openWave() {
     if (!network.live) return 0;
-    return pay(Math.max(0, Math.round(network.P)));
+    var amount = Math.max(0, Math.round(network.P));
+    if (amount <= 0) return 0;
+
+    var m = members();
+    if (m.length) {
+      var i;
+      var share = network.B > 0 ? 0 : amount / m.length;
+      for (i = 0; i < m.length; i++) {
+        m[i].manaProduced += network.B > 0
+          ? amount * (m[i].nominalProduction() / network.B)
+          : share;
+      }
+    }
+    return pay(amount);
   }
 
   // --- the dice -------------------------------------------------------------

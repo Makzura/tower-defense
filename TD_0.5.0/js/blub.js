@@ -1366,7 +1366,7 @@ BlubTower.prototype.panelActions = function () {
       branch: branch,
       upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : "$" + next.cost,
+      detail: refusal ? refusal : next.cost + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
       enabled: refusal === null &&
@@ -1426,7 +1426,7 @@ BlubTower.prototype.upgradeCard = function (upgrade, refusal, preview) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  " + upgrade.id,
-    subtitle: refusal ? refusal : "$" + upgrade.cost,
+    subtitle: refusal ? refusal : upgrade.cost + " mana",
     changes: preview.changes,
     abilities: UpgradeEffects.abilities(preview.grants, null),
     note: note
@@ -1608,7 +1608,7 @@ function Blub(owner, x, y, stats, monsterTier) {
   this.name = stats.name;
 
   // A blub is free and refunds nothing. sellValue() reads totalSpent, so this
-  // is also what makes its panel's Sell button pay exactly $0 -- the brief's
+  // is also what makes its panel's Sell button pay exactly 0 mana -- the brief's
   // "option de vente a 0 gold" needs no special case anywhere.
   this.cost = 0;
   this.totalSpent = 0;

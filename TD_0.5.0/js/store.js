@@ -205,7 +205,7 @@ var Store = (function () {
 
       // Clipped short of the right-hand column (price / OWNED, and the in-run
       // cost under it), not just short of the card edge -- at full card width
-      // a long blurb ran straight through "$200 in a run".
+      // a long blurb ran straight through "200 MANA IN A RUN".
       ctx.font = "11px " + MENU_TECH_FONT;
       ctx.fillStyle = "rgba(186,158,140,0.62)";
       ctx.fillText(fitText(ctx, item.blurb, r.w - 80 - 110), r.x + 80, r.y + 50);
@@ -228,7 +228,7 @@ var Store = (function () {
       if (Type) {
         ctx.font = "10px " + MENU_TECH_FONT;
         ctx.fillStyle = "rgba(186,158,140,0.45)";
-        ctx.fillText("$" + Type.COST + " IN A RUN", r.x + r.w - 14, r.y + 50);
+        ctx.fillText(Type.COST + " MANA IN A RUN", r.x + r.w - 14, r.y + 50);
       }
       ctx.textAlign = "left";
     });
