@@ -72,6 +72,15 @@ var GLModels = (function () {
       // looked like it worked. A missing `loopSeconds` fails the same way --
       // the animation plays at a default rate nobody chose.
       loopSeconds: data.loopSeconds || 0,
+      // A BAND'S LENGTH IN FRAMES SAYS NEITHER HOW LONG IT LASTS NOR WHAT IT
+      // IS, so an animated model that carries more than one clip carries these
+      // beside `bands`. `bandSeconds[i]` is that clip's duration and
+      // `bandNames[i]` is its authored name -- `idle_work`, `produce_tick`,
+      // `kill_capture`. gl-world matches on the NAME rather than on an index,
+      // because an index silently points at a different clip the day a model
+      // gains one. Copied explicitly, like everything else here.
+      bandSeconds: data.bandSeconds || null,
+      bandNames: data.bandNames || null,
       expanded: null,
       gpu: null
     };

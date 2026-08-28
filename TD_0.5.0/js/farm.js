@@ -90,6 +90,29 @@ function FarmTower(x, y, path) {
   // double's precision.
   this.animClock = 0;
 
+  // WHEN EACH ONE-SHOT LAST FIRED, on that same clock, or -1 for never.
+  //
+  // The T3 models ship an idle loop AND action clips that depict things this
+  // tower already does: A3's `produce_tick` is a production tick, B3's
+  // `target_lock` is a body entering the field and `kill_capture` is one dying
+  // in it, C3's `end_wave_roll` is the network rolling its dice. So the
+  // simulation records WHEN, in animClock seconds, and the renderer decides
+  // whether that is recent enough to still be playing -- which is the same
+  // one-way arrangement as `swingProgress` and `gearPhase`: presentation reads
+  // the simulation, and nothing here reads back.
+  //
+  // -1 rather than 0 because 0 is a real moment: a farm placed and paid on the
+  // same step would otherwise play its tick at birth.
+  this.lastTick = -1;
+  this.lastLock = -1;
+  this.lastCapture = -1;
+  this.lastRoll = -1;
+
+  // Whether the field held anybody last step, so `lastLock` can fire on the
+  // EDGE -- a body arriving -- rather than every step something is standing
+  // there. Simulation state, but read by nothing that simulates.
+  this.fieldHeld = false;
+
   // PATH A5's investment, as PERMANENT tranches already spent and a temporary
   // burst that is counted in tranches too. Both are read by `Farms.investment`,
   // which is what a boosted tower asks.
@@ -501,10 +524,24 @@ FarmTower.fmt = function (n, digits) {
 
 // --- the clock --------------------------------------------------------------
 
-FarmTower.prototype.update = function (dt) {
+FarmTower.prototype.update = function (dt, enemies) {
   // The animation's clock, first and unconditionally: a farm animates whatever
   // else it is doing, and it is the one thing here that is true of every tier.
   this.animClock += dt;
+
+  // A BODY ARRIVING IN THE FIELD, on the edge and not on the state. Only a
+  // farm with a field asks -- `rangePx` is 0 until path B buys one -- so a
+  // board without one pays a single comparison, and the loop stops at the
+  // first body rather than counting them.
+  if (this.rangePx > 0 && enemies) {
+    var holding = false;
+    for (var i = 0; i < enemies.length && !holding; i++) {
+      var e = enemies[i];
+      if (e && !e.dead && e.pos && this.covers(e.pos.x, e.pos.y)) holding = true;
+    }
+    if (holding && !this.fieldHeld) this.lastLock = this.animClock;
+    this.fieldHeld = holding;
+  }
 
   if (this.tempTimer > 0) {
     // A residue, not an equality. `30 - 29.9 - 0.1` is 1.4e-15 in binary
@@ -525,6 +562,7 @@ FarmTower.prototype.update = function (dt) {
     while (this.tickTimer >= FarmTower.TICK_SECONDS) {
       this.tickTimer -= FarmTower.TICK_SECONDS;
       this.produce(this.perTickProduction);
+      this.lastTick = this.animClock;
     }
   }
   return 0;
@@ -1522,6 +1560,7 @@ var Farms = (function () {
       // T3 on B caps A at 2), so there is no stock for this mana to fall into.
       f.manaProduced += f.manaPerKill;
       f.baseHpProduced += f.baseHpPerKill;
+      f.lastCapture = f.animClock;
       // ONE POPUP PER FARM, BESIDE THE BOUNTY AND NOT INSIDE IT. Owner: "on the
       // bounty, it's separated -- imagine it gives four and the tower gives
       // one, it's written +4 and +1, not +5". Summing them would hide the whole
@@ -1580,6 +1619,13 @@ var Farms = (function () {
     if (baseHp > 0 && typeof growBaseMaxHp === "function") growBaseMaxHp(baseHp);
 
     var rolled = network.live ? rollNetwork() : null;
+    // THE SHRINE THROWS ITS DIE WHEN THE NETWORK DOES. Only the farms that
+    // actually rolled -- `members()` is the ones carrying dice -- so a C1 farm
+    // standing beside a network it is not in does not mime the throw.
+    if (rolled) {
+      var rollers = members();
+      for (i = 0; i < rollers.length; i++) rollers[i].lastRoll = rollers[i].animClock;
+    }
     return { paid: paid, cloned: cloned, baseHp: baseHp, dice: rolled };
   }
 

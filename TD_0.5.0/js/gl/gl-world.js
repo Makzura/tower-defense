@@ -1101,13 +1101,76 @@ var World3D = (function () {
     return (name && GLModels.has(name)) ? name : null;
   }
 
-  // THE FARM'S THREE MODELS, AND WHY A TIER 5 STILL WEARS THE T2 ONE.
+  // WHICH CLIP A FARM'S ONE-SHOTS ARE, by the authored name in the model.
+  //
+  // The field on the tower, and the clip that depicts it. Matched by NAME
+  // rather than by band index, because an index points at whatever happens to
+  // be second in the file -- and B3 already carries two one-shots where A3 and
+  // C3 carry one. A model without the clip simply never plays it, which is what
+  // makes this list safe to state once for every tier.
+  var FARM_ONE_SHOTS = [
+    { at: "lastTick", clip: "produce_tick" },      // A3: a production tick
+    { at: "lastCapture", clip: "kill_capture" },   // B3: a body died in the field
+    { at: "lastLock", clip: "target_lock" },       // B3: a body entered it
+    { at: "lastRoll", clip: "end_wave_roll" }      // C3: the network rolled
+  ];
+
+  // WHICH FRAME A FARM IS ON: the most recent one-shot that is still running,
+  // otherwise the idle loop.
+  //
+  // Bands are read out of the model -- `bands` says where each clip's frames
+  // are, `bandSeconds` how long it lasts, `bandNames` what it is -- and never
+  // derived by dividing `frames.length`, which is the arithmetic every
+  // off-by-one in this file's history came from.
+  //
+  // A ONE-SHOT WINS OVER THE IDLE AND OVER AN OLDER ONE-SHOT, so a kill landing
+  // during a target lock cuts to the capture rather than queueing behind it.
+  // Every action clip ends bit-exact on the idle's first pose (the importer
+  // checks it), so falling back needs no blend.
+  function farmFrame(m, tower) {
+    var clock = tower.animClock || 0;
+    var bands = m.bands, seconds = m.bandSeconds, names = m.bandNames;
+
+    if (bands && bands.length > 1 && seconds && names) {
+      var bestBand = -1, bestPhase = 0, bestAt = -1;
+      for (var i = 0; i < FARM_ONE_SHOTS.length; i++) {
+        var fired = tower[FARM_ONE_SHOTS[i].at];
+        if (!(fired >= 0) || fired < bestAt) continue;
+        var b = names.indexOf(FARM_ONE_SHOTS[i].clip);
+        if (b < 1) continue;
+        var age = clock - fired;
+        if (age < 0 || age >= seconds[b]) continue;   // not running
+        bestBand = b; bestAt = fired;
+        bestPhase = seconds[b] > 0 ? age / seconds[b] : 0;
+      }
+      if (bestBand > 0) {
+        // A one-shot's last frame IS its end pose, so the window maps across
+        // the whole band inclusive: n frames span [0, 1] rather than [0, 1).
+        var n = bands[bestBand][1];
+        return bands[bestBand][0] +
+          Math.min(n - 1, Math.floor(bestPhase * (n - 1) + 0.5));
+      }
+    }
+
+    // The idle. Band 0 when the model declares bands, the whole strip when it
+    // does not -- which is the Base/T1/T2 case and the format's documented
+    // fallback.
+    var first = (bands && bands.length) ? bands[0][0] : 0;
+    var count = (bands && bands.length) ? bands[0][1] : m.frames.length;
+    var loop = (seconds && seconds.length) ? seconds[0]
+      : (m.loopSeconds > 0 ? m.loopSeconds : 8);
+    var phase = (((clock / loop) % 1) + 1) % 1;
+    return first + Math.min(count - 1, Math.floor(phase * count));
+  }
+
+  // THE FARM'S MODELS, AND WHY A TIER 5 STILL WEARS A T3 ONE.
   //
   // Twelve are planned -- a base, a T1 shared by A1/B1/C1, a T2 shared by
-  // A2/B2/C2, and one per path for T3, T4 and T5 -- and three exist:
-  // `mana_well_base`, `hand_pump_t1` and `reinforced_pump_t2`, imported from
-  // Claude Design on 2026-08-28. So this answers with the highest model that
-  // has been authored rather than the highest tier that has been bought.
+  // A2/B2/C2, and one per path for T3, T4 and T5 -- and six exist: the well,
+  // the hand pump and the reinforced pump (2026-08-28), then the refinery, the
+  // scanner and the fate shrine for A3/B3/C3 (2026-08-29). So this answers with
+  // the highest model that has been AUTHORED rather than the highest tier that
+  // has been bought: a T5 on path B still wears `farm-t3b`.
   //
   // It reads the `hasA1..hasC5` flags rather than a purchase list because that
   // is how js/farm.js spells its tiers -- the same shape the Warbringer and the
@@ -1120,10 +1183,19 @@ var World3D = (function () {
   function farmGroup(tower) {
     var branches = ["A", "B", "C"];
     var best = 0;
+    var main = "A";
     for (var b = 0; b < branches.length; b++) {
       for (var t = 5; t > best; t--) {
-        if (tower["has" + branches[b] + t]) { best = t; break; }
+        if (tower["has" + branches[b] + t]) { best = t; main = branches[b]; break; }
       }
+    }
+    if (best >= 3) {
+      // FROM T3 THE PATH DECIDES THE BODY, which is the brief's own rule: a
+      // farm with a main path at T3+ wears that path's model and its secondary
+      // T1/T2 add no overlay. The crosspath makes `main` unambiguous -- a T3
+      // anywhere caps both other branches at 2 -- so the branch holding `best`
+      // is the only one it can be.
+      return "t3" + main.toLowerCase();
     }
     if (best >= 2) return "t2";
     if (best >= 1) return "t1";
@@ -2223,10 +2295,7 @@ var World3D = (function () {
         // FarmTower.update and therefore freezes and accelerates with the run.
         if (m && m.frames.length > 1 && t.constructor &&
             t.constructor.ID === "farm") {
-          var loop = m.loopSeconds > 0 ? m.loopSeconds : 8;
-          var fphase = (((t.animClock || 0) / loop) % 1 + 1) % 1;
-          frame = Math.min(m.frames.length - 1,
-            Math.floor(fphase * m.frames.length));
+          frame = farmFrame(m, t);
         }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from

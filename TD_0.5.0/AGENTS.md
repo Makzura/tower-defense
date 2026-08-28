@@ -6620,19 +6620,46 @@ A2/B2/C2, and one each for A3-A5, B3-B5 and C3-C5. **No crosspath ever gets a
 model of its own** — a Farm with a main path at T3+ wears that path's body and
 its secondary T1/T2 add no overlay.
 
-**Three are built** (2026-08-28, imported from Claude Design): `farm-base` is a
-stone mana well with a crank, a pulley, a rope and a bucket, and a novice
-working it; `farm-t1` is a hand pump with a lever, a piston, a hose and a
-bottle; `farm-t2` is the same pump reinforced with a flywheel and a pressure
-tank. `farmGroup` in gl-world answers with **the highest model that has been
-AUTHORED**, not the highest tier bought, so a T5 farm wears the T2 body until
-its own is built.
+**Six are built**, imported from Claude Design. `farm-base` is a stone mana well
+with a crank, a pulley, a rope and a bucket, and a novice working it; `farm-t1`
+is a hand pump with a lever, a piston, a hose and a bottle; `farm-t2` is that
+pump reinforced with a flywheel and a pressure tank (all three 2026-08-28). Then
+the three T3 bodies, one per path (2026-08-29): `farm-t3a` a relic piston
+refinery, `farm-t3b` a targeting array on a gimbal, `farm-t3c` a d20 fate altar.
 
-**Each carries one authored looping animation** rather than a cycle this project
-solved — 8 s for the well, 7.5 s for the pumps, keyed at 24 fps in the source.
-They are imported whole by `tools/glb_to_animated.py`; see the model-contract
-section for how that differs from `glb_to_model.py`, which synthesises motion
-from a rig and ignores a file's own animation.
+`farmGroup` in gl-world answers with **the highest model that has been
+AUTHORED**, not the highest tier bought, so a T5 on path B wears `farm-t3b`
+until its own is built. From T3 the PATH picks the body, which is the brief's
+rule; the crosspath makes that unambiguous, since a T3 anywhere caps the other
+two branches at 2.
+
+**Every model carries authored clips** rather than a cycle this project solved.
+Base/T1/T2 have one loop each (8 s, 7.5 s, 7.5 s). The T3 bodies have an idle
+AND one-shots, and each one-shot depicts something the tower already does:
+
+| model | idle | one-shots | fired by |
+|---|---|---|---|
+| `farm-t3a` | `idle_work` 4 s | `produce_tick` 1.6 s | a production tick (A3+) |
+| `farm-t3b` | `idle_scan` 6 s | `target_lock` 0.35 s | a body entering the field |
+| | | `kill_capture` 0.7 s | a body dying inside it |
+| `farm-t3c` | `idle_magic` 3 s | `end_wave_roll` 2.4 s | the C network rolling |
+
+**THE SIMULATION RECORDS *WHEN*, THE RENDERER DECIDES *WHETHER*.** `lastTick`,
+`lastLock`, `lastCapture` and `lastRoll` are animClock stamps on the tower, -1
+for never — 0 is a real moment and a farm paid on its first step would otherwise
+play its tick at birth. `farmFrame` in gl-world picks the most recent one-shot
+still inside its own duration, else the idle. One-way, exactly like
+`swingProgress` and `gearPhase`: nothing simulated reads any of it back.
+
+**Clips are matched BY NAME, never by band index** — `bandNames` on the model —
+because an index points at whatever happens to be second in the file, and B3
+already carries two one-shots where A3 and C3 carry one. A test pins the names.
+
+**Emissive pulses are NOT imported and cannot be.** The handoff specifies them
+per material (`mana_chamber_t3a` at `1.15 + 0.35·sin`, and so on); a palette row
+here is `[r, g, b, emission]` with ONE static scalar, and the only runtime knob
+is `renderer.setGlow`, which lights a whole tower rather than one material. The
+bodies move correctly and do not pulse. That is a known gap, not an oversight.
 
 **THE ANIMATION RUNS ON THE SIMULATION CLOCK, not `state.now`.**
 `FarmTower.animClock` is accumulated in `update(dt)`, so the well turns three

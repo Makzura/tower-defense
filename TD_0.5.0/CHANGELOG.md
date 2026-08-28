@@ -13,6 +13,50 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The three T3 farms, and the animations they act out.**
+`farm-t3a` a relic piston refinery, `farm-t3b` a targeting array on a gimbal,
+`farm-t3c` a d20 fate altar — one per path, from a Claude Design handoff. Six of
+the twelve now exist, and from T3 the PATH picks the body.
+
+**These carry more than an idle**, which is what the work here was. Each ships
+one-shot clips beside its loop, and every one of them depicts something the
+tower already does: A3's `produce_tick` is a production tick, B3's `target_lock`
+is a body entering the field and `kill_capture` is one dying in it, C3's
+`end_wave_roll` is the network rolling its dice. So they are wired to those
+events rather than to a timer.
+
+The simulation records WHEN, as animClock stamps (`lastTick`, `lastLock`,
+`lastCapture`, `lastRoll`, -1 for never); `farmFrame` in gl-world decides
+whether that is recent enough to still be playing, and picks the most recent
+one-shot still inside its own duration, else the idle. Clips are matched **by
+name** through the model's `bandNames`, never by band index — B3 already carries
+two one-shots where the others carry one.
+
+**Two things the importer learned.** Groups are decided by the union of every
+clip's nodes, not the idle's alone: A3's valve and its three liquid levels are
+keyed by `produce_tick` and nothing else, and grouping off the idle would weld
+them into the static body. And a node keyed ONLY by an action clip has no idle
+pose in the file — `b3_capture_pulse` exports with a rest scale of 2, so falling
+back to the authored transform parked a full-size orb on the scanner's lens
+forever. Its idle pose is recovered from the data: an action ends on the idle
+pose, so the pose is that clip's own final one, which matches the design
+source's `pulse.scale.setScalar(0.001)` exactly.
+
+Actions are sampled at the source's 24 fps and idles at 8: `target_lock` lasts
+0.35 s, which at 8 fps is three frames — a stutter, not a snap.
+
+Verified in the running game: three T3 farms drawn (646 px), 63–91 px of them
+moving every second at idle, and each one-shot visibly taking over — up to 31, 23,
+19 and 49 pixels differing from the idle, each peaking exactly where the handoff
+says the motion is (the valve turn at 0.65 s, the yaw snap at 0.14 s, the pulse
+reaching the vial at 0.31 s, the die at the top of its arc at 0.35 s). Every
+clip reproduces its source to 8.5e-6 model units, and all four end bit-exact on
+the idle's first pose.
+
+**Emissive pulses are not imported.** The handoff specifies them per material;
+a palette row here carries one static emission scalar and the only runtime knob
+lights a whole tower. The bodies move correctly and do not pulse — a known gap.
+
 **2026-08-29 — The Farm's parts are where they belong.** The first import
 posed every animated group RELATIVE to its own pivot, but the format applies a
 frame matrix as `instance * pose` and expects it to land points in model space —

@@ -93,13 +93,35 @@
 # twice in a row.
 #
 # FRAME COUNT IS A TRADE AND IT IS NOT THE SOURCE'S. gl-world indexes the strip
-# and never interpolates, so the playback rate is `frames / loopSeconds` and
-# every frame is a 4x4 per group on disk. 24 fps for 8 seconds is 192 frames
-# and about half a megabyte per model for motion no reader can see; 64 is 8 fps,
-# which is 5.6 degrees a frame on the T2 flywheel -- the fastest thing any of
-# these files does -- and lands each model near the size of the ones already
-# shipped. Pass `--frames` to argue with that; the contact sheet below is how
-# you check the answer without loading the game.
+# and never interpolates, so the playback rate is `frames / seconds` and every
+# frame is a 4x4 per group on disk. 24 fps for 8 seconds is 192 frames and about
+# half a megabyte per model for motion no reader can see; 8 fps is 5.6 degrees a
+# frame on the T2 flywheel -- the fastest thing any of these files does -- and
+# lands each model near the size of the ones already shipped.
+#
+# ACTION CLIPS ARE SAMPLED FASTER THAN IDLES, and that is why the two rates are
+# separate flags. An idle is a slow loop nobody watches closely; an action is a
+# short punctuation the player's eye is on, and B3's `target_lock` lasts 0.35 s
+# -- three frames at 8 fps, which is not a snap, it is a stutter. Actions ship at
+# the source's own 24 fps, which costs 38 frames for a 1.6 s tick.
+#
+# MORE THAN ONE CLIP MEANS `bands`, WHICH THE FORMAT ALREADY HAS. Clips are
+# concatenated into the one frame list the format allows and `bands` says where
+# each starts and how long it runs -- the same pair `export_mesh.py` emits, and
+# the reason gl-world's `walkBand` exists: a reader must never divide
+# `frames.length` by something. Two more fields go with it, because a band's
+# LENGTH IN FRAMES does not say how long it lasts or what it is: `bandSeconds`
+# is each band's duration and `bandNames` is each band's clip name. Naming them
+# is what lets gl-world map `produce_tick` to a production tick rather than to
+# "band 1", which would silently point at a different clip the day a model gains
+# one.
+#
+# BAND 0 IS THE IDLE, by the handoff's own naming convention: a clip called
+# `idle_*` comes first and loops, everything else is a one-shot in file order.
+# The design guarantees action clips begin and end bit-exact on the idle's t=0
+# pose, so returning to band 0 frame 0 needs no blend.
+#
+# The contact sheet below is how you check any of this without loading the game.
 #
 # LOOK AT IT BEFORE SHIPPING IT. `--preview out.png` draws the same contact
 # sheet the other tool does, in the same fixed camera, and for the same reason:
@@ -206,6 +228,22 @@ def slerp(a, b, t):
     import math
     n = math.sqrt(sum(v * v for v in out)) or 1.0
     return [v / n for v in out]
+
+
+def clip_order(gltf):
+    """Every animation index, the idle first.
+
+    The handoff names its loop `idle_*` and its one-shots anything else, and
+    that convention is the only thing in the file that says which clip a model
+    rests in. A file with no `idle_` clip keeps its own order and band 0 is
+    simply the first one -- which is right for the Base/T1/T2 models, whose
+    single clip is an idle without saying so.
+    """
+    anims = gltf.json.get("animations") or []
+    order = list(range(len(anims)))
+    order.sort(key=lambda i: (0 if str(anims[i].get("name", ""))
+                              .startswith("idle") else 1, i))
+    return order
 
 
 class Animation(object):
@@ -332,15 +370,50 @@ def chain_of(index, parent):
     return out
 
 
-def world_at(chain, anim, time, nodes):
+def idle_poses(clips, nodes):
+    """What each animated node holds while a clip that does not key it plays.
+
+    A NODE KEYED ONLY BY AN ACTION CLIP HAS NO POSE IN THE IDLE, and its
+    authored transform is not it. `b3_capture_pulse` is the case that proves it:
+    the orb that travels from lens to vial during a capture is exported with a
+    rest scale of 2, is keyed by `kill_capture` alone, and the idle never
+    mentions it -- so falling back to the authored transform parks a full-size
+    orb on the scanner's lens for the entire run. The design source is explicit
+    that it is hidden (`pulse.scale.setScalar(0.001)`, and the idle clip sets it
+    again), but that intent does not survive into glTF.
+
+    It is recovered from the data rather than typed: an action clip is
+    guaranteed to END on the idle pose, so the pose such a node should hold is
+    that clip's own final one. Every other node -- keyed by the idle, or keyed
+    by nothing at all -- keeps its authored transform, so this changes nothing
+    for the models that have a single clip.
+    """
+    idle = clips[0]
+    poses = {}
+    for index in range(len(nodes)):
+        if idle.animates(index):
+            continue                                  # the idle speaks for it
+        for clip in clips[1:]:
+            if clip.animates(index):
+                poses[index] = clip.sample(index, nodes, clip.duration)
+                break
+    return poses
+
+
+def world_at(chain, anim, time, nodes, idles=None):
     """The product of local matrices up a chain, animated nodes sampled.
 
-    `time` of None gives the rest pose, which is the same walk with every
-    node's authored transform.
+    `time` of None gives the AUTHORED pose, which is what `collect` bakes the
+    geometry with and therefore what every delta is measured against. It is
+    deliberately not the idle: the two differ exactly on the nodes `idle_poses`
+    describes, and measuring a delta against a rest the geometry is not in would
+    move those parts twice.
     """
     out = IDENTITY
     for index in chain:
         local = None if time is None else anim.sample(index, nodes, time)
+        if local is None and idles:
+            local = idles.get(index)
         if local is None:
             local = node_matrix(nodes[index])
         out = mat_multiply(out, local)
@@ -350,8 +423,14 @@ def world_at(chain, anim, time, nodes):
 # --- the build --------------------------------------------------------------
 
 def build(gltf, options):
-    anim = Animation(gltf, options.animation)
+    clips = [Animation(gltf, i) for i in clip_order(gltf)]
+    # THE UNION OF EVERY CLIP'S NODES DECIDES THE GROUPS, not the idle's alone.
+    # A3's valve and its three liquid levels are keyed by `produce_tick` and by
+    # nothing else; grouping off the idle would weld them into the static body
+    # and the tick would move a machine with a valve painted on it.
+    anim = clips[0]
     nodes = gltf.json["nodes"]
+    idles = idle_poses(clips, nodes)
     parent, by_name = node_index_by_chain(gltf)
     parts = collect(gltf, options.exclude)
 
@@ -364,7 +443,7 @@ def build(gltf, options):
             raise ValueError("mesh %r is not in the node table" % part["name"])
         owner = None
         for ancestor in reversed(chain_of(index, parent)):
-            if anim.animates(ancestor):
+            if any(clip.animates(ancestor) for clip in clips):
                 owner = ancestor
                 break
         part["group"] = (nodes[owner].get("name") or "") if owner is not None else ""
@@ -404,7 +483,7 @@ def build(gltf, options):
         if not name:
             continue
         chain = chain_of(group_node[name], parent)
-        rest_world[name] = world_at(chain, anim, None, nodes)
+        rest_world[name] = world_at(chain, anim, None, nodes)   # time None: authored
 
     palette = []
     lookup = {}
@@ -436,21 +515,38 @@ def build(gltf, options):
         out_groups.append({"name": name, "first": first,
                            "count": len(colour_index) * 3 - first})
 
-    # THE FRAMES. Sampled over [0, duration) so the loop's closing repeat of
-    # frame 0 is not shipped twice -- see the header.
+    # THE FRAMES, one block per clip, concatenated with a band each.
+    #
+    # An IDLE is sampled over [0, duration) so its closing repeat of frame 0 is
+    # not shipped twice. An ACTION is sampled over [0, duration] INCLUSIVE: it
+    # is played once and its last frame is the pose it hands back to the idle,
+    # which the handoff guarantees is bit-exact on idle t=0. Dropping it would
+    # end every action one frame early, on a pose mid-motion.
     frames = []
-    for f in range(options.frames):
-        time = anim.duration * f / float(options.frames)
-        pose = []
-        for name in names:
-            if not name:
-                pose.append(None)
-                continue
-            chain = chain_of(group_node[name], parent)
-            posed = world_at(chain, anim, time, nodes)
-            delta = mat_multiply(posed, mat_invert(rest_world[name]))
-            pose.append(mat_multiply(C, mat_multiply(delta, C_inv)))
-        frames.append(pose)
+    bands = []
+    band_seconds = []
+    band_names = []
+    for index, clip in enumerate(clips):
+        idle = index == 0
+        fps = options.idle_fps if idle else options.action_fps
+        count = max(options.min_frames, int(round(clip.duration * fps)))
+        first = len(frames)
+        for f in range(count):
+            span = float(count) if idle else float(max(1, count - 1))
+            time = clip.duration * f / span
+            pose = []
+            for name in names:
+                if not name:
+                    pose.append(None)
+                    continue
+                chain = chain_of(group_node[name], parent)
+                posed = world_at(chain, clip, time, nodes, idles)
+                delta = mat_multiply(posed, mat_invert(rest_world[name]))
+                pose.append(mat_multiply(C, mat_multiply(delta, C_inv)))
+            frames.append(pose)
+        bands.append([first, count])
+        band_seconds.append(round(clip.duration, 4))
+        band_names.append(clip.name)
 
     frames = [[None if m is None else
                [round(m[r][c], 5) for c in range(4) for r in range(4)]
@@ -459,8 +555,9 @@ def build(gltf, options):
     return {"name": options.name, "triangles": len(colour_index),
             "palette": palette, "positions": positions, "normals": normals,
             "colourIndex": colour_index, "groups": out_groups,
-            "frames": frames, "loopSeconds": round(anim.duration, 4),
-            "animation": anim.name, "scale": scale,
+            "frames": frames, "loopSeconds": band_seconds[0],
+            "bands": bands, "bandSeconds": band_seconds, "bandNames": band_names,
+            "animation": band_names[0], "scale": scale,
             "height": (max(p[1] for p in raw) - floor) * scale}
 
 
@@ -484,16 +581,23 @@ def write_js(model, filename, source):
         "// GENERATED by tools/glb_to_animated.py -- do not edit.",
         "// Source of truth is %s; re-run the importer." % source,
         "//",
-        "// %d triangles, %d colours, %d groups, %d frames of the authored" %
+        "// %d triangles, %d colours, %d groups, %d frames across %d clip(s):" %
         (model["triangles"], len(model["palette"]), len(model["groups"]),
-         len(model["frames"])),
-        "// %r loop (%g s). Normals and colours are per TRIANGLE; positions" %
-        (model["animation"], model["loopSeconds"]),
-        "// are per vertex. GLModels.register expands them.",
+         len(model["frames"]), len(model["bands"])),
+        "//   " + ", ".join(
+            "%s %gs x%d" % (model["bandNames"][i], model["bandSeconds"][i],
+                            model["bands"][i][1])
+            for i in range(len(model["bands"]))),
+        "// Band 0 loops; the rest play once and end on band 0 frame 0.",
+        "// Normals and colours are per TRIANGLE; positions are per vertex.",
+        "// GLModels.register expands them.",
         "GLModels.register(%s, {" % json.dumps(model["name"]),
         "  unitsToPx: %g," % UNITS_TO_PX,
         "  triangles: %d," % model["triangles"],
         "  loopSeconds: %g," % model["loopSeconds"],
+        "  bands: %s," % json.dumps(model["bands"]),
+        "  bandSeconds: %s," % json.dumps(model["bandSeconds"]),
+        "  bandNames: %s," % json.dumps(model["bandNames"]),
         "  palette: %s," % json.dumps(model["palette"]),
         "  groups: %s," % json.dumps(model["groups"]),
         "  frames: %s," % json.dumps(model["frames"]),
@@ -513,8 +617,15 @@ def main():
         description="Import a .glb that carries its own looping animation.")
     ap.add_argument("source")
     ap.add_argument("--name", help="model id, e.g. farm-base")
-    ap.add_argument("--frames", type=int, default=64)
-    ap.add_argument("--animation", type=int, default=0)
+    ap.add_argument("--idle-fps", type=float, default=8.0,
+                    dest="idle_fps",
+                    help="frames a second for the looping clip (band 0)")
+    ap.add_argument("--action-fps", type=float, default=24.0,
+                    dest="action_fps",
+                    help="frames a second for one-shot clips; 24 is the "
+                         "source's own rate")
+    ap.add_argument("--min-frames", type=int, default=6, dest="min_frames",
+                    help="floor for a very short clip")
     ap.add_argument("--size", type=float, default=None,
                     help="target height in model units; omit to keep the "
                          "source's own scale, which is what these files want")

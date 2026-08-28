@@ -1221,6 +1221,103 @@ function (t) {
 });
 
 
+group("Farm — the moments the T3 bodies act out");
+
+// The three T3 models ship one-shot clips beside their idle, and each depicts
+// something this tower already does. The simulation's whole job is to record
+// WHEN, on the animation clock; the renderer decides whether that is recent
+// enough to still be playing. These pin the when.
+
+test("a production tick is stamped, and only when one lands", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3"]);
+  t.eq(f.lastTick, -1, "nothing has ticked yet, and -1 is not a moment");
+
+  f.update(FarmTowerTick(h) - 0.01, []);
+  t.eq(f.lastTick, -1, "still nothing at 4.99 s");
+  f.update(0.02, []);
+  t.near(f.lastTick, f.animClock, 1e-9, "the tick stamps the clock it fired on");
+
+  var first = f.lastTick;
+  f.update(FarmTowerTick(h), []);
+  t.ok(f.lastTick > first, "and the next tick moves it");
+});
+
+test("a body entering the field stamps a lock, on the edge and once",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["B1", "B2", "B3"]);
+  t.eq(f.lastLock, -1, "an empty field has locked onto nothing");
+
+  var outside = enemyAt(h, f.x + f.rangePx * 3, f.y, 10);
+  f.update(1 / 60, g.enemies);
+  t.eq(f.lastLock, -1, "a body out of reach is not a lock");
+
+  var inside = enemyAt(h, f.x + 4, f.y, 10);
+  f.update(1 / 60, g.enemies);
+  var locked = f.lastLock;
+  t.ok(locked >= 0, "one arriving is");
+
+  f.update(1 / 60, g.enemies);
+  t.eq(f.lastLock, locked, "and it does not fire again while it stands there");
+
+  // It re-arms once the field empties.
+  g.enemies.length = 0;
+  f.update(1 / 60, g.enemies);
+  enemyAt(h, f.x + 4, f.y, 10);
+  f.update(1 / 60, g.enemies);
+  t.ok(f.lastLock > locked, "the next arrival is its own lock");
+});
+
+test("a kill in the field stamps a capture on the farm that was paid",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var near = farm(h, 600, 200, ["B1", "B2", "B3"]);
+  var far = farm(h, 600, 200 + g.ul(400), ["B1", "B2", "B3"]);
+  near.animClock = 12;
+
+  var e = enemyAt(h, near.x + 4, near.y, 10);
+  g.Farms.onEnemyKilled(e);
+  t.near(near.lastCapture, 12, 1e-9, "the farm that covered the body");
+  t.eq(far.lastCapture, -1, "and not one that did not");
+});
+
+test("the shrine throws when the network rolls, and only its members",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var member = farm(h, 600, 200, ["C1", "C2", "C3"]);
+  var bystander = farm(h, 700, 200, ["C1", "C2"]);
+  member.animClock = 5;
+
+  g.Farms.settleWave(1);
+  t.near(member.lastRoll, 5, 1e-9, "the farm holding a die threw it");
+  t.eq(bystander.lastRoll, -1,
+    "a farm with no dice is standing beside a network, not in it");
+});
+
+test("every model's one-shot clips are named by what fires them", function (t) {
+  var h = boot();
+  var g = h.game;
+  // The renderer matches clips BY NAME, so a rename in a re-import would
+  // silently stop an animation. This is the list, asserted against the models
+  // as shipped.
+  var expected = {
+    "farm-t3a": ["idle_work", "produce_tick"],
+    "farm-t3b": ["idle_scan", "target_lock", "kill_capture"],
+    "farm-t3c": ["idle_magic", "end_wave_roll"]
+  };
+  Object.keys(expected).forEach(function (id) {
+    var raw = g.GLModels && g.GLModels.raw ? g.GLModels.raw(id) : null;
+    if (!raw) return;                       // no WebGL in the harness: skip
+    t.eq(raw.bandNames.join(","), expected[id].join(","), id + " bands");
+  });
+  t.ok(true, "the model files carry the clip names the renderer looks for");
+});
+
+
 group("Farm — what the player is shown");
 
 test("every build's panel fits above the build bar", function (t) {
