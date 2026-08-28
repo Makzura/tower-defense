@@ -2575,10 +2575,16 @@ Per-run cash **does not persist**: `MetaProgress` saves coins, owned tower types
 and the loadout, and nothing else. The multi-run currency is still coins.
 
 **Selling refunds half, rounded up.** `SELL_REFUND_FRACTION = 0.5` and
-`sellValue(tower)` is `Math.ceil(tower.cost * fraction)`. The rate lives in
-game.js as global economy policy; each tower supplies its actual cumulative
-`cost`. A 100% refund would make placement reversible and is not the current
-design.
+`sellValue(tower)` is `Math.ceil((totalSpent - unrefundableSpent) * fraction)`.
+The rate lives in game.js as global economy policy; each tower supplies its own
+cumulative spend. A 100% refund would make placement reversible and is not the
+current design.
+
+**`unrefundableSpent` is mana that is SUNK rather than invested**, subtracted
+before the fraction so a tier marked `noRefund` gives back nothing at all while
+every other mana on the same tower still gives back half. Exactly one tier uses
+it — the Farm's C5 (2026-08-28) — and `totalSpent` stays honest about what was
+paid, because that is what the end-of-run screen reports.
 
 When adding or changing an enemy, update its `bounty` deliberately and test both
 base and health-override resolution. When changing a tower price, re-run the
@@ -3464,8 +3470,9 @@ stats and already reads `Target: first`; a row above it saying the same word is
 the duplication the map labels were deleted for (2026-07-27).
 
 **Every tower carries `cost` AND `totalSpent`.** `cost` is the build price and
-never moves; `totalSpent` is everything sunk in, and is what `sellValue()`
-refunds half of. Before this, the smasher grew its `cost`, the beam grew a
+never moves; `totalSpent` is everything paid into the tower, and is what
+`sellValue()` refunds half of — less `unrefundableSpent`, see the economy
+section. Before this, the smasher grew its `cost`, the beam grew a
 separate `totalSpent`, and the Longshot grew neither — so a Longshot with
 $19 000 of upgrades on it sold for $38.
 
@@ -6583,6 +6590,20 @@ faces individually, with a scripted die rather than a seed.
 and 22, so the table is the harder constraint and the die has 22 sides. It is
 recorded here rather than quietly reconciled.
 
+**C5 IS PRICED AND SUNK, AND IT IS THE ONLY TIER IN THE GAME THAT IS** (retuned
+2026-08-28, to the owner's figures). 250 000 mana, up from 9 000; **the sale
+refunds none of it**; and its own production came down from +500 a wave to
++400. Every gain face on its table was cut with it: 9 +65, 10 +95, 11 +130,
+12 +175, 14 +350, 15 max(+425, +10%), 16 +225, 17 next gain max(+650, +35%),
+18 max(+525, +15%), 20 +700 then +20%. The loss faces, the reset, the reroll,
+the cull, the multiplier and the two doubles are unchanged.
+
+**The no-refund half is a tier flag, not a Farm rule**: `noRefund: true` on the
+row, `unrefundableSpent` on the tower, and `sellValue` in js/game.js subtracts
+it before the refund fraction. `totalSpent` stays honest about what was paid —
+that is the figure the end-of-run screen reports — so the two must not be
+conflated. Any future tier can be sunk the same way by adding the flag.
+
 **The deferred effects are ordered, and the order is mandated because every step
 changes what the next one sees**: a face 13's protections reroll up to three 8s;
 then the +1/+2 land on C5 dice; then a +2 that produces exactly 8 becomes 9 (a
@@ -8228,7 +8249,7 @@ no mechanic was moved to match the description.
 | Charge decay | 1 charge / 3 s, continuous, out of combat | `charge_to_gold.decaySeconds` |
 | Gold scaling ceiling | 50 000 gold (5 tiers, cap x10) | `GoldPower.MAX_SCALING_GOLD` |
 | Death denial gate | 5 000 HP healed, pooled across all towers | `beam.config.js` B5 `unlockCondition` |
-| Sell refund | half of everything spent | `SELL_REFUND_FRACTION`, `sellValue()` |
+| Sell refund | half of everything spent, less anything sunk | `SELL_REFUND_FRACTION`, `sellValue()`, `unrefundableSpent` |
 | Starting cash | 600 (was 20 before 2026-07-30); buys two Riflemen. BUILD prices were deliberately not touched by the 2026-08-01 repricing, to keep that true | `STARTING_CASH` |
 | Combat income | each body's authored kill bounty, paid once on final death | `Enemy.TYPES[*].bounty`, `Enemy.bountyOf`, `Enemy.prototype.bounty` |
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |

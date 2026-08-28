@@ -640,7 +640,10 @@ var BASELINE = [
   // be paid for while it is still alive.
   // 58 -> 60: the field and the per-kill bounty stopping at a sight blocker,
   // asked of the real Ironwood stump, and a farm standing on one seeing over it.
-  { file: "tests/farm.test.js", pass: 60, fail: 0, failing: [] },
+  // 60 -> 63: C5's price and its refund of nothing, its 400 a wave, and the
+  // button and card that warn the price is sunk. Its ten retuned faces are
+  // re-pinned inside the tests that already walked the table face by face.
+  { file: "tests/farm.test.js", pass: 63, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

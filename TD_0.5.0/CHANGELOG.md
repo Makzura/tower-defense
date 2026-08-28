@@ -13,6 +13,27 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — C5 is priced like the thing it is.** The owner's figures,
+applied exactly: 9 000 mana → **250 000**, the sale refunds **none** of it
+(50% → 0%), and its own production comes down from +500 a wave to **+400**.
+
+Every gain face on its table was cut with it: 9 +75→+65, 10 +110→+95,
+11 +150→+130, 12 +200→+175, 14 +400→+350, 15 max(+450,+10%)→max(+425,+10%),
+16 +250→+225, 17 next gain max(+700,+35%)→max(+650,+35%),
+18 max(+550,+15%)→max(+525,+15%), 20 +750→+700 then +20%. The loss faces, the
+reset, the reroll, the cull, the multiplier and the two doubles are untouched.
+
+**The no-refund half is a tier flag rather than a Farm rule**: `noRefund` on the
+row, `unrefundableSpent` on the tower, and `sellValue` subtracts it before the
+refund fraction — so any future tier can be sunk the same way, and `totalSpent`
+stays honest about what was paid for the end-of-run screen. The button now reads
+“no refund on sale” and the card spells it out, because a quarter of a million
+mana that a sale gives nothing back for has to be said before the press.
+
+Verified in the running game: 250 000 paid, sell value 3 600 before and 3 600
+after, `totalSpent` 257 200 with 250 000 of it sunk, nominal production 900 and
+the network's baseline with it, and all ten faces carrying their new numbers.
+
 **2026-08-28 — Path B's hit points are real, and its field needs to see.** Two
 reports from the same playtest.
 

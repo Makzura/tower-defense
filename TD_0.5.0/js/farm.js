@@ -54,6 +54,10 @@ function FarmTower(x, y, path) {
   this.name = FarmTower.DISPLAY_NAME;
   this.cost = FarmTower.COST;
   this.totalSpent = FarmTower.COST;
+  // Of that total, what a sale refunds nothing of. Only C5 adds to it, and it
+  // is a plain number rather than a lookup so `sellValue` stays one line of
+  // arithmetic over fields every tower could carry.
+  this.unrefundableSpent = 0;
 
   this.hasA1 = false; this.hasA2 = false; this.hasA3 = false;
   this.hasA4 = false; this.hasA5 = false;
@@ -197,8 +201,15 @@ FarmTower.UPGRADES = [
     dice: 1, table: "C3", requires: "C2", locksPath: true },
   { id: "C4", branch: "C", cost: 3500, hp: 300, production: 200,
     dice: 2, table: "C4", requires: "C3", locksPath: true },
-  { id: "C5", branch: "C", cost: 9000, hp: 500, production: 500,
-    dice: 3, table: "C5", requires: "C4", locksPath: true, unique: "c5" }
+  // C5 IS THE ONE TIER THE GAME DOES NOT BUY BACK. 250 000 mana, none of it
+  // refunded, for the only die on the board that can double P twice over -- and
+  // the only tier anywhere carrying `noRefund`. Priced and sunk this way on
+  // 2026-08-28 at the owner's instruction: at 9 000 with the usual half back it
+  // was a rounding error against a network already paying thousands a wave, and
+  // a one-per-map tier that can be sold for half is a tier you rent.
+  { id: "C5", branch: "C", cost: 250000, hp: 500, production: 400,
+    dice: 3, table: "C5", requires: "C4", locksPath: true, unique: "c5",
+    noRefund: true }
 ];
 
 FarmTower.upgradeById = function (id) {
@@ -359,6 +370,9 @@ FarmTower.prototype.applyUpgrade = function (id) {
   // rather than in `buyUpgrade` because that is where every other tower
   // grows it, and a tier applied by a fixture is still a tier bought.
   this.totalSpent += this.upgradeCost(id);
+  // And the part of it a sale will not give back. See sellValue in game.js.
+  var tier = FarmTower.upgradeById(id);
+  if (tier && tier.noRefund) this.unrefundableSpent += this.upgradeCost(id);
   var before = this.maxHp;
   this.recalcStats();
   // A HEALTH TIER GRANTS ITS DELTA rather than healing to the new maximum, the
@@ -432,6 +446,10 @@ FarmTower.prototype.previewUpgrade = function (id) {
   if (u.stores && !snap.stores) effects.push("stores its own mana");
   if (u.invests) effects.push("investment");
   if (u.dice) effects.push(u.dice + "× d" + FarmDice.sides(u.table));
+  // SAID ON THE BUTTON, not only in the card: a quarter of a million mana that
+  // a sale gives nothing back for is the kind of thing a player must be told
+  // before the press rather than after it.
+  if (u.noRefund) effects.push("no refund on sale");
 
   var grants = [];
   if (u.stores && !snap.stores) grants.push("farmStock");
@@ -815,7 +833,11 @@ FarmTower.prototype.panelActions = function () {
           subtitle: refusal ? refusal : next.cost + " mana",
           changes: preview.changes,
           abilities: UpgradeEffects.abilities(preview.grants, null),
-          note: refusal ? "Unavailable: " + refusal + "." : null
+          note: refusal ? "Unavailable: " + refusal + "."
+            : (next.noRefund
+              ? "This tier is SUNK: selling the tower refunds half of everything "
+                + "else on it and nothing of this " + next.cost + " mana."
+              : null)
         });
       }
     });
@@ -1219,18 +1241,18 @@ var FarmDice = (function () {
     { face: 6,  flat: -80 },
     { face: 7,  flat: -50 },
     { face: 8,  reset: true },
-    { face: 9,  flat: 75 },
-    { face: 10, flat: 110 },
-    { face: 11, flat: 150 },
-    { face: 12, flat: 200 },
+    { face: 9,  flat: 65 },
+    { face: 10, flat: 95 },
+    { face: 11, flat: 130 },
+    { face: 12, flat: 175 },
     { face: 13, prep: { rerollEights: 3 } },
-    { face: 14, flat: 400, prep: { dieBonus: 1 } },
-    { face: 15, bestOf: true, flat: 450, percent: 0.10 },
-    { face: 16, flat: 250, prep: { dieBonus: 2 } },
-    { face: 17, nextFlat: 700, nextPercent: 0.35 },
-    { face: 18, bestOf: true, flat: 550, percent: 0.15 },
+    { face: 14, flat: 350, prep: { dieBonus: 1 } },
+    { face: 15, bestOf: true, flat: 425, percent: 0.10 },
+    { face: 16, flat: 225, prep: { dieBonus: 2 } },
+    { face: 17, nextFlat: 650, nextPercent: 0.35 },
+    { face: 18, bestOf: true, flat: 525, percent: 0.15 },
     { face: 19, nextMult: 2.5 },
-    { face: 20, flat: 750, thenPercent: 0.20 },
+    { face: 20, flat: 700, thenPercent: 0.20 },
     { face: 21, double: true },
     { face: 22, double: true, prep: { cullBelow9: true } }
   ];

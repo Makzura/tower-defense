@@ -682,6 +682,42 @@ test("P never goes below zero", function (t) {
   t.eq(g.Farms.network.P, 0, "a loss bigger than P leaves nothing, never a debt");
 });
 
+test("C5 costs a quarter of a million, and a sale gives none of it back",
+function (t) {
+  var h = boot();
+  var g = h.game;
+
+  t.eq(g.FarmTower.upgradeById("C5").cost, 250000, "250 000 mana");
+  t.eq(g.FarmTower.upgradeById("C5").noRefund, true, "and it is sunk, not invested");
+
+  var f = farm(h, 600, 200, ["C1", "C2", "C3", "C4"]);
+  var beforeSpent = f.totalSpent;
+  var beforeValue = h.run("sellValue(towers[0])");
+  t.eq(beforeValue, Math.ceil(beforeSpent / 2), "up to C4 it is half of everything");
+
+  f.applyUpgrade("C5");
+  t.eq(f.totalSpent, beforeSpent + 250000,
+    "the total spent is honest about it -- the result screen reports this");
+  t.eq(f.unrefundableSpent, 250000, "and all of it is sunk");
+  t.eq(h.run("sellValue(towers[0])"), beforeValue,
+    "so the sale is worth exactly what it was worth before C5 was bought");
+
+  var cashBefore = g.cash;
+  h.run("sellTower(towers[0])");
+  t.eq(g.cash, cashBefore + beforeValue, "and that is what the purse gets");
+});
+
+test("C5 pays 400 a wave, and the network's baseline follows", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["C1", "C2", "C3", "C4"]);
+  t.eq(f.nominalProduction(), 500, "200 base + 100 (C3) + 200 (C4)");
+
+  f.applyUpgrade("C5");
+  t.eq(f.nominalProduction(), 900, "and C5 adds 400, not the 500 it used to");
+  t.eq(g.Farms.network.B, 900, "the baseline is that sum");
+});
+
 test("only one C5 on the map", function (t) {
   var h = boot();
   var a = farm(h, 600, 200, ["C1", "C2", "C3", "C4"]);
@@ -772,14 +808,17 @@ test("the C5 table, and it has twenty-two faces rather than twenty", function (t
   t.eq(g.FarmDice.sides("C4"), 20, "and so is C4");
 
   var C = ["C1", "C2", "C3", "C4", "C5"];
-  // A C5 farm rolls THREE dice.
-  t.near(faceRun(h, "C5", C, 9, 1000), 1225, 1e-9, "9: +75, three times");
-  t.near(faceRun(h, "C5", C, 10, 1000), 1330, 1e-9, "10: +110, three times");
-  t.near(faceRun(h, "C5", C, 11, 1000), 1450, 1e-9, "11: +150, three times");
-  t.near(faceRun(h, "C5", C, 12, 1000), 1600, 1e-9, "12: +200, three times");
+  // A C5 farm rolls THREE dice. Every gain face was cut on 2026-08-28 along
+  // with C5's own production, so these are the retuned figures.
+  t.near(faceRun(h, "C5", C, 9, 1000), 1195, 1e-9, "9: +65, three times");
+  t.near(faceRun(h, "C5", C, 10, 1000), 1285, 1e-9, "10: +95, three times");
+  t.near(faceRun(h, "C5", C, 11, 1000), 1390, 1e-9, "11: +130, three times");
+  t.near(faceRun(h, "C5", C, 12, 1000), 1525, 1e-9, "12: +175, three times");
   t.near(faceRun(h, "C5", C, 21, 1000), 8000, 1e-9, "21: doubles, three times");
-  t.near(faceRun(h, "C5", C, 8, 1000), 1000, 1e-9,
-    "8: reset to B, which for one C5 farm is 1000");
+  // B is 200 base + 100 (C3) + 200 (C4) + 400 (C5). C5's production came down
+  // from 500 in the same retune, so the reset face lands 100 lower than it did.
+  t.near(faceRun(h, "C5", C, 8, 1000), 900, 1e-9,
+    "8: reset to B, which for one C5 farm is 900");
 });
 
 
@@ -797,13 +836,13 @@ test("face 13 rerolls up to three 8s in the NEXT series, and no more", function 
   g.Farms.settleWave(1);
   t.eq(g.Farms.prepState().rerollEights, 3, "three protections are recorded");
 
-  // Next wave: three 8s, all rerolled into 9s (+75 each on the C5 table).
+  // Next wave: three 8s, all rerolled into 9s (+65 each on the C5 table).
   var seq = [8, 8, 8];
   var i = 0;
   h.run("__seq = [8,8,8,9,9,9]; __i = 0;" +
         "Farms.setDie(function () { return __seq[__i++]; });");
   g.Farms.settleWave(2);
-  t.eq(g.Farms.network.P, 1225, "all three 8s became 9s: +75 each");
+  t.eq(g.Farms.network.P, 1195, "all three 8s became 9s: +65 each");
   t.eq(g.Farms.prepState().rerollEights, 0, "and the charges are spent");
 });
 
@@ -825,10 +864,10 @@ test("a +2 landing exactly on 8 becomes 9, and a +1 on 8 does not", function (t)
   g.Farms.network.P = 1000;
   g.Farms.settleWave(2);
   // 6 + 2 = 8 -> 9. A C5 is on the board, so the series is SORTED: the two
-  // 1s halve P first and the 9 pays its 75 into what is left. That ordering
+  // 1s halve P first and the 9 pays its 65 into what is left. That ordering
   // is exactly what C5's third line buys, and it is why the expected figure
   // is not the one an unsorted series would give.
-  t.near(g.Farms.network.P, 1000 * 0.5 * 0.5 + 75, 1e-9,
+  t.near(g.Farms.network.P, 1000 * 0.5 * 0.5 + 65, 1e-9,
     "the two 1s resolved first, then the rescued 9 paid");
 
   // Face 14 records a +1, and a +1 arriving on 8 is left alone.
@@ -863,8 +902,8 @@ test("face 22 removes everything under 9 from the next series", function (t) {
   g.Farms.network.P = 1000;
   h.run("__seq = [1,2,20]; __i = 0; Farms.setDie(function () { return __seq[__i++]; });");
   g.Farms.settleWave(2);
-  // 1 and 2 are removed; only the 20 resolves: +750 then +20%.
-  t.near(g.Farms.network.P, (1000 + 750) * 1.2, 1e-9,
+  // 1 and 2 are removed; only the 20 resolves: +700 then +20%.
+  t.near(g.Farms.network.P, (1000 + 700) * 1.2, 1e-9,
     "the two losing faces never resolved");
   t.eq(g.Farms.prepState().cullBelow9, false, "and the charge expired with the series");
 });
@@ -882,8 +921,8 @@ function (t) {
   g.Farms.network.P = 1000;
   h.run("__seq = [20,19,11]; __i = 0; Farms.setDie(function () { return __seq[__i++]; });");
   g.Farms.settleWave(1);
-  // sorted -> 11 (+150), 19 (charge), 20 (+750 x 2.5 = 1875, then +20%)
-  t.near(g.Farms.network.P, (1000 + 150 + 1875) * 1.2, 1e-9,
+  // sorted -> 11 (+130), 19 (charge), 20 (+700 x 2.5 = 1750, then +20%)
+  t.near(g.Farms.network.P, (1000 + 130 + 1750) * 1.2, 1e-9,
     "11, then 19, then 20 -- the multiplier caught the big gain");
 
   // A network with no C5 keeps the random order, so the same three faces are
@@ -1206,6 +1245,22 @@ test("every build's panel fits above the build bar", function (t) {
       row[0] + ": the panel ends at " + Math.round(L.y + L.h) +
       ", above the bar at " + g.BAR_Y);
   });
+});
+
+test("the C5 button says its price and that it will not be refunded",
+function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["C1", "C2", "C3", "C4"]);
+  var button = f.panelActions().filter(function (a) { return a.upgradeId === "C5"; })[0];
+
+  t.ok(button, "the C branch offers C5");
+  t.eq(button.detail, "250000 mana", "at its price");
+  t.ok(/no refund on sale/.test(button.effects),
+    "and the button itself warns that the price is sunk: " + button.effects);
+
+  var card = button.tooltip();
+  t.ok(/SUNK/.test(card.note) && /250000/.test(card.note),
+    "the card says it in full: " + card.note);
 });
 
 test("the panel offers all three branches, and A5 adds its two invest buttons",

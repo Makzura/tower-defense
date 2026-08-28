@@ -1317,7 +1317,14 @@ function formatCash(value) {
 // economy rule, not a per-tower one, which is why it lives here.
 function sellValue(tower) {
   var spent = (typeof tower.totalSpent === "number") ? tower.totalSpent : tower.cost;
-  return Math.ceil(spent * SELL_REFUND_FRACTION);
+  // MANA THAT IS SUNK RATHER THAN INVESTED. `unrefundableSpent` is subtracted
+  // before the refund fraction, so a tier marked `noRefund` gives back nothing
+  // at all while every other mana on the tower gives back half. Exactly one
+  // tier uses it -- the Farm's C5 (2026-08-28) -- and `totalSpent` stays honest
+  // about what was paid, which is what the end-of-run screen reports.
+  var sunk = (typeof tower.unrefundableSpent === "number")
+    ? tower.unrefundableSpent : 0;
+  return Math.ceil(Math.max(0, spent - sunk) * SELL_REFUND_FRACTION);
 }
 
 // The path, in u.l. -- like every other distance in the game (see
