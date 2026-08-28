@@ -53,25 +53,38 @@
 #   * a mesh with no animated ancestor lands in the unnamed group, which is the
 #     static body and is posed by `null` on every frame, exactly as the other
 #     tool's is;
-#   * a group's PIVOT is its node's own origin at rest, because that is what
-#     the animation turns about. The other tool derives pivots from geometry
-#     because a static mesh has no other answer; here, asking the geometry
-#     would move the crank about the middle of the crank instead of about its
-#     axle.
+#   * GEOMETRY IS STORED IN MODEL SPACE AND EVERY PIVOT IS ZERO, which is what
+#     the walker rigs in the other tool do (`origin_pivot`) and for both of
+#     their reasons. The first is the format: a frame matrix is applied as
+#     `instance * pose`, so it must land its points in MODEL space -- storing
+#     them relative to a joint means every matrix has to carry that joint's
+#     translation back, and getting the direction wrong shifts a whole group by
+#     the pivot. It did, on the first version of this tool: the well's bucket
+#     and rope were pushed out of frame, the novice's hands ended up inside the
+#     well, and the pumps' levers sank into the ground. The second is
+#     `GLModels.expand`, which derives `model.top` -- the height a health bar is
+#     drawn at -- from the RAW stored positions with no group matrix applied, so
+#     a tower whose parts are stored relative to joints halfway up itself
+#     reports a top halfway up itself. `node tools/check-model-top.js` is what
+#     catches that.
+#
+#     Nothing is lost by it. A rotation is expressed about the node's own origin
+#     either way, because that origin is inside the delta the animation is
+#     sampled into -- see below.
 #
 # THE MATRIX PER GROUP PER FRAME, which is the whole of the animation:
 #
 #     W_rest  = product of local matrices up the chain, as authored
 #     W_f     = the same product with animated nodes sampled at time f
 #     D       = W_f . W_rest^-1                    (a delta in SOURCE space)
-#     D'      = C . D . C^-1                       (the same delta, game space)
-#     M       = T(-pivot) . D' . T(+pivot)
+#     M       = C . D . C^-1                       (the same delta, game space)
 #
-# where C is the axis remap, scale and ground shift above. Points ship LOCAL to
-# their group's pivot -- the format's contract, and the other tool's comment on
-# it says the same -- so the conjugation by T(pivot) is what makes M operate on
-# what is actually stored. Composing the chain rather than reading one node's
-# channel is what makes a novice's forearm follow the upper arm that carries it.
+# where C is the axis remap, scale and ground shift above. `D` already turns
+# about the part's own origin -- it is built from that node's world transform,
+# not from a rotation at the model root -- so no conjugation by a pivot is
+# needed once the geometry is in model space. Composing the chain rather than
+# reading one node's channel is what makes a novice's forearm follow the upper
+# arm that carries it.
 #
 # WHY THE LAST KEY IS DROPPED. A looping animation authored at 24 fps ends on a
 # repeat of its first pose -- 193 keys for an 8 s loop is 192 steps plus the
@@ -386,16 +399,12 @@ def build(gltf, options):
     # be compared as the same shape of thing.
     names = sorted(set(part["group"] for part in parts))
 
-    pivots = {}
     rest_world = {}
     for name in names:
         if not name:
-            pivots[name] = (0.0, 0.0, 0.0)
             continue
         chain = chain_of(group_node[name], parent)
-        rest = world_at(chain, anim, None, nodes)
-        rest_world[name] = rest
-        pivots[name] = convert(mat_apply(rest, (0.0, 0.0, 0.0)))
+        rest_world[name] = world_at(chain, anim, None, nodes)
 
     palette = []
     lookup = {}
@@ -406,13 +415,12 @@ def build(gltf, options):
 
     for name in names:
         first = len(colour_index) * 3
-        pivot = pivots[name]
         for part in parts:
             if part["group"] != name:
                 continue
             for tri in part["triangles"]:
-                local = [(p[0] - pivot[0], p[1] - pivot[1], p[2] - pivot[2])
-                         for p in tri[0]] if name else list(tri[0])
+                # MODEL SPACE, every group, animated or not -- see the header.
+                local = list(tri[0])
                 n = triangle_normal(local)
                 entry = material_entry(
                     gltf.json["materials"][tri[1]], options.tint, options.glow,
@@ -441,11 +449,7 @@ def build(gltf, options):
             chain = chain_of(group_node[name], parent)
             posed = world_at(chain, anim, time, nodes)
             delta = mat_multiply(posed, mat_invert(rest_world[name]))
-            game = mat_multiply(C, mat_multiply(delta, C_inv))
-            pivot = pivots[name]
-            m = mat_multiply(mat_translate([-pivot[0], -pivot[1], -pivot[2]]),
-                             mat_multiply(game, mat_translate(list(pivot))))
-            pose.append(m)
+            pose.append(mat_multiply(C, mat_multiply(delta, C_inv)))
         frames.append(pose)
 
     frames = [[None if m is None else

@@ -13,6 +13,25 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The Farm's parts are where they belong.** The first import
+posed every animated group RELATIVE to its own pivot, but the format applies a
+frame matrix as `instance * pose` and expects it to land points in model space —
+so each group was drawn shifted by `-pivot`. Owner: *"pour la base y a pas de
+seau ni de corde et les mains sont dans le puits, et pour les deux autres les
+mains et le shaft sont dans le sol"*. The bucket and the rope hang from a node
+1.44 units up, so they were pushed out of frame entirely; the novice's hands
+came back into the well; the pumps' levers sank into the plank.
+
+Geometry now ships in MODEL space with every pivot at zero, which is what the
+walker rigs already do (`origin_pivot`) and what `GLModels.expand` wants anyway
+— it reads `model.top` off the raw positions with no group matrix applied.
+
+Checked properly this time, and the check is the reusable part: pose each
+group's rest origin by its own frame matrix and compare against the glTF sampled
+at the same instant. Bucket, rope, pulley, crank and both hands agree with the
+source to 8e-6 model units. On the board the tower went from 12–25 moving pixels
+a second to 20–67, because the bucket and rope are in the picture again.
+
 **2026-08-28 — The Farm has three real bodies, and they move.** Imported from
 Claude Design: `farm-base` is a stone mana well with a crank, a pulley, a rope,
 a bucket and a novice working it; `farm-t1` is a hand pump with a lever, a

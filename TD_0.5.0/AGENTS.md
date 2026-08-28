@@ -7400,9 +7400,29 @@ gait, and there is none.
 
 What it shares it IMPORTS rather than copies: the `.glb` reader, the mesh walk,
 the palette derivation, the axis convention and the emitted format. What it adds
-is grouping by **nearest animated ancestor**, a pivot taken from the node's own
-origin (not from its geometry — that would turn a crank about the middle of the
-crank instead of about its axle), and one field, `loopSeconds`.
+is grouping by **nearest animated ancestor**, geometry stored in MODEL space
+with every pivot at zero, and one field, `loopSeconds`.
+
+**GEOMETRY IN MODEL SPACE IS THE FORMAT'S RULE, NOT A CHOICE**, and it is the
+same one the walker rigs make with `origin_pivot`. A frame matrix is applied as
+`instance * pose`, so it must land its points in model space; storing them
+relative to a joint means every matrix has to carry that joint's translation
+back, and getting the direction of that wrong shifts a whole group by its pivot.
+It did, on the first version of this tool: the well's bucket and rope were
+pushed out of frame, the novice's hands ended up inside the well, and the pumps'
+levers sank into the ground. Owner: *"pour la base y a pas de seau ni de corde
+et les mains sont dans le puits, et pour les deux autres les mains et le shaft
+sont dans le sol"*.
+
+Nothing is lost by it: the delta a group is posed by already turns about that
+part's own origin, because it is built from the node's world transform rather
+than from a rotation at the model root.
+
+**HOW TO CHECK AN IMPORT WITHOUT LOADING THE GAME**, and this is the check that
+would have caught the above in one run: pose each group's rest origin by its own
+frame matrix and compare against the glTF sampled directly at the same time. The
+three Farm models agree with their sources to 8e-6 model units on the bucket,
+the rope, the pulley, the crank and both of the novice's hands.
 
 **`GLModels.register` COPIES FIELDS EXPLICITLY, so a new one has to be added
 there too.** `loopSeconds` is on that list because `bands` was not for eight
