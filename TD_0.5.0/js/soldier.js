@@ -540,6 +540,25 @@ Soldier.prototype.recalcStats = function () {
 
   this.maxHp = maxHp;
   this.rangePx = elevatedRangePx(this, this.rangeUl);
+
+  // A FARM'S INVESTMENT, LAST, on damage and attack speed only. Range already
+  // carries it -- elevatedRangePx is where it is applied for every tower -- and
+  // hit points are deliberately outside the bonus. Applied here rather than at
+  // the firing sites so `statLines`, the hover card and the DPS the panel
+  // quotes all describe the tower the player actually has.
+  //
+  // Attack speed is three numbers on this tower and all three are it: the
+  // automatic rate MULTIPLIES, and the two intervals -- the spacing inside a
+  // burst and the wait between bursts -- DIVIDE. Same statement, two units.
+  if (typeof FarmBoost !== "undefined") {
+    var boost = FarmBoost.multiplier(this);
+    if (boost !== 1) {
+      this.damage *= boost;
+      this.shotsPerSecond *= boost;
+      this.shotSpacing /= boost;
+      this.burstCooldown /= boost;
+    }
+  }
 };
 
 // The resolved numbers and visual tier a recruit is born with, as one object.

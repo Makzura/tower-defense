@@ -13,6 +13,50 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — Path A is worth buying, and the Farm shows its work.** Four
+reports from one playtest, all of them the tower doing something invisible or
+doing less than it charged for.
+
+**A3 adds its tick instead of replacing the per-wave figure.** Owner: *“it stops
+producing mana every wave from the moment it starts producing every five
+seconds… it's way too weak. It should continue producing as it already did.”*
+1600 mana used to trade 400 a wave for 50 every five seconds and switch off the
+crosspathed B2 as well. Nothing a farm buys turns off something else it bought.
+
+**The stock has a door.** `collect()` takes the whole stock into the purse
+whenever the player likes — *“we can't take the mana stored whenever we want,
+which is supposed to be the point.”* The trade is the one the design already
+had: what you leave in clones 5% a wave, so collecting every wave is the same
+tower without its stock.
+
+**A5's investment is aimed, and the permanent one lands once per tower.** It was
+a board-wide figure no tower read, so the press spent the stock and changed
+nothing. Now: press the button, click a tier-5 tower, and that tower gets +5%
+damage, attack speed and range per tranche — permanently and once ever, or as a
+thirty-second surge at five times the bonus, re-pressable. Range is applied in
+`elevatedRangePx` and damage/speed at the end of each type's own recompute, so
+the bonus reaches the Siphon's beam and the Summoner's blubs without either file
+knowing what a tranche is. A mis-press costs nothing: the mode arms, and only
+the click on a target spends.
+
+**And all of it is visible.** A payment throws a popup, including the clone —
+the one gain that happens between waves, when nothing else explains the stock
+rising. A path-B farm's share of a kill is its own green popup above the gold
+bounty rather than a bigger bounty: *“+4 and +1, not +5.”* And a body that farm
+will be paid for wears a ring while it is still alive.
+
+Three of those four were found not working on the 3D board after they worked on
+the flat one — the popup colour honoured in one renderer and not the other, the
+target ring called only inside `if (!world3D)`, and a label raised by `y` (a
+world coordinate) instead of by `lift` (a height). Measured each time by reading
+pixels back out of the real game rather than by looking at it.
+
+Twenty-three tests: the two production columns, collect through the real action
+door, the aim, the once-only rule, what the bonus does and does not touch, the
+surge's clock and its death with its farm, the additive stacking, the mode the
+button arms, the clone's announcement, the separated kill popups, and the mark
+on a living body.
+
 **2026-08-28 — The run currency is called MANA everywhere a player can read
 it.** Owner: *"j'ai décidé de changer l'argent pour du mana, donc change s'il te
 plaît toute instance de argent, gold, coins en mana — change pas encore les

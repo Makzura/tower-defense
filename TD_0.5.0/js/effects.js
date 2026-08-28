@@ -288,9 +288,15 @@ var Effects = (function () {
       var pop = popups[i];
       var alpha = Math.min(1, pop.life / (pop.maxLife * 0.5));
       ctx.font = "600 14px system-ui, sans-serif";
-      ctx.fillStyle = pop.bad
-        ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
-        : "rgba(255,215,110," + alpha.toFixed(3) + ")";
+      // `rgb` lets a popup pick its own colour; without one it is the gold a
+      // gain has always been, or red when it is a loss. The Farm's per-kill
+      // bonus uses it so that a bounty and a farm's share of the same corpse
+      // are told apart by colour as well as by position.
+      ctx.fillStyle = pop.rgb
+        ? "rgba(" + pop.rgb + "," + alpha.toFixed(3) + ")"
+        : (pop.bad
+          ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
+          : "rgba(255,215,110," + alpha.toFixed(3) + ")");
       ctx.fillText(pop.text, pop.x, pop.y - (pop.lift || 0));
     }
 
@@ -437,6 +443,35 @@ var Effects = (function () {
         x: tower.x, y: tower.y - 18,
         text: "+" + Math.round(amount) + (stored ? " stored" : " mana"),
         life: 1.1, maxLife: 1.1
+      });
+    },
+
+    // A PATH-B FARM WAS PAID FOR A BODY THAT DIED IN ITS CIRCLE, and this is
+    // its own popup rather than a bigger number on the bounty's. Owner: "on the
+    // bounty, it's separated -- imagine it gives four and the tower gives one,
+    // it's written +4 and +1, not +5."
+    //
+    // Offset ABOVE the bounty popup and drawn in the farm's green, so the two
+    // read as two sources rather than one figure that moved. Several farms
+    // covering the same corpse stack their offsets, which is correct: each of
+    // them really was paid.
+    farmKillBonus: function (farm, enemy, mana, baseHp) {
+      if (mana <= 0 && baseHp <= 0) return;
+      var bits = [];
+      if (mana > 0) bits.push("+" + mana + " mana");
+      if (baseHp > 0) bits.push("+" + baseHp + " HP");
+      // ABOVE the bounty through `lift`, not through `y`. On the 3D board a
+      // popup's y is a world coordinate and its lift is a HEIGHT, so shifting
+      // y moves this label northwards across the map and lands it on top of the
+      // bounty anyway -- measured: two popups 16 world units apart projected
+      // into one 18px band. Lift is the axis that means "above" on both boards.
+      var lift = (enemy.visualBodyLift ? enemy.visualBodyLift() : 0) + 22;
+      popups.push({
+        x: enemy.pos.x, y: enemy.pos.y - 18,
+        text: bits.join("  "),
+        lift: lift,
+        life: 1.0, maxLife: 1.0,
+        rgb: "150,225,160"
       });
     },
 

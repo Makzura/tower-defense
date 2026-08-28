@@ -74,6 +74,10 @@ function FarmTower(x, y, path) {
   this.investedTranches = 0;
   this.tempTranches = 0;
   this.tempTimer = 0;
+  // WHICH TOWER the running surge is on. The bonus lives on that tower; this
+  // is the farm's half of the arrangement, so the clock that ends the surge
+  // knows what to take it off.
+  this.tempTarget = null;
 
   // PATH C. `dice` is what this farm contributed last time it rolled, kept so
   // the panel can show the player what their own tower threw.
@@ -275,18 +279,28 @@ FarmTower.prototype.recalcStats = function () {
   if (this.currentHp === undefined) this.currentHp = maxHp;
 };
 
-// PRODUCTION IS EITHER A WAVE'S WORTH OR A TICK'S, never both. A3 replaces the
-// per-wave figure rather than adding to it -- "remplace la production par vague
-// par 50 mana toutes les 5 secondes" -- so the per-wave column stops being read
-// the moment any tier carries a tick. The crosspathed B2/B3 production a path-A
-// farm may hold goes with it, which is what "replaces" means.
+// PRODUCTION IS BOTH A WAVE'S WORTH AND A TICK'S, from A3 on.
+//
+// It was EITHER/OR until 2026-08-28, on the brief's word "remplace": A3 read
+// as replacing the per-wave figure with 50 mana every five seconds. Played,
+// that is a downgrade dressed as a tier -- 1600 mana to trade 400 a wave for
+// 50 every five seconds, and the per-wave column it silently switched off
+// included the crosspathed B2 the player had also paid for. Owner: "it stops
+// producing mana every wave from the moment it starts producing mana each five
+// seconds. So that's the problem, because it's way too weak. It should continue
+// producing mana as it already did."
+//
+// So the tick is ADDED. Nothing a farm has bought is ever turned off by
+// something else it buys, which is the rule the rest of the tree already
+// follows and the one this line was the only exception to.
 FarmTower.prototype.producesPerWave = function () {
-  return this.perTickProduction > 0 ? 0 : this.perWaveProduction;
+  return this.perWaveProduction;
 };
 
 // What this farm contributes to the C network's baseline B. A farm on the C
 // path is always paying by the wave -- a T3 on C locks A at 2, so it can never
-// hold A3 -- and its nominal production is exactly its per-wave figure.
+// hold A3 and therefore never has a tick -- and its nominal production is
+// exactly its per-wave figure.
 FarmTower.prototype.nominalProduction = function () {
   return this.producesPerWave();
 };
@@ -457,10 +471,10 @@ FarmTower.prototype.update = function (dt) {
     // floating point, so a surge tested against zero would run for ever --
     // the same trap the flash fields document in gl-world.
     this.tempTimer -= dt;
-    if (this.tempTimer <= 1e-9) {
-      this.tempTimer = 0;
-      this.tempTranches = 0;
-    }
+    // The bonus comes OFF the tower it was put on, here and nowhere else. This
+    // is the whole clock: it advances at 3x speed and freezes with the run,
+    // because it is the tower update loop's dt like every other cooldown.
+    if (this.tempTimer <= 1e-9) this.clearSurge();
   }
 
   // A3+ pays by the clock. Kept out of the wave hooks on purpose: a tick is a
@@ -505,7 +519,45 @@ FarmTower.prototype.cloneStock = function () {
   // growing -- and routing it there would pay a non-storing farm for a stock
   // it cannot have.
   this.manaProduced += cloned;
+  // BUT IT IS ANNOUNCED LIKE ANYTHING ELSE IT MAKES. Owner: "we can't see
+  // whenever an A4 or A5 tower produces mana between waves -- the cloned mana
+  // from the storage." Everything else a farm makes throws a popup through
+  // produce(); the clone was the one gain with no sign at all, and it is the
+  // one that only ever happens between waves, when nothing else on the board is
+  // moving to explain the stock going up.
+  if (cloned > 0 && typeof Effects !== "undefined") {
+    Effects.farmProduced(this, cloned, true);
+  }
   return cloned;
+};
+
+// TAKE THE STOCK OUT, ALL OF IT, WHENEVER YOU LIKE.
+//
+// Missing until 2026-08-28, and its absence was most of what made path A read
+// as a trap: from A4 the tower stops paying into the purse and fills its own
+// stock instead, and the only door out of that stock was A5's investment --
+// which needs 13 000 more mana to exist and spends in whole tranches of ten
+// thousand. So an A4 farm was a jar with no lid. Owner: "we can't take the mana
+// stored whenever we want, which is supposed to be the point."
+//
+// It is free and it is immediate, and the cost is the one the design already
+// has: what you take out stops compounding. `cloneStock` pays 5% of what is
+// STANDING at the end of a wave, so collecting every wave turns the tower back
+// into an ordinary per-wave farm and leaving it in is what makes A4 worth its
+// price. That trade is the decision this button exists to offer.
+//
+// It does NOT touch `manaProduced`: this mana was counted when it was made, and
+// counting it again on the way out would make the total a measure of how often
+// the player pressed a button.
+FarmTower.prototype.collect = function () {
+  if (!this.stores) return "needs A4";
+  if (this.stock <= 0) return "nothing stored";
+
+  var amount = this.stock;
+  this.stock = 0;
+  Farms.pay(amount);
+  if (typeof Effects !== "undefined") Effects.farmProduced(this, amount, false);
+  return null;
 };
 
 // A5's investment. Whole tranches only, a minimum of one, at most ten in a
@@ -515,28 +567,69 @@ FarmTower.prototype.tranchesAvailable = function () {
     Math.floor(this.stock / FarmTower.TRANCHE));
 };
 
-FarmTower.prototype.invest = function (temporary) {
+// THE INVESTMENT IS AIMED, AND THE PERMANENT ONE LANDS ONCE PER TOWER.
+//
+// Both were true of nothing until 2026-08-28. The bonus was a board-wide figure
+// `Farms.investment()` that no tower read, so pressing Invest spent the stock
+// and changed nothing at all. Owner: "we can't choose who to boost with the
+// ability -- we're supposed to click on the ability, then click on the tower,
+// and that target boosted. Also make sure the boosts are one time only: for the
+// permanent one it can only boost a tower once. Boosted with 10k is boosted --
+// it is limited to 100k, but you can't boost it ten times at 10k."
+//
+// So: `target` is mandatory, the bonus lives ON the target (see FarmBoost), and
+// a tower that already carries a permanent boost refuses a second one whatever
+// it would be worth. The ten-tranche ceiling is therefore a ceiling on the ONE
+// press a tower ever gets, not on a running total -- 100 000 mana at once is
+// +50%, and 10 000 ten times is +5% and nine refusals.
+//
+// The SURGE has no such rule. It is thirty seconds long and it is meant to be
+// pressed again, on the same tower or another one.
+FarmTower.prototype.invest = function (target, temporary) {
   if (!this.invests) return "needs A5";
+  if (!target) return "pick a tower";
+
+  var refusal = FarmBoost.whyCannotBoost(target, !temporary);
+  if (refusal) return refusal;
+
   var n = this.tranchesAvailable();
   if (n < 1) return "needs " + FarmTower.TRANCHE + " mana";
 
   this.stock -= n * FarmTower.TRANCHE;
   if (temporary) {
+    // The farm keeps the surge's clock, because the farm already has one and a
+    // second clock somewhere else would be a second thing that can disagree
+    // with the simulation's step. The BONUS is on the target; the countdown
+    // that ends it is here.
+    this.clearSurge();
     this.tempTranches = n;
     this.tempTimer = FarmTower.TEMP_SECONDS;
+    this.tempTarget = target;
+    FarmBoost.grant(target, n * FarmTower.TRANCHE_BONUS * FarmTower.TEMP_MULTIPLIER,
+      true);
   } else {
     this.investedTranches += n;
+    FarmBoost.grant(target, n * FarmTower.TRANCHE_BONUS, false);
   }
   return null;
 };
 
-// What a tower boosted by this farm gets, as a plain multiplier. Permanent
-// tranches and a running temporary burst add: the burst is the same bonus
-// multiplied by five, not a replacement for it.
+// Take the running surge off whatever is carrying it. Called when the timer
+// runs out, when a second surge replaces it, and when the farm is sold -- the
+// bonus belongs to a farm that is paying for it, and a farm that is gone is
+// not paying for anything.
+FarmTower.prototype.clearSurge = function () {
+  if (this.tempTarget) FarmBoost.clearSurge(this.tempTarget);
+  this.tempTarget = null;
+  this.tempTranches = 0;
+  this.tempTimer = 0;
+};
+
+// What this farm's permanent tranches were worth, as a plain multiplier's
+// fraction. Kept for the panel: the effect itself is on the towers it was
+// spent on, and this is only the record of what was spent.
 FarmTower.prototype.investmentBonus = function () {
-  var tranches = this.investedTranches +
-    this.tempTranches * FarmTower.TEMP_MULTIPLIER;
-  return tranches * FarmTower.TRANCHE_BONUS;
+  return this.investedTranches * FarmTower.TRANCHE_BONUS;
 };
 
 
@@ -574,6 +667,7 @@ FarmTower.prototype.isDestroyed = function () {
 };
 
 FarmTower.prototype.onRemoved = function () {
+  this.clearSurge();
   Farms.unregister(this);
 };
 
@@ -591,17 +685,25 @@ FarmTower.prototype.attacksPerSecond = function () { return 0; };
 FarmTower.prototype.statLines = function () {
   var rows = [];
 
-  if (this.perTickProduction > 0) {
-    rows.push(["Mana", this.perTickProduction + " / " + FarmTower.TICK_SECONDS + " s"]);
-  } else if (Farms.inNetwork(this)) {
-    rows.push(["Mana", this.nominalProduction() + " / wave  (networked)"]);
-  } else {
-    rows.push(["Mana", this.producesPerWave() + " / wave"]);
-  }
+  // BOTH COLUMNS, because from A3 a farm really is paid on both -- see the note
+  // on producesPerWave. One row rather than two: they are one answer to "how
+  // much does this make", and a panel that split them read as two towers.
+  var perWave = Farms.inNetwork(this)
+    ? this.nominalProduction() + " / wave  (networked)"
+    : this.producesPerWave() + " / wave";
+  rows.push(["Mana", this.perTickProduction > 0
+    ? perWave + "  ·  " + this.perTickProduction + " / " + FarmTower.TICK_SECONDS + " s"
+    : perWave]);
 
+  // ONE ROW, not two: the clone is a property OF the stock -- 5% of what is
+  // standing at the end of a wave -- and reading it beside the figure it is a
+  // percentage of is how a player decides whether to press Collect. Split
+  // across two rows it was also the row that pushed an A5 panel through the
+  // build bar once the Collect button arrived, which sandbox.smoke.js and the
+  // suite both pin against.
   if (this.stores) {
-    rows.push(["Stored", Math.round(this.stock) + " mana"]);
-    rows.push(["Cloned / wave", "5%  (max " + this.cloneCap + ")"]);
+    rows.push(["Stored", Math.round(this.stock) + " mana  ·  +5% a wave (max " +
+      this.cloneCap + ")"]);
   }
   if (this.invests) {
     var t = this.investedTranches;
@@ -609,7 +711,8 @@ FarmTower.prototype.statLines = function () {
       (t ? "  (+" + Math.round(t * FarmTower.TRANCHE_BONUS * 100) + "%)" : "")]);
     if (this.tempTimer > 0) {
       rows.push(["Surge", "+" + Math.round(this.tempTranches *
-        FarmTower.TEMP_MULTIPLIER * FarmTower.TRANCHE_BONUS * 100) + "%  ·  " +
+        FarmTower.TEMP_MULTIPLIER * FarmTower.TRANCHE_BONUS * 100) + "% on " +
+        ((this.tempTarget && this.tempTarget.name) || "a tower") + "  ·  " +
         Math.ceil(this.tempTimer) + " s"]);
     }
   }
@@ -697,36 +800,66 @@ FarmTower.prototype.panelActions = function () {
     });
   });
 
+  // THE COLLECT BUTTON COMES FIRST of the tower's own actions, because it is
+  // the one every storing farm has and the investment is the one only an A5
+  // does. Disabled rather than hidden on an empty stock, so a player who just
+  // collected can see where the mana goes back to.
+  if (this.stores) {
+    var stored = Math.floor(this.stock);
+    var hasStock = this.stock > 0;
+    actions.push({
+      id: "collect",
+      label: "Collect stored mana",
+      detail: hasStock ? stored + " mana" : "nothing stored",
+      effects: hasStock ? "all of it, into your purse" : "nothing stored yet",
+      enabled: hasStock, tone: "ability",
+      tooltip: UpgradeEffects.card({
+        title: "Collect",
+        subtitle: hasStock ? stored + " mana" : "nothing stored",
+        note: "Takes the whole stock into your purse, whenever you like. What " +
+          "you leave in keeps compounding -- the clone at the end of a wave is " +
+          "5% of what is STANDING, up to " + this.cloneCap + " -- so collecting " +
+          "every wave is the same tower without its stock." +
+          (this.invests ? "  An investment spends the stock too." : "")
+      })
+    });
+  }
+
   if (this.invests) {
     var n = this.tranchesAvailable();
     var ready = n >= 1;
     var perm = Math.round(n * FarmTower.TRANCHE_BONUS * 100);
     actions.push({
       id: "investPermanent",
-      label: "Invest  (permanent)",
+      label: "Boost a tower  (permanent)",
       detail: ready ? n + " × " + FarmTower.TRANCHE + " mana" : "needs 10000 mana",
-      effects: ready ? "+" + perm + "% damage, attack speed and range" : "not enough stored",
+      effects: ready ? "pick a tier 5 tower  ·  +" + perm +
+        "% damage, attack speed, range" : "not enough stored",
       enabled: ready, tone: "ability",
       tooltip: UpgradeEffects.card({
-        title: "Invest  ·  permanent",
+        title: "Boost  ·  permanent",
         subtitle: ready ? n + " tranche" + (n === 1 ? "" : "s") : "needs 10000 mana",
-        note: "Whole tranches of " + FarmTower.TRANCHE + " mana, ten at most. " +
-          "Each is +5% damage, attack speed and range for every tower at tier 5 " +
-          "or above, and for the units they summon. The remainder stays stored."
+        note: "Press, then click the tower to boost. Whole tranches of " +
+          FarmTower.TRANCHE + " mana, ten at most, and each is +5% damage, " +
+          "attack speed and range -- for a tower at tier 5 or above and for the " +
+          "units it summons. ONE PERMANENT BOOST PER TOWER, ever: spend all ten " +
+          "tranches at once or the rest is wasted on it. The remainder stays stored."
       })
     });
     actions.push({
       id: "investSurge",
-      label: "Invest  (surge)",
+      label: "Boost a tower  (surge)",
       detail: ready ? n + " × " + FarmTower.TRANCHE + " mana" : "needs 10000 mana",
-      effects: ready ? "+" + (perm * FarmTower.TEMP_MULTIPLIER) + "% for " +
+      effects: ready ? "pick a tier 5 tower  ·  +" +
+        (perm * FarmTower.TEMP_MULTIPLIER) + "% for " +
         FarmTower.TEMP_SECONDS + " s" : "not enough stored",
       enabled: ready, tone: "ability",
       tooltip: UpgradeEffects.card({
-        title: "Invest  ·  surge",
+        title: "Boost  ·  surge",
         subtitle: FarmTower.TEMP_SECONDS + " seconds",
-        note: "The same tranches at five times the bonus, for " +
-          FarmTower.TEMP_SECONDS + " seconds. The mana is spent either way."
+        note: "Press, then click the tower. The same tranches at five times the " +
+          "bonus, for " + FarmTower.TEMP_SECONDS + " seconds, and this one may " +
+          "be used again on the same tower. The mana is spent either way."
       })
     });
   }
@@ -734,10 +867,24 @@ FarmTower.prototype.panelActions = function () {
   return actions;
 };
 
-FarmTower.prototype.performAction = function (id) {
+FarmTower.prototype.performAction = function (id, context) {
+  if (id === "collect") {
+    var refusedCollect = this.collect();
+    return refusedCollect ? refusedCollect : this.name + " → collected";
+  }
   if (id === "investPermanent" || id === "investSurge") {
-    var refused = this.invest(id === "investSurge");
-    return refused ? refused : this.name + " → invested";
+    // ARMS THE MODE; it does not spend. The stock is only taken once a target
+    // has been clicked, in game.js's click path -- so a mis-press costs
+    // nothing, and Escape or a click on open ground backs out for free.
+    if (!this.invests) return "needs A5";
+    if (this.tranchesAvailable() < 1) return "needs " + FarmTower.TRANCHE + " mana";
+    if (context && typeof context.beginInvesting === "function") {
+      context.beginInvesting(this, id === "investSurge");
+      return this.name + " → pick a tower";
+    }
+    // No mode to arm (a fixture, the sandbox): fall back to the direct call so
+    // the mechanic is still reachable without the interface.
+    return "pick a tower";
   }
   if (id === "upgradeA" || id === "upgradeB" || id === "upgradeC") {
     var next = this.nextUpgrade(id.slice(7));
@@ -861,6 +1008,137 @@ FarmTower.prototype.draw = function (ctx) {
 //   nextFlat / nextPercent / nextMult   modify the NEXT gain in this series
 //   prep        a C5 effect recorded now and applied to the NEXT wave's series
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// FarmBoost -- the bonus an A5 investment puts ON A TOWER, and the one place
+// that knows how a boosted tower differs from an unboosted one.
+//
+// It lives here rather than in each tower file because the bonus is the Farm's
+// mechanic and the towers are only where it lands: five types plus summoned
+// units, all of which resolve their stats their own way, and none of which
+// should have to know what a tranche is.
+//
+// WHAT A BOOST DOES: +5% damage, +5% attack speed and +5% range per tranche.
+// Nothing else. Hit points, footprint, pierce, crit and every flag are
+// untouched, which is what makes this safe to apply as one multiplier at the
+// end of a resolve rather than as a set of deltas the resolver has to model.
+//
+// WHERE EACH QUANTITY IS APPLIED, once each, and this list is the whole of it:
+//   range   -- inside `elevatedRangePx` (js/tower.js), the one function every
+//              tower converts its reach through.
+//   damage  -- at the end of each type's own recompute, below.
+//   speed   -- same place. Cooldowns DIVIDE by the multiplier and rates
+//              MULTIPLY by it, which is the same thing said in the two units
+//              the game uses.
+//
+// WHO CAN BE BOOSTED: a tower at TIER 5 OR ABOVE on some branch, which is the
+// brief's rule and the only spelling all five types share -- see `tierReached`.
+// The gunner has no upgrades at all and can therefore never qualify.
+// ---------------------------------------------------------------------------
+
+var FarmBoost = (function () {
+  "use strict";
+
+  // How far along a branch a tower has actually bought. Every type counts its
+  // own purchases differently, so this asks each one the way it can answer:
+  // the config towers keep `core.purchased`, the hand-written ones keep
+  // `hasA1..hasB5` flags, and the Summoner keeps `upgradeCount` per path.
+  function tierReached(tower) {
+    if (!tower) return 0;
+
+    // Config-driven towers (Arcane Sniper, Siphon): the purchased list, by path.
+    if (tower.core && tower.core.purchased) {
+      var counts = {};
+      var best = 0;
+      for (var i = 0; i < tower.core.purchased.length; i++) {
+        var id = tower.core.purchased[i];
+        var branch = String(id).charAt(0);
+        counts[branch] = (counts[branch] || 0) + 1;
+        if (counts[branch] > best) best = counts[branch];
+      }
+      return best;
+    }
+
+    // Everything hand-written spells its tiers `hasA1`.."hasC5".
+    var branches = ["A", "B", "C"];
+    var most = 0;
+    for (var b = 0; b < branches.length; b++) {
+      var owned = 0;
+      for (var t = 1; t <= 5; t++) {
+        if (tower["has" + branches[b] + t]) owned++;
+      }
+      if (owned > most) most = owned;
+    }
+    return most;
+  }
+
+  // Why this tower cannot take the boost, or null if it can.
+  // `permanent` picks which of the two rules applies -- the once-only one is
+  // the permanent investment's alone.
+  function whyCannotBoost(tower, permanent) {
+    if (!tower) return "pick a tower";
+    if (tower.isDestroyed && tower.isDestroyed()) return "that tower is gone";
+    if (tower instanceof FarmTower) return "a farm cannot be boosted";
+    if (tierReached(tower) < TIER_REQUIRED) return "needs a tier 5 tower";
+    if (permanent && tower.farmBoost > 0) return "already boosted";
+    return null;
+  }
+
+  var TIER_REQUIRED = 5;
+
+  // The multiplier a tower is currently carrying. Permanent and surge ADD as
+  // fractions before the multiply, so a +50% permanent under a +25% surge is
+  // x1.75 rather than x1.875 -- the same additive rule js/enemy.js uses for
+  // damage amplification, and for the same reason: two bonuses that multiply
+  // are a number nobody can predict from the panel.
+  function multiplier(tower) {
+    if (!tower) return 1;
+    var perm = tower.farmBoost || 0;
+    var surge = tower.farmSurge || 0;
+    return 1 + perm + surge;
+  }
+
+  // Put a boost on. `bonus` is already a fraction (0.05 per tranche, five times
+  // that for a surge). Recomputing is what actually moves the tower's numbers.
+  function grant(tower, bonus, temporary) {
+    if (!tower || bonus <= 0) return;
+    if (temporary) tower.farmSurge = bonus;
+    else tower.farmBoost = (tower.farmBoost || 0) + bonus;
+    refresh(tower);
+  }
+
+  function clearSurge(tower) {
+    if (!tower || !tower.farmSurge) return;
+    tower.farmSurge = 0;
+    refresh(tower);
+  }
+
+  // RECOMPUTE, THROUGH THE TOWER'S OWN DOOR. Every type already has a function
+  // that rebuilds its derived numbers from its purchases, and the boost is
+  // applied inside those; calling it here is what makes a boost land and a
+  // surge expiring take it back. The config towers need their core resolved
+  // again as well, because their damage and rate live in `core.stats`.
+  function refresh(tower) {
+    if (!tower) return;
+    if (tower.core && typeof tower.core._refreshStats === "function") {
+      tower.core.farmBoostMult = multiplier(tower);
+      tower.core._refreshStats();
+    }
+    if (typeof tower.refreshDerived === "function") tower.refreshDerived();
+    else if (typeof tower.recalcStats === "function") tower.recalcStats();
+  }
+
+  return {
+    TIER_REQUIRED: TIER_REQUIRED,
+    tierReached: tierReached,
+    whyCannotBoost: whyCannotBoost,
+    multiplier: multiplier,
+    grant: grant,
+    clearSurge: clearSurge,
+    refresh: refresh
+  };
+})();
+
 
 var FarmDice = (function () {
   "use strict";
@@ -1137,6 +1415,31 @@ var Farms = (function () {
   // A SUMMONED body pays nothing, which is the brief's "ennemi non invoque" and
   // the same rule the Hive's brood already lives under.
 
+  // WHAT A BODY STANDING HERE IS WORTH TO THE FARMS, or null for nothing.
+  //
+  // Read by both boards every frame, per body, so it opens with the same
+  // length test `fieldAt` does: with no farms on the map it costs one
+  // comparison. It exists because path B's per-kill bounty was invisible until
+  // the moment it paid -- owner: "you should make it apparent on the enemies
+  // that they're affected by the +1 mana and HP per kill" -- and a marker that
+  // asked each renderer to re-derive the rule would be the rule in three
+  // places. `onEnemyKilled` keeps its own loop because it credits each farm
+  // separately; this one only answers the total.
+  function killBonusAt(x, y) {
+    if (!list.length) return null;
+    var mana = 0, baseHp = 0;
+    for (var i = 0; i < list.length; i++) {
+      var f = list[i];
+      if (f.manaPerKill <= 0) continue;
+      if (f.isDestroyed && f.isDestroyed()) continue;
+      if (!f.covers(x, y)) continue;
+      mana += f.manaPerKill;
+      baseHp += f.baseHpPerKill;
+    }
+    if (mana <= 0 && baseHp <= 0) return null;
+    return { mana: mana, baseHp: baseHp };
+  }
+
   function onEnemyKilled(enemy) {
     if (!list.length || !enemy || !enemy.pos) return { mana: 0, baseHp: 0 };
     if (enemy.noBounty) return { mana: 0, baseHp: 0 };
@@ -1154,6 +1457,14 @@ var Farms = (function () {
       // T3 on B caps A at 2), so there is no stock for this mana to fall into.
       f.manaProduced += f.manaPerKill;
       f.baseHpProduced += f.baseHpPerKill;
+      // ONE POPUP PER FARM, BESIDE THE BOUNTY AND NOT INSIDE IT. Owner: "on the
+      // bounty, it's separated -- imagine it gives four and the tower gives
+      // one, it's written +4 and +1, not +5". Summing them would hide the whole
+      // reason path B is worth its price, and two farms covering the same
+      // corpse read as two gains because they ARE two gains.
+      if (typeof Effects !== "undefined") {
+        Effects.farmKillBonus(f, enemy, f.manaPerKill, f.baseHpPerKill);
+      }
     }
     if (mana > 0) pay(mana);
     if (baseHp > 0 && typeof growBaseMaxHp === "function") growBaseMaxHp(baseHp);
@@ -1384,6 +1695,7 @@ var Farms = (function () {
     pay: pay,
     roll: roll,
     fieldAt: fieldAt,
+    killBonusAt: killBonusAt,
     slowAt: slowAt,
     damageAmpAt: damageAmpAt,
     executes: executes,

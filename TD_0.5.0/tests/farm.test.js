@@ -44,6 +44,19 @@ function farm(h, x, y, tiers) {
 // rule the rest of the suite follows for every figure it checks.
 function FarmTowerTick(h) { return h.game.FarmTower.TICK_SECONDS; }
 
+// A TOWER THE INVESTMENT WILL ACCEPT: a Warbringer with `tiers` bought on path
+// A, five by default, which is what FarmBoost.TIER_REQUIRED asks for. A real
+// tower through the real upgrade door, so what the boost multiplies is what the
+// game would have had.
+function tierFiveTower(h, x, y, tiers) {
+  var g = h.game;
+  var t = new g.Smasher(x, y, g.path);
+  g.addTower(t);
+  var want = tiers === undefined ? 5 : tiers;
+  for (var i = 1; i <= want; i++) t.applyUpgrade("A" + i);
+  return t;
+}
+
 function enemyAt(h, x, y, health, typeId) {
   var e = new h.game.Enemy(h.game.path, health, typeId);
   e.pos = { x: x, y: y };
@@ -104,20 +117,35 @@ test("A1 and A2 add to the per-wave figure", function (t) {
   t.eq(f.maxHp, 350, "and +100 more");
 });
 
-test("A3 REPLACES the per-wave figure with a tick", function (t) {
+test("A3 ADDS a tick, and the per-wave figure keeps paying", function (t) {
   var h = boot();
+  var g = h.game;
   var f = farm(h, 600, 200, ["A1", "A2", "A3"]);
   t.eq(f.perTickProduction, 50, "50 every 5 s");
-  t.eq(f.producesPerWave(), 0,
-    "and the per-wave column stops being read -- replaced, not added to");
+  t.eq(f.producesPerWave(), 400,
+    "and the per-wave column keeps paying -- added to, not replaced");
 
-  var before = h.game.cash;
+  var before = g.cash;
   f.update(4.9);
-  t.eq(h.game.cash, before, "nothing at 4.9 seconds");
+  t.eq(g.cash, before, "nothing at 4.9 seconds");
   f.update(0.1);
-  t.eq(h.game.cash, before + 50, "and 50 on the tick");
+  t.eq(g.cash, before + 50, "and 50 on the tick");
   f.update(10);
-  t.eq(h.game.cash, before + 150, "two more ticks in ten seconds");
+  t.eq(g.cash, before + 150, "two more ticks in ten seconds");
+
+  // The wave boundary still pays, which is the whole of the 2026-08-28 fix:
+  // 1600 mana used to buy a tick and switch the 400 off.
+  before = g.cash;
+  g.Farms.settleWave(1);
+  t.eq(g.cash, before + 400, "and the wave still pays its 400 on top");
+});
+
+test("the panel shows both columns at once", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3"]);
+  var row = f.statLines().filter(function (r) { return r[0] === "Mana"; })[0];
+  t.ok(/400 \/ wave/.test(row[1]), "the wave figure: " + row[1]);
+  t.ok(/50 \/ 5 s/.test(row[1]), "and the tick beside it: " + row[1]);
 });
 
 test("A4 keeps what it makes, and clones five per cent of it a wave", function (t) {
@@ -149,43 +177,235 @@ test("A5 raises the tick and the clone cap", function (t) {
   t.eq(f.cloneStock(), 3000, "and 3000 of cloning a wave");
 });
 
-test("A5 invests whole tranches and leaves the remainder stored", function (t) {
+test("the stock can be taken out whenever, all of it", function (t) {
   var h = boot();
-  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4"]);
 
-  f.stock = 9999;
-  t.eq(f.tranchesAvailable(), 0, "under ten thousand buys nothing");
-  t.eq(f.invest(false), "needs 10000 mana", "and is refused in as many words");
+  t.eq(f.collect(), "nothing stored", "an empty stock refuses");
+
+  f.update(h.game.FarmTower.TICK_SECONDS);
+  t.eq(f.stock, 75, "a tick fills it");
+
+  var before = g.cash;
+  t.eq(f.collect(), null, "and it comes straight out");
+  t.eq(g.cash, before + 75, "into the purse, in full");
+  t.eq(f.stock, 0, "leaving nothing behind");
+  t.eq(f.manaProduced, 75,
+    "and the lifetime total does not count it twice on the way out");
+
+  // 400 for the wave, then the clone on top of it: the 5% is taken from what is
+  // STANDING at the end of the wave, and the wave's own production is standing
+  // by then. That ordering is what makes leaving mana in worth anything.
+  g.Farms.settleWave(1);
+  t.eq(f.stock, 420, "the wave's production lands in the stock, and clones");
+  t.eq(f.collect(), null, "which can be taken too");
+  t.eq(g.cash, before + 495, "so nothing this tower makes is ever locked in");
+});
+
+test("a farm that does not store has nothing to collect", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3"]);
+  t.eq(f.stores, false, "A3 still pays straight out");
+  t.eq(f.collect(), "needs A4", "so there is no stock to take");
+});
+
+test("the collect button is offered from A4, and goes dead on an empty stock",
+function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3"]);
+  var ids = f.panelActions().map(function (a) { return a.id; });
+  t.eq(ids.indexOf("collect"), -1, "no button before A4");
+
+  f.applyUpgrade("A4");
+  var button = f.panelActions().filter(function (a) { return a.id === "collect"; })[0];
+  t.ok(button, "and one after it");
+  t.eq(button.enabled, false, "dead while the stock is empty");
+  t.eq(button.detail, "nothing stored", "and it says so");
+
+  f.stock = 1234.6;
+  button = f.panelActions().filter(function (a) { return a.id === "collect"; })[0];
+  t.eq(button.enabled, true, "live once there is something in it");
+  t.eq(button.detail, "1234 mana", "quoting what it would pay, never rounded up");
+
+  // Through the real action door, the one the panel's click path calls.
+  var before = h.game.cash;
+  t.ok(/collected/.test(f.performAction("collect")), "the press reports back");
+  t.near(h.game.cash, before + 1234.6, 1e-9, "and pays the exact stock");
+});
+
+test("the boost is AIMED, and a press with no target spends nothing",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
 
   f.stock = 25500;
-  t.eq(f.tranchesAvailable(), 2, "two whole tranches");
-  t.eq(f.invest(false), null, "accepted");
-  t.eq(f.stock, 5500, "the incomplete tranche stays stored");
-  t.eq(f.investedTranches, 2, "two are spent");
-  t.near(f.investmentBonus(), 0.10, 1e-12, "+5% each, permanently");
+  t.eq(f.invest(null, false), "pick a tower", "no target, no boost");
+  t.eq(f.stock, 25500, "and nothing is spent");
 
-  // Ten at most in one press, which is the brief's 100 000 ceiling.
+  t.eq(f.invest(five, false), null, "aimed at a tier 5 tower it lands");
+  t.eq(f.stock, 5500, "two whole tranches spent, the remainder stored");
+  t.eq(f.investedTranches, 2, "and recorded");
+  t.near(five.farmBoost, 0.10, 1e-12, "the bonus is ON THE TARGET, +5% a tranche");
+});
+
+test("a tower can be permanently boosted ONCE, however much is spent",
+function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+
+  f.stock = 10000;
+  t.eq(f.invest(five, false), null, "10 000 boosts it");
+  t.near(five.farmBoost, 0.05, 1e-12, "+5%");
+
   f.stock = 500000;
-  t.eq(f.tranchesAvailable(), 10, "ten tranches at once and no more");
-  f.invest(false);
-  t.eq(f.stock, 400000, "so 100 000 is spent and the rest is kept");
-  t.near(f.investmentBonus(), 0.60, 1e-12, "twelve tranches in all");
+  t.eq(f.invest(five, false), "already boosted",
+    "and a second permanent press is refused whatever it is worth");
+  t.eq(f.stock, 500000, "nothing spent on the refusal");
+  t.near(five.farmBoost, 0.05, 1e-12, "the tower still carries its one boost");
+
+  // The ceiling is on the ONE press, not on a running total: ten tranches at
+  // once is +50%, and ten presses of one is +5% and nine refusals.
+  var other = tierFiveTower(h, 1000, 400);
+  t.eq(f.invest(other, false), null, "a different tower may still be boosted");
+  t.near(other.farmBoost, 0.50, 1e-12, "ten tranches in one press, +50%");
+});
+
+test("only a tier 5 tower can be boosted, and never a farm", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  f.stock = 100000;
+
+  var plain = new g.Smasher(1100, 300, g.path);
+  g.addTower(plain);
+  t.eq(f.invest(plain, false), "needs a tier 5 tower", "a fresh tower is refused");
+
+  var four = tierFiveTower(h, 1200, 300, 4);
+  t.eq(f.invest(four, false), "needs a tier 5 tower", "and so is a tier 4");
+
+  var other = farm(h, 700, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  t.eq(f.invest(other, false), "a farm cannot be boosted", "a farm is not a target");
+  t.eq(f.stock, 100000, "and none of those refusals cost anything");
+});
+
+test("the boost raises damage, attack speed and range, and nothing else",
+function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+
+  var before = {
+    damage: five.damage, cooldown: five.cooldownSeconds,
+    range: five.rangePx, hp: five.maxHp, footprint: five.footprintPx
+  };
+
+  f.stock = 100000;
+  t.eq(f.invest(five, false), null, "ten tranches, +50%");
+
+  t.near(five.damage, before.damage * 1.5, 1e-9, "damage");
+  t.near(five.cooldownSeconds, before.cooldown / 1.5, 1e-9,
+    "seconds per swing, which is attack speed said the other way round");
+  t.near(five.rangePx, before.range * 1.5, 1e-9, "reach");
+  t.eq(five.maxHp, before.hp, "hit points are NOT in the bonus");
+  t.eq(five.footprintPx, before.footprint, "and neither is the footprint");
 });
 
 test("the surge is the same tranches at five times the bonus, for 30 s",
 function (t) {
   var h = boot();
   var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+  var damage = five.damage;
+
   f.stock = 20000;
-  t.eq(f.invest(true), null, "two tranches, temporarily");
+  t.eq(f.invest(five, true), null, "two tranches, temporarily");
   t.eq(f.stock, 0, "spent either way");
-  t.near(f.investmentBonus(), 2 * 5 * 0.05, 1e-12, "+50% while it runs");
+  t.near(five.farmSurge, 2 * 5 * 0.05, 1e-12, "+50% while it runs");
+  t.near(five.damage, damage * 1.5, 1e-9, "and the tower really hits harder");
 
   f.update(29.9);
-  t.ok(f.investmentBonus() > 0, "still running at 29.9 s");
+  t.ok(five.farmSurge > 0, "still running at 29.9 s");
   f.update(0.1);
-  t.eq(f.investmentBonus(), 0, "and gone at 30");
+  t.eq(five.farmSurge, 0, "and gone at 30");
+  t.near(five.damage, damage, 1e-9, "with the damage back where it was");
 });
+
+test("a surge may be pressed again, unlike the permanent boost", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+
+  f.stock = 10000;
+  t.eq(f.invest(five, true), null, "one tranche");
+  f.stock = 20000;
+  t.eq(f.invest(five, true), null, "and again on the same tower");
+  t.near(five.farmSurge, 2 * 5 * 0.05, 1e-12,
+    "the second replaces the first rather than stacking with it");
+
+  // A farm that leaves the board stops paying for the surge it lit.
+  h.run("sellTower(towers.filter(function (x) { return x instanceof FarmTower; })[0])");
+  t.eq(five.farmSurge, 0, "and a sold farm takes its surge with it");
+});
+
+test("the permanent boost and a surge add, they do not compound", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+  var damage = five.damage;
+
+  f.stock = 100000;
+  f.invest(five, false);          // +50% permanent
+  f.stock = 100000;
+  f.invest(five, true);           // +250% surge
+  t.near(five.damage, damage * (1 + 0.5 + 2.5), 1e-9,
+    "1 + 0.5 + 2.5, not 1.5 x 3.5 -- the same additive rule enemy amps follow");
+});
+
+test("the button arms a mode instead of spending, and the click spends",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+  f.stock = 100000;
+
+  g.inspected = f;
+  var armed = null;
+  t.ok(/pick a tower/.test(f.performAction("investPermanent", {
+    beginInvesting: function (farmArg, temporary) {
+      armed = { farm: farmArg, temporary: temporary };
+    }
+  })), "the press asks for a target");
+  t.eq(armed.farm, f, "arming the farm that was pressed");
+  t.eq(armed.temporary, false, "for a permanent boost");
+  t.eq(f.stock, 100000, "and spends nothing yet");
+
+  // Through the real click path, on the point the tower is DRAWN at. The
+  // farm's own panel is dismissed first: it is still up in the real game too,
+  // and a click that lands on it belongs to it -- the same rule every other
+  // mode plays by, and not what this test is about.
+  h.run("inspected = null");
+  h.run("investingFarm = { farm: towers.filter(function (x) { " +
+    "return x instanceof FarmTower; })[0], temporary: false }");
+  h.click(five.x, five.y);
+  t.eq(f.stock, 0, "the click on the tower is what spends the stock");
+  t.near(five.farmBoost, 0.50, 1e-12, "and boosts what was clicked");
+  t.eq(h.run("investingFarm"), null, "the mode closes behind it");
+});
+
+test("an empty press is refused before it can arm anything", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  f.stock = 9999;
+  t.eq(f.performAction("investPermanent", { beginInvesting: function () {
+    throw new Error("should not arm");
+  } }), "needs 10000 mana", "under a tranche it never opens the mode");
+});
+
 
 
 group("Farm — path B, the mana lab");
@@ -717,9 +937,10 @@ function (t) {
 test("investing the stock does not take back what was produced", function (t) {
   var h = boot();
   var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
   f.produce(30000);
   t.eq(f.manaProduced, 30000, "produced");
-  t.eq(f.invest(false), null, "three whole tranches are spent");
+  t.eq(f.invest(five, false), null, "three whole tranches are spent");
   t.eq(f.stock, 0, "the stock is gone");
   t.eq(f.manaProduced, 30000, "the LIFETIME total is not -- it is not a balance");
 });
@@ -811,6 +1032,84 @@ test("production is announced over the tower that made it", function (t) {
   t.eq(seen[0].tower, f, "over the farm itself");
   t.eq(seen[0].amount, 200, "for what it paid");
   t.eq(seen[0].stored, false, "and it went to the purse, not to a stock");
+});
+
+
+test("the clone is announced, because it happens between waves", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4"]);
+  f.stock = 1000;
+
+  var seen = [];
+  var real = g.Effects.farmProduced;
+  g.Effects.farmProduced = function (tower, amount, stored) {
+    seen.push({ amount: amount, stored: stored });
+    return real.apply(null, arguments);
+  };
+  g.Farms.settleWave(1);
+  g.Effects.farmProduced = real;
+
+  // The wave's own production, then the clone on what is standing after it.
+  t.eq(seen.length, 2, "two announcements: the production and the clone");
+  t.eq(seen[0].amount, 400, "the wave's production");
+  t.eq(seen[1].amount, 70, "and 5% of the 1400 standing once it lands");
+  t.eq(seen[0].stored && seen[1].stored, true, "both marked as stored, not paid");
+});
+
+test("a farm's share of a kill is its own popup, not added to the bounty",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["B1", "B2", "B3"]);
+  var e = enemyAt(h, f.x, f.y, 10);
+
+  var calls = [];
+  var realFarm = g.Effects.farmKillBonus;
+  g.Effects.farmKillBonus = function (farmArg, enemy, mana, baseHp) {
+    calls.push({ mana: mana, baseHp: baseHp });
+    return realFarm.apply(null, arguments);
+  };
+  g.Farms.onEnemyKilled(e);
+  g.Effects.farmKillBonus = realFarm;
+
+  t.eq(calls.length, 1, "one popup for one farm");
+  t.eq(calls[0].mana, f.manaPerKill, "carrying the farm's figure alone");
+  t.eq(calls[0].baseHp, f.baseHpPerKill, "and its base HP alone");
+
+  // Two farms over the same corpse are two gains and read as two.
+  var second = farm(h, 620, 210, ["B1", "B2", "B3"]);
+  calls = [];
+  g.Effects.farmKillBonus = function (farmArg, enemy, mana, baseHp) {
+    calls.push({ farm: farmArg, mana: mana });
+    return realFarm.apply(null, arguments);
+  };
+  g.Farms.onEnemyKilled(enemyAt(h, f.x, f.y, 10));
+  g.Effects.farmKillBonus = realFarm;
+  t.eq(calls.length, 2, "two farms, two popups");
+  t.eq(calls[0].farm !== calls[1].farm, true, "one each rather than one summed");
+});
+
+test("a body a farm will pay for is marked while it is still alive",
+function (t) {
+  var h = boot();
+  var g = h.game;
+
+  t.eq(g.Farms.killBonusAt(600, 200), null, "nothing to mark with no farm");
+
+  var f = farm(h, 600, 200, ["B1", "B2", "B3"]);
+  var inside = g.Farms.killBonusAt(f.x + 10, f.y + 10);
+  t.ok(inside, "a body in the circle is worth something");
+  t.eq(inside.mana, f.manaPerKill, "exactly what it would pay");
+  t.eq(inside.baseHp, f.baseHpPerKill, "in both currencies");
+  t.eq(g.Farms.killBonusAt(f.x + f.rangePx + 40, f.y), null,
+    "and a body outside it is not marked");
+
+  // A farm with no per-kill tier marks nothing, however big its circle.
+  h.run("towers.length = 0; Farms.reset()");
+  var b1 = farm(h, 600, 200, ["B1"]);
+  t.eq(b1.manaPerKill, 0, "B1 pays nothing per kill");
+  t.eq(g.Farms.killBonusAt(b1.x, b1.y), null, "so it marks nothing");
 });
 
 

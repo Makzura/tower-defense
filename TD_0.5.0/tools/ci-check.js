@@ -625,7 +625,20 @@ var BASELINE = [
   // base HP produced, on every door that makes either -- the wave, the tick,
   // the stock, the clone, a kill in the field, and the C network's split
   // payout) plus the popup that says a farm paid.
-  { file: "tests/farm.test.js", pass: 44, fail: 0, failing: [] },
+  // 44 -> 48 on 2026-08-28: A3 adding its tick instead of replacing the
+  // per-wave figure (plus the panel row that shows both), and the Collect
+  // button that takes the stock out on demand -- refused, offered, dead on an
+  // empty stock, and paid through the real action door.
+  // 48 -> 55 on 2026-08-28: the investment became AIMED and once-only, so the
+  // two old invest tests were replaced by seven -- the target is mandatory, a
+  // tower takes one permanent boost ever, only a tier 5 non-farm qualifies, the
+  // bonus moves damage/speed/range and nothing else, a surge is re-pressable
+  // and dies with its farm, permanent and surge add rather than compound, and
+  // the button arms a mode that the next click on a tower spends.
+  // 55 -> 58: the clone announcing itself, a farm's share of a kill being its
+  // own popup rather than a bigger bounty, and the mark on a body a farm will
+  // be paid for while it is still alive.
+  { file: "tests/farm.test.js", pass: 58, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

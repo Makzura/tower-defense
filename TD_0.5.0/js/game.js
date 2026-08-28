@@ -1667,6 +1667,17 @@ var paused = false;
 // inspecting, and Escape cancels it.
 var aimingTower = null;
 
+// SET WHILE A FARM'S INVESTMENT IS WAITING FOR ITS TARGET, as
+// `{ farm, temporary }`. The same shape as `aimingTower` above and for the same
+// reason: an action that needs a second click is a MODE, and a mode has to be
+// cancellable, has to be cleared when the thing that opened it leaves the
+// board, and has to consume the next click ahead of building and inspecting.
+//
+// Owner: "we're supposed to click on the ability, then click on the tower, and
+// that target boosted." Before this the press spent the stock and picked
+// nothing, because there was nothing to pick with.
+var investingFarm = null;
+
 // Extra things to draw in world space, between the map and the interface.
 // Push a function(ctx) to add one; the sandbox's u.l. debug overlay uses this
 // so its shapes cannot end up on top of the panel.
@@ -1956,6 +1967,7 @@ function restartGame() {
   selectedSlot = null;
   inspected = null;
   aimingTower = null;
+  investingFarm = null;
   blockReason = null;
   paused = false;
 
@@ -2230,6 +2242,7 @@ function onRightClick(event) {
   selectedSlot = null;
   inspected = null;
   aimingTower = null;
+  investingFarm = null;
   refreshBlockReason();
 }
 
@@ -2462,6 +2475,30 @@ function onClick(event) {
   // and on a board with height in it that is not the world point under the
   // cursor. See `pickTower`.
   var hit = pickTower(p.x, p.y);
+
+  // A FARM'S INVESTMENT IS WAITING FOR ITS TARGET. It consumes this click
+  // whatever it lands on: on a tower it spends, and on open ground it cancels,
+  // because a mode you cannot get out of by clicking away is a trap. Ahead of
+  // inspecting for the same reason `aimingTower` is: while a mode is up it owns
+  // the click.
+  if (investingFarm) {
+    var farm = investingFarm.farm;
+    var temporary = investingFarm.temporary;
+    investingFarm = null;
+    if (hit) {
+      var refused = farm.invest(hit, temporary);
+      Sound.playUIClick();
+      if (refused) {
+        Effects.announce(farm.name, refused);
+      } else {
+        inspected = hit;
+        Effects.announce(hit.name || "Tower",
+          temporary ? "surge  ·  " + FarmTower.TEMP_SECONDS + " s" : "boosted");
+      }
+    }
+    return;
+  }
+
   if (hit) {
     Sound.playUIClick();
     inspected = hit;
@@ -2536,6 +2573,9 @@ function sellTower(tower, options) {
 
   if (inspected === tower) inspected = null;
   if (aimingTower === tower) aimingTower = null;   // it cannot aim once sold
+  // A sold farm is not paying for an investment it never landed, and a sold
+  // TARGET cannot receive one. Either way the mode goes with the tower.
+  if (investingFarm && (investingFarm.farm === tower)) investingFarm = null;
   refreshBlockReason();          // the ground it stood on may now be buildable
 }
 
@@ -2685,7 +2725,13 @@ function runPanelAction(x, y) {
     spend: function (amount) { cash -= amount; },
     enemies: enemies,
     damage: function (enemy, amount) { enemy.takeDamage(amount); },
-    beginAiming: function (tower) { aimingTower = tower; }
+    beginAiming: function (tower) { aimingTower = tower; },
+    // The Farm's investment, which needs a target the panel cannot know. Same
+    // seam and the same shape as beginAiming above: the tower says what it
+    // wants, game.js owns the mode.
+    beginInvesting: function (farm, temporary) {
+      investingFarm = { farm: farm, temporary: !!temporary };
+    }
   });
 
   refreshBlockReason();                 // spending may have changed what is affordable
@@ -2838,10 +2884,12 @@ function onKeyDown(event) {
   // Opening a menu over a half-placed tower would be the wrong answer to
   // "get me out of this".
   if (event.key === "Escape") {
-    if (selectedSlot !== null || inspected !== null || aimingTower !== null) {
+    if (selectedSlot !== null || inspected !== null || aimingTower !== null ||
+        investingFarm !== null) {
       selectedSlot = null;
       inspected = null;
       aimingTower = null;
+      investingFarm = null;
       refreshBlockReason();
       return;
     }
@@ -3441,6 +3489,8 @@ function update(dt) {
     // dead tower would offer to sell something that is not there.
     if (inspected && inspected.isDestroyed && inspected.isDestroyed()) inspected = null;
     if (aimingTower && aimingTower.isDestroyed && aimingTower.isDestroyed()) aimingTower = null;
+    if (investingFarm && investingFarm.farm.isDestroyed &&
+        investingFarm.farm.isDestroyed()) investingFarm = null;
   }
 
   // A tower's update returns the DAMAGE it landed itself this step. Cash no
@@ -4766,6 +4816,7 @@ function draw() {
   drawPlacementFeedback();
   drawBuildPreview();
   drawAimPreview();
+  drawInvestPreview();
 
   // World overlays: drawn in WORLD space, on top of the map but UNDER every
   // piece of interface. Debug shapes belong here -- drawn after the panel
@@ -4794,6 +4845,14 @@ function draw() {
   // with the board.
   if (world3D) {
     drawPlacementFeedback();
+    // AND THE INVESTMENT'S TARGETS, which are interface attached to world
+    // actors exactly as the placement feedback is. It has to be called on both
+    // branches: the call in the 2D block above is inside `if (!world3D)` and so
+    // never runs on this board -- which is why the ring stroked and nothing
+    // appeared, measured as zero changed pixels between a frame with the mode
+    // armed and one without. drawInvestPreview projects through the camera when
+    // there is one, so the same function is correct in both places.
+    drawInvestPreview();
     World3D.drawOverlays(ctx, worldRenderState());
   }
 
@@ -5607,6 +5666,75 @@ function drawBuildPreview() {
     ctx.fillText(blockReason, ghostX, ghostY + footprintPx + 8);
     ctx.textAlign = "left";
   }
+}
+
+// WHILE A FARM'S INVESTMENT IS WAITING FOR ITS TARGET, say so on the board and
+// mark what can take it. Same job as drawAimPreview below and drawn beside it:
+// a mode with no sign on screen is a click the player has forgotten they owe.
+//
+// The eligible towers wear a ring; a tower that already carries a permanent
+// boost does not, because for a permanent press it is not eligible -- which is
+// the once-only rule made visible before the click rather than explained after
+// it in a refusal.
+function drawInvestPreview() {
+  if (!investingFarm) return;
+
+  // THROUGH THE CAMERA, like every other world ring on this board. A plain
+  // `ctx.arc` at a world coordinate is only correct on the flat fallback: on
+  // the 3D board the world transform is a projection the 2D context cannot
+  // express, which is why drawSightShadows and the range circles all go through
+  // projectRing. Measured before this was fixed: the ring drew 23 stray pixels
+  // somewhere off the tower rather than around it.
+  var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
+             World3D.camera) ? World3D.camera() : null;
+  var temporary = investingFarm.temporary;
+
+  ctx.save();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(150,225,160,0.9)";
+  for (var i = 0; i < towers.length; i++) {
+    var t = towers[i];
+    if (FarmBoost.whyCannotBoost(t, !temporary)) continue;
+
+    var radius = t.footprintPx + 8;
+    var ring = [];
+    for (var k = 0; k <= 48; k++) {
+      var a = k / 48 * Math.PI * 2;
+      ring.push([t.x + Math.cos(a) * radius, t.y + Math.sin(a) * radius]);
+    }
+    var r = projectRing(ring, cam);
+    if (!r || r.length < 3) continue;
+    ctx.beginPath();
+    ctx.moveTo(r[0][0], r[0][1]);
+    for (k = 1; k < r.length; k++) ctx.lineTo(r[k][0], r[k][1]);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  if (mouse.x < -100) return;
+
+  // The label follows the CURSOR, so it is placed in screen space on the 3D
+  // board and in world space on the flat one -- which are the same point, said
+  // in whichever coordinates that board's overlay pass is working in.
+  var lx = worldMouse.x, ly = worldMouse.y + 16;
+  if (cam) {
+    var at = cam.worldToScreen(worldMouse.x, worldMouse.y,
+      (typeof World3D !== "undefined" && World3D.groundHeightAt)
+        ? World3D.groundHeightAt(worldMouse.x, worldMouse.y) : 0);
+    if (!at) return;
+    lx = at.x; ly = at.y + 18;
+  }
+
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(170,235,180,0.95)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText(
+    (temporary ? "click a tower to surge" : "click a tower to boost") +
+      "  ·  Esc to cancel", lx, ly);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 }
 
 // While a cone tower is waiting for a direction, show where it would point

@@ -6371,11 +6371,25 @@ nets, and paying a wave's production twice is the whole risk in a design with
 several doors. **`Farms.reset()` clears that latch**, and forgetting to was a
 real defect the suite caught: a second run would silently skip its own wave 1.
 
-**A3 REPLACES the per-wave figure with a tick** rather than adding to it, and
-the tick is driven from `update(dt)` rather than from a wave hook — so it
-advances at 3× speed and freezes with the run like every other cooldown. From
-A4 production stops reaching the purse at all and fills the tower's own stock,
-which is what the cloning compounds and what A5's investment spends.
+**A3 ADDS a tick; it does not replace the per-wave figure** (changed
+2026-08-28). It read as “replaces” from the brief's word *remplace*, and played,
+that is a downgrade dressed as a tier: 1600 mana to trade 400 a wave for 50
+every five seconds, silently switching off the crosspathed B2 the player had
+also paid for. Owner: *“it should continue producing mana as it already did.”*
+Nothing a farm buys is ever turned off by something else it buys. The tick is
+driven from `update(dt)` rather than from a wave hook — so it advances at 3×
+speed and freezes with the run like every other cooldown.
+
+**From A4 production fills the tower's own stock instead of the purse, and
+`collect()` is the door out of it** — free, immediate, the whole stock, whenever
+the player likes. That door was missing until 2026-08-28, and its absence was
+most of what made path A read as a trap: the only other way out was A5's
+investment, 13 000 mana further on and spending in whole tranches of ten
+thousand. Owner: *“we can't take the mana stored whenever we want, which is
+supposed to be the point.”* The cost of collecting is the one the design already
+has — `cloneStock` pays 5% of what is STANDING at the end of a wave, so
+collecting every wave turns the tower back into an ordinary per-wave farm, and
+leaving it in is what makes A4 worth its price.
 
 **IT KEEPS TWO LIFETIME TOTALS, AND THEY EXIST BECAUSE THE PRODUCTION WAS
 INVISIBLE** (2026-08-28). `manaProduced` and `baseHpProduced` are on the tower,
@@ -6406,6 +6420,55 @@ screen like any other tower's totals. **`Base HP produced` is shown only on a
 farm with a tier that makes it** — no invented zeroes, the rule that screen is
 built on.
 
+### A5's investment is AIMED, and the permanent one lands once per tower
+
+**`FarmBoost` (bottom of js/farm.js) is the whole of it**, and it exists because
+until 2026-08-28 the bonus was a board-wide figure `Farms.investment()` that no
+tower read: pressing Invest spent the stock and changed nothing at all. Owner:
+*“we can't choose who to boost — we're supposed to click on the ability, then
+click on the tower, and that target boosted. Also make sure the boosts are one
+time only… boosted with 10k is boosted. It is limited to 100k, but you can't
+boost it ten times at 10k.”*
+
+**Two clicks, and the mode is a mode.** `performAction` ARMS rather than
+spends: it calls `context.beginInvesting(farm, temporary)`, which sets
+`investingFarm` in game.js — the same shape, the same rules and the same clears
+as `aimingTower` beside it. It consumes the next click ahead of building and
+inspecting, a click on open ground cancels it, Escape cancels it, and it goes
+with the farm if the farm is sold or destroyed. **A mis-press costs nothing**:
+the stock is only taken once a target has been clicked.
+
+**One permanent boost per tower, ever.** The ten-tranche ceiling is a ceiling on
+that ONE press, not on a running total: 100 000 mana at once is +50%, and 10 000
+ten times is +5% and nine refusals (`already boosted`). The SURGE has no such
+rule — thirty seconds, re-pressable, and a second one replaces the first rather
+than stacking.
+
+**Who can be boosted**: a tower at tier 5 or above on some branch
+(`FarmBoost.tierReached`, which reads `core.purchased` on the config towers and
+`hasA1..hasC5` on the hand-written ones), and never a Farm. The eligible towers
+wear a ring while the mode is up, so the once-only rule is visible BEFORE the
+click rather than explained after it.
+
+**What a boost does, and the one place each quantity is applied.** +5% damage,
++5% attack speed, +5% range per tranche. Nothing else — not hit points, not the
+footprint, not a flag:
+
+| quantity | applied in |
+|---|---|
+| range | `elevatedRangePx` (js/tower.js) — every type converts its reach through it, so the Summoner's blubs and the Siphon's beam get it for free |
+| damage, speed | the end of each type's own recompute: `recalcStats` for the Rifleman and the Warbringer, `_refreshStats` for the config towers, `Blub.attackDamage`/`attacksPerSecond` for the summoned units |
+
+Cooldowns DIVIDE by the multiplier and rates MULTIPLY by it — the same statement
+in the two units the game uses. **The blubs read the boost off their OWNER at use
+time** rather than baking it in at birth, so a thirty-second surge lifts the
+blubs already standing rather than only the ones planted while it runs.
+
+**Permanent and surge ADD as fractions**, so +50% under a +250% surge is ×4.00
+and not ×5.25 — the same additive rule `js/enemy.js` uses for damage
+amplification, and for the same reason: two bonuses that multiply are a number
+nobody can predict from the panel.
+
 ### Path B raises a global, so the base's maximum is run state now
 
 `BASE_MAX_HP` is still where a run begins and still what the sandbox overrides.
@@ -6428,6 +6491,37 @@ keeps every existing figure in the suite where it was.
 situé dans la portée est ATTAQUÉ" — a body that walks through untouched is never
 executed; being hit is what asks the question. It takes the ordinary death path,
 so a Revenant still gets up and the bounty is still paid once by the sweep.
+
+### Everything it makes is visible on the board, not only in the panel
+
+Four separate reports, all from 2026-08-28 and all the same complaint: the tower
+worked and nothing said so.
+
+* **A payment throws a popup** — `Effects.farmProduced(tower, amount, stored)`,
+  the same one an enemy's bounty gets, saying `stored` when A4 kept it. The
+  CLONE throws one too, and that one matters most: it is the only gain that
+  happens *between* waves, when nothing else on the board is moving to explain
+  the stock going up. Owner: *“we can't see whenever an A4 or A5 tower produces
+  mana between waves — the cloned mana from the storage.”*
+* **A path-B farm's share of a kill is its OWN popup**, green, above the gold
+  bounty, never added into it. Owner: *“imagine it gives four and the tower
+  gives one — it's written +4 and +1, not +5.”* Two farms over one corpse are
+  two gains and read as two.
+* **A body a farm will be paid for wears a ring while it is still alive**, in
+  the same green, solid where the camo ring is dashed so a camo body inside a
+  field reads as both. Gated on `Farms.killBonusAt`, which costs one length test
+  with no farm on the board — this is the per-body overlay term measured to
+  break first.
+
+**BOTH BOARDS DRAW ALL OF IT.** Every one of these lives in two places — the 2D
+pass and gl-world's — and each was found by the 3D board silently not doing it:
+the popup colour was honoured only in `Effects.drawWorld` and painted gold in
+gl-world; the target ring was called only inside `if (!world3D)` and so stroked
+nothing at all (measured: zero changed pixels between a frame with the mode
+armed and one without). **A popup's `y` is a world coordinate and its `lift` is a
+HEIGHT** — raising a label means raising the lift; changing `y` walks it
+northwards across the map, which is how two popups sixteen units apart ended up
+in one eighteen-pixel band.
 
 ### Path C is a network, and its dice are DATA
 

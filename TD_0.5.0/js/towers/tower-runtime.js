@@ -66,6 +66,23 @@ function ConfiguredTower(config, x, y) {
 ConfiguredTower.prototype._refreshStats = function () {
   var previousMaxHp = this.maxHp;
   var resolved = StatResolver.resolve(this.config, this.purchased);
+
+  // A FARM'S INVESTMENT, applied after the resolve and never inside it.
+  //
+  // `farmBoostMult` is written by FarmBoost (js/farm.js) and is 1 or absent on
+  // every tower nobody has spent a tranche on. It belongs here rather than in
+  // the resolver because it is not an upgrade: it is not purchased, it does not
+  // crosspath, it can be taken away when a surge ends, and the resolver's job
+  // is to turn a purchase list into stats deterministically. Damage and rate
+  // only -- range goes through elevatedRangePx and HP is never touched.
+  var boost = this.farmBoostMult || 1;
+  if (boost !== 1) {
+    if (typeof resolved.damage === "number") resolved.damage *= boost;
+    if (typeof resolved.ad === "number") resolved.ad *= boost;
+    if (typeof resolved.fireRate === "number") resolved.fireRate *= boost;
+    if (typeof resolved.attackRate === "number") resolved.attackRate *= boost;
+  }
+
   this.stats = resolved;
 
   if (this.maxHp === null) {

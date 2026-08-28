@@ -1291,6 +1291,12 @@ var World3D = (function () {
   // The camo ring's colour, dash and radius are lifted verbatim from the 2D
   // pack (js/enemy.js) so a player who learns the cue on one path reads it
   // unchanged on the other. Only the projection differs.
+  // The Farm's per-kill ring: its own green, its own radius, and SOLID where
+  // the camo ring is dashed, so a camo body inside a path-B circle wears both
+  // and neither is mistaken for the other.
+  var FARM_BOUNTY_RING_RGBA = "rgba(150,225,160,0.85)";
+  var FARM_BOUNTY_RING_PAD = 8;
+
   var CAMO_RING_RGBA = "rgba(190,255,205,0.75)";
   var CAMO_RING_PAD = 4;                  // px beyond radiusPx(), as in 2D
 
@@ -3759,6 +3765,29 @@ var World3D = (function () {
       drawGroundRing(ctx, ce.pos.x, ce.pos.y, cr, CAMO_RING_RGBA, null, 1.5);
       ctx.restore();
     }
+    // A BODY WORTH SOMETHING TO A FARM SAYS SO WHILE IT IS STILL ALIVE.
+    //
+    // Path B pays mana and base HP for anything that dies inside its circle,
+    // and until 2026-08-28 the only sign of that was the payout itself -- by
+    // which time the body is gone and the reason with it. Owner: "you should
+    // make it apparent on the enemies that they're affected by the +1 mana and
+    // HP per kill." So the bodies that carry the bounty wear a ring, in the
+    // Farm's green, solid where the camo ring is dashed so a camo body inside
+    // a field reads as both.
+    //
+    // Gated on `Farms.killBonusAt`, which costs one length test with no farm on
+    // the board -- this is the per-body overlay term measured to break first
+    // (see the camo ring above), so it does not run for a board without one.
+    if (typeof Farms !== "undefined") {
+      for (i = 0; i < state.enemies.length; i++) {
+        var fe = state.enemies[i];
+        if (!fe.pos) continue;
+        if (!Farms.killBonusAt(fe.pos.x, fe.pos.y)) continue;
+        var fr = (fe.radiusPx ? fe.radiusPx() : 11) + FARM_BOUNTY_RING_PAD;
+        drawGroundRing(ctx, fe.pos.x, fe.pos.y, fr, FARM_BOUNTY_RING_RGBA, null, 2);
+      }
+    }
+
     // Behind the bars and behind the bodies' own interface, because it is the
     // only thing in this pass that is not information.
     for (i = 0; i < state.enemies.length; i++) {
@@ -4523,9 +4552,16 @@ var World3D = (function () {
         30 + (p.lift || 0) + (1 - p.life / p.maxLife) * 22);
       if (!at) continue;
       ctx.font = "600 14px system-ui, sans-serif";
-      ctx.fillStyle = p.bad
-        ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
-        : "rgba(255,215,110," + alpha.toFixed(3) + ")";
+      // `rgb` lets a popup pick its own colour, exactly as in the 2D pass this
+      // branch replaces (Effects.drawWorld). BOTH have to honour it or the two
+      // boards disagree about the same event -- the Farm's per-kill bonus is
+      // green precisely so it is not read as part of the bounty beside it, and
+      // a 3D board that painted it gold would put the distinction back.
+      ctx.fillStyle = p.rgb
+        ? "rgba(" + p.rgb + "," + alpha.toFixed(3) + ")"
+        : (p.bad
+          ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
+          : "rgba(255,215,110," + alpha.toFixed(3) + ")");
       ctx.fillText(p.text, at.x, at.y);
     }
     ctx.textAlign = "left";

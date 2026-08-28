@@ -391,6 +391,17 @@ Smasher.prototype.recalcStats = function () {
   this.rangePx = elevatedRangePx(this, this.rangeUl);
   this.arcRadians = this.arcDegrees * Math.PI / 180;
   this.fullCircle = this.arcDegrees >= 360;
+
+  // A FARM'S INVESTMENT, last: damage up, seconds per swing down. Range comes
+  // through elevatedRangePx above, hit points are outside the bonus, and the
+  // arc is a shape rather than a rate. See FarmBoost in js/farm.js.
+  if (typeof FarmBoost !== "undefined") {
+    var boost = FarmBoost.multiplier(this);
+    if (boost !== 1) {
+      this.damage *= boost;
+      this.cooldownSeconds /= boost;
+    }
+  }
 };
 
 // Which branch this tower has committed to, or null if it is still open.

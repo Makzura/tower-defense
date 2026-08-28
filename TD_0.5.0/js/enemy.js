@@ -3198,6 +3198,17 @@ Enemy.prototype.draw = function (ctx, options) {
     ctx.stroke();
   }
 
+  // WORTH SOMETHING TO A PATH-B FARM: the same solid green ring the 3D board
+  // draws (see gl-world), so the two boards say the same thing about the same
+  // body. Costs one length test inside `killBonusAt` when no farm is placed.
+  if (typeof Farms !== "undefined" && Farms.killBonusAt(x, y)) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 8, 0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(150,225,160,0.85)";
+    ctx.stroke();
+  }
+
   // STUNNED: a broken ring that does not turn, plus a bright flash on the
   // moment it lands. Deliberately a different shape from the frost ring rather
   // than a different colour -- a whole map going still at once has to be
