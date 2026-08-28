@@ -635,10 +635,31 @@ FarmTower.prototype.investmentBonus = function () {
 
 // --- path B's field ---------------------------------------------------------
 
+// IS THIS POINT INSIDE THE CIRCLE **AND** IN SIGHT OF THE TOWER.
+//
+// The sight half arrived 2026-08-28. Until then this was a plain radius test,
+// which made path B the one reach on the board that ignored terrain: a farm
+// behind a stump slowed, amplified, executed and got paid for bodies it could
+// not see, while every weapon on the map -- and the red blind-spot overlay the
+// player is shown over this very circle -- said the opposite. Owner: "make sure
+// when a tower doesn't have vision the buff and debuff don't apply."
+//
+// Through `RangeFilter.sightClear`, which is the same door the Warbringer's
+// acquisition and the Siphon's lock check use, so there is one answer to "can
+// this tower see that point" and not a second one written here. The eye is the
+// ground under the farm, exactly as it is for a weapon: a farm on a stump sees
+// over everything at or below its own height.
 FarmTower.prototype.covers = function (x, y) {
   if (this.rangePx <= 0) return false;
   var dx = x - this.x, dy = y - this.y;
-  return dx * dx + dy * dy <= this.rangePx * this.rangePx;
+  if (dx * dx + dy * dy > this.rangePx * this.rangePx) return false;
+  // Cheap test first, always: sight is a shape loop and the circle throws most
+  // candidates away before it runs. Same ordering RangeFilter.canTarget uses,
+  // and for the same reason.
+  if (typeof RangeFilter === "undefined") return true;
+  return RangeFilter.sightClear(
+    { x: this.x, y: this.y, groundHeight: this.groundHeight || 0 },
+    { x: x, y: y });
 };
 
 FarmTower.prototype.executeThreshold = function (enemy) {

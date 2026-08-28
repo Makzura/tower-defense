@@ -410,17 +410,24 @@ test("an empty press is refused before it can arm anything", function (t) {
 
 group("Farm — path B, the mana lab");
 
-test("path B raises the base's MAXIMUM every wave, and never heals it",
+test("path B's hit points are REAL hit points, and damage stays taken",
 function (t) {
   var h = boot();
   var f = farm(h, 600, 200, ["B1"]);
   t.eq(f.baseHpPerWave, 15, "B1 is +15 a wave");
 
+  // The maximum used to move on its own, which made the whole line unfeelable:
+  // nothing but a Siphon's lifesteal heals the base, so the bar read "100 / 400"
+  // for a whole run. Owner: "hp gain of B doesn't work at all."
   var maxBefore = h.run("baseMaxHp");
   h.run("baseHp = 40");
   h.game.Farms.settleWave(1);
-  t.eq(h.run("baseMaxHp"), maxBefore + 15, "the maximum went up");
-  t.eq(h.run("baseHp"), 40, "and the current hit points did NOT");
+  t.eq(h.run("baseMaxHp"), maxBefore + 15, "the maximum goes up");
+  t.eq(h.run("baseHp"), 55, "and so do the hit points -- the grant is real");
+
+  // What it does NOT do is undo a leak: 40 of the 100 were lost and stay lost.
+  t.eq(h.run("baseMaxHp") - h.run("baseHp"), maxBefore - 40,
+    "the damage already taken is exactly as big a hole as it was");
 });
 
 test("the per-wave grants are cumulative up the branch", function (t) {
@@ -547,6 +554,68 @@ function (t) {
   var untouched = enemyAt(h, 620, 200, 10);
   untouched.update(1 / 60);
   t.eq(untouched.dead, false, "a body nobody hit is not executed");
+});
+
+
+test("the field stops at a sight blocker, exactly as a weapon's reach does",
+function (t) {
+  // Ironwood is the one shipped map with terrain that blocks sight, so the
+  // question can be asked of the real thing rather than of a fixture.
+  var h = harness.boot("ironwood-frontier");
+  h.run("cash = 1000000");
+  h.run("waveIndex = WAVES.length");
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var stump = geo.platforms[0];
+
+  // A farm on open ground beside the stump, with the stump between it and the
+  // far side. Its circle reaches over the rock; its sight does not.
+  var eye = { x: stump.x - stump.radius - g.ul(20), y: stump.y };
+  var f = new g.FarmTower(eye.x, eye.y, g.path);
+  g.addTower(f);
+  ["B1", "B2", "B3"].forEach(function (id) { f.applyUpgrade(id); });
+
+  // THE POINT MUST BE INSIDE THE CIRCLE, or this test passes for the wrong
+  // reason. Measured on the shipped map: 107 px against a 156 px reach, with a
+  // 40 px stump 20 units tall sitting between the two.
+  var behindX = stump.x + stump.radius + g.ul(6);
+  var distance = Math.abs(behindX - f.x);
+  t.ok(distance < f.rangePx,
+    "the far side of the stump is well inside the circle: " +
+    Math.round(distance) + " px of " + Math.round(f.rangePx));
+
+  t.eq(f.covers(behindX, stump.y), false,
+    "but it is not covered, because the rock is in the way");
+  t.eq(g.Farms.killBonusAt(behindX, stump.y), null,
+    "so nothing dying there pays this farm");
+  t.eq(g.Farms.slowAt(behindX, stump.y), 0, "and nothing standing there is slowed");
+  t.eq(g.Farms.damageAmpAt(behindX, stump.y), 0, "or amplified");
+
+  // The same point, with nothing between: covered again.
+  var open = { x: f.x - g.ul(10), y: f.y };
+  t.eq(f.covers(open.x, open.y), true, "open ground inside the circle is covered");
+});
+
+test("a farm ON a stump sees over everything at or below its own height",
+function (t) {
+  var h = harness.boot("ironwood-frontier");
+  h.run("cash = 1000000");
+  h.run("waveIndex = WAVES.length");
+  var g = h.game;
+  var geo = g.Maps.geometryOf(g.currentMap);
+  var stump = geo.platforms[0];
+
+  var f = new g.FarmTower(stump.x, stump.y, g.path);
+  g.addTower(f);
+  ["B1", "B2", "B3"].forEach(function (id) { f.applyUpgrade(id); });
+
+  t.ok(f.groundHeight > 0, "it is standing on the rock, not beside it");
+  // Its own stump cannot be what blinds it -- the eye is on top of it. This is
+  // the same failure the Arcane Sniper had before elevation was wired up, where
+  // 100% of rays were blocked by the rock the tower was standing on.
+  var probe = { x: stump.x + stump.radius + g.ul(4), y: stump.y };
+  t.eq(f.covers(probe.x, probe.y), true,
+    "and the ground it is standing on does not blind it");
 });
 
 

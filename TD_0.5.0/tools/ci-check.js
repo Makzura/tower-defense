@@ -638,7 +638,9 @@ var BASELINE = [
   // 55 -> 58: the clone announcing itself, a farm's share of a kill being its
   // own popup rather than a bigger bounty, and the mark on a body a farm will
   // be paid for while it is still alive.
-  { file: "tests/farm.test.js", pass: 58, fail: 0, failing: [] },
+  // 58 -> 60: the field and the per-kill bounty stopping at a sight blocker,
+  // asked of the real Ironwood stump, and a farm standing on one seeing over it.
+  { file: "tests/farm.test.js", pass: 60, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

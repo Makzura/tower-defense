@@ -13,6 +13,32 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-28 — Path B's hit points are real, and its field needs to see.** Two
+reports from the same playtest.
+
+**“hp gain of B doesn't work at all.”** It fired every wave — but it raised the
+base's MAXIMUM and nothing else, on the brief's word that a Farm buys headroom
+rather than repair. Nothing in the game heals the base except a Siphon's
+lifesteal, so a B3 farm bought +150 a wave and the bar read *Base 100 / 400*
+while the player's health had never moved. `growBaseMaxHp` now grants the hit
+points as well. Damage already taken is still taken: at 50/100 a grant of 150
+gives 200/250, never 250/250.
+
+**“Make sure when a tower doesn't have vision the buff and debuff don't
+apply.”** `FarmTower.covers` was a plain radius test — the one reach on the board
+that ignored terrain. A farm behind a stump slowed, amplified, executed and got
+paid for bodies it could not see, while the red blind-spot overlay drawn over
+that same circle said the opposite. It now asks `RangeFilter.sightClear`, the
+door the Warbringer's acquisition and the Siphon's lock check already use, with
+the ground under the farm as the eye — so a farm on a stump still sees over
+everything at or below its own height.
+
+Measured on Ironwood: a point 107 px away inside a 156 px reach, with a 40 px
+stump 20 units tall between them, is refused by `covers`, `killBonusAt`,
+`slowAt` and `damageAmpAt`, and the overlay paints 8 063 red pixels over that
+side of the circle. The cost was measured rather than assumed: 2 µs per body for
+the whole sweep, against ~15 µs for the camo ground ring, in a 0.84 ms frame.
+
 **2026-08-28 — Path A is worth buying, and the Farm shows its work.** Four
 reports from one playtest, all of them the tower doing something invisible or
 doing less than it charged for.

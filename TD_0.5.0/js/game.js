@@ -1458,14 +1458,23 @@ var baseHp = BASE_MAX_HP;
 // playing with, and a path-B Farm raises it every wave and on every kill in
 // its circle.
 //
-// RAISING THE MAXIMUM DOES NOT HEAL, which the brief is explicit about and
-// which is the whole reason the two are separate variables: a Farm buys the
-// player headroom to repair into, never the repair itself.
+// GRANTED HIT POINTS ARE REAL HIT POINTS, and the maximum moves with them
+// (2026-08-28). This read "raising the maximum does not heal" until a playtest,
+// on the brief's word, and the result was a tier that could not be felt: a B3
+// farm bought +150 a wave, the bar read "Base 100 / 400" after two of them, and
+// the player's actual health had not moved once -- nothing in the game heals the
+// base except a Siphon's lifesteal, so the headroom was room to repair into with
+// no repair. Owner: "hp gain of B doesn't work at all."
+//
+// What is still NOT undone is damage already taken: at 50/100 a grant of 150
+// gives 200/250, not 250/250. The two variables stay separate for exactly that
+// -- the farm gives what it makes, and gives back nothing that was lost.
 var baseMaxHp = BASE_MAX_HP;
 
 function growBaseMaxHp(amount) {
   if (!(amount > 0)) return 0;
   baseMaxHp += amount;
+  baseHp += amount;
   return amount;
 }
 var gameOver = false;

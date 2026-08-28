@@ -6473,9 +6473,45 @@ nobody can predict from the panel.
 
 `BASE_MAX_HP` is still where a run begins and still what the sandbox overrides.
 **`baseMaxHp` is what the run is currently playing with**, and `growBaseMaxHp`
-is the one door. **Raising the maximum does not heal**, which the brief is
-explicit about and which is the whole reason the two are separate variables: a
-Farm buys headroom to repair into, never the repair.
+is the one door.
+
+**A GRANTED HIT POINT IS A REAL HIT POINT** (changed 2026-08-28). This read
+“raising the maximum does not heal”, on the brief's word, and the result was a
+tier nobody could feel: a B3 farm bought +150 a wave, the bar read *Base 100 /
+400* after two waves, and the player's actual health had never moved — nothing
+in the game heals the base except a Siphon's lifesteal, so the headroom was room
+to repair into with no repair in sight. Owner: *“hp gain of B doesn't work at
+all.”* `growBaseMaxHp` now raises both.
+
+**What it still does not do is undo damage already taken.** At 50/100 a grant of
+150 gives 200/250, never 250/250. That is why the two variables stay separate: a
+Farm gives what it makes and gives back nothing that was lost.
+
+### The field and the per-kill bounty need LINE OF SIGHT
+
+`FarmTower.covers` is a circle test **and** a sight test, through
+`RangeFilter.sightClear` — the same door the Warbringer's acquisition and the
+Siphon's lock check use, with the ground under the farm as the eye. Everything
+path B does reads through it: the slow, the damage amplification, B5's execution
+and the per-kill mana and base HP.
+
+The sight half arrived 2026-08-28. Until then this was the one reach on the
+board that ignored terrain — a farm behind a stump slowed, amplified and got
+paid for bodies it could not see, **while the red blind-spot overlay drawn over
+that very circle said the opposite**. Owner: *“make sure when a tower doesn't
+have vision the buff and debuff don't apply.”* Measured on Ironwood: a point 107
+px away inside a 156 px reach, with a 40 px stump 20 units tall between, is now
+refused by `covers`, by `killBonusAt`, by `slowAt` and by `damageAmpAt` — and the
+overlay paints 8 063 red pixels over exactly that side of the circle.
+
+**A farm ON a stump sees over everything at or below its own height**, like
+every other tower — the eye is `groundHeight`, so its own rock cannot blind it.
+That was the total failure the Arcane Sniper had before elevation was wired up.
+
+**The cost is small and was measured rather than assumed**: 2 µs per body for
+the whole `killBonusAt` sweep, against the ~15 µs per body the camo ground ring
+costs, in a 0.84 ms frame. The circle test runs first and throws most candidates
+away before any shape loop — the same ordering `RangeFilter.canTarget` uses.
 
 **THE FIELD IS ITS OWN CHANNEL, not a slow and not a DamageAmp stack.**
 `applySlow` takes the strongest and refreshes it, which is right for a timed
