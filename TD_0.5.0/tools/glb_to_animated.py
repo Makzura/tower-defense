@@ -409,50 +409,40 @@ def chain_of(index, parent):
     return out
 
 
-def idle_poses(clips, nodes):
-    """What each animated node holds while a clip that does not key it plays.
-
-    A NODE KEYED ONLY BY AN ACTION CLIP HAS NO POSE IN THE IDLE, and its
-    authored transform is not it. `b3_capture_pulse` is the case that proves it:
-    the orb that travels from lens to vial during a capture is exported with a
-    rest scale of 2, is keyed by `kill_capture` alone, and the idle never
-    mentions it -- so falling back to the authored transform parks a full-size
-    orb on the scanner's lens for the entire run. The design source is explicit
-    that it is hidden (`pulse.scale.setScalar(0.001)`, and the idle clip sets it
-    again), but that intent does not survive into glTF.
-
-    It is recovered from the data rather than typed: an action clip is
-    guaranteed to END on the idle pose, so the pose such a node should hold is
-    that clip's own final one. Every other node -- keyed by the idle, or keyed
-    by nothing at all -- keeps its authored transform, so this changes nothing
-    for the models that have a single clip.
-    """
-    idle = clips[0]
-    poses = {}
-    for index in range(len(nodes)):
-        if idle.animates(index):
-            continue                                  # the idle speaks for it
-        for clip in clips[1:]:
-            if clip.animates(index):
-                poses[index] = clip.sample(index, nodes, clip.duration)
-                break
-    return poses
+# `idle_poses` STOOD HERE AND WAS WRONG, and the way it was wrong is worth
+# keeping written down.
+#
+# It answered "what does a node keyed only by an action clip hold during the
+# idle?" with "that clip's FINAL pose", reasoning from the guarantee that an
+# action ends on the idle pose. One case motivated it -- `b3_capture_pulse`,
+# whose exported rest scale of 2 parks a 3 px orb on the scanner's lens -- and
+# it was generalised from that single observation.
+#
+# It is false in general, and T5-C proves it. `c5_wedge_0..7` are keyed ONLY by
+# `purge_under_nine` and `result_22_purge_double`, both of which START at the
+# authored rest (y 0.028, scale 1) and deliberately END sunk (y -0.002, scale y
+# 0.45) -- the instructions call that clip "one-shot -> ends purged
+# (next-state)". Taking the final pose as the idle meant the sectors sank once
+# and never came back. Owner: "the purge is deleting them permanently -- it
+# should only be deleted for the animation and then appear again."
+#
+# THE AUTHORED REST IS THE IDLE POSE, for every node the idle does not key. It
+# is what the exporter wrote, it is what every one-shot starts from, and it is
+# what `collect` bakes the geometry in -- so a delta measured against it is
+# zero when nothing is playing, which is the whole definition of a rest.
 
 
-def world_at(chain, anim, time, nodes, idles=None):
+def world_at(chain, anim, time, nodes):
     """The product of local matrices up a chain, animated nodes sampled.
 
     `time` of None gives the AUTHORED pose, which is what `collect` bakes the
-    geometry with and therefore what every delta is measured against. It is
-    deliberately not the idle: the two differ exactly on the nodes `idle_poses`
-    describes, and measuring a delta against a rest the geometry is not in would
-    move those parts twice.
+    geometry with and therefore what every delta is measured against -- and,
+    since the note above, also what a node holds during any clip that does not
+    key it.
     """
     out = IDENTITY
     for index in chain:
         local = None if time is None else anim.sample(index, nodes, time)
-        if local is None and idles:
-            local = idles.get(index)
         if local is None:
             local = node_matrix(nodes[index])
         out = mat_multiply(out, local)
@@ -469,7 +459,6 @@ def build(gltf, options):
     # and the tick would move a machine with a valve painted on it.
     anim = clips[0]
     nodes = gltf.json["nodes"]
-    idles = idle_poses(clips, nodes)
     parent, by_name = node_index_by_chain(gltf)
     parts = collect(gltf, options.exclude)
 
@@ -579,7 +568,7 @@ def build(gltf, options):
                     pose.append(None)
                     continue
                 chain = chain_of(group_node[name], parent)
-                posed = world_at(chain, clip, time, nodes, idles)
+                posed = world_at(chain, clip, time, nodes)
                 delta = mat_multiply(posed, mat_invert(rest_world[name]))
                 pose.append(mat_multiply(C, mat_multiply(delta, C_inv)))
             frames.append(pose)

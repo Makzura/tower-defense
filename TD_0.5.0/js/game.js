@@ -2747,6 +2747,19 @@ function runPanelAction(x, y) {
     // wants, game.js owns the mode.
     beginInvesting: function (farm, temporary) {
       investingFarm = { farm: farm, temporary: !!temporary };
+      // AND THE PANEL GOES, because it is standing on the thing to be clicked.
+      // It is a 268 px slab down the right third of the board and it eats every
+      // click that lands on it (`runPanelAction` runs before `pickTower`), so a
+      // tower behind it could not be picked at all -- owner: "A5 ability is
+      // kinda bugged because I can't select the tower to empower". Measured: a
+      // Warbringer drawn at x 741 is inside a panel spanning 733..977 and its
+      // click never reached the board; the same tower at 696 worked.
+      //
+      // Aiming (`beginAiming`) deliberately keeps the panel, and the two are
+      // not the same case: a cone is aimed at a DIRECTION, and the player can
+      // pick one that is not under the panel. A target is a specific tower,
+      // and it is wherever it was built.
+      inspected = null;
     }
   });
 

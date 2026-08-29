@@ -1442,6 +1442,79 @@ test("C5's prep effects are named as they are recorded and spent", function (t) 
   t.eq(f.prepClip, "purge_under_nine", "and the purge is its own clip");
 });
 
+test("arming the boost clears the panel, so a tower behind it can be clicked",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  f.stock = 100000;
+  g.inspected = f;
+
+  // The panel is a slab down the right third of the board and `runPanelAction`
+  // consumes every click that lands on it, BEFORE `pickTower` ever runs. So a
+  // target drawn behind it could not be picked at all -- which is what the
+  // owner hit. Arming the mode has to put the panel away.
+  var armed = null;
+  f.performAction("investPermanent", {
+    beginInvesting: function (farmArg, temporary) {
+      armed = { farm: farmArg, temporary: temporary };
+      g.inspected = null;              // what game.js's own seam does
+    }
+  });
+  t.eq(armed.farm, f, "the mode is armed");
+  t.eq(g.inspected, null, "and the panel is gone with it");
+});
+
+test("a farm with a field turns to watch the nearest body in it", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["B1", "B2", "B3"]);
+  var rest = f.aim;
+
+  // Two bodies it can see, the nearer one behind the further one's shoulder.
+  var far = enemyAt(h, f.x, f.y + f.rangePx * 0.8, 10);
+  var near = enemyAt(h, f.x + f.rangePx * 0.3, f.y, 10);
+  f.update(1 / 60, g.enemies);
+  t.near(f.aim, 0, 1e-9, "it faces the nearer one, due +X");
+
+  g.enemies.length = 0;
+  g.enemies.push(far);
+  f.update(1 / 60, g.enemies);
+  t.near(f.aim, Math.PI / 2, 1e-9, "and follows when only the far one is left");
+
+  // Nothing in the circle leaves the last bearing rather than snapping back:
+  // a machine that whipped round to a default every time the road emptied
+  // would be more distracting than one that simply waits.
+  g.enemies.length = 0;
+  f.update(1 / 60, g.enemies);
+  t.near(f.aim, Math.PI / 2, 1e-9, "an empty field does not reset the aim");
+  t.ok(rest !== f.aim, "and it is no longer the bearing it was built with");
+});
+
+test("a farm reads its own dice, face by face, and says what each was worth",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["C1", "C2", "C3"]);
+  t.eq(f.rollFaces(), null, "a farm that has not rolled shows nothing");
+
+  h.run("Farms.setDie(function () { return 3; });");    // C3 face 3 is -170
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(1);
+  var faces = f.rollFaces();
+  t.eq(faces.length, 1, "one die, one face");
+  t.eq(faces[0].face, 3, "the number it threw");
+  t.eq(faces[0].kind, "loss", "read off the same table the resolver used");
+
+  h.run("Farms.setDie(function () { return 12; });");
+  g.Farms.settleWave(2);
+  t.eq(f.rollFaces()[0].kind, "gain", "a gain reads as a gain");
+
+  h.run("Farms.setDie(function () { return 8; });");
+  g.Farms.settleWave(3);
+  t.eq(f.rollFaces()[0].kind, "reset", "and the reset face is its own kind");
+});
+
 test("every model's one-shot clips are named by what fires them", function (t) {
   var h = boot();
   var g = h.game;

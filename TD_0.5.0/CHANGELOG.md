@@ -13,6 +13,35 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — Four corrections to the farms, from a playtest.**
+
+**A5's boost could not pick its target.** Arming the mode left the panel up, and
+the panel eats every click that lands on it before `pickTower` runs — so a tower
+drawn behind that 268 px slab was unclickable. Measured: a Warbringer at x 741
+inside a panel spanning 733–977, its click never reaching the board. Arming now
+clears the panel. Aiming a cone deliberately still keeps it: that picks a
+direction, and the player can choose one that is not under the panel.
+
+**A farm with a field now turns to watch it.** Every other tower faces what it is
+working on; the Farm stared at a fixed bearing whatever walked through its
+circle. It follows the nearest COVERED body — the sight rule still applies, so it
+will not track something behind a rock — found by the same sweep that already
+looks for the lock edge. An empty field leaves the last bearing rather than
+snapping back.
+
+**The purge was permanent, and that was the importer's fault.** `idle_poses`
+took an action clip's FINAL pose as the idle for any node the idle does not key
+— a rule generalised from one case. T5-C's wedges are keyed only by the two
+purge clips, which start at the authored rest and deliberately end sunk, so the
+sectors sank once and stayed. The rule is gone: the authored rest is the idle
+pose, which is what the exporter wrote and what every one-shot starts from.
+
+**And the dice show their faces.** One number per die over the tower, coloured by
+what that face was worth — green a gain, red a loss, gold a double, blue a reset.
+The reading comes from the tower, which owns the dice table; the renderer only
+places it, the same division as the Summoner's counter. Verified on a mixed
+throw: 3 red, 14 green, 21 gold.
+
 **2026-08-29 — The T5 farms, and the set is complete.** `farm-t5a` the Mana
 Vault Engine, `farm-t5b` the Azure Panopticon, `farm-t5c` The House Always Wins.
 Twelve of twelve bodies: a base, a shared T1 and T2, and one per path at T3, T4

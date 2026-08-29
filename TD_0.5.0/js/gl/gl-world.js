@@ -4087,6 +4087,53 @@ var World3D = (function () {
       ctx.textBaseline = "top";
     }
 
+    // THE FACES A C-PATH FARM THREW, over the dice that threw them.
+    //
+    // Permanent, like the Summoner's counter above and for the same reason: the
+    // throw is what the whole path is about, it happens once a wave, and a
+    // player between waves wants to look at it rather than have caught it.
+    // Colour is the reading -- green a gain, red a loss, gold a double, blue a
+    // reset, grey a face that only prepares something -- and it comes off the
+    // TOWER, which owns the dice table. See `FarmTower.rollFaces`.
+    for (i = 0; i < state.towers.length; i++) {
+      var fm = state.towers[i];
+      if (typeof fm.rollFaces !== "function") continue;
+      var faces = fm.rollFaces();
+      if (!faces) continue;
+      var seat = project(fm.x, fm.y, towerCrown(fm) + 16);
+      if (!seat) continue;
+
+      ctx.font = "700 12px system-ui, sans-serif";
+      var widths = [], total = 0;
+      for (var d = 0; d < faces.length; d++) {
+        widths[d] = ctx.measureText(String(faces[d].face)).width + 11;
+        total += widths[d] + (d ? 3 : 0);
+      }
+      var penX = seat.x - total / 2;
+      for (d = 0; d < faces.length; d++) {
+        var kind = faces[d].kind;
+        var ink = kind === "loss" ? "#ff9d9d"
+                : kind === "double" ? "#ffd66b"
+                : kind === "reset" ? "#9fd0ff"
+                : kind === "prep" ? "#cfd6e2"
+                : "#a8f0b0";
+        ctx.fillStyle = "rgba(16,19,26,0.88)";
+        ctx.fillRect(penX, seat.y - 9, widths[d], 17);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = ink;
+        ctx.globalAlpha = 0.55;
+        ctx.strokeRect(penX + 0.5, seat.y - 8.5, widths[d] - 1, 16);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = ink;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(faces[d].face), penX + widths[d] / 2, seat.y);
+        penX += widths[d] + 3;
+      }
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+    }
+
     // The readouts for whatever is being pointed at, over the bars.
     if (state.hoveredEnemy && !state.hoveredEnemy.dead) {
       drawEnemyCard(ctx, state.hoveredEnemy);

@@ -554,13 +554,32 @@ FarmTower.prototype.update = function (dt, enemies) {
   // board without one pays a single comparison, and the loop stops at the
   // first body rather than counting them.
   if (this.rangePx > 0 && enemies) {
+    // AND THE MACHINE TURNS TO WATCH IT. Every other tower in the game faces
+    // what it is working on -- `aim` is read by gl-world's tower loop as the
+    // draw yaw -- and the Farm was the only one that stared at a fixed bearing
+    // whatever walked through its circle. Owner: "the eyes of the whole machine
+    // should be looking at the enemy; right now it just looks at a random place
+    // and it's useless."
+    //
+    // The NEAREST covered body, so a crowd does not make the eye jitter between
+    // two equals, and the same sweep that finds the lock edge finds it -- one
+    // pass over the enemies, not two.
     var holding = false;
-    for (var i = 0; i < enemies.length && !holding; i++) {
+    var closest = null, closestD2 = Infinity;
+    for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
-      if (e && !e.dead && e.pos && this.covers(e.pos.x, e.pos.y)) holding = true;
+      if (!e || e.dead || !e.pos) continue;
+      if (!this.covers(e.pos.x, e.pos.y)) continue;
+      holding = true;
+      var dx = e.pos.x - this.x, dy = e.pos.y - this.y;
+      var d2 = dx * dx + dy * dy;
+      if (d2 < closestD2) { closestD2 = d2; closest = e; }
     }
     if (holding && !this.fieldHeld) this.lastLock = this.animClock;
     this.fieldHeld = holding;
+    if (closest) {
+      this.aim = Math.atan2(closest.pos.y - this.y, closest.pos.x - this.x);
+    }
   }
 
   if (this.tempTimer > 0) {
@@ -806,6 +825,41 @@ FarmTower.prototype.containsPoint = Tower.prototype.containsPoint;
 // its damage, and a Farm has none at all.
 FarmTower.prototype.attackDamage = function () { return 0; };
 FarmTower.prototype.attacksPerSecond = function () { return 0; };
+
+// WHAT THIS FARM'S OWN DICE SHOWED, and whether each face was worth having.
+//
+// Returns one entry per die -- `{ face, kind }` -- or null for a farm that has
+// never rolled. `kind` is read off the SAME table the resolver uses, so the
+// colour a player sees and the arithmetic that moved P can never disagree:
+// "gain", "loss", "reset" and "double" are the four things a face does.
+//
+// It exists because the throw was unreadable. The dice tumble, P moves, and
+// nothing on the board says WHICH faces came up -- owner: "we have no way of
+// knowing if it's bad or good except the animations, and it's not enough." The
+// numbers are the answer, and the colour is the answer at a glance.
+//
+// The STRING and the reading are the tower's; gl-world only places them. Same
+// division as the Summoner's counter, and for the same reason: a renderer that
+// re-derived this would be the dice table in a second place.
+FarmTower.prototype.rollFaces = function () {
+  if (!this.diceCount || !this.lastRolls || !this.lastRolls.length) return null;
+  var out = [];
+  for (var i = 0; i < this.lastRolls.length; i++) {
+    var n = this.lastRolls[i];
+    var face = FarmDice.faceOf(this.diceTable, n);
+    var kind = "gain";
+    if (!face) kind = "gain";
+    else if (face.double) kind = "double";
+    else if (face.reset) kind = "reset";
+    else if (face.percent < 0 || face.flat < 0 || face.worstOf) kind = "loss";
+    else if (face.prep && face.flat === undefined && face.percent === undefined &&
+             face.nextFlat === undefined && face.nextMult === undefined) {
+      kind = "prep";
+    }
+    out.push({ face: n, kind: kind });
+  }
+  return out;
+};
 
 FarmTower.prototype.statLines = function () {
   var rows = [];

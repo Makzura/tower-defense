@@ -6670,6 +6670,42 @@ AND one-shots, and each one-shot depicts something the tower already does:
 | | | `result_21_double` · `result_22_purge_double` | the C5 table's own doubles |
 | | | the other `result_*` | as C4 |
 
+### Four things the first T5 pass got wrong, and what they taught
+
+**THE PANEL WAS STANDING ON THE TARGET.** Arming A5's boost left the inspection
+panel up — a 268 px slab down the right third of the board — and `runPanelAction`
+consumes every click that lands on it *before* `pickTower` runs, so a tower drawn
+behind it could not be picked at all. Owner: *"A5's ability is bugged, I can't
+select the tower to empower."* Measured: a Warbringer drawn at x 741 sits inside
+a panel spanning 733–977 and its click never reached the board. `beginInvesting`
+now clears `inspected`. **Aiming deliberately does not**, and the two are not the
+same case: a cone is aimed at a DIRECTION and the player can pick one that is not
+under the panel; a target is a specific tower, wherever it was built.
+
+**A FARM WITH A FIELD NOW TURNS TO WATCH IT.** Every other tower faces what it is
+working on — `aim` is the draw yaw — and the Farm was the only one staring at a
+fixed bearing. Owner: *"the eyes of the whole machine should be looking at the
+enemy; right now it just looks at a random place."* The nearest COVERED body
+wins, found by the same sweep that finds the lock edge, and an empty field leaves
+the last bearing rather than snapping back to a default.
+
+**THE PURGE WAS PERMANENT, AND THE IMPORTER'S FAULT.** `idle_poses` answered
+"what does a node keyed only by an action hold during the idle?" with "that
+clip's final pose" — generalised from one case, `b3_capture_pulse`. It is false:
+T5-C's `c5_wedge_0..7` are keyed only by the two purge clips, both of which START
+at the authored rest and deliberately END sunk, so the sectors sank once and
+never came back. Owner: *"it should only be deleted for the animation and then
+appear again."* The rule is gone: **the authored rest IS the idle pose** for any
+node the idle does not key — it is what the exporter wrote, what every one-shot
+starts from, and what `collect` bakes the geometry in.
+
+**AND THE DICE NOW SHOW THEIR FACES.** `FarmTower.rollFaces` returns one
+`{face, kind}` per die, read off the same table the resolver used, and gl-world
+draws them over the tower permanently — green a gain, red a loss, gold a double,
+blue a reset, grey a face that only prepares something. Owner: *"we have no way
+of knowing if it's bad or good."* The reading belongs to the tower, which owns
+the table; the renderer only places it. Same division as the Summoner's counter.
+
 **RECORDING A PREP EFFECT AND SPENDING IT ARE TWO MOMENTS**, and T5-C draws them
 differently — a plaque sliding into its slot, then firing. `resolve` stamps
 `queue_modifier` when a face banks one; `applyPrep` stamps `reroll_eight`,

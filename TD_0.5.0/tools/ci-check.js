@@ -651,7 +651,10 @@ var BASELINE = [
   // 72 -> 75 on 2026-08-29: A5's two investments told apart, B5's execution
   // stamped on the field that took the body, and C5's prep effects named as
   // they are recorded and spent -- the four clips that shipped unwired on C4.
-  { file: "tests/farm.test.js", pass: 75, fail: 0, failing: [] },
+  // 75 -> 78 on 2026-08-29: the panel clearing when the boost arms (a target
+  // behind it was unclickable), the field turning to watch its nearest body,
+  // and a farm reading its own dice face by face for the board readout.
+  { file: "tests/farm.test.js", pass: 78, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.
