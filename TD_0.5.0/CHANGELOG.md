@@ -13,6 +13,41 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The farms have their colour, and they shine.** Owner: *"il n'y a
+pas de shine ni de couleur — le A path est censé avoir du violet, le C orange
+plus vibrant, le B briller quand il y a des interactions."* Two separate causes,
+both real, neither the models' fault.
+
+**Glass ships opaque, so it walled the mana in.** The design paints glass at 35%
+opacity; a palette row here is `[r, g, b, emission]` with no fourth channel. So
+every glass shell arrived solid with the mana sealed inside — A4's reservoir was
+a white cylinder. They are `--exclude`d at import now, the same argument the
+Bulwark's shield pane settled. No glass node carries mana as a child, so the
+subtree goes without taking anything with it, and the caps and bands stay. C3
+and C4 have no glass at all, which is exactly why their gold read from the start.
+
+**Emission is a route to white, so what did show was washed.** `expand` bakes
+`min(1, emit * 0.16)` into every linear channel; at the authored 1.15–2.6 the
+purple goes from `#794aff` to `#cdb9ff`, saturation 0.71 down to 0.27. Capped at
+0.8 it lands at `#9a7bff` and stays mana.
+
+**And a farm had no glow at all** — `towerGlow` returns 0 for anything with no
+swing and no core. It now has a steady pilot light plus a flash that decays over
+0.6 s on every event it already stamps. `vEmi` is per material, so this
+brightens the mana, the coils, the dice and the orrery's core and never the
+wood: one number doing the work of the handoff's per-material curves, because
+the shader is already selecting the right surfaces.
+
+**The tint is the path's, in LINEAR** — and that distinction is the whole
+difference between a purple flash and a pink one. The shader adds
+`uGlowTint * (vEmi * uGlow)` before its single sRGB conversion, so the sRGB
+triplet for `#7a4bff` pours two and a half times too much red in. Converted, the
+hue holds through the flash.
+
+Measured on the board: 92 tower pixels brighten on a flash, strongest
+`#47616a → #82aeb2`. Looked at, magnified, at rest and mid-flash: A4 violet,
+B4 cyan, C4 gold.
+
 **2026-08-29 — The three T4 farms.** `farm-t4a` a storage-and-cloning
 generator, `farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate
 manipulator. Nine of the twelve bodies now exist.

@@ -6689,11 +6689,52 @@ still inside its own duration, else the idle. One-way, exactly like
 because an index points at whatever happens to be second in the file, and B3
 already carries two one-shots where A3 and C3 carry one. A test pins the names.
 
-**Emissive pulses are NOT imported and cannot be.** The handoff specifies them
-per material (`mana_chamber_t3a` at `1.15 + 0.35·sin`, and so on); a palette row
-here is `[r, g, b, emission]` with ONE static scalar, and the only runtime knob
-is `renderer.setGlow`, which lights a whole tower rather than one material. The
-bodies move correctly and do not pulse. That is a known gap, not an oversight.
+### The mana has to be VISIBLE, and two separate things were hiding it
+
+Owner, on the first import: *“il n'y a pas de shine ni de couleur… le A path
+est censé avoir des couleurs violettes, le C orange un peu plus vibrant, le B
+briller quand il y a des interactions.”* Both causes were real and neither was
+the model's fault.
+
+**1. GLASS SHIPS OPAQUE, so it walled the mana in.** The design paints glass at
+35% opacity (`alphaMode: BLEND`); a palette row here is `[r, g, b, emission]`
+with no fourth channel. So every glass shell arrived as a solid pale object with
+the mana sealed inside it — A4's reservoir was a white cylinder. Each is now
+`--exclude`d at import, which is the Bulwark's argument again (see
+`Integrated_Kinetic_Field` in `glb_to_model.py`). **None of the glass nodes
+carry mana as a child**, which is what makes dropping the subtree safe, and the
+caps, necks and bands are separate nodes that stay — the silhouette survives.
+C3 and C4 have no glass at all, which is exactly why their gold read from the
+start.
+
+**2. EMISSION IS A ROUTE TO WHITE, so the colour that did show was washed.**
+`GLModels.expand` bakes `min(1, emit * 0.16)` into every LINEAR channel as a
+resting floor. At the authored 1.15–2.6 the purple goes from `#794aff` to
+`#cdb9ff` — saturation 0.71 down to 0.27. Every farm model is imported with
+`--emit-cap 0.8`, which lands it at `#9a7bff` and keeps it mana.
+
+**THE BRIGHTNESS THAT CAP GIVES UP IS REPAID BY A REAL GLOW.** A farm had none:
+`towerGlow` returns 0 for anything with no swing and no core, so the mana was
+lit only by the sun. `farmGlow` gives it a steady pilot light (0.42–0.62,
+breathing on a 2.4 s period that is deliberately no clip's length) plus a flash
+of up to 1.15 that decays over 0.6 s on **every** event the tower already
+stamps. `vEmi` is per material, so this brightens the mana, the coils, the dice
+and the orrery's core and never the wood — one number standing in for the
+handoff's per-material curves, because the shader is already picking the right
+surfaces.
+
+**THE TINT IS THE PATH'S, AND IT IS IN LINEAR.** `#7a4bff`, `#46d8ff`,
+`#ff9d2e` — the handoff's own tokens, converted: (0.195, 0.070, 1.0),
+(0.061, 0.687, 1.0), (1.0, 0.337, 0.027). The shader adds `uGlowTint * (vEmi *
+uGlow)` BEFORE its single sRGB conversion, so passing the sRGB triplets pours
+two and a half times too much red into every flash and turns a purple chamber
+pink. Measured on the board: with the linear tints a flash brightens 92 tower
+pixels, the strongest `#47616a → #82aeb2`, and the hue holds.
+
+**The per-material CURVES are still not imported and cannot be.** The handoff
+specifies them per material (`mana_chamber_t3a` at `1.15 + 0.35·sin`, and so
+on) and the format carries one static scalar per palette row. What ships is the
+right colour, lit, brightening on every event — not five independent curves.
 
 **THE ANIMATION RUNS ON THE SIMULATION CLOCK, not `state.now`.**
 `FarmTower.animClock` is accumulated in `update(dt)`, so the well turns three

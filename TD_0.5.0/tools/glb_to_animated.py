@@ -123,6 +123,45 @@
 #
 # The contact sheet below is how you check any of this without loading the game.
 #
+# THE NINE COMMANDS, and they are here because two of the flags are not
+# optional and would be lost the moment somebody re-ran this from memory:
+#
+#   python3 tools/glb_to_animated.py ../glb/mana_well_base_2.glb \
+#       --name farm-base --emit-cap 0.8
+#   ... --name farm-t1  --emit-cap 0.8 --exclude pump1_bottle_body \
+#       --exclude pump1_bottle_neck --exclude pump1_bottle_shoulder
+#   ... --name farm-t2  --emit-cap 0.8 --exclude pump2_bottle_body \
+#       --exclude pump2_bottle_neck --exclude pump2_bottle_shoulder
+#   ... --name farm-t3a --emit-cap 0.8 --exclude a3_bottle_body \
+#       --exclude a3_bottle_neck --exclude a3_chamber_glass --exclude a3_jar_glass
+#   ... --name farm-t3b --emit-cap 0.8 --exclude b3_vial_body \
+#       --exclude b3_vial_shoulder
+#   ... --name farm-t3c --emit-cap 0.8
+#   ... --name farm-t4a --emit-cap 0.8 --exclude a4_bottle_body \
+#       --exclude a4_bottle_neck --exclude a4_jar_glass --exclude a4_neck_glass \
+#       --exclude a4_res_glass
+#   ... --name farm-t4b --emit-cap 0.8 --exclude b4_vial_body \
+#       --exclude b4_vial_shoulder
+#   ... --name farm-t4c --emit-cap 0.8
+#
+# `--emit-cap 0.8` BECAUSE EMISSION HERE IS A ROUTE TO WHITE. `GLModels.expand`
+# adds `min(1, emit * 0.16)` to every LINEAR channel as a resting floor, so the
+# authored strengths of 1.15 to 2.6 take the purple mana from #794aff to
+# #cdb9ff -- saturation 0.71 down to 0.27, which is lavender-grey. Capped at
+# 0.8 it lands at #9a7bff and stays mana. The brightness that cap gives up is
+# repaid by gl-world's per-tower glow, which is tinted and therefore does not
+# wash. Owner, on the uncapped import: "il n'y a pas de shine ni de couleur".
+#
+# EVERY `--exclude` IS A PIECE OF GLASS, and this is the Bulwark's argument
+# again (see glb_to_model.py on `Integrated_Kinetic_Field`). The design paints
+# glass at 35% opacity in `alphaMode: BLEND`; a palette row here is
+# `[r, g, b, emission]` with no fourth channel, so glass ships OPAQUE -- and
+# every one of these nodes is a shell wrapped around the mana that is the whole
+# point of the tower. A4's reservoir was a white cylinder with its purple
+# hidden inside it. None of them carry the mana as a CHILD, which is what makes
+# dropping the subtree safe; the caps, necks and bands are separate nodes and
+# stay, so the silhouette survives.
+#
 # LOOK AT IT BEFORE SHIPPING IT. `--preview out.png` draws the same contact
 # sheet the other tool does, in the same fixed camera, and for the same reason:
 # an axis ninety degrees out or a group posed about the wrong point is one

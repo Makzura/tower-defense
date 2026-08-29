@@ -2643,7 +2643,80 @@ var World3D = (function () {
   // nothing, and then it winds up just before the shot. A linear ramp reads as
   // a lamp on a dimmer rather than as a capacitor bank filling. A channelling
   // B5 holds near full instead, because it is not cycling -- it is casting.
+  // THE FARM'S OWN LIGHT, in its path's colour.
+  //
+  // Its models carry emissive materials -- mana in glass, coil pulses, dice,
+  // the orrery's core -- and `vEmi` is per material, so a whole-tower `uGlow`
+  // brightens exactly those and never the wood or the iron. That is what makes
+  // a single number stand in for the handoff's per-material curves: the shader
+  // is already selecting the right surfaces.
+  //
+  // WHY THERE IS A STEADY PART AT ALL. Mana is lit whether or not anything is
+  // happening -- the design's idle curves all sit at 1.1 to 2.2 rather than at
+  // zero -- so a farm that only flashed on an event would be a dark jar between
+  // ticks. The breathing is slow and shallow; it is a pilot light, not a pulse.
+  //
+  // AND WHY THE EVENTS ADD TO IT. "Il est censé briller quand il y a des
+  // interactions": every one-shot this tower plays is worth a flash, and they
+  // are already stamped on the tower for the animation (see FARM_ONE_SHOTS).
+  // One decay for all of them, in simulation seconds, so it freezes and
+  // accelerates with the run exactly as the clips do.
+  var FARM_FLASH_SECONDS = 0.6;
+  var FARM_STAMPS = ["lastTick", "lastClone", "lastWithdraw", "lastCapture",
+                     "lastLock", "lastGain", "lastRoll"];
+
+  function farmGlow(tower) {
+    var clock = tower.animClock || 0;
+    // A slow breath. 2.4 s is deliberately not any clip's length: tying it to
+    // one would make the pilot light beat in step with the machine and read as
+    // part of the animation rather than under it.
+    var glow = 0.52 + 0.10 * Math.sin(clock * (Math.PI * 2 / 2.4));
+    var best = 0;
+    for (var i = 0; i < FARM_STAMPS.length; i++) {
+      var fired = tower[FARM_STAMPS[i]];
+      if (!(fired >= 0)) continue;
+      var age = clock - fired;
+      if (age < 0 || age >= FARM_FLASH_SECONDS) continue;
+      var k = 1 - age / FARM_FLASH_SECONDS;
+      if (k > best) best = k;
+    }
+    return glow + 1.15 * best * best;
+  }
+
+  // Path A is the purple mana, B the cyan scanner, C the gold fate -- the
+  // handoff's own design tokens (#7a4bff, #46d8ff, #ff9d2e), which are also the
+  // colours the emissive materials are painted. Tinting the glow to match is
+  // what keeps a brightening chamber PURPLE instead of routing it to white.
+  //
+  // IN LINEAR, NOT sRGB, because the shader adds this term before the one
+  // conversion at the end (`lit += uGlowTint * (vEmi * uGlow)`). The sRGB
+  // triplets look like the right numbers and are not: #7a4bff reads (0.48,
+  // 0.29, 1.0) sRGB but (0.195, 0.070, 1.0) linear, so using the first pours
+  // two and a half times too much red into every flash -- which is exactly the
+  // pastel wash it was meant to prevent.
+  var FARM_GLOW_A = [0.195, 0.070, 1.000];
+  var FARM_GLOW_B = [0.061, 0.687, 1.000];
+  var FARM_GLOW_C = [1.000, 0.337, 0.027];
+
+  // OFF THE MODEL THE TOWER IS ACTUALLY WEARING, not off its tier flags: the
+  // body decides the colour, so a T5 farm still glows in the hue of the T4 it
+  // is wearing. `farmGroup` answers "base", "t1", "t2" or "t3a".."t4c", and only
+  // the per-path ones end in a branch letter -- "base" is not path B.
+  function farmGlowTint(tower) {
+    var group = farmGroup(tower);
+    var last = group.charAt(group.length - 1);
+    if (group.charAt(0) !== "t" || group.length !== 3) return FARM_GLOW_A;
+    if (last === "b") return FARM_GLOW_B;
+    if (last === "c") return FARM_GLOW_C;
+    return FARM_GLOW_A;
+  }
+
   function towerGlow(tower) {
+    // A farm has neither a swing nor a core, so every branch below would leave
+    // it at zero -- unlit mana in a glass jar. See farmGlow.
+    if (tower.constructor && tower.constructor.ID === "farm") {
+      return farmGlow(tower);
+    }
     // THE WARBRINGER'S LEY LIGHTS ON THE BLOW, NOT ON A TIMER.
     //
     // From A3 there is ley in the hammer head, and the honest moment for it is
@@ -2675,6 +2748,9 @@ var World3D = (function () {
   }
 
   function towerGlowTint(tower) {
+    if (tower.constructor && tower.constructor.ID === "farm") {
+      return farmGlowTint(tower);
+    }
     var bought = tower.core && tower.core.purchased;
     var b = bought && bought.B ? bought.B : 0;
     var a = bought && bought.A ? bought.A : 0;
