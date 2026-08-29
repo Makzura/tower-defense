@@ -1,16 +1,30 @@
 # Tower Defense — project context
 
-**Version 0.5.0** — one thirty-five-wave campaign schedule at 830 bodies /
-25 939 effective HP (plus every body a Hive's brood or the Tyrant's roar
-creates at runtime), which can be won or lost and ends on a boss. (Three
-selectable difficulties existed from 2026-07-30 to 2026-08-12; Normal and Hard
-were placeholders and the whole concept was deleted. See the change log.)
-A **twenty-one**-type enemy roster (swarms, armor, camo,
+**Version 0.5.0** — **two** campaign schedules of DIFFERENT LENGTHS, chosen
+after the route: **Easy** at 35 waves / 830 bodies / 25 939 effective HP and
+**Normal** at **40 waves / 1 321 bodies / 131 595** (plus every body a Fractal
+Slime's cascade, a Hive's brood or a Tyrant's roar creates at runtime), either
+of which can be won or lost and ends on a boss. **The two are no longer the
+same length**, and nothing in the game may assume they are: finality,
+victory, the readout's FINAL WAVE state and the run-over denominator all come
+off `WAVES.length` and never off a wave number. **Normal is authored in full,
+not derived from Easy** — three
+placeholder difficulties DERIVED by multiplier existed from 2026-07-30 to
+2026-08-12 and the whole concept was deleted for exactly that reason; a test now
+proves the current one is not a derivation. There is no Hard and no placeholder
+for one. See the change log.
+A **twenty-five**-type enemy roster (swarms, armor, camo,
 an early midboss, one that attacks your towers, one behind a shield that
 doubles its speed when the shield breaks, one that gets back up once, a spawner
-whose brood is shielded and pays nothing, and the Tyrant at wave 35). **All
-twenty-one are scheduled**, including the four v0.4.9
-additions and the flying Aether Wisp imported from v0.4.10.0.
+whose brood is shielded and pays nothing, one that hastens everything around it,
+one that switches your towers off without damaging them, one that leaves a live
+charge where it dies, the Tyrant, and the **Dinomech** — 45 000 hit points, no
+shield, no phase and no summons, which ends Normal at wave 40). **All
+twenty-five are scheduled** — Easy carries twenty-one and Normal carries all
+twenty-five,
+including the four v0.4.9 additions, the flying Aether Wisp imported from
+v0.4.10.0, the three v0.5.1 types (Herald, Sapper, Volatile) and the Dinomech,
+all four of which appear in **Normal only**.
 **A shield now pays nothing, ever**, and so does healed health;
 waves
 that mix three or four types at once; a clear bonus of a tenth of each wave;
@@ -40,6 +54,24 @@ pause before wave 1 with a Start button on it, and waves that own their own
 window — each one runs until it is wiped out or its `duration` expires, and the
 next is announced three seconds later if you sent it in, five if it ended on
 its own. See the change log.
+
+**The HUD pause button STOPS THE CLOCK; it is not the pause menu.** Two flags,
+two different things, and they are independent in both directions. `paused` is
+the modal menu, reached by **Escape only**: it owns every click, and it is still
+the safety on leaving a run. `frozen` is the bottom-right button (2026-08-28, at
+the owner's instruction): the simulation holds and **the board stays the
+player's** — hover, pan, zoom, build, sell, inspect and upgrade all keep
+working. Escape over a frozen board opens the menu, and Resume closes the menu
+without starting the clock.
+
+`frozen` gates **exactly one thing — `update()` — and nothing else in the file
+reads it.** That is the feature, not an oversight: every input path already asks
+about `paused` and none asks about this, so interaction keeps working without
+being listed anywhere, and a control added later inherits it. Put anything that
+must freeze inside `update()`; anything in `draw()` or an input handler
+correctly does not freeze. Both flags are run state and are cleared by
+`restartGame()` and `openMenu()`. The button is a **toggle** — it is the only
+way back out, because a stopped clock puts nothing else on screen to click.
 
 **Do not retune the schedule by simulation.** The owner asked for that to stop
 on 2026-07-29; its totals are authored to a stated figure. See the note at the
@@ -120,20 +152,33 @@ suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
 Where this file says "the five unit suites" it means these six minus the smoke
 test, and that is a correct count, not a stale one. Name the set a count counts
 before repairing it. These are the current measured results, **re-run
-2026-08-27 with the elevation repair**, through
+2026-08-28, with the elevation repair, Normal’s extension to forty waves
+and the HUD pause button all in**, through
 `node tools/ci-check.js`, which is the gate and holds these same numbers as its
 baseline:
 
 ```
-node tests/run.js                 191 pass / 0 fail   core game and schedule
-node tests/content.test.js        244 pass / 0 fail   content, visuals and index
-node tests/long-range-dps.test.js  74 pass / 0 fail   the Longshot spec
-node tests/beam.test.js            47 pass / 0 fail   the beam acceptance list
+node tests/run.js                 232 pass / 0 fail   core game, schedules, difficulty
+node tests/content.test.js        302 pass / 0 fail   content, visuals and index
+node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
+node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
 node tests/sandbox.smoke.js       passed              sandbox integration
 ```
 
-`run.js` was 107 on 2026-08-14 and is 191 now. **Do not re-derive the steps
+**Re-measured 2026-08-27 after the Normal difficulty landed:** run.js 139 → 157
+and content 225 → 263, all in the change that earned them; nothing was removed.
+**Then run.js 157 → 161 and content 263 → 271** with the forest board's road
+profiles, and **content 271 → 281** with the enemy sidebar and `Enemy.traitsOf`
+underneath it — ten tests, itemised in `tools/ci-check.js`. **Then run.js
+161 → 175 and content 281 → 282** (2026-08-28) with Normal's extension to forty waves: three
+existing names were CORRECTED because their titles had become false (they said
+thirty-five waves and twenty-four types), and nothing was removed.
+`run.js` was 107 on 2026-08-14 and 133 before the merge. **Do not re-derive the steps
+**Then the forest board merged into Ironwood**: run.js 229 and content
+302 once the elevation repair, the sight shadows and Normal’s forty waves
+were all in one tree.
+`run.js` was 107 on 2026-08-14 and is 232 now. **Do not re-derive the steps
 from this document** — every one of them is itemised, by test name and with its
 self-test, in the baseline comment at the top of `tools/ci-check.js`: 108 → 112
 wave identity, → 118 the wave HUD, → 125 the timeline scheduler (eight added,
@@ -210,8 +255,46 @@ under three building policies (the figures are in the `WAVES` comment). That is
 a good substitute for the *balance* work and a poor one for the suite. The new
 tests are written and believed correct; they are not yet proven.
 
+**A BOOT IS NOT FREE, AND ON node v24 THAT IS A CORRECTNESS PROBLEM RATHER THAN
+A SPEED ONE** (2026-08-27). `tests/harness.js` builds a whole `vm` context per
+boot and the suites make several hundred between them. Enough of that garbage
+forces repeated full mark-compacts, and node v24 has a GC bug this suite can
+reach: **SIGSEGV inside V8's own `ClearStaleLeftTrimmedPointerVisitor`, from
+`MarkCompactCollector::MarkRoots`** — no JavaScript stack, no failing test name,
+and the process dies partway through, so the suite **stops REPORTING rather than
+starts failing**. Measured at 8 crashes in 40 runs when the Normal difficulty
+first landed. Three changes took it to 0 in 60, and each is a rule worth
+keeping:
+
+- **The canvas stub returns ONE shared no-op**, not a fresh closure per property
+  access. Every drawing call goes through that proxy's `get` trap, so the old
+  form allocated a function object per `beginPath()` — the single largest source
+  of garbage in the run. It also cut the content suite's wall clock by about
+  four fifths.
+- **Each game file is read and compiled ONCE** (`vm.Script`, cached by path) and
+  run in every context, instead of being re-parsed per boot. Several megabytes
+  of source through the tokeniser, two hundred times, for source that cannot
+  have changed since the process started.
+- **Read-only tests share a booted game.** `readOnlyBoot()` in
+  `tests/content.test.js` and `schedulesBoot()` in `tests/run.js`. A test that
+  asks what a type's health is, or what the index would print, changes nothing
+  and does not need a board of its own. **The sharing is by USE and never by
+  convenience**: anything that places, spawns, steps or clicks still boots.
+
+And the same lesson landed in the game: **`js/game.js` validates the ACTIVE
+schedule at load and each other one when it is selected**, because expanding
+every campaign into its arrival list at load doubled that per-boot work and was
+measurably what tipped this over. `tests/run.js` covers every schedule
+explicitly, so nothing is lost.
+
+**`tools/ci-check.js` is what caught it**, and only because it asserts that the
+number of FAIL lines it scraped matches the count the suite reported about
+itself. A truncated read has no summary line, which the gate reports as
+`NO SUMMARY LINE -- suite did not report`. A gate that only counted failures
+would have seen a suite with no failures.
+
 **Run all six before believing a change is done.** Together they take roughly
-25 seconds on the bundled Node runtime.
+15 seconds on the bundled Node runtime.
 
 No install, no dependencies — the suite uses only Node's built-in
 `fs`/`path`/`vm`. This does not break the no-toolchain rule: the tests need
@@ -413,9 +496,14 @@ js/maps.js          five authored maps plus two deterministic generated maps;
                      difficulty, and themed non-gameplay environments -- six
                      sci-fi facilities and one wild board (a dead relay in a
                      forest: fog, a river, a human camp)
-js/enemy.js         Enemy: the twenty-one-type roster, movement, lane offsets
+js/enemy.js         Enemy: the twenty-five-type roster, movement, lane offsets
                      (scaled by the road's own width),
                      health, armor/defense, camo, flight, per-type sprite size,
+                     timed slows, hover hit test, damage reporting -- and
+                     `Enemy.traitsOf`, the ONE list of what is distinctive
+                     about a type, read by the hover sidebar and by the index's
+                     badge line
+js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces)
                      timed slows, hover hit test, damage reporting
 js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces).
                      Neither knows what a map is: a shot does not collide with
@@ -425,7 +513,18 @@ js/bullet.js        Bullet (homing) + PierceBullet (straight line, pierces).
 js/systems/tower-stats.js  the ONE vocabulary every tower reports its numbers
                      in: damage, range, attack speed, DPS, lifetime totals
 js/systems/tower-health.js towers have HP and DIE at zero. init/damage/
-                     isDestroyed/mirror, shared by all four types
+                     isDestroyed/mirror, shared by all four types -- plus stun
+                     and, since 2026-08-27, SUPPRESSION: named timed immunities
+                     keyed by a string an attack spec supplies (the Sapper's
+                     four seconds). Lives on the tower, so selling, destruction
+                     and a restart clean it up by taking the object with them
+js/systems/hazards.js  what a DEATH leaves on a fuse, read off a type's
+                     `deathEffect` block. Simulation, not presentation -- towers
+                     lose real hit points to it, so it is stepped from update()
+                     and inherits the pause and the speed toggle. A hazard is
+                     NOT an enemy: never in `enemies`, so it cannot hold a wave
+                     or the victory screen open, and it pays nothing. Knows no
+                     type ids
 js/meta.js          MetaProgress: coins, owned towers, the equipped loadout,
                      and the only thing in the game that is SAVED
 js/store.js         the armoury screen (screen === "store"): a Store tab that
@@ -636,8 +735,13 @@ js/codex.js         the index screen (screen === "index"): the tower/enemy
                      field guide. DERIVES everything it shows -- tower stats
                      from statLines(), the upgrade tree by walking each path
                      on a throwaway instance through panelActions(), enemies
-                     from Enemy.TYPES + EASY_WAVES -- so it cannot go stale
-js/game.js          setup, map chooser, waves, victory/loss, base HP,
+                     from Enemy.TYPES + EVERY difficulty's schedule, and the
+                     Difficulties tab's wave preview from waveSummary /
+                     waveCount / waveEffectiveHealth / waveReward -- so it
+                     cannot go stale
+js/game.js          setup, map chooser, THE DIFFICULTY STEP, both wave
+                     schedules and the selector between them, victory/loss,
+                     base HP,
                      placement, main loop, all drawing -- AND, since
                      2026-08-18, SoundSynthesizer and the audio panel, which
                      are in here rather than in a js/audio.js because the ask
@@ -698,8 +802,12 @@ js/towers/beam.config.js             tower_beam's stats/upgrades/mechanics -- pu
 js/towers/beam-adapter.js            BeamTower: the continuous-beam runtime
 sandbox.html                         SANDBOX MODE -- the real game plus infinite
                                       cash, on-demand spawning, every tower type,
-                                      the Easy/Normal/Hard schedule picker, and
-                                      the u.l. debug overlay
+                                      a schedule picker over the two AUTHORED
+                                      difficulties (through the game's own
+                                      setDifficulty, and built from DIFFICULTIES
+                                      so a third would appear unedited), a WAVE
+                                      picker that starts that schedule on any
+                                      wave of it, and the u.l. debug overlay
 js/sandbox/sandbox.js                that page's wiring and schedule controls
                                       (hooks game.js, never edits it)
 tests/long-range-dps.test.js         run standalone, not part of run.js
@@ -767,14 +875,128 @@ That is deliberate, and documented in the file as a known limitation.
 
 ## Waves, base health, loss, victory, and restart
 
-`EASY_WAVES` in `game.js` is the campaign's finite enemy schedule, and `WAVES`
-is an alias for it — one schedule, nothing to select. **The `EASY_` prefix is
-historical.** Three selectable difficulties existed between 2026-07-30 and
-2026-08-12 and were deleted along with the whole concept: `DIFFICULTIES`,
-`setDifficulty`, `selectedDifficultyId`, `buildDifficultyWaves` and
-`difficultyGroup` are all gone. Normal and Hard were placeholder modes a
-collaborator added in a few seconds and the owner had forgotten existed; the
-schedule below is the only one that ever meant anything. See the change log.
+**THERE ARE TWO SCHEDULES AND ONE ACTIVE NAME.** `EASY_WAVES` and
+`NORMAL_WAVES` in `game.js` are both authored in full; `WAVES` is whichever one
+the player selected, and it starts on Easy. Everything in the game that reads a
+schedule reads `WAVES` — the scheduler, the readout, the banner, the reward, the
+victory test, the sandbox — so there is exactly one thing that moves when the
+selection changes and no consumer has to know a difficulty exists.
+
+| | waves | authored roots | effective HP | types |
+|---|---:|---:|---:|---:|
+| **Easy** | 35 | 830 | 25 939 | 21 |
+| **Normal** | **40** | **1 321** | **131 595** | **25** |
+
+**NORMAL RAN TO 35 WAVES / 1 000 ROOTS UNTIL 2026-08-28**, when the owner asked
+for it to reach forty. Waves 1–35 are unchanged — same groups, same counts, same
+overrides, same timings — with exactly one field added anywhere in them: wave 35
+gained a `duration`, because a wave with something after it must have a ceiling.
+**Easy was not touched at all**, and a test says so rather than leaving it
+implied. Act VI (36–40) is 321 new roots: three money convoys, the Royal Legion,
+and the Dinomech.
+
+**THE FIRST THIRTY-FIVE WAVES ARE 39 139 EFFECTIVE HP, NOT 39 507.** This file
+carried 39 507 from the day Normal landed and nothing asserted it either way;
+the prose was wrong and the schedule was right. It is pinned now, off the game's
+own `waveEffectiveHealth`.
+
+**NORMAL IS NOT DERIVED FROM EASY AND MUST NEVER BECOME SO.** This is the
+second attempt at selectable difficulties. The first, 2026-07-30 to 2026-08-12,
+built Normal and Hard by MULTIPLYING Easy's counts, health and spacing
+(`buildDifficultyWaves`, `difficultyGroup`) and bolting an extra group onto some
+waves. The owner had forgotten the modes existed at all, and the whole concept
+was deleted — because a schedule that is a multiple of another schedule asks the
+same questions in the same order and merely takes longer to answer. `NORMAL_WAVES`
+is therefore written out wave by wave, and `tests/run.js`'s *"Normal is authored,
+not derived from Easy and not an alias of it"* is the guard: no object in common
+at any depth, no constant ratio reproducing one schedule's bodies / effective HP
+/ clear bounty / kill bounty from the other's, not one of the thirty-five waves
+sharing a roster with Easy's wave of that number, and the source of
+`NORMAL_WAVES` never naming `EASY_WAVES`. **If a future retune makes any of
+those four true, the feature has regressed to the thing that was deleted.**
+
+**THE DIFFICULTY LAYER IS A SELECTOR, NOT A DERIVATION.** `DIFFICULTIES` is a
+list of `{ id, name, blurb, detail, waves }`; `setDifficulty(id)` writes
+`selectedDifficultyId`, points `WAVES` at that entry's array and calls
+`resetWaveTimeline()`. **That last call is load-bearing**: `activeWaveEvents()`
+caches the expanded event list keyed on `waveIndex`, which is 0 in both
+schedules, so swapping without dropping the cache would deploy the old
+schedule's wave 1. An unknown id falls back to the default rather than throwing —
+it is reached from a dropdown and from a string, and a throw would take the
+sandbox down while an `undefined` would take the run down four frames later.
+
+**`selectedDifficultyId` is NOT run state and is NOT saved.** `restartGame()`
+leaves it alone: restart means play this route again, and a player who chose
+Normal and lost did not ask to be put back on Easy. `MetaProgress` still holds
+four fields and no settings.
+
+**NO HARD, AND NO PLACEHOLDER FOR ONE.** A third entry is a third fully authored
+array plus its own card. An empty one recreates the exact state that got the
+concept deleted.
+
+**Normal's five teaching acts are 158 / 174 / 213 / 212 / 243 bodies**, seven
+waves each, and the totals are pinned — they are the curve, and a retune that
+holds the 1 000 while moving bodies between acts is a different campaign wearing
+the same total. **Act VI is a sixth act of FIVE waves and 321 bodies**
+(54 / 68 / 102 / 66 / 31) and is pinned separately, deliberately: acts I–V are
+the teaching curve and did not move when the campaign was extended, and one
+summed total would let either absorb the other. Its four exclusive types are the
+Herald (wave 6), the Sapper (13), the Volatile (20) and the Dinomech (40); its
+Fractal ladder opens at T2 rather than T0 and climbs 17 / 27 / 32 / 35.
+
+**ACT VI HAS A SHAPE AND IT IS NOT "MORE OF ACT V".** 36–38 are money convoys —
+armour and escort, and nothing in any of the three can take a tower off the map —
+and they exist to refund the board that survived act V, paying $3 185, $4 471 and
+$7 292 all in. 39 is the Royal Legion, the mechanically hardest wave in the game:
+three Tyrants twenty seconds apart, eight Colossi and a support court, at 28 300
+authored effective HP. 40 is one body.
+
+**ACT VI IS MEASURED, and the figures are the reason its ceilings are what they
+are** (headless, 40 maxed towers of all five types placed at `Maps.bestSpots`,
+all seven routes, 2026-08-28). This is measurement, not the retuning-by-simulation
+the note at the top of this file forbids — no wave's composition was chosen from
+it; two `duration` values were:
+
+- **Wave 35 clears before wave 36 on every route**, in 40.8 s (`null-meridian`)
+  to 144.2 s (`twin-confluence`, which mirrors all fifty bodies onto two roads),
+  against a 170 s ceiling. Peak road population runs 240–437 bodies — that is the
+  T5 cascade, not the wave. 190 was measured at 150 first and Twin Confluence
+  came within six seconds of it, which is why the ceiling is 170.
+- **The convoys pay exactly their authored figures**, on every single-road route
+  and to the dollar: **$3 185 / $4 471 / $7 292**. They clear in 42–63 s, 47–81 s
+  and 50–90 s against ceilings of 95, 105 and 120, and cost a maxed board nothing
+  — zero base damage on every route. Twin Confluence pays roughly double, as it
+  does for every wave in the game.
+- **Wave 39 is 28 300 authored effective HP** and peaks at **49–83 bodies** on
+  the road. It is eliminated in 81–141 s on five boards and **264 s on
+  `mana-coil`**, whose 3 510 u.l. road is the floor under any wave carrying a
+  15 u.l./s Tyrant. 190 and 240 were both tried and both cut mana-coil off with a
+  boss still standing; 290 does not. Twin Confluence still reaches the ceiling,
+  for a reason that predates this act — a rooted Revenant can keep a wave from
+  ever being ELIMINATED, which is exactly what gate 2 exists for.
+- **The 45 000 boss is beatable, and the threshold is about thirty maxed
+  towers.** At 40 towers it dies at 139–221 s with ZERO leak on all five
+  single-road routes; at 30 it dies with zero leak on four and 534–561 points of
+  leak on two; at 25, 20 and 15 it reaches the base with 1 700, 15 700 and
+  23 700 points still on it, which a 100 HP base does not survive. The winning
+  boards this file records run 60–70 towers, so the check lands where it should:
+  a finished board wins and an under-built one does not.
+- **THE ONE ROUTE WHERE IT DOES NOT WORK IS `twin-confluence`.** It mirrors every
+  scheduled arrival onto both of its roads, so wave 40 sends **two** Dinomechs —
+  90 000 points — and a 40-tower maxed board loses one of them into the base. That
+  is the map's standing property rather than anything act VI introduced (it
+  doubles every wave in both campaigns), but it is the sharpest place it has ever
+  bitten, and it is the first playtest risk to look at if the finale is reported
+  as unfair.
+
+**AND THE WAVE-NUMBER REWARDS STOP AT 34 FOR BOTH SCHEDULES.**
+`WAVE_PROGRESSION_REWARD_COUNT` is 34, so Normal's waves 35–40 pay their clear
+bounty and nothing else. That was already true of wave 35 and it was deliberately
+not changed for act VI: the redistributed $5 000 and the rising allowance are the
+opening economy, and raising the count for a longer schedule would be exactly the
+global reward inflation the convoys were written to avoid — their rise is bought
+with authored counts and `health` overrides, through the bounty rule the whole
+schedule already lives under.
 
 **A WAVE IS A TIMELINE** (2026-08-25; what it replaced is described under *A
 wave ends at a gate* below):
@@ -795,12 +1017,28 @@ anywhere and is still a different authored thing.
 
 `duration` is a CEILING ON THE WAVE, measured from the moment the wave opens —
 not a gap after its last body. When it expires the wave is over, its survivors
-keep walking and the next wave is announced. Across the schedule it runs from
+keep walking and the next wave is announced. Across EASY it runs from
 30 s to 125 s, and it clears the wave's own last arrival by at least 26.02 s
-(wave 7, the tightest). A `duration` that fell before its own tail is rejected
+(wave 7, the tightest); across NORMAL it runs from 32 s to **290 s** since act VI
+landed, and the three longest in the game are all in it — wave 35's 170, wave
+38's 120 and wave 39's 290. A `duration` that fell before its own tail is rejected
 at load time by `validateWaveTimelines`, which is the one authoring mistake the
-timeline makes easy. **Wave 35 authors no `duration` at all**, and
-that absence is the data saying there is nothing after it.
+timeline makes easy. **THE LAST WAVE OF A SCHEDULE authors no `duration` at
+all** — Easy's 35 and Normal's 40 — and that absence is the data saying there is
+nothing after it. `validateWaveTimelines` permits it in the last slot and
+nowhere else.
+
+**WHICH WAVE THAT IS COMES OFF `WAVES.length`, NEVER OFF WHAT THE WAVE HOLDS**,
+and that stopped being a distinction without a difference on 2026-08-28. Normal's
+wave 35 still contains a Tyrant, a T5 Fractal Slime and the largest health
+overrides in the first half of the campaign — everything that made it *look*
+final — and it is now an ordinary wave with a 170 s ceiling and a Send button
+that hands over to wave 36. **A long ceiling costs the schedule nothing**: income
+is a fixed bounty per kill and never a trickle per second, so an idle second
+earns exactly nothing and a ceiling nobody reaches is free, while one that fires
+early hands a struggling player the next wave on top of the one they are losing.
+That is why act VI's are the longest in the game and why they were MEASURED
+rather than picked — see the figures in the `NORMAL_WAVES` comment.
 
 **GROUPS ARE INDEPENDENT AND ROUTINELY OVERLAP.** Measured on the shipping
 schedule: 134 groups over 35 waves, and **18 of the 35 have at least one pair
@@ -873,10 +1111,10 @@ route. Nothing about the schedule is saved to `MetaProgress`.
 **A wave may be MIXED** (2026-07-29, v0.4.7, at the owner's request — "make the
 wave a bit more chaotic, still deterministic but with more than 1 type"):
 several groups, several types, deliberately on top of each other rather than
-one after another. **No group carries a `tier`** since 2026-08-29 — the ten
-that did were the Fractal Slime's, and they came off the campaign (see below).
-The field is still read by the scheduler and still the only way to send a rung
-of the ladder from the sandbox.
+one after another. **No group in EASY carries a `tier`** since 2026-08-29 — the
+ten that did were the Fractal Slime's, and they came off that schedule (see
+below). Normal still carries five, and the field is still the only way to send
+a rung of the ladder from a wave or from the sandbox.
 
 **Mixed is about the ROSTER, never about the group count.** Every wave carries
 `groups` now, so counting them says nothing: wave 24 is three salvos of Aether
@@ -891,14 +1129,46 @@ Added 2026-08-26 with the timeline scheduler's test pass. Six names in
 `tests/run.js` carry the load; know which one to read before changing the
 schedule, because they fail for very different reasons.
 
+**EVERY ONE OF THEM IS ABOUT EASY**, and that is deliberate rather than an
+oversight: they read `WAVES`, which a fresh boot points at `EASY_WAVES`, and the
+snapshot in the composition gate is a snapshot of Easy taken before the timeline
+rewrite. **Normal has its own group** (`group("difficulty")` in the same file)
+built the other way round: Easy's gate holds what the schedule WAS and checks
+the file still agrees, while Normal's table is the SPECIFICATION the owner wrote
+and the schedule is what has to agree with it. Reach for whichever matches what
+you are changing; neither sees the other's schedule.
+
+**`NORMAL_TABLE` IS FORTY ROWS SINCE 2026-08-28**, and the four assertions that
+matter most when act VI is retuned are named separately rather than folded into
+it, because the table alone cannot see any of them:
+
+- *"Normal's first thirty-five waves are untouched but for wave 35's ceiling"* —
+  the extension's load-bearing NEGATIVE. The composition table would still pass
+  if act VI had been paid for by trimming act V, so this holds waves 1–35 at
+  1 000 roots and 39 139 effective HP and names the one field allowed to have
+  changed.
+- *"the money convoys pay strictly more each wave, and enough to spend"* — read
+  through `waveKillBounty` + `waveReward` against real upgrade prices, so a
+  retune of any count or override moves the assertion with the schedule.
+- *"the three money convoys carry armour and escort and nothing else"* — the
+  prohibitions, stated as PROPERTIES of the type (`!type.attack`, `!type.support`,
+  `!type.spawns`, `!type.isCamo`, …) and never as a list of forbidden ids, so a
+  future type that acquires one is caught by the same line.
+- *"Normal's wave 35 hands over to wave 36 and cannot win the run"* and *"Normal
+  wins only once wave 40's boss and its escort are both gone"* — the two
+  behavioural halves of "finality comes from `WAVES.length`". Wave 35 holds a
+  Tyrant, which is exactly what makes it look final to a reader and to a
+  half-written predicate.
+
 **`the timeline rewrite moved when bodies arrive and changed nothing else` is
 the composition gate, and it is the one a retune trips.** It holds a snapshot
 of all 35 waves taken BEFORE the rewrite — bodies, effective HP, clear bounty,
 kill bounty, and the AUTHORED SIGNATURE of every group — plus the roster rules
 (one Midboss, in 11; one Tyrant, in 35; Vanguard only in 34; Colossus in 29
 **and 35**; flight introduced at 24; 14, 18 and 28 camo end to end; and **no
-Fractal Slime anywhere**, asserted as an empty list so one creeping back into a
-retune fails here). **Absence is part of the signature**: a group with
+Fractal Slime in Easy**, asserted as an empty list so one creeping back into a
+retune fails here). **It walks the ACTIVE `WAVES`, which is Easy** — Normal has
+its own gate, `Normal is forty waves of exactly the authored composition`. **Absence is part of the signature**: a group with
 no `health` is a different authored thing from one that writes the type's own
 number, and materialising a default while splitting a group is the mistake the
 rewrite made easy — every aggregate in the game still balances afterwards, so
@@ -906,18 +1176,22 @@ nothing else in any suite would notice. If you deliberately retune a wave, this
 test is what you update, in the same change, with the reason.
 
 **The kill column in that table is priced off the TYPE ROW and ignores `tier`,
-so it is not `waveKillBounty`.** They read $22 321 and $22 987 while the fractal
-ladder was scheduled; the $666 gap was the six roots, whose tiers only
-`Enemy.bountyOf` can see. Since 2026-08-29 nothing in the campaign carries a
-tier, so both formulas land on **$23 132**. Both totals are still pinned apart,
-deliberately: the day a tiered body is scheduled again, that pair is what shows
-it.
+so it is not `waveKillBounty`.** They read $22 321 and $22 987 while Easy's
+fractal ladder was scheduled; the $666 gap was the six roots, whose tiers only
+`Enemy.bountyOf` can see. Since 2026-08-29 nothing in EASY carries a tier, so
+over that schedule both formulas land on **$23 132**. Both totals are still
+pinned apart, deliberately: the day a tiered body is scheduled into Easy again,
+that pair is what shows it. (Normal still carries five tiered groups, and its
+own gate prices them.)
 
 **`the whole campaign runs itself dry, with every authored arrival emitted
 once` is the only test in the repo that watches the RUN rather than the data.**
-It plays all thirty-five waves with no Send, no auto-send and no click — every
-wave closing on elimination or on its own ceiling — and wraps `emitWaveEvent`
-to record each arrival as (wave, group, body). A dropped arrival and a doubled
+It plays all thirty-five of EASY's waves with no Send, no auto-send and no
+click — every wave closing on elimination or on its own ceiling — and wraps
+`emitWaveEvent` to record each arrival as (wave, group, body). **Its twin,
+`Normal runs itself dry over forty waves, every arrival emitted once`, does the
+same for Normal's 1 321** (2026-08-28); the pair exist separately because this
+one boots onto Easy and act VI is 321 arrivals it can never see. A dropped arrival and a doubled
 one are both invisible to every count in the suite, because the counts read
 `WAVES`: a wave whose ceiling cut its own tail still says 88 bodies and still
 pays for 88. It costs about three seconds of CPU and is worth them.
@@ -941,16 +1215,21 @@ existed), and `a second road mirrors the whole timeline, and is still one wave
 and one reward` (Twin Confluence deploys all 88 bodies of wave 12 down each
 road, off ONE cursor, and pays one reward).
 
-### The Fractal Slime is OFF the campaign, and what replaced it
+### The Fractal Slime is OFF the EASY campaign, and what replaced it
 
 2026-08-29, at the owner's instruction: *"take out the fractal slime, all of
 them, from easy mode, and replace them by, in order, colossus > hive > slow >
-normal, matching the HP total"*. `EASY_WAVES` is the only schedule, so this
-took the type off the road entirely. The type itself is untouched and still
-live — the ladder, the division, the AoE resistance, the half-price bounty —
-and it carries `sandboxOnly: true`, which is the documented way to park a type
-in the index and the sandbox. `tests/run.js` reads that flag in **both**
-directions, so a slime creeping back into a wave fails there by name.
+normal, matching the HP total"*, and then *"don't change normal"*. All ten roots
+came off `EASY_WAVES`.
+
+**`NORMAL_WAVES` IS UNTOUCHED** and still sends four rungs, in waves 17, 27, 32
+and 35. The type itself is untouched too — the ladder, the division, the AoE
+resistance, the half-price bounty — and it carries **no** `sandboxOnly` flag:
+that flag means "keep this out of the fixed campaign", `tests/run.js` reads it
+in **both** directions, and on a type Normal still schedules it would be a false
+claim. (It was written that way for an afternoon, on a branch that predated the
+second campaign; merging is what caught it. If Easy is ever the only schedule
+again, that flag is the right way to say this.)
 
 **The substitution rule.** Each root became ONE body of the first type in that
 ladder whose own health fits inside the root's, carrying a `health` override
@@ -970,12 +1249,12 @@ Wave 16's four one-point Normals are the one place the ladder reached its bottom
 rung: nothing in the game weighs one point on its own, and a Normal at
 `health: 1` is what a T0 always was in play — a body that dies to one shot.
 
-**What moved, measured.** Authored effective HP is **unchanged**, 25 939, wave
-for wave: `waveEffectiveHealth` counts the root only and each override matches
-its root point for point. The wave-clear bonus is a tenth of health and so does
-not move either. Scheduled kill bounty rose **$22 987 → $23 132**, +$145: these
-four types are worth $1 a point where a Fractal Slime's row was written at
-$0.50.
+**What moved, measured** — all of it Easy's, none of it Normal's. Authored
+effective HP is **unchanged**, 25 939, wave for wave: `waveEffectiveHealth`
+counts the root only and each override matches its root point for point. The
+wave-clear bonus is a tenth of health and so does not move either. Scheduled
+kill bounty rose **$22 987 → $23 132**, +$145: these four types are worth $1 a
+point where a Fractal Slime's row was written at $0.50.
 
 **The REAL load fell, and the unchanged authored total must not be quoted as if
 it had not.** A cleared cascade was 7 748 points across 1 826 born bodies where
@@ -989,14 +1268,15 @@ maxed towers peaking at 151 bodies on wave 35, 14 maxed Snipers losing the
 finale on leaks — described the cascade and no longer describe anything; they
 have not been re-run against the substitution.
 
-**The rules that outlived the ladder.** `Enemy.healthOf` still takes the tier
-branch and discards any `health` beside it, so **a fractal group must never
-carry a `health` override** — it is a no-op on the body and a lie in
-`waveKillBounty`. And `js/codex.js` still DERIVES the index's tier range,
-highest campaign HP and wave list from the schedule: with nothing scheduled it
-falls back to the type's own row and describes the base specimen, T1 at 4 HP,
-naming no wave. That is what `tests/content.test.js` pins now, in that
-direction.
+**The rules that outlived Easy's ladder**, and they are live rules because
+Normal still spends it. `Enemy.healthOf` takes the tier branch and discards any
+`health` beside it, so **a fractal group must never carry a `health` override**
+— it is a no-op on the body and a lie in `waveKillBounty`. And `js/codex.js`
+DERIVES the index's tier range, highest campaign HP and wave list from the
+schedules, keeping the wave list **per difficulty**: the card now reads Easy
+"none" and Normal "17, 27, 32, 35" with no edit to that file. That split is
+what stops the guide sending an Easy player to look for a body that is not on
+their road, and `tests/content.test.js` pins both halves.
 
 **THE FLAT FORM IS GONE (2026-08-25).** Until the timeline rewrite a wave could
 be a bare group object — `count`, `interval` and `type` on the wave itself, no
@@ -1090,14 +1370,23 @@ toggle exists.
 compress an `interval`, move an `at` or drop an arrival, which would be
 rewriting the schedule rather than its pacing. A test pins it.
 
-**NO GATE OPENS A TRANSITION FOR WAVE 35**, because there is nothing to
+**NO GATE OPENS A TRANSITION FOR THE LAST WAVE** — Easy's 35, Normal's 40 —
+because there is nothing to
 transition to. Gate 2 cannot fire — it authors no `duration`. Gate 3 is refused
 by index as well as by deployment, and the button is not drawn. Gate 1 still
 fires, on its own branch in `update()`: it pays the last bounty and stops
 there, with no `waveIndex++` and no countdown. The cursor is retired instead by
 `emitDueSpawns()` on the last body of the last wave — the only place
 `allWavesDeployed` is set — and the run then ends on the whole-road victory
-test, which is a question about the map rather than about wave 35.
+test, which is a question about the map rather than about that wave.
+
+**EVERY ONE OF THOSE READS AN INDEX AGAINST `WAVES.length`**, which is why the
+schedules being different lengths needed no code change anywhere: `waveSendReady`
+refuses `waveIndex === WAVES.length - 1`, `waveTimeRemaining` returns null on a
+wave with no ceiling, and the readout's FINAL WAVE state, the run-over screen's
+denominator and the victory test all follow. Two tests hold the behavioural
+halves for Normal — that wave 35 hands over to 36 and cannot win the run, and
+that wave 40 opens no transition and cannot create a wave 41.
 
 **What is deliberately gone is the FLOOR under a losing board.** The 90 s break
 was a wait nobody could lose: with something still walking, the player got as
@@ -1226,8 +1515,33 @@ before wave 1 there is no wave to be "next", so `waveSkipButtonLabel()` says
 hit-test, draw and hide in order to say what that one already says.
 
 **The sandbox does not inherit the pause.** It is a workbench; you do not reset
-one in order to wait on it. `js/sandbox/sandbox.js` zeroes the countdown in both
-of its restart paths, deliberately.
+one in order to wait on it. `js/sandbox/sandbox.js` zeroes the countdown in all
+of its restart paths, deliberately — including the wave picker below.
+
+**THE SANDBOX CAN START THE SCHEDULE ON ANY WAVE OF IT** (2026-08-27, at the
+owner's request). The sidebar's wave dropdown is built from `WAVES` and labelled
+with the game's own `waveSummary()` — the same function the on-canvas banner
+uses, so the line you pick from is the line the banner shows, and a schedule
+edit reaches the list unedited. Two buttons drive it:
+
+- **Play this wave** runs that wave and then PARKS the scheduler
+  (`waveIndex = WAVES.length`, the file's standing idiom for "nothing left to
+  deploy"). Whatever the wave put on the road keeps walking; nothing further
+  arrives. `allWavesDeployed` is deliberately left false — see the victory rule:
+  a parked workbench has not won anything.
+- **Play from here** starts the campaign at that wave and carries on.
+
+Both go through the real `updateWaves`; the sandbox only writes the cursor
+(`waveIndex`, `waveSpawned`, `waveElapsed`, `waveCountdown`) and then gets out of
+the way, so what deploys is the game's own scheduler on the game's own data.
+They set `waveOnClockIndex = -1` so that re-picking the wave already on the
+cursor announces itself again, and they turn the schedule checkbox ON rather
+than doing nothing while it is unticked — a shortcut must not rewrite the
+controls it shortcuts, and it must not silently disagree with them either.
+
+**A wave number only means something inside one schedule**, so switching
+difficulty rebuilds the list and drops a pending single-wave request, exactly as
+it already resets the wave counter. `tests/sandbox.smoke.js` pins all of it.
 
 **The test harness does not inherit it either**, for the same reason it used to
 pin the break: every test written against "t=0 is wave 1 on the road" should
@@ -1309,6 +1623,10 @@ time kills fewer of them. A wave says how many, how often and which type —
 groups) carries a `health` override, resolved through `Enemy.healthOf`, the
 same resolver the spawner uses.
 
+**The figures below are EASY's.** Normal's are in the table at the top of this
+section and its own comment block above `NORMAL_WAVES`; the two schedules share
+every mechanism and no number.
+
 **Easy is thirty-five waves, 830 enemies, 24 141 scheduled HP**
 (2026-07-29, v0.4.7, rescaled since; 866 / 23 796 until the tier ladder was
 scheduled on 2026-08-20; it was 33 waves and 4308 HP, before that 20
@@ -1348,6 +1666,16 @@ opening the starting-stake economy is measured against. **The pin is
 and including the midboss" — so wave 12 is the first wave any retune may
 touch**, which is where the 2026-08-14 retune starts.
 
+**ALL OF THAT IS ABOUT EASY, and none of it constrains Normal.** Normal's
+opening is its own: twelve bodies of two types in wave 1 against Easy's five of
+one, no health override before wave 5, the Herald at 6, camo at 9, the Sapper at
+13 and the Midboss at 14. It carries no v0.4.4 spine, is not pinned field for
+field, and does not fund the starting stake — the stake is measured against
+Easy's opening and that opening has not moved. What Normal IS pinned to is its
+forty-row composition table, its five teaching-act totals, act VI's own total,
+and its 1 321 roots — plus the 1 000 and the 39 139 that waves 1–35 still add up
+to on their own; see the difficulty group in `tests/run.js`.
+
 **Overriding health rather than adding tougher enemy TYPES is deliberate.** A
 type is a balance decision the owner makes; late-wave scaling is the same
 enemies turned up. It also keeps `Enemy.TYPES` the single place a *type's*
@@ -1360,11 +1688,13 @@ sized off the instance rather than declared as a number.
 roster** (revised 2026-07-30). The index derives each type's appearances per
 GROUP from the schedule itself rather than from whatever ran last.
 
-The schedule carries all twenty-one types; Aether Wisp, Shieldbearer, Healer,
-Vanguard and Camo Heavy all arrive late. `tests/run.js` asserts that every type
-is scheduled
-and also resolves every scheduled id through `Enemy.typeOf`, so a typo fails
-loudly.
+Easy carries twenty-one types; Aether Wisp, Shieldbearer, Healer, Vanguard and
+Camo Heavy all arrive late. **Normal carries all twenty-five**, and the four it
+adds are in Normal alone. `tests/run.js` asserts that every type is scheduled
+SOMEWHERE — walking every difficulty, because "is this content reachable" is a
+question about the game rather than about one schedule — and also resolves every
+scheduled id through `Enemy.typeOf`, so a typo fails loudly. A second test pins
+that Normal specifically covers the whole roster.
 
 **The v0.4.4 twenty-wave spine is still in there, in order.** Those waves were
 never replaced: v0.4.5 inserted eleven between them, and v0.4.7 gave some of
@@ -1437,7 +1767,9 @@ still funds its own answer — but only when it is actually KILLED, which is the
 point of the change: damage on its own no longer pays.
 
 **Wave 35 is the boss wave** — the Tyrant walks in mid-wave. It has its own
-section below, after this one.
+section below, after this one. **On Normal it is no longer the LAST wave**: it
+carries a 170 s ceiling and hands over to act VI, and the Tyrant returns three at
+a time in wave 39 before the Dinomech ends the run at 40.
 
 The full table with per-wave HP is a comment on `WAVES` itself;
 `simulate-campaign.js` is the arithmetic behind it (see Balance math below) —
@@ -1467,11 +1799,18 @@ At zero HP, `gameOver` makes `update()` return immediately, freezing all
 simulation. The opaque loss overlay owns input until one of its **three**
 buttons is used: Restart (or R/Enter), Choose another route (or M), and **Main
 menu** (or Escape). `restartGame()` resets the whole run: base HP, cash,
-towers, enemies, bullets, selection, effects, the enemy lane sequence, and the
-wave schedule. Adding any new run-scoped state means adding it there too —
-`victory`, `allWavesDeployed`, `runKills` and `Enemy.laneSequence` are all
-reset there. `gameSpeed` and `autoSkipWaves` are deliberately **not**: they are
+towers, enemies, bullets, selection, effects, the enemy lane sequence, pending
+death hazards (`Hazards.reset()`) and the wave cursor. Adding any new run-scoped
+state means adding it there too — `victory`, `allWavesDeployed`, `runKills`,
+`Enemy.laneSequence` and the hazard list are all reset there. `gameSpeed`,
+`autoSkipWaves` and **`selectedDifficultyId`** are deliberately **not**: they are
 preferences, not run state.
+
+**A PENDING HAZARD IS THE MOST DANGEROUS PIECE OF RUN STATE THIS GAME HAS.** A
+Volatile's fuse that survived into the next run would detonate under towers
+placed after the body that armed it died. `restartGame()` is the door every exit
+takes — Restart, Choose another route, Main menu, and the sandbox's map
+switcher — so clearing it there covers all of them, and a test checks each.
 
 **The Main menu button was added 2026-07-29, at the owner's request.** Before
 it the overlay offered "restart this route" and "choose another route" and no
@@ -1525,7 +1864,7 @@ within a release.
 |---|---|---|
 | a wave is on the road | `Wave 7 / 35  ·  12 / 22 deployed  ·  38 s left` | which wave, how much of it is out, how long it has |
 | a transition | `Wave 8 in 3 s` | when does the next one land |
-| the final wave, on the road | `Wave 35 / 35  ·  3 / 49 deployed  ·  FINAL WAVE` | which wave, how much of it is out, **and that there is no next one** |
+| the final wave, on the road | `Wave 40 / 40  ·  3 / 31 deployed  ·  FINAL WAVE` | which wave, how much of it is out, **and that there is no next one** |
 | the schedule is spent | `Final wave  ·  6 still walking` | how many are left to kill |
 
 **One transition state, three delays.** The 10 s opening pause, the 5 s a
@@ -1535,13 +1874,19 @@ It reads `waveCountdown` and not a per-gate constant, so the corner cannot claim
 three seconds while the scheduler is running five — whichever gate opened the
 transition already wrote its own delay there.
 
-**The final wave shows a STATE where the timer goes, never a number.** Wave 35
+**The final wave shows a STATE where the timer goes, never a number.** The last
+wave of the active schedule — Easy's 35, Normal's 40 —
 authors no `duration`, and that absence is the data saying *there is nothing
 after this*. `waveTimeRemaining()` returns **null**, not 0 and not a default, and
 the readout puts `FINAL WAVE` in the slot — a `0 s left` or a materialised
-ceiling would be a countdown to a wave 36 that does not exist. This is the same
+ceiling would be a countdown to a wave that does not exist. This is the same
 never-materialise-a-default rule the wave data follows; here the cost of
 breaking it is a lie on screen.
+
+**AND IT IS AN INDEX QUESTION, NOT A CONTENT ONE.** On Normal the line reads
+`Wave 35 / 40 · 50 / 50 deployed · 78 s left` for a wave holding the Tyrant and
+the T5, and `FINAL WAVE` only at 40. Nothing in the readout inspects what a wave
+carries; it compares `waveIndex` with `WAVES.length`.
 
 **`waveElapsed` is the wave clock, and it starts when the WAVE OPENS** — the
 frame the transition in front of it expires, which is also the frame `at: 0`
@@ -1576,10 +1921,12 @@ builds through the click handler in two of them.
 **The state that sweep exists for is the final wave, on the road.** It is the
 only one where the two halves of the wave chrome disagree: `waveControlsShown()`
 is true — the index has not passed the end, so the AUTO toggle is still drawn —
-while the Send button is down, because there is no wave 36 to send. Every other
+while the Send button is down, because there is no next wave to send. Every other
 negative has *both* halves off, where a live rectangle would have to be live for
 no reason at all; this one has a live half to be dragged along by, and it lasts
-the minutes wave 35 takes on a board the player is still building on.
+the minutes the last wave takes on a board the player is still building on — on
+Normal that is wave 40, where the Dinomech alone takes two to four minutes to
+remove.
 
 `waveSendReady()` refuses the last wave by index as well as by deployment, and
 **that guard is unreachable from a running game**: `emitDueSpawns()` retires the
@@ -1621,7 +1968,25 @@ reason about.
 
 ---
 
-## The wave 35 boss — the Tyrant
+## The Tyrant — Easy's wave-35 boss, and three of it in Normal's wave 39
+
+**IT IS NO LONGER "THE WAVE 35 BOSS" AND THIS HEADING SAID SO UNTIL 2026-08-28.**
+It is Easy's finale and it is the middle of Normal's wave 35; Normal's wave 39
+sends **three** of them, twenty seconds apart, at a 3 600 health override each,
+and Normal now ends on the Dinomech at wave 40 instead. Everything below is
+unchanged — no figure in this section moved — but read every "final" in it as
+"Easy's final".
+
+**THREE AT ONCE WORKS BECAUSE NOTHING IN THE FIGHT IS ON THE TYPE.**
+`phasesEntered`, `attackIndex`, `attacks` and the shield the roar conjures are
+all per-instance, and `enterPhase` COPIES every spec off `Enemy.TYPES` rather
+than mutating it (see the trap below, which was closed long before three of
+them shared a road). So one roaring, one dying and one still walking are three
+independent fights, and each one's summons inherit ITS wave through
+`spawnMinions`. A test drives all three and asserts the type row is untouched
+afterwards, which is the assertion that would catch a future `enterPhase`
+winding an interval down in place and permanently speeding up every boss in
+every later run.
 
 Specified by the owner on 2026-07-29, after asking for the slot to be held
 empty a few hours earlier: *"2500hp slow, arrives at the middle of the 35th
@@ -1794,24 +2159,29 @@ frame the wave finishes deploying, and `payWaveBounty()` settles it from
    sandbox, a fixture) has no gate behind it;
 3. **`beginWave()`** — the same safety net from the other end, for a cursor that
    was moved without going through a gate;
-4. **the last-wave branch in `update()`** — wave 35 has no next wave and no
-   transition, so its payout is the whole of closing it.
+4. **the last-wave branch in `update()`** — the last wave of the active schedule
+   has no next wave and no transition, so its payout is the whole of closing it.
 
 **The latch is `pendingBounty` itself**, zeroed before the payout, so no two of
 them can pay twice even if both fire on the same step, and `waveRewardLatched`
 is what stops the reward being OWED twice while a fully deployed wave is still
 being fought. Each route has its own test, because paying twice is the whole
 risk in a design with four doors. The strongest of them is not a unit test at
-all: the campaign run-dry test plays all thirty-five waves with nothing on the
-board that can kill, and asserts the cash earned equals the sum of the
-thirty-five `waveReward`s exactly.
+all: the campaign run-dry tests play a whole schedule with nothing on the
+board that can kill, and assert the cash earned equals the sum of that
+schedule's `waveReward`s exactly. **There are two of them since 2026-08-28** —
+one for Easy's 35 waves and one for Normal's 40 — because the Easy one reads
+`WAVES` on a fresh boot, which is Easy, and act VI's 321 arrivals had nothing
+watching the run rather than the data.
 
-**Wave 35 has no next wave and no break, so only route 1 can reach it** — which
-is correct: the last bounty is paid for actually removing wave 35, descendants
+**THE LAST WAVE HAS NO NEXT WAVE AND NO BREAK, SO ONLY ROUTE 1 CAN REACH
+IT** — Easy's 35, Normal's 40 — which
+is correct: the last bounty is paid for actually removing that wave, descendants
 included. On a road with nothing else left on it that is also the step that sets
 `victory`; the two conditions are not the same test, though (route 1 asks about
-wave 35's bodies, `victory` asks about the whole road), so an earlier wave's
-straggler can separate them by however long it lives. A test pins the payout.
+the last wave's bodies, `victory` asks about the whole road), so an earlier
+wave's straggler can separate them by however long it lives. A test pins the
+payout.
 
 It lands as the wave closes and the player is about to read a panel, which is
 part of the point — kill bounties arrive one body at a time, at whatever each
@@ -2735,9 +3105,37 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   `MetaProgress`**; do not adjust coins or splice the loadout in the screen,
   because that module refuses an empty or unaffordable bar and saves after
   every change.
-- **`"select"`** is the combined run chooser. Easy / Normal / Hard sit above
-  the route cards; click one (or E/N/H), then click a ley-line (or 1–6).
-  Easy is selected by default. The `← Menu` button and Escape go back.
+- **`"select"`** is the ROUTE chooser: click a ley-line (or 1–6). The
+  `← Menu` button and Escape go back. It no longer starts a run — since
+  2026-08-27 it hands off to `"difficulty"`.
+
+  (It carried an Easy/Normal/Hard band above the cards from 2026-07-30 to
+  2026-08-12, when the derived difficulties were deleted. The step below is not
+  that control moved: those modes were multipliers, this one selects between two
+  authored schedules, and it comes AFTER the route rather than before it.)
+- **`"difficulty"`** (added 2026-08-27, at the owner's instruction: *"the
+  difficulty must be selected by the player after he selects the map he wants to
+  play"*). One card per entry in `DIFFICULTIES`, click one (or 1–2, or the
+  difficulty's own initial), Escape or `← Menu` back to the routes.
+
+  **It is a SCREEN, and it inherits its inertness for free.** `update()` tests
+  `screen !== "play"` rather than listing the screens that are not, so a new
+  value simulates nothing by default — which is exactly what that rule was
+  written for, and this is the first new screen since it was.
+
+  `pendingMap` holds the route between the two beats; `chooseDifficulty(id)`
+  calls `setDifficulty` and then `startRun`, so the run cannot begin without
+  both halves. The loss overlay's "Choose another route" goes back to the
+  chooser and therefore comes through here again, deliberately: a player
+  changing route is changing their mind about the run, and re-confirming costs
+  one click.
+
+  **The cards are DERIVED.** `difficultySummary` walks the schedule for waves,
+  bodies, effective HP and type count; nothing about a difficulty's difficulty
+  is typed on a card, so retuning a wave moves the card with it. The accent is
+  `TIER_COLOURS` keyed by the difficulty's own id, which is why those ids match
+  the band names — a route and a difficulty of the same weight wear the same
+  colour and the player learns one scale.
 
   **Each route card IS the map** (2026-08-01). `drawMapThumbnail` renders the
   whole 1280×720 battlefield into the card through the same three calls the
@@ -2775,12 +3173,38 @@ overlay: nothing behind one runs, so it cannot be interacted with by accident.
   enemies and the old start/end dots are deliberately absent: the first are run
   state and there is no run yet, and the dots were interface the battlefield
   itself never shows.
-- **`"index"`** (added 2026-07-28, `js/codex.js`) is the field guide: a Towers
-  tab (every roster tower, its stats, and its full upgrade tree — click a
-  tier and the SAME preview card the in-game hover shows is drawn by the same
-  renderer, `drawCardBox`) and an Enemies tab (every `Enemy.TYPES` row with
-  its real sprite, and wave appearances derived from the schedule). Everything on
-  it is measured off real instances at open time; nothing is a second copy.
+- **`"index"`** (added 2026-07-28, `js/codex.js`) is the field guide, in
+  **three** tabs since 2026-08-27: a Towers tab (every roster tower, its stats,
+  and its full upgrade tree — click a tier and the SAME preview card the in-game
+  hover shows is drawn by the same renderer, `drawCardBox`), an Enemies tab
+  (every `Enemy.TYPES` row with its real sprite, and **one wave row per
+  difficulty**), and a **Difficulties** tab with a sub-tab per schedule that
+  previews all thirty-five waves. Everything on it is measured off real
+  instances and real schedules at open time; nothing is a second copy.
+
+  **A TYPE'S APPEARANCES ARE PER DIFFICULTY, and that is not cosmetic.** The
+  Herald, the Sapper and the Volatile are scheduled in Normal and nowhere else;
+  one merged wave list would tell a player on Easy to look for a Herald that is
+  not there. `model.appearances` is one entry per `DIFFICULTIES` row and
+  `model.waves` is the union — the union is what the compact list row prints and
+  what "is this scheduled at all" asks. `maxHp` and the Fractal ladder's top rung
+  are taken ACROSS every schedule, because "highest campaign HP" is a claim about
+  the game rather than about one difficulty (a stock Normal reads 36, from
+  Normal's finale, not Easy's 30).
+
+  **PREVIEWING IS NOT SELECTING.** `previewDifficultyId` is separate from
+  `selectedDifficultyId` and opens on it as a copy. The index is reached from the
+  title menu, where there is no run to change, and a screen that quietly changed
+  what the next run plays would be a trap. Every column of the preview
+  (`Codex.scheduleRows`) is the game's own arithmetic over the same wave, so the
+  table cannot state a schedule the game does not have; the final wave prints
+  `FINAL` where the window goes rather than a number, the same
+  never-materialise-a-default rule the in-run readout follows.
+
+  **`previewDifficultyId` starts NULL and `schedWidth()` is a function**, both
+  for the same reason: `js/codex.js` loads BEFORE `js/game.js`, so a top-level
+  `var` in this module that reads a game.js global throws at load. Every reader
+  goes through `previewDifficulty()`, which falls back to the first entry.
   The preview walker advances throwaway instances through `purchase()` /
   `applyUpgrade()` — deliberately BELOW `buyUpgrade`, which is the economy —
   and stops at any tier whose action carries a `reason`, so a gated tier (the
@@ -2876,11 +3300,28 @@ has none and an unguarded menu button would take the whole suite down.
 load, so they bypass both screens and land straight on a board.
 
 **Getting back out of a run** (2026-07-28) is the **pause menu**, opened with
-Escape and nothing else. There is deliberately no button for it on the HUD: a
-permanent `Menu` control beside the build bar was built first and taken back
-out the same day, because it spent screen space all run to be used once and
-sat one stray click away from ending a twenty-wave game. A test asserts no
-such button exists.
+Escape **or with the HUD pause button** (2026-08-27, at the owner's request).
+
+**There is still deliberately no HUD button that LEAVES a run**, and that is the
+rule the 2026-07-28 note was really about. A permanent `Menu` control beside the
+build bar was built that day and taken back out the same day, because it spent
+screen space all run to be used once and sat one stray click away from ending a
+twenty-wave game. The pause button does not reopen that hole: it opens the
+**menu**, and leaving is still a second, deliberate click on `Back to main menu`
+inside it, with Escape or Resume undoing the first click at no cost. What the
+old rule also cost was that nothing on screen said a run could be stopped at
+all, which is a keyboard-only control on a game played with a mouse. A test
+still asserts no one-click exit exists (`exitButtonRect` is undefined).
+
+`pauseButtonRect()` is the left end of the bottom-right chrome row —
+**pause · mixer · auto-send · speed**, each anchored off the rectangle of the
+one to its right, so one number (the 8 px gap) describes the row's spacing and
+widening any button slides the ones left of it. The row spans x=962..1256
+against a build bar that ends at x=875. It sets the same `paused` flag Escape
+sets: **one state, two ways in, no second pause implementation.** It is drawn
+under the same guard the mixer is (`!paused && !gameOver && !victory`), which is
+exactly when `onClick` can reach it — a button drawn where it is not clickable
+is the trap `waveSendAvailable` exists to avoid.
 
 **Escape CANCELS FIRST, then opens the menu.** If a slot is armed, a tower is
 inspected, or a tower is aiming, Escape backs out of that — the job it has
@@ -2910,8 +3351,8 @@ so `restartGame()` clears it.
 
 The menu shows where the run stands (route, wave, towers, kills, base) and
 offers **Resume** and **Back to main menu**. There is no separate "are you
-sure?" step, because the menu itself is the safety — leaving takes Escape and
-then a deliberate click.
+sure?" step, because the menu itself is the safety — leaving takes two
+deliberate actions, whichever one opened it.
 
 **`leaveRun()` is a seam.** In the shipping game it calls `openMenu()`. The
 sandbox is a separate PAGE, so there is no menu screen to switch to and it
@@ -3543,6 +3984,94 @@ button. The tallest case — a 5-2 Siphon, whose A5 adds a third button — uses
 Adding a row to *every* tower's stat block will push it through the bar.
 `tests/sandbox.smoke.js` walks six builds of all three upgradeable towers and
 fails if any panel stops fitting.
+
+---
+
+## Hovering an enemy — the sidebar, and the one trait list behind it
+
+Added 2026-08-27, at the owner's request: *"when hovering an enemy, add a side
+bar with their name, and any special attributes if they have some (camo, or if
+they attack, anything distinctive)"*.
+
+**Two readouts, two questions.** The card pinned over the body answers *how much
+is left* — a figure, a health strip and a shield strip, sized so it does not
+swallow the enemy wearing it (`drawEnemyHover` in 2D, `drawEnemyCard` in
+`js/gl/gl-world.js` in 3D). The left column answers *what it is*: the type's
+name and colour chip, its live speed, what killing this one pays, and one row
+per trait it carries. Behaviour used to be readable only in the index, on a
+screen the run is not on — a player watching a Sapper stop beside their best
+tower had nowhere to ask what it was about to do.
+
+`enemySidebarModel` → `enemySidebarLayout` → `drawEnemySidebar`, all in
+`js/game.js`, and the split is the same one `enemyHoverLabel` already has: the
+model is what the panel SAYS and a test reads it back, because the stub canvas
+records nothing and anything left inside a `draw()` is untestable.
+
+- **It is screen-space interface, drawn once.** Everything anchored to an enemy
+  has to be drawn twice in this project — once in the 2D world block and once in
+  gl-world's overlay pass — because the two renderers put a body in different
+  places. This is anchored to the canvas, so the 3D board gets it for free.
+- **Live numbers off the BODY, trait rows off its TYPE.** The speed row reads
+  `currentSpeedUlps()`, which is where a Herald's haste, a frost slow, a
+  Vanguard's opening sprint, a route's pace profile and a Bulwark whose shield
+  has just broken are already summed — so the row reports all five without
+  knowing any of them exist. A fractal's tier goes in the NAME (`Fractal Slime
+  T4`), because a T4 and a T0 are the same type and nothing like the same
+  problem.
+- **It is deliberately NOT in `overInterfaceChrome`.** The inspection panel is,
+  and that is safe there because a selected tower stays selected. This panel
+  exists only *while* an enemy is hovered, so the same rule would oscillate:
+  hover a body, the panel appears under the cursor, the cursor is now "on
+  interface", the hover is cancelled, the panel vanishes, the hover returns. It
+  is not clickable, so it eats nothing by staying out of that list.
+- **It is drawn before the inspection panel and the build bar.** Both of those
+  are things the player clicked and is still using; this one follows the cursor.
+- **A body with no traits says so** ("Nothing special"), rather than leaving an
+  empty space under the numbers that reads as a panel which failed to finish.
+- **Headroom**, the enemy-side twin of the tower panel's warning above: the
+  floor is `BAR_Y - 12` and the tallest case on the roster is the Camo Heavy's
+  three rows at **468 of the 614 px** available. Detail sentences wrap to six
+  lines — measured, not guessed; the Bulwark's and the Sapper's both run to five
+  — and a trait that will not fit is **dropped and counted** ("+N more in the
+  index") rather than clipped, because half a sentence about what an enemy does
+  is worse than an honest overflow. A test in `tests/content.test.js` walks all
+  twenty-five types and fails if any panel reaches the bar or drops a row. The
+  Dinomech is the first body with TWO attack rows — its pool is authored on the
+  type rather than half-added by a phase — and it still fits.
+
+### `Enemy.traitsOf` — the one list, and why it is not in the codex
+
+**What is distinctive about an enemy is now one ordered list per type**
+(`js/enemy.js`), each row carrying an id, a short label, a sentence of detail
+with that type's own numbers in it, the colour that names it, and — for the rows
+a card may lead with — the single-line BADGE the index prints.
+
+**Two readers, one list.** `drawEnemySidebar` shows every row; `enemyBadge` in
+`js/codex.js` shows the first row carrying a badge, which is exactly what the
+index printed when that chain was seventeen `if`s written out in that file.
+Writing the sidebar's version separately would have been a second copy of the
+same table, and a second copy is the one that quietly stops matching the roster
+after a retune.
+
+- **Order is the contract**, because the badge is a first-match walk down it:
+  can I even shoot it (flying, camo) → does it shoot back (one row per spec from
+  `Enemy.attacksOf`, badge on the first) → what it leaves when it dies → what it
+  does for the wave around it → what it does when hurt → its plating. The badge
+  strings and colours are the ones the index printed before this existed,
+  verbatim; a test pins all fourteen of them **by type**, so reordering the
+  roster cannot silently reassign one.
+- **Plating carries no badge.** Armor, defense, area resistance, phases and
+  `noBounty` are rows in the sidebar and nothing in the index, which has one
+  headline line and gives it to an ability. That is why an Armored's badge is
+  still `null` and its card still reads "STANDARD — no special ability".
+- **It reads blocks, never ids**, like every mechanic in `js/enemy.js`. A new
+  type carrying `attack` and `deathEffect` gets both rows with nothing edited;
+  a new *mechanic* is one more `add()` and one more row on screen.
+- It accepts a type id, an `Enemy.TYPES` row, or the codex's own enemy model —
+  that model copies every block off the type under the same names.
+- **`u.l.` ends in a full stop of its own.** Appending one blindly gave "within
+  47.5 u.l.." on every attacking type in the roster; `sentence()` is the guard,
+  and a test walks all twenty-five types looking for the doubled stop.
 
 ---
 
@@ -4276,6 +4805,29 @@ tested content. Neither was added speculatively here. The same guard still
 applies to anything new: no more enemy types, and no more menus, without an
 explicit ask.
 
+**2026-08-28: the owner asked for the Normal campaign to run to FORTY
+waves, and for a twenty-fifth type to end it** -- an enemy named `dinomech` with
+45 000 hit points, three money convoys before it, and a three-Tyrant wave between
+the two. The composition of all five new waves, the wave-40 deployment instants,
+the Colossus progression and the payout shape were all given exactly. That is
+the explicit ask this guard was waiting for, and what was built is what was
+asked for and nothing beside it: Easy is untouched, no dependency was added, no
+new currency or loot system exists, and the convoys' rising payout is bought
+with authored counts and `health` overrides through the bounty rule the schedule
+already lives under. **It does NOT generalise**: a twenty-sixth type still needs
+its own ask, a third difficulty still needs its own ask, and neither schedule
+gets a wave 41 without one.
+
+**2026-08-27: the owner asked for three more types by name, and for a second
+campaign to put them in** -- a slow standard-bearer that hastens the bodies
+around it, a saboteur that deals no damage and switches a tower off, and a small
+runner that leaves a live charge where it dies, plus a fully authored 35-wave
+Normal schedule at an exact composition and a difficulty step after the route.
+That is the explicit ask this guard was waiting for, and what was built is what
+was asked for and nothing beside it. **It does NOT generalise**: a
+twenty-fifth type still needs its own ask, and so does a third difficulty --
+which is why there is no Hard and no placeholder for one.
+
 **2026-07-28, later the same day: the owner asked for six more types by
 name** -- a low-HP swarm, a 20%-armor normal, a slow high-HP one with 5 flat
 armor, camo normals and camo fasts, and an early ~250 HP midboss with 10%
@@ -4748,8 +5300,12 @@ walks past every tower regardless, so length only changes how long you have
 before the first leak. What actually moves the number is whether the road
 comes back *near itself*, within the Rifleman's reach of a second lane.
 
-**Enemy types (`Enemy.TYPES`).** Twenty-one, and **all twenty-one are
-scheduled** — a passing test in `tests/run.js` pins that.
+**Enemy types (`Enemy.TYPES`).** Twenty-five, and **all twenty-five are
+scheduled** — a passing test in `tests/run.js` pins that ACROSS EVERY
+DIFFICULTY, which is what it had to become: "is this content reachable" is a
+question about the game, and the last four rows are authored into Normal and
+deliberately kept out of Easy. The `first seen` column below is Easy's wave
+where the type is in Easy and Normal's where it is not.
 
 | id | HP | speed | armor | defense | camo | size | first seen | what it asks of the player |
 |---|---|---|---|---|---|---|---|---|
@@ -4772,11 +5328,31 @@ scheduled** — a passing test in `tests/run.js` pins that.
 | `healer` | 200 | ×0.4 | — | — | — | 1.45 | 32 | BURST — 15 HP/s for 4 s to the 3 most wounded every 8 s, and healed HP pays nothing either. **FLIES** since 2026-08-26 — a targeting rule, so wave 32 needs air reach (it hovered, as a picture only, until then) |
 | `boss_fast` | 750 | ×3.5 **for the first 400 u.l.**, then ×1.75 | — | — | — | 1.9 | 34 | TEMPO — 100 shield every 7 s that never stacks, on a body that crosses the opening stretch faster than anything else in the game |
 | `camo_heavy` | 20 | ×0.65 | **5** | 20% | **yes** | 1.4 | 28 | that SEEING it and KILLING it are two separate purchases |
+| `herald` | 100 | ×0.55 | — | — | — | 1.15 | **N6** | TIME — every 8 s it gives the 8 nearest eligible ground allies within 160 u.l. +30% speed for 4 s, so a board tuned to kill a column in the seconds it spends in one circle stops killing it |
+| `sapper` | 45 | ×0.8 | — | — | — | 1.0 | **N13** | REDUNDANCY — no damage at all: it telegraphs 1.1 s and switches one tower off for 2 s, then that tower is immune to every Sapper for 4 s |
+| `volatile` | **8** | ×1.5 | — | — | — | 0.9 | **N20** | POSITION — dives into the nearest tower within 75 u.l. for 13 and dies of the impact; the charge that death leaves takes 13 more off every tower within **60** u.l. one second later; leaking leaves nothing. Almost any shot kills one, so it is answered by rate of fire and placement, never by damage |
+| `dinomech` | **45 000** | ×0.25 | — | — | — | 2.6 | **N40** | THROUGHPUT — the whole of it. No shield, no second life, no phase, no summons: 45 000 is what the schedule says and what has to come off. It rails the board's best tower for 60 + a 2.5 s stun every 14 s and stomps for 90 across 140 u.l. with no stun at all, so what it takes off the board it takes permanently. Measured: ~30 maxed towers kill it before it lands, ~25 do not |
 
-The four v0.4.9 additions and the Aether Wisp are all scheduled, and all arrive
-late — Aether Wisp 24/31/35, Shieldbearer 27/29/30/34, Camo Heavy 28, Healer 32,
-Vanguard 34. The index derives those appearances from the schedule itself; the
-sandbox's type dropdown still exposes every roster row individually.
+The four v0.4.9 additions and the Aether Wisp are all scheduled in Easy, and all
+arrive late — Aether Wisp 24/31/35, Shieldbearer 27/29/30/34, Camo Heavy 28,
+Healer 32, Vanguard 34. **FOUR TYPES ARE IN NORMAL ONLY** — Herald
+6/12/16/21/27/32/34/35, Sapper 13/23/31, Volatile 20/26/31 and the **Dinomech at
+40** — and Easy gaining one
+would be a retune of a schedule nobody asked to retune. The index derives every
+appearance from the schedules themselves, per difficulty; the sandbox's type
+dropdown still exposes every roster row individually.
+
+**Act VI moved three EXISTING types' appearance lists too**, and the index
+follows without an edit: the Colossus is now 25/29/**36/37/38/39** on Normal
+(2 / 4 / 6 / 8 across the act), the Tyrant is 35 **and 39** (three of them), and
+a stock Normal's highest campaign health is **48** rather than 36, from wave 38.
+
+**THE DINOMECH HAS NO MESH**, so the 3D board draws it as an untextured sphere
+at `sizeScale` 2.6 — the documented fallback for every type with no
+`js/gl/models/enemy-<typeId>.js`. It is the only body in either campaign's
+finale in that state, and it is a known visual gap rather than an oversight:
+building one is a modelling job with its own gates (clause 3b, the tag check,
+the gait gate), not a side effect of a schedule change.
 
 Speeds are stored as **multipliers** of `BASE_SPEED_ULPS` so retuning the
 walking speed moves the whole roster in proportion; health is stored as plain
@@ -4816,13 +5392,74 @@ enemy HAS one:
 | `phases` | changes what it IS at a health threshold | `checkPhases`, `enterPhase` |
 | `support` | helps OTHER enemies on a timer — shields or heals them | `supportAllies` |
 | `sprint` | faster over the OPENING stretch of road, then never again | `currentSpeedUlps`, `isSprinting` |
+| `deathEffect` | what this body leaves BEHIND when it dies | `Hazards.fromDeath`, from update()'s death sweep |
 
-Tests pin the exact membership of each list — `attack` is `["angry"]`,
-`shield` is `["shielded"]`, `revive` is `["revenant"]`, `spawns` is `["hive"]`,
-`phases` is `["boss"]`, `support` is
-`["shieldbearer", "healer", "boss_fast"]`, `sprint` is `["boss_fast"]` — so a
-type gaining a mechanic by accident is caught. Adding an eighth mechanic means
-an eighth block and one method that reads it, not a branch in an existing one.
+Tests pin the exact membership of each list — `attack` is
+`["angry", "sapper", "volatile"]`, `shield` is `["shielded"]`, `revive` is `["revenant"]`,
+`spawns` is `["hive"]`, `phases` is `["boss"]`, `support` is
+`["shieldbearer", "healer", "boss_fast", "herald"]`, `sprint` is
+`["boss_fast"]`, `deathEffect` is `["volatile"]` and `showHealthBanner` is
+`["midboss", "boss", "boss_fast", "dinomech"]` — so a type gaining a mechanic
+by accident is caught. **The Dinomech is the second type to carry an `attacks`
+POOL and the first to be scheduled with one on the type alone**: the Tyrant's
+second spec is appended by its roar, so until 2026-08-28 nothing in the roster
+showed two attack rows at rest. It is deliberately absent from `phases`,
+`shield`, `revive`, `support` and `spawns` — every one of those would have made
+`waveEffectiveHealth`'s 45 000 smaller than what the player has to remove. Adding another mechanic means another block and one
+method that reads it, not a branch in an existing one.
+
+**AND A TEST NOW READS THE SOURCE FOR THE RULE ITSELF** (2026-08-27). Three
+types landed at once, which is exactly the change that would break the file's
+founding promise quietly, so `tests/content.test.js`'s *"no shared code branches
+on herald, sapper or volatile"* walks every `.js` under `js/` and fails on any
+`=== "herald"`, `.indexOf("sapper")` and so on. The ids may APPEAR — in
+`Enemy.TYPES`, where they are declared, and in the wave data, where a group names
+one — but never inside a comparison.
+
+**The three v0.5.1 mechanics, and what each one grew:**
+
+- **`support.haste`** — `{ speedMultiplier, seconds }`, applied by
+  `Enemy.prototype.applyHaste`. Taken, never stacked (strongest wins, equal
+  refreshes: `applySlow`'s rule pointed the other way), it rides on the TARGET's
+  clock so it survives the source's death, and it is a TIMED MULTIPLIER reset to
+  exactly 1 rather than decayed towards it — which is what makes repeated pulses
+  incapable of leaving permanent speed drift. Read by `currentSpeedUlps`
+  alongside the slow.
+- **`support.eligible`** — `{ excludeFlying, excludeFractal, excludeBanner,
+  excludeSameType }`, read by `Enemy.supportEligible`. **Stated as PROPERTIES,
+  never as a list of ids**, and the properties were chosen because the excluded
+  types already carried them: `isFlying` covers the Wisp and the Healer,
+  `fractal` covers every rung AND every descendant (a split child is the same
+  roster row), and `showHealthBanner` is exactly the Midboss, the Vanguard and
+  the Tyrant. An id list would go stale the day a second flier or boss lands and
+  would put type ids into shared code.
+- **`support.pick: "nearest"`** — sorted by distance, **tie-broken on
+  `laneIndex`**, the spawn counter every body already carries. Ties are not
+  hypothetical: a salvo of Swarm 0.13 s apart puts several within a float of each
+  other, and `Array.prototype.sort` is not required to be stable.
+- **`attack.disable`** — `{ seconds, immuneSeconds, immunityKey }`. Applies
+  `TowerHealth.stun` plus `TowerHealth.suppress(tower, key, seconds +
+  immuneSeconds)` — one span of invalidity covering the silence AND the recovery
+  window, rather than two states somebody has to check in the right order.
+  `attackCandidates` skips any tower that is stunned or suppressed under that
+  key, so a Sapper with nothing valid in reach never commits and **does not
+  consume its cycle**.
+- **`attack.commitsTarget`** — freezes the TARGET as well as the spec for the
+  wind-up (`windUpTarget`). Every other wind-up in the game re-resolves when it
+  lands, which is right for the Tyrant's aimed shot and would make a Sapper's
+  telegraph a lie. A committed target that is gone, sold, destroyed, already dark
+  or immune resolves to NOTHING: the cycle is spent and no effect lands.
+  **That fizzle is also how two Sappers on one tower resolve** — the main loop
+  walks `enemies` in order, the first disables and stamps the immunity, the
+  second finds its committed target invalid and fizzles without refreshing or
+  extending the stun. Deterministic, and it needed no arbitration code.
+- **`deathEffect.hazard`** — `{ kind, fuseSeconds, radiusUl, towerDamage }`,
+  read by `Hazards.fromDeath` from update()'s `dead` branch and nowhere else.
+  That placement is the whole of "a leak leaves nothing" (`leaked` is the other
+  branch) and "a revive leaves nothing yet" (`dead` is only set once `tryRevive`
+  has refused). **A blast touches TOWERS ONLY**, which is what makes "one charge
+  never sets off another" a fact about the shape of the effect rather than a
+  special case — there is no chain to bound at any density.
 
 **`sprint` is on this list even though it is two lines**, and that is the point
 of the pattern rather than an over-application of it: the alternative was a
@@ -8402,30 +9039,35 @@ no mechanic was moved to match the description.
 | Map authoring scale | 1.04 px per u.l. | `AUTHORED_AT_PX_PER_UL` in game.js, applied by `Maps.toWorld` |
 | Road width | 21.875 u.l. | `ROAD_WIDTH_UL` in game.js |
 | Base HP | 100 | `BASE_MAX_HP` in game.js |
-| The schedule | 35 waves, 830 enemies, 24 141 scheduled HP / **25 939 effective**, plus each Hive's brood, each Fractal Slime's cascade and the boss's summons. One schedule — selectable difficulties were deleted 2026-08-12 | `EASY_WAVES` in game.js, aliased as `WAVES` |
+| The schedules | **TWO, both authored in full, and NO LONGER THE SAME LENGTH.** Easy: 35 waves, 830 roots, 25 939 effective HP, 21 types. Normal: **40 waves, 1 321 roots, 131 595 effective HP, 25 types**, five teaching acts of 158/174/213/212/243 plus act VI's five waves and 321 bodies. Plus each Hive's brood, each Fractal Slime's cascade and every Tyrant's summons in both | `EASY_WAVES`, `NORMAL_WAVES` in game.js; `WAVES` is the active one |
+| Difficulty | a SELECTOR, never a derivation. Chosen after the route, defaults to Easy, survives a restart, is not saved. No Hard and no placeholder | `DIFFICULTIES`, `setDifficulty`, `selectedDifficultyId`, `difficultyOf` in game.js |
+| Difficulty step | `screen === "difficulty"`; one card per entry, keys 1-2 and each id's initial, Escape back to the routes. Card stats are derived from the schedule | `openDifficultySelect`, `chooseDifficulty`, `difficultyCardRect`, `difficultySummary` |
 | Wave clear bounty | a tenth of the wave's effective HP, ~$2 594 across the run | `WAVE_CLEAR_BOUNTY_FRACTION`, `waveBounty`, `waveEffectiveHealth` |
 | Wave reward, all in | clear bounty + redistributed opening cash + rising allowance | `waveReward`, `waveProgressionReward`, `waveEscalatingReward` |
-| The boss | Tyrant, wave 35, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap | `Enemy.TYPES.boss` |
+| The boss | Tyrant, 5000 HP; aimed shot at the highest-DPS tower (45 + 2 s stun, every 12 s after a 1.3 s wind-up); roars at half and adds a 90 u.l. leap. **Easy's wave 35, mid-wave in Normal's 35, and THREE at a 3600 override in Normal's 39** | `Enemy.TYPES.boss` |
 | Tyrant roar | +1000 shield, ×1.35 speed, intervals ×0.75 (12 s → 9 s), leap unlocked, and 40 bodies / 2780 HP called in at 1.5× — the running mob plus 2 Hives, 3 Shieldbearers, 3 Healers, 2 Colossi | `Enemy.TYPES.boss.phases[0]` |
 | Tyrant leap | 90 u.l. jump, 120 u.l. shockwave, 80 damage + 3 s stun to everything it reaches, commits within 220 u.l., 1.5 s wind-up | `phases[0].addAttack` |
 | Wave bonus timing | owed on the frame the wave finishes deploying; paid once, by whichever gate closes the wave (`endWave`), with `callNextWave` and `beginWave` as latched safety nets | `pendingBounty`, `waveRewardLatched`, `payWaveBounty` |
 | Tower stun | longest wins; no update, cooldown, aim tracking or live Siphon beam presentation while stunned | `TowerHealth.stun / isStunned / tickStun`, `BeamTower.visibleLocks` |
 | Waves 1-11 | the introduction, single-type, pinned exactly | `WAVES.slice(0, 11)` — deep-equal test in run.js |
 | Wave shape | `{ duration, groups: [ { at, count, interval, type?, health?, tier? } ] }`. `at` is absolute, from the wave's own start; body N lands at `at + N × interval`; groups overlap freely and tie on (group index, body index). No flat form, no `lead`, no wave-level count | `waveGroups`, `waveTimeline`, `waveCount`, `waveSummary` (`waveGroupAt` and the `|| [wave]` fallback were deleted with the sequential scheduler) |
-| Wave `duration` | ceiling on the WAVE, from the frame it opens — 30 s to 125 s, at least 26.02 s clear of the wave's own last arrival; expiring keeps the survivors and announces the next wave. Wave 35 has none | `duration` in `EASY_WAVES`, `waveTimeRemaining`, `validateWaveTimelines` in game.js |
+| Wave `duration` | ceiling on the WAVE, from the frame it opens; expiring keeps the survivors and announces the next wave. Easy runs 30–125 s, **Normal 32–290 s**, and every ceiling in both clears its own wave's last arrival. **The LAST wave of each has none** — Easy's 35, Normal's 40 — and `validateWaveTimelines` permits the absence in that slot only | `duration` in `EASY_WAVES` / `NORMAL_WAVES`, `waveTimeRemaining`, `validateWaveTimelines` |
+| Schedule validation | the ACTIVE schedule at load, each other one when `setDifficulty` selects it. Validating all of them at load doubled the per-boot work and destabilised the suite — see "How to run and test" | `assertScheduleDeployable`, `setDifficulty` in game.js; every schedule is pinned in tests/run.js |
 | Wave summary key | `(type, health, tier)` — identical salvos sum, unlike ones stay apart; NOT the display name, which merges the whole Fractal ladder | `waveSummary` in game.js |
-| Wave gates | three, one exit: eliminated (5 s), `duration` expired (5 s, survivors stay), Send/auto-send once fully deployed (3 s, survivors stay). Wave 35 has none of them | `endWave`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave`, `waveSendReady` in game.js |
+| Wave gates | three, one exit: eliminated (5 s), `duration` expired (5 s, survivors stay), Send/auto-send once fully deployed (3 s, survivors stay). The last wave of the active schedule has none of them | `endWave`, `WAVE_CALL_DELAY`, `WAVE_CLEAR_DELAY`, `callNextWave`, `waveSendReady` in game.js |
 | Transition | the gap between two waves — 3 s, 5 s or the 10 s opening pause; never a wait to be sat out. `WAVE_BREAK` is GONE (was 90 s, after the last spawn) | `waveCountdown`, `betweenWaves` in game.js |
 | Wave identity | every body carries the 1-based number of the wave that scheduled it; descendants inherit it; 0 = no wave | `waveId` on Enemy, `waveStillOnTheRoad`, `lastDeployedWave` in game.js |
 | Run opening | 10 s before wave 1, or the Start button; 0 with auto-send | `RUN_START_DELAY`, `beforeFirstWave`, `waveSkipButtonLabel` in game.js |
 | Wave call triggers | inside a transition: the Send button or auto-send, shortening it and never lengthening it. A wave on the clock is ended instead, never shortened | `callNextWave`, `skipNextWave`, `endWave` in game.js |
-| Send button availability | live once every scheduled body of the wave in play is out, never before, and never at all on wave 35; ONE predicate read by the drawing, the click and the build preview's chrome test | `waveSendAvailable`, `waveSkipButtonRect`, `overInterfaceChrome` in game.js |
-| Wave readout | four states: wave on the road (number / deployed / `s left`), transition (`Wave 8 in 3 s`), final wave (`FINAL WAVE` where the timer goes — wave 35 has no `duration`), schedule spent (survivor count) | `waveStatusText`, `waveTimeRemaining`, `countdownSeconds` in game.js |
+| Send button availability | live once every scheduled body of the wave in play is out, never before, and never at all on the last wave of the active schedule; ONE predicate read by the drawing, the click and the build preview's chrome test | `waveSendAvailable`, `waveSkipButtonRect`, `overInterfaceChrome` in game.js |
+| Wave readout | four states: wave on the road (number / deployed / `s left`), transition (`Wave 8 in 3 s`), final wave (`FINAL WAVE` where the timer goes — the last wave of the ACTIVE schedule has no `duration`), schedule spent (survivor count) | `waveStatusText`, `waveTimeRemaining`, `countdownSeconds` in game.js |
 | Wave clock | `waveElapsed`, seconds since the wave OPENED (same origin as `at`; for 34 of 35 waves that is also the first arrival — wave 11 opens 4 s before its Midboss); 0 when no wave is in play; the opening pause is not part of wave 1 | `waveElapsed`, `waveInPlay`, `waveFullyDeployed` in game.js |
 | Auto-send waves | off by default; sends every wave the frame it becomes sendable (fully deployed), and shortens every transition to 3 s. Never touches an `at`, an `interval` or an arrival | `autoSkipWaves`, `toggleAutoSkipWaves` in game.js |
 | Boss banner | a named bar at the top for any type flagged `showHealthBanner` | `drawBossBar`, `bossBarEnemies` in game.js |
 | Game speed | 1x / 2x / 3x in the game, **1/2/3/5/10/20 in the sandbox**, cycled from the bottom-right button, not run state. The sandbox APPENDS to the same array rather than replacing the button, so speed stays applied in exactly one place | `GAME_SPEEDS`, `gameSpeed`, `cycleGameSpeed` in game.js; `installSpeeds` in sandbox.js |
 | Speed button chevrons | capped at 3; the NUMBER is the precise statement, so 10x reads as three chevrons and "10×" rather than a bar of arrowheads | `drawSpeedButton` |
+| Pause | one flag, two ways in: Escape (which CANCELS first) and the HUD pause button. The button opens the menu only — leaving a run is still a second click on Back to main menu, and there is still no one-click exit | `paused`, `pauseButtonRect`, `drawPauseButton` in game.js |
+| Bottom-right chrome row | pause · mixer · auto-send · speed, x=962..1256, each rect anchored off the one to its right so one 8 px gap describes the spacing. Build bar ends at x=875 | `pauseButtonRect` -> `audioButtonRect` -> `autoSkipButtonRect` -> `speedButtonRect` |
 | Sandbox base HP | **100 000**, against the game's 100, so a leak is a reading rather than an ending. Moves `BASE_MAX_HP`, so it survives every restart | `installBase` in js/sandbox/sandbox.js |
 | Run-over buttons | Restart (R/Enter), Choose another route (M), Main menu (Escape) | `restartButtonRect`, `changeMapButtonRect`, `mainMenuButtonRect` |
 | Victory | all waves naturally deployed + the WHOLE road clear, descendants and earlier-wave stragglers included + base standing | `allWavesDeployed`, `victory` in game.js |
@@ -8436,8 +9078,18 @@ no mechanic was moved to match the description.
 | Polyphony cap | 28 voices; ≤3 simultaneous death explosions; worst-case measured peak 0.70 at the master output | `SOUND_MAX_VOICES`, `claimVoices`, `playEnemyDeath` |
 | Low-health alert | arms at 25% of BASE_MAX_HP, disarms above 32%, repeats every 9 s; klaxon AND a pulse behind the HP readout | `LOW_HEALTH_FRACTION`, `LOW_HEALTH_CLEAR_FRACTION`, `LOW_HEALTH_REPEAT`, `updateLowHealthAlert`, `drawStatus` |
 | Mute | the panel's toggle or `M` **on the board only** (`m` is "change route" on the loss overlay) | `Sound.toggleMute`, `onKeyDown`, `drawAudioPanel` |
-| Enemy roster | 21 types, all 21 scheduled, including the flying Aether Wisp | `Enemy.TYPES`, `EASY_WAVES` |
-| Enemy mechanic blocks | `attack`, `shield`, `revive`, `spawns`, `phases`, `support`, `sprint` — data, never a branch on the id | `Enemy.TYPES`, and one method per block |
+| Enemy roster | **25 types**. Easy schedules 21; Normal schedules all 25 | `Enemy.TYPES`, `EASY_WAVES`, `NORMAL_WAVES` |
+| Enemy mechanic blocks | `attack`, `shield`, `revive`, `spawns`, `phases`, `support`, `sprint`, `fractal`, `aoeDamageReduction`, **`deathEffect`** — data, never a branch on the id, and a test reads js/ to prove it for the three newest | `Enemy.TYPES`, and one method per block |
+| Herald | 100 HP, 120 bounty, ×0.55, size 1.15. +30% speed for 4 s to the 8 nearest eligible allies within 160 u.l., every 8 s. Never stacks; survives its own death; leaves no drift. **Normal only** | `Enemy.TYPES.herald`, `support.haste`, `applyHaste`, `isHastened` |
+| Herald exclusions | fliers, every Fractal tier AND descendant, anything wearing a boss banner, itself and other Heralds — all by FLAG, never by id | `support.eligible`, `Enemy.supportEligible` |
+| Sapper | 45 HP, 60 bounty, ×0.8. No damage. Nearest valid tower within 90 u.l., 1.1 s telegraph, 2 s disable, then 4 s of immunity to every Sapper. **Normal only** | `Enemy.TYPES.sapper`, `attack.disable`, `attack.commitsTarget` |
+| Sapper collisions | resolved in enemy order: the first disable lands, later ones see a dark target, fizzle, and consume their cycles without extending the stun | `windUpTarget`, `committedTargetValid`, `Enemy.towerAcceptsDisable` |
+| Tower suppression | named timed immunities on the tower, keyed by the spec's own string; longest wins; ticked BEFORE the stun check because that check `continue`s | `TowerHealth.suppress / isSuppressed / suppressionRemaining / tickSuppression` |
+| Volatile | **8 HP**, 25 bounty, **×1.5**, size 0.9. Dives onto the nearest tower within **75 u.l.** for **13** and dies of it (`lunge` + `selfDestructs`); any combat death — dive or gunfire — leaves a charge, and 1 s later that is exactly **13** damage once to every living tower within **60 u.l.**, no stun. **The dive reaches further than the blast, and that gap is the point**: a tower can be close enough to be dived at and far enough back to sit outside the explosion, so spacing buys something. A dive pays its bounty like any death; a leak leaves nothing. **Normal only** | `Enemy.TYPES.volatile`, `attack.lunge`, `attack.selfDestructs`, `deathEffect.hazard` |
+| Dinomech | **45 000 HP**, 6000 bounty, ×0.25, size 2.6, banner. NO shield, NO revive, NO phases, NO support, NO spawns — its effective HP is exactly its health. Two attacks it cycles: a board-wide rail (60 + a 2.5 s stun, 14 s, 1.4 s wind-up) at the highest-DPS tower, and a stomp (90, 14 s, 2 s wind-up, 70 u.l. jump into a 140 u.l. landing) with **no stun at all** — it breaks towers where the Tyrant silences them. **Normal only, wave 40.** No mesh: draws as the fallback sphere | `Enemy.TYPES.dinomech` |
+| `lunge` / `selfDestructs` | two generic ATTACK-SPEC flags, read off the spec and never off a type id. `lunge` writes the body's `pos` to the tower it is about to hit — the one move in the game that leaves the path, allowed only because `selfDestructs` removes the body in the same step. `selfDestructs` sets `dead` (not `takeDamage`: a self-destruct is not damage, so no shield soaks it, no defense mitigates it, no revive denies it and no tower is credited) and ONLY if the swing connected, so nothing blows up over empty road | `Enemy.prototype.resolveAttack` |
+| Volatiles come LAST | every Volatile group in the campaign starts after every other group in its wave has FINISHED arriving — waves 20 and 26 at 14 s and 20 s, wave 31 at 18 s and 24 s. A campaign-wide rule, not three authored coincidences: a test walks every schedule in `DIFFICULTIES` and fails if any wave's first Volatile leaves before another group's last body does | `NORMAL_WAVES` waves 20/26/31, `tests/content.test.js` *"every Volatile in the campaign is the last thing its wave spawns"* |
+| Hazards | not enemies: their own list, never in `enemies`, cannot hold a wave or the win open, pay nothing, touch towers only (so no charge can chain), cleared by `restartGame()` | `Hazards` in js/systems/hazards.js |
 | What a shield pays | **nothing, ever** (2026-07-30). Healed HP too. Only health pays | `Enemy.takeDamage`, `Enemy.bounty` |
 | Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks, **and a second mesh from that moment on** | `Enemy.TYPES.shielded`, `shieldBroken`, `ENEMY_VARIANT` |
 | Vanguard's shield | 100 every 7 s, non-stacking, granted to ITSELF. A break swaps in the shattered mesh, throws the fragments onto the road and pulls them home again, and the mesh swaps BACK when the pool refills | `Enemy.TYPES.boss_fast.support`, `shieldOut`, `shieldReformProgress`, `ENEMY_VARIANT`, `shardPose` |
@@ -8445,14 +9097,14 @@ no mechanic was moved to match the description.
 | Revenant | 16 HP, revives once to full and roots where it fell | `Enemy.TYPES.revenant` |
 | Hive | 150 HP, ordinary, pays normally | `Enemy.TYPES.hive` |
 | Hive brood | 5 normals every 7 s, each with a shield equal to its life and paying $0 | `Enemy.TYPES.hive.spawns` |
-| Shieldbearer | 60 HP, ×0.45; +20 shield to the 10 strongest every 10 s, STACKING. Normal/Hard | `Enemy.TYPES.shieldbearer` |
+| Shieldbearer | 60 HP, ×0.45; +20 shield to the 10 strongest every 10 s, STACKING | `Enemy.TYPES.shieldbearer` |
 | Shieldbearer hover | 0.55 radii off the road, broadcast turning at 0.18 Hz | `Enemy.TYPES.shieldbearer.hover` |
 | Shieldbearer tether | 1.8 s per cord, `rgb(150, 214, 255)`, bowed 0.34 of the span, 3 plates | `Enemy.TYPES.shieldbearer.support.tether` |
-| Healer | 200 HP, ×0.4; 15 HP/s for 4 s to the 3 most wounded every 8 s. Normal/Hard | `Enemy.TYPES.healer` |
+| Healer | 200 HP, ×0.4; 15 HP/s for 4 s to the 3 most wounded every 8 s | `Enemy.TYPES.healer` |
 | Healer hover | 1.25 radii off the road, rings turning at 0.32 Hz | `Enemy.TYPES.healer.hover` |
 | Healer tether | 1.4 s per cord, `rgb(142, 232, 255)` | `Enemy.TYPES.healer.support.tether` |
-| Vanguard (fast boss) | 750 HP; ×3.5 for the first 400 u.l. then ×1.75; 100 shield every 7 s, no stacking. Normal/Hard | `Enemy.TYPES.boss_fast` |
-| Camo Heavy | 20 HP, ×0.65, camo, 5 flat armor + 20% defense. Normal/Hard | `Enemy.TYPES.camo_heavy` |
+| Vanguard (fast boss) | 750 HP; ×3.5 for the first 400 u.l. then ×1.75; 100 shield every 7 s, no stacking | `Enemy.TYPES.boss_fast` |
+| Camo Heavy | 20 HP, ×0.65, camo, 5 flat armor + 20% defense | `Enemy.TYPES.camo_heavy` |
 | Brood trail | 12 u.l. between hatchlings, back along the road | `Enemy.BROOD_TRAIL_UL` |
 | Enemy lane offsets | a 32-bit hash of the spawn index, ±7 u.l. | `Enemy.laneOffsetFor`, `Enemy.LANE_SPREAD_UL` |
 | Tower HP | Rifleman 80 (145 with B1+B2), Warbringer 150, Arcane Sniper / Siphon from their stat tables (the deleted gunner was 60) | `Soldier.BASE_HP`, `Smasher.BASE_HP`, `config.base.hp` |
@@ -8545,6 +9197,7 @@ no mechanic was moved to match the description.
 | Blub rail click | left click STARTS OR STOPS that line, from A3 on; below A3 it is refused. Base stats are on the HOVER card. A fused tower has no rail | `clickLine`, `railBoxAt`, `blubTypeCard` |
 | Sandbox speeds | 5x, 10x and 20x appended to the shipping ladder, so the button cycles 1/2/3/5/10/20. The chevrons cap at three; the number is the statement | `SANDBOX_SPEEDS`, `installSpeeds` in js/sandbox/sandbox.js |
 | Sandbox base HP | 100 000, against the game's 100, and it survives a restart because the CONSTANT moves | `SANDBOX_BASE_HP`, `installBase` in js/sandbox/sandbox.js |
+| Sandbox wave picker | starts the chosen schedule on ANY wave. "Play this wave" parks the scheduler when that wave closes (and never sets `allWavesDeployed`); "Play from here" carries on. Switching difficulty rebuilds the list and drops a pending solo request | `soloWave`, `parkSchedule`, `buildWaveList`, `playWave` in js/sandbox/sandbox.js |
 | Blub removed by hand | selling one through its panel takes it out of the fleet, the pooled HP, the swarm buff and the next merge | `sellTower` -> `Blub.onRemoved` -> `isDestroyed` |
 | Summon clock vs cycle | a tier that shortens an interval clamps the running timer to it -- from applyUpgrade, NEVER from recalcStats | `BlubTower.clampTimersToCycle` |
 | Compact panel actions | `action.compact` — 34 px, two per row, so six action rows still fit | `inspectionLayout` in game.js |
@@ -8556,7 +9209,8 @@ no mechanic was moved to match the description.
 | Farm path C | every C3+ joins ONE network: B is the sum of nominal productions, P is what the dice batter and what the next wave pays. C3 rolls one d20, C4 two, C5 three d22 | `Farms.network`, `FarmDice` |
 | Farm uniqueness | one B4-or-B5 on the map (not one of each), and one C5 | `unique` on the tier, `Farms.uniqueHolder` |
 | Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 150–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
-| Screens | menu → route chooser (`select`) / index / store → play | `screen` in game.js |
+| Screens | menu → route chooser (`select`) → difficulty step (`difficulty`) → play; index and store off the menu | `screen` in game.js |
+| Index tabs | three: Towers, Enemies, **Difficulties** (a sub-tab per schedule previewing every wave of it — 35 for Easy, 40 for Normal — derived, and previewing never selects) | `TABS`, `tabRect`, `drawDifficultiesTab`, `Codex.scheduleRows` in js/codex.js |
 | Pause menu | Escape only, no HUD button | `paused`, `drawPauseMenu` |
 | Build slot size | **86 px**, 10 px gap (76 until 2026-08-13; this row was left behind and said 76 until 2026-08-27, while the build-bar section above had 86) | `SLOT_SIZE`, `SLOT_GAP` |
 | Attack speed unit | attacks per second, on every tower | `TowerStats.rate` |

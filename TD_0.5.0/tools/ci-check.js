@@ -255,12 +255,109 @@ var BASELINE = [
     // `ENEMY_GAIT_BAND` and dropping the `shieldOut = false` line in
     // `grantShield` turns three of them red; dropping `model.positions` in
     // gl-models turns the fourth red. Green again on restore.
+    // 161 on 2026-08-27, from 157: FOUR tests ADDED with the HUD pause button,
+    // in the change that earned them. They live in the existing "the pause
+    // menu" group and nothing was removed to make room -- the one existing
+    // assertion they touch is the 2026-07-28 "no HUD menu button" line, which
+    // kept its subject (`exitButtonRect` is still undefined) and narrowed its
+    // claim to the half that was load-bearing: no button that LEAVES a run in
+    // one click. The button added opens the menu, and Back to main menu inside
+    // it is still a second deliberate click.
+    //
+    // The load-bearing member is "the bottom-right chrome row is four buttons
+    // that do not overlap". The row is a CHAIN -- each rectangle is derived
+    // from the one to its right -- so widening any button slides its neighbours
+    // leftwards, and the failure mode is a live rectangle sitting silently
+    // under the build bar. It sweeps the chain for overlap, for a common
+    // baseline, and for clearance from `BAR_X + BAR_WIDTH`, which is itself
+    // derived from the build-slot count. Self-tested by mutation: collapsing
+    // the pause button's offset onto the mixer's turns it red, along with the
+    // two behavioural tests; disabling the click handler turns those two red on
+    // their own. Green again on restore.
+    //
+    // ---- the previous entry, kept ------------------------------------------
+    // 157 on 2026-08-27, from 139: SEVENTEEN tests ADDED with the Normal
+    // difficulty, plus one existing test WIDENED, in the change that earned
+    // them. Nothing was removed and no existing assertion changed its mind.
+    //
+    // The new group is "difficulty", and the load-bearing member of it is
+    // "Normal is authored, not derived from Easy and not an alias of it" --
+    // which is the claim the whole feature rests on and the one no aggregate
+    // can carry. It checks three things a derivation cannot survive: no object
+    // in common at any depth, no constant ratio reproducing one schedule's
+    // bodies / effective HP / clear bounty / kill bounty from the other's, and
+    // not one of the thirty-five waves sharing a roster with Easy's wave of the
+    // same number. It also reads js/game.js and refuses the deleted
+    // `buildDifficultyWaves` by name, because a derivation is a SHAPE and no
+    // data assertion can rule it out. Self-tested by pointing NORMAL_WAVES at
+    // EASY_WAVES: red on every clause.
+    //
+    // The rest: the exact 35-wave composition against the owner's own table
+    // (which is the specification, so the schedule is what has to agree), the
+    // 1 000 authored roots, all twenty-four types, the five act totals
+    // 158/174/213/212/243, the three waves with written encounter direction
+    // (11, 16, 18) plus 34's twelve-second Vanguards and 35's Tyrant/T5/no-
+    // Sapper contract, the selection flow through the real click handlers,
+    // restart preserving the difficulty while clearing every new run-scoped
+    // thing, the readouts following the active schedule, both schedules
+    // validating with wave 35 as the only ceiling-less wave, Normal's camo and
+    // air checks, and both campaigns running themselves dry to a win.
+    //
+    // WIDENED, assertions unchanged in kind: "every enemy type is scheduled,
+    // and every scheduled type exists" now walks EVERY difficulty. It had to:
+    // it is a question about the game rather than about one schedule, and the
+    // Herald, the Sapper and the Volatile are authored into Normal and
+    // deliberately kept out of Easy.
+    //
+    // ---- the previous entry, kept ------------------------------------------
     // 139 measured on the merged tree: 108 at the fork, +27 from the timeline
     // rewrite and +4 from the Vanguard's import, which is exactly the sum and
     // so is evidence that nothing was lost in the merge. ONE fixture was
     // repaired to get there, and no product code moved for it: the flying-wave
     // list read [24, 31, 35], written on a branch that forked before the owner
     // ruled that the Healer flies (2026-08-26). Wave 32 is the healer wave.
+    // 175 on 2026-08-28, from 161: FOURTEEN tests ADDED with Normal's
+    // extension from thirty-five waves to forty, in the change that earned
+    // them. Nothing was removed; three existing names were CORRECTED because
+    // their titles had become false ("Normal is thirty-five waves ..." ->
+    // "... forty waves", "Normal carries all twenty-four types" -> twenty-five,
+    // and the five-act total gained "teaching" to say which acts it means).
+    //
+    //   "Normal's first thirty-five waves are untouched but for wave 35's
+    //     ceiling" -- the extension's load-bearing negative. The composition
+    //     table would still pass if act VI had been paid for by trimming act V.
+    //     This holds waves 1-35 at 1 000 roots and 39 139 effective HP and
+    //     names the one field allowed to have changed. It also PINS 39 139,
+    //     which AGENTS.md had recorded as 39 507 since Normal landed with
+    //     nothing asserting it either way -- the prose was wrong and the
+    //     schedule was right.
+    //   "act VI is five waves and 321 bodies, on top of the thousand"
+    //   "the three money convoys carry armour and escort and nothing else" --
+    //     the prohibitions, stated as PROPERTIES of the type rather than as an
+    //     id blacklist, so a future type that acquires one is caught here.
+    //   "the Colossus progression across 36-39 is 2, 4, 6 and 8"
+    //   "the money convoys pay strictly more each wave, and enough to spend" --
+    //     read through waveKillBounty + waveReward, against real upgrade
+    //     prices, so a retune of a count or an override moves it.
+    //   "wave 39 sends three independent Tyrants about twenty seconds apart"
+    //   "wave 39's three Tyrants keep independent state, and their summons keep
+    //     39" -- the one that would catch enterPhase mutating Enemy.TYPES
+    //     instead of copying it, which would speed up every future boss.
+    //   "wave 39 is the tactical peak, but not the damage peak"
+    //   "wave 40 is one 45k boss, eighteen Swarm, twelve Fast and no support"
+    //   "wave 40's four deployments land at 0, 12, 32 and 55 seconds"
+    //   "every event in Normal's waves 35-39 happens before that wave's
+    //     ceiling"
+    //   "Normal's wave 35 hands over to wave 36 and cannot win the run" -- the
+    //     behavioural half of "finality comes from the schedule's LENGTH". Wave
+    //     35 holds a Tyrant, which is exactly what makes it look final.
+    //   "Normal wins only once wave 40's boss and its escort are both gone"
+    //   "Normal runs itself dry over forty waves, every arrival emitted once"
+    //     -- the arrival audit, for Normal. Its Easy twin reads `WAVES` on a
+    //     fresh boot, which is Easy, so act VI's 321 new arrivals had nothing
+    //     watching the RUN rather than the data.
+    //
+    // ---- the previous entry, kept ------------------------------------------
     // 159 on 2026-08-26, from 139: TWENTY tests ADDED with Ironwood Frontier,
     // the first board whose scenery is also solid, and none removed.
     //
@@ -388,20 +485,40 @@ var BASELINE = [
     // centre line hits at the feet and misses against the body -- the flat top,
     // and the owner's own case with its null control: widen the near tower's
     // shaft back to its footprint and it takes the click again.
+    // ---- 229 on 2026-08-28, merging Normal's forty waves into Ironwood -----
+    // 229 is the UNION of main's 193 and the branch's 175, measured as names
+    // rather than trusted as arithmetic: every name on each side is present
+    // here, nothing is duplicated, and the two sides overlapped on 139.
+    // Both blocks below are kept because both raises are still in this tree.
+    // ---- 232 on 2026-08-28, the HUD pause button became a clock -----------
+    // 229 -> 232: FOUR added, ONE removed, and the removal is the point. "the
+    // HUD pause button opens the same menu Escape does" asserted the old
+    // behaviour exactly, so it could not be repaired -- the button no longer
+    // opens the menu. What replaced it:
     //
-    // 194 on 2026-08-27, from 193: THE CURSOR LANDS ON THE SURFACE. The click
-    // target was only half of it -- `screenToWorld` casts at z = 0, so hovering
-    // a stump to PLACE a tower answered with the floor and the ghost stood
-    // somewhere the cursor was not. 29 pins the seam that makes the fix
-    // possible (`OrbitCamera.planeAt`, the old `groundAt` with the plane as an
-    // argument rather than a literal) and what the placement feedback is
-    // painted on. The walk itself needs WebGL and is measured in a browser:
-    // pointing at the centre of the tallest stump used to answer 40.3 units
-    // away, on ground height 0 -- OUTSIDE a stump of radius 36 -- and now
-    // answers the centre exactly, on height 25; flat ground is identical to the
-    // float; and the no-build rim went from 28.9 px below the edge it describes
-    // to 0.
-    file: "tests/run.js", pass: 194, fail: 0,
+    //   "the HUD pause button stops the clock without opening the menu" -- and
+    //     that a SECOND press starts it again, since the button is the only
+    //     way back out of a state that puts nothing else on screen to click.
+    //   "a frozen board still builds, upgrades, inspects and hovers" -- the
+    //     load-bearing one. Everything else here proves the clock stopped;
+    //     this is the half that says the player did not stop with it.
+    //   "Escape still opens the menu over a frozen board, and Resume leaves
+    //     the clock alone" -- the two states are independent in BOTH
+    //     directions, and a Resume that cleared the freeze would start a clock
+    //     the player deliberately stopped.
+    //   "a restart clears the freeze" -- run state, exactly as the pause is.
+    //
+    // "the pause button is dead while a run is over" now reads `frozen` rather
+    // than `paused` and still checks both, which is why it moves no count.
+    // ---- 233 on 2026-08-29, merging the Farm and Fractal Slime work ------
+    // 232 -> 233: ONE added and none removed. The stat-rows test gained a
+    // second assertion group (a specimen of the same tower, showing everything
+    // except its two lifetime totals) when TowerStats grew a total MARK, which
+    // is what let the armoury and the index stop slicing rows off the front.
+    // Nothing here moved for the Fractal Slime: the composition gate, the
+    // spine, the roster rule, the wave-35 landmarks, the summary and the purse
+    // were all EDITED rather than added to, name for name.
+    file: "tests/run.js", pass: 233, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
@@ -549,6 +666,89 @@ var BASELINE = [
     //     `inspected` instead of the `tower` it is handed, so the two callers
     //     that never set the global indexed with -1 and handed `buyUpgrade`
     //     an undefined tower. It now upgrades its own argument.
+    // 261 on 2026-08-27, from 225: THIRTY-SIX tests added and four existing
+    // assertions moved, all in the Normal-difficulty change.
+    //
+    // Three new groups -- "the Herald", "the Sapper", "the Volatile" -- one per
+    // mechanic, driven through the real entry points (supportAllies,
+    // attackTowers, resolveAttack, Hazards.update and the game's own update())
+    // rather than against the data. Plus "the three new types are DATA, not
+    // branches", which READS EVERY FILE under js/ and fails on any comparison
+    // against the strings "herald", "sapper" or "volatile" -- the rule
+    // js/enemy.js opens by stating, and the one three types at once would
+    // break quietly. Plus the index cards for all three and the Difficulties
+    // tab's schedule preview.
+    //
+    // FOUR ASSERTIONS MOVED, and each is the feature rather than a drift:
+    //   - `attack` is now ["angry", "sapper"] and `support` gains "herald".
+    //     Those lists exist to be UPDATED deliberately; growing by accident is
+    //     what they catch.
+    //   - the normal's "highest campaign HP" is 36, not 30. The ceiling is
+    //     taken across every authored schedule now, because it is a claim about
+    //     the game and not about one difficulty.
+    //   - the Colossus and the Fractal ladder are stated per difficulty.
+    //   - "the number keys pick a route too" became "…and then a difficulty":
+    //     the chooser is two beats now, and the keyboard reaches both.
+    // 268 on 2026-08-27, from 263: the Volatile's dive.
+    //
+    // FIVE tests added under "the Volatile" -- the dive itself, its 120 u.l.
+    // edge from both sides, the dive-as-death (bounty, kill credit, and the
+    // charge armed ON the tower it landed on), the shot-down case that proves
+    // killing one early still costs the board nothing, and the blub it must
+    // not dive into. All driven through attackTowers/resolveAttack and the
+    // game's own update() rather than against the data, like the group they
+    // join.
+    //
+    // FOUR ASSERTIONS MOVED, each the feature rather than a drift:
+    //   - `attack` is now ["angry", "sapper", "volatile"]. That list exists to
+    //     be UPDATED deliberately, which is what this is.
+    //   - the blast radius is 120 u.l., not 45, in the numbers test, the
+    //     radius test (renamed with it) and the index card.
+    // 269 on 2026-08-27, from 268: the Volatile retune (8 HP, x1.5, 75 u.l.
+    // dive, 60 u.l. blast, 13 damage).
+    //
+    // ONE test added -- "a tower can be inside the dive and outside the
+    // blast". The dive and the blast used to be one number and the old suite
+    // asserted they were EQUAL; they are now deliberately different, and the
+    // gap between them is what the retune sold the player, so it gets a test
+    // of its own rather than living only in the two edge cases.
+    //
+    // Every other Volatile assertion moved with the numbers, and one changed
+    // in kind: "no other ground type walks as fast" would have been FALSE (a
+    // Fast is 1.75), so it is now "it closes far faster than anything else
+    // that acts on towers", derived from the roster rather than typed.
+    // 271 on 2026-08-27, from 269: every Volatile group moved to the tail of
+    // its wave ("in every wave there are volatiles, make them come out last").
+    //
+    // TWO tests added, and the first is the rule itself rather than the three
+    // waves that satisfy it today: it walks every schedule in DIFFICULTIES and
+    // fails if any wave's first Volatile leaves before another group has
+    // FINISHED arriving. It counts the waves it checked (3) so it cannot pass
+    // by finding no Volatiles at all -- verified by mutation, putting wave 20's
+    // first pulse back at 1.5 s and watching it fail by name. The second pins
+    // the ceiling margin, because moving six groups to the tail of their waves
+    // is exactly the edit that pushes a last spawn past `duration`.
+    //
+    // 281 on 2026-08-27, from 271: the enemy sidebar, and the trait list under
+    // it. TEN tests, and the shape of them is the point -- one asserts the
+    // panel exists, and the other nine pin the seam it created. `Enemy.
+    // traitsOf` is now the ONE list of what is distinctive about a type, read
+    // by the sidebar (every row) and by the index's badge line (the first row
+    // carrying a badge), so the pair that matters most walks all fourteen badge
+    // strings by TYPE -- a reordered roster cannot quietly reassign one -- and
+    // walks all twenty-four types checking no detail sentence ends in a
+    // doubled full stop, which is a real defect this found ("within 47.5 u.l..",
+    // on every attacking type, from appending a stop to a unit that ends in
+    // one). One more measures every type's panel against the build bar, which
+    // is the enemy-side twin of the sandbox smoke test's panel-headroom check.
+    // 282 on 2026-08-28, from 281: ONE test ADDED, "the index explains the
+    // Dinomech, and it is 45 000 and nothing else" -- the twenty-fifth type,
+    // and the one whose card is mostly a list of blocks it does NOT carry.
+    // Assertions were also added inside four existing tests (the banner list,
+    // the trait rows, the badge map and the derived wave appearances), which
+    // move no count and are the reason the totals are a cross-check here and
+    // never the gate.
+    // ---- the previous entry, kept ------------------------------------------
     // MERGED 2026-08-26 with Marc's forest-board branch: he added tests and
     // so did this branch, so the count below is neither of the two numbers
     // that conflicted here (236 and 219) -- it is measured after the merge.
@@ -591,11 +791,27 @@ var BASELINE = [
     // own tests moved rather than being added to -- "the six other boards
     // take neither" counted the boards by hand and there are seven now that
     // Ironwood Frontier exists, so it derives the number from Maps.LIST.
-    // 245 on 2026-08-29: the Fractal Slime came off the campaign, and the test
-    // that pinned its six-rung ladder INTO the schedule became two -- the
-    // ladder still being intact as a mechanic, and the ten bodies that
-    // replaced it standing where each root stood at the weight each root had.
-    file: "tests/content.test.js", pass: 245, fail: 0,
+    // ---- 302 on 2026-08-28, merging Normal's forty waves into Ironwood ----
+    // The union of main's 244 and the branch's 282 is 305 names; three of them
+    // are the SAME test under two names, each side having renamed one, and the
+    // newer name won in each case: "a blast kill ... right out past the swing"
+    // -> "... and the chain carries past the swing", "width and pace are opt-in,
+    // and the six other boards take neither" -> "route width and pace stay
+    // opt-in, including Ironwood's constant width" (both main's), and "the
+    // number keys pick a route too" -> "... pick a route, and then a difficulty"
+    // (the branch's, once there was a difficulty to pick). 305 - 3 = 302.
+    //
+    // "the two loss-screen buttons do not overlap" was RESTORED here. It was on
+    // the route-width branch and did not survive that branch being squashed
+    // into the forest board; restartButtonRect and changeMapButtonRect are both
+    // still live and still drawn, so the test was collateral, not retired.
+    // ---- 303 on 2026-08-29, merging the Farm and Fractal Slime work ------
+    // 302 -> 303: the test that pinned Easy's six-rung fractal ladder INTO the
+    // schedule became two, since taking the ladder off left two separate
+    // claims -- that the ladder is still intact as a mechanic (and still spent
+    // by Normal, which was not touched), and that the ten bodies that replaced
+    // it stand where each root stood at the weight each root had.
+    file: "tests/content.test.js", pass: 303, fail: 0,
     failing: []
   },
   {

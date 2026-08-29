@@ -945,18 +945,29 @@ test("every enemy type is scheduled, and every scheduled type exists", function 
   var h = harness.boot();
   var Enemy = h.game.Enemy;
 
-  // The index screen derives "appears in waves N, M" from WAVES, so a type
-  // that is never scheduled would be documented as content nobody can meet.
+  // The index screen derives "appears in waves N, M" from the schedules, so a
+  // type that is never scheduled anywhere would be documented as content nobody
+  // can meet.
   //
   // Waves may be MIXED since v0.4.7, so this walks groups rather than waves --
   // the old "exactly one type per wave" half of this test is gone, replaced by
   // the camo rule above, which is the part that was actually load-bearing.
+  //
+  // AND IT WALKS EVERY DIFFICULTY SINCE 2026-08-27, which is the change the
+  // second schedule forced and the right one. "Is this content reachable" is a
+  // question about the GAME; asking it of one schedule would either freeze Easy
+  // out of ever gaining a type or -- what actually happened -- fail the moment
+  // the Herald, the Sapper and the Volatile were authored into Normal and
+  // deliberately kept out of Easy. The per-difficulty coverage is pinned
+  // separately, in the Normal group below.
   var scheduled = {};
-  h.game.WAVES.forEach(function (wave) {
-    h.game.waveGroups(wave).forEach(function (g) {
-      var id = g.type || Enemy.DEFAULT_TYPE;
-      Enemy.typeOf(id);                     // throws on a typo in the schedule
-      scheduled[id] = (scheduled[id] || 0) + 1;
+  h.game.DIFFICULTIES.forEach(function (difficulty) {
+    difficulty.waves.forEach(function (wave) {
+      h.game.waveGroups(wave).forEach(function (g) {
+        var id = g.type || Enemy.DEFAULT_TYPE;
+        Enemy.typeOf(id);                   // throws on a typo in the schedule
+        scheduled[id] = (scheduled[id] || 0) + 1;
+      });
     });
   });
 
@@ -2226,6 +2237,1154 @@ function (t) {
 // offered "restart this route" and "choose another route" and no way out of
 // the run loop at all -- the armoury, where the coins the overlay had just
 // awarded are actually spent, was unreachable without reloading the page.
+
+// ---------------------------------------------------------------------------
+// TWO AUTHORED CAMPAIGNS (2026-08-27)
+//
+// Easy is frozen at what it has always been. Normal is a second schedule
+// written out in full -- FORTY waves, 1 321 authored roots, all twenty-five
+// types since it was extended on 2026-08-28 (it was 35 / 1 000 / 24, and waves
+// 1-35 still are exactly that, wave 35's new `duration` aside)
+// -- and the load-bearing claim about it is a NEGATIVE one: it is not derived
+// from Easy. This project has shipped derived difficulties before, the owner
+// had forgotten they existed, and the whole concept was deleted on 2026-08-12
+// for exactly that reason. So the independence test below is not a formality.
+// ---------------------------------------------------------------------------
+
+group("difficulty");
+
+// A SINGLE BOOTED GAME, SHARED BY THE TESTS THAT ONLY READ THE SCHEDULES.
+//
+// The composition table, the act totals, the encounter directions and the
+// independence check all ask questions about DATA and change nothing. A boot
+// builds a whole `vm` context that lives until the process ends, and between
+// them the suites already make several hundred; every one is garbage that
+// forces a full mark-compact sooner, and every mark-compact is a chance to hit
+// the GC crash node v24 has in `ClearStaleLeftTrimmedPointerVisitor` (see
+// tests/harness.js). Anything that steps the clock, clicks, places or spawns
+// still boots its own -- the sharing is by USE, never by convenience.
+var sharedSchedules = null;
+function schedulesBoot() {
+  if (!sharedSchedules) sharedSchedules = harness.boot();
+  return sharedSchedules;
+}
+
+
+// "UNTOUCHED" MEANS BY THE NORMAL CAMPAIGN, NOT BY ANYBODY. This test was
+// written on 2026-08-28 to catch a second schedule landing on top of the first,
+// and it is still exactly that; a deliberate retune of Easy is edited here, in
+// the same change, with the reason. One has happened since: the Fractal Slime
+// came off Easy on 2026-08-29 at the owner's instruction, which is where the
+// twenty types and the $23 132 below come from.
+test("Easy is untouched: thirty-five waves and 830 authored enemies", function (t) {
+  var h = schedulesBoot();
+  var E = h.game.EASY_WAVES;
+
+  t.eq(E.length, 35, "thirty-five waves");
+  var bodies = 0, health = 0, clear = 0, kill = 0;
+  E.forEach(function (wave, i) {
+    bodies += h.game.waveCount(wave);
+    health += h.game.waveEffectiveHealth(wave);
+    clear += h.game.waveBounty(wave);
+    kill += h.game.waveKillBounty(wave);
+  });
+  // Every one of these is the figure the composition gate above already pins;
+  // they are restated here against EASY_WAVES BY NAME rather than against the
+  // active `WAVES`, because the thing this test exists to catch is a second
+  // schedule quietly landing on top of the first.
+  t.eq(bodies, 830, "830 authored bodies");
+  t.eq(health, 25939, "25 939 effective HP");
+  t.eq(clear, 2594, "$2594 of clear bounty");
+  // $22 987 until the Fractal Slime came off it. Health did not move -- every
+  // root was replaced point for point -- and this rose $145 anyway, because
+  // the four types that replaced them are ordinary bodies at $1 a point where
+  // a slime was written at $0.50.
+  t.eq(kill, 23132, "$23 132 of kill bounty");
+  t.eq(h.game.WAVES, E, "and Easy is what a fresh boot plays");
+
+  // The three v0.5.1 types are deliberately absent from it. Easy gaining one
+  // would be a retune of a schedule nobody asked to retune.
+  var ids = {};
+  E.forEach(function (wave) {
+    h.game.waveGroups(wave).forEach(function (g) {
+      ids[g.type || h.game.Enemy.DEFAULT_TYPE] = true;
+    });
+  });
+  t.eq(ids.herald, undefined, "no Herald in Easy");
+  t.eq(ids.sapper, undefined, "no Sapper in Easy");
+  t.eq(ids.volatile, undefined, "no Volatile in Easy");
+  // AND NO FRACTAL SLIME, which is the twenty-first type it used to carry.
+  // Normal still sends four rungs of the ladder, so this is a claim about Easy
+  // and not about the roster -- see "Easy schedules no Fractal Slime, and the
+  // ladder is intact anyway" in tests/content.test.js.
+  t.eq(ids.fractal_slime, undefined, "no Fractal Slime in Easy");
+  t.eq(Object.keys(ids).length, 20, "Easy still carries exactly its 20 types");
+});
+
+// THE EXACT COMPOSITION, WAVE BY WAVE. Written as the owner's own table rather
+// than as a snapshot of the file, so this test is the specification and the
+// schedule is what has to agree with it -- the other way round from the
+// pre-rewrite gate above, which snapshots what was already there.
+var NORMAL_TABLE = [
+  [ 1, { normal: 8, fast: 4 }],
+  [ 2, { normal: 10, slow: 6 }],
+  [ 3, { swarm: 18, fast: 8 }],
+  [ 4, { normal: 12, armored: 8 }],
+  [ 5, { slow: 8, swarm: 12, fast: 6 }],
+  [ 6, { herald: 2, normal: 14, fast: 8 }],
+  [ 7, { armored: 10, slow: 12, swarm: 12 }],
+  [ 8, { angry: 8, normal: 14 }],
+  [ 9, { camo_normal: 8, camo_fast: 8 }],
+  [10, { shielded: 6, brute: 2, fast: 14 }],
+  [11, { shieldbearer: 1, armored: 14, fast: 12, flying: 3 }],
+  [12, { herald: 2, shielded: 6, swarm: 20 }],
+  [13, { sapper: 3, normal: 16, angry: 8 }],
+  [14, { midboss: 1, shieldbearer: 2, armored: 10, fast: 16 }],
+  [15, { brute: 4, revenant: 8, fast: 10 }],
+  [16, { hive: 2, swarm: 20, herald: 2, flying: 10 }],
+  [17, { fractal_slime: 2, armored: 16, swarm: 16 }],
+  [18, { healer: 2, brute: 6, angry: 12 }],
+  [19, { shieldbearer: 2, healer: 2, armored: 14, shielded: 8 }],
+  [20, { volatile: 8, swarm: 18, fast: 8 }],
+  [21, { boss_fast: 1, herald: 2, shieldbearer: 2, swarm: 24, fast: 14 }],
+  [22, { camo_normal: 12, camo_fast: 8, camo_heavy: 6 }],
+  [23, { sapper: 3, angry: 12, shielded: 10, normal: 12 }],
+  [24, { flying: 18 }],
+  [25, { colossus: 1, shieldbearer: 2, healer: 2, slow: 12, armored: 8 }],
+  [26, { hive: 3, shieldbearer: 2, swarm: 24, volatile: 8 }],
+  [27, { fractal_slime: 1, herald: 2, fast: 16, armored: 16, angry: 8 }],
+  [28, { camo_heavy: 8, camo_normal: 12, camo_fast: 6 }],
+  [29, { colossus: 2, shieldbearer: 2, healer: 2, shielded: 14 }],
+  [30, { hive: 3, shieldbearer: 3, healer: 2, revenant: 10, swarm: 12 }],
+  [31, { sapper: 3, angry: 8, volatile: 8, fast: 14 }],
+  [32, { fractal_slime: 1, herald: 2, armored: 14, brute: 6, swarm: 16 }],
+  [33, { flying: 12, camo_fast: 8, camo_heavy: 4 }],
+  [34, { boss_fast: 2, shieldbearer: 2, healer: 1, herald: 2, swarm: 22,
+         fast: 12, angry: 6 }],
+  [35, { normal: 26, flying: 8, shielded: 6, angry: 6, boss: 1,
+         fractal_slime: 1, herald: 2 }],
+  // --- ACT VI, added 2026-08-28 with the extension to forty waves ---------
+  [36, { colossus: 2, brute: 6, armored: 16, normal: 18, fast: 12 }],
+  [37, { colossus: 4, brute: 8, armored: 20, normal: 20, swarm: 16 }],
+  [38, { colossus: 6, brute: 10, armored: 24, normal: 24, fast: 18, swarm: 20 }],
+  [39, { boss: 3, colossus: 8, shieldbearer: 4, healer: 4, herald: 3,
+         shielded: 12, revenant: 12, swarm: 20 }],
+  [40, { dinomech: 1, swarm: 18, fast: 12 }]
+];
+
+// One wave's roster, as { typeId: bodies }. Walked through waveGroups so a wave
+// cut into salvos reads the same as one that is not -- the aggregate is what
+// the table above is about, and the salvo shape is a timing decision.
+function compositionOf(h, wave) {
+  var out = {};
+  h.game.waveGroups(wave).forEach(function (g) {
+    var id = g.type || h.game.Enemy.DEFAULT_TYPE;
+    out[id] = (out[id] || 0) + g.count;
+  });
+  return out;
+}
+
+// A roster as a SORTED string, for comparing two of them.
+//
+// `t.deep` compares key ORDER as well as content, and a composition's key order
+// is the order the groups happen to be written in -- a timing decision, which
+// the aggregate deliberately does not care about. Sorting is what lets the
+// table above state a wave the way the owner wrote it while the file states it
+// in the order the bodies arrive.
+function rosterLine(comp) {
+  return Object.keys(comp).sort().map(function (id) {
+    return id + " x" + comp[id];
+  }).join(", ");
+}
+
+test("Normal is forty waves of exactly the authored composition", function (t) {
+  var h = schedulesBoot();
+  var N = h.game.NORMAL_WAVES;
+
+  t.eq(N.length, 40, "forty waves");
+  t.eq(NORMAL_TABLE.length, 40, "and forty rows to check them against");
+
+  var wrong = [];
+  var total = 0;
+  N.forEach(function (wave, i) {
+    var want = NORMAL_TABLE[i][1];
+    var got = compositionOf(h, wave);
+    var n = 0;
+    Object.keys(got).forEach(function (id) { n += got[id]; });
+    total += n;
+
+    Object.keys(want).forEach(function (id) {
+      if (got[id] !== want[id]) {
+        wrong.push("wave " + (i + 1) + ": " + (got[id] || 0) + " x " + id +
+          ", the table says " + want[id]);
+      }
+    });
+    Object.keys(got).forEach(function (id) {
+      if (want[id] === undefined) {
+        wrong.push("wave " + (i + 1) + " has an unlisted " + got[id] + " x " + id);
+      }
+    });
+  });
+  t.eq(wrong.join("\n          "), "", "every wave matches the authored table");
+  t.eq(total, 1321, "1 321 authored root enemies");
+
+  // ROOTS, and the word is load-bearing. A Hive's brood, a Fractal Slime's
+  // descendants and the Tyrant's roar are all born at run time and none of them
+  // is in this count -- exactly as none of them is in Easy's 830.
+  var live = 0;
+  N.forEach(function (wave) { live += h.game.waveCount(wave); });
+  t.eq(live, 1321, "and the game's own waveCount agrees");
+});
+
+// WAVES 1-35 DID NOT MOVE WHEN THE CAMPAIGN GREW TO FORTY, and that is a
+// separate claim from the table above -- the table would still pass if act VI
+// had been paid for by trimming act V. This one holds the composition, the
+// group timing and the authored signature of the first thirty-five waves
+// against what they were before the extension, and it names the ONE field that
+// was allowed to change: wave 35's `duration`, which it had to gain because a
+// wave with something after it must have a ceiling.
+test("Normal's first thirty-five waves are untouched but for wave 35's ceiling",
+function (t) {
+  var h = schedulesBoot();
+  var N = h.game.NORMAL_WAVES;
+
+  var bodies = 0, health = 0;
+  for (var i = 0; i < 35; i++) {
+    bodies += h.game.waveCount(N[i]);
+    health += h.game.waveEffectiveHealth(N[i]);
+  }
+  t.eq(bodies, 1000, "the original 1 000 roots are all still in waves 1-35");
+  // 39 139 MEASURED, and AGENTS.md said 39 507 from the day Normal landed until
+  // 2026-08-27. Nothing pinned it, so nothing caught it; the prose figure was
+  // wrong and the schedule was right. Pinned here now, off the game's own
+  // waveEffectiveHealth, so it cannot drift again unremarked.
+  t.eq(Math.round(health), 39139, "and their 39 139 effective HP with them");
+
+  // The ceiling wave 35 grew, and the fact that it is the ONLY one it grew.
+  t.eq(N[34].duration, 170, "wave 35 now carries a ceiling");
+  var missing = [];
+  for (var j = 0; j < 39; j++) {
+    if (N[j].duration === undefined) missing.push(j + 1);
+  }
+  t.deep(missing, [], "and every wave before the last one has one");
+  t.eq(N[39].duration, undefined, "while wave 40 authors none");
+});
+
+// ACT VI, WAVE BY WAVE, AS THE SPECIFICATION RATHER THAN AS A SNAPSHOT.
+// The composition is already pinned by the table; what these add is the SHAPE
+// each wave was written for, which no roster count can carry.
+test("the three money convoys carry armour and escort and nothing else",
+function (t) {
+  var h = schedulesBoot();
+  var Enemy = h.game.Enemy;
+  var ALLOWED = ["colossus", "brute", "armored", "normal", "fast", "swarm"];
+
+  [36, 37, 38].forEach(function (n) {
+    var wave = h.game.NORMAL_WAVES[n - 1];
+    h.game.waveGroups(wave).forEach(function (g) {
+      var type = Enemy.typeOf(g.type);
+      t.ok(ALLOWED.indexOf(type.id) !== -1,
+        "wave " + n + " carries only ordinary bodies (" + type.id + ")");
+      // The prohibitions, stated as PROPERTIES rather than as an id blacklist,
+      // so a future type that acquires one is caught by the same assertion.
+      t.ok(!type.attack && !type.attacks,
+        "wave " + n + ": nothing in it attacks a tower (" + type.id + ")");
+      t.ok(!type.support, "wave " + n + ": no support (" + type.id + ")");
+      t.ok(!type.spawns, "wave " + n + ": no spawner (" + type.id + ")");
+      t.ok(!type.fractal, "wave " + n + ": no Fractal (" + type.id + ")");
+      t.ok(!type.deathEffect, "wave " + n + ": nothing leaves a charge (" + type.id + ")");
+      t.ok(!type.isCamo && !type.isFlying,
+        "wave " + n + ": nothing camouflaged and nothing airborne (" + type.id + ")");
+      t.ok(!type.showHealthBanner, "wave " + n + ": no boss (" + type.id + ")");
+    });
+
+    // A generous window: the ceiling clears the wave's own last arrival by at
+    // least forty seconds, which is what "a wave to spend in" means when idle
+    // seconds earn nothing.
+    var ev = h.game.waveTimeline(wave);
+    var last = ev[ev.length - 1].time;
+    t.ok(wave.duration - last >= 40,
+      "wave " + n + "'s ceiling (" + wave.duration + " s) clears its last " +
+      "arrival at " + last.toFixed(2) + " s by " +
+      (wave.duration - last).toFixed(2) + " s");
+  });
+});
+
+// THE COLOSSUS PROGRESSION IS THE SPINE OF THE ACT, and it is pinned on its own
+// because it is the one number a retune of any single wave could quietly break.
+test("the Colossus progression across 36-39 is 2, 4, 6 and 8", function (t) {
+  var h = schedulesBoot();
+  var counts = [36, 37, 38, 39].map(function (n) {
+    return compositionOf(h, h.game.NORMAL_WAVES[n - 1]).colossus;
+  });
+  t.deep(counts, [2, 4, 6, 8], "two more every wave, to eight beside the Tyrants");
+  t.eq(compositionOf(h, h.game.NORMAL_WAVES[38]).boss, 3,
+    "and wave 39 adds the three Tyrants to its eight");
+});
+
+// PAYOUT, AND IT HAS TO RISE. The three convoys exist to refund the board that
+// survived act V, and each is meant to buy strictly more than the one before.
+// Measured through the game's own arithmetic -- waveKillBounty plus waveReward
+// -- so a retune of a count or a `health` override moves this with it, and no
+// per-wave reward is typed in anywhere.
+test("the money convoys pay strictly more each wave, and enough to spend",
+function (t) {
+  var h = schedulesBoot();
+  function payout(n) {
+    var wave = h.game.NORMAL_WAVES[n - 1];
+    return h.game.waveKillBounty(wave) + h.game.waveReward(wave, n);
+  }
+  var p36 = payout(36), p37 = payout(37), p38 = payout(38);
+
+  t.ok(p36 < p37, "wave 36 ($" + p36 + ") pays less than wave 37 ($" + p37 + ")");
+  t.ok(p37 < p38, "wave 37 pays less than wave 38 ($" + p38 + ")");
+
+  // WHAT EACH ONE BUYS, against real late-game prices rather than round
+  // numbers: the Warbringer's B5 earthquake is $2900, the Rifleman's B4 is
+  // $2100 and its B5 $3800. One meaningful tier, then one or two, then two or
+  // three (or a rebuild).
+  var oneTier = 2900;                     // Warbringer B5
+  t.ok(p36 >= oneTier,
+    "wave 36 covers a meaningful late-game tier ($" + p36 + " vs $" + oneTier + ")");
+  t.ok(p37 >= 3800 && p37 < 2 * 3800,
+    "wave 37 covers one or two ($" + p37 + ")");
+  t.ok(p38 >= 2100 + 3800,
+    "wave 38 covers two or three, or a substantial rebuild ($" + p38 + ")");
+});
+
+// WAVE 39 -- THE ROYAL LEGION. The staging is the wave, so it is checked as
+// staging: three Tyrants, roughly twenty seconds apart, never together, with
+// support interleaved into the payload it exists to keep standing.
+test("wave 39 sends three independent Tyrants about twenty seconds apart",
+function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[38];
+
+  var tyrants = h.game.waveGroups(wave).filter(function (g) {
+    return g.type === "boss";
+  });
+  t.eq(tyrants.length, 3, "three separate one-body groups, not one group of three");
+  tyrants.forEach(function (g) {
+    t.eq(g.count, 1, "each Tyrant is its own entrance");
+  });
+  var at = tyrants.map(function (g) { return g.at; });
+  t.deep(at, [8, 28, 50], "at 8 s, 28 s and 50 s");
+  t.ok(at[1] - at[0] >= 18 && at[1] - at[0] <= 24, "twenty seconds between 1 and 2");
+  t.ok(at[2] - at[1] >= 18 && at[2] - at[1] <= 24, "and between 2 and 3");
+
+  // NEVER TOGETHER, which is what "approximately twenty seconds apart" is
+  // actually protecting: no two of them share an arrival instant.
+  var times = h.game.waveTimeline(wave).filter(function (e) {
+    return h.game.waveGroups(wave)[e.groupIndex].type === "boss";
+  }).map(function (e) { return e.time; });
+  t.eq(times.length, 3, "three boss arrivals on the timeline");
+  t.eq(times[0] === times[1] || times[1] === times[2], false,
+    "and no two of them land on the same frame");
+});
+
+test("wave 39's three Tyrants keep independent state, and their summons keep 39",
+function (t) {
+  var h = harness.boot("rune-circuit", "normal");
+  var Enemy = h.game.Enemy;
+
+  // THE STATE THAT MUST NOT BE SHARED is the attack pool: `enterPhase` COPIES
+  // every spec rather than mutating the row in Enemy.TYPES, so one Tyrant
+  // roaring must not wind the interval down on the other two -- or on the next
+  // run's boss.
+  var typeInterval = Enemy.TYPES.boss.attacks[0].intervalSeconds;
+  var a = new Enemy(h.game.path, 3600, "boss", { waveId: 39 });
+  var b = new Enemy(h.game.path, 3600, "boss", { waveId: 39 });
+  var c = new Enemy(h.game.path, 3600, "boss", { waveId: 39 });
+
+  a.takeDamage(2000);                      // past half of 3600: a roars
+  t.eq(a.phasesEntered, 1, "the first Tyrant has roared");
+  t.eq(b.phasesEntered, 0, "the second has not");
+  t.eq(c.phasesEntered, 0, "and neither has the third");
+  t.eq(a.attacks.length, 2, "the roarer has its leap");
+  t.eq(b.attacks.length, 1, "the others do not");
+  t.eq(Enemy.TYPES.boss.attacks[0].intervalSeconds, typeInterval,
+    "and the TYPE's own spec is untouched, so the next boss is unaffected");
+
+  // AND ONE DYING CHANGES NOTHING ABOUT THE OTHERS. Two blows, not one: the
+  // roar conjured a 1000 point shield and a shield absorbs the WHOLE hit that
+  // breaks it, so the first blow only strips the shell.
+  a.takeDamage(999999);
+  a.takeDamage(999999);
+  t.eq(a.dead, true, "the first Tyrant is down");
+  t.eq(b.phasesEntered, 0, "the second is still whole");
+  b.takeDamage(2000);
+  t.eq(b.phasesEntered, 1, "and roars on its own clock");
+  t.eq(c.phasesEntered, 0, "with the third still untouched");
+
+  // SUMMONS INHERIT THE WAVE. `pendingSpawns` is what the roar fills and
+  // spawnMinions is the one door it comes out of; every body it makes carries
+  // the roarer's own waveId, which is wave 39's.
+  var brood = b.spawnMinions(0);
+  t.ok(brood.length > 0, "the roar queued a crowd");
+  var wrong = brood.filter(function (e) { return e.waveId !== 39; });
+  t.eq(wrong.length, 0, "and every summoned body carries wave 39");
+});
+
+test("wave 39 is the tactical peak, but not the damage peak", function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[38];
+  var effective = h.game.waveEffectiveHealth(wave);
+
+  // The authored band the wave was written to: durable/effective HP BEFORE any
+  // renewable support (Healers, Shieldbearers) and before a Tyrant's summons,
+  // none of which waveEffectiveHealth counts.
+  t.ok(effective >= 28000 && effective <= 32000,
+    "28 000 - 32 000 authored effective HP (" + Math.round(effective) + ")");
+
+  // AND IT STAYS UNDER THE 45K BOSS. Wave 39 may be the more complicated wave;
+  // it may not be the heavier one.
+  t.ok(effective < h.game.Enemy.TYPES.dinomech.health,
+    "under wave 40's single body (" + Math.round(effective) + " < " +
+    h.game.Enemy.TYPES.dinomech.health + ")");
+
+  // Support is INTERLEAVED, never parked behind the payload: every supporter
+  // lands while something else in the wave is still arriving.
+  var lastArrival = 0;
+  h.game.waveGroups(wave).forEach(function (g) {
+    lastArrival = Math.max(lastArrival, g.at + (g.count - 1) * g.interval);
+  });
+  var late = [];
+  h.game.waveGroups(wave).forEach(function (g) {
+    var type = h.game.Enemy.typeOf(g.type);
+    if (!type.support) return;
+    if (!(g.at < lastArrival)) late.push(type.id + " at " + g.at);
+  });
+  t.deep(late, [], "every supporter arrives inside the deploy it supports");
+});
+
+// WAVE 40 -- THE TRUE FINALE.
+test("wave 40 is one 45k boss, eighteen Swarm, twelve Fast and no support",
+function (t) {
+  var h = schedulesBoot();
+  var Enemy = h.game.Enemy;
+  var wave = h.game.NORMAL_WAVES[39];
+
+  t.eq(rosterLine(compositionOf(h, wave)),
+    rosterLine({ dinomech: 1, swarm: 18, fast: 12 }),
+    "1 Dinomech + 18 Swarm + 12 Fast");
+  t.eq(Enemy.TYPES.dinomech.health, 45000, "and the boss is exactly 45 000 HP");
+
+  // NO SHIELD, NO REVIVE, NO PHASE -- so 45 000 is what the schedule says AND
+  // what the player has to remove, with nothing conditional on top of it.
+  t.eq(Enemy.TYPES.dinomech.shield, undefined, "no shield");
+  t.eq(Enemy.TYPES.dinomech.revive, undefined, "no second life");
+  t.eq(Enemy.TYPES.dinomech.phases, undefined, "and no phase to call anything in");
+  t.eq(Enemy.TYPES.dinomech.support, undefined, "it helps nothing");
+  t.eq(Enemy.TYPES.dinomech.spawns, undefined, "and spawns nothing");
+
+  // NOTHING IN THE WAVE HEALS, SHIELDS, HASTENS, SPAWNS OR DISABLES. Stated as
+  // properties rather than as a list of forbidden ids.
+  h.game.waveGroups(wave).forEach(function (g) {
+    var type = Enemy.typeOf(g.type);
+    t.ok(!type.support, "no supporter in wave 40 (" + type.id + ")");
+    t.ok(!type.spawns, "no spawner in wave 40 (" + type.id + ")");
+    t.ok(!type.shield, "nothing wearing a shield (" + type.id + ")");
+    t.ok(!type.revive, "nothing that gets back up (" + type.id + ")");
+    t.ok(!type.fractal, "and no Fractal (" + type.id + ")");
+  });
+
+  // THE DISTRACTIONS ARE SECONDARY, by weight and by speed.
+  var boss = h.game.Enemy.TYPES.dinomech;
+  ["swarm", "fast"].forEach(function (id) {
+    t.ok(Enemy.TYPES[id].speedMultiplier > boss.speedMultiplier,
+      "a " + id + " overtakes the boss it spawns behind");
+  });
+  var escortHp = h.game.waveEffectiveHealth(wave) - boss.health;
+  t.ok(escortHp < boss.health * 0.05,
+    "the thirty escort bodies are " + Math.round(escortHp) +
+    " points against the boss's " + boss.health);
+});
+
+test("wave 40's four deployments land at 0, 12, 32 and 55 seconds",
+function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[39];
+
+  var at = [];
+  h.game.waveGroups(wave).forEach(function (g) {
+    if (at.indexOf(g.at) === -1) at.push(g.at);
+  });
+  at.sort(function (a, b) { return a - b; });
+  t.deep(at, [0, 12, 32, 55], "four authored deployment instants and no others");
+
+  // A CLEAN TWELVE-SECOND ENTRANCE: the boss is the only thing on the road
+  // until the first escort lands.
+  var events = h.game.waveTimeline(wave);
+  var groups = h.game.waveGroups(wave);
+  var early = events.filter(function (e) { return e.time < 12; });
+  t.eq(early.length, 1, "exactly one body arrives before 12 s");
+  t.eq(groups[early[0].groupIndex].type, "dinomech", "and it is the boss");
+
+  // NO CEILING, so nothing can create a wave 41.
+  t.eq(wave.duration, undefined, "wave 40 authors no `duration`");
+  t.eq(h.game.NORMAL_WAVES.length, 40, "and there are forty waves, not forty-one");
+});
+
+// EVERY AUTHORED EVENT IN 35-39 LANDS BEFORE ITS OWN CEILING, point-blank off
+// the EVENT LIST rather than off the group arithmetic the shipping validator
+// uses -- so the two derivations have to agree. A `duration` at or under its own
+// last arrival deletes the tail of a wave silently: the wave still says 102
+// bodies and still pays for 102.
+test("every event in Normal's waves 35-39 happens before that wave's ceiling",
+function (t) {
+  var h = schedulesBoot();
+  var short = [];
+  for (var i = 34; i < 39; i++) {
+    var wave = h.game.NORMAL_WAVES[i];
+    var ev = h.game.waveTimeline(wave);
+    var last = ev[ev.length - 1].time;
+    if (wave.duration === undefined) {
+      short.push("wave " + (i + 1) + " has no ceiling at all");
+    } else if (!(wave.duration > last)) {
+      short.push("wave " + (i + 1) + ": ceiling " + wave.duration +
+        " s does not outlast its last arrival at " + last.toFixed(2) + " s");
+    }
+  }
+  t.eq(short.join(" | "), "", "35, 36, 37, 38 and 39 all clear their own tails");
+});
+
+// ---------------------------------------------------------------------------
+// THE FINALE MOVED, AND FINALITY COMES FROM THE SCHEDULE'S LENGTH.
+//
+// Wave 35 was Normal's last wave until 2026-08-28 and it holds a Tyrant, which
+// is exactly the thing that makes "is this the end" look like a question about
+// content. It is not: the only thing that decides it is `WAVES.length`. These
+// two tests are the behavioural halves -- one that wave 35 hands over, one that
+// wave 40 does not.
+// ---------------------------------------------------------------------------
+test("Normal's wave 35 hands over to wave 36 and cannot win the run",
+function (t) {
+  var h = harness.boot("rune-circuit", "normal");
+  t.eq(h.game.WAVES.length, 40, "forty waves are on the clock");
+
+  h.run("waveIndex = 34; waveSpawned = 0; waveCountdown = 0; waveElapsed = 0;" +
+        "enemies = []; bullets = []; baseHp = 1000000;");
+  h.step(1 / 60);
+
+  // IT IS AN ORDINARY WAVE NOW: a ceiling, a readable window, and a Send button
+  // once it has finished arriving.
+  t.eq(h.game.WAVES[34].duration, 170, "wave 35 carries its ceiling");
+  t.ok(h.run("waveTimeRemaining()") > 0, "so the readout has a number to print");
+  t.ok(h.run("waveStatusText()").indexOf("FINAL WAVE") === -1,
+    "and it does not claim to be the final wave (" + h.run("waveStatusText()") + ")");
+
+  // Run it out and clear the road. Nothing here may win the run.
+  for (var i = 0; i < 200 * 60 && h.game.waveIndex === 34; i++) {
+    h.run("enemies.forEach(function (e) { e.noBounty = true; e.dead = true; })");
+    h.step(1 / 60);
+  }
+  t.eq(h.game.victory, false, "beating wave 35 does not win the campaign");
+  t.eq(h.game.allWavesDeployed, false, "the schedule is not exhausted");
+  t.eq(h.game.waveIndex, 35, "and wave 36 is what is on the cursor");
+  t.ok(h.game.waveCountdown > 0 || h.game.waveIndex === 35,
+    "with the transition to it already running");
+});
+
+test("Normal wins only once wave 40's boss and its escort are both gone",
+function (t) {
+  var h = harness.boot("rune-circuit", "normal");
+  var last = h.game.WAVES.length - 1;
+  t.eq(last, 39, "wave 40 is the last index");
+
+  h.run("waveIndex = " + last + "; waveSpawned = 0; waveCountdown = 0;" +
+        "waveElapsed = 0; enemies = []; bullets = []; baseHp = 1000000;");
+  h.step(1 / 60);
+
+  t.eq(h.game.WAVES[last].duration, undefined, "wave 40 authors no ceiling");
+  t.eq(h.run("waveTimeRemaining()"), null, "so there is no window to count down");
+  t.notOk(h.run("waveSendAvailable()"), "and no Send while it deploys");
+  t.ok(h.run("waveStatusText()").indexOf("FINAL WAVE") !== -1,
+    "the readout says FINAL WAVE (" + h.run("waveStatusText()") + ")");
+
+  // Run it out. Nothing may hand over to a wave 41.
+  for (var i = 0; i < 200 * 60 && !h.game.allWavesDeployed; i++) h.step(1 / 60);
+  t.ok(h.game.allWavesDeployed, "wave 40 finished arriving");
+  t.eq(h.game.waveIndex, 40, "the cursor is retired past the end");
+  t.notOk(h.run("waveSendAvailable()"), "still no Send once it is out");
+  t.eq(h.game.waveCountdown, 0, "no countdown to a wave 41");
+  t.notOk(h.game.betweenWaves(), "and no transition, because there is nothing next");
+  t.ok(h.game.enemies.length > 0, "the boss and its escort are still walking");
+  t.eq(h.game.victory, false, "so the run is not won");
+
+  // Kill the escort but leave the boss: still not a win.
+  h.run("enemies.forEach(function (e) {" +
+        "  if (e.typeId !== 'dinomech') { e.noBounty = true; e.dead = true; }" +
+        "})");
+  h.step(1 / 60);
+  var boss = h.game.enemies.filter(function (e) { return e.typeId === "dinomech"; });
+  t.eq(boss.length, 1, "one Dinomech left on the road");
+  t.eq(boss[0].maxHealth, 45000, "carrying its 45 000");
+  t.eq(boss[0].waveId, 40, "and wearing wave 40");
+  t.eq(h.game.victory, false, "the boss alone still holds the win away");
+
+  // And now it too.
+  h.run("enemies.forEach(function (e) { e.noBounty = true; e.dead = true; })");
+  h.step(1 / 60);
+  t.eq(h.game.enemies.length, 0, "the road is clear");
+  t.eq(h.game.victory, true, "and that is the win");
+  t.eq(h.game.WAVES.length, 40, "off forty waves and no forty-first");
+});
+
+// THE ARRIVAL AUDIT, FOR NORMAL. Its Easy twin ("the whole campaign runs itself
+// dry, with every authored arrival emitted once") is the only test in the repo
+// that watches the RUN rather than the data, and it reads `WAVES` on a fresh
+// boot, which is Easy. Act VI is 321 new arrivals across five waves nothing
+// else exercises end to end, and the two failures that hide from every count in
+// this file -- an arrival emitted twice, an arrival dropped by a ceiling that
+// cut its own tail -- are exactly what a newly authored act is most likely to
+// carry.
+test("Normal runs itself dry over forty waves, every arrival emitted once",
+function (t) {
+  var h = harness.boot(null);
+  h.chooseMap(h.game.Maps.DEFAULT_ID, "normal");
+  t.eq(h.game.WAVES, h.game.NORMAL_WAVES, "on Normal's schedule");
+  h.run("baseHp = 4000000");
+  var openingCash = h.game.cash;
+
+  h.run("(function () {" +
+        "  var real = emitWaveEvent;" +
+        "  emittedArrivals = [];" +
+        "  emitWaveEvent = function (ev) {" +
+        "    emittedArrivals.push((waveIndex + 1) + ':' + ev.groupIndex + ':' + ev.bodyIndex);" +
+        "    return real(ev);" +
+        "  };" +
+        "})()");
+
+  for (var i = 0; i < 90 * 60 * 60 && !h.game.victory && !h.game.gameOver; i++) {
+    h.step(1 / 60);
+  }
+  t.eq(h.game.victory, true, "the campaign ends in a win with nobody touching it");
+  t.eq(h.game.enemies.length, 0, "on an empty road");
+  t.eq(h.game.allWavesDeployed, true, "with the schedule exhausted");
+
+  var emitted = h.run("emittedArrivals");
+  t.eq(emitted.length, 1321, "1 321 arrivals were emitted across the run");
+
+  var seen = {}, twice = [];
+  emitted.forEach(function (key) {
+    if (seen[key]) twice.push(key);
+    seen[key] = (seen[key] || 0) + 1;
+  });
+  t.eq(twice.join(" "), "", "and no arrival was emitted twice");
+
+  var missing = [];
+  h.game.WAVES.forEach(function (wave, i) {
+    var prefix = (i + 1) + ":";
+    var got = emitted.filter(function (key) {
+      return key.slice(0, prefix.length) === prefix;
+    }).length;
+    if (got !== h.game.waveCount(wave)) {
+      missing.push("wave " + (i + 1) + " emitted " + got + " of " +
+        h.game.waveCount(wave));
+    }
+  });
+  t.eq(missing.join(" | "), "", "every wave emitted exactly the bodies it authors");
+
+  // Nothing was killed -- every body leaked into an oversized base and a leak
+  // pays nothing -- so the only cash that moved is the FORTY clear rewards.
+  var owed = 0;
+  h.game.WAVES.forEach(function (wave, i) { owed += h.game.waveReward(wave, i + 1); });
+  t.eq(h.game.cash - openingCash, owed,
+    "the unattended run paid exactly the 40 clear rewards, no more and no less");
+  t.eq(h.game.pendingBounty, 0, "with nothing left owed at the end");
+});
+
+test("Normal carries all twenty-five types, and Easy's twenty-one", function (t) {
+  var h = schedulesBoot();
+  var seen = {};
+  h.game.NORMAL_WAVES.forEach(function (wave) {
+    h.game.waveGroups(wave).forEach(function (g) {
+      var id = g.type || h.game.Enemy.DEFAULT_TYPE;
+      h.game.Enemy.typeOf(id);              // throws on a typo in the schedule
+      seen[id] = (seen[id] || 0) + 1;
+    });
+  });
+  var roster = Object.keys(h.game.Enemy.TYPES);
+  t.eq(roster.length, 25, "twenty-five types exist");
+  t.ok(seen.dinomech > 0, "the Dinomech among them, in wave 40");
+
+  var missing = roster.filter(function (id) { return !seen[id]; });
+  t.eq(missing.join(", "), "", "and Normal schedules every one of them");
+});
+
+// THE ACT TOTALS. They are the CURVE, and a retune that holds the total while
+// moving bodies between acts is a different campaign wearing the same figure --
+// which no other assertion here would see.
+//
+// THE FIRST FIVE ARE PINNED SEPARATELY FROM THE SIXTH, deliberately. Acts I-V
+// are the teaching curve and they did not move when the campaign was extended
+// on 2026-08-28; act VI is five waves rather than seven and is the ending. Summing
+// all six into one figure would let one absorb the other.
+test("Normal's five teaching acts are still 158, 174, 213, 212 and 243 bodies",
+function (t) {
+  var h = schedulesBoot();
+  var acts = [0, 0, 0, 0, 0];
+  h.game.NORMAL_WAVES.slice(0, 35).forEach(function (wave, i) {
+    acts[Math.floor(i / 7)] += h.game.waveCount(wave);
+  });
+  t.deep(acts, [158, 174, 213, 212, 243], "seven waves per act, five acts");
+  t.eq(acts.reduce(function (a, b) { return a + b; }, 0), 1000,
+    "and they still add to the thousand they always did");
+});
+
+test("act VI is five waves and 321 bodies, on top of the thousand", function (t) {
+  var h = schedulesBoot();
+  var act6 = h.game.NORMAL_WAVES.slice(35);
+  t.eq(act6.length, 5, "waves 36 to 40");
+  var bodies = 0;
+  act6.forEach(function (wave) { bodies += h.game.waveCount(wave); });
+  t.deep(act6.map(function (wave) { return h.game.waveCount(wave); }),
+    [54, 68, 102, 66, 31], "54 / 68 / 102 / 66 / 31");
+  t.eq(bodies, 321, "321 new roots");
+  t.eq(1000 + bodies, 1321, "and 1 321 across the whole campaign");
+});
+
+// THE THREE WAVES WITH WRITTEN ENCOUNTER DIRECTION. Each one is a sentence the
+// owner wrote, and each is checked as the sentence rather than as a row of the
+// table above -- the composition is already pinned there, so what these add is
+// the SHAPE the composition was chosen for.
+test("wave 11 is the aerial warning: three Wisps inside a grounded formation",
+function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[10];
+  var comp = compositionOf(h, wave);
+  t.eq(rosterLine(comp),
+    rosterLine({ shieldbearer: 1, armored: 14, fast: 12, flying: 3 }),
+    "1 Shieldbearer + 14 Armored + 12 Fast + 3 Aether Wisp");
+
+  // ONLY THREE, and everything else on the ground. It is a warning and not the
+  // check -- wave 24 is the check -- so a board with no air reach leaks three
+  // bodies here rather than eighteen.
+  t.eq(comp.flying, 3, "three flyers and no more");
+  var ground = 0;
+  Object.keys(comp).forEach(function (id) {
+    if (!h.game.Enemy.typeOf(id).isFlying) ground += comp[id];
+  });
+  t.eq(ground, 27, "embedded in twenty-seven grounded bodies");
+
+  // AND THE SUPPORT ARRIVES WHILE ITS BENEFICIARIES ARE STILL DEPLOYING, which
+  // is this schedule's standing authoring rule: a supporter behind its own wave
+  // props up nothing and the player never learns what it does.
+  var bearer = groupOfType(h, wave, "shieldbearer");
+  var lastArrival = 0;
+  h.game.waveGroups(wave).forEach(function (g) {
+    if ((g.type || "normal") === "shieldbearer") return;
+    lastArrival = Math.max(lastArrival, g.at + (g.count - 1) * g.interval);
+  });
+  t.ok(bearer.at < lastArrival,
+    "the Shieldbearer lands at " + bearer.at + " s, inside a deploy that runs " +
+    "to " + lastArrival.toFixed(2) + " s");
+});
+
+test("wave 16 is the split-coverage test, and the Heralds cannot touch the air",
+function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[15];
+  t.eq(rosterLine(compositionOf(h, wave)),
+    rosterLine({ hive: 2, swarm: 20, herald: 2, flying: 10 }),
+    "2 Hive + 20 Swarm + 2 Herald + 10 Aether Wisp");
+
+  // "TEN WISPS WHILE HERALDS ACCELERATE ONLY THE HIVE/SWARM GROUND FORMATION."
+  // The word is "only", and it is true by the MECHANIC rather than by the
+  // schedule: a Herald's eligibility rule excludes fliers, so no spacing, no
+  // ordering and no proximity can make it hasten a Wisp. Checked here against
+  // the live rule rather than restated, so a change to `eligible` fails the
+  // wave that was designed around it.
+  var Enemy = h.game.Enemy;
+  var herald = new Enemy(h.game.path, undefined, "herald");
+  var rule = Enemy.TYPES.herald.support.eligible;
+  var wisp = new Enemy(h.game.path, undefined, "flying");
+  var speck = new Enemy(h.game.path, undefined, "swarm");
+  var hive = new Enemy(h.game.path, undefined, "hive");
+  t.eq(Enemy.supportEligible(herald, wisp, rule), false, "a Wisp is ineligible");
+  t.eq(Enemy.supportEligible(herald, speck, rule), true, "a Swarm is eligible");
+  t.eq(Enemy.supportEligible(herald, hive, rule), true, "and so is a Hive");
+});
+
+test("wave 18 is Field Surgery: Brutes, Angries, and Healers inside the wave",
+function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[17];
+  t.eq(rosterLine(compositionOf(h, wave)),
+    rosterLine({ healer: 2, brute: 6, angry: 12 }),
+    "2 Healer + 6 Brute + 12 Angry");
+
+  // The Brutes are the durable body the Healers are there to sustain, so they
+  // have to be scaled enough to survive long enough to be healed -- and the
+  // Angries have to be the type that stops to attack towers, or the wave is
+  // just a tank wave with a medic in it.
+  var brute = groupOfType(h, wave, "brute");
+  t.ok(h.game.Enemy.healthOf("brute", brute.health) >= 60,
+    "the Brutes are scaled to absorb sustained fire (" +
+    h.game.Enemy.healthOf("brute", brute.health) + " HP)");
+  t.eq(h.game.Enemy.typeOf("brute").armor, 5, "behind their 5 flat armor");
+  t.ok(!!h.game.Enemy.TYPES.angry.attack, "the Angries stop to hit towers");
+  t.eq(h.game.Enemy.TYPES.healer.support.pick, "mostMissingHealth",
+    "and the Healers sustain whichever body is most wounded");
+
+  // BOTH HEALERS ARRIVE INSIDE THE WAVE, not behind it. That is the direction
+  // "Healers sustain whichever durable body is wounded" actually needs: a pulse
+  // fires eight seconds after the body arrives, and it has to land while there
+  // is something wounded to land on.
+  var healers = [];
+  var lastOther = 0;
+  h.game.waveGroups(wave).forEach(function (g) {
+    if ((g.type || "normal") === "healer") { healers.push(g.at); return; }
+    lastOther = Math.max(lastOther, g.at + (g.count - 1) * g.interval);
+  });
+  t.eq(healers.length, 2, "two Healer groups");
+  healers.forEach(function (at) {
+    t.ok(at < lastOther, "a Healer at " + at + " s, inside a deploy ending at " +
+      lastOther.toFixed(2) + " s");
+  });
+});
+
+test("wave 34's Vanguards arrive about twelve seconds apart", function (t) {
+  var h = schedulesBoot();
+  var at = [];
+  h.game.waveGroups(h.game.NORMAL_WAVES[33]).forEach(function (g) {
+    if (g.type === "boss_fast") at.push(g.at);
+  });
+  t.eq(at.length, 2, "two Vanguards, as two authored entrances");
+  t.ok(Math.abs((at[1] - at[0]) - 12) <= 1.5,
+    "twelve seconds apart (" + (at[1] - at[0]).toFixed(1) + " s)");
+});
+
+test("wave 35 puts the Tyrant near the middle, the T5 last, and no Sapper",
+function (t) {
+  var h = schedulesBoot();
+  var wave = h.game.NORMAL_WAVES[34];
+  var events = h.game.waveTimeline(wave);
+  var deploy = events[events.length - 1].time;
+
+  var tyrant = null, slime = null;
+  h.game.waveGroups(wave).forEach(function (g) {
+    if (g.type === "boss") tyrant = g;
+    if (g.type === "fractal_slime") slime = g;
+  });
+  t.ok(tyrant !== null, "the Tyrant is scheduled");
+  var share = tyrant.at / deploy;
+  t.ok(share > 0.35 && share < 0.6,
+    "and walks in at " + Math.round(share * 100) + "% of the deploy");
+
+  t.eq(slime.tier, 5, "the T5 root is the top rung");
+  t.eq(slime.at, deploy, "and it is the last thing the wave sends");
+
+  // SAPPER PLUS TYRANT IS RESERVED FOR HARD. A saboteur switching towers off
+  // while the boss is already silencing the best one is a compounding lockout,
+  // and Normal's finale is a wave you fight rather than one you watch.
+  t.eq(compositionOf(h, wave).sapper, undefined, "and there is no Sapper in it");
+
+  // THE ROAR PACKAGE IS UNTOUCHED -- it is data on the type, and this schedule
+  // neither overrides the boss's health nor adds a phase.
+  t.eq(tyrant.health, undefined, "the Tyrant carries its own 5000");
+  t.eq(h.game.Enemy.TYPES.boss.phases.length, 1, "with its one roar");
+  t.eq(h.game.Enemy.TYPES.boss.phases[0].shield, 1000, "and the roar's 1000 shield");
+});
+
+// ---------------------------------------------------------------------------
+// INDEPENDENTLY AUTHORED, WHICH IS THE CLAIM THAT MATTERS.
+// ---------------------------------------------------------------------------
+test("Normal is authored, not derived from Easy and not an alias of it",
+function (t) {
+  var h = schedulesBoot();
+  var E = h.game.EASY_WAVES;
+  var N = h.game.NORMAL_WAVES;
+
+  // 1 -- NOT AN ALIAS, AT ANY DEPTH. Not the same array, not the same wave
+  // objects, not the same group objects. A schedule that shared a group with
+  // another would have one editable in two places.
+  t.ok(E !== N, "two different arrays");
+  var shared = [];
+  for (var i = 0; i < N.length; i++) {
+    for (var j = 0; j < E.length; j++) {
+      if (N[i] === E[j]) shared.push("wave object " + (i + 1) + " = easy " + (j + 1));
+      var ng = h.game.waveGroups(N[i]);
+      var eg = h.game.waveGroups(E[j]);
+      for (var a = 0; a < ng.length; a++) {
+        for (var b = 0; b < eg.length; b++) {
+          if (ng[a] === eg[b]) shared.push("n" + (i + 1) + ".g" + a + " = e" + (j + 1) + ".g" + b);
+        }
+      }
+    }
+  }
+  t.eq(shared.slice(0, 5).join(" | "), "", "and no object in common at any depth");
+
+  // 2 -- NOT A MULTIPLE. `buildDifficultyWaves` scaled Easy by constants, so
+  // the test for its return is that NO single ratio reproduces one schedule
+  // from the other. Four independent quantities, per wave: if any of them were
+  // a constant times Easy's, that quantity was derived.
+  ["waveCount", "waveEffectiveHealth", "waveBounty", "waveKillBounty"]
+    .forEach(function (fn) {
+      var ratios = [];
+      for (var k = 0; k < 35; k++) {
+        var easy = h.game[fn](E[k]);
+        var normal = h.game[fn](N[k]);
+        if (easy > 0) ratios.push(normal / easy);
+      }
+      var lo = Math.min.apply(null, ratios);
+      var hi = Math.max.apply(null, ratios);
+      t.ok(hi - lo > 0.5, fn + " varies wave to wave (" + lo.toFixed(2) +
+        " to " + hi.toFixed(2) + "), so it is not Easy times a constant");
+    });
+
+  // 3 -- AND IT IS A DIFFERENT CAMPAIGN, not the same one reordered. Every
+  // wave's roster is compared with Easy's wave of the same number; a schedule
+  // that merely turned the numbers up would match on most of them.
+  var same = 0;
+  for (var w = 0; w < 35; w++) {
+    var ec = compositionOf(h, E[w]);
+    var nc = compositionOf(h, N[w]);
+    var keys = Object.keys(ec).concat(Object.keys(nc)).sort();
+    var identical = true;
+    for (var q = 0; q < keys.length; q++) {
+      if (ec[keys[q]] !== nc[keys[q]]) { identical = false; break; }
+    }
+    if (identical) same++;
+  }
+  t.eq(same, 0, "not one wave has the same roster as Easy's wave of that number");
+
+  // 4 -- AND NOTHING IN THE SOURCE DERIVES ONE FROM THE OTHER. The deleted
+  // 2026-08-12 implementation was named; a new one would have to be too, and
+  // the point of reading the file is that a derivation is a shape no data
+  // assertion above can rule out.
+  var src = require("fs").readFileSync(
+    require("path").join(__dirname, "..", "js", "game.js"), "utf8");
+  var body = src.slice(src.indexOf("var NORMAL_WAVES"),
+    src.indexOf("function waveGroups"));
+  t.eq(body.indexOf("EASY_WAVES"), -1,
+    "NORMAL_WAVES is authored without mentioning EASY_WAVES");
+  // The 2026-08-12 derivation by name. Both forms are checked -- a definition
+  // and a call -- because the identifier itself appears in the comment above
+  // DIFFICULTIES, where it is the history that explains why this test exists.
+  t.eq(src.indexOf("function buildDifficultyWaves"), -1,
+    "and the deleted derivation has not been redefined");
+  t.eq(src.indexOf("buildDifficultyWaves("), -1, "or called");
+});
+
+// ---------------------------------------------------------------------------
+// SELECTION
+// ---------------------------------------------------------------------------
+test("the difficulty step follows the route, and its cards start the run",
+function (t) {
+  var h = harness.boot(null);
+  t.eq(h.game.screen, "select", "the chooser is up");
+
+  var card = h.game.mapCardRect(1);
+  h.click(card.x + card.w / 2, card.y + card.h / 2);
+  t.eq(h.game.screen, "difficulty", "a route card opens the difficulty step");
+  t.eq(h.game.pendingMap.id, h.game.Maps.LIST[1].id, "holding the route it chose");
+
+  // NOTHING SIMULATES ON THE WAY THROUGH. `update()` tests `screen !== "play"`
+  // rather than listing the screens that are not, so a new one is inert by
+  // default -- and this is what proves the new one inherited that.
+  h.step(5);
+  t.eq(h.game.enemies.length, 0, "and nothing walked while it was up");
+
+  var pick = h.game.difficultyCardRect(1);
+  h.click(pick.x + pick.w / 2, pick.y + pick.h / 2);
+  t.eq(h.game.screen, "play", "the difficulty card starts the run");
+  t.eq(h.game.currentMap.id, h.game.Maps.LIST[1].id, "on the chosen route");
+  t.eq(h.game.selectedDifficultyId, "normal", "at the chosen difficulty");
+  t.eq(h.game.waveCountdown, h.game.RUN_START_DELAY,
+    "on the ordinary ten-second opening pause");
+});
+
+test("selecting a difficulty activates that schedule and nothing else",
+function (t) {
+  var h = harness.boot();
+  t.eq(h.game.WAVES, h.game.EASY_WAVES, "a fresh boot is on Easy");
+  t.eq(h.game.selectedDifficultyId, "easy", "and says so");
+
+  t.eq(h.run("setDifficulty('normal').id"), "normal", "setDifficulty returns the pick");
+  t.eq(h.game.WAVES, h.game.NORMAL_WAVES, "Normal is now the active schedule");
+  t.eq(h.game.EASY_WAVES.length, 35, "Easy is untouched by the swap");
+
+  t.eq(h.run("setDifficulty('easy').id"), "easy", "and back");
+  t.eq(h.game.WAVES, h.game.EASY_WAVES, "Easy is active again");
+
+  // AN UNKNOWN ID FALLS BACK RATHER THAN LEAVING `WAVES` POINTING AT NOTHING.
+  // This is reached from a dropdown and from a string; a throw here would take
+  // the sandbox down and an undefined would take the run down four frames later.
+  t.eq(h.run("setDifficulty('hard').id"), "easy", "an unknown id falls back");
+  t.eq(h.game.WAVES, h.game.EASY_WAVES, "to the default schedule");
+  t.eq(h.game.DIFFICULTIES.length, 2,
+    "and there are exactly two difficulties -- no Hard, and no placeholder");
+});
+
+test("swapping schedule drops the derived timeline with it", function (t) {
+  var h = harness.boot();
+  // The event cache is keyed on `waveIndex`, which is 0 in both schedules --
+  // so without resetWaveTimeline() the first wave of Normal would deploy the
+  // first wave of Easy's bodies until the cursor happened to move.
+  t.eq(h.game.waveEventCount(), h.game.waveCount(h.game.EASY_WAVES[0]),
+    "wave 1 of Easy is on the cursor");
+  h.run("setDifficulty('normal')");
+  t.eq(h.game.waveEventCount(), h.game.waveCount(h.game.NORMAL_WAVES[0]),
+    "and wave 1 of Normal is on it the instant the schedule changes");
+});
+
+test("restart preserves the difficulty and clears every new run-scoped thing",
+function (t) {
+  var h = harness.boot("rune-circuit", "normal");
+  t.eq(h.game.selectedDifficultyId, "normal", "booted on Normal");
+  t.eq(h.game.WAVES, h.game.NORMAL_WAVES, "playing Normal's schedule");
+
+  // Dirty the run: a hazard on a fuse, a suppressed tower, a hastened body.
+  h.run("cash = 100000");
+  var spot = h.game.Maps.bestSpots(h.game.currentMap, 1)[0];
+  var tower = h.placeGunner(spot.x, spot.y);
+  h.run("TowerHealth.suppress(towers[0], 'sapper', 6); TowerHealth.stun(towers[0], 2);");
+  var body = h.spawnAt(200, undefined, "volatile");
+  body.dead = true;
+  h.run("Hazards.fromDeath(enemies[enemies.length - 1])");
+  var walker = h.spawnAt(300, undefined, "swarm");
+  walker.applyHaste(1.3, 4);
+  t.eq(h.game.Hazards.count(), 1, "a hazard is armed");
+  t.eq(h.game.TowerHealth.isSuppressed(tower, "sapper"), true, "a tower is immune");
+
+  h.run("restartGame()");
+
+  // THE DIFFICULTY SURVIVES. "Restart" means play this route again, and a
+  // player who chose Normal and lost did not ask to be put back on Easy.
+  t.eq(h.game.selectedDifficultyId, "normal", "the difficulty survived the restart");
+  t.eq(h.game.WAVES, h.game.NORMAL_WAVES, "and so did its schedule");
+
+  // AND EVERY NEW PIECE OF RUN STATE IS GONE. A fuse armed in the run that
+  // ended would otherwise detonate under towers placed in the run that began.
+  t.eq(h.game.Hazards.count(), 0, "no hazard survived");
+  t.eq(h.game.towers.length, 0, "no tower survived, so no immunity did either");
+  t.eq(h.game.enemies.length, 0, "and no hastened body survived");
+  t.eq(h.game.baseHp, h.game.BASE_MAX_HP, "on a clean base");
+  t.eq(h.game.waveIndex, 0, "with the cursor back on wave 1");
+});
+
+test("the schedule-dependent readouts all follow the active difficulty",
+function (t) {
+  var easy = harness.boot("rune-circuit", "easy");
+  var normal = harness.boot("rune-circuit", "normal");
+
+  // The wave readout. Both schedules are 35 long, so the interesting half is
+  // the DEPLOYMENT COUNT -- Easy's wave 1 is five bodies and Normal's is
+  // twelve, and the line has to name the wave that is actually arriving.
+  t.ok(easy.game.waveStatusText().indexOf("/ 5 deployed") !== -1,
+    "Easy's readout counts its own wave 1 (" + easy.game.waveStatusText() + ")");
+  t.ok(normal.game.waveStatusText().indexOf("/ 12 deployed") !== -1,
+    "Normal's counts its own (" + normal.game.waveStatusText() + ")");
+
+  // The banner, the ceiling and the reward, all off the active schedule.
+  t.eq(easy.game.waveSummary(easy.game.WAVES[0]), "5 × Normal", "Easy's banner");
+  t.eq(normal.game.waveSummary(normal.game.WAVES[0]), "8 × Normal  +  4 × Fast",
+    "Normal's banner");
+  t.eq(easy.game.waveTimeRemaining() > 0, true, "Easy's wave 1 has a ceiling");
+  t.ok(normal.game.waveReward(normal.game.WAVES[0], 1) !==
+    easy.game.waveReward(easy.game.WAVES[0], 1),
+    "and the two waves pay different rewards");
+
+  // The run-over overlay's own arithmetic reads WAVES.length, which is 35 in
+  // both -- so what is checked here is that it reads the ACTIVE one at all.
+  t.eq(normal.game.WAVES.length, normal.game.NORMAL_WAVES.length,
+    "the overlay's denominator is the active schedule's length");
+
+  // And the last wave is the last wave of whichever schedule is running.
+  t.eq(easy.game.WAVES[34], easy.game.EASY_WAVES[34], "Easy ends on Easy's finale");
+  t.eq(normal.game.WAVES[34], normal.game.NORMAL_WAVES[34],
+    "Normal ends on Normal's");
+});
+
+test("both schedules are deployable, and wave 35 is the only one without a ceiling",
+function (t) {
+  var h = schedulesBoot();
+  h.game.DIFFICULTIES.forEach(function (difficulty) {
+    t.deep(h.game.validateWaveTimelines(difficulty.waves), [],
+      difficulty.name + " deploys every body it authors");
+
+    var problems = [];
+    difficulty.waves.forEach(function (wave, i) {
+      var ev = h.game.waveTimeline(wave);
+      var last = ev[ev.length - 1].time;
+      var isLast = i === difficulty.waves.length - 1;
+      if (isLast) {
+        if (wave.duration !== undefined) {
+          problems.push("wave 35 carries a ceiling");
+        }
+        return;
+      }
+      if (wave.duration === undefined) {
+        problems.push("wave " + (i + 1) + " has no ceiling");
+      } else if (!(wave.duration > last)) {
+        problems.push("wave " + (i + 1) + ": ceiling " + wave.duration +
+          " s does not outlast its last arrival at " + last.toFixed(2) + " s");
+      }
+    });
+    t.eq(problems.join(" | "), "",
+      difficulty.name + "'s ceilings all outlast their waves, and only its " +
+      "last wave has none");
+  });
+});
+
+test("Normal's camo checks hold nothing visible on the ground", function (t) {
+  var h = schedulesBoot();
+  var Enemy = h.game.Enemy;
+  // THE SMASHER RULE, restated for a second schedule. Its swing damages
+  // whatever it physically reaches but it will not TURN towards something it
+  // cannot see -- so a camo wave must hold nothing a detectionless,
+  // ground-bound board could start swinging at. A FLYER is not such a thing:
+  // Targeting.sees fails closed on flight as well, so a Warbringer with neither
+  // detection nor air reach has nothing to trigger on in wave 33 either.
+  var problems = [];
+  h.game.NORMAL_WAVES.forEach(function (wave, i) {
+    var groups = h.game.waveGroups(wave);
+    var camo = groups.some(function (g) { return !!Enemy.typeOf(g.type).isCamo; });
+    if (!camo) return;
+    groups.forEach(function (g) {
+      var type = Enemy.typeOf(g.type);
+      if (type.isCamo || type.isFlying) return;
+      problems.push("wave " + (i + 1) + " puts a visible " + type.id +
+        " in a camo wave");
+    });
+  });
+  t.eq(problems.join(" | "), "", "no visible ground body walks in a camo wave");
+
+  // And the pure-air check holds nothing on the ground, for the mirror reason.
+  var air = h.game.waveGroups(h.game.NORMAL_WAVES[23]).filter(function (g) {
+    return !Enemy.typeOf(g.type).isFlying;
+  });
+  t.eq(air.length, 0, "wave 24 is flight end to end");
+});
+
+test("Easy and Normal both run themselves dry and end in a win", function (t) {
+  ["easy", "normal"].forEach(function (id) {
+    var h = harness.boot(null);
+    h.chooseMap(h.game.Maps.DEFAULT_ID, id);
+    t.eq(h.game.selectedDifficultyId, id, id + ": selected");
+
+    // An oversized base, so every body leaks and the run is decided by the
+    // scheduler rather than by damage. Nothing is built and nothing is clicked.
+    h.run("BASE_MAX_HP = 4000000; baseHp = 4000000;");
+    var opening = h.game.cash;
+
+    for (var i = 0; i < 60 * 60 * 90 && !h.game.victory && !h.game.gameOver; i++) {
+      h.step(1 / 60);
+    }
+    t.eq(h.game.victory, true, id + ": the campaign ends in a win, unattended");
+    t.eq(h.game.enemies.length, 0, id + ": on an empty road");
+    t.eq(h.game.allWavesDeployed, true, id + ": with the schedule exhausted");
+
+    // Exactly the thirty-five clear rewards moved, so no gate paid twice and
+    // none was skipped.
+    var owed = 0;
+    h.game.WAVES.forEach(function (wave, n) { owed += h.game.waveReward(wave, n + 1); });
+    t.eq(h.game.cash - opening, owed, id + ": paid exactly its 35 rewards");
+    t.eq(h.game.pendingBounty, 0, id + ": with nothing left owed");
+  });
+});
+
 test("both endings offer a way back to the main menu", function (t) {
   ["gameOver", "victory"].forEach(function (ending) {
     var h = harness.boot();
@@ -3359,13 +4518,201 @@ test("the pause menu draws, does not overlap itself, and restart clears it", fun
   t.ok(resume.y + resume.h <= back.y, "Resume sits clear of Back to main menu");
   t.ok(back.y + back.h < h.game.VIEW_HEIGHT, "both fit on the canvas");
 
-  // There is deliberately NO pause button on the HUD -- Escape is the only
-  // way in, so nothing on screen is one stray click from ending a run.
-  t.eq(typeof h.game.exitButtonRect, "undefined", "no HUD menu button");
+  // THERE IS STILL NO HUD BUTTON THAT LEAVES A RUN, which is the part of the
+  // old rule here that was load-bearing. A pause button was added to the chrome
+  // row on 2026-08-27 and the line this replaces said there deliberately was
+  // none: "Escape is the only way in, so nothing on screen is one stray click
+  // from ending a run". The safety it was protecting is intact, because the
+  // button opens the MENU and the menu is where leaving is decided -- Back to
+  // main menu is still a second, deliberate click, and Escape or Resume undoes
+  // the first one at no cost. What the old rule actually bought was that no
+  // single click ends a run; what it also cost was that a player without a
+  // keyboard, or without the habit, had nothing on screen telling them the run
+  // could be stopped at all.
+  t.eq(typeof h.game.exitButtonRect, "undefined",
+    "still no HUD button that leaves a run in one click");
 
   // It is run state, so restarting clears it.
   h.run("restartGame()");
   t.eq(h.game.paused, false, "restart clears the pause");
+});
+
+// --- the HUD pause button: a clock, not a menu (2026-08-28) ----------------
+//
+// TWO STATES, DELIBERATELY. `paused` is the modal menu and owns every click;
+// `frozen` stops the clock and owns nothing, so the board stays the player's.
+// The button reaches the second and must never reach the first -- that is the
+// whole change, and these tests are about the DIFFERENCE rather than about
+// freezing, which the pause-menu tests above already cover.
+test("the HUD pause button stops the clock without opening the menu", function (t) {
+  var h = harness.boot();
+  h.placeGunner(w(h, 600), w(h, 505));
+  h.step(3);
+
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "the button stops the clock");
+  t.eq(h.game.paused, false, "and does NOT put a modal on screen");
+
+  var progress = h.game.enemies[0].progress;
+  h.step(5);
+  t.eq(h.game.enemies[0].progress, progress, "the board really is held");
+
+  // A TOGGLE. The button is the only way back, so a second press has to be it.
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, false, "and the same button starts it again");
+  h.step(1);
+  t.ok(h.game.enemies[0].progress > progress, "time moves once it is running");
+});
+
+// THE LOAD-BEARING TEST. Everything above proves the clock stopped; this is
+// the half that says the board did not go with it. A freeze that also froze
+// the player would just be the pause menu without its buttons.
+test("a frozen board still builds, upgrades, inspects and hovers", function (t) {
+  var h = harness.boot();
+  h.run("cash = 100000");
+  h.placeGunner(w(h, 600), w(h, 505));
+  h.step(3);
+
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "clock stopped");
+
+  // Build. A second tower goes down on a held board.
+  var before = h.game.towers.length;
+  h.placeGunner(w(h, 700), w(h, 420));
+  t.eq(h.game.towers.length, before + 1, "a tower can be placed while frozen");
+
+  // Inspect, by clicking the one just built.
+  var tower = h.game.towers[h.game.towers.length - 1];
+  h.click(tower.x, tower.y);
+  t.eq(h.game.inspected, tower, "and clicked to inspect");
+
+  // Upgrade, through the same entry point the panel's buttons use.
+  var paths = tower.upgradePaths ? tower.upgradePaths() : null;
+  if (paths && paths.length) {
+    var id = paths[0].id;
+    var reason = h.run("buyUpgrade(towers[towers.length - 1], '" + id + "')");
+    t.eq(reason, null, "and upgraded, with the clock still stopped");
+  }
+
+  // Hover an enemy. The pointer is re-asked outside update(), which is what
+  // makes this work at all -- see the note on `frozen`. Aimed through the
+  // inverse of screenToWorld rather than at raw world numbers, so the test
+  // survives a camera that is not sitting at zoom 1 dead centre.
+  var e = h.game.enemies[0];
+  var cam = h.game.camera;
+  var sx = (e.pos.x - cam.x) * cam.zoom + h.game.VIEW_WIDTH / 2;
+  var sy = (e.visualBodyY() - cam.y) * cam.zoom + h.game.VIEW_HEIGHT / 2;
+  h.move(sx, sy);
+  t.eq(h.game.hoveredEnemy, e, "and an enemy still answers the cursor");
+
+  // None of that quietly started time again.
+  t.eq(h.game.frozen, true, "and the clock is still stopped afterwards");
+  t.eq(h.game.paused, false, "with no modal anywhere near it");
+
+  h.draw();
+  t.ok(true, "a frozen board draws, notice and all");
+});
+
+// The two states are independent in BOTH directions, which is the bit that is
+// easy to get wrong: a Resume that cleared the freeze would start a clock the
+// player stopped on purpose.
+test("Escape still opens the menu over a frozen board, and Resume leaves the clock alone", function (t) {
+  var h = harness.boot();
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "frozen");
+
+  h.key("Escape");
+  t.eq(h.game.paused, true, "Escape still reaches the menu");
+  t.eq(h.game.frozen, true, "and the freeze is untouched by it");
+
+  var resume = h.game.resumeButtonRect();
+  h.click(resume.x + resume.w / 2, resume.y + resume.h / 2);
+  t.eq(h.game.paused, false, "Resume closes the menu");
+  t.eq(h.game.frozen, true, "and does NOT start the clock the player stopped");
+});
+
+test("a restart clears the freeze", function (t) {
+  var h = harness.boot();
+  var r = h.game.pauseButtonRect();
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, true, "frozen");
+
+  h.run("restartGame()");
+  t.eq(h.game.frozen, false, "a new run does not begin on a stopped clock");
+});
+
+test("the pause button consumes its click and does not build under itself", function (t) {
+  var h = harness.boot();
+  h.run("cash = 100000");
+  var r = h.game.pauseButtonRect();
+  var towers = h.game.towers.length;
+
+  t.ok(h.run("overInterfaceChrome(" + (r.x + 4) + ", " + (r.y + 4) + ")"),
+    "the build preview knows the rectangle claims clicks");
+
+  h.run("selectedSlot = 0");
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+
+  t.eq(h.game.towers.length, towers, "nothing was placed underneath it");
+  t.eq(h.game.frozen, true, "the press did what it was for");
+});
+
+// The row grew a fourth button, and every one of them is anchored off the one
+// to its right. That is a chain, and a chain is exactly the arrangement where
+// widening one button silently slides another under the build bar -- so the
+// whole row is swept rather than reasoned about.
+test("the bottom-right chrome row is four buttons that do not overlap", function (t) {
+  var h = harness.boot();
+  var row = [
+    { name: "pause", r: h.game.pauseButtonRect() },
+    { name: "mixer", r: h.game.audioButtonRect() },
+    { name: "auto-send", r: h.run("autoSkipButtonRect()") },
+    { name: "speed", r: h.run("speedButtonRect()") }
+  ];
+
+  for (var i = 1; i < row.length; i++) {
+    var left = row[i - 1], right = row[i];
+    t.ok(left.r.x + left.r.w <= right.r.x,
+      left.name + " sits clear of " + right.name);
+    t.eq(left.r.y, right.r.y, "and on the same line as it");
+    t.eq(left.r.h, right.r.h, "at the same height");
+  }
+
+  // Clear of the build bar to its left, which is the thing this row can
+  // actually collide with as it grows leftwards. BAR_X is derived from the
+  // slot count, so a sixth build slot would move it -- and this is the line
+  // that would notice.
+  t.ok(h.game.BAR_X + h.game.BAR_WIDTH < row[0].r.x,
+    "and the whole row is clear of the build bar");
+  t.ok(row[row.length - 1].r.x + row[row.length - 1].r.w <= h.game.VIEW_WIDTH,
+    "and inside the canvas");
+});
+
+// A button drawn under a modal that swallows nothing is the trap
+// waveSkipButtonRect and the mixer both exist to avoid; the pause button is
+// drawn under the same guard as the mixer, and this is the other half of it.
+test("the pause button is dead while a run is over", function (t) {
+  var h = harness.boot();
+  var r = h.game.pauseButtonRect();
+
+  h.run("gameOver = true");
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, false, "a lost run cannot be frozen from the HUD");
+  t.eq(h.game.paused, false, "and nothing opened a menu either");
+
+  h.run("gameOver = false; victory = true");
+  h.click(r.x + r.w / 2, r.y + r.h / 2);
+  t.eq(h.game.frozen, false, "nor a won one");
+
+  // And it draws in every one of those states without throwing, which is what
+  // says the guard in draw() matches the guard in onClick.
+  h.draw();
+  h.run("victory = false; paused = true");
+  h.draw();
+  t.ok(true, "the play screen draws paused, won and lost");
 });
 
 

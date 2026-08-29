@@ -35,6 +35,34 @@
   var overlay = { range: true, deadzone: true, footprint: true, labels: true };
   var autoWaves = false;
 
+  // WHICH wave is being watched on its own, or null for "run the campaign".
+  //
+  // The workbench's reason for existing is to reach a board state quickly, and
+  // "wave 27, please" is the state a schedule is most often wanted for -- there
+  // is no other way to see it here short of sitting through twenty-six waves at
+  // 20x. So the picker below can start the schedule anywhere in it, and this
+  // holds the case where the answer to "and then?" is "nothing": the wave plays
+  // out and the schedule parks itself rather than rolling into the next one.
+  //
+  // It is an INDEX into the active schedule, so it is cleared by anything that
+  // changes which schedule that is -- see the difficulty dropdown.
+  var soloWave = null;
+
+  // Switch spawning off, leaving whatever is already on the road walking.
+  //
+  // `waveIndex = WAVES.length` is this file's long-standing way of saying "the
+  // scheduler has nothing left to deploy" (see the boot block at the bottom),
+  // and `allWavesDeployed` is deliberately NOT set with it: js/game.js states
+  // that only the scheduler exhausting itself may set that flag, because it is
+  // what the victory test reads and a parked workbench has not won anything.
+  function parkSchedule() {
+    waveIndex = WAVES.length;
+    waveSpawned = 0;
+    waveCountdown = 0;
+    waveElapsed = 0;
+    allWavesDeployed = false;
+  }
+
   // While true, gold is re-topped every step -- the usual sandbox behaviour,
   // so placement is never gated on price. It has to be switchable, because
   // some things can only be tested at a SPECIFIC amount of gold (the beam
@@ -372,8 +400,24 @@
 
     // Enemies arrive when YOU say so. Ticking the checkbox hands control
     // back to the game's real scheduler, unmodified.
+    //
+    // THE SOLO CHECK IS OUTSIDE THE SCHEDULER, not a flag inside it. Whichever
+    // of the three gates closes the wave -- fully deployed and cleared, wiped
+    // out, or the ceiling -- it ends by moving `waveIndex` off the wave, and
+    // that one comparison catches all three. A gate flag inside js/game.js
+    // would be a fourth thing for the gates to keep in step, on a schedule the
+    // shipping game never parks.
+    //
+    // Only spawning stops. Everything already on the road keeps walking, which
+    // is the point: "play out wave 27" means watch it through, not freeze it.
     updateWaves = function (dt) {
-      if (autoWaves) originalUpdateWaves(dt);
+      if (!autoWaves) return;
+      originalUpdateWaves(dt);
+      if (soloWave !== null && waveIndex !== soloWave) {
+        log("wave " + (soloWave + 1) + " is through — schedule parked");
+        soloWave = null;
+        parkSchedule();
+      }
     };
 
     // Registered as a WORLD overlay rather than drawn after the frame: the
@@ -393,6 +437,9 @@
     restartGame = function () {
       originalRestart();
       if (lockGold) cash = SANDBOX_CASH;
+      // A reset means "back to the top of the schedule", so a request to watch
+      // one wave in the middle of it does not survive one.
+      soloWave = null;
       if (!autoWaves) {
         // Mark every wave deployed so the scheduler has nothing left to spawn,
         // and clear the road.
@@ -513,7 +560,8 @@
   function wire() {
     [
       "towerList", "enemyHp", "enemyType", "enemyTier", "slimeTiers", "spawnOne", "spawnFive", "spawnWave1", "spawnWave2",
-      "spawnTanky", "clearEnemies", "autoWaves",
+      "spawnTanky", "clearEnemies", "autoWaves", "scheduleDifficulty",
+      "waveJump", "playWave", "playFromWave",
       "selectedName", "selectedStats",
       "upgradeControls", "buyA", "buyB", "reaimCone", "useAbility", "upgradeNote",
       "goldInput", "setGold", "goldPresets", "lockGold", "baseHpInput",
@@ -709,8 +757,128 @@
 
     els.autoWaves.addEventListener("change", function () {
       autoWaves = els.autoWaves.checked;
+      // The checkbox is the coarse control and outranks the picker: ticking it
+      // means "run the campaign from the top", which is not a request to watch
+      // one wave.
+      soloWave = null;
       resetWaveSchedule();
       log(autoWaves ? "wave schedule ON" : "wave schedule OFF");
+    });
+
+    // --- WHICH campaign the schedule checkbox plays -------------------------
+    //
+    // Both authored schedules are reachable from the workbench, and they are
+    // reached through the GAME'S OWN `setDifficulty` -- the same function the
+    // chooser's difficulty step calls. That is this file's standing promise
+    // applied to a new feature: what you learn here is true in the shipping
+    // game, which it would not be if the sandbox swapped `WAVES` itself and
+    // skipped whatever setDifficulty does around it (it drops the derived
+    // timeline; a hand-swap would deploy the old schedule's wave 1).
+    //
+    // The options are BUILT FROM `DIFFICULTIES`, not typed into sandbox.html,
+    // so a third schedule would appear here with no edit -- the same rule the
+    // enemy-type dropdown and the Fractal tier buttons already follow.
+    //
+    // Changing it resets the wave counter for the same reason the checkbox
+    // does: the cursor is an index into a schedule, and index 4 of a different
+    // schedule is a different wave.
+    DIFFICULTIES.forEach(function (difficulty) {
+      var option = document.createElement("option");
+      option.value = difficulty.id;
+      option.textContent = difficulty.name + " \u00b7 " + difficulty.detail;
+      els.scheduleDifficulty.appendChild(option);
+    });
+    els.scheduleDifficulty.value = selectedDifficultyId;
+
+    els.scheduleDifficulty.addEventListener("change", function () {
+      var picked = setDifficulty(els.scheduleDifficulty.value);
+      // Re-read rather than trusting the box: setDifficulty falls back to the
+      // default on an id it does not know, and a dropdown showing one thing
+      // while the game plays another is exactly the disagreement the Fractal
+      // tier row's "a shortcut must not rewrite the controls it shortcuts" rule
+      // is about, seen from the other side.
+      els.scheduleDifficulty.value = picked.id;
+      // `soloWave` and the picker's value are both INDICES into a schedule, and
+      // index 4 of a different schedule is a different wave -- the same reason
+      // the paragraph above gives for resetting the counter. So the request is
+      // dropped and the list is rebuilt from the schedule that is now active.
+      soloWave = null;
+      resetWaveSchedule();
+      buildWaveList();
+      log("schedule: " + picked.name + " (" + picked.waves.length + " waves)");
+      refreshSidebar();
+    });
+
+    // --- WHICH wave of that schedule to play --------------------------------
+    //
+    // Built from `WAVES` and labelled with the game's own waveSummary(), the
+    // same function the on-canvas wave banner uses -- so the line you pick from
+    // is the line the banner will show, and a schedule edit reaches this list
+    // without anyone remembering to update it. Rebuilt when the schedule
+    // changes, for the same reason the counter is reset.
+    function buildWaveList() {
+      // Keep the player's place across a schedule swap where it still exists.
+      // Both authored campaigns are 35 waves today; a third of a different
+      // length is exactly the case a bare re-select would get wrong.
+      var keep = parseInt(els.waveJump.value, 10);
+      els.waveJump.innerHTML = "";
+      WAVES.forEach(function (wave, index) {
+        var option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = "Wave " + (index + 1) + "  \u00b7  " + waveSummary(wave);
+        els.waveJump.appendChild(option);
+      });
+      els.waveJump.value =
+        String(isNaN(keep) || keep < 0 || keep >= WAVES.length ? 0 : keep);
+    }
+    buildWaveList();
+
+    function pickedWaveIndex() {
+      var n = parseInt(els.waveJump.value, 10);
+      return (isNaN(n) || n < 0 || n >= WAVES.length) ? 0 : n;
+    }
+
+    // Start the schedule ON a wave rather than at the top of it.
+    //
+    // It turns the checkbox ON rather than refusing when it is off: the button
+    // says "play this wave", and a button that silently does nothing because a
+    // box three lines up is unticked is the disagreement between a shortcut and
+    // the controls it shortcuts that the Fractal tier row's rule is about. The
+    // checkbox is moved to match, so the sidebar never shows one thing while the
+    // board does another.
+    //
+    // `waveOnClockIndex = -1` is what makes RE-playing the wave already on the
+    // cursor announce itself again. js/game.js compares that against `waveIndex`
+    // to decide whether a wave has had its banner, and picking the same wave
+    // twice does not move the index -- so without this the second run would
+    // start in silence. (The reward latch needs no such help: updateWaves clears
+    // it on any wave whose cursor is back at zero, and says so.)
+    //
+    // The countdown is zeroed rather than left at the opening ten seconds, for
+    // the reason the restart wrapper already gives: nobody sets up a workbench
+    // in order to wait on it.
+    function playWave(index, solo) {
+      if (!autoWaves) {
+        autoWaves = true;
+        els.autoWaves.checked = true;
+      }
+      resetWaveSchedule();
+      soloWave = solo ? index : null;
+      waveIndex = index;
+      waveSpawned = 0;
+      waveElapsed = 0;
+      waveCountdown = 0;
+      waveOnClockIndex = -1;
+      log((solo ? "playing wave " : "schedule from wave ") + (index + 1) +
+        " / " + WAVES.length + "  \u00b7  " + waveSummary(WAVES[index]));
+      refreshSidebar();
+    }
+
+    els.playWave.addEventListener("click", function () {
+      playWave(pickedWaveIndex(), true);
+    });
+    els.playFromWave.addEventListener("click", function () {
+      playWave(pickedWaveIndex(), false);
     });
 
     // All three go through the tower's own performAction, the same entry

@@ -74,6 +74,7 @@
     color: #dcffe4;
   }
   button.wide { display: block; width: 100%; margin-right: 0; }
+  select.wide { display: block; width: 100%; box-sizing: border-box; }
 
   .towerbtn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
   .towerbtn canvas { width: 28px; height: 28px; background: none; flex: 0 0 auto; }
@@ -173,7 +174,19 @@
       <button id="clearEnemies">Clear all</button>
     </div>
     <label class="check"><input id="autoWaves" type="checkbox"> Run the wave schedule</label>
-    <div class="sub">Plays the campaign's 35 waves. Turning it on restarts the wave counter; manual enemy spawning remains available with waves off.</div>
+    <div>
+      <label for="scheduleDifficulty">Schedule</label>
+      <select id="scheduleDifficulty"></select>
+    </div>
+    <div class="sub">Plays a campaign's 35 waves. The picker chooses WHICH campaign — the same two authored schedules the game's difficulty step offers, selected through the same setDifficulty() the chooser calls, so a wave you watch here is the wave that arrives in a run. Changing either the checkbox or the schedule restarts the wave counter; manual enemy spawning remains available with waves off.</div>
+    <div style="margin-top:6px;">
+      <select id="waveJump" class="wide"></select>
+    </div>
+    <div>
+      <button id="playWave">Play this wave</button>
+      <button id="playFromWave">Play from here</button>
+    </div>
+    <div class="sub">Jump straight to any wave of the schedule above, rather than sitting through the ones in front of it. <b>Play this wave</b> runs that one and then parks the scheduler — whatever it put on the road keeps walking, nothing further arrives. <b>Play from here</b> starts the campaign at that wave and carries on into the rest of it. Either turns the schedule on if it is off, and the board is cleared first; picking a different schedule rebuilds this list, because a wave number only means something inside one.</div>
   </section>
 
   <section>
@@ -264,6 +277,10 @@
 <!-- Towers have hit points and die at zero. Shared by all four types, so it
      must load before any of them. -->
 <script src="js/systems/tower-health.js"></script>
+<!-- Hazards a death leaves on a fuse (the Volatile's charge). Simulation, not
+     presentation: towers lose real hit points to it, so it is stepped from
+     update(). Reads a type's `deathEffect` block and knows no type ids. -->
+<script src="js/systems/hazards.js"></script>
 <script src="js/tower.js"></script>
 
 <!-- Longshot: config + systems + runtime, then the adapter that gives it the

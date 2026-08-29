@@ -138,7 +138,9 @@ function makeElement(tag) {
 var IDS = [
   "sidebar",
   "game", "towerList", "enemyHp", "enemyType", "enemyTier", "slimeTiers", "spawnOne", "spawnFive", "spawnWave1",
-  "spawnWave2", "spawnTanky", "clearEnemies", "autoWaves", "selectedName",
+  "spawnWave2", "spawnTanky", "clearEnemies", "autoWaves", "scheduleDifficulty",
+  "waveJump", "playWave", "playFromWave",
+  "selectedName",
   "mapList", "selectedStats", "upgradeControls", "buyA", "buyB", "reaimCone", "useAbility",
   "upgradeNote", "maxField", "maxFieldStatus", "showRange", "showDeadzone", "showFootprint", "showLabels",
   "unitLength", "resetBoard", "exitToMenu", "runState", "log",
@@ -351,6 +353,174 @@ check("turning schedules off restores the empty manual-spawn board",
   sandbox.waveIndex === sandbox.WAVES.length,
   "enemies " + sandbox.enemies.length + ", waveIndex " + sandbox.waveIndex +
   " of " + sandbox.WAVES.length);
+
+// --- WHICH campaign the schedule checkbox plays (2026-08-27) ---------------
+//
+// A dropdown built from DIFFICULTIES rather than typed into sandbox.html, so a
+// third schedule would appear here with nothing edited -- the same rule the
+// enemy-type picker and the Fractal tier row already follow.
+//
+// NOTE what is NOT here: a "waveDifficulty" control. One existed until
+// 2026-08-12 and was deleted with the derived Easy/Normal/Hard modes, and the
+// paragraph above this block records what its removal cost. This one is a real
+// picker over two really-authored schedules, and it goes through the game's own
+// setDifficulty -- so what is watched here is that the workbench and the run
+// play the same wave.
+check("the schedule picker offers every authored difficulty",
+  elements.scheduleDifficulty.childNodes.length === sandbox.DIFFICULTIES.length &&
+  sandbox.DIFFICULTIES.every(function (difficulty) {
+    return elements.scheduleDifficulty.childNodes.some(function (option) {
+      return option.value === difficulty.id;
+    });
+  }),
+  elements.scheduleDifficulty.childNodes.length + " options for " +
+  sandbox.DIFFICULTIES.length + " difficulties");
+
+elements.scheduleDifficulty.value = "normal";
+elements.scheduleDifficulty.fire("change");
+check("picking Normal makes Normal the active schedule",
+  sandbox.selectedDifficultyId === "normal" &&
+  sandbox.WAVES === sandbox.NORMAL_WAVES,
+  "selected " + sandbox.selectedDifficultyId);
+
+elements.autoWaves.checked = true;
+elements.autoWaves.fire("change");
+step(sandbox.FIXED_STEP);
+check("and the workbench runs Normal's own wave 1",
+  sandbox.waveIndex === 0 &&
+  sandbox.waveEventCount() === sandbox.waveCount(sandbox.NORMAL_WAVES[0]),
+  "cursor holds " + sandbox.waveEventCount() + " arrivals against Normal's " +
+  sandbox.waveCount(sandbox.NORMAL_WAVES[0]));
+
+elements.autoWaves.checked = false;
+elements.autoWaves.fire("change");
+elements.scheduleDifficulty.value = "easy";
+elements.scheduleDifficulty.fire("change");
+check("and back to Easy leaves the board clear and the schedule off",
+  sandbox.WAVES === sandbox.EASY_WAVES &&
+  sandbox.enemies.length === 0 &&
+  sandbox.waveIndex === sandbox.WAVES.length,
+  "waveIndex " + sandbox.waveIndex + " of " + sandbox.WAVES.length);
+
+// --- WHICH WAVE of that campaign to play (2026-08-27) ----------------------
+//
+// The picker starts the schedule on a chosen wave instead of at the top of it,
+// which is the whole difference between "watch wave 27" and "sit through
+// twenty-six waves at 20x first". Two buttons: one runs the wave and parks the
+// scheduler, one carries on into the rest of the campaign.
+//
+// What is worth pinning here is NOT that a number lands in `waveIndex` -- an
+// assignment cannot fail. It is that the cursor and the schedule AGREE: that
+// the wave which then deploys is the picked wave's own arrivals, out of the
+// picked campaign, through js/game.js's real scheduler. That is the same thing
+// the difficulty block above checks, asked one level in.
+
+check("the wave picker lists every wave of the active schedule",
+  elements.waveJump.childNodes.length === sandbox.EASY_WAVES.length &&
+  elements.waveJump.childNodes[0].value === "0" &&
+  elements.waveJump.childNodes[sandbox.EASY_WAVES.length - 1].value ===
+    String(sandbox.EASY_WAVES.length - 1),
+  elements.waveJump.childNodes.length + " options for " +
+  sandbox.EASY_WAVES.length + " waves");
+
+// Labelled with the GAME'S OWN waveSummary -- the same function the on-canvas
+// banner uses. A hand-written label here would be a second description of a
+// wave, free to drift from the one the player sees when it arrives.
+check("and labels them with the same summary the wave banner shows",
+  elements.waveJump.childNodes[10].textContent ===
+    "Wave 11  \u00b7  " + sandbox.waveSummary(sandbox.EASY_WAVES[10]),
+  "label = " + elements.waveJump.childNodes[10].textContent);
+
+// Wave 7, which is neither the first (indistinguishable from the default) nor
+// the last (indistinguishable from a parked schedule), and is the shortest
+// ceiling in the opening ten at 30 s -- so the park below can be reached by
+// really playing the wave out rather than by writing over the clock.
+var PICKED = 6;
+elements.waveJump.value = String(PICKED);
+elements.playFromWave.fire("click");
+step(sandbox.FIXED_STEP);
+
+check("Play from here starts the schedule on the picked wave",
+  sandbox.waveIndex === PICKED &&
+  sandbox.waveEventCount() === sandbox.waveCount(sandbox.EASY_WAVES[PICKED]),
+  "waveIndex " + sandbox.waveIndex + ", cursor holds " +
+  sandbox.waveEventCount() + " arrivals against wave " + (PICKED + 1) + "'s " +
+  sandbox.waveCount(sandbox.EASY_WAVES[PICKED]));
+
+// It turns the schedule on rather than doing nothing while the box above it is
+// unticked, and MOVES THE BOX to match -- a sidebar that showed one thing while
+// the board did another is the disagreement between a shortcut and the control
+// it shortcuts that the Fractal tier row's rule is about.
+check("and switches the schedule on, checkbox included",
+  elements.autoWaves.checked === true && sandbox.enemies.length > 0,
+  "checked " + elements.autoWaves.checked + ", enemies " + sandbox.enemies.length);
+
+// Carrying on: the wave is played out for real, and the cursor rolls into the
+// next wave the way a run's does.
+step(sandbox.EASY_WAVES[PICKED].duration + 1);
+check("and carries on into the wave after it",
+  sandbox.waveIndex === PICKED + 1,
+  "waveIndex " + sandbox.waveIndex);
+
+// --- and the other button, which stops -------------------------------------
+
+elements.waveJump.value = String(PICKED);
+elements.playWave.fire("click");
+step(sandbox.FIXED_STEP);
+check("Play this wave also starts on the picked wave",
+  sandbox.waveIndex === PICKED, "waveIndex " + sandbox.waveIndex);
+
+step(sandbox.EASY_WAVES[PICKED].duration + 1);
+check("but parks the scheduler when that wave is through",
+  sandbox.waveIndex === sandbox.WAVES.length,
+  "waveIndex " + sandbox.waveIndex + " of " + sandbox.WAVES.length);
+
+// PARKED IS NOT WON. js/game.js states that only the scheduler exhausting
+// itself may set `allWavesDeployed`, because the victory test reads it -- so a
+// workbench that stopped a schedule by hand must not have tripped it, or
+// clearing wave 7 on an empty board would raise the victory overlay.
+check("and parking is not a victory",
+  sandbox.allWavesDeployed === false && sandbox.victory === false,
+  "allWavesDeployed " + sandbox.allWavesDeployed + ", victory " + sandbox.victory);
+
+var parkedEnemies = sandbox.enemies.length;
+step(20);
+check("nothing further deploys once it is parked",
+  sandbox.waveIndex === sandbox.WAVES.length &&
+  sandbox.enemies.length <= parkedEnemies,
+  "waveIndex " + sandbox.waveIndex + ", enemies " + parkedEnemies +
+  " -> " + sandbox.enemies.length);
+
+// A wave number only means something inside one schedule, so switching
+// campaigns rebuilds the list and drops a pending single-wave request -- the
+// same reasoning the difficulty dropdown already applies to the wave counter.
+elements.waveJump.value = String(PICKED);
+elements.playWave.fire("click");
+elements.scheduleDifficulty.value = "normal";
+elements.scheduleDifficulty.fire("change");
+step(sandbox.FIXED_STEP);
+check("switching schedule rebuilds the wave list against the new campaign",
+  elements.waveJump.childNodes.length === sandbox.NORMAL_WAVES.length &&
+  elements.waveJump.childNodes[10].textContent ===
+    "Wave 11  \u00b7  " + sandbox.waveSummary(sandbox.NORMAL_WAVES[10]),
+  elements.waveJump.childNodes.length + " options, label = " +
+  elements.waveJump.childNodes[10].textContent);
+
+check("and drops the single-wave request with it",
+  sandbox.waveIndex === 0,
+  "waveIndex " + sandbox.waveIndex + " (a live solo request would have parked " +
+  "the schedule on the first close)");
+
+// Back to where this block started, for everything below it.
+elements.scheduleDifficulty.value = "easy";
+elements.scheduleDifficulty.fire("change");
+elements.autoWaves.checked = false;
+elements.autoWaves.fire("change");
+check("the wave picker leaves the board clear on the way out",
+  sandbox.WAVES === sandbox.EASY_WAVES &&
+  sandbox.enemies.length === 0 &&
+  sandbox.waveIndex === sandbox.WAVES.length,
+  "waveIndex " + sandbox.waveIndex + " of " + sandbox.WAVES.length);
 
 // --- spawning --------------------------------------------------------------
 
