@@ -13,6 +13,50 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The three T4 farms.** `farm-t4a` a storage-and-cloning
+generator, `farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate
+manipulator. Nine of the twelve bodies now exist.
+
+**The handoff shipped no GLBs this time** — only the three.js builders and the
+workshop page that exports them. Rather than ask for six more downloads, the
+page was served locally and driven to export the three files through its own
+`GLTFExporter`, with every clip and the gameplay events it puts in the root's
+extras. `tools/glb_to_animated.py` then read them like any other import. The
+exporter's settings are the page's own, so what shipped is what the workshop
+would have handed over.
+
+**These carry far more than an idle**: four clips on A4, five on B4, and eleven
+on C4. Wired to the events they depict — a production tick, the stock cloning at
+a wave boundary, the player collecting it, a body entering the zone or dying in
+it, the base being given its hit points, and the network throwing its dice.
+
+**`field_pulse` is a second IDLE rather than a one-shot**, a seamless 1.5 s loop
+that replaces band 0 while B4's zone holds a body. The tower already knew that:
+`fieldHeld` was there for the lock edge.
+
+**And the simulation names its own outcome.** C4 has a body for each way a throw
+can go, so `outcomeOf` decides which by reading that farm's own dice and the
+network's movement. The order is the decision: a reset from a high P is a bigger
+loss than any other face can deal, so testing "P halved" first would swallow face
+8 and play a generic catastrophe where the shrine has a body for exactly that.
+
+Measured in the running game, every clip against its own idle: 32 px for the
+tick peaking at 0.99 s (the pulse reaching the manifold, 0.70–1.10 per the
+handoff), 40 px for the clone at 1.79 s, 29 px for the withdrawal at 1.01 s (the
+pulse leaving the hose, 0.55–0.95), 11 px for the capture at 0.59 s (the cable
+into the vial, 0.60–0.80), 40 px for the wave gain at 0.47 s (the ring tilts
+aligning, 0.45–0.55), 47 px for the throw. Every clip reproduces its source to
+1e-5 model units.
+
+**Two clips deliberately do NOT end on the idle pose**, and that is the design:
+A4's `withdraw` leaves the worker at the storage valve, a different handwheel,
+and C4's `queue_fate` is documented as persistent state. Everything else lands
+bit-exact.
+
+**Four of C4's eleven clips are not wired**: `queue_fate`, `pre_roll_modifier`
+and the two `reroll_eight_*`. They belong to C5's prep effects, which the network
+records but does not attribute to one farm's die. They ship and never play.
+
 **2026-08-29 — The three T3 farms, and the animations they act out.**
 `farm-t3a` a relic piston refinery, `farm-t3b` a targeting array on a gimbal,
 `farm-t3c` a d20 fate altar — one per path, from a Claude Design handoff. Six of

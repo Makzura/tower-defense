@@ -646,7 +646,9 @@ var BASELINE = [
   // 63 -> 68 on 2026-08-29: the four moments the T3 bodies act out -- a
   // production tick, a body entering the field, a kill inside it, and the
   // network rolling -- plus the clip names the renderer matches on.
-  { file: "tests/farm.test.js", pass: 68, fail: 0, failing: [] },
+  // 68 -> 72 on 2026-08-29: A4's clone and withdrawal, B4's wave gain, and the
+  // name the network puts on its own throw for C4's outcome bodies.
+  { file: "tests/farm.test.js", pass: 72, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

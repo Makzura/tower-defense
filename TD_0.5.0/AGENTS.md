@@ -6620,12 +6620,14 @@ A2/B2/C2, and one each for A3-A5, B3-B5 and C3-C5. **No crosspath ever gets a
 model of its own** — a Farm with a main path at T3+ wears that path's body and
 its secondary T1/T2 add no overlay.
 
-**Six are built**, imported from Claude Design. `farm-base` is a stone mana well
+**Nine are built**, imported from Claude Design. `farm-base` is a stone mana well
 with a crank, a pulley, a rope and a bucket, and a novice working it; `farm-t1`
 is a hand pump with a lever, a piston, a hose and a bottle; `farm-t2` is that
 pump reinforced with a flywheel and a pressure tank (all three 2026-08-28). Then
 the three T3 bodies, one per path (2026-08-29): `farm-t3a` a relic piston
 refinery, `farm-t3b` a targeting array on a gimbal, `farm-t3c` a d20 fate altar.
+Then the three T4s the same day: `farm-t4a` a storage-and-cloning generator,
+`farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate manipulator.
 
 `farmGroup` in gl-world answers with **the highest model that has been
 AUTHORED**, not the highest tier bought, so a T5 on path B wears `farm-t3b`
@@ -6643,10 +6645,42 @@ AND one-shots, and each one-shot depicts something the tower already does:
 | `farm-t3b` | `idle_scan` 6 s | `target_lock` 0.35 s | a body entering the field |
 | | | `kill_capture` 0.7 s | a body dying inside it |
 | `farm-t3c` | `idle_magic` 3 s | `end_wave_roll` 2.4 s | the C network rolling |
+| `farm-t4a` | `idle_process` 4 s | `produce_tick` 1.6 s | a production tick |
+| | | `clone_wave` 2.2 s | the stock cloning at a wave |
+| | | `withdraw` 1.4 s | the player collecting it |
+| `farm-t4b` | `idle_orbit` 8 s | `field_pulse` 1.5 s | *a second IDLE — see below* |
+| | | `target_lock` 0.35 s | a body entering the field |
+| | | `kill_capture` 0.8 s | a body dying inside it |
+| | | `wave_gain` 1.1 s | the base being given its HP |
+| `farm-t4c` | `idle_fate` 4 s | `end_wave_roll` 2.4 s | the C network rolling |
+| | | `result_positive/negative` | what that throw did to P |
+| | | `result_reset` 1 s | a reset face (8) |
+| | | `critical_success/failure` | a doubling face, or P halved |
+
+**`field_pulse` IS A SECOND IDLE, NOT A ONE-SHOT.** It is a seamless 1.5 s loop,
+and it replaces band 0 for as long as B4's zone holds a body — which the tower
+already knows, because `fieldHeld` is kept for the lock edge. Any model without
+the clip falls through to its own band 0.
+
+**THE SIMULATION NAMES ITS OWN OUTCOME.** C4 has a body for each way a throw can
+go, so `outcomeOf` in js/farm.js decides which — reading that farm's OWN dice
+(`lastRolls`) and the network's movement, in order: a doubling face is a
+critical success, a reset face names itself, P halved or worse is a critical
+failure, then merely up or down. The order is the decision: face 8 from a high P
+is a bigger loss than any other face can deal, so testing the halving first would
+swallow it and play a generic catastrophe where the shrine has a body for exactly
+that. The renderer never re-reads a face table.
+
+**FOUR OF C4's ELEVEN CLIPS ARE NOT WIRED YET**: `queue_fate`,
+`pre_roll_modifier` and the two `reroll_eight_*`. They belong to C5's prep
+effects — the face-13 reroll, the +1/+2 die bonuses, the face-22 cull — which
+the network records but does not yet attribute to one farm's die. They ship in
+the model and simply never play, which is the same shape as a missing tier's
+model: nothing fake, nothing broken.
 
 **THE SIMULATION RECORDS *WHEN*, THE RENDERER DECIDES *WHETHER*.** `lastTick`,
-`lastLock`, `lastCapture` and `lastRoll` are animClock stamps on the tower, -1
-for never — 0 is a real moment and a farm paid on its first step would otherwise
+`lastLock`, `lastCapture`, `lastRoll`, `lastClone`, `lastWithdraw` and
+`lastGain` are animClock stamps on the tower, -1 for never — 0 is a real moment and a farm paid on its first step would otherwise
 play its tick at birth. `farmFrame` in gl-world picks the most recent one-shot
 still inside its own duration, else the idle. One-way, exactly like
 `swingProgress` and `gearPhase`: nothing simulated reads any of it back.

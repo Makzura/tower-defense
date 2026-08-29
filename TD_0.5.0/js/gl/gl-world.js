@@ -1109,10 +1109,18 @@ var World3D = (function () {
   // C3 carry one. A model without the clip simply never plays it, which is what
   // makes this list safe to state once for every tier.
   var FARM_ONE_SHOTS = [
-    { at: "lastTick", clip: "produce_tick" },      // A3: a production tick
-    { at: "lastCapture", clip: "kill_capture" },   // B3: a body died in the field
-    { at: "lastLock", clip: "target_lock" },       // B3: a body entered it
-    { at: "lastRoll", clip: "end_wave_roll" }      // C3: the network rolled
+    { at: "lastTick", clip: "produce_tick" },      // A3/A4: a production tick
+    { at: "lastClone", clip: "clone_wave" },       // A4: the stock cloned itself
+    { at: "lastWithdraw", clip: "withdraw" },      // A4: the player collected it
+    { at: "lastCapture", clip: "kill_capture" },   // B3/B4: a body died in the field
+    { at: "lastLock", clip: "target_lock" },       // B3/B4: a body entered it
+    { at: "lastGain", clip: "wave_gain" },         // B4: the base was given HP
+    { at: "lastRoll", clip: "end_wave_roll" },     // C3/C4: the network rolled
+    // AND WHAT THE THROW MEANT, named by the simulation (`rollOutcome`) and
+    // played on the same stamp. It follows `end_wave_roll` in this list so that
+    // when both are live the outcome wins -- it is the later reading of the same
+    // moment, and it is what the player is waiting to see.
+    { at: "lastRoll", clip: null, from: "rollOutcome" }
   ];
 
   // WHICH FRAME A FARM IS ON: the most recent one-shot that is still running,
@@ -1134,9 +1142,15 @@ var World3D = (function () {
     if (bands && bands.length > 1 && seconds && names) {
       var bestBand = -1, bestPhase = 0, bestAt = -1;
       for (var i = 0; i < FARM_ONE_SHOTS.length; i++) {
-        var fired = tower[FARM_ONE_SHOTS[i].at];
+        var entry = FARM_ONE_SHOTS[i];
+        var fired = tower[entry.at];
+        // STRICTLY LESS, so a later entry sharing a stamp REPLACES an earlier
+        // one rather than losing the tie. That is what lets `rollOutcome` beat
+        // the `end_wave_roll` it is the reading of.
         if (!(fired >= 0) || fired < bestAt) continue;
-        var b = names.indexOf(FARM_ONE_SHOTS[i].clip);
+        var clip = entry.from ? tower[entry.from] : entry.clip;
+        if (!clip) continue;
+        var b = names.indexOf(clip);
         if (b < 1) continue;
         var age = clock - fired;
         if (age < 0 || age >= seconds[b]) continue;   // not running
@@ -1152,12 +1166,22 @@ var World3D = (function () {
       }
     }
 
-    // The idle. Band 0 when the model declares bands, the whole strip when it
-    // does not -- which is the Base/T1/T2 case and the format's documented
-    // fallback.
-    var first = (bands && bands.length) ? bands[0][0] : 0;
-    var count = (bands && bands.length) ? bands[0][1] : m.frames.length;
-    var loop = (seconds && seconds.length) ? seconds[0]
+    // THE IDLE, AND B4 HAS TWO OF THEM. `field_pulse` is a seamless 1.5 s loop
+    // rather than a one-shot -- the orrery's zone pulsing while it holds
+    // something -- so it REPLACES band 0 for as long as the field is occupied,
+    // and the tower already knows that (`fieldHeld`, kept for the lock edge).
+    // Any model without the clip falls through to its own band 0.
+    var idleBand = 0;
+    if (tower.fieldHeld && names) {
+      var pulse = names.indexOf("field_pulse");
+      if (pulse > 0) idleBand = pulse;
+    }
+
+    // Band 0 when the model declares bands, the whole strip when it does not --
+    // which is the Base/T1/T2 case and the format's documented fallback.
+    var first = (bands && bands.length) ? bands[idleBand][0] : 0;
+    var count = (bands && bands.length) ? bands[idleBand][1] : m.frames.length;
+    var loop = (seconds && seconds.length) ? seconds[idleBand]
       : (m.loopSeconds > 0 ? m.loopSeconds : 8);
     var phase = (((clock / loop) % 1) + 1) % 1;
     return first + Math.min(count - 1, Math.floor(phase * count));
@@ -1166,11 +1190,12 @@ var World3D = (function () {
   // THE FARM'S MODELS, AND WHY A TIER 5 STILL WEARS A T3 ONE.
   //
   // Twelve are planned -- a base, a T1 shared by A1/B1/C1, a T2 shared by
-  // A2/B2/C2, and one per path for T3, T4 and T5 -- and six exist: the well,
-  // the hand pump and the reinforced pump (2026-08-28), then the refinery, the
-  // scanner and the fate shrine for A3/B3/C3 (2026-08-29). So this answers with
-  // the highest model that has been AUTHORED rather than the highest tier that
-  // has been bought: a T5 on path B still wears `farm-t3b`.
+  // A2/B2/C2, and one per path for T3, T4 and T5 -- and NINE exist: the well,
+  // the hand pump and the reinforced pump (2026-08-28); the refinery, the
+  // scanner and the fate shrine at T3, and the generator, the orrery and the
+  // manipulator at T4 (2026-08-29). So this answers with the highest model that
+  // has been AUTHORED rather than the highest tier that has been bought: a T5
+  // on path B still wears `farm-t4b`.
   //
   // It reads the `hasA1..hasC5` flags rather than a purchase list because that
   // is how js/farm.js spells its tiers -- the same shape the Warbringer and the
@@ -1188,6 +1213,11 @@ var World3D = (function () {
       for (var t = 5; t > best; t--) {
         if (tower["has" + branches[b] + t]) { best = t; main = branches[b]; break; }
       }
+    }
+    if (best >= 4) {
+      // T4 is a body per path too, and the same "highest AUTHORED" rule holds:
+      // a T5 farm wears its path's T4 until a T5 body exists.
+      return "t4" + main.toLowerCase();
     }
     if (best >= 3) {
       // FROM T3 THE PATH DECIDES THE BODY, which is the brief's own rule: a

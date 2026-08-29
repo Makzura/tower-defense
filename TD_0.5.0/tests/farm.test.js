@@ -1298,6 +1298,69 @@ function (t) {
     "a farm with no dice is standing beside a network, not in it");
 });
 
+test("A4's clone and withdrawal are stamped where they happen", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4"]);
+  t.eq(f.lastClone, -1, "nothing cloned yet");
+  t.eq(f.lastWithdraw, -1, "and nothing withdrawn");
+
+  f.stock = 1000;
+  f.animClock = 7;
+  g.Farms.settleWave(1);
+  t.near(f.lastClone, 7, 1e-9, "the wave's cloning stamps the clock");
+
+  f.animClock = 9;
+  t.eq(f.collect(), null, "and collecting the stock");
+  t.near(f.lastWithdraw, 9, 1e-9, "stamps its own");
+});
+
+test("B4's wave gain is stamped only on a farm that grants HP", function (t) {
+  var h = boot();
+  var g = h.game;
+  var field = farm(h, 600, 200, ["B1"]);
+  var plain = farm(h, 700, 200, []);
+  field.animClock = 3;
+
+  g.Farms.settleWave(1);
+  t.near(field.lastGain, 3, 1e-9, "the farm that gave the base hit points");
+  t.eq(plain.lastGain, -1, "and not one with no B tier at all");
+});
+
+test("the throw names its own outcome, and the network agrees", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["C1", "C2", "C3"]);
+
+  // Face 12 on the C3 table is a gain; face 8 is the reset; face 1 halves P.
+  h.run("Farms.setDie(function () { return 12; });");
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(1);
+  t.eq(f.rollOutcome, "result_positive", "a gain reads as a gain");
+
+  // C3's face 1 takes 35%, which is a loss and not a catastrophe.
+  h.run("Farms.setDie(function () { return 1; });");
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(2);
+  t.eq(f.rollOutcome, "result_negative", "a loss reads as a loss");
+
+  h.run("Farms.setDie(function () { return 8; });");
+  g.Farms.network.P = 5000;
+  g.Farms.settleWave(3);
+  t.eq(f.rollOutcome, "result_reset", "the reset face names itself");
+});
+
+test("a doubling face is a critical, whichever way P moved", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["C1", "C2", "C3", "C4", "C5"]);
+  h.run("Farms.setDie(function () { return 21; });");   // C5 face 21 doubles
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(1);
+  t.eq(f.rollOutcome, "critical_success", "doubling is the best thing a die does");
+  t.eq(g.Farms.network.P, 8000, "three dice, three doublings");
+});
+
 test("every model's one-shot clips are named by what fires them", function (t) {
   var h = boot();
   var g = h.game;
@@ -1307,7 +1370,14 @@ test("every model's one-shot clips are named by what fires them", function (t) {
   var expected = {
     "farm-t3a": ["idle_work", "produce_tick"],
     "farm-t3b": ["idle_scan", "target_lock", "kill_capture"],
-    "farm-t3c": ["idle_magic", "end_wave_roll"]
+    "farm-t3c": ["idle_magic", "end_wave_roll"],
+    "farm-t4a": ["idle_process", "produce_tick", "clone_wave", "withdraw"],
+    "farm-t4b": ["idle_orbit", "field_pulse", "target_lock", "kill_capture",
+                 "wave_gain"],
+    "farm-t4c": ["idle_fate", "queue_fate", "pre_roll_modifier", "end_wave_roll",
+                 "reroll_eight_left", "reroll_eight_right", "result_positive",
+                 "result_negative", "result_reset", "critical_success",
+                 "critical_failure"]
   };
   Object.keys(expected).forEach(function (id) {
     var raw = g.GLModels && g.GLModels.raw ? g.GLModels.raw(id) : null;

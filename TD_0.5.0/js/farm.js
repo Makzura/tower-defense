@@ -103,10 +103,20 @@ function FarmTower(x, y, path) {
   //
   // -1 rather than 0 because 0 is a real moment: a farm placed and paid on the
   // same step would otherwise play its tick at birth.
-  this.lastTick = -1;
-  this.lastLock = -1;
-  this.lastCapture = -1;
-  this.lastRoll = -1;
+  this.lastTick = -1;        // A3/A4: a production tick landed
+  this.lastLock = -1;        // B3/B4: a body entered the field
+  this.lastCapture = -1;     // B3/B4: a body died inside it
+  this.lastRoll = -1;        // C3/C4: the network threw its dice
+  this.lastClone = -1;       // A4: the stock cloned itself at a wave boundary
+  this.lastWithdraw = -1;    // A4: the player collected the stock
+  this.lastGain = -1;        // B4: the field granted the base its hit points
+  // WHAT THE LAST THROW MEANT, as a clip name or null -- `result_positive`,
+  // `result_negative`, `result_reset`, `critical_success`, `critical_failure`.
+  // C4's model has a body for each, and the network already knows which one
+  // happened; carrying the NAME rather than a number keeps the decision in the
+  // simulation, where the dice are, instead of asking the renderer to re-read a
+  // face table it has no business knowing.
+  this.rollOutcome = null;
 
   // Whether the field held anybody last step, so `lastLock` can fire on the
   // EDGE -- a body arriving -- rather than every step something is standing
@@ -597,6 +607,7 @@ FarmTower.prototype.cloneStock = function () {
   // growing -- and routing it there would pay a non-storing farm for a stock
   // it cannot have.
   this.manaProduced += cloned;
+  this.lastClone = this.animClock;
   // BUT IT IS ANNOUNCED LIKE ANYTHING ELSE IT MAKES. Owner: "we can't see
   // whenever an A4 or A5 tower produces mana between waves -- the cloned mana
   // from the storage." Everything else a farm makes throws a popup through
@@ -633,6 +644,7 @@ FarmTower.prototype.collect = function () {
 
   var amount = this.stock;
   this.stock = 0;
+  this.lastWithdraw = this.animClock;
   Farms.pay(amount);
   if (typeof Effects !== "undefined") Effects.farmProduced(this, amount, false);
   return null;
@@ -1593,6 +1605,46 @@ var Farms = (function () {
     return total;
   }
 
+  // WHAT A FARM'S OWN THROW MEANT, as the name of the clip that shows it.
+  //
+  // C4's fate manipulator carries a body for each outcome, and the network
+  // already knows which one happened -- so the naming is decided HERE, where
+  // the faces are, rather than by a renderer re-reading a face table.
+  //
+  // Read off THIS FARM'S OWN dice (`lastRolls`) and the network's movement, in
+  // that order of specificity:
+  //
+  //   a doubling face   -> `critical_success`  (21 and 22 on the C5 table)
+  //   a reset face      -> `result_reset`      (face 8 puts P back to B)
+  //   P more than halved-> `critical_failure`  (C5's face 1 alone takes half)
+  //   P went up         -> `result_positive`
+  //   P went down       -> `result_negative`
+  //   P did not move    -> null, and the idle keeps playing
+  //
+  // A farm rolling several dice reports the STRONGEST thing its own dice did,
+  // which is why a face is asked about before the direction P moved.
+  //
+  // A RESET IS NAMED BEFORE THE HALVING TEST, and the order is the whole
+  // decision: face 8 from a high P is a bigger loss than any other face can
+  // deal, so a halving test placed first would swallow it and the shrine would
+  // play a generic catastrophe where it has a body for exactly this one.
+  function outcomeOf(farm, before) {
+    var faces = farm.lastRolls || [];
+    var reset = false, double = false;
+    for (var i = 0; i < faces.length; i++) {
+      var face = FarmDice.faceOf(farm.diceTable, faces[i]);
+      if (!face) continue;
+      if (face.reset) reset = true;
+      if (face.double) double = true;
+    }
+    if (double) return "critical_success";
+    if (reset) return "result_reset";
+    if (before > 0 && network.P <= before * 0.5) return "critical_failure";
+    if (network.P > before) return "result_positive";
+    if (network.P < before) return "result_negative";
+    return null;
+  }
+
   // --- the wave boundary ----------------------------------------------------
 
   // END OF A WAVE. Production for the wave that just ended, path A's cloning,
@@ -1615,16 +1667,23 @@ var Farms = (function () {
       cloned += f.cloneStock();
       baseHp += f.baseHpPerWave;
       f.baseHpProduced += f.baseHpPerWave;
+      // B4's orrery sweeps its ring when the field hands the base its hit
+      // points -- the wave's gain, and the only thing path B does once a wave.
+      if (f.baseHpPerWave > 0) f.lastGain = f.animClock;
     }
     if (baseHp > 0 && typeof growBaseMaxHp === "function") growBaseMaxHp(baseHp);
 
+    var before = network.P;
     var rolled = network.live ? rollNetwork() : null;
     // THE SHRINE THROWS ITS DIE WHEN THE NETWORK DOES. Only the farms that
     // actually rolled -- `members()` is the ones carrying dice -- so a C1 farm
     // standing beside a network it is not in does not mime the throw.
     if (rolled) {
       var rollers = members();
-      for (i = 0; i < rollers.length; i++) rollers[i].lastRoll = rollers[i].animClock;
+      for (i = 0; i < rollers.length; i++) {
+        rollers[i].lastRoll = rollers[i].animClock;
+        rollers[i].rollOutcome = outcomeOf(rollers[i], before);
+      }
     }
     return { paid: paid, cloned: cloned, baseHp: baseHp, dice: rolled };
   }
