@@ -13,6 +13,76 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The Farm gets its picture and its words.**
+
+**Its body was on the board and its picture was not.** `TowerPreview3D` resolves
+a tower type to a mesh through a family map; a type missing from it answers null
+and every call site quietly falls back to the flat 2D glyph. So the armoury card,
+the loadout row, the build bar and the index rail all drew a picture of nothing
+in particular while twelve authored bodies stood on the battlefield, and nothing
+anywhere reported a problem. Six characters, plus a test that asserts the
+resolution for every catalogue tower so the sixth is not the last one found this
+way.
+
+**The index showed a 1200-mana economy tower as one line.** The index and the
+armoury show a specimen and drop its history — by counting two rows off the
+front of `statLines`, on the assumption that every tower opens with "Damage
+dealt" and "Kills". The Farm has neither and keeps its own totals at the bottom,
+under the production rate a player opens the panel for, so the count ate that
+rate and left "Tower HP 200 / 200". The mark travels with the row now
+(`TowerStats.total`), so the drop is by identity.
+
+**Four tiers said "No description written for this one yet."** — A4, A5, B5 and
+the C dice, which is every tier those paths are taken for. They have sentences
+now, and their names in words rather than as flag ids, with every number handed
+in from the Farm's own constants and the tier's own row. All four measured
+against `tooltipLines`' five-line budget at the card's real width: a description
+clipped at "…" is a description missing its point.
+
+**And the one consequence a price tag cannot show.** Every other tower warns
+that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
+Its rule is its own — two paths at most, one past tier 2 — and the note states
+the half that is true of the board in front of you.
+
+**2026-08-29 — The Fractal Slime comes off the campaign.**
+
+At the owner's instruction: *"take out the fractal slime, all of them, from easy
+mode, and replace them by, in order, colossus > hive > slow > normal, matching
+the HP total"*. `EASY_WAVES` is the only schedule, so all ten roots came off the
+road. The type is untouched and still live — the ladder, the division, the AoE
+resistance, the half-price bounty — and now carries `sandboxOnly: true`, the
+documented way to park a type in the index and the sandbox. `tests/run.js` reads
+that flag in both directions, so a slime creeping back into a wave fails by name.
+
+**The substitution.** Each root became ONE body of the first type in that ladder
+whose own health fits inside the root's, with a `health` override equal to the
+root: four Normals at 1 in wave 16, two at 4 in wave 17, a Slow at 16 in 22, a
+Slow at 64 in 25, a Hive at 256 in 33, and a Colossus at 1024 last in wave 35.
+Every `at`, `count` and `interval` is untouched, so when a body enters and into
+what is exactly what it was.
+
+**Authored HP did not move — 25 939, wave for wave — and that is the one number
+not to read as "nothing changed".** `waveEffectiveHealth` counts the root only,
+so matching each root point for point holds it still; the wave-clear bonus is a
+tenth of health and holds still with it. But a cleared cascade was 7 748 points
+across 1 826 born bodies where the six roots authored 1 372, and all of that is
+gone. Waves 22, 25, 33 and 35 are materially easier to clear and quieter on the
+road, and the finale now ends on the longest single kill in the game instead of
+on a clearing problem. Kill bounty rose $22 987 → $23 132: these four types are
+worth $1 a point where the Slime's row was written at $0.50. The $3 188 the
+cascades used to pay outside every table is gone with them.
+
+**One test found a real trap on the way.** The v0.4.4 spine matcher summed every
+body of a type in a wave and then read `health` off whichever group came last.
+Wave 17's two new 4 HP Normals brought its Normal count to sixteen, so it matched
+old wave 11 ahead of wave 19 — its authored home — and then reported the spine
+as WEAKER off the two-body salvo. It buckets by health now and asks for a bucket
+of the right size, which is what a split salvo actually looks like.
+
+The index derives everything it says about this enemy from the schedule, so with
+nothing scheduled it falls back to the type's own row and describes the base
+specimen, T1 at 4 HP, naming no wave. No edit to `js/codex.js`.
+
 **2026-08-29 — The Farm's crosspath, its eye, and a tidier end screen.**
 
 **The crosspath was wrong in both directions.** `lockedBranch` alone refused

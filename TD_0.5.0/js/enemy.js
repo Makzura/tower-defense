@@ -462,10 +462,22 @@ Enemy.TYPES = {
   // has four times the health and breaks into four copies of the tier below.
   // T1 is the ordinary/base specimen shown in the index. A T5 is therefore
   // 1024 HP without inventing five more enemy definitions.
+  //
+  // OUT OF THE CAMPAIGN SINCE 2026-08-29, at the owner's instruction: "take out
+  // the fractal slime, all of them, from easy mode". EASY_WAVES is the only
+  // schedule, so `sandboxOnly` is the honest way to say it -- the flag means
+  // "keep this out of the fixed campaign", and tests/run.js reads it in BOTH
+  // directions, so a slime creeping back into a wave fails there rather than
+  // passing unnoticed. Everything below is untouched: the ladder, the division,
+  // the AoE resistance and the half bounty are all still live, still in the
+  // index, and still sendable from the sandbox. The ten roots it used to carry
+  // were replaced point for point -- see the block above wave 16 in js/game.js
+  // for which body took which.
   fractal_slime: {
     id: "fractal_slime",
     displayName: "Fractal Slime",
     description: "A dividing slime whose tier determines both its health and what it leaves behind.",
+    sandboxOnly: true,
     health: 4,                       // T1, the default/base specimen
     bounty: 2,                       // half its old bounty at base T1
     bountyStep: 0.5,                 // lets terminal T0 pay the exact half: $0.50

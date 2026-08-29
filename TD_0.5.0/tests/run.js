@@ -357,17 +357,17 @@ function (t) {
     [13,  20,   180,   18,   200, { "angry | hp=9 | <no-tier>": 20 }],
     [14,  10,    70,    7,    70, { "camo_normal | hp=7 | <no-tier>": 10 }],
     [15,   5,   225,   23,   125, { "shielded | hp=15 | <no-tier>": 5 }],
-    [16,  66,   406,   41,   354, {
+    [16,  66,   406,   41,   350, {
       "slow | hp=15 | <no-tier>": 14,
       "swarm | hp=3 | <no-tier>": 24,
       "armored | hp=5 | <no-tier>": 24,
-      "fractal_slime | <no-health> | tier=0": 4
+      "normal | hp=1 | <no-tier>": 4
     }],
-    [17,  59,   383,   38,   401, {
+    [17,  59,   383,   38,   403, {
       "swarm | hp=3 | <no-tier>": 27,
       "<default-normal> | hp=13 | <no-tier>": 14,
       "fast | hp=7 | <no-tier>": 16,
-      "fractal_slime | <no-health> | tier=1": 2
+      "normal | hp=4 | <no-tier>": 2
     }],
     [18,  12,   108,   11,   168, { "camo_fast | hp=9 | <no-tier>": 12 }],
     [19,  35,   668,   67,   569, {
@@ -377,11 +377,11 @@ function (t) {
     }],
     [20,   4,   300,   30,   300, { "brute | hp=75 | <no-tier>": 4 }],
     [21,   6,   312,   31,   198, { "revenant | hp=26 | <no-tier>": 6 }],
-    [22,  37,   652,   65,   746, {
+    [22,  37,   652,   65,   755, {
       "fast | hp=18 | <no-tier>": 12,
       "brute | hp=85 | <no-tier>": 4,
       "swarm | hp=4 | <no-tier>": 20,
-      "fractal_slime | <no-health> | tier=2": 1
+      "slow | hp=16 | <no-tier>": 1
     }],
     [23,  24,   760,   76,   578, {
       "slow | hp=26 | <no-tier>": 14,
@@ -389,11 +389,11 @@ function (t) {
       "shielded | hp=18 | <no-tier>": 4
     }],
     [24,  10,    90,    9,    90, { "flying | hp=9 | <no-tier>": 10 }],
-    [25,  36,   984,   98,   687, {
+    [25,  36,   984,   98,   731, {
       "<default-normal> | hp=22 | <no-tier>": 20,
       "shielded | hp=20 | <no-tier>": 5,
       "armored | hp=18 | <no-tier>": 10,
-      "fractal_slime | <no-health> | tier=3": 1
+      "slow | hp=64 | <no-tier>": 1
     }],
     [26,   2,   440,   44,   514, { "hive | hp=220 | <no-tier>": 2 }],
     [27,  30,   808,   81,  1032, {
@@ -430,12 +430,12 @@ function (t) {
       "healer | hp=260 | <no-tier>": 3,
       "revenant | hp=32 | <no-tier>": 4
     }],
-    [33,  28,  1952,  195,  1426, {
+    [33,  28,  1952,  195,  1723, {
       "slow | hp=38 | <no-tier>": 18,
       "hive | hp=200 | <no-tier>": 2,
       "shielded | hp=26 | <no-tier>": 4,
       "brute | hp=100 | <no-tier>": 3,
-      "fractal_slime | <no-health> | tier=4": 1
+      "hive | hp=256 | <no-tier>": 1
     }],
     [34,  45,  2364,  236,  3252, {
       "swarm | hp=6 | <no-tier>": 24,
@@ -444,13 +444,13 @@ function (t) {
       "shieldbearer | hp=180 | <no-tier>": 2,
       "angry | hp=40 | <no-tier>": 5
     }],
-    [35,  49,  7684,  768,  4313, {
+    [35,  49,  7684,  768,  4776, {
       "<default-normal> | hp=30 | <no-tier>": 30,
       "flying | hp=20 | <no-tier>": 6,
       "boss | <no-health> | <no-tier>": 1,
       "angry | hp=40 | <no-tier>": 7,
       "shielded | hp=30 | <no-tier>": 4,
-      "fractal_slime | <no-health> | tier=5": 1
+      "colossus | hp=1024 | <no-tier>": 1
     }],
   ];
 
@@ -537,12 +537,14 @@ function (t) {
   t.eq(totals.health, 25939, "and the table agrees");
   t.eq(live.clear, 2594, "$2594 of clear bounty");
   t.eq(totals.clear, 2594, "and the table agrees");
-  t.eq(totals.kill, 22321, "$22 321 priced off the type rows");
-  // The game's own pricing over the same bodies. It is higher because
-  // Enemy.bountyOf resolves a Fractal Slime's TIER, which the type-row sum
-  // above cannot see -- so the two moving apart means a tier was lost, and the
-  // two moving together means a body was.
-  t.eq(live.kill, 22987, "and $22 987 once every fractal's tier is priced in");
+  t.eq(totals.kill, 23132, "$23 132 priced off the type rows");
+  // The game's own pricing over the same bodies. The two used to differ by
+  // $666 -- Enemy.bountyOf resolves a Fractal Slime's TIER, which the type-row
+  // sum above cannot see -- and since 2026-08-29 the campaign schedules no
+  // fractal at all, so every body it prices is priced off its own health and
+  // the two formulas land on one number. They must still be asserted apart:
+  // the day a tiered body is scheduled again, this is the pair that shows it.
+  t.eq(live.kill, 23132, "and the same $23 132 through Enemy.bountyOf");
 
   // --- the roster rules the schedule is built around ----------------------
   //
@@ -563,7 +565,10 @@ function (t) {
   t.eq(h.game.waveCount(h.game.WAVES[10]), 1, "and it is exactly one body");
   t.deep(where.boss, [35], "the Tyrant is scheduled once, in wave 35");
   t.deep(where.boss_fast, [34], "the Vanguard once, in wave 34");
-  t.deep(where.colossus, [29], "the Colossus once, in wave 29");
+  // TWICE SINCE 2026-08-29. Wave 35's is the body that replaced the T5 Fractal
+  // Slime -- 1024 points, matched to the root it stands in for -- and it is
+  // the heaviest single non-boss body in the campaign.
+  t.deep(where.colossus, [29, 35], "the Colossus in waves 29 and 35");
 
   // Flight is INTRODUCED at 24 and then mixes in freely; camo is introduced at
   // 14 and every wave that carries it carries nothing else (the two tests above
@@ -585,22 +590,15 @@ function (t) {
   t.deep(flies, [24, 31, 32, 35], "and returns three times after that");
   t.deep(camo, [14, 18, 28], "waves 14, 18 and 28 are camo end to end");
 
-  // THE TIER LADDER, ONE RUNG PER APPEARANCE. Wave 16 sends four separate T0
-  // groups since the rewrite -- four groups, one body each, which is the same
-  // four T0s the schedule always had -- so this counts BODIES per tier rather
-  // than groups.
-  var perTier = {};
-  fractals.forEach(function (f) {
-    perTier[f[1]] = perTier[f[1]] || { wave: f[0], bodies: 0 };
-    perTier[f[1]].bodies += f[2];
-  });
-  t.deep(Object.keys(perTier).sort(), ["0", "1", "2", "3", "4", "5"],
-    "all six rungs of the Fractal ladder are scheduled");
-  t.deep([0, 1, 2, 3, 4, 5].map(function (tier) { return perTier[tier].wave; }),
-    [16, 17, 22, 25, 33, 35],
-    "T0 at 16, T1 at 17, T2 at 22, T3 at 25, T4 at 33, T5 at 35");
-  t.deep([0, 1, 2, 3, 4, 5].map(function (tier) { return perTier[tier].bodies; }),
-    [4, 2, 1, 1, 1, 1], "four T0s, two T1s, and one of each rung above");
+  // NO FRACTAL SLIME IS SCHEDULED, and this used to be the tier ladder's own
+  // fixture: four T0s in 16, two T1s in 17, and one rung each in 22, 25, 33
+  // and 35. 2026-08-29, at the owner's instruction, all ten roots came off the
+  // campaign and were replaced body for body and point for point (see the
+  // block above wave 16 in js/game.js). The assertion is inverted rather than
+  // deleted: an empty list is the claim, and a fractal creeping back into the
+  // schedule -- which is exactly the sort of thing a retune does by copying a
+  // group -- fails here rather than nowhere.
+  t.deep(fractals, [], "the campaign schedules no Fractal Slime");
 
   // --- and every ceiling still outlasts its own wave ----------------------
   //
@@ -893,14 +891,35 @@ test("the v0.4.4 twenty-wave spine is still in there, in order", function (t) {
   // re-measuring -- the last from-scratch rebuild put the first swarm at wave
   // 5, when three towers are on the board, and null-meridian could not survive
   // it.
-  function aggregate(h, wave, typeId) {
-    var total = 0, health;
+  // ONE SALVO FAMILY, NOT EVERY BODY OF THAT TYPE IN THE WAVE (2026-08-29).
+  //
+  // This used to sum every group of the wanted type and then read `health` off
+  // whichever of them happened to be last, which is meaningless the moment a
+  // wave carries two unlike salvos of one type. It went wrong the day wave 17's
+  // two Fractal Slime roots became two 4 HP Normals: 14 Normals at 13 plus 2 at
+  // 4 is sixteen bodies, so wave 17 matched old wave 11's "16 Normals" ahead of
+  // wave 19 -- its authored home -- and then reported the spine as WEAKER,
+  // 8 -> 4, off the two-body salvo.
+  //
+  // The rewrite the comment above describes split old waves into salvos of the
+  // SAME weight (old wave 2's eight Normals arrive as 4 + 4), so that is what a
+  // spine wave looks like: one health, split across groups. Bucketing by health
+  // and asking for a bucket of the right size is the same claim, stated so that
+  // an unrelated body of the same type cannot join it.
+  function aggregate(h, wave, typeId, wantCount) {
+    var byHealth = {};
     h.game.waveGroups(wave).forEach(function (g) {
       if ((g.type || "normal") !== typeId) return;
-      total += g.count;
-      health = g.health;
+      var key = g.health === undefined ? "" : String(g.health);
+      byHealth[key] = (byHealth[key] || 0) + g.count;
     });
-    return { count: total, health: health };
+    var keys = Object.keys(byHealth);
+    for (var i = 0; i < keys.length; i++) {
+      if (byHealth[keys[i]] === wantCount) {
+        return { count: wantCount, health: keys[i] === "" ? undefined : Number(keys[i]) };
+      }
+    }
+    return { count: -1, health: undefined };
   }
 
   var i = 0;
@@ -908,7 +927,7 @@ test("the v0.4.4 twenty-wave spine is still in there, in order", function (t) {
     if (i >= OLD.length) return;
     var want = OLD[i];
     var wantType = want.type || "normal";
-    var got = aggregate(h, wave, wantType);
+    var got = aggregate(h, wave, wantType, want.count);
     if (got.count !== want.count) return;
     // Health may have been turned UP by v0.4.7. It must never have been turned
     // down: that would be a difficulty cut hiding inside a difficulty raise.
@@ -1661,15 +1680,23 @@ function (t) {
 // which is deliberate: the last wave's cursor is retired the instant its final
 // body is emitted (see emitDueSpawns), and that resets the wave clock to zero
 // on the very frame the T5 appears.
-test("wave 35's Tyrant walks in at thirteen seconds and its T5 slime at twenty-eight",
+// 2026-08-29: the seventh group was a T5 Fractal Slime until the ladder came
+// off the campaign. It is a 1024 HP Colossus now -- the same 1024 points at the
+// same 28 s, which is the whole substitution rule -- so this test keeps its
+// shape and changes its subject. What it is FOR is unchanged: the finale's two
+// late arrivals land where they are authored to, in the order they are authored
+// in, and the last thing the campaign ever sends is the one behind the boss.
+test("wave 35's Tyrant walks in at thirteen seconds and its Colossus at twenty-eight",
 function (t) {
   var h = harness.boot();
   var last = h.game.WAVES[34];
 
   t.eq(h.game.waveGroups(last)[3].type, "boss", "the fourth group is the Tyrant");
   t.eq(h.game.waveGroups(last)[3].at, 13, "authored at 13.00 s");
-  t.eq(h.game.waveGroups(last)[6].type, "fractal_slime", "the seventh is the slime");
-  t.eq(h.game.waveGroups(last)[6].tier, 5, "at tier 5");
+  t.eq(h.game.waveGroups(last)[6].type, "colossus", "the seventh is the Colossus");
+  t.eq(h.game.waveGroups(last)[6].health, 1024,
+    "at the 1024 HP it inherited from the T5 root it replaced");
+  t.eq(h.game.waveGroups(last)[6].tier, undefined, "and carries no tier of its own");
   t.eq(h.game.waveGroups(last)[6].at, 28, "authored at 28.00 s");
 
   h.run("waveIndex = 34; waveSpawned = 0; waveCountdown = 0; waveElapsed = 0;" +
@@ -1677,37 +1704,36 @@ function (t) {
         "baseHp = 1000000;");
 
   var elapsed = 0;
-  var bossAt = null, slimeAt = null, bossBody = null, slimeBody = null;
+  var bossAt = null, tankAt = null, bossBody = null, tankBody = null;
   for (var i = 0; i < 60 * 40; i++) {
     h.game.updateWaves(1 / 60);
     elapsed += 1 / 60;
     h.game.enemies.forEach(function (e) {
       if (e.typeId === "boss" && bossAt === null) { bossAt = elapsed; bossBody = e; }
-      if (e.typeId === "fractal_slime" && slimeAt === null) { slimeAt = elapsed; slimeBody = e; }
+      if (e.typeId === "colossus" && tankAt === null) { tankAt = elapsed; tankBody = e; }
     });
   }
 
   t.ok(bossAt !== null, "the Tyrant reached the road");
   t.near(bossAt, 13, 0.03, "thirteen seconds in (" + Number(bossAt).toFixed(2) + ")");
-  t.ok(slimeAt !== null, "and so did the slime");
-  t.near(slimeAt, 28, 0.03, "twenty-eight seconds in (" + Number(slimeAt).toFixed(2) + ")");
-  t.ok(slimeAt > bossAt, "the slime is the last thing the campaign sends");
+  t.ok(tankAt !== null, "and so did the Colossus");
+  t.near(tankAt, 28, 0.03, "twenty-eight seconds in (" + Number(tankAt).toFixed(2) + ")");
+  t.ok(tankAt > bossAt, "it is the last thing the campaign sends");
 
-  // THE BODIES ARE THE DECLARED ONES, not just something wearing the type.
-  // The tier is the half that shipped broken once already: an untiered slime is
-  // 4 HP, and the T5's 1024 is what makes it the finale rather than a footnote.
+  // THE BODIES ARE THE DECLARED ONES, not just something wearing the type. The
+  // health is the half that carries the substitution: a stock Colossus is 550,
+  // and 1024 is what makes this the body the T5 root used to be.
   t.eq(bossBody.maxHealth, h.game.Enemy.TYPES.boss.health, "the Tyrant at its type's health");
   t.eq(bossBody.waveId, 35, "carrying wave 35");
-  t.eq(slimeBody.fractalTier, 5, "the slime at tier 5");
-  t.eq(slimeBody.maxHealth, 1024, "which is 1024 HP, not the untiered 4");
-  t.eq(slimeBody.waveId, 35, "and it too carries wave 35");
+  t.eq(tankBody.maxHealth, 1024, "the Colossus at 1024 HP, not its stock 550");
+  t.eq(tankBody.waveId, 35, "and it too carries wave 35");
 
   // Nothing of either arrived early. A group that leaked one body onto an
   // earlier frame would still pass every count in the suite.
   t.eq(h.game.enemies.filter(function (e) { return e.typeId === "boss"; }).length, 1,
     "exactly one Tyrant");
-  t.eq(h.game.enemies.filter(function (e) { return e.typeId === "fractal_slime"; }).length, 1,
-    "and exactly one slime");
+  t.eq(h.game.enemies.filter(function (e) { return e.typeId === "colossus"; }).length, 1,
+    "and exactly one Colossus");
   t.eq(h.game.waveCount(last), 49, "wave 35 is 49 bodies");
   t.eq(h.game.enemies.length, 49, "and all 49 are on the road by 40 s");
 });
@@ -2366,11 +2392,34 @@ test("auto-send keeps its three seconds through a cleared board", function (t) {
 //
 // Easy only. Normal and Hard are unfinished placeholder schedules and their
 // wave 25 declares no tier at all, so they would prove nothing here.
+// THE CAMPAIGN SCHEDULES NO FRACTAL SLIME SINCE 2026-08-29, and the three tests
+// below are not about the campaign. They are about the SCHEDULER: that it hands
+// a group's `tier` to the body it builds, that it mints a wave number, and that
+// a wave stays open on bodies it never emitted. The Fractal Slime is the only
+// body in the game that can prove any of that -- it is the one type whose
+// health comes from a tier and the one that makes children out of itself -- so
+// these build the wave they need instead of borrowing one.
+//
+// The real wave 25 with a T3 root put back on the end of it, at the `at` the
+// campaign used to send it at. Wave 25 is still wave 25 and still carries its
+// other 35 bodies, so every number these tests assert -- the spawn cursor, the
+// 25, the 84 descendants -- means exactly what it meant when the root was
+// authored there. EASY_WAVES itself is not touched: WAVES is repointed at a
+// copy, and only this test's game sees it.
+function scheduleFractalIntoWave25(h) {
+  h.run("WAVES = EASY_WAVES.slice();" +
+        "WAVES[24] = { duration: EASY_WAVES[24].duration," +
+        "  groups: waveGroups(EASY_WAVES[24]).concat([" +
+        "    { at: 15, count: 1, interval: 1, type: 'fractal_slime', tier: 3 }" +
+        "  ]) };");
+}
+
 test("a scheduled fractal slime reaches the board at its declared tier", function (t) {
   var h = harness.boot("null-meridian");
+  scheduleFractalIntoWave25(h);
 
-  // Find the group rather than typing its cursor: the wave-25 fractal group is
-  // index 3 at spawn cursor 35 today, and both move if the schedule is edited.
+  // Find the group rather than typing its cursor: it is the last group of the
+  // wave today, and that moves if the wave is edited.
   var found = h.run("(function () {" +
     "  var groups = waveGroups(WAVES[24]);" +
     "  var cursor = 0;" +
@@ -2380,7 +2429,7 @@ test("a scheduled fractal slime reaches the board at its declared tier", functio
     "    cursor += groups[i].count;" +
     "  }" +
     "  return null; })()");
-  t.ok(found !== null, "wave 25 still declares a fractal slime group");
+  t.ok(found !== null, "the fixture's wave 25 declares a fractal slime group");
   t.eq(found.tier, 3, "declared at tier 3");
 
   var body = h.run("(function () {" +
@@ -2434,11 +2483,11 @@ test("a scheduled fractal slime reaches the board at its declared tier", functio
 
 test("a scheduled body carries its wave's number, and its cascade keeps it", function (t) {
   var h = harness.boot("null-meridian");
+  scheduleFractalIntoWave25(h);
 
-  // The wave-25 fractal group again, found rather than typed for the same
-  // reason the tier test above finds it: the cursor moves if the schedule is
-  // edited, and a test that hard-codes 35 would go quietly green on the wrong
-  // body.
+  // The same group again, found rather than typed for the same reason the tier
+  // test above finds it: the cursor moves if the wave is edited, and a test
+  // that hard-codes 35 would go quietly green on the wrong body.
   var cursor = h.run("(function () {" +
     "  var groups = waveGroups(WAVES[24]);" +
     "  var at = 0;" +
@@ -2447,7 +2496,7 @@ test("a scheduled body carries its wave's number, and its cascade keeps it", fun
     "    at += groups[i].count;" +
     "  }" +
     "  return -1; })()");
-  t.ok(cursor >= 0, "wave 25 still declares a fractal slime group");
+  t.ok(cursor >= 0, "the fixture's wave 25 declares a fractal slime group");
 
   var stamped = h.run("(function () {" +
     "  enemies.length = 0; bullets.length = 0;" +
@@ -2549,8 +2598,9 @@ test("a brood and a summon inherit the wave of whatever made them", function (t)
 test("a wave stays open while a body it never scheduled is still walking",
 function (t) {
   var h = harness.boot("null-meridian");
+  scheduleFractalIntoWave25(h);
 
-  // Wave 25 is the one that ends on a T3 Fractal Slime, at `at: 15`. Deployed by
+  // The fixture's wave 25 ends on a T3 Fractal Slime at `at: 15`. Deployed by
   // the real clock rather than by writing `waveSpawned`, because the claim is
   // about the gate that runs inside update() and a hand-placed cursor would let
   // this go green against a scheduler that never ran.
@@ -2572,7 +2622,7 @@ function (t) {
     "    e.noBounty = true; e.dead = true;" +
     "  }" +
     "  return found; })()");
-  t.ok(kept, "wave 25 still schedules a Fractal Slime");
+  t.ok(kept, "the fixture's wave 25 put a Fractal Slime on the road");
   h.step(1 / 60);
   t.eq(h.game.enemies.length, 1, "one slime is left, and nothing else");
   t.eq(h.game.enemies[0].waveId, 25, "wearing wave 25's number");
@@ -3056,7 +3106,7 @@ test("a wave summary sums identical salvos and separates unlike ones",
     // health override, same (absent) tier -- one entry.
     t.eq(h.game.waveSummary(h.game.WAVES[34]),
       "30 × Normal  +  6 × Aether Wisp  +  1 × Tyrant  +  7 × Angry  +  " +
-      "4 × Bulwark  +  1 × Fractal Slime",
+      "4 × Bulwark  +  1 × Colossus",
       "two salvos of fifteen Normals read as thirty");
 
     // Four and four is eight, not two lines of four.
@@ -4294,15 +4344,20 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   // $23 333 until the 2026-08-13 curve retune. The rise is the HP inflation
   // paying for itself, NOT a bounty change -- `b = 1.00`, no bounty was touched.
   //
-  // $23 438 until the tier ladder was scheduled, and THIS ONE FELL -- by $451,
-  // while health barely moved. That is the Fractal Slime's half-price row
-  // doing exactly what it was written to do: it pays $0.50 per point where an
+  // $23 438 until the tier ladder was scheduled, and THAT ONE FELL -- by $451,
+  // while health barely moved. That was the Fractal Slime's half-price row
+  // doing exactly what it was written to do: it paid $0.50 per point where an
   // ordinary body pays $1, so converting 1 308 points of scheduled health into
-  // slime roots gives up half the kill money on them. The board gets it back
-  // and more from the generations, which are conditional and so are not in
-  // this sum: clearing all six cascades pays $3 874 against the $686 of roots
-  // counted here, +$3 188 that only a player who actually kills them sees.
-  t.eq(killIncome, 22987, "scheduled kill bounties");
+  // slime roots gave up half the kill money on them, and the board earned it
+  // back from the generations (conditional, so never in this sum).
+  //
+  // $22 987 until 2026-08-29, when the ladder came off the campaign. The ten
+  // roots were replaced point for point, so HEALTH did not move at all -- and
+  // this rose $145 anyway, because the four types that replaced them are
+  // ordinary bodies at $1 a point where a slime was $0.50. The conditional
+  // $3 188 the cascades used to pay is gone with them: what a board earns for
+  // clearing wave 35 is now what this line says it is.
+  t.eq(killIncome, 23132, "scheduled kill bounties");
   var progressionIncome = 0;
   var escalatingIncome = 0;
   for (var waveNumber = 1; waveNumber <= h.game.WAVES.length; waveNumber++) {
@@ -4316,11 +4371,13 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   // is schedule-blind, so inflating health dilutes spending power on its own
   // and no bounty has to be touched to make that happen.
   //
-  // $36 133 until the tier ladder. The $447 it lost is the half-price kill
+  // $36 133 until the tier ladder, which cost it $447: the half-price kill
   // money above plus the clear bonus following the three waves that got
-  // lighter; the conditional $3 188 the cascades pay is not in an AUTHORED
-  // purse and must not be added to one.
-  t.eq(purse, 35686, "authored run purse before conditional rewards");
+  // lighter. Taking the ladder back off on 2026-08-29 returned $145 of that --
+  // the kill money only, since the substitution matched every root's health and
+  // the clear bonus is a tenth of health. The conditional $3 188 the cascades
+  // used to pay was never in an AUTHORED purse and must not be added to one.
+  t.eq(purse, 35831, "authored run purse before conditional rewards");
   var dearest = h.game.BUILD_SLOTS.reduce(function (max, type) {
     return type && type.COST > max ? type.COST : max;
   }, 0);

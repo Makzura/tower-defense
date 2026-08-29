@@ -511,100 +511,78 @@ var EASY_WAVES = [
     { at: 4, count: 2, interval: 0.6, type: "shielded", health: 15 },
     { at: 8, count: 2, interval: 0.6, type: "shielded", health: 15 }
   ] },
-  // --- THE FRACTAL SLIME'S TIER LADDER, 16 / 17 / 22 / 25 / 33 / 35 -------
+  // --- WHERE THE FRACTAL SLIME'S TIER LADDER USED TO BE, 16 / 17 / 22 / 25 / 33 / 35
   //
-  // 2026-08-20, at the owner's instruction: "i want the slime tiers to spawn
-  // in accordance to their HP as stated in the index and behave in that
-  // manner". The index has always printed all six rungs -- T0 = 1, T1 = 4,
-  // T2 = 16, T3 = 64, T4 = 256, T5 = 1024 -- and until this patch the campaign
-  // sent exactly one of them, the T3 in wave 25. The other five existed only
-  // as somebody else's split children, so the guide was advertising a ladder
-  // the schedule never climbed.
+  // 2026-08-29, at the owner's instruction: "take out the fractal slime, all of
+  // them, from easy mode, and replace them by, in order, colossus > hive > slow
+  // > normal, matching the HP total". EASY_WAVES is the campaign, so this took
+  // the type off the road entirely -- `fractal_slime` is still a live enemy
+  // definition (js/enemy.js), still sendable from the sandbox and still walked
+  // by the tests that own the division rules, but nothing schedules it.
   //
-  // ONE RUNG PER WAVE, ASCENDING, AND THE HP IS THE PLACEMENT RULE. Each tier
-  // sits in the first wave heavy enough to carry it, which is why the gaps
-  // widen as they do: 1 and 4 points are texture in an early mixed wave, 16
-  // is a body, 64 is the event wave 25 was already built around, 256 is a
-  // second boss-weight body in 33, and 1024 has exactly one home in a
-  // thirty-five wave schedule.
+  // THE SUBSTITUTION RULE, applied to all ten groups and to nothing else. Each
+  // root became ONE body of the first type in that ladder whose own health
+  // fits inside the root's, carrying a `health` override that reproduces the
+  // root exactly:
   //
-  // WHAT A RUNG ACTUALLY COSTS IS NOT ITS ROOT. A tier T root takes
-  // root x (T + 1) points to clear -- it conserves health as it divides, four
-  // bodies at a quarter each -- and leaves 4^T terminal T0s walking:
+  //     wave 16   4 x T0     1 HP each   ->  4 x Normal    @ 1
+  //     wave 17   2 x T1     4 HP each   ->  2 x Normal    @ 4
+  //     wave 22   1 x T2    16 HP        ->  1 x Slow      @ 16
+  //     wave 25   1 x T3    64 HP        ->  1 x Slow      @ 64
+  //     wave 33   1 x T4   256 HP        ->  1 x Hive      @ 256
+  //     wave 35   1 x T5  1024 HP        ->  1 x Colossus  @ 1024
   //
-  //     T0     1 HP        1 point        1 body
-  //     T1     4 HP        8 points       5 bodies
-  //     T2    16 HP       48 points      21 bodies
-  //     T3    64 HP      256 points      85 bodies
-  //     T4   256 HP    1 280 points     341 bodies
-  //     T5  1024 HP    6 144 points   1 365 bodies
+  // Every `at`, `count` and `interval` is untouched, so the schedule's shape --
+  // when a body enters, and into what -- is exactly what it was. The overrides
+  // are how this file has always spelled "this type, at this wave's weight"
+  // (the Hive walks wave 33 at 200 and wave 26 at 220); the ladder simply
+  // decides WHICH type carries the weight, biggest first.
   //
-  // The base has 100 HP and a leak costs the leaker's remaining health, so the
-  // right column is the difficulty that matters: a T5 that is not cleared is
-  // 1 024 separate points of base damage arriving one at a time. That, not the
-  // root, is why T4 waits for 33 and T5 for the Tyrant's wave.
+  // WHAT MOVED, MEASURED RATHER THAN ASSUMED:
   //
-  // THE SCHEDULE PAID FOR IT RATHER THAN GROWING BY IT. Authored effective HP
-  // moved 25 898 -> 25 939, +0.16%: wave 33 funds its T4 exactly (two Bulwarks
-  // and a Brute), wave 35 covers -340 of the T5's 1024 and waves 27, 29, 30,
-  // 31, 32 and 34 give up 641 more at 5-9% each -- 1 267 trimmed against 1 308
-  // added, and the 41 points of difference ARE the whole rise. NOTHING WAS TAKEN
-  // OFF A SPINE OPENER or off a mechanism body -- see the retune note above:
-  // halving a Hive, Shieldbearer, Healer or Colossus is a design change, not a
-  // trim -- so what got thinner is ordinary escort. The curve someone measured
-  // is still the curve; tests/run.js pins both totals.
+  //   * Authored HP: 25 939 -> 25 939. Unchanged, wave for wave, because the
+  //     override matches each root point for point -- which is what "matching
+  //     the HP total" was asked for. waveEffectiveHealth counts the root only
+  //     (it never counted a cascade), so it does not move either.
+  //   * Kill bounty: 22 987 -> 23 132, +145. Enemy.bountyOf prices a body as
+  //     its type's value scaled to its health, and these four types are worth
+  //     more per point than a Slime was. The end-of-wave bonus is a tenth of
+  //     the HP and therefore does not move at all.
+  //   * REAL load fell, and this is the honest part. A cleared cascade was
+  //     7 748 points across 1 826 born bodies where the six roots authored
+  //     1 372; that work is gone. What replaces it is 1 372 points in ten
+  //     bodies, plus one Hive brood -- five shielded hatchlings, worth nothing
+  //     -- on wave 33. Waves 22, 25, 33 and 35 are materially easier to clear
+  //     and materially quieter on the road. Do not read the unchanged authored
+  //     total as an unchanged wave.
   //
-  // AND THE REAL LOAD DID GO UP, WHICH IS THE POINT. Authored says +41; a
-  // board that clears every cascade removes 7 748 points where the six roots
-  // count 1 372, and it earns the difference back at half rate ($3 874 across
-  // the generations against the $686 of roots the purse counts). 1 826 bodies
-  // are born to do it. Do not quote the authored figure as if the schedule
-  // were unchanged.
-  //
-  // DO NOT GIVE A FRACTAL GROUP A `health` OVERRIDE, here or in any later
-  // retune. `fractal_slime` DISCARDS one at every value: `fractalTierOf`
-  // resolves undefined to the default tier, so the constructor always holds a
-  // tier and `Enemy.healthOf` takes the tier branch. Writing `health` would be
-  // a no-op on the body and NOT a no-op on the accounting -- `waveKillBounty`
-  // would declare income for a body that never got tougher. Scale the TIER, or
-  // scale the type row in js/enemy.js; not this. tests/content.test.js checks
-  // the whole schedule for one, because the mistake is invisible in play.
-  //
-  // A RUNG IS ONE `at`, NOT ONE GROUP, since the timeline. Wave 16's four T0s
-  // are four one-body groups at 1, 5, 9 and 13 s rather than one group of four
-  // at 0.9 spacing -- same four bodies, same tier, spread across the wave
-  // instead of bunched at the end of it. Read the ladder off the tiers, never
-  // off the group count.
-  //
-  // T0 OPENS THE LADDER IN 16 AND IS THE ONE RUNG THAT DOES NOT DIVIDE. Four
-  // 1 HP bodies among two dozen Swarm: the player meets the terminal rung as
-  // harmless texture first, so that when wave 17's T1 breaks apart, what it
-  // breaks into is already familiar. It is deliberately NOT in wave 12 -- that
-  // wave is the suite's mixed-wave fixture (tests/run.js), and a fixture that
-  // changes shape whenever content lands is a fixture that stops testing the
-  // scheduler.
+  // Wave 16's four one-point Normals are the one place the ladder had to reach
+  // its bottom rung: no body in the game weighs one point on its own, and a
+  // Normal at `health: 1` is what a T0 always was in play -- a body that dies
+  // to a single shot. They keep their four separate `at` times rather than
+  // being folded into one group, because wave 16's other groups are timed
+  // around them.
   { duration: 58, groups: [                                       // 406 HP  old 10 + company -- RETUNED
     { at: 0,   count: 14, interval: 0.8,  type: "slow", health: 15 },
-    { at: 1,   count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 },
+    { at: 1,   count: 1,  interval: 0.9,  type: "normal", health: 1 },
     { at: 1.5, count: 24, interval: 0.18, type: "swarm", health: 3 },
-    { at: 5,   count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 },
+    { at: 5,   count: 1,  interval: 0.9,  type: "normal", health: 1 },
     { at: 5.5, count: 24, interval: 0.55, type: "armored", health: 5 },
-    { at: 9,   count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 },
-    { at: 13,  count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 }
+    { at: 9,   count: 1,  interval: 0.9,  type: "normal", health: 1 },
+    { at: 13,  count: 1,  interval: 0.9,  type: "normal", health: 1 }
   ] },
-  // T1, AND THE FIRST DIVISION THE PLAYER EVER SEES. Two 4 HP bodies that
-  // each leave four of wave 16's T0s behind: eight points of scheduled health
-  // teaching a mechanic that will later arrive as 6 144. Cheap on purpose --
-  // the lesson has to be survivable by a board that has not been built for it.
-  // The two roots are 6.5 s apart, at 4 and 10.5, so the second division
-  // happens while the first cascade is still on the road: the lesson is shown
-  // once and then immediately asked for.
+  // THE TWO BODIES AT 4 AND 10.5 were the T1 roots -- the first division the
+  // player ever saw, four points each that broke into four of wave 16's T0s.
+  // Four points is a Normal at its own weight, so that is what walks now. The
+  // 6.5 s between them was the gap that let the second cascade start while the
+  // first was still on the road; nothing cascades any more, so the spacing is
+  // simply two stragglers behind the Fast group and costs the wave nothing.
   { duration: 55, groups: [                                       // 383 HP
     { at: 0,    count: 27, interval: 0.18, type: "swarm", health: 3 },
     { at: 2,    count: 14, interval: 0.55, health: 13 },
-    { at: 4,    count: 1,  interval: 2,    type: "fractal_slime", tier: 1 },
+    { at: 4,    count: 1,  interval: 2,    type: "normal", health: 4 },
     { at: 4.5,  count: 16, interval: 0.3,  type: "fast", health: 7 },
-    { at: 10.5, count: 1,  interval: 2,    type: "fractal_slime", tier: 1 }
+    { at: 10.5, count: 1,  interval: 2,    type: "normal", health: 4 }
   ] },
   { duration: 38, groups: [                                       // 108 HP  camo again -- PURE
     { at: 0, count: 4, interval: 0.25, type: "camo_fast", health: 9 },
@@ -661,13 +639,13 @@ var EASY_WAVES = [
     { at: 0,   count: 12, interval: 0.4,  type: "fast", health: 18 },
     { at: 1.6, count: 4,  interval: 2.2,  type: "brute", health: 85 },
     { at: 3,   count: 20, interval: 0.15, type: "swarm", health: 4 },
-    // T2: 16 points that become 21 bodies. The first rung that is a BODY
-    // rather than texture, and the first that asks for a second answer -- the
-    // Brutes above it want the Longshot's flat 10, and twenty-one small
-    // slimes want coverage. It enters at 11 s, which is 2.8 s after the last
-    // Brute and 5.1 s after the last speck, so the two questions are not
-    // asked in the same breath.
-    { at: 11,  count: 1,  interval: 1,    type: "fractal_slime", tier: 2 }
+    // 16 points, arriving alone at 11 s -- 2.8 s after the last Brute and
+    // 5.1 s after the last speck, which is the beat this group was placed on
+    // and keeps. It was a T2 root that became twenty-one bodies and asked the
+    // board for coverage; a Slow at sixteen asks for the opposite, one patient
+    // body that walks at 35 u.l./s and gives the guns time. The wave's other
+    // three groups are untouched and still carry its shape.
+    { at: 11,  count: 1,  interval: 1,    type: "slow", health: 16 }
   ] },
   { duration: 65, groups: [                                       // 760 HP  old 13 + company
     { at: 0,   count: 14, interval: 0.7, type: "slow", health: 26 },
@@ -701,39 +679,28 @@ var EASY_WAVES = [
     { at: 6, count: 4, interval: 0.35, type: "flying", health: 9 }
   ] },
 
-  // T3, the middle rung and the wave this whole cascade was designed around.
-  // One 64 HP body which divides through T2, T1 and T0 when killed. Only the
-  // root is authored here; all 84 descendants are produced by the one type's
-  // `fractal` block.
+  // THE BODY AT 15 s was the T3 root -- 64 points that divided through T2, T1
+  // and T0 into 84 descendants, and the wave this whole cascade was once
+  // designed around. It is a Slow at 64 now, which is the same 64 points
+  // arriving as one body instead of eighty-five.
   //
-  // NO LONGER THE INTRODUCTION. Until 2026-08-20 this was the only Fractal
-  // Slime in the campaign, so it had to be first sight, first division and
-  // first cascade all at once; 16, 17 and 22 now do that work, and what is
-  // left here is the escalation this wave was already sized for. Nothing about
-  // the group changed -- it is the same T3, the same one body, and it still
-  // arrives alone at the end of the deploy.
+  // THE GAP IS STILL THE POINT AND STILL WORTH KEEPING. The rest of the wave
+  // is done at 10.3, so this walks into a silence -- the same property the old
+  // `lead: 6` bought, stated as an absolute time rather than as a pause
+  // appended to whatever ran before it. It used to buy ROOM for a cascade to
+  // resolve on an emptying road; it now buys a board that has just finished
+  // twenty Normals, five Bulwarks and ten Armored one heavy body to work on
+  // alone, which is the same beat asked of a different creature.
   //
-  // THE ROOT ENTERS AT 15 s AND THE REST OF THE WAVE IS DONE AT 10.3, so it
-  // still walks into a silence -- that is the same property the old `lead: 6`
-  // bought, now stated as an absolute time instead of as a pause appended to
-  // whatever ran before it. Until 2026-08-12 the tier never reached the
-  // spawner, so this group put a 4 HP T1 on the road and the gap did not
-  // matter; with the tier arriving, the same beat has to cover a body that
-  // divides four times. The gap lets the wave's other 35 bodies clear first,
-  // so the cascade resolves on an emptying road instead of on top of the
-  // Armored. It buys ROOM, not difficulty: the cascade conserves health --
-  // four bodies at a quarter each, so never more than the root's 64 points are
-  // in flight -- and measured peak concurrency does not rise.
-  //
-  // IT IS NOW A REAL GAP AND NOT A DRIFTING ONE. Under the old scheduler the
-  // root's entrance was the sum of every interval and lead above it, so
-  // re-timing any group in this wave silently moved the cascade. `at: 15` is
-  // the one number that decides it.
-  { duration: 78, groups: [                                       // 984 effective HP + split generations
+  // IT IS A REAL GAP AND NOT A DRIFTING ONE. Under the old scheduler this
+  // entrance was the sum of every interval and lead above it, so re-timing any
+  // group in this wave silently moved it. `at: 15` is the one number that
+  // decides it.
+  { duration: 78, groups: [                                       // 784 HP
     { at: 0,  count: 20, interval: 0.45, health: 22 },
     { at: 2,  count: 5,  interval: 0.9,  type: "shielded", health: 20 },
     { at: 4,  count: 10, interval: 0.7,  type: "armored", health: 18 },
-    { at: 15, count: 1,  interval: 1,    type: "fractal_slime", tier: 3 }
+    { at: 15, count: 1,  interval: 1,    type: "slow", health: 64 }
   ] },
   { duration: 75, groups: [                                       // 440 HP  first spawner -- its BROOD is the cost
     { at: 0,   count: 1, interval: 5, type: "hive", health: 220 },
@@ -867,16 +834,14 @@ var EASY_WAVES = [
     { at: 3,  count: 4,  interval: 1.6,  type: "shielded", health: 26 },
     { at: 5,  count: 3,  interval: 2.2,  type: "brute", health: 100 },
     { at: 7,  count: 1,  interval: 5,    type: "hive", health: 200 },
-    // T4. 256 points of root, 1 280 to clear, and 256 terminal bodies against
-    // a 100 HP base -- so this is the wave that asks whether the board can
-    // WIPE rather than snipe, one wave before the two that end the campaign.
-    // It cost this wave exactly what it is worth: the fourth Brute and two of
-    // the six Bulwarks paid for it, and 1952 HP is unchanged.
-    //
-    // At 15 s it lands 5.6 s after the last Brute, on a road that still has
-    // two Hives seeding on it -- the cascade and the broods overlap, which is
-    // the rehearsal for 35.
-    { at: 15, count: 1,  interval: 1,    type: "fractal_slime", tier: 4 }
+    // 256 points at 15 s, 5.6 s after the last Brute. This was the T4 root --
+    // 1 280 points to clear and 256 terminal bodies against a 100 HP base, the
+    // wave that asked whether the board could WIPE rather than snipe. A third
+    // Hive is what carries the weight now, and it keeps the question in the
+    // wave's own vocabulary: this is already the two-Hive wave, so the answer
+    // it wants is still coverage over time rather than one big hit. It brings
+    // a third brood onto a road that has two seeding on it.
+    { at: 15, count: 1,  interval: 1,    type: "hive", health: 256 }
   ] },
 
   // --- 34: THE VANGUARD. The first of the two boss waves. ----------------
@@ -955,20 +920,19 @@ var EASY_WAVES = [
     { at: 13, count: 1,  interval: 1,    type: "boss" },
     { at: 15, count: 7,  interval: 1.1,  type: "angry", health: 40 },
     { at: 17, count: 4,  interval: 1.5,  type: "shielded", health: 30 },
-    // T5, LAST IN THE LAST WAVE, and the only place 1024 points fit. It walks
-    // in at 28 s, which is 6.5 s behind the final Bulwark and fifteen behind
-    // the Tyrant -- deliberately: the boss is still the wave's centre, and the
-    // cascade is what the run ends on rather than something the Tyrant fights
-    // alongside.
+    // LAST IN THE LAST WAVE, and the only place 1024 points fit. It walks in
+    // at 28 s, which is 6.5 s behind the final Bulwark and fifteen behind the
+    // Tyrant -- deliberately: the boss is still the wave's centre, and this is
+    // what the run ends on rather than something the Tyrant fights alongside.
     //
-    // 6 144 points across six generations, ending in 1 024 one-point bodies.
-    // A board that cannot clear them loses on leaks alone, which is the
-    // intended shape of a finale and the reason no earlier wave carries this
-    // rung. The 30 opening Normals are untouched -- they are the v0.4.4
-    // spine's twentieth wave and cannot be trimmed to fund anything. They are
-    // sent as two salvos of fifteen now; the thirty bodies and their 30 HP
-    // override are exactly what they were.
-    { at: 28, count: 1,  interval: 1,    type: "fractal_slime", tier: 5 }
+    // It was the T5 root: 6 144 points across six generations ending in 1 024
+    // one-point bodies, a wave a board could lose on leaks alone. It is a
+    // Colossus at 1024 now -- one body, no ability, 17.5 u.l./s -- so the
+    // finale ends on the longest single kill in the game instead of on a
+    // clearing problem. The 30 opening Normals are untouched either way: they
+    // are the v0.4.4 spine's twentieth wave and cannot be trimmed to fund
+    // anything.
+    { at: 28, count: 1,  interval: 1,    type: "colossus", health: 1024 }
   ] }
 ];
 

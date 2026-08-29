@@ -591,7 +591,11 @@ var BASELINE = [
     // own tests moved rather than being added to -- "the six other boards
     // take neither" counted the boards by hand and there are seven now that
     // Ironwood Frontier exists, so it derives the number from Maps.LIST.
-    file: "tests/content.test.js", pass: 244, fail: 0,
+    // 245 on 2026-08-29: the Fractal Slime came off the campaign, and the test
+    // that pinned its six-rung ladder INTO the schedule became two -- the
+    // ladder still being intact as a mechanic, and the ten bodies that
+    // replaced it standing where each root stood at the weight each root had.
+    file: "tests/content.test.js", pass: 245, fail: 0,
     failing: []
   },
   {

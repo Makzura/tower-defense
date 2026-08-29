@@ -1,8 +1,8 @@
 # Tower Defense — project context
 
 **Version 0.5.0** — one thirty-five-wave campaign schedule at 830 bodies /
-25 939 effective HP (plus every body a Fractal Slime's cascade, a Hive's brood
-or the Tyrant's roar creates at runtime), which can be won or lost and ends on a boss. (Three
+25 939 effective HP (plus every body a Hive's brood or the Tyrant's roar
+creates at runtime), which can be won or lost and ends on a boss. (Three
 selectable difficulties existed from 2026-07-30 to 2026-08-12; Normal and Hard
 were placeholders and the whole concept was deleted. See the change log.)
 A **twenty-one**-type enemy roster (swarms, armor, camo,
@@ -873,8 +873,10 @@ route. Nothing about the schedule is saved to `MetaProgress`.
 **A wave may be MIXED** (2026-07-29, v0.4.7, at the owner's request — "make the
 wave a bit more chaotic, still deterministic but with more than 1 type"):
 several groups, several types, deliberately on top of each other rather than
-one after another. Six groups carry a `tier` on a fractal type (see the tier
-ladder below).
+one after another. **No group carries a `tier`** since 2026-08-29 — the ten
+that did were the Fractal Slime's, and they came off the campaign (see below).
+The field is still read by the scheduler and still the only way to send a rung
+of the ladder from the sandbox.
 
 **Mixed is about the ROSTER, never about the group count.** Every wave carries
 `groups` now, so counting them says nothing: wave 24 is three salvos of Aether
@@ -893,9 +895,10 @@ schedule, because they fail for very different reasons.
 the composition gate, and it is the one a retune trips.** It holds a snapshot
 of all 35 waves taken BEFORE the rewrite — bodies, effective HP, clear bounty,
 kill bounty, and the AUTHORED SIGNATURE of every group — plus the roster rules
-(one Midboss, in 11; one Tyrant, in 35; Vanguard only in 34; Colossus only in
-29; flight introduced at 24; 14, 18 and 28 camo end to end; the six fractal
-rungs at 16/17/22/25/33/35). **Absence is part of the signature**: a group with
+(one Midboss, in 11; one Tyrant, in 35; Vanguard only in 34; Colossus in 29
+**and 35**; flight introduced at 24; 14, 18 and 28 camo end to end; and **no
+Fractal Slime anywhere**, asserted as an empty list so one creeping back into a
+retune fails here). **Absence is part of the signature**: a group with
 no `health` is a different authored thing from one that writes the type's own
 number, and materialising a default while splitting a group is the mistake the
 rewrite made easy — every aggregate in the game still balances afterwards, so
@@ -903,10 +906,12 @@ nothing else in any suite would notice. If you deliberately retune a wave, this
 test is what you update, in the same change, with the reason.
 
 **The kill column in that table is priced off the TYPE ROW and ignores `tier`,
-so it is not `waveKillBounty`.** Over the whole campaign the two read $22 321
-and $22 987; the gap is the six Fractal Slimes, whose tiers only
-`Enemy.bountyOf` can see. Both totals are pinned, deliberately: a group that
-loses its tier moves one of them and not the other.
+so it is not `waveKillBounty`.** They read $22 321 and $22 987 while the fractal
+ladder was scheduled; the $666 gap was the six roots, whose tiers only
+`Enemy.bountyOf` can see. Since 2026-08-29 nothing in the campaign carries a
+tier, so both formulas land on **$23 132**. Both totals are still pinned apart,
+deliberately: the day a tiered body is scheduled again, that pair is what shows
+it.
 
 **`the whole campaign runs itself dry, with every authored arrival emitted
 once` is the only test in the repo that watches the RUN rather than the data.**
@@ -930,86 +935,68 @@ that moves.
 The other three are `wave 22 runs three groups at once, and wave 30 opens two
 on the same frame` (overlap and the same-frame tie-break, on the shipping
 schedule rather than on a fixture built to have one), `wave 35's Tyrant walks
-in at thirteen seconds and its T5 slime at twenty-eight` (the finale's two
+in at thirteen seconds and its Colossus at twenty-eight` (the finale's two
 authored landmarks, on the clock — neither was a readable number before `at`
 existed), and `a second road mirrors the whole timeline, and is still one wave
 and one reward` (Twin Confluence deploys all 88 bodies of wave 12 down each
 road, off ONE cursor, and pays one reward).
 
-### The Fractal Slime's tier ladder is SCHEDULED, one rung per wave
+### The Fractal Slime is OFF the campaign, and what replaced it
 
-2026-08-20, at the owner's instruction: *"i want the slime tiers to spawn in
-accordance to their HP as stated in the index and behave in that manner"*. The
-mechanic was never wrong — a tier spawned by hand has always carried its stated
-health — but the campaign sent **one rung of the six**, the T3 in wave 25, while
-the index advertised all six. Five tiers existed only as somebody else's split
-children.
+2026-08-29, at the owner's instruction: *"take out the fractal slime, all of
+them, from easy mode, and replace them by, in order, colossus > hive > slow >
+normal, matching the HP total"*. `EASY_WAVES` is the only schedule, so this
+took the type off the road entirely. The type itself is untouched and still
+live — the ladder, the division, the AoE resistance, the half-price bounty —
+and it carries `sandboxOnly: true`, which is the documented way to park a type
+in the index and the sandbox. `tests/run.js` reads that flag in **both**
+directions, so a slime creeping back into a wave fails there by name.
 
-Per ROOT, and the group's own total where a wave sends more than one:
+**The substitution rule.** Each root became ONE body of the first type in that
+ladder whose own health fits inside the root's, carrying a `health` override
+equal to the root. `at`, `count` and `interval` are untouched, so the schedule's
+shape — when a body enters, and into what — is exactly what it was.
 
-| wave | group | root HP | to clear | bodies in all |
-|---:|:--|---:|---:|---:|
-| 16 | T0 ×4 | 1 | 4 | 4 |
-| 17 | T1 ×2 | 4 | 16 | 10 |
-| 22 | T2 ×1 | 16 | 48 | 21 |
-| 25 | T3 ×1 | 64 | 256 | 85 |
-| 33 | T4 ×1 | 256 | 1 280 | 341 |
-| 35 | T5 ×1 | 1024 | 6 144 | 1 365 |
-| | **1 372 authored** | | **7 748** | **1 826** |
+| wave | root | HP | stands in for it |
+|---:|:--|---:|:--|
+| 16 | T0 ×4 | 1 each | Normal @ 1, ×4 |
+| 17 | T1 ×2 | 4 each | Normal @ 4, ×2 |
+| 22 | T2 | 16 | Slow @ 16 |
+| 25 | T3 | 64 | Slow @ 64 |
+| 33 | T4 | 256 | Hive @ 256 |
+| 35 | T5 | 1024 | Colossus @ 1024 |
 
-(The last column counts the root and every generation under it, which is where
-the 1 826 measured figure comes from; only the roots are in `waveCount`.)
+Wave 16's four one-point Normals are the one place the ladder reached its bottom
+rung: nothing in the game weighs one point on its own, and a Normal at
+`health: 1` is what a T0 always was in play — a body that dies to one shot.
 
-**HP is the placement rule, and "to clear" is the difficulty.** A tier T root
-takes `root × (T + 1)` points to remove — it conserves health as it divides,
-four bodies at a quarter each — and ends in `4^T` terminal T0s. The base has
-100 HP and a leak costs the leaker's remaining health, so a T5 that is not
-cleared is 1 024 separate points of base damage. That, not the root, is why T4
-waits for 33 and T5 for the last wave.
+**What moved, measured.** Authored effective HP is **unchanged**, 25 939, wave
+for wave: `waveEffectiveHealth` counts the root only and each override matches
+its root point for point. The wave-clear bonus is a tenth of health and so does
+not move either. Scheduled kill bounty rose **$22 987 → $23 132**, +$145: these
+four types are worth $1 a point where a Fractal Slime's row was written at
+$0.50.
 
-**The schedule PAID for the ladder rather than growing by it**: effective HP
-25 898 → 25 939, +0.16%. Wave 33 funds its T4 exactly (two Bulwarks and a
-Brute); wave 35 covers −340 of the T5's 1024 and waves 27, 29, 30, 31, 32 and 34
-give up 641 more at 5–9% each — 1 267 trimmed against 1 308 added, and the 41
-points of difference are the whole rise. **Nothing was taken off a v0.4.4 spine
-opener or off a mechanism body** (Hive, Shieldbearer, Healer, Colossus, boss) —
-what got thinner is ordinary escort.
+**The REAL load fell, and the unchanged authored total must not be quoted as if
+it had not.** A cleared cascade was 7 748 points across 1 826 born bodies where
+the six roots authored 1 372, paying $3 874 against $686 of roots. All of that
+is gone. What replaces it is 1 372 points in ten bodies, plus one extra Hive
+brood on wave 33 (five shielded hatchlings, worth nothing). Waves 22, 25, 33
+and 35 are materially easier to clear and materially quieter on the road, and
+wave 35 in particular now ends on the longest single kill in the game instead
+of on a clearing problem. The measurements in the section this replaced — 20
+maxed towers peaking at 151 bodies on wave 35, 14 maxed Snipers losing the
+finale on leaks — described the cascade and no longer describe anything; they
+have not been re-run against the substitution.
 
-**Do not quote the authored total as if nothing changed.** A board that clears
-every cascade removes 7 748 points where the six roots count 1 372 (1 826
-bodies born to do it), and earns $3 874 across the generations against the $686
-of roots the purse counts. The
-authored figures are deliberately blind to death-born bodies, exactly as they
-are to a Hive's brood.
-
-**Measured, not asserted** (headless, maxed board, `baseHp` is useless as a
-meter because upgrade paths heal it, so leaks were counted directly):
-
-- 20 mixed maxed towers, wave 35: 1 453 kills, **peak 151 bodies on the road**,
-  zero leaks, 55 s. Without the T5: 88 kills, peak 40, 37 s.
-- 14 maxed Arcane Snipers and nothing else, wave 35: 146 points of leak damage
-  against a 100 HP base — **it loses**. The finale now asks for coverage, not
-  only for single-target damage, and that is the intended shape.
-- The three early rungs cost a weak board nothing: 5 un-upgraded towers took
-  the same 11 / 70 / 100 points of leak damage on waves 16, 17 and 22 with the
-  ladder in and with it stripped out.
-- Simulation cost is linear and small — 1.13 ms per update at 1 024 bodies —
-  and the cascade never puts them all on the road at once anyway.
-
-**T0 is in 16 and not in 12 on purpose.** Wave 12 is the suite's mixed-wave
-fixture — "a wave resolves into one interleaved timeline of arrivals" and "a
-second road mirrors the whole timeline" both walk it, and it was "a mixed wave
-deploys its groups in order" that walked it before 2026-08-25. A fixture that
-changes shape whenever content lands stops testing the scheduler.
-
-**NEVER give a fractal group a `health` override.** `Enemy.healthOf` takes the
-tier branch and discards it, so it is a no-op on the body and a lie in
-`waveKillBounty`. `tests/content.test.js` checks the whole schedule for one.
-
-**The index derives all of this and must not be edited to match.** Tier range,
-highest campaign HP and the campaign-waves list in `js/codex.js` are read off
-the schedule and the type's own `fractal` block, so scheduling a rung moves the
-guide with no edit — which is the property the test pins.
+**The rules that outlived the ladder.** `Enemy.healthOf` still takes the tier
+branch and discards any `health` beside it, so **a fractal group must never
+carry a `health` override** — it is a no-op on the body and a lie in
+`waveKillBounty`. And `js/codex.js` still DERIVES the index's tier range,
+highest campaign HP and wave list from the schedule: with nothing scheduled it
+falls back to the type's own row and describes the base specimen, T1 at 4 HP,
+naming no wave. That is what `tests/content.test.js` pins now, in that
+direction.
 
 **THE FLAT FORM IS GONE (2026-08-25).** Until the timeline rewrite a wave could
 be a bare group object — `count`, `interval` and `type` on the wave itself, no
@@ -1133,8 +1120,9 @@ wave put this here*: sandbox spawns, codex sprites, test fixtures.
 **A wave is over when its own bodies are gone, not when the road is empty.**
 `waveStillOnTheRoad(n)` in `game.js` scans for `waveId === n`, and the clear
 branch in `update()` asks it about `lastDeployedWave()`. What this fixed: a
-survivor of an *earlier* wave — the stragglers a wave's `duration` ceiling leaves behind, a
-Fractal Slime cascade still unwinding two waves later — used to hold the
+survivor of an *earlier* wave — the stragglers a wave's `duration` ceiling leaves
+behind, a Hive brood or (until 2026-08-29) a Fractal Slime cascade still
+unwinding two waves later — used to hold the
 current wave's clear open under the old `enemies.length === 0` test. Beating
 wave 30 outright paid nothing and called nothing in while one wave-29 Brute was
 still walking, and nothing on screen told the player which body was doing it.
@@ -1337,11 +1325,12 @@ two more numbers matter:
   group — `waveEffectiveHealth` in game.js is the one implementation, and the
   clear bounty reads the same function. **This is NOT the run's purse** — a
   shield is counted here and pays nothing, so effective HP (25 939) and
-  scheduled kill bounties ($22 987) are different quantities and always will
-  be. Since 2026-08-20 a THIRD gap sits beside that one: a Fractal Slime's
-  cascade is death-born, so neither figure counts the 6 376 points the six
-  scheduled roots turn into or the $3 188 they pay on the way. See "A SHIELD PAYS NOTHING, EVER" below, which says the same thing from
-  the other end.
+  scheduled kill bounties ($23 132) are different quantities and always will
+  be. A THIRD gap sat beside that one from 2026-08-20 to 2026-08-29 — a Fractal
+  Slime's cascade is death-born, so neither figure counted the 6 376 points the
+  six scheduled roots turned into or the $3 188 they paid on the way — and it
+  closed when the ladder came off the campaign. See "A SHIELD PAYS NOTHING,
+  EVER" below, which says the same thing from the other end.
 - **Plus two amounts no table can state**, both decided by how the run goes.
   Every seven seconds a living Hive drops five hatchlings, each with a shield
   equal to its own life and each paying nothing — about 160 points of unpaid
@@ -1456,8 +1445,8 @@ The full table with per-wave HP is a comment on `WAVES` itself;
 `THE_COMPANY/tools/balance/`, so a clone of this repo cannot reproduce it.**
 
 **The schedule's length is an ECONOMY constraint, not just a difficulty one.**
-Scheduled kill bounties are the bulk of the run's lifetime purse ($22 987 of
-$35 686 all in — see the table in the economy section).
+Scheduled kill bounties are the bulk of the run's lifetime purse ($23 132 of
+$35 831 all in — see the table in the economy section).
 At the old 454 HP the $800 Siphon was unbuyable — it would have sat in
 the build bar permanently greyed out, which is not meaningfully different from
 not shipping it. A test pins `purse > dearest tower × 2`; if a tower is ever
@@ -1614,10 +1603,12 @@ one fact a banner exists for. The cut is a **timing** decision and the banner is
 a **roster**. But the key is all three fields and **not the display name**:
 `Enemy.typeOf` maps every rung of the Fractal ladder onto one row, so a name-only
 key would print a T1 salvo and a T5 salvo — 4 HP and 1024 HP — as one
-`8 × Fractal Slime`. No wave in the schedule splits a type across two `health`
-values or two tiers today (checked wave by wave, all 35), so the strict key
-prints exactly what the loose one printed; it is strict anyway because the
-banner is the only place a player can see the difference.
+`8 × Fractal Slime`. **Wave 17 splits one across two `health` values** since
+2026-08-29 — fourteen Normals at 13 beside the two at 4 that replaced its
+fractal roots — so the strict key is no longer merely defensive there: it is
+the reason that banner reads `14 × Normal + 2 × Normal` rather than folding two
+very different bodies into one line. No wave splits a type across two tiers,
+because no wave carries a tier at all any more.
 
 **Every banner is checked against `waveCount()`, per wave, across the whole
 campaign.** A summing bug here is the kind that hides: a dropped salvo or a
@@ -1771,7 +1762,7 @@ fraction is 0.1. About **$2 594** across the schedule.
 
 **The bounty is a tenth of the wave's HP, not a tenth of its cash value** — HP
 and cash are now separate quantities entirely, since a body's bounty prices its
-whole threat rather than its hit points. Against the $35 686 lifetime purse the
+whole threat rather than its hit points. Against the $35 831 lifetime purse the
 clear bonus is about **7%**. Two further rewards ride on the same payout since
 2026-07-31 — the redistributed $5000 and the rising $50 + $5-per-wave allowance
 — and `waveReward()` is where the three are summed. If it is meant to stay a tenth of
@@ -2540,15 +2531,18 @@ The current authored purse is:
 | Easy starting stake | $600 |
 | progression rewards, waves 1–34 | $5 000 |
 | escalating wave allowance, waves 1–34 | $4 505 |
-| scheduled kill bounties | $22 987 |
+| scheduled kill bounties | $23 132 |
 | wave-clear bonuses | $2 594 |
-| **authored total** | **$35 686** |
+| **authored total** | **$35 831** |
 
-The total excludes Fractal descendants, conditional boss summons and the
-Siphon's A3 charge bonus. It was $23 438 / $2 590 / $36 133 until the tier
-ladder was scheduled on 2026-08-20, and the fall is the Fractal Slime's
-half-price row: **the descendants this table excludes now pay $3 188**, so a
-run that clears every cascade is better off, not worse.
+The total excludes conditional boss summons, a Hive's brood and the Siphon's A3
+charge bonus. It was $23 438 / $2 590 / $36 133 until the tier ladder was
+scheduled on 2026-08-20, which cost it $447 — the Fractal Slime's half-price
+row — against $3 188 the descendants paid outside the table. Taking the ladder
+back off on 2026-08-29 returned $145 of that: the kill money only, since the
+substitution matched every root's health and the clear bonus is a tenth of
+health. **The $3 188 the cascades used to pay is gone with them**, so what a
+board earns for clearing the campaign is now what this table says it is.
 It is the single-route schedule total. Twin Confluence mirrors every scheduled
 body onto its second route, so it also mirrors kill income. **The two figures
 that used to stand here — $47 006 in scheduled kills and $59 707 all in — are
@@ -3663,27 +3657,27 @@ on an Enemy is the same idea at the instance level.
    with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
    scales bounty with a wave's `health` override, so the ratio survives an
    override but would not survive a retune of either field. Across the whole
-   schedule the ratio is 0.8862, and per type — **each type at its own BASE
+   schedule the ratio is 0.8918, and per type — **each type at its own BASE
    health, which is a property of `Enemy.TYPES` and not of the schedule** — it
    runs 0.4545 (`colossus`) to 1.5 (`fast`, `camo_fast`, `camo_heavy`).
 
    **The denominator is EFFECTIVE HP — what you must actually remove — and
-   naming it is load-bearing.** 0.8862 is `22 987 / 25 939`; against *declared*
-   health the same figure would be 0.9522, so the two readings are not
-   interchangeable. (0.9050 = `23 438 / 25 898` until 2026-08-20. It fell
-   because the Fractal Slime pays $0.50 a point where an ordinary body pays $1
-   and the ladder converted 1 308 points of schedule into new slime roots — the
-   cash comes back from the generations, which no schedule figure counts.) Every per-type number above is bounty over effective HP
+   naming it is load-bearing.** 0.8918 is `23 132 / 25 939`. (0.9050 =
+   `23 438 / 25 898` until 2026-08-20, when the fractal ladder was scheduled:
+   it fell to 0.8862 because a Fractal Slime pays $0.50 a point where an
+   ordinary body pays $1, and the cash came back from the generations, which no
+   schedule figure counts. It rose again on 2026-08-29 when the ladder came off
+   and ordinary bodies took the same points at $1.) Every per-type number above is bounty over effective HP
    too. Schedule ratios measured 2026-08-20; the per-type range measured across
    all 21 types, and a wave `health` override cannot move it because
    `Enemy.bountyOf` scales bounty in the same proportion.
 
    **AND THERE IS A SECOND RATIO IN CIRCULATION UNDER THE SAME NAME. IT IS NOT
-   THIS ONE.** The balance tooling reports a "money density" of **1.3758**
-   (1.3952 until the tier ladder),
+   THIS ONE.** The balance tooling reports a "money density" of **1.3814**
+   (1.3952 until the tier ladder, 1.3758 while it was scheduled),
    which is *authored purse over effective HP* — it carries the $10 105 of
    purse that no schedule change touches. **The figure this passage means is
-   kill bounties over effective HP, 0.8862.** Say which numerator you mean
+   kill bounties over effective HP, 0.8918.** Say which numerator you mean
    wherever either appears.
 
    The trap this closes, because it has already been reported as a defect
@@ -3695,7 +3689,7 @@ on an Enemy is the same idea at the instance level.
    the 12 cannot be removed without the 36. `revenant` splits the same way
    (1.25 declared, 0.625 effective). Every other type is identical under both,
    which is why the mismatch stayed invisible. **Do not "correct" the range to
-   1.6667** — that would contradict the 0.8862 schedule ratio at the head of
+   1.6667** — that would contradict the 0.8918 schedule ratio at the head of
    this exception.
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
@@ -4964,7 +4958,7 @@ being precise about what moved:
   retuned group carries a shield. **This bullet used to read "$4 092 off a
   $42 443 purse, a 10% pay cut", and that was damage-era arithmetic end to
   end**: $4 092 was `CASH_PER_DAMAGE` × a then-current shield total, and
-  $42 443 was the 2026-07-30 purse against a current authored $35 686. Nobody has asked for the
+  $42 443 was the 2026-07-30 purse against a current authored $35 831. Nobody has asked for the
   schedule or the prices to move in compensation and neither was touched.
 
 **HEALED HEALTH PAYS NOTHING EITHER**, for the same reason and by the same
@@ -8529,7 +8523,7 @@ no mechanic was moved to match the description.
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | $35 686 = $22 987 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
+| Easy run purse | $35 831 = $23 132 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |

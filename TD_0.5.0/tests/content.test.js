@@ -312,99 +312,63 @@ test("the roster matches the agreed numbers", function (t) {
 
 
 // ---------------------------------------------------------------------------
-// THE TIER LADDER IS SCHEDULED, AND ITS HP IS THE HP THE INDEX PRINTS.
+// THE TIER LADDER IS OFF THE CAMPAIGN, AND WHAT REPLACED IT MATCHES IT POINT
+// FOR POINT.
 //
-// 2026-08-20, at the owner's instruction: "i want the slime tiers to spawn in
-// accordance to their HP as stated in the index and behave in that manner".
-// The mechanic was already right -- a T4 spawned by hand has always had its
-// 256 points -- but the CAMPAIGN only ever sent one rung of the six, so five
-// of the tiers the index advertises were unreachable except as something
-// else's split children.
+// 2026-08-29, at the owner's instruction: "take out the fractal slime, all of
+// them, from easy mode, and replace them by, in order, colossus > hive > slow
+// > normal, matching the HP total". This block used to pin the opposite claim
+// -- that all six rungs were scheduled, in ascending order, at the HP the index
+// prints -- and it is rewritten rather than deleted, because the two halves it
+// was protecting both outlived the schedule it was written against:
 //
-// What this pins is the correspondence itself, in both directions:
+//   * the LADDER ITSELF is still a live mechanic and still what the index
+//     draws. It is asserted here off the type's own `fractal` block, with no
+//     wave involved, so a retune of the rungs still fails here.
+//   * the SUBSTITUTION is the new claim. Ten roots came off six waves, and the
+//     only thing that made that safe was that every one of them was replaced by
+//     the same number of points. That is checked wave by wave against the
+//     figures the schedule itself carries.
 //
-//   every rung the index states is somewhere in the schedule,
-//   every scheduled rung spawns at exactly the HP stated for it,
-//   and the rungs arrive in ascending order, each in a heavier wave.
-//
-// It reads the tier ladder out of the type's own `fractal` block and the
-// health out of Enemy.healthOf -- the two things js/codex.js reads to draw the
-// index -- so a retune of the ladder moves the index and this test together
-// and neither can quietly stop describing the other.
-//
-// NO `health` OVERRIDE ON A FRACTAL GROUP, ever: `Enemy.healthOf` takes the
-// tier branch and discards it, so an override would be a no-op on the body and
-// a lie in waveKillBounty. The schedule is checked for one here because the
-// hazard is invisible at every other altitude -- see the note in js/game.js.
-test("the campaign spends the whole tier ladder, at the index's own HP",
+// If a Fractal Slime is ever scheduled again, `sandboxOnly` on its type row
+// (js/enemy.js) makes tests/run.js fail first and by name -- that is the guard,
+// and this test does not duplicate it.
+test("no Fractal Slime is scheduled, and its ladder is intact anyway",
 function (t) {
   var h = harness.boot();
   var Enemy = h.game.Enemy;
   var spec = Enemy.TYPES.fractal_slime.fractal;
 
-  // ONE RUNG PER WAVE, NOT ONE RUNG PER GROUP (2026-08-25). The timeline
-  // rewrite cut waves into the salvos they actually arrive in, so wave 16's
-  // four T0 slimes are four groups and wave 17's two T1s are two -- ten groups
-  // carrying six rungs. Counting GROUPS made this read a ladder twice as long
-  // as the one the campaign spends, with T1 landing where T0 should be. The
-  // ladder is a per-wave claim and is now counted per wave.
-  //
-  // A wave that mixed two tiers would be a real error and is still caught: the
-  // tier is read off the first group of the wave and every later group of the
-  // same type is checked against it.
   var scheduled = [];
   h.game.WAVES.forEach(function (wave, i) {
-    var tier;
-    var found = false;
     h.game.waveGroups(wave).forEach(function (g) {
-      if (g.type !== "fractal_slime") return;
-      if (found) {
-        t.eq(g.tier, tier,
-          "wave " + (i + 1) + " sends one tier of Fractal Slime, not two");
-        return;
-      }
-      found = true;
-      tier = g.tier;
-      scheduled.push({ wave: i + 1, group: g });
+      if (g.type === "fractal_slime") scheduled.push(i + 1);
     });
   });
+  t.deep(scheduled, [], "the campaign sends no Fractal Slime");
+  t.eq(Enemy.TYPES.fractal_slime.sandboxOnly, true,
+    "and the type says so itself, so the roster rule knows it is deliberate");
 
-  t.eq(scheduled.length, spec.maxTier - spec.minTier + 1,
-    "one scheduled WAVE per rung of the ladder");
-
-  var previousWave = 0;
+  // EVERY RUNG STILL WEIGHS WHAT THE INDEX PRINTS. Read off the `fractal` block
+  // and Enemy.healthOf -- the two things js/codex.js reads to draw the index --
+  // so a retune of the ladder moves the index and this test together.
   var previousHp = 0;
-  scheduled.forEach(function (entry, i) {
-    var tier = spec.minTier + i;
+  for (var tier = spec.minTier; tier <= spec.maxTier; tier++) {
     var stated = spec.tierZeroHealth * Math.pow(spec.healthMultiplier, tier);
-    var body = new Enemy(h.game.path, entry.group.health, "fractal_slime",
-      { tier: entry.group.tier });
-
-    t.eq(entry.group.tier, tier,
-      "wave " + entry.wave + " carries T" + tier + ", the next rung up");
-    t.eq(entry.group.health, undefined,
-      "and authors no health override on it");
-    t.eq(Enemy.healthOf("fractal_slime", undefined, entry.group.tier), stated,
+    var body = new Enemy(h.game.path, undefined, "fractal_slime", { tier: tier });
+    t.eq(Enemy.healthOf("fractal_slime", undefined, tier), stated,
       "T" + tier + " is stated at " + stated + " HP");
-    t.eq(body.maxHealth, stated,
-      "and the body that walks out of the gate has exactly that");
-    t.eq(body.fractalTier, tier, "carrying the tier it was scheduled at");
-
-    t.ok(entry.wave > previousWave,
-      "T" + tier + " arrives after T" + (tier - 1) + " (wave " + entry.wave + ")");
-    t.ok(stated > previousHp, "and is heavier than the rung below it");
-    previousWave = entry.wave;
+    t.eq(body.maxHealth, stated, "and a body built at that tier has exactly that");
+    t.eq(body.fractalTier, tier, "carrying the tier it was built at");
+    t.ok(stated > previousHp, "and it is heavier than the rung below it");
     previousHp = stated;
-  });
+  }
 
-  // BEHAVING IN THAT MANNER: the scheduled tier is not just a health number,
-  // it is how many generations the wave has to be cleared through. A rung at
-  // tier T costs root x (T+1) in total damage and leaves 4^T terminal bodies
-  // walking, which is the real reason a T5 belongs in the finale and nowhere
-  // earlier.
-  var top = scheduled[scheduled.length - 1];
+  // AND IT STILL DIVIDES. A tier T root costs root x (T+1) in total damage and
+  // ends in 4^T terminal bodies; that is the reason the T5 was a finale body
+  // and the reason nothing else in the game costs what it cost.
   var queue = [new Enemy(h.game.path, undefined, "fractal_slime",
-    { tier: top.group.tier })];
+    { tier: spec.maxTier })];
   var totalHp = 0;
   var terminal = 0;
   while (queue.length) {
@@ -415,11 +379,72 @@ function (t) {
     if (children) queue = queue.concat(children);
     else terminal++;
   }
-  t.eq(top.wave, h.game.WAVES.length, "the top rung is in the last wave");
-  t.eq(totalHp, 1024 * (top.group.tier + 1),
-    "clearing the T5 takes 6 144 points across six generations");
-  t.eq(terminal, Math.pow(spec.splitCount, top.group.tier),
-    "and ends in 1 024 terminal T0s, one point of base damage each");
+  t.eq(totalHp, 1024 * (spec.maxTier + 1),
+    "clearing a T5 still takes 6 144 points across six generations");
+  t.eq(terminal, Math.pow(spec.splitCount, spec.maxTier),
+    "and still ends in 1 024 terminal T0s");
+});
+
+// WHAT STANDS WHERE EACH ROOT STOOD, and that it weighs the same.
+//
+// The ladder the owner named is descending, and it was applied that way: each
+// root became ONE body of the first type in colossus > hive > slow > normal
+// whose own health fits inside the root's, carrying a `health` override equal
+// to the root. The table below is the whole substitution, and it is checked
+// against the LIVE schedule -- the group has to be there, at that `at`, at that
+// weight -- rather than against a total, because a total hides a swap.
+test("the bodies that replaced the tier ladder match it point for point",
+function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+
+  //  wave   at     type        HP   (the root it stands in for)
+  var STANDS_IN = [
+    [16,  1,    "normal",      1,    "T0"],
+    [16,  5,    "normal",      1,    "T0"],
+    [16,  9,    "normal",      1,    "T0"],
+    [16, 13,    "normal",      1,    "T0"],
+    [17,  4,    "normal",      4,    "T1"],
+    [17, 10.5,  "normal",      4,    "T1"],
+    [22, 11,    "slow",       16,    "T2"],
+    [25, 15,    "slow",       64,    "T3"],
+    [33, 15,    "hive",      256,    "T4"],
+    [35, 28,    "colossus", 1024,    "T5"]
+  ];
+
+  var ladder = ["colossus", "hive", "slow", "normal"];
+  STANDS_IN.forEach(function (row) {
+    var wave = h.game.WAVES[row[0] - 1];
+    var found = h.game.waveGroups(wave).filter(function (g) {
+      return g.at === row[1] && g.type === row[2] && g.health === row[3];
+    });
+    t.eq(found.length, 1, "wave " + row[0] + " sends one " + row[2] + " at " +
+      row[3] + " HP, " + row[1] + " s in, where the " + row[4] + " root stood");
+    t.eq(found[0].count, 1, "as a single body, the way the root was");
+    t.eq(found[0].tier, undefined, "and with no tier of its own");
+
+    // THE LADDER IS A PRIORITY, not a free choice: nothing earlier in the list
+    // would have fitted inside this body's health. That is the rule that made
+    // the mapping deterministic, and it is the half a later retune would break
+    // by reaching for a heavier body because it reads better.
+    ladder.slice(0, ladder.indexOf(row[2])).forEach(function (heavier) {
+      t.ok(Enemy.TYPES[heavier].health > row[3],
+        "a " + heavier + " would not fit inside " + row[3] + " HP");
+    });
+  });
+
+  // AND NOTHING ELSE MOVED. The six waves carry exactly the health they carried
+  // with the roots in them, which is what "matching the HP total" was asked
+  // for -- these are the authored figures from before the substitution.
+  var BEFORE = { 16: 406, 17: 383, 22: 652, 25: 784, 33: 1744, 35: 7444 };
+  Object.keys(BEFORE).forEach(function (n) {
+    var wave = h.game.WAVES[Number(n) - 1];
+    var hp = 0;
+    h.game.waveGroups(wave).forEach(function (g) {
+      hp += g.count * Enemy.healthOf(g.type, g.health, g.tier);
+    });
+    t.eq(hp, BEFORE[n], "wave " + n + " still authors " + BEFORE[n] + " points");
+  });
 });
 
 
@@ -4609,12 +4634,14 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   // mixed wave shows up in every list it belongs to. They no longer TILE the
   // schedule (that only held while a wave named one type).
   //
-  // **AND THEY COVER THE WHOLE ROSTER AGAIN since 2026-07-30.** For one
-  // version they did not: v0.4.9 added four types that were deliberately kept
-  // out of the schedule, plus the imported Aether Wisp, so the owner could try
-  // them in the index and the sandbox before anything was built around them.
-  // All five are now scheduled (waves 24 through 35), so the original
-  // assertion is back -- a type nobody ever meets is not content.
+  // **THEY COVER THE ROSTER EXCEPT FOR WHAT IS DELIBERATELY PARKED.** For one
+  // version they covered all of it: v0.4.9 added four types kept out of the
+  // schedule, plus the imported Aether Wisp, and all five were scheduled by
+  // 2026-07-30. On 2026-08-29 the Fractal Slime went the other way -- off the
+  // campaign at the owner's instruction, kept in the index and the sandbox --
+  // so the exemption is asserted BY NAME against the type's own `sandboxOnly`
+  // flag rather than as a hole in the list. A type that is neither scheduled
+  // nor flagged is still a failure, which is the rule that was always meant.
   var seen = {};
   var unscheduled = [];
   enemies.forEach(function (e) {
@@ -4623,7 +4650,10 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   });
   t.eq(Object.keys(seen).length, h.game.WAVES.length,
     "every wave in the schedule is claimed by at least one type");
-  t.deep(unscheduled, [], "and no type is left off the schedule");
+  t.deep(unscheduled, ["fractal_slime"],
+    "and the only type off the schedule is the one parked there on purpose");
+  t.eq(h.game.Enemy.TYPES.fractal_slime.sandboxOnly, true,
+    "which the type row says itself");
 
   // And the late-campaign scaling shows: a stock normal is 4 HP, the finale
   // sends 30 HP normals, and the guide must say so.
@@ -4654,21 +4684,24 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   var colossus = enemies.filter(function (e) { return e.id === "colossus"; })[0];
   t.eq(colossus.health, 550, "the new tank's HP reaches the guide");
   t.eq(colossus.bounty, 250, "with its authored bounty");
-  t.deep(colossus.waves, [29], "and its campaign appearance");
+  t.deep(colossus.waves, [29, 35],
+    "and both campaign appearances -- 35 is the body that replaced the T5 root");
 
   var fractal = enemies.filter(function (e) { return e.id === "fractal_slime"; })[0];
   t.eq(fractal.health, 4, "Fractal Slime is listed at its base T1 health");
   t.eq(fractal.bounty, 2, "with its halved base bounty");
   t.eq(fractal.aoeDamageReduction, 0.5, "with its AoE resistance in the detail model");
-  // T3/64/[25] until 2026-08-20, when the whole ladder was scheduled. The
-  // guide DERIVES all three by walking the schedule, so this moved with no
-  // edit to js/codex.js -- which is the property worth pinning here: the index
-  // states the tier range and the campaign now actually spends it.
-  t.eq(fractal.maxTier, 5, "the guide derives the highest campaign tier");
-  t.eq(fractal.maxHp, 1024, "and derives that T5's 1024 HP");
-  t.eq(fractal.fractal.splitCount, 4, "the split block reaches the guide");
-  t.deep(fractal.waves, [16, 17, 22, 25, 33, 35],
-    "with one wave per rung of the ladder, in ascending order");
+  // T3/64/[25] until 2026-08-20, when the whole ladder was scheduled; 5/1024
+  // and six waves until 2026-08-29, when it came off the campaign entirely.
+  // The guide DERIVES all three by walking the schedule, so all three moved
+  // with no edit to js/codex.js -- which is the property worth pinning here,
+  // and it is worth pinning in this direction too: with nothing scheduled the
+  // guide falls back to the type's own row and describes the BASE specimen,
+  // T1 at 4 HP, rather than inventing a campaign appearance for it.
+  t.eq(fractal.maxTier, 1, "with nothing scheduled the guide states the base tier");
+  t.eq(fractal.maxHp, 4, "and the base T1's 4 HP");
+  t.eq(fractal.fractal.splitCount, 4, "the split block still reaches the guide");
+  t.deep(fractal.waves, [], "and it names no wave, because it is in none");
 });
 
 // The roster became a SCROLLING VIEWPORT on 2026-08-01, at the owner's request
