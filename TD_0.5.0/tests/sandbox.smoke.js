@@ -594,9 +594,17 @@ check("crosspath lock still caps B at 2 after A3+",
   upgradeTarget.core.purchased.B === 2,
   "B = " + upgradeTarget.core.purchased.B);
 
+// A row is a label and a value. Since 2026-08-29 a row MAY carry a third
+// element, `true`, marking it as a lifetime total so the armoury and the index
+// can drop a specimen's history by identity rather than by counting rows off
+// the front -- see TowerStats.total. Nothing that draws a row reads past [1],
+// which is what this still pins.
 check("statLines renders for an upgraded tower",
   upgradeTarget.statLines().length > 0 &&
-  upgradeTarget.statLines().every(function (r) { return r.length === 2; }));
+  upgradeTarget.statLines().every(function (r) {
+    return (r.length === 2 || (r.length === 3 && r[2] === true)) &&
+      typeof r[0] === "string";
+  }));
 
 // --- the on-canvas panel buttons -------------------------------------------
 

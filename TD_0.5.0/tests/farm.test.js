@@ -1697,4 +1697,158 @@ function (t) {
   t.ok(r && r.w > 0, "a branch column has a width");
 });
 
+// A specimen: the throwaway instance the armoury card and the index both
+// measure, and the rows they show for it.
+function specimenRows(h) {
+  var g = h.game;
+  var f = new g.FarmTower(-1000, -1000, g.path);
+  return g.TowerStats.withoutTotals(f.statLines());
+}
+
+test("a specimen shows what the Farm makes, and not what it has made",
+function (t) {
+  var h = boot();
+  var labels = specimenRows(h).map(function (row) { return row[0]; });
+
+  // THE ROW THE SCREEN EXISTS FOR. Both screens used to drop the first two
+  // rows of statLines on the assumption that every tower opens with "Damage
+  // dealt" and "Kills"; the Farm has neither, so the count ate its production
+  // rate and the index showed a 1200-mana economy tower as one HP line.
+  t.ok(labels.indexOf("Mana") !== -1,
+    "the production rate survives: " + labels.join(", "));
+  t.eq(labels.indexOf("Mana produced"), -1, "its lifetime total does not");
+  t.ok(labels.indexOf("Tower HP") !== -1, "and the health line does");
+});
+
+test("every tower's specimen drops its history and keeps the rest",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  g.MetaProgress.catalogue().forEach(function (row) {
+    var Type = g.MetaProgress.constructorOf(row.id);
+    var all = new Type(-1000, -1000, g.path).statLines();
+    var shown = g.TowerStats.withoutTotals(all);
+    var dropped = all.length - shown.length;
+
+    t.eq(dropped, all.filter(function (r) { return g.TowerStats.isTotal(r); }).length,
+      row.id + ": drops exactly the rows marked as totals (" + dropped + ")");
+    shown.forEach(function (r) {
+      t.ok(!/^(Damage dealt|Kills|Mana produced|Base HP produced)$/.test(r[0]),
+        row.id + ": no history row survives (" + r[0] + ")");
+    });
+  });
+});
+
+test("every ability the Farm grants has a description written for it",
+function (t) {
+  var h = boot();
+  var g = h.game;
+
+  // Walked the way the index walks it: one instance per branch, buying every
+  // tier in turn and reading the card the panel would show.
+  ["A", "B", "C"].forEach(function (branch) {
+    h.run("towers.length = 0");
+    var f = farm(h, 600, 200);
+    for (var guard = 0; guard < 6; guard++) {
+      var next = f.nextUpgrade(branch);
+      if (!next) break;
+      var card = f.panelActions().filter(function (a) {
+        return a.branch === branch && a.upgradeId === next.id;
+      })[0].tooltip();
+
+      card.abilities.forEach(function (ability) {
+        t.ok(!/No description written/.test(ability.text),
+          branch + next.id.slice(1) + " " + ability.name + ": has a sentence");
+        t.ok(ability.name !== "farmStock" && ability.name !== "farmInvest" &&
+             ability.name !== "farmExecute" && ability.name !== "farmNetwork",
+          branch + next.id.slice(1) + ": named in words, not by its flag");
+      });
+      f.applyUpgrade(next.id);
+    }
+  });
+});
+
+test("the ability sentences quote the tier's own numbers", function (t) {
+  var h = boot();
+  var g = h.game;
+
+  function cardFor(f, id) {
+    return f.panelActions().filter(function (a) {
+      return a.upgradeId === id;
+    })[0].tooltip();
+  }
+
+  var a = farm(h, 600, 200, ["A1", "A2", "A3"]);
+  var stock = cardFor(a, "A4").abilities[0];
+  t.eq(stock.name, "stores its mana", "A4's ability is named");
+  t.ok(stock.text.indexOf("1000") !== -1,
+    "and quotes A4's own clone cap: " + stock.text);
+  t.ok(stock.text.indexOf(
+    Math.round(g.FarmTower.CLONE_RATE * 100) + "%") !== -1,
+    "and the clone rate off the constant");
+
+  a.applyUpgrade("A4");
+  var invest = cardFor(a, "A5").abilities[0];
+  t.eq(invest.name, "investment", "A5's ability is named");
+  t.ok(invest.text.indexOf(String(g.FarmTower.TRANCHE)) !== -1 &&
+       invest.text.indexOf(g.FarmTower.TEMP_SECONDS + " s") !== -1,
+    "and quotes the tranche and the surge: " + invest.text);
+
+  h.run("towers.length = 0");
+  var c = farm(h, 600, 200, ["C1", "C2", "C3", "C4"]);
+  var dice = cardFor(c, "C5").abilities[0];
+  t.eq(dice.name, "dice network", "C5's ability is named");
+  t.ok(/3 d22/.test(dice.text), "and quotes the three d22: " + dice.text);
+});
+
+test("a tier that commits the farm says so, in the Farm's own rule",
+function (t) {
+  var h = boot();
+
+  function noteFor(f, id) {
+    return f.panelActions().filter(function (a) {
+      return a.upgradeId === id;
+    })[0].tooltip().note;
+  }
+
+  // One path open: a second may still be started, capped at 2.
+  var alone = farm(h, 600, 200, ["A1", "A2"]);
+  var note = noteFor(alone, "A3");
+  t.ok(/commits this farm to path A/.test(note), "names the path: " + note);
+  t.ok(/one other path may still be opened/.test(note) &&
+       /tier 2/.test(note) && /never a third/.test(note),
+    "and states both halves of the rule");
+
+  // Two paths open: the note has to name the one that is about to be capped
+  // rather than promise a second that is already spent.
+  h.run("towers.length = 0");
+  var both = farm(h, 600, 200, ["A1", "A2", "B1"]);
+  var note2 = noteFor(both, "A3");
+  t.ok(/path B stays capped at tier 2/.test(note2),
+    "names the open second path: " + note2);
+  t.ok(!/may still be opened/.test(note2), "and does not offer another");
+
+  // Once committed, the refusals say it and the note stands down.
+  both.applyUpgrade("A3");
+  t.eq(noteFor(both, "A4"), null, "nothing to warn about after the commitment");
+});
+
+test("the Farm's body is the icon the interface draws for it", function (t) {
+  var h = boot();
+  var g = h.game;
+
+  // TowerPreview3D resolves a tower TYPE to a mesh through its own family map,
+  // and a type missing from that map is not an error anywhere -- it answers
+  // null and every call site quietly falls back to the flat 2D glyph. So the
+  // Farm shipped twelve bodies to the board while the armoury, the loadout
+  // row, the build bar and the index rail all drew a picture of nothing in
+  // particular. Asserted for every catalogue tower, so the sixth is not the
+  // last one to be found this way.
+  g.MetaProgress.catalogue().forEach(function (row) {
+    var name = g.TowerPreview3D.modelName(row.id);
+    t.ok(name && g.GLModels.has(name),
+      row.id + " resolves to a registered body (" + name + ")");
+  });
+});
+
 runner.run();

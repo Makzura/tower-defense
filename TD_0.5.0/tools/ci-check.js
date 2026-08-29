@@ -658,7 +658,14 @@ var BASELINE = [
   // to five and the other to two, and a committed branch no longer closes the
   // secondary at tier 1), the boost refusing at the press when no tier 5 tower
   // is standing, and the EYE tracking instead of the whole machine.
-  { file: "tests/farm.test.js", pass: 81, fail: 0, failing: [] },
+  // 81 -> 87 on 2026-08-29: what the interface SAYS about this tower. A
+  // specimen keeping its production rate and dropping its history (the index
+  // showed a 1200-mana economy tower as one HP line), that rule holding for
+  // every catalogue tower, a written description on all four of the Farm's
+  // abilities, those sentences quoting the tier's own numbers, the commitment
+  // note in the Farm's own three-path rule, and every catalogue tower
+  // resolving to a registered body for its icon.
+  { file: "tests/farm.test.js", pass: 87, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

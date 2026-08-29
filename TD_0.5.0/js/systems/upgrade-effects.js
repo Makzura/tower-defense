@@ -107,6 +107,11 @@ var UpgradeEffects = {
     superBlub: "superblub",
     coagulation: "coagulation",
 
+    farmStock: "stores its mana",
+    farmInvest: "investment",
+    farmExecute: "executes",
+    farmNetwork: "dice network",
+
     // The third spelling (see grantsOf): a plain stat flag rather than a named
     // mechanic. `camoDetection` and `seesCamo` are the same promise made by
     // two configs in two vocabularies, so they get the same words.
@@ -314,6 +319,57 @@ var UpgradeEffects = {
         "The pooled total picks its tier, permanently. From tier 3 the tower " +
         "fuses with it and stops summoning; tier 4 needs a pool of exactly 6666. " +
         "300 s cooldown."
+    },
+
+    // THE FARM'S FOUR, which had no entry at all and so read "No description
+    // written for this one yet." in the index and on the panel -- for the four
+    // tiers that are the entire reason to take those paths. Every number is a
+    // parameter, handed in by js/farm.js off its own constants and the tier's
+    // own row, so retuning a tranche or a die moves the sentence with it.
+    // WRITTEN TO THE CARD'S BUDGET. tooltipLines gives an ability five wrapped
+    // lines and clips the fifth with an ellipsis; a description that ends in
+    // "..." is a description missing its point, which is the fault this whole
+    // block was added to fix. All four measured at five lines or fewer at the
+    // card's 276 px.
+    farmStock: {
+      text: function (p) {
+        if (!p) return "The farm keeps the mana it makes instead of paying it straight out.";
+        return "Mana this farm makes is kept here instead of going to your purse; " +
+          "Collect takes the whole stock whenever you like. What you leave in " +
+          "compounds: the stock grows by " + Math.round(p.rate * 100) +
+          "% of what is STANDING at the end of each wave, up to " + p.cap + ".";
+      }
+    },
+    farmInvest: {
+      text: function (p) {
+        if (!p) return "Spends the stock to make another tower permanently stronger.";
+        return "Spends the stock in tranches of " + p.tranche + " mana, up to " +
+          p.maxTranches + " at once, on a tier " + p.tierRequired +
+          " tower you pick by clicking it. Each tranche is +" +
+          Math.round(p.bonus * 100) + "% damage, attack speed and range: " +
+          "permanently and ONCE per tower, or " + p.multiplier + "x that for " +
+          p.seconds + " s as often as you can pay.";
+      }
+    },
+    farmExecute: {
+      text: function (p) {
+        if (!p) return "Kills badly wounded enemies inside the field outright.";
+        return "An enemy inside this farm's field dies outright once it is under " +
+          p.flat + " HP or " + Math.round(p.fraction * 100) +
+          "% of its own maximum, whichever is higher. The farm still fires nothing " +
+          "-- the field does it.";
+      }
+    },
+    farmNetwork: {
+      text: function (p) {
+        if (!p) return "Joins every dice farm on the board into one shared payout.";
+        return "Every dice farm on the board is one network: their production is " +
+          "pooled into a single figure the whole network is paid each wave. " +
+          p.dice + " d" + p.sides + " " +
+          (p.dice === 1 ? "is thrown" : "are thrown") +
+          " against that figure every wave -- it can grow, shrink, double or " +
+          "reset, and never recovers on its own.";
+      }
     },
 
     seesCamo: {

@@ -57,7 +57,14 @@ var TowerPreview3D = (function () {
     soldier: "rifleman",
     longshot: "sniper",
     siphon: "siphon",
-    blub: "summoner"
+    blub: "summoner",
+    // THE SIXTH TYPE, AND THE ONE THIS MAP EXISTS TO CATCH. A tower absent
+    // from here is not an error anywhere -- `modelName` answers null, every
+    // caller falls back to `drawIcon`, and nothing logs. So the Farm shipped
+    // its twelve bodies to the board while the armoury, the loadout row, the
+    // build bar and the index rail all kept drawing its flat glyph, and the
+    // only symptom was a picture that looked deliberate.
+    farm: "farm"
   };
 
   // The same correction gl-world applies (`authoredFrontOffset`): the Summoner,

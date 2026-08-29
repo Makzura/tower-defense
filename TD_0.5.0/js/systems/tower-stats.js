@@ -90,10 +90,43 @@ var TowerStats = {
   // opened), then what it hits for, then how far and how often, then whatever
   // the type adds, with DPS last because the panel emphasises the last row.
 
+  // A ROW THAT IS A LIFETIME TOTAL, MARKED AS ONE.
+  //
+  // The armoury and the index both show a SPECIMEN -- an instance parked
+  // off-screen that has never fired -- and both drop its history, because a
+  // field guide has no history to report. Until now they dropped it by COUNT:
+  // `statLines().slice(TowerStats.totals(t).length)`, on the assumption that
+  // every tower opens with exactly these two rows.
+  //
+  // The Farm broke that assumption and said nothing. It deals no damage and
+  // takes no kills, so it has neither of these rows; its history is "Mana
+  // produced", and it comes near the END of its list because its production
+  // rate is the row a player opens the panel for. Slicing two off the front
+  // therefore ate the production rate and the total alike, and the index
+  // showed a 1200-mana economy tower as one line: "Tower HP 200 / 200".
+  //
+  // So the mark travels with the row. A third element rather than a label
+  // match, because the original comment's fear was right -- matching by label
+  // means renaming a row silently changes what the guide shows -- and a flag
+  // set where the row is BUILT cannot be renamed apart from it. Every consumer
+  // reads row[0] and row[1] and is untouched by a third element.
+  total: function (label, value) {
+    return [label, value, true];
+  },
+
+  isTotal: function (row) {
+    return !!(row && row[2] === true);
+  },
+
+  // What a specimen shows: everything except its history.
+  withoutTotals: function (rows) {
+    return (rows || []).filter(function (row) { return !TowerStats.isTotal(row); });
+  },
+
   totals: function (tower) {
     return [
-      ["Damage dealt", TowerStats.formatTotal(tower.damageDealt)],
-      ["Kills", String(tower.kills)]
+      TowerStats.total("Damage dealt", TowerStats.formatTotal(tower.damageDealt)),
+      TowerStats.total("Kills", String(tower.kills))
     ];
   },
 

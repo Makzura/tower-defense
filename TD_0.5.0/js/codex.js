@@ -208,16 +208,18 @@ var Codex = (function () {
     return roster().map(function (Type) {
       var base = new Type(-1000, -1000, path);
 
-      // Drop the lifetime-total rows (damage dealt, kills): a specimen in a
-      // field guide has no history. Sliced by COUNT off the front rather than
-      // matched by label, so renaming a row cannot silently break this.
-      var totalRows = TowerStats.totals(base).length;
+      // Drop the lifetime-total rows: a specimen in a field guide has no
+      // history. Asked of the ROWS rather than counted off the front -- the
+      // count assumed every tower opens with "Damage dealt" and "Kills", and
+      // the Farm has neither, so the guide was slicing away its production
+      // rate and showing a 1200-mana economy tower as a single HP line. See
+      // TowerStats.total.
 
       return {
         type: Type,
         name: Type.DISPLAY_NAME,
         cost: Type.COST,
-        stats: base.statLines().slice(totalRows),
+        stats: TowerStats.withoutTotals(base.statLines()),
         // The unbought body, from the same resolver every tier uses.
         model: bodyOf(base),
         // WHICH BRANCHES A TOWER HAS IS ITS OWN ANSWER, not two letters typed

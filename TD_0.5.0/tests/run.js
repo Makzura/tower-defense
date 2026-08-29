@@ -3841,9 +3841,15 @@ test("clicking a tower shows its stats, escape clears them", function (t) {
   // No "Target" row: the targeting button under these rows is the one place
   // the mode is shown. Two readouts of one setting, one above the other, is
   // the duplication the map labels were removed for.
+  // THE THIRD ELEMENT IS THE LIFETIME-TOTAL MARK (TowerStats.total). The
+  // armoury card and the index show a specimen that has never fired and drop
+  // its history; they used to drop it by counting two rows off the front, which
+  // silently ate the Farm's production rate -- the Farm has no "Damage dealt"
+  // row and keeps its own totals at the bottom. The mark travels with the row
+  // so the drop is by identity. Nothing that DRAWS a row reads past [1].
   t.deep(tower.statLines(), [
-    ["Damage dealt", "0"],
-    ["Kills", "0"],
+    ["Damage dealt", "0", true],
+    ["Kills", "0", true],
     ["Damage", "1"],
     ["Range", "100 u.l."],
     ["Attack speed", "1.00/s"],
@@ -3852,6 +3858,11 @@ test("clicking a tower shows its stats, escape clears them", function (t) {
     ["Tower HP", "60 / 60"],
     ["DPS", "1.0"]
   ], "stat rows");
+
+  t.deep(h.game.TowerStats.withoutTotals(tower.statLines()).map(function (r) {
+    return r[0];
+  }), ["Damage", "Range", "Attack speed", "Tower HP", "DPS"],
+    "and a specimen of it shows everything except the two totals");
 
   h.key("Escape");
   t.eq(h.game.inspected, null, "inspected after escape");

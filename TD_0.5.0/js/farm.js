@@ -214,6 +214,11 @@ FarmTower.TICK_SECONDS = 5;
 // slow enough that a body crossing the circle does not make it flick.
 FarmTower.VIEW_EASE = 6;
 
+// A4's clone, as a fraction of the standing stock. Named because three places
+// quote it -- the panel row, the Collect card and the index's description of
+// the tier -- and a rate typed out four times is a rate that drifts.
+FarmTower.CLONE_RATE = 0.05;
+
 // A5's investment. Tranches are whole and the remainder stays stocked.
 FarmTower.TRANCHE = 10000;
 FarmTower.MAX_TRANCHES = 10;             // 100 000 mana in one go
@@ -706,7 +711,7 @@ FarmTower.prototype.produce = function (amount) {
 // A4's cloning, at the end of a wave: five per cent of what is standing, capped.
 FarmTower.prototype.cloneStock = function () {
   if (!this.stores || this.stock <= 0) return 0;
-  var cloned = Math.min(this.stock * 0.05, this.cloneCap);
+  var cloned = Math.min(this.stock * FarmTower.CLONE_RATE, this.cloneCap);
   this.stock += cloned;
   // Cloned mana is mana this farm made, so it counts. It does not go through
   // produce() because it never leaves the stock -- the clone IS the stock
@@ -958,7 +963,8 @@ FarmTower.prototype.statLines = function () {
   // build bar once the Collect button arrived, which sandbox.smoke.js and the
   // suite both pin against.
   if (this.stores) {
-    rows.push(["Stored", Math.round(this.stock) + " mana  ·  +5% a wave (max " +
+    rows.push(["Stored", Math.round(this.stock) + " mana  ·  +" +
+      Math.round(FarmTower.CLONE_RATE * 100) + "% a wave (max " +
       this.cloneCap + ")"]);
   }
   if (this.invests) {
@@ -1002,13 +1008,91 @@ FarmTower.prototype.statLines = function () {
   // on a tower that has a tier which makes it, so a farm with no B tier does
   // not print a zero it can never move (the same no-invented-zeroes rule the
   // result screen is built on).
-  rows.push(["Mana produced", TowerStats.formatTotal(this.manaProduced)]);
+  //
+  // MARKED AS TOTALS (TowerStats.total), which is what keeps them off the
+  // armoury card and out of the index: those two screens show a specimen that
+  // has never produced anything, and they drop a row because it is a history
+  // rather than because of where it sits in this list. See the note on
+  // TowerStats.total -- this tower is the reason it exists.
+  rows.push(TowerStats.total("Mana produced",
+    TowerStats.formatTotal(this.manaProduced)));
   if (this.baseHpPerWave > 0 || this.baseHpPerKill > 0 || this.baseHpProduced > 0) {
-    rows.push(["Base HP produced", TowerStats.formatTotal(this.baseHpProduced)]);
+    rows.push(TowerStats.total("Base HP produced",
+      TowerStats.formatTotal(this.baseHpProduced)));
   }
 
   rows.push(["Tower HP", TowerHealth.label(this)]);
   return rows;
+};
+
+// THE PARAMETERS EVERY ABILITY SENTENCE QUOTES, in one place.
+//
+// js/systems/upgrade-effects.js holds the words; this holds the numbers, so a
+// retuned tranche, clone rate or die moves the description with it and nobody
+// has to remember that a sentence somewhere repeats the figure. Keyed by grant
+// name, which is how `UpgradeEffects.abilities` looks a mechanic's parameters
+// up -- the same contract the Rifleman's recruits use.
+//
+// `upgrade` is the tier being described, so the cap and the dice are the ones
+// THAT tier buys rather than the ones this tower happens to own today.
+FarmTower.prototype.abilityParams = function (upgrade) {
+  return {
+    farmStock: {
+      rate: FarmTower.CLONE_RATE,
+      cap: upgrade.cloneCap || this.cloneCap
+    },
+    farmInvest: {
+      tranche: FarmTower.TRANCHE,
+      maxTranches: FarmTower.MAX_TRANCHES,
+      bonus: FarmTower.TRANCHE_BONUS,
+      multiplier: FarmTower.TEMP_MULTIPLIER,
+      seconds: FarmTower.TEMP_SECONDS,
+      tierRequired: FarmBoost.TIER_REQUIRED
+    },
+    farmExecute: {
+      flat: FarmTower.EXECUTE_FLAT,
+      fraction: FarmTower.EXECUTE_FRACTION
+    },
+    farmNetwork: {
+      dice: upgrade.dice,
+      sides: FarmDice.sides(upgrade.table)
+    }
+  };
+};
+
+// THE ONE CONSEQUENCE A PRICE TAG CANNOT SHOW, in this tower's own terms.
+//
+// Every other tower says "Tier 3 commits this tower: the other branch is capped
+// at tier 2 for good" on the tier that does the locking, and the Farm said
+// nothing at all -- the one tower with THREE paths, and so the one where the
+// rule most needs stating. Its rule is not the two-path one either: a farm
+// opens at most two paths, and only one of them may pass tier 2 (see
+// whyCannotUpgrade, which enforces both halves).
+//
+// Shown only while nothing is committed yet, exactly as the others do it: once
+// a path is locked in, the refusal on the other buttons says so directly.
+FarmTower.prototype.crosspathNote = function (upgrade) {
+  if (!upgrade.locksPath || this.lockedBranch() !== null) return null;
+  var tier = this.tierNumber(upgrade.id);
+  var cap = tier - 1;
+
+  // WHICH SECOND PATH, if one is already open. "One other path may still be
+  // opened" is true of a farm standing on one path and false of a farm already
+  // standing on two, and a note that says the wrong one of those is worse than
+  // no note -- it is the sentence a player plans the rest of the tower around.
+  var others = [];
+  ["A", "B", "C"].forEach(function (b) {
+    if (b !== upgrade.branch && this.tiersOwned(b) > 0) others.push(b);
+  }, this);
+
+  if (others.length) {
+    return "Tier " + tier + " commits this farm to path " + upgrade.branch +
+      ": path " + others.join(" and ") + " stays capped at tier " + cap +
+      " for good, and no third path opens.";
+  }
+  return "Tier " + tier + " commits this farm to path " + upgrade.branch +
+    ": one other path may still be opened, capped at tier " + cap +
+    " for good, and never a third.";
 };
 
 FarmTower.prototype.panelActions = function () {
@@ -1049,12 +1133,18 @@ FarmTower.prototype.panelActions = function () {
           title: self.name + "  ·  " + next.id,
           subtitle: refusal ? refusal : next.cost + " mana",
           changes: preview.changes,
-          abilities: UpgradeEffects.abilities(preview.grants, null),
+          // THE NUMBERS FOR THE SENTENCES, off this tower's own constants and
+          // the tier's own row rather than repeated in the description table --
+          // the same arrangement the Rifleman's recruits have. Handing `null`
+          // here is what left four tiers reading "No description written for
+          // this one yet." in the index and on the panel.
+          abilities: UpgradeEffects.abilities(preview.grants,
+            self.abilityParams(next)),
           note: refusal ? "Unavailable: " + refusal + "."
             : (next.noRefund
               ? "This tier is SUNK: selling the tower refunds half of everything "
                 + "else on it and nothing of this " + next.cost + " mana."
-              : null)
+              : self.crosspathNote(next))
         });
       }
     });
@@ -1078,7 +1168,8 @@ FarmTower.prototype.panelActions = function () {
         subtitle: hasStock ? stored + " mana" : "nothing stored",
         note: "Takes the whole stock into your purse, whenever you like. What " +
           "you leave in keeps compounding -- the clone at the end of a wave is " +
-          "5% of what is STANDING, up to " + this.cloneCap + " -- so collecting " +
+          Math.round(FarmTower.CLONE_RATE * 100) + "% of what is STANDING, up to " +
+          this.cloneCap + " -- so collecting " +
           "every wave is the same tower without its stock." +
           (this.invests ? "  An investment spends the stock too." : "")
       })

@@ -483,13 +483,13 @@ BeamTower.prototype.statLines = function () {
     rows.push(["Charges", String(this.charge.charges)]);
     // The bonus, not the total: base income is what any tower earns for that
     // damage, so it says nothing about whether path A is paying off.
-    rows.push(["Bonus mana", TowerStats.formatTotal(this.bonusGold)]);
+    rows.push(TowerStats.total("Bonus mana", TowerStats.formatTotal(this.bonusGold)));
   }
   if (s.flags.lifesteal) {
     rows.push(["Lifesteal", Math.round(s.mechanics.lifesteal.ratio * 100) + "%"]);
     // Its own total, and the shared pool the B5 gate actually reads.
-    rows.push(["HP healed", TowerStats.formatTotal(this.hpHealed) +
-      "  (all " + TowerStats.formatTotal(HealingLedger.total()) + ")"]);
+    rows.push(TowerStats.total("HP healed", TowerStats.formatTotal(this.hpHealed) +
+      "  (all " + TowerStats.formatTotal(HealingLedger.total()) + ")"));
   }
   if (s.flags.death_denial) rows.push(["Death denial", "armed"]);
 
