@@ -3762,25 +3762,33 @@ that does not move contributes exactly 1.
 
 | factor | what it measures | Normal |
 |---|---|---:|
-| `demand` | mean required DPS — HP over the seconds a wave has to be cleared in. Folds hp, bodies and PACING; a count cannot tell forty bodies in ten seconds from forty in sixty | ×2.60 |
+| `demand` | mean required DPS — HP over the seconds a wave has to be cleared in. Folds hp, bodies and PACING; a count cannot tell forty bodies in ten seconds from forty in sixty | ×3.66 |
 | `spike` | peak required DPS. The wave that actually ends runs | ×2.95 |
 | `length` | waves, and so chances to die | ×1.14 |
 | `fragility` | the mean body's health against the base's 100. What ONE leak costs, and the axis money cannot answer | ×3.19 |
 | `roster` | share of scheduled HP behind a body needing a SPECIFIC answer — flight, camo, armour, shield, revive, brood, an attack on your towers | ×1.22 |
 | `relief` | the purse, **inverted**, because money is the only thing that makes a campaign easier | ×0.36 |
 | `map` | `Maps.analyse(map).score`, already normalised against a straight reference road | ×1.00 |
-| | **geometric mean** | **1.43** |
+| | **geometric mean** | **1.50** |
 
 **NORMALISED SO THE REFERENCE READS EXACTLY 1.00.** The reference is Easy on
 `Maps.DEFAULT_ID`, by construction and not by luck, which is what makes "scale
 the Normal rewards on the Easy rewards" mean something. A test asserts every
 factor is 1 against itself.
 
-**The number is 1.43 and NOT the 5.07 the raw HP suggests — read the factors
-before retuning anything.** Normal sends 2.60× the DPS and hits 3.19× as hard
+**The number is 1.50 and NOT the 5.07 the raw HP suggests — read the factors
+before retuning anything.** Normal sends 3.66× the DPS and hits 3.19× as hard
 per leak, and it also pays 2.80× the purse. A campaign that scales its own
 economy with its own threat is not five times harder; it is a bigger version of
 itself, and the honest number is the one that says so.
+
+**HEALTH IS A WEAK LEVER AND TIME IS THE STRONG ONE, and that is the single
+most useful thing this function has said.** Bounties are priced off health, so
+adding HP adds purse in lockstep and the rating barely moves — measured, +14%
+scheduled health bought +0.04 rating. A wave's CEILING is the one term the
+purse cannot answer. When Normal was raised from 1.43 to 1.50 on 2026-08-29,
+not one point of scheduled health and not one body changed; every ceiling did.
+A test pins both of those zeros.
 
 **`relief` is capped at `boardCeiling()`** — the five cheapest towers fully
 built, about 128 000 mana — because five slots and a tier-5 cap mean a purse
@@ -3800,14 +3808,53 @@ exist when it is evaluated — the arrangement `MetaProgress.constructorOf`
 documents. It also means it degrades to a flat 1.00 rather than throwing on a
 page that never loaded a schedule.
 
+### Does it get HARDER? — `Difficulty.curveOf` and `riseOf`
+
+The rating is one number for a whole campaign and cannot answer that: a
+campaign that opens brutally and coasts rates the same as one that does the
+opposite, and **Normal was measurably the first of those.** So there is a second
+reading, per wave:
+
+```
+pressure(n) = required DPS at wave n / the purse the run has by then
+```
+
+Rising pressure means the campaign is outrunning the player's wallet; falling
+pressure is "it gets easier". Normal measured **1.46 → 0.95 → 0.71** in thirds
+— it got easier the further you went, because its purse outgrew its schedule.
+
+**Answered in THIRDS, never wave by wave**, and that is design rather than
+statistics: a campaign SHOULD have breather waves (Normal's pure camo wave, its
+pure flight wave) and a monotonic-per-wave rule would forbid them. What must
+rise is the trend. `riseOf` returns the three means plus two booleans the tests
+hold: `rises` and `gentlestAtTheStart`.
+
+**THE LAST WAVE IS ALWAYS EXCLUDED.** A finale carries no `duration` — there is
+no wave after it to hold up — so its span is its last arrival and its pressure
+is an order of magnitude above everything else (Normal's reads 8 where nothing
+else reaches 2). Left in, it would swamp the late third and report any campaign
+as rising.
+
+**Normal now reads 1.18 → 1.26 → 1.50**, a ×1.28 rise, and its opening third is
+the gentlest part of the run — which was the owner's other condition, "don't
+make it impossible at the start". **Easy does NOT rise** (0.72 → 0.85 → 0.68)
+and has not been retuned; nobody has asked for it.
+
+**Two floors stopped the re-time going further, and the suite already owned
+both.** A Volatile wave needs more than 20 s of ceiling after its last diver
+for the fuse to resolve, and the three money convoys (36–38) need at least 40 s
+— the waves a player is meant to have time to clear and bank. The first attempt
+at this re-time violated both and those tests caught it. Every other ceiling
+clears its last arrival by at least 16 s.
+
 ### What the rating pays for
 
 **TWO SCALES, NOT ONE**, because a coin and a wave number are different
 quantities:
 
-- **coins** scale by the rating. Normal's ladder is 57/40/26/14/7 against
-  Easy's 40/28/18/10/5, a clear is 114 against 80, and a first clear of a route
-  is 36 against 25.
+- **coins** scale by the rating. Normal's ladder is 60/42/27/15/7 against
+  Easy's 40/28/18/10/5, a clear is 120 against 80, and a first clear of a route
+  is 38 against 25.
 - **thresholds** scale by WAVE COUNT alone, so a rung sits at the same FRACTION
   of its own campaign. Normal's ladder gates at 34/29/23/17/11 of forty, and
   its top rung is the last one before the finale on both campaigns.
@@ -3830,7 +3877,7 @@ never be worth more than a difficulty, and a test pins that it moves the rating
 by less than a fifth.
 
 **The difficulty card shows both**, on the screen where the choice is made —
-`Difficulty 1.43×` and `A clear pays 114 ⬡`, read through the same two modules
+`Difficulty 1.50×` and `A clear pays 120 ⬡`, read through the same two modules
 the bank goes through, so a card cannot promise a number the bank will not hand
 over. The card grew from 300 px to 348 for the two extra rows.
 

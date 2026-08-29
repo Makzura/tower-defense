@@ -1028,12 +1028,12 @@ var NORMAL_WAVES = [
   // is twelve bodies of two types against Easy's five of one. Nothing in the
   // first five waves carries a health override at all -- the lesson each wave
   // teaches is the type, and a scaled body teaches the same lesson more slowly.
-  { duration: 34, groups: [                                       // 40 HP
+  { duration: 43, groups: [                                       // 40 HP
     { at: 0, count: 5, interval: 0.9 },
     { at: 6, count: 3, interval: 0.9 },
     { at: 9, count: 4, interval: 0.6, type: "fast" }
   ] },
-  { duration: 36, groups: [                                       // 82 HP
+  { duration: 45, groups: [                                       // 82 HP
     { at: 0, count: 6, interval: 0.8 },
     { at: 3, count: 6, interval: 1.1, type: "slow" },
     { at: 6, count: 4, interval: 0.7 }
@@ -1041,19 +1041,19 @@ var NORMAL_WAVES = [
   // The swarm arrives at 3 rather than at 7, and it arrives INSIDE a pair of
   // Fast salvos rather than alone. The question is still rate and not damage;
   // what is new is that the rate has to be spent on two speeds at once.
-  { duration: 32, groups: [                                       // 34 HP
+  { duration: 40, groups: [                                       // 34 HP
     { at: 0,   count: 10, interval: 0.16, type: "swarm" },
     { at: 2.5, count: 4,  interval: 0.35, type: "fast" },
     { at: 4,   count: 8,  interval: 0.16, type: "swarm" },
     { at: 6.5, count: 4,  interval: 0.35, type: "fast" }
   ] },
-  { duration: 38, groups: [                                       // 80 HP
+  { duration: 48, groups: [                                       // 80 HP
     { at: 0, count: 6, interval: 0.5 },
     { at: 2, count: 4, interval: 0.8, type: "armored" },
     { at: 5, count: 6, interval: 0.5 },
     { at: 7, count: 4, interval: 0.8, type: "armored" }
   ] },
-  { duration: 40, groups: [                                       // 96 HP
+  { duration: 50, groups: [                                       // 96 HP
     { at: 0, count: 4,  interval: 1,    type: "slow", health: 9 },
     { at: 2, count: 12, interval: 0.18, type: "swarm" },
     { at: 5, count: 4,  interval: 1,    type: "slow", health: 9 },
@@ -1073,7 +1073,7 @@ var NORMAL_WAVES = [
   // where the player still has room to be surprised by it. What it costs here
   // is small; what it teaches is which body to shoot first, which waves 12, 16,
   // 21, 27, 32, 34 and 35 all charge for later.
-  { duration: 44, groups: [                                       // 272 HP
+  { duration: 55, groups: [                                       // 272 HP
     { at: 0,  count: 5, interval: 0.7 },
     { at: 1,  count: 1, interval: 1,    type: "herald" },
     { at: 4,  count: 4, interval: 0.45, type: "fast" },
@@ -1085,7 +1085,7 @@ var NORMAL_WAVES = [
   // The act closes on the first wave that is three types deep and the first
   // that scales anything: thirty-four bodies, two of them tanky enough to need
   // more than one pass.
-  { duration: 46, groups: [                                       // 204 HP
+  { duration: 58, groups: [                                       // 204 HP
     { at: 0,   count: 6,  interval: 0.9,  type: "slow",    health: 10 },
     { at: 1.5, count: 12, interval: 0.16, type: "swarm",   health: 2 },
     { at: 4,   count: 5,  interval: 0.8,  type: "armored", health: 6 },
@@ -1099,7 +1099,7 @@ var NORMAL_WAVES = [
   // an answer to a body that shoots back (8), detection (9), a weapon that
   // hits for more than 5 (10), air reach (11), burst for a shield (12),
   // redundancy (13) and all of it at once (14).
-  { duration: 46, groups: [                                       // 210 HP
+  { duration: 58, groups: [                                       // 210 HP
     { at: 0, count: 7, interval: 0.55, health: 7 },
     { at: 2, count: 4, interval: 1.2,  type: "angry" },
     { at: 7, count: 7, interval: 0.55, health: 7 },
@@ -1118,7 +1118,7 @@ var NORMAL_WAVES = [
   // Eighty points against a 100 HP base: a player with no detection leaks the
   // whole wave and lives, which is what a warning is. Waves 22 and 28 are where
   // it bites, at 666 and 1 080.
-  { duration: 40, groups: [                                       // 80 HP
+  { duration: 50, groups: [                                       // 80 HP
     { at: 0, count: 4, interval: 0.8,  type: "camo_normal", health: 6 },
     { at: 3, count: 4, interval: 0.35, type: "camo_fast",   health: 4 },
     { at: 6, count: 4, interval: 0.8,  type: "camo_normal", health: 6 },
@@ -1127,7 +1127,7 @@ var NORMAL_WAVES = [
   // Bulwarks and the first Brutes together: a shell to burst through and a
   // body that ignores anything under 5 damage, in one wave, so "more damage"
   // and "damage ready at the right moment" are asked side by side.
-  { duration: 48, groups: [                                       // 432 HP
+  { duration: 60, groups: [                                       // 432 HP
     { at: 0,   count: 7, interval: 0.35, type: "fast",     health: 5 },
     { at: 1.5, count: 3, interval: 1.2,  type: "shielded", health: 14 },
     { at: 5,   count: 1, interval: 2,    type: "brute",    health: 55 },
@@ -1148,7 +1148,7 @@ var NORMAL_WAVES = [
   // while fourteen Armored are still deploying, so its first pulse at 13 s has
   // a wave to put plating on rather than a road it has outlived -- which is the
   // authoring rule every supporter in this schedule follows.
-  { duration: 52, groups: [                                       // 298 HP
+  { duration: 65, groups: [                                       // 298 HP
     { at: 0,   count: 7, interval: 0.6, type: "armored",      health: 8 },
     { at: 1.5, count: 6, interval: 0.3, type: "fast",         health: 6 },
     { at: 3,   count: 1, interval: 3,   type: "shieldbearer", health: 90 },
@@ -1159,7 +1159,7 @@ var NORMAL_WAVES = [
   // Heralds again, this time on a body worth hastening: twenty Swarm and six
   // Bulwarks. A hastened Bulwark is the tempo trap arriving sooner than the
   // board is ready for, which is the first time the two mechanics compound.
-  { duration: 50, groups: [                                       // 548 HP
+  { duration: 63, groups: [                                       // 548 HP
     { at: 0,   count: 10, interval: 0.15, type: "swarm",    health: 3 },
     { at: 1,   count: 1,  interval: 1,    type: "herald" },
     { at: 2.5, count: 3,  interval: 1.1,  type: "shielded", health: 16 },
@@ -1178,7 +1178,7 @@ var NORMAL_WAVES = [
   //
   // The Angries beside them are the reason the holes matter: a tower that is
   // switched off is a tower that is not shooting the thing shooting it.
-  { duration: 54, groups: [                                       // 423 HP
+  { duration: 57, groups: [                                       // 423 HP
     { at: 0,  count: 8, interval: 0.5, health: 9 },
     { at: 2,  count: 4, interval: 1.1, type: "angry",  health: 18 },
     { at: 4,  count: 1, interval: 2,   type: "sapper" },
@@ -1194,7 +1194,7 @@ var NORMAL_WAVES = [
   // is the escort -- two Shieldbearers stacking plating onto it, which is a
   // question about which body to shoot rather than about how much damage the
   // board has.
-  { duration: 62, groups: [                                       // 662 HP
+  { duration: 61, groups: [                                       // 662 HP
     { at: 0,   count: 8, interval: 0.3, type: "fast",         health: 7 },
     { at: 1.5, count: 5, interval: 0.7, type: "armored",      health: 10 },
     { at: 3,   count: 1, interval: 3,   type: "shieldbearer", health: 100 },
@@ -1205,7 +1205,7 @@ var NORMAL_WAVES = [
   ] },
 
   // --- ACT III, 15-21: the mechanics. 213 bodies. ------------------------
-  { duration: 56, groups: [                                       // 702 HP
+  { duration: 52, groups: [                                       // 702 HP
     { at: 0,  count: 5, interval: 0.32, type: "fast",     health: 9 },
     { at: 1,  count: 2, interval: 2.4,  type: "brute",    health: 65 },
     { at: 4,  count: 4, interval: 1.3,  type: "revenant", health: 22 },
@@ -1228,7 +1228,7 @@ var NORMAL_WAVES = [
   //
   // Compare wave 11, which is the same roster idea inverted -- three Wisps
   // inside a ground wave, as a warning. This is the bill.
-  { duration: 70, groups: [                                       // 760 HP
+  { duration: 61, groups: [                                       // 760 HP
     { at: 0,  count: 1,  interval: 5,    type: "hive",   health: 190 },
     { at: 1,  count: 10, interval: 0.14, type: "swarm",  health: 4 },
     { at: 2,  count: 1,  interval: 1,    type: "herald" },
@@ -1243,7 +1243,7 @@ var NORMAL_WAVES = [
   // that become 21 bodies, which is a coverage question the moment it lands,
   // and there are two of them. NO `health` ON A FRACTAL GROUP, ever: the type
   // discards it and only the accounting would move. See the ladder note above.
-  { duration: 62, groups: [                                       // 416 HP
+  { duration: 52, groups: [                                       // 416 HP
     { at: 0,   count: 8, interval: 0.55, type: "armored", health: 18 },
     { at: 1.5, count: 8, interval: 0.14, type: "swarm",   health: 6 },
     { at: 4,   count: 1, interval: 2,    type: "fractal_slime", tier: 2 },
@@ -1270,7 +1270,7 @@ var NORMAL_WAVES = [
   // the first pulse at 12 s. The counter is BURST -- 15 HP/s outrun, not
   // out-lasted -- and the wave is small enough that a board which has it wins
   // cleanly and one that does not never finishes a single Brute.
-  { duration: 66, groups: [                                       // 1218 HP
+  { duration: 52, groups: [                                       // 1218 HP
     { at: 0,   count: 3, interval: 2.2, type: "brute",  health: 75 },
     { at: 1.5, count: 6, interval: 1,   type: "angry",  health: 24 },
     { at: 4,   count: 1, interval: 3,   type: "healer", health: 240 },
@@ -1290,7 +1290,7 @@ var NORMAL_WAVES = [
   // 60 back into the three most wounded every eight. Neither of those raises a
   // single bounty, so this wave gets more expensive for exactly as long as the
   // player answers the payload instead of the support.
-  { duration: 70, groups: [                                       // 1376 HP
+  { duration: 53, groups: [                                       // 1376 HP
     { at: 0,   count: 7, interval: 0.5, type: "armored",      health: 14 },
     { at: 1.5, count: 1, interval: 3,   type: "shieldbearer", health: 110 },
     { at: 3,   count: 4, interval: 1.1, type: "shielded",     health: 20 },
@@ -1329,7 +1329,7 @@ var NORMAL_WAVES = [
   // the wave from resolving as two separate fights: the last specks step out at
   // 12.05 s and are still walking when the first diver leaves at 14 s -- and at
   // 75 u.l./s the divers run them down from behind.
-  { duration: 58, groups: [                                       // 300 HP
+  { duration: 45, groups: [                                       // 300 HP
     { at: 0,   count: 9, interval: 0.14, type: "swarm",    health: 6 },
     { at: 4,   count: 4, interval: 0.35, type: "fast",     health: 16 },
     { at: 7,   count: 9, interval: 0.14, type: "swarm",    health: 6 },
@@ -1350,7 +1350,7 @@ var NORMAL_WAVES = [
   // cannot touch it -- `excludeBanner` -- which is deliberate: 175 u.l./s is
   // already the fastest thing in the game and +30% on top of it is a number
   // nobody chose.
-  { duration: 80, groups: [                                       // 1662 HP
+  { duration: 55, groups: [                                       // 1662 HP
     { at: 0,   count: 12, interval: 0.13, type: "swarm",        health: 5 },
     { at: 0.8, count: 1,  interval: 3,    type: "shieldbearer", health: 130 },
     { at: 2,   count: 1,  interval: 1,    type: "herald" },
@@ -1368,7 +1368,7 @@ var NORMAL_WAVES = [
   // camo end to end, 24 is air end to end -- and the four between them are the
   // heaviest mixed waves the campaign has sent so far. The act is where a board
   // that has only ever bought damage runs out of road.
-  { duration: 64, groups: [                                       // 666 HP  ALL CAMO
+  { duration: 42, groups: [                                       // 666 HP  ALL CAMO
     { at: 0,   count: 6, interval: 0.8,  type: "camo_normal", health: 20 },
     { at: 1.5, count: 3, interval: 1.5,  type: "camo_heavy",  health: 55 },
     { at: 4,   count: 4, interval: 0.32, type: "camo_fast",   health: 12 },
@@ -1380,7 +1380,7 @@ var NORMAL_WAVES = [
   // wave. Ten Bulwarks and twelve Angries are the wave; the three Sappers are
   // two seconds of silence each, taken from whichever tower is doing the most
   // work at the moment they arrive.
-  { duration: 72, groups: [                                       // 1419 HP
+  { duration: 45, groups: [                                       // 1419 HP
     { at: 0,   count: 6, interval: 0.5, health: 22 },
     { at: 1.5, count: 5, interval: 1.1, type: "shielded", health: 22 },
     { at: 3,   count: 6, interval: 1,   type: "angry",    health: 30 },
@@ -1402,7 +1402,7 @@ var NORMAL_WAVES = [
   // the run for a board that never bought upward reach -- which is the shape
   // Easy's wave 24 has at 90 points, said in a campaign where the player has
   // had thirteen waves of notice.
-  { duration: 52, groups: [                                       // 288 HP  PURE
+  { duration: 31, groups: [                                       // 288 HP  PURE
     { at: 0, count: 6, interval: 0.4,  type: "flying", health: 16 },
     { at: 4, count: 6, interval: 0.35, type: "flying", health: 16 },
     { at: 8, count: 6, interval: 0.3,  type: "flying", health: 16 }
@@ -1424,7 +1424,7 @@ var NORMAL_WAVES = [
   // The Shieldbearer is two and a half seconds AHEAD of the Colossus so the
   // spike walks in already propped up, and the second pair arrives six seconds
   // behind it so the propping does not stop.
-  { duration: 85, groups: [                                       // 1918 HP
+  { duration: 49, groups: [                                       // 1918 HP
     { at: 0,   count: 6, interval: 0.75, type: "slow",         health: 34 },
     { at: 1.5, count: 4, interval: 0.65, type: "armored",      health: 20 },
     { at: 3,   count: 1, interval: 2.5,  type: "shieldbearer", health: 140 },
@@ -1456,7 +1456,7 @@ var NORMAL_WAVES = [
   // different enemy from the one wave 20 taught and the one the index
   // describes. The bounty follows the health through Enemy.bountyOf on its
   // own, which is the economy rule this schedule already lives under.
-  { duration: 88, groups: [                                       // 1154 HP
+  { duration: 49, groups: [                                       // 1154 HP
     { at: 0,   count: 1, interval: 5,    type: "hive",         health: 210 },
     { at: 1,   count: 8, interval: 0.13, type: "swarm",        health: 6 },
     { at: 2,   count: 1, interval: 3,    type: "shieldbearer", health: 150 },
@@ -1481,7 +1481,7 @@ var NORMAL_WAVES = [
   // resolves against the board rather than on top of thirty-two other things.
   // That is the same beat Easy's wave 25 buys for the same rung, and it is
   // bought here with an absolute `at` rather than with a gap that drifts.
-  { duration: 90, groups: [                                       // 1192 HP
+  { duration: 47, groups: [                                       // 1192 HP
     { at: 0,   count: 8, interval: 0.3, type: "fast",    health: 18 },
     { at: 1.5, count: 8, interval: 0.6, type: "armored", health: 22 },
     { at: 3,   count: 1, interval: 1,   type: "herald" },
@@ -1496,7 +1496,7 @@ var NORMAL_WAVES = [
   // does nothing at all about eight Camo Heavies behind 5 flat armor and 20%
   // defense -- seeing it and hurting it are two separate purchases, and this is
   // the wave that charges for both. All camo, so the Smasher rule holds.
-  { duration: 70, groups: [                                       // 1080 HP  ALL CAMO
+  { duration: 35, groups: [                                       // 1080 HP  ALL CAMO
     { at: 0,   count: 6, interval: 0.85, type: "camo_normal", health: 30 },
     { at: 1.5, count: 4, interval: 1.5,  type: "camo_heavy",  health: 75 },
     { at: 5,   count: 3, interval: 0.32, type: "camo_fast",   health: 20 },
@@ -1506,7 +1506,7 @@ var NORMAL_WAVES = [
   ] },
 
   // --- ACT V, 29-35: the finale. 243 bodies. -----------------------------
-  { duration: 95, groups: [                                       // 3156 HP
+  { duration: 46, groups: [                                       // 3156 HP
     { at: 0,   count: 7, interval: 0.9, type: "shielded",     health: 28 },
     { at: 1.5, count: 1, interval: 2.5, type: "shieldbearer", health: 160 },
     { at: 3,   count: 1, interval: 1,   type: "colossus" },
@@ -1537,7 +1537,7 @@ var NORMAL_WAVES = [
   // all three; the Revenants come in three waves so their revivals are spread
   // rather than simultaneous. Aggregate composition: 3 Hives, 3 Shieldbearers,
   // 2 Healers, 10 Revenants, 12 Swarm.
-  { duration: 105, groups: [                                      // 2714 HP + broods + free shield
+  { duration: 48, groups: [                                      // 2714 HP + broods + free shield
     { at: 0,  count: 1, interval: 5,    type: "hive",         health: 230 },
     { at: 1,  count: 4, interval: 0.13, type: "swarm",        health: 7 },
     { at: 2,  count: 1, interval: 3,    type: "shieldbearer", health: 180 },
@@ -1584,7 +1584,7 @@ var NORMAL_WAVES = [
   // the composition: two seconds of a tower being dark is two seconds of
   // Angries hitting it unanswered, and the immunity window that stops three
   // Sappers stacking on one tower is exactly what spreads them across three.
-  { duration: 80, groups: [                                       // 831 HP
+  { duration: 49, groups: [                                       // 831 HP
     { at: 0,   count: 7, interval: 0.28, type: "fast",     health: 20 },
     { at: 3,   count: 4, interval: 1.1,  type: "angry",    health: 40 },
     { at: 4,   count: 1, interval: 2,    type: "sapper" },
@@ -1609,7 +1609,7 @@ var NORMAL_WAVES = [
   // a road that is otherwise emptying. The two Heralds are on the escort and
   // cannot touch the slime: `excludeFractal` covers every tier AND every
   // descendant, so one pulse cannot compound through 341 bodies.
-  { duration: 100, groups: [                                      // 1608 HP
+  { duration: 42, groups: [                                      // 1608 HP
     { at: 0,  count: 7, interval: 0.55, type: "armored", health: 26 },
     { at: 1,  count: 8, interval: 0.13, type: "swarm",   health: 8 },
     { at: 2,  count: 3, interval: 2,    type: "brute",   health: 110 },
@@ -1626,7 +1626,7 @@ var NORMAL_WAVES = [
   // Smasher rule survives a wave that is not pure camo -- a detectionless,
   // ground-bound swing has nothing in it to start on. Four Camo Heavies at 60
   // points apiece are what makes it a bill rather than a checklist.
-  { duration: 75, groups: [                                       // 852 HP
+  { duration: 30, groups: [                                       // 852 HP
     { at: 0,  count: 6, interval: 0.4, type: "flying",     health: 28 },
     { at: 2,  count: 4, interval: 0.3, type: "camo_fast",  health: 22 },
     { at: 4,  count: 2, interval: 1.6, type: "camo_heavy", health: 85 },
@@ -1649,7 +1649,7 @@ var NORMAL_WAVES = [
   // Everything else in the wave -- the swarm they sprint through, the Herald on
   // the escort, the Shieldbearers stacking another 40 onto whichever of them is
   // strongest, the single Healer -- is cover for that one question.
-  { duration: 115, groups: [                                      // 4062 HP
+  { duration: 43, groups: [                                      // 4062 HP
     { at: 0,  count: 11, interval: 0.13, type: "swarm",        health: 9 },
     { at: 1,  count: 1,  interval: 3,    type: "shieldbearer", health: 190 },
     { at: 2,  count: 1,  interval: 1,    type: "herald" },
@@ -1710,7 +1710,7 @@ var NORMAL_WAVES = [
   // is the worst of those plus twenty-five seconds. Nothing about the wave's
   // composition or its group timing moved; the only new field is the ceiling,
   // and the finale's contract moved with it to wave 40.
-  { duration: 170, groups: [                                      // 8304 HP
+  { duration: 60, groups: [                                      // 8304 HP
     { at: 0,  count: 13, interval: 0.35, health: 36 },
     { at: 2,  count: 4,  interval: 0.5,  type: "flying",   health: 26 },
     { at: 4,  count: 1,  interval: 1,    type: "herald" },
@@ -1771,7 +1771,7 @@ var NORMAL_WAVES = [
   // than fifty seconds, which is what "a money wave" means in a game where idle
   // seconds earn nothing: the window cannot be farmed, so a long one costs the
   // schedule nothing and buys the player room to spend.
-  { duration: 95, groups: [                                       // 3612 HP
+  { duration: 84, groups: [                                       // 3612 HP
     { at: 0,  count: 1,  interval: 1,    type: "colossus", health: 700 },
     { at: 1,  count: 8,  interval: 0.7,                   health: 40 },
     { at: 5,  count: 8,  interval: 0.9,  type: "armored",  health: 40 },
@@ -1791,7 +1791,7 @@ var NORMAL_WAVES = [
   // instead of of coverage. The Brutes come in pairs behind every column now,
   // which is what turns "a tank walked past" into "a tank walked past and the
   // things behind it were still standing".
-  { duration: 105, groups: [                                      // 5752 HP
+  { duration: 87, groups: [                                      // 5752 HP
     { at: 0,  count: 1,  interval: 1,    type: "colossus", health: 750 },
     { at: 1,  count: 10, interval: 0.6,                   health: 44 },
     { at: 5,  count: 2,  interval: 1.5,  type: "brute",    health: 100 },
@@ -1816,7 +1816,7 @@ var NORMAL_WAVES = [
   // AND Swarm. It is the biggest single wave in either campaign at 102 bodies
   // and it is still, by construction, a wave nothing in it can silence a tower
   // with.
-  { duration: 120, groups: [                                      // 9024 HP
+  { duration: 90, groups: [                                      // 9024 HP
     { at: 0,  count: 2,  interval: 2,    type: "colossus", health: 800 },
     { at: 1,  count: 12, interval: 0.55,                  health: 48 },
     { at: 4,  count: 12, interval: 0.7,  type: "armored",  health: 48 },
@@ -1874,7 +1874,7 @@ var NORMAL_WAVES = [
   // carrying points. An idle second earns nothing in this game, so a ceiling
   // nobody reaches costs the schedule exactly nothing, while one that fires
   // early hands the player the 45 000 on top of an unfinished boss wave.
-  { duration: 290, groups: [                                      // 28 300 HP
+  { duration: 88, groups: [                                      // 28 300 HP
     // 0 s -- two Colossi, and the first half of the Bulwark screen with them.
     { at: 0,  count: 2,  interval: 3,    type: "colossus",     health: 1050 },
     { at: 1,  count: 4,  interval: 1.2,  type: "shielded",     health: 70 },

@@ -5833,6 +5833,81 @@ test("the board is one of the factors, and it moves the rating", function (t) {
     "and no road moves it by as much as a fifth");
 });
 
+// 2026-08-29, the owner's two conditions on Normal: "increase normal difficulty
+// so it becomes 1.5X also be sure it GET harder, don't make it impossible at
+// the start". All three are properties of the schedule, so all three are pinned
+// here rather than checked once and written down in prose.
+test("Normal is rated 1.50, and it got there on TIME rather than on health",
+function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var rating = g.Difficulty.rateDifficulty("normal", g.Maps.DEFAULT_ID).rating;
+
+  t.near(rating, 1.50, 0.02, "Normal rates 1.50 (" + rating.toFixed(3) + ")");
+
+  // HOW it got there is worth pinning too, because it is the non-obvious half.
+  // Raising a campaign's HEALTH raises its purse in lockstep -- bounties are
+  // priced off health -- so the rating barely moves: +14% health measured
+  // +0.04 rating. Its ceilings are the lever money cannot answer, and they are
+  // what moved. Normal's authored bodies are untouched.
+  t.eq(g.Difficulty.profileOf(g.NORMAL_WAVES).hp, 131595,
+    "not one point of scheduled health was added");
+  t.eq(g.Difficulty.profileOf(g.NORMAL_WAVES).bodies, 1321,
+    "and not one body");
+});
+
+test("Normal gets harder as it goes, and opens gentler than it ends",
+function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var rise = g.Difficulty.riseOf(g.NORMAL_WAVES);
+
+  // IN THIRDS, NOT WAVE BY WAVE, and that is deliberate: a campaign SHOULD
+  // have breather waves -- Normal's pure camo wave and its pure flight wave are
+  // both designed to be one -- and a monotonic-per-wave rule would forbid them.
+  // What has to rise is the trend.
+  t.ok(rise.rises, "each third is under more pressure than the last (" +
+    [rise.early, rise.mid, rise.late].map(function (v) {
+      return (v * 1000).toFixed(2); }).join(" -> ") + ")");
+  t.ok(rise.gentlestAtTheStart,
+    "and the opening third is the gentlest, which is the other half of the ask");
+  t.ok(rise.rise > 1.2, "the finish is meaningfully harder, not nominally (x" +
+    rise.rise.toFixed(2) + ")");
+
+  // IT USED TO FALL, which is why this test exists. Before the re-time the same
+  // three thirds measured 1.46 -> 0.95 -> 0.71: the purse outran the schedule
+  // and Normal got EASIER the further you went.
+  t.ok(rise.late > rise.early,
+    "the late third is no longer the easiest part of the campaign");
+});
+
+test("no wave was tightened past the room its own contents need", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  // THE FLOORS THE SUITE ITSELF ALREADY OWNS, restated here as the reason the
+  // re-time stopped where it did rather than going further. A Volatile's fuse
+  // needs room to resolve after the last diver, and the three money convoys are
+  // the waves a player is meant to have time to clear and bank. Both were
+  // found by the tests that own them, on the first attempt at this re-time.
+  var tight = [];
+  g.NORMAL_WAVES.forEach(function (wave, i) {
+    if (wave.duration === undefined) return;
+    var events = g.waveTimeline(wave);
+    var slack = wave.duration - events[events.length - 1].time;
+    var floor = 16;
+    if (g.waveGroups(wave).some(function (grp) { return grp.type === "volatile"; })) {
+      floor = 20;
+    }
+    if (i + 1 >= 36 && i + 1 <= 38) floor = 40;
+    if (slack < floor) {
+      tight.push("wave " + (i + 1) + ": " + slack.toFixed(1) + " s of room, needs " + floor);
+    }
+  });
+  t.eq(tight.join(" | "), "",
+    "every ceiling clears its last arrival by the room that wave needs");
+});
+
 test("an unmeasurable ask is rated 1 rather than NaN", function (t) {
   var h = harness.boot();
   var g = h.game;

@@ -44,6 +44,44 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — Normal is re-timed to a 1.50 rating, and its curve now rises.**
+
+Owner: *"increase normal difficulty so it becomes 1.5X also be sure it GET
+harder, don't make it impossible at the start"*. Three conditions, all three
+now measured and pinned rather than asserted.
+
+**It got easier as it went, and nothing could see that before.** The rating is
+one number for a whole campaign, so `Difficulty` grew a second reading:
+`pressure(n)` = required DPS at wave n over the purse the run has by then, in
+thirds. Normal measured **1.46 → 0.95 → 0.71** — its purse outgrew its schedule
+and the back half was the easiest part of the run.
+
+**Health is a weak lever; time is the strong one.** Bounties are priced off
+health, so adding HP adds purse in lockstep — measured, +14% scheduled health
+bought +0.04 rating. A wave's CEILING is the one term money cannot answer. So
+**not one point of scheduled health and not one body changed**; all forty
+ceilings did, and a test pins both of those zeros.
+
+The re-time holds the first twelve waves at +25% of their old ceiling — the
+opening is now *looser* than it was, which is the "not impossible at the start"
+half — and closes the slack on a square-root ramp to the finale. Normal reads
+**1.50**, thirds **1.18 → 1.26 → 1.50**, a ×1.28 rise, with the opening third
+the gentlest part of the campaign.
+
+**Two floors stopped it going further, and the suite already owned both.** A
+Volatile wave needs more than 20 s of ceiling after its last diver for the fuse
+to resolve; the three money convoys need 40 s, being the waves a player is
+meant to have time to clear and bank. The first attempt violated both and those
+tests caught it — no ceiling is now tighter than 16 s past its last arrival.
+
+Wave 35's ceiling moved 170 → 60 with the rest, so the two tests that pinned
+the literal 170 were updated: what they are for is that wave 35 HAS a ceiling,
+which is what stops it reading as the finale.
+
+A clear of Normal now pays 120 against Easy's 80, and its ladder is
+60/42/27/15/7. Easy is untouched and does NOT rise (0.72 → 0.85 → 0.68);
+nobody has asked for it to.
+
 **2026-08-29 — A difficulty function, and the meta rewards scale on it.**
 
 Owner: *"scale the normal game mode meta rewards on the easy mode meta

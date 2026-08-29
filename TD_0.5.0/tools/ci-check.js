@@ -826,7 +826,14 @@ var BASELINE = [
     // and milestone ids are untouched, a longer campaign gates on the same
     // fraction of itself, the ladder keeps its doubling, and each campaign
     // banks its own milestones).
-    file: "tests/content.test.js", pass: 311, fail: 0,
+    // ---- 314 on 2026-08-29, Normal re-timed to a 1.50 rating -------------
+    // 311 -> 314: three added. The rating landing on 1.50 and doing it on TIME
+    // rather than on health (not one point of scheduled HP was added), the
+    // curve RISING third over third where it used to fall, and no ceiling
+    // being tightened past the room its own contents need -- the Volatile
+    // fuse and the money convoys, both floors the suite already owned and
+    // both of which caught the first attempt.
+    file: "tests/content.test.js", pass: 314, fail: 0,
     failing: []
   },
   {

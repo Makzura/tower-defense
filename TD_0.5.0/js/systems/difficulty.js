@@ -343,6 +343,86 @@ var Difficulty = (function () {
     return (analysis && analysis.score) || null;
   }
 
+  // --- the CURVE, which is a different question from the rating -------------
+  //
+  // 2026-08-29, the owner's second instruction: "be sure it GETS harder, don't
+  // make it impossible at the start". The rating is one number for a whole
+  // campaign and cannot answer either half of that -- a campaign that opens
+  // brutally and coasts to the finish rates the same as one that does the
+  // opposite, and Normal was measurably the FIRST of those.
+  //
+  // So: per wave, the same ask-over-give the rating is built from, in the one
+  // form that makes waves comparable to each other --
+  //
+  //     pressure(n) = required DPS at wave n / the purse the run has by then
+  //
+  // Required DPS is `waveEffectiveHealth / waveSeconds`, and the purse is every
+  // coin the run has been paid up to and including that wave, through the same
+  // four reward functions the game pays them with. A rising `pressure` means
+  // the campaign is outrunning the player's wallet; a falling one means the
+  // wallet is outrunning the campaign, which is what "it gets easier" is.
+  function curveOf(schedule) {
+    if (!schedule || !schedule.length || !available()) return [];
+    var effectiveHealth = readGlobal("waveEffectiveHealth");
+    var killBounty = readGlobal("waveKillBounty");
+    var clearBounty = readGlobal("waveBounty");
+    var progression = readGlobal("waveProgressionReward");
+    var escalating = readGlobal("waveEscalatingReward");
+
+    var purse = readGlobal("STARTING_CASH") || 0;
+    var out = [];
+    for (var i = 0; i < schedule.length; i++) {
+      var wave = schedule[i];
+      var number = i + 1;
+      var hp = effectiveHealth(wave);
+      var seconds = waveSeconds(wave);
+      purse += killBounty(wave) + clearBounty(wave) +
+        progression(number) + escalating(number);
+      out.push({
+        wave: number,
+        hp: hp,
+        seconds: seconds,
+        purse: purse,
+        demand: hp / seconds,
+        pressure: purse > 0 ? (hp / seconds) / purse : 0
+      });
+    }
+    return out;
+  }
+
+  // Does it get harder? Answered in THIRDS rather than wave by wave, and that
+  // is a design decision rather than a statistical convenience: a campaign
+  // SHOULD have breather waves -- Normal's pure camo wave, its pure flight
+  // wave -- and a monotonic-per-wave rule would forbid them. What must rise is
+  // the trend.
+  //
+  // THE LAST WAVE IS EXCLUDED, always. A finale carries no `duration` (there is
+  // no wave after it to hold up), so its span is its last arrival and its
+  // pressure is an order of magnitude above everything else -- Normal's reads
+  // eight where no other wave reaches two. Left in, it would swamp the late
+  // third and report any campaign as rising.
+  function riseOf(schedule) {
+    var curve = curveOf(schedule);
+    if (curve.length < 6) return null;
+    var body = curve.slice(0, curve.length - 1);
+    var third = Math.floor(body.length / 3);
+    function mean(rows) {
+      var total = 0;
+      for (var i = 0; i < rows.length; i++) total += rows[i].pressure;
+      return rows.length ? total / rows.length : 0;
+    }
+    var early = mean(body.slice(0, third));
+    var mid = mean(body.slice(third, third * 2));
+    var late = mean(body.slice(third * 2));
+    return {
+      early: early, mid: mid, late: late,
+      rise: early > 0 ? late / early : 0,
+      // The two halves of the owner's brief, as booleans a test can hold.
+      rises: late > mid && mid > early,
+      gentlestAtTheStart: early <= mid && early <= late
+    };
+  }
+
   // --- the rating -----------------------------------------------------------
   //
   // Returns the number AND every factor behind it, because a single number
@@ -427,6 +507,8 @@ var Difficulty = (function () {
     factors: function () { return FACTORS.slice(); },
     rate: rate,
     rateDifficulty: rateDifficulty,
+    curveOf: curveOf,
+    riseOf: riseOf,
     scaleFor: scaleFor,
     reset: reset
   };

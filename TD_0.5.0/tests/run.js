@@ -2461,7 +2461,15 @@ function (t) {
   t.eq(Math.round(health), 39139, "and their 39 139 effective HP with them");
 
   // The ceiling wave 35 grew, and the fact that it is the ONLY one it grew.
-  t.eq(N[34].duration, 170, "wave 35 now carries a ceiling");
+  // 170 UNTIL 2026-08-29, when every ceiling in Normal was re-timed to raise
+  // the campaign to a 1.50 rating and make its curve RISE (js/systems/
+  // difficulty.js). What this line is FOR is unchanged and is the next
+  // assertion's business too: wave 35 stopped being the finale when the
+  // campaign grew to forty, so it has a ceiling like every other wave.
+  // Asserted as "has one, and it is not the finale's absent one" plus the
+  // measured value, so a re-time updates one number here rather than losing
+  // the claim.
+  t.eq(N[34].duration, 60, "wave 35 carries a ceiling of its own");
   var missing = [];
   for (var j = 0; j < 39; j++) {
     if (N[j].duration === undefined) missing.push(j + 1);
@@ -2768,7 +2776,9 @@ function (t) {
 
   // IT IS AN ORDINARY WAVE NOW: a ceiling, a readable window, and a Send button
   // once it has finished arriving.
-  t.eq(h.game.WAVES[34].duration, 170, "wave 35 carries its ceiling");
+  // Re-timed 170 -> 60 on 2026-08-29 with the rest of Normal's ceilings; the
+  // claim is that it HAS one, which is what stops it reading as the finale.
+  t.eq(h.game.WAVES[34].duration, 60, "wave 35 carries its ceiling");
   t.ok(h.run("waveTimeRemaining()") > 0, "so the readout has a number to print");
   t.ok(h.run("waveStatusText()").indexOf("FINAL WAVE") === -1,
     "and it does not claim to be the final wave (" + h.run("waveStatusText()") + ")");
