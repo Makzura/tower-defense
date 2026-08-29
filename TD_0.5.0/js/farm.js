@@ -109,7 +109,17 @@ function FarmTower(x, y, path) {
   this.lastRoll = -1;        // C3/C4: the network threw its dice
   this.lastClone = -1;       // A4: the stock cloned itself at a wave boundary
   this.lastWithdraw = -1;    // A4: the player collected the stock
-  this.lastGain = -1;        // B4: the field granted the base its hit points
+  this.lastGain = -1;        // B4/B5: the field granted the base its hit points
+  this.lastEmpower = -1;     // A5: an investment was aimed at a tower
+  this.lastExecute = -1;     // B5: the field executed something outright
+  this.lastPrep = -1;        // C5: a prep effect was recorded or spent
+  // WHICH prep clip, as a name, for the same reason `rollOutcome` is a name:
+  // the C5 table is what knows a face 13 from a face 22, and a renderer that
+  // re-read the table would be the table in two places.
+  this.prepClip = null;
+  // Whether this farm's investment was the permanent one, so A5 can tell its
+  // two empower clips apart. Set beside `lastEmpower` and read with it.
+  this.empowerTemporary = false;
   // WHAT THE LAST THROW MEANT, as a clip name or null -- `result_positive`,
   // `result_negative`, `result_reset`, `critical_success`, `critical_failure`.
   // C4's model has a body for each, and the network already knows which one
@@ -701,6 +711,10 @@ FarmTower.prototype.invest = function (target, temporary) {
     this.investedTranches += n;
     FarmBoost.grant(target, n * FarmTower.TRANCHE_BONUS, false);
   }
+  // The vault engine has a clip for each: a long beam for the permanent one,
+  // a short bright burst for the surge. Same stamp, one flag to tell them apart.
+  this.lastEmpower = this.animClock;
+  this.empowerTemporary = !!temporary;
   return null;
 };
 
@@ -1520,7 +1534,19 @@ var Farms = (function () {
     if (!f || !f.executes) return false;
     var threshold = Math.max(FarmTower.EXECUTE_FLAT,
       (enemy.maxHealth || 0) * FarmTower.EXECUTE_FRACTION);
-    return enemy.health > 0 && enemy.health < threshold;
+    if (!(enemy.health > 0 && enemy.health < threshold)) return false;
+    // THE PANOPTICON FIRES ITS BEAM WHEN THE FIELD ACTUALLY TAKES SOMETHING.
+    // Stamped on every farm whose circle covers the body and that carries the
+    // execution -- `fieldAt` already established that one does, and several may.
+    // The answer is unchanged either way: this only records the moment.
+    for (var i = 0; i < list.length; i++) {
+      var farm = list[i];
+      if (!farm.executes) continue;
+      if (farm.isDestroyed && farm.isDestroyed()) continue;
+      if (!farm.covers(enemy.pos.x, enemy.pos.y)) continue;
+      farm.lastExecute = farm.animClock;
+    }
+    return true;
   }
 
   // --- kills in range -------------------------------------------------------
@@ -1636,6 +1662,15 @@ var Farms = (function () {
       if (!face) continue;
       if (face.reset) reset = true;
       if (face.double) double = true;
+    }
+    // THE C5 TABLE HAS ITS OWN TWO DOUBLES, and the T5 body has a clip for each:
+    // face 21 arms the next one, face 22 purges everything under nine AND arms
+    // it. A C3 or C4 double has no such face and stays the generic critical.
+    if (faces.indexOf(22) !== -1 && farm.diceTable === "C5") {
+      return "result_22_purge_double";
+    }
+    if (faces.indexOf(21) !== -1 && farm.diceTable === "C5") {
+      return "result_21_double";
     }
     if (double) return "critical_success";
     if (reset) return "result_reset";
@@ -1763,6 +1798,17 @@ var Farms = (function () {
   //   5. what survives is sorted
   //   6. and resolved low to high
   // Steps 5 and 6 are the caller's; 1 to 4 are here.
+  // WHICH PREP CLIP A FARM SHOULD PLAY, stamped on the farms that own the die
+  // the effect touched. The C5 body has a clip for every one of these -- a
+  // reroll, a purge of everything under nine, a double armed for next time --
+  // and until T5 there was nowhere to play them, which is why they were the
+  // four documented as unwired on C4.
+  function stampPrep(farm, clip) {
+    if (!farm) return;
+    farm.lastPrep = farm.animClock;
+    farm.prepClip = clip;
+  }
+
   function applyPrep(rolls, hasC5) {
     var i;
 
@@ -1771,12 +1817,15 @@ var Farms = (function () {
       if (rolls[i].n !== 8) continue;
       rolls[i].n = rollDie(FarmDice.sides(rolls[i].table));
       rerolls--;
+      // The die that was rescued is the one that respins on screen.
+      stampPrep(rolls[i].farm, "reroll_eight");
     }
 
     var bonuses = prep.dieBonuses.slice();
     for (i = 0; i < rolls.length && bonuses.length; i++) {
       if (rolls[i].table !== "C5") continue;      // C5 dice only, per the brief
       var add = bonuses.shift();
+      stampPrep(rolls[i].farm, "pre_roll_modifiers");
       var sides = FarmDice.sides(rolls[i].table);
       var moved = Math.min(sides, rolls[i].n + add);
       // A +2 THAT LANDS EXACTLY ON 8 BECOMES 9. Only a +2: the brief names the
@@ -1786,6 +1835,10 @@ var Farms = (function () {
     }
 
     if (prep.cullBelow9) {
+      // Every member sweeps its board clean, not just the farms that lost a
+      // die: the purge is a state of the whole next series, and the model shows
+      // it as sectors sinking on the table.
+      for (i = 0; i < rolls.length; i++) stampPrep(rolls[i].farm, "purge_under_nine");
       rolls = rolls.filter(function (r) { return r.n >= 9; });
     }
 
@@ -1816,6 +1869,11 @@ var Farms = (function () {
       }
       if (f.prep.dieBonus) pending.dieBonuses.push(f.prep.dieBonus);
       if (f.prep.cullBelow9) pending.cullBelow9 = true;
+      // RECORDING one is `queue_modifier`; SPENDING it next wave is one of the
+      // clips `applyPrep` stamps. The C5 body shows the two halves differently
+      // -- a plaque sliding into its slot, then firing -- so they are two
+      // moments and not one.
+      stampPrep(entry.farm, "queue_modifier");
     }
 
     if (f.nextFlat !== undefined) series.nextFlat += f.nextFlat;

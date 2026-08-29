@@ -13,6 +13,37 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The T5 farms, and the set is complete.** `farm-t5a` the Mana
+Vault Engine, `farm-t5b` the Azure Panopticon, `farm-t5c` The House Always Wins.
+Twelve of twelve bodies: a base, a shared T1 and T2, and one per path at T3, T4
+and T5. Nothing falls back to a lower tier's model any more.
+
+**The T5 clips reach mechanics the earlier bodies could not show.** A5's two
+investments are separate clips — a long beam for the permanent boost, a short
+burst for the surge — told apart by a flag beside the shared stamp, because they
+are one press with two costs. B5 has `execute`, stamped inside `Farms.executes`
+on every farm whose field actually took the body. And C5 has a body for each of
+its own faces.
+
+**The four clips that shipped unwired on C4 are wired here.** Recording a prep
+effect and spending it are two moments and T5-C draws them differently: a plaque
+sliding into its slot, then firing. `resolve` stamps `queue_modifier` when a
+face banks one; `applyPrep` stamps `reroll_eight`, `purge_under_nine` or
+`pre_roll_modifiers` when the next series consumes it. C4 keeps its own four
+unplayed — its model has no such states to land in, and a farm wearing it has
+not bought C5 anyway.
+
+**The C5 table's two doubles name themselves.** Face 21 arms the next one, face
+22 purges everything under nine as well, and each has a clip; a C3 or C4 double
+has no such face and stays the generic critical. `outcomeOf` checks the numbers
+only when the farm's table IS `C5`.
+
+Measured in the running game: 8 069 tower pixels drawn across the three, and
+every clip visibly taking over from its idle — 351 px for A5's tick, 356 and 347
+for the two empowers (different clips, as intended), 1 112 for B5's execution
+peaking at 0.53 s, 930 for C5's three-second throw peaking at 0.93 s with the
+dice in flight. Twelve farm models, 7.4 MB, and the page still loads in 234 ms.
+
 **2026-08-29 — The farms have their colour, and they shine.** Owner: *"il n'y a
 pas de shine ni de couleur — le A path est censé avoir du violet, le C orange
 plus vibrant, le B briller quand il y a des interactions."* Two separate causes,

@@ -1350,15 +1350,96 @@ test("the throw names its own outcome, and the network agrees", function (t) {
   t.eq(f.rollOutcome, "result_reset", "the reset face names itself");
 });
 
-test("a doubling face is a critical, whichever way P moved", function (t) {
+test("the C5 table's two doubles name themselves, and a plain one does not",
+function (t) {
   var h = boot();
   var g = h.game;
-  var f = farm(h, 600, 200, ["C1", "C2", "C3", "C4", "C5"]);
+  var five = farm(h, 600, 200, ["C1", "C2", "C3", "C4", "C5"]);
   h.run("Farms.setDie(function () { return 21; });");   // C5 face 21 doubles
   g.Farms.network.P = 1000;
   g.Farms.settleWave(1);
-  t.eq(f.rollOutcome, "critical_success", "doubling is the best thing a die does");
+  t.eq(five.rollOutcome, "result_21_double",
+    "face 21 has its own body on the T5 shrine, and arms the next double");
   t.eq(g.Farms.network.P, 8000, "three dice, three doublings");
+
+  // Face 22 doubles AND culls everything under nine next series.
+  h.run("Farms.setDie(function () { return 22; });");
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(2);
+  t.eq(five.rollOutcome, "result_22_purge_double", "and face 22 is the other one");
+  t.eq(g.Farms.prepState().cullBelow9, true, "which is a purge as well as a double");
+
+  // A C4 farm has no such faces: its double stays the generic critical.
+  h.run("towers.length = 0"); g.Farms.reset();
+  var four = farm(h, 700, 200, ["C1", "C2", "C3", "C4"]);
+  h.run("Farms.setDie(function () { return 20; });");
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(1);
+  t.ok(four.rollOutcome !== "result_21_double" &&
+       four.rollOutcome !== "result_22_purge_double",
+    "a C4 never names a C5 face: " + four.rollOutcome);
+});
+
+test("A5 tells its two investments apart", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  var five = tierFiveTower(h, 900, 300);
+  t.eq(f.lastEmpower, -1, "nothing empowered yet");
+
+  f.stock = 100000; f.animClock = 4;
+  t.eq(f.invest(five, false), null, "a permanent boost");
+  t.near(f.lastEmpower, 4, 1e-9, "is stamped");
+  t.eq(f.empowerTemporary, false, "and marked as the long beam");
+
+  var other = tierFiveTower(h, 1000, 400);
+  f.stock = 100000; f.animClock = 9;
+  t.eq(f.invest(other, true), null, "a surge");
+  t.near(f.lastEmpower, 9, 1e-9, "is stamped on the same field");
+  t.eq(f.empowerTemporary, true, "and marked as the burst");
+});
+
+test("B5's execution is stamped on the farm whose field took the body",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var near = farm(h, 600, 200, ["B1", "B2", "B3", "B4", "B5"]);
+  var far = farm(h, 600, 200 + g.ul(400), ["B1", "B2", "B3", "B4", "B5"]);
+  near.animClock = 11;
+  t.eq(near.executes, true, "B5 carries the execution");
+
+  var e = enemyAt(h, near.x + 4, near.y, 1000);
+  e.health = 1;                                  // well under the threshold
+  t.eq(g.Farms.executes(e), true, "the field takes it");
+  t.near(near.lastExecute, 11, 1e-9, "and the farm that did it says so");
+  t.eq(far.lastExecute, -1, "the one across the map does not");
+});
+
+test("C5's prep effects are named as they are recorded and spent", function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["C1", "C2", "C3", "C4", "C5"]);
+
+  // Face 13 records three rerolls: that is a modifier being QUEUED.
+  h.run("Farms.setDie(function () { return 13; });");
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(1);
+  t.eq(f.prepClip, "queue_modifier", "recording one queues a plaque");
+  t.eq(g.Farms.prepState().rerollEights, 3, "and the charges are held");
+
+  // Next wave the 8s are rescued: that is the die respinning.
+  h.run("__seq = [8,8,8,9,9,9]; __i = 0;" +
+        "Farms.setDie(function () { return __seq[__i++]; });");
+  g.Farms.settleWave(2);
+  t.eq(f.prepClip, "reroll_eight", "spending one respins the die that was saved");
+
+  // Face 22 arms a purge, and the next series sweeps the board.
+  h.run("Farms.setDie(function () { return 22; });");
+  g.Farms.network.P = 1000;
+  g.Farms.settleWave(3);
+  h.run("Farms.setDie(function () { return 3; });");
+  g.Farms.settleWave(4);
+  t.eq(f.prepClip, "purge_under_nine", "and the purge is its own clip");
 });
 
 test("every model's one-shot clips are named by what fires them", function (t) {
@@ -1377,7 +1458,17 @@ test("every model's one-shot clips are named by what fires them", function (t) {
     "farm-t4c": ["idle_fate", "queue_fate", "pre_roll_modifier", "end_wave_roll",
                  "reroll_eight_left", "reroll_eight_right", "result_positive",
                  "result_negative", "result_reset", "critical_success",
-                 "critical_failure"]
+                 "critical_failure"],
+    "farm-t5a": ["idle_vault", "produce_tick", "clone_wave", "target_acquire",
+                 "empower_permanent", "empower_temporary", "withdraw_mana"],
+    "farm-t5b": ["idle_panopticon", "field_aura", "target_lock", "mark_debuff",
+                 "kill_capture", "execute", "wave_gain"],
+    "farm-t5c": ["idle_casino", "queue_modifier", "pre_roll_modifiers",
+                 "end_wave_roll", "reroll_eight", "purge_under_nine",
+                 "double_next", "result_positive", "result_negative",
+                 "result_reset", "result_critical_failure",
+                 "result_critical_success", "result_21_double",
+                 "result_22_purge_double"]
   };
   Object.keys(expected).forEach(function (id) {
     var raw = g.GLModels && g.GLModels.raw ? g.GLModels.raw(id) : null;

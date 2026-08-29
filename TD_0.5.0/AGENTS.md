@@ -6620,14 +6620,16 @@ A2/B2/C2, and one each for A3-A5, B3-B5 and C3-C5. **No crosspath ever gets a
 model of its own** — a Farm with a main path at T3+ wears that path's body and
 its secondary T1/T2 add no overlay.
 
-**Nine are built**, imported from Claude Design. `farm-base` is a stone mana well
+**All twelve are built**, imported from Claude Design. `farm-base` is a stone mana well
 with a crank, a pulley, a rope and a bucket, and a novice working it; `farm-t1`
 is a hand pump with a lever, a piston, a hose and a bottle; `farm-t2` is that
 pump reinforced with a flywheel and a pressure tank (all three 2026-08-28). Then
 the three T3 bodies, one per path (2026-08-29): `farm-t3a` a relic piston
 refinery, `farm-t3b` a targeting array on a gimbal, `farm-t3c` a d20 fate altar.
 Then the three T4s the same day: `farm-t4a` a storage-and-cloning generator,
-`farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate manipulator.
+`farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate manipulator. And
+the T5s that finish the set: `farm-t5a` the Mana Vault Engine, `farm-t5b` the
+Azure Panopticon, `farm-t5c` The House Always Wins.
 
 `farmGroup` in gl-world answers with **the highest model that has been
 AUTHORED**, not the highest tier bought, so a T5 on path B wears `farm-t3b`
@@ -6656,6 +6658,29 @@ AND one-shots, and each one-shot depicts something the tower already does:
 | | | `result_positive/negative` | what that throw did to P |
 | | | `result_reset` 1 s | a reset face (8) |
 | | | `critical_success/failure` | a doubling face, or P halved |
+| `farm-t5a` | `idle_vault` 6 s | `produce_tick` · `clone_wave` · `withdraw_mana` | as A4 |
+| | | `empower_permanent` 3.4 s | A5's permanent investment |
+| | | `empower_temporary` 2.2 s | A5's surge |
+| `farm-t5b` | `idle_panopticon` 10 s | `field_aura` 2 s | *a second IDLE, as B4's* |
+| | | `target_lock` · `kill_capture` · `wave_gain` | as B4 |
+| | | `execute` 1.25 s | B5 taking a body outright |
+| `farm-t5c` | `idle_casino` 6 s | `end_wave_roll` 3 s | the C network rolling |
+| | | `queue_modifier` 0.9 s | a face RECORDING a prep effect |
+| | | `reroll_eight` · `purge_under_nine` · `pre_roll_modifiers` | one being SPENT |
+| | | `result_21_double` · `result_22_purge_double` | the C5 table's own doubles |
+| | | the other `result_*` | as C4 |
+
+**RECORDING A PREP EFFECT AND SPENDING IT ARE TWO MOMENTS**, and T5-C draws them
+differently — a plaque sliding into its slot, then firing. `resolve` stamps
+`queue_modifier` when a face banks one; `applyPrep` stamps `reroll_eight`,
+`purge_under_nine` or `pre_roll_modifiers` when the next series consumes it.
+These are the four clips that shipped on C4 with nowhere to play: T5's body has
+the states they describe, so they are wired now.
+
+**THE C5 TABLE HAS ITS OWN TWO DOUBLES.** Face 21 arms the next one and face 22
+purges everything under nine as well, and the T5 body has a clip for each; a C3
+or C4 double has no such face and stays the generic `critical_success`.
+`outcomeOf` checks the face numbers, and only when the farm's table IS `C5`.
 
 **`field_pulse` IS A SECOND IDLE, NOT A ONE-SHOT.** It is a seamless 1.5 s loop,
 and it replaces band 0 for as long as B4's zone holds a body — which the tower
@@ -6671,16 +6696,15 @@ is a bigger loss than any other face can deal, so testing the halving first woul
 swallow it and play a generic catastrophe where the shrine has a body for exactly
 that. The renderer never re-reads a face table.
 
-**FOUR OF C4's ELEVEN CLIPS ARE NOT WIRED YET**: `queue_fate`,
-`pre_roll_modifier` and the two `reroll_eight_*`. They belong to C5's prep
-effects — the face-13 reroll, the +1/+2 die bonuses, the face-22 cull — which
-the network records but does not yet attribute to one farm's die. They ship in
-the model and simply never play, which is the same shape as a missing tier's
-model: nothing fake, nothing broken.
+**C4's four unwired clips are wired on T5-C**, where the same effects have
+bodies that show the resulting STATE — a queued plaque, purged sectors, an armed
+double. C4 keeps its own four unplayed, because its model has no such states to
+land in and a farm wearing it has not bought C5 anyway.
 
 **THE SIMULATION RECORDS *WHEN*, THE RENDERER DECIDES *WHETHER*.** `lastTick`,
-`lastLock`, `lastCapture`, `lastRoll`, `lastClone`, `lastWithdraw` and
-`lastGain` are animClock stamps on the tower, -1 for never — 0 is a real moment and a farm paid on its first step would otherwise
+`lastLock`, `lastCapture`, `lastRoll`, `lastClone`, `lastWithdraw`, `lastGain`,
+`lastExecute`, `lastEmpower` and `lastPrep` are animClock stamps on the tower,
+-1 for never — 0 is a real moment and a farm paid on its first step would otherwise
 play its tick at birth. `farmFrame` in gl-world picks the most recent one-shot
 still inside its own duration, else the idle. One-way, exactly like
 `swingProgress` and `gearPhase`: nothing simulated reads any of it back.
