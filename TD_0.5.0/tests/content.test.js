@@ -5754,6 +5754,201 @@ test("every route draws a full frame without throwing", function (t) {
 });
 
 
+group("difficulty: rating a campaign, and paying for it");
+
+// 2026-08-29, the owner's brief: "scale according to difficulty. find online or
+// create a difficulty function that takes into account map, bodies, hp, wave
+// count, money". js/systems/difficulty.js is that function. These tests own two
+// claims about it: that it is NORMALISED (the reference reads exactly 1.00, so
+// "scale on Easy" means what it says) and that it is DERIVED (every factor is
+// measured off the schedules and the board, so retuning either moves it).
+
+test("the reference campaign on the reference board rates exactly 1", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var r = g.Difficulty.rateDifficulty("easy", g.Maps.DEFAULT_ID);
+
+  t.eq(r.rating, 1, "Easy on the default board is the unit");
+  t.ok(r.factors.length >= 6, "and it says so factor by factor (" +
+    r.factors.length + " of them)");
+  r.factors.forEach(function (f) {
+    t.eq(f.ratio, 1, f.label + " is 1 against itself");
+    t.ok(typeof f.note === "string" && f.note.length > 0,
+      f.label + " says what it measures");
+  });
+});
+
+test("a heavier campaign rates higher, and every factor is derived", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var easy = g.Difficulty.rateDifficulty("easy", g.Maps.DEFAULT_ID);
+  var normal = g.Difficulty.rateDifficulty("normal", g.Maps.DEFAULT_ID);
+
+  t.ok(normal.rating > easy.rating,
+    "Normal is rated harder than Easy (" + normal.rating.toFixed(3) + ")");
+
+  // NOT THE RAW HP RATIO, and this is the whole point of the function rather
+  // than a division. Normal carries 5.07x Easy's effective HP and would be
+  // rated absurdly if that were the measure -- it also pays 2.80x the purse.
+  var hpRatio = normal.profile.hp / easy.profile.hp;
+  t.ok(hpRatio > 5, "Normal really does carry five times the HP (" +
+    hpRatio.toFixed(2) + "x)");
+  t.ok(normal.rating < hpRatio / 2,
+    "and is rated far below that, because it pays for itself");
+
+  var byKey = {};
+  normal.factors.forEach(function (f) { byKey[f.key] = f; });
+  t.ok(byKey.demand.ratio > 1, "it demands more DPS");
+  t.ok(byKey.spike.ratio > 1, "its worst wave is worse");
+  t.ok(byKey.length.ratio > 1, "it is longer");
+  t.ok(byKey.fragility.ratio > 1, "and one leak costs more");
+  t.ok(byKey.relief.ratio < 1, "but the purse is bigger, which pulls it DOWN");
+  t.eq(byKey.map.ratio, 1, "and the board is the reference one, so it says nothing");
+
+  // The rating is the geometric mean of exactly those, and nothing else.
+  var product = normal.factors.reduce(function (a, f) { return a * f.ratio; }, 1);
+  t.near(normal.rating, Math.pow(product, 1 / normal.factors.length), 1e-9,
+    "the rating IS the geometric mean of its factors");
+});
+
+test("the board is one of the factors, and it moves the rating", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  var scores = g.Maps.LIST.map(function (m) {
+    return { id: m.id, rating: g.Difficulty.rateDifficulty("easy", m.id).rating,
+             board: g.Maps.analyse(g.Maps.byId(m.id)).score };
+  });
+  var hardest = scores.slice().sort(function (a, b) { return b.board - a.board; })[0];
+  var easiest = scores.slice().sort(function (a, b) { return a.board - b.board; })[0];
+
+  t.ok(hardest.rating > easiest.rating,
+    "the same campaign rates harder on the harder road (" + hardest.id + " " +
+    hardest.rating.toFixed(3) + " against " + easiest.id + " " +
+    easiest.rating.toFixed(3) + ")");
+  // A ROAD IS A NUDGE, NOT A CAMPAIGN. Every board sits inside a few per cent,
+  // because `Maps.analyse` is already normalised against a straight reference
+  // road -- so a route can never be worth more than a difficulty.
+  t.ok(hardest.rating / easiest.rating < 1.2,
+    "and no road moves it by as much as a fifth");
+});
+
+test("an unmeasurable ask is rated 1 rather than NaN", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  t.eq(g.Difficulty.rateDifficulty("no-such-difficulty").rating, 1,
+    "an unknown campaign is the reference's own value");
+  t.eq(g.Difficulty.rate([]).rating, 1, "and so is an empty schedule");
+  t.eq(g.Difficulty.rate(null).rating, 1, "and so is none at all");
+});
+
+// --- and what it is for --------------------------------------------------
+
+test("Easy's authored reward tables are untouched by the scaling", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var M = g.MetaProgress;
+  var map = g.Maps.DEFAULT_ID;
+
+  t.deep(M.tiersFor("easy", map), M.repeatableTiers(),
+    "the ladder Easy is paid IS the authored ladder");
+  t.eq(M.victoryCoinsFor("easy", map), M.victoryCoins(), "and its clear");
+  t.eq(M.firstWinCoinsFor("easy", map), M.firstWinCoins(), "and its first clear");
+  t.deep(M.milestonesFor("easy", map).map(function (m) { return m.id; }),
+    M.milestoneTable().map(function (m) { return m.id; }),
+    "and its milestone ids, which is a SAVE-COMPATIBILITY rule: a profile that " +
+    "has already claimed reach_11 must not be handed it again");
+  t.deep(M.milestonesFor("easy", map).map(function (m) { return m.label; }),
+    M.milestoneTable().map(function (m) { return m.label; }),
+    "and even their wording");
+});
+
+test("a longer campaign gates on the same FRACTION of itself", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var M = g.MetaProgress;
+  var map = g.Maps.DEFAULT_ID;
+
+  var easyWaves = g.difficultyOf("easy").waves.length;
+  var normalWaves = g.difficultyOf("normal").waves.length;
+  t.eq(M.waveScale("normal"), normalWaves / easyWaves,
+    "the threshold scale is the wave count and nothing else");
+
+  var easyTiers = M.tiersFor("easy", map);
+  var normalTiers = M.tiersFor("normal", map);
+  easyTiers.forEach(function (tier, i) {
+    var want = Math.round(tier.atLeast * normalWaves / easyWaves);
+    t.eq(normalTiers[i].atLeast, want,
+      "Easy's wave " + tier.atLeast + " rung sits at Normal's " + want);
+  });
+
+  // The top rung is the last one before the finale on BOTH, which is the
+  // property the fractions exist to preserve.
+  t.eq(easyWaves - easyTiers[0].atLeast, 5, "Easy's top rung is five waves out");
+  t.eq(normalWaves - normalTiers[0].atLeast, 6, "Normal's is six, of forty");
+});
+
+test("a harder campaign pays more, and the ladder keeps its doubling", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var M = g.MetaProgress;
+  var map = g.Maps.DEFAULT_ID;
+
+  var scale = M.coinScale("normal", map);
+  t.eq(scale, g.Difficulty.scaleFor("normal", map),
+    "the coin scale IS the difficulty rating, not a second number beside it");
+
+  t.ok(M.victoryCoinsFor("normal", map) > M.victoryCoinsFor("easy", map),
+    "a Normal clear is worth more than an Easy one (" +
+    M.victoryCoinsFor("normal", map) + " against " +
+    M.victoryCoinsFor("easy", map) + ")");
+
+  // THE DOUBLING SURVIVES. "A clear is worth exactly twice dying on the last
+  // wave" is the rule the whole ladder is built around, and scaling both sides
+  // by one number cannot break it.
+  ["easy", "normal"].forEach(function (id) {
+    var top = M.tiersFor(id, map)[0].coins;
+    var clear = M.victoryCoinsFor(id, map);
+    t.near(clear / top, 2, 0.05, id + ": a clear is twice the top rung (" +
+      clear + " against " + top + ")");
+  });
+});
+
+test("each campaign banks its own milestones, and they do not pay for each other",
+function (t) {
+  var h = harness.boot();
+  var M = h.game.MetaProgress;
+  var map = h.game.Maps.DEFAULT_ID;
+  h.run("MetaProgress.reset()");
+
+  // Reach the top of Easy. Its four milestones bank.
+  var easy = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true,
+                          mapId: map, difficultyId: "easy" });
+  t.eq(easy.objectives.filter(function (o) {
+    return o.id.indexOf("reach_") === 0;
+  }).length, 4, "all four of Easy's milestones bank at once");
+
+  // The same run again pays nothing one-time.
+  var again = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true,
+                           mapId: map, difficultyId: "easy" });
+  t.eq(again.objectives.length, 0, "and never again");
+
+  // Now Normal. Its own four are unclaimed, and they are DIFFERENT ids.
+  var normal = M.awardRun({ wavesCompleted: 40, waveReached: 40, victory: true,
+                            mapId: map, difficultyId: "normal" });
+  var banked = normal.objectives.map(function (o) { return o.id; });
+  t.eq(banked.length, 4, "Normal's four are still there to earn");
+  banked.forEach(function (id) {
+    t.ok(id.indexOf("normal:") === 0, "under its own id (" + id + ")");
+  });
+  t.ok(normal.objectives[0].label.indexOf("on Normal") !== -1,
+    "and its label says which campaign: " + normal.objectives[0].label);
+
+  var third = M.awardRun({ wavesCompleted: 40, waveReached: 40, victory: true,
+                           mapId: map, difficultyId: "normal" });
+  t.eq(third.objectives.length, 0, "and they are once for the life of the save too");
+});
+
 group("meta progression: coins, the store, the inventory");
 
 // Every test here resets the profile first. There is no localStorage under
@@ -5877,10 +6072,23 @@ function (t) {
   var h = harness.boot();
   var M = h.game.MetaProgress;
   h.run("MetaProgress.reset()");
+  // THE AUTHORED NUMBERS ARE THE DEFAULT BOARD'S (2026-08-29). Since coins are
+  // priced through `Difficulty`, which reads the road as well as the campaign,
+  // "a clear pays 80" is a statement about Easy on `Maps.DEFAULT_ID` -- the
+  // reference, where every factor is 1.00 by construction. Rune Circuit rates a
+  // shade harder and pays a shade more, which is the feature.
+  var onDefault = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true,
+                               mapId: h.game.Maps.DEFAULT_ID, mapName: "default" });
+  t.eq(onDefault.repeatable, 80, "on the reference board a clear pays the authored 80");
+  t.eq(onDefault.total, 175, "and a first full clear on a fresh save is 175");
+
+  h.run("MetaProgress.reset()");
   var r = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true,
                        mapId: "rune-circuit", mapName: "Rune Circuit" });
-  t.eq(r.total, 175, "a first full clear on a fresh save and a new route is 175");
-  t.eq(r.repeatable, 80, "80 of it is the clear itself");
+  t.eq(r.repeatable, M.victoryCoinsFor("easy", "rune-circuit"),
+    "on another road it pays what that road is rated (" + r.repeatable + ")");
+  t.ok(r.repeatable >= 76 && r.repeatable <= 84,
+    "which is within a few coins of the authored figure, never a different order");
   t.deep(r.bounties, [], "and the bounty slot is present and empty, ready for rotation");
 
   var summed = r.repeatable;
@@ -5908,11 +6116,23 @@ function (t) {
   var again = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true, mapId: "rune-circuit" });
   var b = M.awardRun({ wavesCompleted: 35, waveReached: 35, victory: true, mapId: "mana-coil" });
 
-  t.eq(a.total, 175, "the first clear ever: 80 + four milestones + 25");
-  t.eq(again.total, 80, "the same route again pays the repeatable alone");
+  // The amounts are the ROUTE's since 2026-08-29 -- see the note in the test
+  // above -- so they are asked for rather than typed. What this test is about
+  // is which objectives fire and which do not, and that is unchanged.
+  var clearA = M.victoryCoinsFor("easy", "rune-circuit");
+  var clearB = M.victoryCoinsFor("easy", "mana-coil");
+  var onceA = M.milestonesFor("easy", "rune-circuit")
+    .reduce(function (sum, m) { return sum + m.coins; }, 0);
+
+  t.eq(a.total, clearA + onceA + M.firstWinCoinsFor("easy", "rune-circuit"),
+    "the first clear ever: the clear, four milestones and the route's own bonus");
+  t.eq(again.total, clearA, "the same route again pays the repeatable alone");
   t.eq(again.objectives.length, 0, "nothing one-time is left on it");
-  t.eq(b.total, 105, "a NEW route pays 80 + its own 25");
+  t.eq(b.total, clearB + M.firstWinCoinsFor("easy", "mana-coil"),
+    "a NEW route pays its clear and its own first-clear bonus");
   t.eq(b.objectives.length, 1, "and only that one");
+  t.ok(a.total > b.total,
+    "and the first run of all is worth more, because it banked the milestones");
   t.ok(win !== null, "");
 });
 

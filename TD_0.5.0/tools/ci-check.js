@@ -817,7 +817,16 @@ var BASELINE = [
     // claims -- that the ladder is still intact as a mechanic (and still spent
     // by Normal, which was not touched), and that the ten bodies that replaced
     // it stand where each root stood at the weight each root had.
-    file: "tests/content.test.js", pass: 303, fail: 0,
+    // ---- 311 on 2026-08-29, the difficulty function ----------------------
+    // 303 -> 311: eight added under `difficulty: rating a campaign, and paying
+    // for it`. Four own js/systems/difficulty.js (the reference rates exactly
+    // 1, a heavier campaign rates higher but nowhere near its raw HP ratio,
+    // the board moves it but only by a few per cent, and an unmeasurable ask
+    // is 1 rather than NaN); four own what it is FOR (Easy's authored tables
+    // and milestone ids are untouched, a longer campaign gates on the same
+    // fraction of itself, the ladder keeps its doubling, and each campaign
+    // banks its own milestones).
+    file: "tests/content.test.js", pass: 311, fail: 0,
     failing: []
   },
   {

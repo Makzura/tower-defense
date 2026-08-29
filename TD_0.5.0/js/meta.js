@@ -379,6 +379,14 @@ var MetaProgress = (function () {
   // cursor itself in both states -- mid-wave the cursor still points at the
   // unfinished one, and between waves it has already stepped past the one that
   // ended. game.js passes it rather than deriving it a second time here.
+  //
+  // EVERY NUMBER BELOW IS AUTHORED AGAINST THE REFERENCE CAMPAIGN, which is
+  // Easy: 35 waves, and a ladder that gates on ten of them at a time. A second
+  // campaign of a different length and weight arrived on 2026-08-28 and was
+  // paid by this table unchanged -- the same 80 coins for clearing forty waves
+  // at 2.6x the required DPS, and a "reach wave 30" that means 86% of Easy and
+  // 75% of Normal. See `scaledTiers` and `scaledMilestones`, which is where the
+  // table stops being Easy's and starts being the campaign's.
   var REPEATABLE_TIERS = [
     { atLeast: 30, coins: 40 },
     { atLeast: 25, coins: 28 },
@@ -388,15 +396,105 @@ var MetaProgress = (function () {
   ];
   var VICTORY_COINS = 80;
 
+  // --- scaling a table to the campaign it is being paid for ----------------
+  //
+  // 2026-08-29, at the owner's instruction: "scale the normal game mode meta
+  // rewards on the easy mode meta rewards", and then "scale according to
+  // difficulty... a difficulty function that takes into account map, bodies,
+  // hp, wave count, money".
+  //
+  // TWO SCALES, NOT ONE, because a coin and a wave number are different
+  // quantities and nothing sensible comes of moving them together:
+  //
+  //   the COINS scale by `Difficulty` (js/systems/difficulty.js), which is the
+  //   whole ask-over-give measurement -- demand, spike, length, fragility,
+  //   roster, relief and the board. Normal on the default map rates 1.43.
+  //
+  //   the THRESHOLDS scale by WAVE COUNT alone, so a rung sits at the same
+  //   FRACTION of its own campaign. "Two thirds of the way in" has to mean the
+  //   same thing on a 35-wave campaign and a 40-wave one, and it is the only
+  //   reading under which the top rung is the last one before the finale on
+  //   both.
+  //
+  // Both fall back to 1 when nothing can be measured -- an unknown id, a page
+  // that never loaded the schedules, a test booting meta.js alone -- so the
+  // reference campaign's own numbers are what a caller gets when the world
+  // cannot answer. Read at CALL time for the load-order reason
+  // `constructorOf` gives above.
+  function difficultyList() {
+    var s = (typeof globalThis !== "undefined") ? globalThis
+      : (typeof window !== "undefined") ? window : null;
+    var list = s && s.DIFFICULTIES;
+    return (list && list.length) ? list : null;
+  }
+
+  function referenceId() {
+    return (typeof Difficulty !== "undefined")
+      ? Difficulty.REFERENCE_DIFFICULTY_ID : "easy";
+  }
+
+  // How long a campaign is, in waves, or null when it cannot be known.
+  function waveCountOf(difficultyId) {
+    var list = difficultyList();
+    if (!list) return null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === difficultyId) return list[i].waves.length;
+    }
+    return null;
+  }
+
+  function waveScale(difficultyId) {
+    if (!difficultyId || difficultyId === referenceId()) return 1;
+    var mine = waveCountOf(difficultyId);
+    var theirs = waveCountOf(referenceId());
+    return (mine > 0 && theirs > 0) ? mine / theirs : 1;
+  }
+
+  function coinScale(difficultyId, mapId) {
+    if (typeof Difficulty === "undefined") return 1;
+    if (!difficultyId) return 1;
+    var scale = Difficulty.scaleFor(difficultyId, mapId);
+    return (scale > 0 && isFinite(scale)) ? scale : 1;
+  }
+
+  // A COIN AMOUNT IS AT LEAST ONE. Rounding a small reward down to nothing on
+  // an easier board would be a source that pays zero, and a source that pays
+  // zero is a line on the result screen saying the player earned nothing for
+  // something they did.
+  function scaleCoins(amount, scale) {
+    return Math.max(1, Math.round(amount * scale));
+  }
+
+  function scaledTiers(difficultyId, mapId) {
+    var waves = waveScale(difficultyId);
+    var coins = coinScale(difficultyId, mapId);
+    return REPEATABLE_TIERS.map(function (tier) {
+      return {
+        atLeast: Math.max(1, Math.round(tier.atLeast * waves)),
+        coins: scaleCoins(tier.coins, coins)
+      };
+    });
+  }
+
+  function scaledVictoryCoins(difficultyId, mapId) {
+    return scaleCoins(VICTORY_COINS, coinScale(difficultyId, mapId));
+  }
+
   // A CLEAR REPLACES THE TIER, it does not stack on it. 34 waves finished and
   // a loss pays 40; 35 and a win pays 80, which is the doubling the ladder is
-  // built around -- not 120.
-  function repeatableCoins(wavesCompleted, victory) {
-    if (victory) return VICTORY_COINS;
+  // built around -- not 120. The doubling survives scaling, because both sides
+  // of it are multiplied by the same number.
+  //
+  // `difficultyId` and `mapId` are OPTIONAL and default to the reference
+  // campaign, so every caller written before 2026-08-29 -- and every test --
+  // asks the same question and gets the same answer it always did.
+  function repeatableCoins(wavesCompleted, victory, difficultyId, mapId) {
+    if (victory) return scaledVictoryCoins(difficultyId, mapId);
     var done = (typeof wavesCompleted === "number" && isFinite(wavesCompleted))
       ? Math.max(0, Math.floor(wavesCompleted)) : 0;
-    for (var i = 0; i < REPEATABLE_TIERS.length; i++) {
-      if (done >= REPEATABLE_TIERS[i].atLeast) return REPEATABLE_TIERS[i].coins;
+    var tiers = scaledTiers(difficultyId, mapId);
+    for (var i = 0; i < tiers.length; i++) {
+      if (done >= tiers[i].atLeast) return tiers[i].coins;
     }
     return 0;
   }
@@ -415,6 +513,47 @@ var MetaProgress = (function () {
     { id: "reach_25", wave: 25, coins: 20, label: "Reached wave 25" },
     { id: "reach_30", wave: 30, coins: 25, label: "Reached wave 30" }
   ];
+
+  // ONE SET PER CAMPAIGN, CLAIMABLE SEPARATELY (2026-08-29, the owner's call).
+  // Reaching wave 29 of Normal is not the same achievement as reaching wave 25
+  // of Easy and does not pay for it -- the waves are a different length, a
+  // different weight and a different roster.
+  //
+  // THE REFERENCE CAMPAIGN KEEPS ITS BARE IDS, and that is a save-compatibility
+  // rule rather than a tidiness one: every profile already on disk has claimed
+  // `reach_11` and friends, and prefixing them would hand all four out again.
+  // Only the campaigns that did not exist when those ids were minted carry a
+  // prefix.
+  function milestoneIdFor(difficultyId, baseId) {
+    return (!difficultyId || difficultyId === referenceId())
+      ? baseId : difficultyId + ":" + baseId;
+  }
+
+  function scaledMilestones(difficultyId, mapId) {
+    var waves = waveScale(difficultyId);
+    var coins = coinScale(difficultyId, mapId);
+    var isReference = !difficultyId || difficultyId === referenceId();
+    var name = null;
+    if (!isReference) {
+      var list = difficultyList();
+      for (var i = 0; list && i < list.length; i++) {
+        if (list[i].id === difficultyId) name = list[i].name;
+      }
+    }
+    return WAVE_MILESTONES.map(function (m) {
+      var wave = Math.max(1, Math.round(m.wave * waves));
+      return {
+        id: milestoneIdFor(difficultyId, m.id),
+        wave: wave,
+        coins: scaleCoins(m.coins, coins),
+        // The reference's label is left EXACTLY as it was, so the four lines a
+        // player has already seen on the result screen do not change wording.
+        label: isReference ? m.label
+          : "Reached wave " + wave + (name ? " on " + name : "")
+      };
+    });
+  }
+
   var MILESTONE_IDS = WAVE_MILESTONES.map(function (m) { return m.id; });
 
   var FIRST_WIN_COINS = 25;
@@ -434,7 +573,7 @@ var MetaProgress = (function () {
   // rotating objectives will land in, and giving it a shape now means the
   // screen does not have to change when they arrive.
   //
-  // `run` is { wavesCompleted, waveReached, victory, mapId }.
+  // `run` is { wavesCompleted, waveReached, victory, mapId, difficultyId }.
   function awardRun(run) {
     run = run || {};
     var s = ensure();
@@ -442,10 +581,16 @@ var MetaProgress = (function () {
     var completed = Math.max(0, Math.floor(run.wavesCompleted || 0));
     var reached = Math.max(0, Math.floor(run.waveReached || 0));
 
-    var repeatable = repeatableCoins(completed, victory);
+    // WHICH CAMPAIGN AND WHICH BOARD, because since 2026-08-29 both are priced.
+    // An absent id is the reference campaign, which is what every caller
+    // written before that date effectively asked for.
+    var difficultyId = run.difficultyId || referenceId();
+    var scale = coinScale(difficultyId, run.mapId);
+
+    var repeatable = repeatableCoins(completed, victory, difficultyId, run.mapId);
     var objectives = [];
 
-    WAVE_MILESTONES.forEach(function (m) {
+    scaledMilestones(difficultyId, run.mapId).forEach(function (m) {
       if (reached < m.wave) return;
       if (s.milestones.indexOf(m.id) !== -1) return;
       s.milestones.push(m.id);
@@ -458,8 +603,11 @@ var MetaProgress = (function () {
         s.routesWon.push(run.mapId);
         objectives.push({
           id: id,
+          // KEYED ON THE ROUTE ALONE, deliberately: a first clear is a first
+          // clear of that road, and clearing it again on a harder campaign is
+          // not a second first. The AMOUNT still prices the run that earned it.
           label: "First clear of " + (run.mapName || run.mapId),
-          amount: FIRST_WIN_COINS
+          amount: scaleCoins(FIRST_WIN_COINS, scale)
         });
       }
     }
@@ -671,10 +819,25 @@ var MetaProgress = (function () {
     repeatableCoins: repeatableCoins,
     awardRun: awardRun,
     bestWave: bestWave,
+    // THE REFERENCE CAMPAIGN'S OWN TABLES, unchanged and still zero-argument:
+    // these are the authored numbers, and they are what a reader compares a
+    // scaled table against.
     milestoneTable: function () { return WAVE_MILESTONES.slice(); },
     firstWinCoins: function () { return FIRST_WIN_COINS; },
     repeatableTiers: function () { return REPEATABLE_TIERS.slice(); },
     victoryCoins: function () { return VICTORY_COINS; },
+    // AND THE SAME TABLES AS A GIVEN CAMPAIGN ON A GIVEN BOARD WILL PAY THEM.
+    // Called with no arguments they answer exactly as the four above do.
+    tiersFor: scaledTiers,
+    milestonesFor: scaledMilestones,
+    victoryCoinsFor: scaledVictoryCoins,
+    firstWinCoinsFor: function (difficultyId, mapId) {
+      return scaleCoins(FIRST_WIN_COINS, coinScale(difficultyId, mapId));
+    },
+    // The number every one of those is multiplied by, so the index and the
+    // tests can show it rather than re-deriving it.
+    coinScale: coinScale,
+    waveScale: waveScale,
     owns: owns,
     buy: buy,
     equipped: equipped,

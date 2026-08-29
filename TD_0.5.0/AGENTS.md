@@ -3710,6 +3710,13 @@ reaching waves 11/20/25/30 pays 10/15/20/25 once per save, and a first clear of
 each route pays 25, keyed on the route ID. A first full clear on a fresh
 profile and a new route is **175**.
 
+**THAT TABLE IS EASY'S, ON THE DEFAULT BOARD, AND EVERY CAMPAIGN NOW SCALES IT**
+(2026-08-29). See "Rating a campaign" below: the coins are multiplied by
+`Difficulty.scaleFor(difficultyId, mapId)` and the wave thresholds by the wave
+count alone. Easy on `Maps.DEFAULT_ID` rates exactly 1.00, so the numbers above
+are literally unchanged there — a test asserts that the scaled table IS the
+authored table, ids and wording included.
+
 **`awardRun` returns sources, not a number** — `{ repeatable, objectives,
 bounties, total }`, each source carrying a stable id, a printable label and an
 amount, with the total summed FROM them. The result screen prints that list and
@@ -3724,6 +3731,108 @@ number before the run and the overlay can show the same one after, without
 either re-deriving the rule. It is banked **exactly once**, latched by
 `runAwarded` — the sandbox un-loses a run by restoring base HP, and a second
 award on the way down again would pay twice for the same run.
+
+### Rating a campaign — `js/systems/difficulty.js`
+
+2026-08-29, the owner's brief: *"scale according to difficulty. find online or
+create a difficulty function that takes into account map, bodies, hp, wave
+count, money"*. It exists because a second campaign arrived and every reward
+table in the game was authored against the first one: Normal is 40 waves and
+131 595 effective HP against Easy's 35 and 25 939, and it paid the same 80
+coins for a clear and gated on the same "reach wave 30" that means 86% of one
+campaign and 75% of the other.
+
+**The identity it is built on** is the one the genre's balance writing keeps
+arriving at, and it is already this repo's:
+
+```
+effective HP delivered  <=  seconds available x board DPS x coverage
+```
+
+`waveEffectiveHealth` is the left side, `Maps.analyse` already measures the
+coverage term, and the purse is what buys the DPS. **So difficulty is not a
+property of a schedule. It is what the run ASKS over what the run GIVES, on the
+board it is played on.**
+
+**Six measures of the ask and the give, plus the board**, each a plain ratio
+against the same measure on the reference campaign, combined as a GEOMETRIC
+MEAN — the same idiom `Maps.analyse` uses for its own score, and the right one
+for a product of ratios: no factor can dominate through its unit, and a factor
+that does not move contributes exactly 1.
+
+| factor | what it measures | Normal |
+|---|---|---:|
+| `demand` | mean required DPS — HP over the seconds a wave has to be cleared in. Folds hp, bodies and PACING; a count cannot tell forty bodies in ten seconds from forty in sixty | ×2.60 |
+| `spike` | peak required DPS. The wave that actually ends runs | ×2.95 |
+| `length` | waves, and so chances to die | ×1.14 |
+| `fragility` | the mean body's health against the base's 100. What ONE leak costs, and the axis money cannot answer | ×3.19 |
+| `roster` | share of scheduled HP behind a body needing a SPECIFIC answer — flight, camo, armour, shield, revive, brood, an attack on your towers | ×1.22 |
+| `relief` | the purse, **inverted**, because money is the only thing that makes a campaign easier | ×0.36 |
+| `map` | `Maps.analyse(map).score`, already normalised against a straight reference road | ×1.00 |
+| | **geometric mean** | **1.43** |
+
+**NORMALISED SO THE REFERENCE READS EXACTLY 1.00.** The reference is Easy on
+`Maps.DEFAULT_ID`, by construction and not by luck, which is what makes "scale
+the Normal rewards on the Easy rewards" mean something. A test asserts every
+factor is 1 against itself.
+
+**The number is 1.43 and NOT the 5.07 the raw HP suggests — read the factors
+before retuning anything.** Normal sends 2.60× the DPS and hits 3.19× as hard
+per leak, and it also pays 2.80× the purse. A campaign that scales its own
+economy with its own threat is not five times harder; it is a bigger version of
+itself, and the honest number is the one that says so.
+
+**`relief` is capped at `boardCeiling()`** — the five cheapest towers fully
+built, about 128 000 mana — because five slots and a tier-5 cap mean a purse
+past that buys nothing. **It does not bind today** (Easy's whole purse is
+35 831 and Normal's 100 480, so both are still money-limited and `relief` is
+the plain purse ratio) and it is there for the campaign that is not. A table it
+cannot read gives `Infinity`, which is no cap, which is the behaviour of not
+having written it.
+
+**`rate()` returns the factors, not just the number.** A single number nobody
+can take apart is a number nobody can retune, so the readout, the tests and the
+difficulty card all read the same `{ rating, factors, profile }`.
+
+**Everything is read at CALL time.** This file loads with the systems, before
+`game.js`, so `WAVES`, `waveEffectiveHealth`, `STARTING_CASH` and `Maps` do not
+exist when it is evaluated — the arrangement `MetaProgress.constructorOf`
+documents. It also means it degrades to a flat 1.00 rather than throwing on a
+page that never loaded a schedule.
+
+### What the rating pays for
+
+**TWO SCALES, NOT ONE**, because a coin and a wave number are different
+quantities:
+
+- **coins** scale by the rating. Normal's ladder is 57/40/26/14/7 against
+  Easy's 40/28/18/10/5, a clear is 114 against 80, and a first clear of a route
+  is 36 against 25.
+- **thresholds** scale by WAVE COUNT alone, so a rung sits at the same FRACTION
+  of its own campaign. Normal's ladder gates at 34/29/23/17/11 of forty, and
+  its top rung is the last one before the finale on both campaigns.
+
+**Each campaign banks its own milestones.** Reaching wave 29 of Normal is not
+the achievement of reaching wave 25 of Easy and does not pay for it. **The
+reference campaign keeps its BARE ids** (`reach_11`, …) and that is a
+save-compatibility rule, not a tidiness one: every profile on disk has already
+claimed them and a prefix would hand all four out again. Only campaigns that
+did not exist when those ids were minted carry one (`normal:reach_11`).
+
+**A first clear is keyed on the ROUTE alone.** Clearing a road again on a
+harder campaign is not a second first clear — but the AMOUNT prices the run
+that earned it.
+
+**The board is worth a few per cent and never more.** `Maps.analyse` is already
+normalised against a straight reference road, so the eight boards span 0.95 to
+1.04 on Easy: a clear pays 76 on Mana Coil and 83 on Null Meridian. A route can
+never be worth more than a difficulty, and a test pins that it moves the rating
+by less than a fifth.
+
+**The difficulty card shows both**, on the screen where the choice is made —
+`Difficulty 1.43×` and `A clear pays 114 ⬡`, read through the same two modules
+the bank goes through, so a card cannot promise a number the bank will not hand
+over. The card grew from 300 px to 348 for the two extra rows.
 
 **`BUILD_SLOTS` is now DERIVED from the loadout**, via `rebuildBuildBar()`.
 Everything downstream is unchanged: the bar still reads constructors out of

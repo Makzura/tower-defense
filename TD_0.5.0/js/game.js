@@ -5014,7 +5014,13 @@ function update(dt) {
       waveReached: reachedWave(),
       victory: victory,
       mapId: Maps.currentId ? Maps.currentId() : (currentMap && currentMap.id),
-      mapName: currentMap && currentMap.name
+      mapName: currentMap && currentMap.name,
+      // WHICH CAMPAIGN THIS WAS (2026-08-29). Every coin the run pays is priced
+      // through `Difficulty` against Easy, so the reward layer has to be told
+      // which schedule was actually played -- and the board, which the rating
+      // also reads. Passing the id rather than the schedule keeps meta.js free
+      // of any reference to a wave array.
+      difficultyId: selectedDifficultyId
     });
   }
 
@@ -10500,7 +10506,13 @@ function drawBackButton() {
 // heading instead of hanging off one side. Nothing about the geometry knows
 // there are two.
 var DIFFICULTY_CARD_W = 380;
-var DIFFICULTY_CARD_H = 300;
+// 300 until 2026-08-29, when the stat block grew from four rows to six -- the
+// campaign's rating and what a clear of it pays. The rows start at y + 180 and
+// step 24, so the sixth sits at y + 300 and was drawn ON the old bottom edge.
+// The card grew rather than the rows tightening: the grid sits at y = 210 in a
+// 720 px viewport, so there was room for it and no other card on the screen
+// shares this height.
+var DIFFICULTY_CARD_H = 348;
 var DIFFICULTY_CARD_GAP = 40;
 var DIFFICULTY_CARD_Y = 210;
 
@@ -10624,6 +10636,21 @@ function drawDifficultyCard(i) {
     ["Effective HP", String(s.health)],
     ["Enemy types", String(s.types)]
   ];
+
+  // THE RATING AND WHAT IT PAYS, on the road that is already chosen (this
+  // screen comes after the route). Both are read from the same two modules the
+  // reward itself goes through -- js/systems/difficulty.js and MetaProgress --
+  // so the card cannot promise a number the bank will not hand over.
+  //
+  // The four rows above are what the campaign IS; these two are what it is
+  // worth, which is the question a player actually has at this moment.
+  var mapId = pendingMap && pendingMap.id;
+  if (typeof Difficulty !== "undefined" && Difficulty.available()) {
+    var rating = Difficulty.scaleFor(difficulty.id, mapId);
+    rows.push(["Difficulty", rating.toFixed(2) + "\u00d7"]);
+    rows.push(["A clear pays",
+      MetaProgress.victoryCoinsFor(difficulty.id, mapId) + " \u2b21"]);
+  }
   for (var k = 0; k < rows.length; k++) {
     var y = r.y + 180 + k * 24;
     ctx.textAlign = "left";

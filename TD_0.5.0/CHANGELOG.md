@@ -44,6 +44,58 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — A difficulty function, and the meta rewards scale on it.**
+
+Owner: *"scale the normal game mode meta rewards on the easy mode meta
+rewards"*, and then, asked which axis: *"scale according to difficulty. find
+online or create a difficulty function that takes into account map, bodies, hp,
+wave count, money etc. actually make that your main focus."* So the function is
+the deliverable and the rewards are its first consumer.
+
+**`js/systems/difficulty.js`.** Difficulty is not a property of a schedule — it
+is what a run ASKS over what it GIVES, on the board it is played on, which is
+the identity this repo already runs on: `waveEffectiveHealth` is the ask,
+`Maps.analyse` already measures the coverage, and the purse buys the answer.
+Six measures of that plus the board, each a ratio against the reference
+campaign, combined as a geometric mean — the same idiom `Maps.analyse` uses for
+its own score:
+
+`demand` (mean required DPS, which folds hp, bodies and pacing), `spike` (the
+worst wave), `length`, `fragility` (what one leak costs against a 100 HP base —
+the axis money cannot answer), `roster` (share of HP needing a specific answer
+rather than more damage), `relief` (the purse, inverted, capped at what five
+tower slots can physically absorb), and `map`.
+
+**Easy on the default board rates exactly 1.00, by construction** — that is
+what makes "scale on Easy" mean something. Normal rates **1.43**.
+
+**1.43 and not the 5.07 its raw HP suggests, and the factors say why.** Normal
+sends 2.60× the DPS and hits 3.19× as hard per leak — and pays 2.80× the purse.
+A campaign that scales its own economy with its own threat is a bigger version
+of itself, not a five-times harder one. The function is written to be taken
+apart for exactly this reason: `rate()` returns every factor, not just the
+number.
+
+**Two scales on the rewards, because a coin and a wave number are different
+quantities.** Coins scale by the rating: Normal's ladder is 57/40/26/14/7
+against Easy's 40/28/18/10/5, a clear is 114 against 80. Thresholds scale by
+wave count alone, so a rung sits at the same fraction of its own campaign —
+Normal gates at 34/29/23/17/11 of forty, and the top rung is the last one
+before the finale on both. Each campaign banks its own milestones under its own
+ids, at waves 13/23/29/34 for Normal; **Easy keeps its bare `reach_11` ids**,
+which is save compatibility and not tidiness — a prefix would hand all four out
+again to every profile on disk. Easy's authored tables come out of the scaling
+byte for byte, wording included, and a test asserts it.
+
+**The board is worth a few per cent and never more** — 0.95 to 1.04 across the
+eight roads, so a clear pays 76 on Mana Coil and 83 on Null Meridian. A route
+can never be worth more than a difficulty.
+
+The choice screen shows both, since it is the screen where the choice is made:
+`Difficulty 1.43×` and `A clear pays 114 ⬡`, read through the same two modules
+the bank goes through. The card grew 300 → 348 px for the two rows; the sixth
+was being drawn on the old bottom edge.
+
 **2026-08-29 — The Arcane Sniper stops leading bodies that have stopped.**
 
 Owner's report: *"if a revenant is only in a sniper range it gets killed but the
