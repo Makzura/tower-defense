@@ -6360,10 +6360,21 @@ has no coins to spend and is a preview of the towers rather than of the bar — 
 re-derives `BAR_WIDTH`/`BAR_X` after installing its roster so the extra slot is
 not drawn off the end of a bar centred for five.
 
-**A T3 ON ANY BRANCH CAPS BOTH OTHERS AT 2.** The two-branch crosspath rule the
-other four towers share, said for three. The brief settles it from the other
-end: a Farm with a main path at T3+ wears that path's model, and its secondary
-upgrades are T1/T2 only.
+**TWO BRANCHES AT MOST: ONE TO FIVE, THE OTHER TO TWO.** Corrected 2026-08-29,
+and both halves had been wrong. `lockedBranch` alone refused every other branch
+outright once one reached T3, so a farm going up A could never buy B1 — the
+secondary is meant to be open to tier 2. And nothing counted branches, so before
+any T3 a farm could put two tiers on ALL THREE and only then find itself stuck.
+Owner: *"max 2 paths, one goes up to 2 and the other to 5."* Said as two rules,
+in the order a player meets them: a third branch is never started, and only one
+branch passes tier 2 — whichever got there first. `requires` is still checked
+before either, because "needs A2" is the nearer reason and the one a player can
+act on.
+
+That is the two-branch crosspath rule the other four towers share, and the brief
+settles it from the other end: a Farm with a main path at T3+ wears that path's
+model, and its secondary upgrades are T1/T2 only. THREE branches was never the
+rule — the first implementation simply never counted them.
 
 ### Where its output goes, and when
 
@@ -6672,6 +6683,13 @@ AND one-shots, and each one-shot depicts something the tower already does:
 
 ### Four things the first T5 pass got wrong, and what they taught
 
+**AND NOTHING TO AIM AT IS A REFUSAL, NOT A MODE.** The investment only lands on
+a tower at TIER 5 OR ABOVE — the brief's rule, and what the button says — so on a
+board with none, arming opened a mode whose every click was refused after the
+fact. That reads exactly like a broken button, and the owner reported it twice.
+`beginInvesting` asks the board first and answers false; the press then says "no
+tier 5 tower to boost" through the same channel every other refusal uses.
+
 **THE PANEL WAS STANDING ON THE TARGET.** Arming A5's boost left the inspection
 panel up — a 268 px slab down the right third of the board — and `runPanelAction`
 consumes every click that lands on it *before* `pickTower` runs, so a tower drawn
@@ -6682,12 +6700,29 @@ now clears `inspected`. **Aiming deliberately does not**, and the two are not th
 same case: a cone is aimed at a DIRECTION and the player can pick one that is not
 under the panel; a target is a specific tower, wherever it was built.
 
-**A FARM WITH A FIELD NOW TURNS TO WATCH IT.** Every other tower faces what it is
-working on — `aim` is the draw yaw — and the Farm was the only one staring at a
-fixed bearing. Owner: *"the eyes of the whole machine should be looking at the
-enemy; right now it just looks at a random place."* The nearest COVERED body
-wins, found by the same sweep that finds the lock edge, and an empty field leaves
-the last bearing rather than snapping back to a default.
+**THE EYE WATCHES, NOT THE MACHINE.** A farm with a field tracks the nearest
+COVERED body — found by the same sweep that finds the lock edge, so the sight
+rule still holds and it will not follow something behind a rock. The bearing is
+kept as `viewYaw`, **not** as the tower's `aim`: turning `aim` swung the skid,
+the pylons and the operator with it, which is what every other tower does and
+what this one must not. Owner: *"the whole model turns, which is not right; only
+the eye should turn — notice how it already turns alone when in idle."*
+
+`farmAimOverride` in gl-world poses ONE group about its own axis and hands it to
+`drawActor` as a per-group override, the same door the recruit's rifle recoil
+uses. The pivot comes from the model's new `pivots` map, not from the geometry's
+middle — an eye turned about the centre of its own mesh swings off its mount.
+
+**ONLY WHILE THE FIELD IDLE IS PLAYING**, and that is what makes it safe:
+`field_aura` (B5) and `field_pulse` (B4) key the pylons and the range ring and
+leave the eye alone, so an override is the only thing moving it. Measured: 380 px
+change when the eye turns while watching, and **0 px** when the field is empty —
+`idle_panopticon` sweeps the eye on its own then, which is the authored patrol
+and exactly what a scanner with nothing to look at should do.
+
+**EASED, NOT SNAPPED**: `1 - exp(-6·dt)` toward the target, taken the short way
+round, so a body crossing behind does not send the eye the long way. It does not
+shoot, so it does not have to be exact.
 
 **THE PURGE WAS PERMANENT, AND THE IMPORTER'S FAULT.** `idle_poses` answered
 "what does a node keyed only by an action hold during the idle?" with "that

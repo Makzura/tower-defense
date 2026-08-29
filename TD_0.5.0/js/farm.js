@@ -164,6 +164,12 @@ function FarmTower(x, y, path) {
   this.baseHpProduced = 0;
 
   this.aim = -Math.PI / 2;
+
+  // The bearing the EYE holds, eased toward whatever the field is watching.
+  // Starts where the body faces, so a scanner that has never seen anything is
+  // looking the way it was built. See update().
+  this.viewYaw = this.aim;
+
   this.showRange = false;
 
   TowerHealth.init(this, FarmTower.BASE_HP);
@@ -202,6 +208,11 @@ FarmTower.BASE_PRODUCTION = 200;
 // From A3 the per-wave figure is replaced by a tick. This is the clock; the
 // amount per tick is on the tier.
 FarmTower.TICK_SECONDS = 5;
+
+// How fast the eye catches up, as the rate in `1 - exp(-k dt)`. At 6 it covers
+// about 95% of a turn in half a second -- quick enough to read as tracking,
+// slow enough that a body crossing the circle does not make it flick.
+FarmTower.VIEW_EASE = 6;
 
 // A5's investment. Tranches are whole and the remainder stays stocked.
 FarmTower.TRANCHE = 10000;
@@ -377,6 +388,26 @@ FarmTower.prototype.nominalProduction = function () {
   return this.producesPerWave();
 };
 
+// How many tiers this farm owns on a branch. Tiers are sequential -- every row
+// past the first names its `requires` -- so this is also the highest tier owned.
+FarmTower.prototype.tiersOwned = function (branch) {
+  var n = 0;
+  for (var t = 1; t <= 5; t++) if (this["has" + branch + t]) n++;
+  return n;
+};
+
+// The tier number inside its own branch: "B4" is 4. Read off the id rather than
+// counted, so a row moved in the table cannot change what it means.
+FarmTower.tierNumber = function (id) {
+  var n = parseInt(String(id).slice(1), 10);
+  return isNaN(n) ? 0 : n;
+};
+FarmTower.prototype.tierNumber = function (id) {
+  return FarmTower.tierNumber(id);
+};
+
+// The branch that has passed tier 2, or null while none has. That is what
+// "committed" means: the one branch allowed to go on to 5.
 FarmTower.prototype.lockedBranch = function () {
   for (var i = 0; i < FarmTower.UPGRADES.length; i++) {
     var u = FarmTower.UPGRADES[i];
@@ -404,9 +435,36 @@ FarmTower.prototype.whyCannotUpgrade = function (id) {
   if (this.hasUpgrade(id)) return "already owned";
   if (u.requires && !this.hasUpgrade(u.requires)) return "needs " + u.requires;
 
-  var locked = this.lockedBranch();
-  if (locked !== null && locked !== u.branch) {
-    return "path " + locked + " is committed";
+  // THE CROSSPATH: AT MOST TWO BRANCHES, ONE TO 5 AND THE OTHER TO 2.
+  //
+  // Both halves were wrong. `lockedBranch` alone refused every other branch
+  // outright once one reached T3 -- so a farm that went straight up A could
+  // never buy B1, even though the secondary is supposed to be open to tier 2.
+  // And nothing counted branches at all, so before any T3 a farm could put two
+  // tiers on ALL THREE and only then discover it had painted itself in. Owner:
+  // "max 2 paths, one goes up to 2 and the other to 5; right now if a path goes
+  // to 3 all other paths get blocked even still at 0, and if none goes to 3 the
+  // three can go up to 2 and then it's broken."
+  //
+  // Said as two rules, in the order a player meets them:
+  var tier = this.tierNumber(id);
+
+  //   1. A THIRD BRANCH IS NEVER STARTED. Checked on the branch being opened,
+  //      so it fires at the moment of the mistake rather than later.
+  if (this.tiersOwned(u.branch) === 0) {
+    var started = 0;
+    ["A", "B", "C"].forEach(function (b) {
+      if (b !== u.branch && this.tiersOwned(b) > 0) started++;
+    }, this);
+    if (started >= 2) return "two paths at most";
+  }
+
+  //   2. ONLY ONE BRANCH PASSES TIER 2, and it is whichever got there first.
+  if (tier >= 3) {
+    var committed = this.lockedBranch();
+    if (committed !== null && committed !== u.branch) {
+      return "path " + committed + " is committed";
+    }
   }
   if (u.unique && Farms.uniqueHolder(u.unique, this)) {
     return u.unique === "c5" ? "one C5 per map" : "one B4 or B5 per map";
@@ -577,8 +635,27 @@ FarmTower.prototype.update = function (dt, enemies) {
     }
     if (holding && !this.fieldHeld) this.lastLock = this.animClock;
     this.fieldHeld = holding;
+
+    // WHERE THE EYE IS LOOKING, and it is NOT the tower's `aim`.
+    //
+    // Turning `aim` swung the whole machine -- skid, pylons, operator and all --
+    // which is what every other tower does and what this one must not: owner,
+    // "the whole model turns, which is not right; only the eye should turn,
+    // notice how it already turns alone when in idle". So the bearing is kept
+    // here and gl-world spends it on ONE group, the eye's, about its own axis.
+    //
+    // EASED, NOT SNAPPED. "Make sure the motion is smooth and not staggered;
+    // since it doesn't shoot it's alright if he's not exactly on the first
+    // enemy." A fixed fraction per second, taken the short way round the circle
+    // so a target crossing behind the tower does not send the eye the long way.
     if (closest) {
-      this.aim = Math.atan2(closest.pos.y - this.y, closest.pos.x - this.x);
+      var want = Math.atan2(closest.pos.y - this.y, closest.pos.x - this.x);
+      var delta = want - this.viewYaw;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      // 1 - exp(-k dt) rather than a constant step: framerate-independent, and
+      // it eases in the way a heavy instrument would rather than ramping.
+      this.viewYaw += delta * (1 - Math.exp(-FarmTower.VIEW_EASE * dt));
     }
   }
 
@@ -1062,7 +1139,12 @@ FarmTower.prototype.performAction = function (id, context) {
     if (!this.invests) return "needs A5";
     if (this.tranchesAvailable() < 1) return "needs " + FarmTower.TRANCHE + " mana";
     if (context && typeof context.beginInvesting === "function") {
-      context.beginInvesting(this, id === "investSurge");
+      // It answers false when the board has nothing the investment could land
+      // on, which is a refusal the player needs BEFORE they start clicking --
+      // see the note on `beginInvesting` in js/game.js.
+      if (!context.beginInvesting(this, id === "investSurge")) {
+        return "no tier 5 tower to boost";
+      }
       return this.name + " → pick a tower";
     }
     // No mode to arm (a fixture, the sandbox): fall back to the direct call so

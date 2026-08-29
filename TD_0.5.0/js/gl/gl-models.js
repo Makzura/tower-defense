@@ -81,6 +81,10 @@ var GLModels = (function () {
       // gains one. Copied explicitly, like everything else here.
       bandSeconds: data.bandSeconds || null,
       bandNames: data.bandNames || null,
+      // WHERE EACH GROUP TURNS, in model units. Nothing in the animation needs
+      // it -- frame matrices are model-space deltas -- but a RUNTIME pose does:
+      // gl-world aims a scanner's eye by rotating its group about this point.
+      pivots: data.pivots || null,
       expanded: null,
       gpu: null
     };

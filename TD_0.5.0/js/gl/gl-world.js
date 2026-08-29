@@ -1136,6 +1136,61 @@ var World3D = (function () {
     { at: "lastEmpower", clip: "empower_temporary", when: "empowerTemporary" }
   ];
 
+  // AIMING THE EYE, AND ONLY THE EYE.
+  //
+  // A scanner watches what walks into its field, and the tower does NOT turn to
+  // do it -- owner: "the whole model turns, which is not right; only the eye
+  // should turn". So this poses ONE group, about its own axis, and hands it to
+  // `drawActor` as an override: the format already speaks in per-group matrices
+  // and the recruit's rifle recoil goes through the same door.
+  //
+  // ONLY WHILE THE FIELD IDLE IS PLAYING, which is the whole reason this is
+  // safe. `field_aura` (B5) and `field_pulse` (B4) key the pylons and the range
+  // ring and deliberately leave the eye alone, so it sits at its rest and an
+  // override is the only thing moving it. `idle_panopticon` DOES sweep the eye
+  // on its own -- the authored patrol, which is what a scanner with nothing to
+  // look at should do -- and adding an aim on top of that would fight it.
+  //
+  // The pivot comes from the model (`pivots`), not from the geometry's middle:
+  // an eye turned about the centre of its own mesh would swing off its mount.
+  var farmAimMat = new Float32Array(16);
+  var farmAimOut = {};
+
+  function farmAimOverride(m, tower) {
+    if (!m || !m.pivots || !tower.fieldHeld) return null;
+    if (typeof tower.viewYaw !== "number") return null;
+    var names = m.bandNames;
+    if (!names) return null;
+    // The field idle has to be the band actually on screen; if the tower is
+    // mid-one-shot the clip owns the eye and this stands back.
+    var idle = -1;
+    for (var i = 0; i < FARM_FIELD_IDLES.length; i++) {
+      var b = names.indexOf(FARM_FIELD_IDLES[i]);
+      if (b > 0) { idle = b; break; }
+    }
+    if (idle < 0) return null;
+    var now = farmBandNow(m, tower);
+    if (now.oneShot || now.band !== idle) return null;
+
+    var group = null;
+    for (i = 0; i < FARM_AIM_GROUPS.length; i++) {
+      if (m.pivots[FARM_AIM_GROUPS[i]]) { group = FARM_AIM_GROUPS[i]; break; }
+    }
+    if (!group) return null;
+
+    // About Z, which is up in this game, so the eye yaws rather than tumbles.
+    // The tower's own draw yaw is already in the instance matrix, so the
+    // override carries only the DIFFERENCE the eye has to make up.
+    GLMath.localPose(farmAimMat, m.pivots[group], 0, 0,
+      tower.viewYaw - (tower.aim || 0));
+    farmAimOut[group] = farmAimMat;
+    return farmAimOut;
+  }
+
+  // Which group carries the eye, by model. First match wins, and a model with
+  // none simply never aims.
+  var FARM_AIM_GROUPS = ["b5_eye_pitch", "b4_core", "b3_scanner_yaw"];
+
   // WHICH FRAME A FARM IS ON: the most recent one-shot that is still running,
   // otherwise the idle loop.
   //
@@ -1148,7 +1203,11 @@ var World3D = (function () {
   // during a target lock cuts to the capture rather than queueing behind it.
   // Every action clip ends bit-exact on the idle's first pose (the importer
   // checks it), so falling back needs no blend.
-  function farmFrame(m, tower) {
+  // The band and frame a farm is on, and whether that band is a one-shot. Two
+  // callers want different halves of the same decision -- the draw wants the
+  // frame, the eye wants to know whether a clip currently owns it -- and asking
+  // twice would be two scans that could disagree.
+  function farmBandNow(m, tower) {
     var clock = tower.animClock || 0;
     var bands = m.bands, seconds = m.bandSeconds, names = m.bandNames;
 
@@ -1176,8 +1235,8 @@ var World3D = (function () {
         // A one-shot's last frame IS its end pose, so the window maps across
         // the whole band inclusive: n frames span [0, 1] rather than [0, 1).
         var n = bands[bestBand][1];
-        return bands[bestBand][0] +
-          Math.min(n - 1, Math.floor(bestPhase * (n - 1) + 0.5));
+        return { oneShot: true, band: bestBand, frame: bands[bestBand][0] +
+          Math.min(n - 1, Math.floor(bestPhase * (n - 1) + 0.5)) };
       }
     }
 
@@ -1202,7 +1261,12 @@ var World3D = (function () {
     var loop = (seconds && seconds.length) ? seconds[idleBand]
       : (m.loopSeconds > 0 ? m.loopSeconds : 8);
     var phase = (((clock / loop) % 1) + 1) % 1;
-    return first + Math.min(count - 1, Math.floor(phase * count));
+    return { oneShot: false, band: idleBand,
+             frame: first + Math.min(count - 1, Math.floor(phase * count)) };
+  }
+
+  function farmFrame(m, tower) {
+    return farmBandNow(m, tower).frame;
   }
 
   // THE FARM'S MODELS, AND WHY A TIER 5 STILL WEARS A T3 ONE.
@@ -2403,7 +2467,8 @@ var World3D = (function () {
             }
           }
         }
-        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame);
+        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame,
+          farmAimOverride(m, t));
         // Crosspath marks, drawn OVER an unchanged body -- same yaw, same lift,
         // TRANSLATED ONTO THEIR SEAT. Because they are separate models the body
         // underneath is literally the same vertices with or without them, which

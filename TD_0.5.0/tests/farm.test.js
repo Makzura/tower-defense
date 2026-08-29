@@ -378,6 +378,7 @@ function (t) {
   t.ok(/pick a tower/.test(f.performAction("investPermanent", {
     beginInvesting: function (farmArg, temporary) {
       armed = { farm: farmArg, temporary: temporary };
+      return true;                      // game.js answers false with no target
     }
   })), "the press asks for a target");
   t.eq(armed.farm, f, "arming the farm that was pressed");
@@ -934,17 +935,48 @@ function (t) {
 
 group("Farm — the three-branch crosspath and the board");
 
-test("a tier 3 on any branch commits the tower and caps the other two at 2",
+test("two paths at most: one to five, the other to two", function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2"]);
+
+  // A SECOND branch is fine; a THIRD is never started.
+  t.eq(f.applyUpgrade("B1"), null, "a second path opens");
+  t.eq(f.whyCannotUpgrade("C1"), "two paths at most", "a third does not");
+  t.eq(f.applyUpgrade("B2"), null, "and the second reaches two");
+  t.eq(f.whyCannotUpgrade("C1"), "two paths at most", "still refused");
+});
+
+test("only one branch passes tier 2, and the other stays open to it",
 function (t) {
   var h = boot();
-  var f = farm(h, 600, 200, ["A1", "A2", "B1", "B2", "C1", "C2"]);
-  t.eq(f.lockedBranch(), null, "six tier-1s and tier-2s commit nothing");
+  var f = farm(h, 600, 200, ["B1", "B2"]);
+  t.eq(f.lockedBranch(), null, "two tiers commit nothing");
 
   t.eq(f.applyUpgrade("B3"), null, "B3 is taken");
   t.eq(f.lockedBranch(), "B", "which commits path B");
-  t.eq(f.whyCannotUpgrade("A3"), "path B is committed", "A3 is refused");
-  t.eq(f.whyCannotUpgrade("C3"), "path B is committed", "and so is C3");
   t.eq(f.whyCannotUpgrade("B4"), null, "the committed branch carries on");
+
+  // THE HALF THAT WAS BROKEN: a committed branch must not close the other one
+  // at tier 1. The secondary is supposed to be open all the way to two.
+  t.eq(f.whyCannotUpgrade("A1"), null, "the secondary still opens at tier 1");
+  t.eq(f.applyUpgrade("A1"), null, "and can be bought");
+  t.eq(f.applyUpgrade("A2"), null, "up to tier 2");
+  // Asked only once its own prerequisites are met, so the answer is the
+  // crosspath and not "needs A2" -- `requires` is checked first, deliberately:
+  // it is the nearer reason and the one the player can act on.
+  t.eq(f.whyCannotUpgrade("A3"), "path B is committed", "but no further");
+  t.eq(f.whyCannotUpgrade("C1"), "two paths at most", "and never a third");
+});
+
+test("a farm may reach five on its main path with a secondary at two",
+function (t) {
+  var h = boot();
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  t.eq(f.tiersOwned("A"), 5, "five on the main path");
+  t.eq(f.applyUpgrade("B1"), null, "the secondary still opens");
+  t.eq(f.applyUpgrade("B2"), null, "and reaches two");
+  t.eq(f.whyCannotUpgrade("B3"), "path A is committed", "and stops there");
+  t.eq(f.tiersOwned("B"), 2, "which is the shape the brief asks for");
 });
 
 test("selling refunds half of everything invested, and takes it off the board",
@@ -1459,36 +1491,77 @@ function (t) {
     beginInvesting: function (farmArg, temporary) {
       armed = { farm: farmArg, temporary: temporary };
       g.inspected = null;              // what game.js's own seam does
+      return true;
     }
   });
   t.eq(armed.farm, f, "the mode is armed");
   t.eq(g.inspected, null, "and the panel is gone with it");
 });
 
-test("a farm with a field turns to watch the nearest body in it", function (t) {
+test("with nothing on the board to boost, the press refuses instead of arming",
+function (t) {
+  var h = boot();
+  var g = h.game;
+  var f = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  f.stock = 100000;
+
+  // A tier 3 tower is not a target, and it is the only thing standing.
+  var three = tierFiveTower(h, 900, 300, 3);
+  t.eq(g.FarmBoost.whyCannotBoost(three, true), "needs a tier 5 tower",
+    "the rule the brief sets");
+
+  var armed = false;
+  var said = f.performAction("investPermanent", {
+    beginInvesting: function () { armed = true; return false; }
+  });
+  t.eq(said, "no tier 5 tower to boost",
+    "the press says why, rather than opening a mode every click would refuse");
+  t.eq(f.stock, 100000, "and nothing is spent");
+
+  // Through the REAL seam, on a board that does have one.
+  h.run("towers.length = 0"); g.Farms.reset();
+  var f2 = farm(h, 600, 200, ["A1", "A2", "A3", "A4", "A5"]);
+  f2.stock = 100000;
+  tierFiveTower(h, 900, 300);
+  g.inspected = f2;
+  t.ok(/pick a tower/.test(f2.performAction("investPermanent", {
+    beginInvesting: function () { return true; }
+  })), "with a target it arms as before");
+});
+
+test("the EYE watches the nearest body, and the tower does not turn",
+function (t) {
   var h = boot();
   var g = h.game;
   var f = farm(h, 600, 200, ["B1", "B2", "B3"]);
-  var rest = f.aim;
+  var built = f.aim;
 
-  // Two bodies it can see, the nearer one behind the further one's shoulder.
+  // Two bodies it can see; the nearer one wins.
   var far = enemyAt(h, f.x, f.y + f.rangePx * 0.8, 10);
-  var near = enemyAt(h, f.x + f.rangePx * 0.3, f.y, 10);
-  f.update(1 / 60, g.enemies);
-  t.near(f.aim, 0, 1e-9, "it faces the nearer one, due +X");
+  enemyAt(h, f.x + f.rangePx * 0.3, f.y, 10);
+  for (var i = 0; i < 120; i++) f.update(1 / 60, g.enemies);
+  t.near(f.viewYaw, 0, 1e-3, "the eye settles on the nearer one, due +X");
+  t.eq(f.aim, built, "and the machine itself has not moved");
 
   g.enemies.length = 0;
   g.enemies.push(far);
-  f.update(1 / 60, g.enemies);
-  t.near(f.aim, Math.PI / 2, 1e-9, "and follows when only the far one is left");
+  for (i = 0; i < 120; i++) f.update(1 / 60, g.enemies);
+  t.near(f.viewYaw, Math.PI / 2, 1e-3, "it follows when only the far one is left");
 
-  // Nothing in the circle leaves the last bearing rather than snapping back:
-  // a machine that whipped round to a default every time the road emptied
-  // would be more distracting than one that simply waits.
+  // EASED, NOT SNAPPED: one step covers part of the way, never all of it.
   g.enemies.length = 0;
+  enemyAt(h, f.x - f.rangePx * 0.3, f.y, 10);   // straight behind it
+  var before = f.viewYaw;
   f.update(1 / 60, g.enemies);
-  t.near(f.aim, Math.PI / 2, 1e-9, "an empty field does not reset the aim");
-  t.ok(rest !== f.aim, "and it is no longer the bearing it was built with");
+  var moved = Math.abs(f.viewYaw - before);
+  t.ok(moved > 0, "one step turns it a little");
+  t.ok(moved < Math.PI / 4, "and nowhere near the whole way: " + moved.toFixed(3));
+
+  // Nothing in the circle leaves the last bearing rather than snapping back.
+  g.enemies.length = 0;
+  var held = f.viewYaw;
+  f.update(1 / 60, g.enemies);
+  t.eq(f.viewYaw, held, "an empty field does not reset the eye");
 });
 
 test("a farm reads its own dice, face by face, and says what each was worth",

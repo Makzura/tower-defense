@@ -654,7 +654,11 @@ var BASELINE = [
   // 75 -> 78 on 2026-08-29: the panel clearing when the boost arms (a target
   // behind it was unclickable), the field turning to watch its nearest body,
   // and a farm reading its own dice face by face for the board readout.
-  { file: "tests/farm.test.js", pass: 78, fail: 0, failing: [] },
+  // 78 -> 81 on 2026-08-29: the crosspath said properly (two paths at most, one
+  // to five and the other to two, and a committed branch no longer closes the
+  // secondary at tier 1), the boost refusing at the press when no tier 5 tower
+  // is standing, and the EYE tracking instead of the whole machine.
+  { file: "tests/farm.test.js", pass: 81, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

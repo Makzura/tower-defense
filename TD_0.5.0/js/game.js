@@ -2746,6 +2746,20 @@ function runPanelAction(x, y) {
     // seam and the same shape as beginAiming above: the tower says what it
     // wants, game.js owns the mode.
     beginInvesting: function (farm, temporary) {
+      // NOTHING TO AIM AT IS A REFUSAL, NOT A MODE. The investment only lands
+      // on a tower at TIER 5 OR ABOVE -- the Farm's brief says so and the panel
+      // button says so -- and on a board with none, arming opens a mode whose
+      // every click is refused after the fact. That reads exactly like a broken
+      // button: owner, twice, "I can't select a tower with A5's ability".
+      //
+      // So the board is asked first, and the answer comes back through the same
+      // channel every other refusal uses.
+      var eligible = false;
+      for (var i = 0; i < towers.length && !eligible; i++) {
+        if (!FarmBoost.whyCannotBoost(towers[i], !temporary)) eligible = true;
+      }
+      if (!eligible) return false;
+
       investingFarm = { farm: farm, temporary: !!temporary };
       // AND THE PANEL GOES, because it is standing on the thing to be clicked.
       // It is a 268 px slab down the right third of the board and it eats every
@@ -2760,6 +2774,7 @@ function runPanelAction(x, y) {
       // pick one that is not under the panel. A target is a specific tower,
       // and it is wherever it was built.
       inspected = null;
+      return true;
     }
   });
 
@@ -9570,14 +9585,36 @@ var RESULT_TOTAL_LABELS = [
   "Blubs summoned", "Recruits sent"
 ];
 
+// Whether a formatted total reads as nothing at all. `TowerStats.formatTotal`
+// thins big numbers to "12.3k", so this tests the STRING the screen would show
+// rather than re-deriving a number the row no longer carries: "0" is nothing,
+// "0.0k" cannot occur, and "0 / 80" is a health line that never reaches here.
+function isZeroTotal(value) {
+  return String(value).replace(/[^0-9.]/g, "") === "0";
+}
+
 function resultTowerRows() {
   var rows = [];
   for (var i = 0; i < towers.length; i++) {
     var tw = towers[i];
+    // A SUMMONED BODY IS NOT A TOWER ON THIS SCREEN. Blubs live in `towers`
+    // (see js/blub.js for why) and each one was getting a row of its own, so a
+    // finished Summoner filled the screen with a dozen entries for units the
+    // player never placed. The Summoner is the thing that was built and the
+    // thing whose figures matter; its brood is counted inside its own totals.
+    if (tw.isSummon) continue;
+
     var lines = (typeof tw.statLines === "function") ? tw.statLines() : [];
     var totals = [];
     for (var j = 0; j < lines.length; j++) {
-      if (RESULT_TOTAL_LABELS.indexOf(lines[j][0]) !== -1) totals.push(lines[j]);
+      if (RESULT_TOTAL_LABELS.indexOf(lines[j][0]) === -1) continue;
+      // NO INVENTED ZEROES, which is the rule this screen already says it is
+      // built on -- it just was not applied to a total that happens to BE zero.
+      // "Mana produced 0" on a farm that never settled a wave, or "Kills 0" on
+      // a tower that killed nothing, is a row that tells the player something
+      // did not happen; the absence tells them the same thing more quietly.
+      if (isZeroTotal(lines[j][1])) continue;
+      totals.push(lines[j]);
     }
     rows.push({
       name: (typeof tw.displayName === "function" ? tw.displayName()

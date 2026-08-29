@@ -13,6 +13,38 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-29 — The Farm's crosspath, its eye, and a tidier end screen.**
+
+**The crosspath was wrong in both directions.** `lockedBranch` alone refused
+every other branch outright once one reached T3 — so a farm going up A could
+never buy B1, though the secondary is meant to reach tier 2 — and nothing counted
+branches, so before any T3 a farm could put two tiers on all three and only then
+find itself stuck. It is two rules now, in the order a player meets them: a third
+branch is never started, and only one branch passes tier 2. One to five, the
+other to two, which is what the brief always said.
+
+**A5's boost refuses at the press when there is nothing to aim at.** It only
+lands on a tower at tier 5 or above; on a board with none, arming opened a mode
+whose every click was refused after the fact, which reads exactly like a broken
+button. Verified with real mouse clicks that the flow itself works — the banner
+reads "Warbringer — boosted" and its damage goes 65 → 97.5 — so what was missing
+was the refusal, not the mechanism.
+
+**Only the eye turns now.** Tracking was done by turning the tower's `aim`, which
+swung the skid, the pylons and the operator with it. The bearing lives on
+`viewYaw` and gl-world spends it on ONE group, about its own axis, through the
+per-group override the recruit's rifle recoil already uses — with the pivot from
+the model's new `pivots` map, because an eye turned about the middle of its own
+mesh swings off its mount. Only while the field idle is playing, which is what
+makes it safe: those clips leave the eye alone. Measured: 380 px change when it
+turns while watching, 0 px when the field is empty and the authored patrol has
+it. Eased on `1 - exp(-6·dt)`, the short way round.
+
+**And the end screen stopped inventing rows.** A summoned blub is not a tower
+there — each one had been getting an entry of its own, so a finished Summoner
+filled the screen — and a total of zero is no longer printed at all, which is the
+"no invented zeroes" rule that screen already says it is built on.
+
 **2026-08-29 — Four corrections to the farms, from a playtest.**
 
 **A5's boost could not pick its target.** Arming the mode left the panel up, and

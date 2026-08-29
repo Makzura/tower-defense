@@ -507,11 +507,20 @@ def build(gltf, options):
     names = sorted(set(part["group"] for part in parts))
 
     rest_world = {}
+    pivots = {}
     for name in names:
         if not name:
             continue
         chain = chain_of(group_node[name], parent)
         rest_world[name] = world_at(chain, anim, None, nodes)   # time None: authored
+        # WHERE THIS GROUP TURNS, in model space. The geometry ships in model
+        # space and the frame matrices are model-space deltas, so nothing in
+        # the animation needs this -- but a RUNTIME pose does. gl-world aims a
+        # scanner's eye by rotating its group about its own axis, and without
+        # the axis it would have to guess one from the geometry's middle, which
+        # is the crank-about-the-crank mistake the other tool warns about.
+        pivots[name] = [round(v, 4)
+                        for v in convert(mat_apply(rest_world[name], (0.0, 0.0, 0.0)))]
 
     palette = []
     lookup = {}
@@ -583,7 +592,7 @@ def build(gltf, options):
     return {"name": options.name, "triangles": len(colour_index),
             "palette": palette, "positions": positions, "normals": normals,
             "colourIndex": colour_index, "groups": out_groups,
-            "frames": frames, "loopSeconds": band_seconds[0],
+            "frames": frames, "pivots": pivots, "loopSeconds": band_seconds[0],
             "bands": bands, "bandSeconds": band_seconds, "bandNames": band_names,
             "animation": band_names[0], "scale": scale,
             "height": (max(p[1] for p in raw) - floor) * scale}
@@ -628,6 +637,7 @@ def write_js(model, filename, source):
         "  bandNames: %s," % json.dumps(model["bandNames"]),
         "  palette: %s," % json.dumps(model["palette"]),
         "  groups: %s," % json.dumps(model["groups"]),
+        "  pivots: %s," % json.dumps(model["pivots"]),
         "  frames: %s," % json.dumps(model["frames"]),
         "  positions: %s," % arr(model["positions"]),
         "  normals: %s," % arr(model["normals"]),
