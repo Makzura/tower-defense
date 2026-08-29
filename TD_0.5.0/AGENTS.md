@@ -7631,6 +7631,62 @@ still inside its own duration, else the idle. One-way, exactly like
 because an index points at whatever happens to be second in the file, and B3
 already carries two one-shots where A3 and C3 carry one. A test pins the names.
 
+### The Rifleman's nine bodies, and the second family on `bands`
+
+2026-08-29, replacing the five hand-posed meshes with an authored package the
+owner handed over: *"replace old model and animations, do not replace the
+recruits"*. Nine bodies — `base t1 t2 a3 a4 a5 b3 b4 b5` — each carrying its
+whole clip set as named bands, so the Rifleman is the second family after the
+Farm to be driven by `bandNames` rather than by a work cycle.
+
+**WHAT THE TIERS GAINED.** He had five bodies and wore the unbought one until
+his first tier 3; `a4` wore `a3` and `b4` wore `b3`. The package ships nine,
+including the two early bodies (`t1`, `t2`) that stretch never had. Triangles
+FELL — 9 224 to 3 000 on the base, 53k to 38k across the family — because the
+new meshes are built rather than sculpted.
+
+**`riflemanGroup` ASKS THE TOWER NOW.** It walked `hasA1..hasB5` itself and
+could only name five bodies; `Soldier.bodyTier()` was already the place that
+rule lived (`fire()` reads it for the muzzle), so the renderer's copy is gone.
+`bodyTier()` gained the two early rules, and they sit BELOW the tier-3 checks
+for the reason that matters: **a path body is never replaced by a crosspath
+purchase** — an A3 who buys B1 and B2 is still `a3`. A test walks all eleven
+routes.
+
+**THE PACKAGE DECLARES ITS OWN AXIS LAW AND IT IS NOT glTF's.** "Forward +X, up
++Y, his right +Z" — glTF's usual is +Y up with forward on −Z — so the importer
+lands the man facing +Y and his rifle running down the +Y axis in model space
+(measured: the `gun` group spans y −0.031..0.582 against x −0.256..0.337). That
+is corrected by adding `rifleman-` to **`FRONT_PLUS_Y`**, the seam three
+families already use, rather than by rotating geometry at import: the import
+stays faithful to what the package says it is. **`recruit-` does not match**,
+which is what keeps the recruits out of it.
+
+**THE MUZZLES WERE RE-MEASURED, off `socket_muzzle` at `aim_idle` rather than
+off a Blender print.** `Soldier.MUZZLE_UL` and gl-world's `RIFLEMAN_FX_MUZZLE`
+are the same nine measurements, converted once by 30.58 u.l. per world unit, so
+the round and its flash leave one point. Every height rose about ten u.l. — 41
+against 31 — because these bodies SHOULDER the weapon where the old mesh held it
+at the chest. Nothing was rescaled.
+
+**WHAT DRIVES THE CLIPS.** `riflemanBandNow` in gl-world, and it stores nothing:
+`sinceShot()` (already derived, already ages to null) picks `fire_single`,
+`recruitCooldown` counted down from its own 45 s picks `call_recruits`, and
+between shots the burst clock decides `aim_idle` against `idle_low_ready` —
+`optic_scan` on the B path, which is that path's character. `hit_react` and
+`destroyed` ship in every body and are deliberately NOT played: damage is shown
+by the health bar and a destroyed tower leaves on the frame it dies, so neither
+has a moment to run in. `burst_cycle`, `reload_showcase` and `flare_check` are
+marked `sc` — showcase — in the package's own manifest and belong to its preview
+lab, not the board.
+
+**THE IMPORTER LEARNED ONE THING.** three.js's `GLTFExporter` writes animation
+channels with no `target.node` — the casing and the muzzle flash are animated by
+VISIBILITY, which has no node to point at. glTF says to ignore such a channel;
+`glb_to_animated.py` raised `KeyError` on it and turned nine importable models
+into nine crashes. It skips them now, which loses nothing: visibility is not
+part of this format and the flash is gl-world's own effect.
+
 ### The mana has to be VISIBLE, and two separate things were hiding it
 
 Owner, on the first import: *“il n'y a pas de shine ni de couleur… le A path

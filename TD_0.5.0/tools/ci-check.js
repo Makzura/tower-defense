@@ -833,7 +833,14 @@ var BASELINE = [
     // being tightened past the room its own contents need -- the Volatile
     // fuse and the money convoys, both floors the suite already owned and
     // both of which caught the first attempt.
-    file: "tests/content.test.js", pass: 314, fail: 0,
+    // ---- 318 on 2026-08-29, the Rifleman's revamped bodies ---------------
+    // 314 -> 318: four added under `the Rifleman's revamped bodies`. Nine
+    // authored bodies replaced five hand-posed ones, so: every upgrade route
+    // reaches a registered model and a muzzle, the two NEW early bodies (t1,
+    // t2) arrive on either path without a crosspath ever overwriting a
+    // path body, the muzzles are measured off the sockets they belong to, and
+    // the recruits -- which the owner said not to touch -- are untouched.
+    file: "tests/content.test.js", pass: 318, fail: 0,
     failing: []
   },
   {

@@ -44,6 +44,50 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — The Rifleman's nine new bodies, and their clips.**
+
+Owner, handing over a package: *"replace old model and animations, do not
+replace the recruits"*. Nine authored bodies — `base t1 t2 a3 a4 a5 b3 b4 b5` —
+each with its whole clip set as named bands, replacing five hand-posed meshes
+that carried one work cycle between them. The recruits are separate actors with
+their own two models and were not touched.
+
+**He gained the two bodies he never had.** He wore the unbought mesh until his
+first tier 3, and `a4`/`b4` wore `a3`/`b3`; there are now bodies for tier 1 and
+tier 2 and for both fours. Triangles FELL — 9 224 to 3 000 on the base, 53k to
+38k across the family.
+
+**`riflemanGroup` asks the tower now** instead of walking `hasA1..hasB5` a
+second time. `Soldier.bodyTier()` was already where that rule lived, since
+`fire()` reads it for the muzzle; it gained the two early rules, placed BELOW
+the tier-3 checks so a crosspath purchase can never overwrite a path body — an
+A3 who buys B1 and B2 is still `a3`.
+
+**The package declares its own axis law and it is not glTF's** — "forward +X, up
++Y, his right +Z" against glTF's +Y up and forward −Z — so the import lands him
+facing +Y with his rifle down the +Y axis. Corrected by adding `rifleman-` to
+`FRONT_PLUS_Y`, the seam three families already use, rather than by rotating
+geometry: the import stays faithful to what the package says it is. `recruit-`
+deliberately does not match.
+
+**The muzzles were re-measured off `socket_muzzle`** at `aim_idle` rather than
+off a Blender print, and `Soldier.MUZZLE_UL` and `RIFLEMAN_FX_MUZZLE` are now
+the same nine measurements so the round and its flash leave one point. Every
+height rose about ten u.l. because these bodies shoulder the weapon where the
+old mesh held it at the chest; nothing was rescaled.
+
+**`riflemanBandNow` drives the clips and stores nothing.** `sinceShot()` picks
+`fire_single`, `recruitCooldown` picks `call_recruits`, and between shots the
+burst clock decides shouldered against low ready — the optic scan on path B.
+`hit_react` and `destroyed` ship in every body and are not played: damage is the
+health bar's job and a destroyed tower leaves on the frame it dies.
+
+**The importer learned one thing on the way.** three.js's `GLTFExporter` writes
+animation channels with no `target.node` — the casing and the muzzle flash are
+animated by visibility, which has no node to point at. glTF says to ignore such
+a channel; `glb_to_animated.py` raised `KeyError` and turned nine importable
+models into nine crashes.
+
 **2026-08-29 — Normal is re-timed to a 1.50 rating, and its curve now rises.**
 
 Owner: *"increase normal difficulty so it becomes 1.5X also be sure it GET

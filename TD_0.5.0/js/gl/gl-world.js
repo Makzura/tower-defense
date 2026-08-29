@@ -861,17 +861,21 @@ var World3D = (function () {
   // one of these weapons -- so it is derived once and both callers read it,
   // rather than the effect layer re-deriving tiers and drifting out of step
   // with the model it is supposed to be welded to.
+  // ASKED OF THE TOWER, not derived a second time here.
+  //
+  // This used to walk `hasA1..hasB5` itself and could name only five of the
+  // bodies -- base, a3, a5, b3, b5 -- because only five existed; A4 wore A3's
+  // body and B4 wore B3's. The 2026-08-29 revamp ships NINE, including the two
+  // early bodies (t1, t2) that the man never had, and `Soldier.bodyTier()` was
+  // already the place that rule lives: `fire()` reads it to find the muzzle, so
+  // a second copy here was a second copy of a tiering rule, which this file
+  // says elsewhere is exactly what it will not keep.
+  //
+  // A Soldier that somehow has no `bodyTier` falls back to the unbought body
+  // rather than to nothing -- a missing model draws no tower at all.
   function riflemanGroup(tower) {
-    var a = 0, b = 0;
-    for (var i = 1; i <= 5; i++) {
-      if (tower["hasA" + i]) a = i;
-      if (tower["hasB" + i]) b = i;
-    }
-    if (a >= 5) return "a5";
-    if (a >= 3) return "a3";
-    if (b >= 5) return "b5";
-    if (b >= 3) return "b3";
-    return "base";
+    return (tower && typeof tower.bodyTier === "function")
+      ? tower.bodyTier() : "base";
   }
 
   // Same group rule the sprite pack uses: tier 3 locks the other branch, so
@@ -1075,7 +1079,19 @@ var World3D = (function () {
   // would collide. The real fix is to author front on +X and delete this
   // function; until then this keeps the board correct and keeps the mistake in
   // one visible place instead of spread through the draw path.
-  var FRONT_PLUS_Y = /^(blub-|summoner-|siphon-)/;
+  // `rifleman-` JOINED THE LIST ON 2026-08-29 with the revamped bodies. The
+  // package declares its own axis law -- "forward +X, up +Y, his right +Z",
+  // which is NOT glTF's usual (+Y up, forward -Z) -- so the importer's remap
+  // lands the man facing +Y and his rifle runs down the +Y axis in model
+  // space. Measured on the imported base: the `gun` group spans y -0.031..0.582
+  // against x -0.256..0.337, which is the barrel, pointing sideways.
+  //
+  // Corrected HERE rather than by rotating the geometry at import, because this
+  // is the seam the repo already keeps for exactly this and three other
+  // families already use it -- and because the import stays faithful to what
+  // the package says it is. `recruit-` does NOT match: the recruits are their
+  // own actors, were not revamped, and are authored the other way.
+  var FRONT_PLUS_Y = /^(blub-|summoner-|siphon-|rifleman-)/;
 
   function authoredFrontOffset(model) {
     return (model && FRONT_PLUS_Y.test(model)) ? -Math.PI / 2 : 0;
@@ -1263,6 +1279,110 @@ var World3D = (function () {
     var phase = (((clock / loop) % 1) + 1) % 1;
     return { oneShot: false, band: idleBand,
              frame: first + Math.min(count - 1, Math.floor(phase * count)) };
+  }
+
+  // --- the Rifleman's clips ---------------------------------------------
+  //
+  // The 2026-08-29 revamp replaced five hand-posed bodies with nine authored
+  // ones, and with them a WORK CYCLE became a CLIP SET. The old bodies carried
+  // a single strip that the generic driver below walked with `gearPhase()`: one
+  // pose per hundredth of the firing cycle, and frame 0 a rest. These carry
+  // twelve to sixteen named bands -- two idles, a shot, a brace, a recover, a
+  // hit, a death, and on the B path an optic scan and the recruit signal -- so
+  // walking the strip would play every one of them end to end as though it were
+  // one animation.
+  //
+  // NOTHING NEW IS STORED ON THE TOWER. Every signal below is already derived
+  // and already cosmetic: `sinceShot()` ages to null on its own, `cooldown` and
+  // `burstShotsLeft` are the burst clock the simulation already runs, and
+  // `recruitCooldown` counts the 45 s down from the call. That is the same rule
+  // the muzzle flash and the recoil kick have followed since they were written
+  // -- see AGENTS.md on presentation state.
+  //
+  // WHAT IS NOT DRIVEN, and deliberately. `hit_react` and `destroyed` are in
+  // every body and are not played: a tower's damage is shown by its health bar
+  // and a destroyed one leaves the board on the frame it dies, so neither has a
+  // moment to run in. `burst_cycle`, `reload_showcase` and `flare_check` are
+  // marked `sc` -- showcase -- in the package's own manifest and are for the
+  // preview lab, not for the board. They stay in the model so the index can
+  // show them.
+  var RIFLEMAN_CLIP = {
+    idle: "idle_low_ready",
+    aim: "aim_idle",
+    fire: "fire_single",
+    scan: "optic_scan",
+    recruits: "call_recruits"
+  };
+
+  function riflemanBandNow(m, tower) {
+    var bands = m.bands, seconds = m.bandSeconds, names = m.bandNames;
+    if (!bands || bands.length < 2 || !seconds || !names) {
+      return { band: 0, frame: 0 };
+    }
+
+    function bandOf(name) {
+      var i = names.indexOf(name);
+      return i >= 0 ? i : -1;
+    }
+    // A band's frame at a phase in [0,1]. A one-shot's last frame IS its end
+    // pose, so n frames span the window inclusive -- the same arithmetic the
+    // farm's one-shots use, and for the same reason.
+    function frameAt(band, phase, inclusive) {
+      var first = bands[band][0], n = bands[band][1];
+      var t = inclusive ? Math.floor(phase * (n - 1) + 0.5)
+                        : Math.floor(phase * n);
+      return { band: band, frame: first + Math.min(n - 1, Math.max(0, t)) };
+    }
+
+    // THE RECRUIT SIGNAL FIRST, because it is the only thing he does that is
+    // not shooting and it reads over a shot. `recruitCooldown` is set to the
+    // full 45 s at the call and counts down, so the age since the call is the
+    // difference -- no stamp needed.
+    var callBand = bandOf(RIFLEMAN_CLIP.recruits);
+    if (callBand > 0 && tower.recruitCooldownSeconds > 0) {
+      var since = tower.recruitCooldownSeconds - (tower.recruitCooldown || 0);
+      if (since >= 0 && since < seconds[callBand]) {
+        return frameAt(callBand, since / seconds[callBand], true);
+      }
+    }
+
+    // THE SHOT. `sinceShot()` is the age of the round in flight and is null
+    // between shots, which is exactly the window this clip wants -- and it
+    // already reconciles the burst and the automatic models, so B3's steady
+    // rifle pulses the same clip at its own rate with nothing special here.
+    var fireBand = bandOf(RIFLEMAN_CLIP.fire);
+    if (fireBand > 0 && typeof tower.sinceShot === "function") {
+      var age = tower.sinceShot();
+      if (age !== null && age >= 0 && age < seconds[fireBand]) {
+        return frameAt(fireBand, age / seconds[fireBand], true);
+      }
+    }
+
+    // BETWEEN SHOTS: shouldered or at low ready, decided by whether the burst
+    // clock is still running. A tower mid-cycle has just fired or is about to;
+    // one whose cooldown has expired with nothing queued has nothing in front
+    // of it. The B path watches through its optic instead, which is that
+    // path's whole character -- it buys sight, not rate.
+    var busy = (tower.burstShotsLeft > 0) || (tower.cooldown > 0);
+    var idleBand = 0;
+    if (busy) {
+      var aim = bandOf(RIFLEMAN_CLIP.aim);
+      if (aim > 0) idleBand = aim;
+    } else {
+      var scan = bandOf(RIFLEMAN_CLIP.scan);
+      var low = bandOf(RIFLEMAN_CLIP.idle);
+      if (scan > 0) idleBand = scan;
+      else if (low > 0) idleBand = low;
+    }
+
+    // ON THE TOWER'S OWN CLOCK where it has one, and on wall time where it does
+    // not. A Soldier accumulates no `animClock`; its idles are a breath rather
+    // than a picture of production, so a paused board holding its breath is
+    // the wrong read and `state.now` is right -- the same choice the Summoner's
+    // idle documents above.
+    var loop = seconds[idleBand] > 0 ? seconds[idleBand] : 4;
+    var phase = (((state.now / 1000 / loop) % 1) + 1) % 1;
+    return frameAt(idleBand, phase, false);
   }
 
   function farmFrame(m, tower) {
@@ -2415,6 +2535,14 @@ var World3D = (function () {
         if (m && m.frames.length > 1 && t.constructor &&
             t.constructor.ID === "farm") {
           frame = farmFrame(m, t);
+        }
+        // The Rifleman, since its bodies became a clip set. Checked by MODEL
+        // rather than by tower id, so the recruits -- which are `recruit-b4`
+        // and `recruit-b5`, drawn by their own pass below and untouched by the
+        // revamp -- cannot fall into it.
+        if (m && m.bands && m.bands.length > 1 &&
+            /^rifleman-/.test(model)) {
+          frame = riflemanBandNow(m, t).frame;
         }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from
@@ -5159,11 +5287,29 @@ var World3D = (function () {
     b5: { muzzle: [1.25, -0.06, 1.313], chamber: [0.20, -0.06, 1.265],
           source: [0.005, -0.02, 1.520] }
   };
+  // WHERE THE FLASH SITS, per body: forward, lateral, height, in world units.
+  //
+  // MEASURED OFF `socket_muzzle`, not estimated. The 2026-08-29 revamp carries
+  // that empty on every one of its nine bodies, posed at `aim_idle`, and these
+  // are its world position read straight out of the package's own runtime --
+  // the same figures `Soldier.MUZZLE_UL` is converted from, so the flash and
+  // the round it belongs to leave the same point.
+  //
+  // The lateral column is NEGATED from the socket's own +Z. The package puts
+  // "his right" on +Z; this table is read through `anchor()`, which lays x
+  // along the aim and y across it screen-wise, and the two hands are opposite.
+  // Kept as a sign here rather than a rule somewhere, because it is one column
+  // of one table.
+  //
+  // The bodies all hold the weapon higher than the old ones did -- 1.34 against
+  // 1.01 -- because the revamp shoulders the rifle where the old mesh held it
+  // at the chest. Nothing is scaled: this is where the barrel now is.
   var RIFLEMAN_FX_MUZZLE = {
-    base: [0.926, -0.200, 1.008], a3: [0.945, -0.180, 1.015],
-    a4: [1.200, 0, 1.100], a5: [1.190, 0, 1.140],
-    b3: [0.937, -0.200, 0.989], b4: [0.977, -0.200, 0.992],
-    b5: [1.145, 0, 1.240]
+    base: [0.949, -0.210, 1.341], t1: [0.949, -0.210, 1.341],
+    t2:   [1.064, -0.210, 1.345], a3: [1.094, -0.210, 1.346],
+    a4:   [1.134, -0.210, 1.348], a5: [1.134, -0.210, 1.348],
+    b3:   [0.954, -0.210, 1.342], b4: [0.954, -0.210, 1.342],
+    b5:   [0.954, -0.210, 1.342]
   };
   // The three shot colours, byte triplets so a gradient stop can be built from
   // one of them at any alpha. Identical values to js/skins/draw-pack.js

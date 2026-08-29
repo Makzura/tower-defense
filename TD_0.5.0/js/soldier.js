@@ -958,6 +958,20 @@ Soldier.prototype.bodyTier = function () {
   if (this.hasB5) return "b5";
   if (this.hasB4) return "b4";
   if (this.hasB3) return "b3";
+
+  // THE TWO EARLY BODIES (2026-08-29). Until the revamp he wore the unbought
+  // body until his first tier-3, so buying A1 and A2 changed his numbers and
+  // nothing about him; the new package ships `t1` and `t2` for exactly that
+  // stretch. They are SHARED across the paths -- either branch's tier 1 gives
+  // t1 and either branch's tier 2 gives t2 -- because the paths do not diverge
+  // visually until 3, which is also where the crosspath locks.
+  //
+  // BELOW the tier-3 checks and not above them, which is the whole rule that
+  // matters here: a path-specific body is never replaced by a crosspath
+  // purchase. An A3 who then buys B1 and B2 is still `a3` -- the crosspath
+  // bought him stats, not a costume.
+  if (this.hasA2 || this.hasB2) return "t2";
+  if (this.hasA1 || this.hasB1) return "t1";
   return "base";
 };
 
@@ -979,14 +993,27 @@ Soldier.prototype.bodyTier = function () {
 // offset, so folding it in would put the spawn point wrong in a different way.
 // It is under a bullet's own radius; `height` is presentation only and rides on
 // the bullet as `liftUl`, exactly as the Longshot's does.
+//
+// RE-MEASURED 2026-08-29 for the revamped bodies, and off the model rather
+// than off a Blender print this time: every one of the nine carries a
+// `socket_muzzle` empty, and these are its world position at `aim_idle`
+// converted once by 30.58 u.l. per world unit. gl-world's RIFLEMAN_FX_MUZZLE
+// is the same nine measurements, so the flash and the round share a point.
+//
+// The heights all rose by about ten u.l. -- 41 against 31 -- because the new
+// bodies SHOULDER the weapon where the old mesh held it at the chest. Nothing
+// was rescaled; that is where the barrel is now. `height` is presentation only
+// and rides on the bullet as `liftUl`.
 Soldier.MUZZLE_UL = {
-  base: { forward: 28.3, height: 30.8 },
-  a3:   { forward: 28.9, height: 31.0 },
-  a4:   { forward: 36.7, height: 33.6 },
-  a5:   { forward: 36.4, height: 34.9 },
-  b3:   { forward: 28.7, height: 30.2 },
-  b4:   { forward: 29.9, height: 30.3 },
-  b5:   { forward: 35.0, height: 37.9 }
+  base: { forward: 29.0, height: 41.0 },
+  t1:   { forward: 29.0, height: 41.0 },
+  t2:   { forward: 32.5, height: 41.1 },
+  a3:   { forward: 33.5, height: 41.2 },
+  a4:   { forward: 34.7, height: 41.2 },
+  a5:   { forward: 34.7, height: 41.2 },
+  b3:   { forward: 29.2, height: 41.0 },
+  b4:   { forward: 29.2, height: 41.0 },
+  b5:   { forward: 29.2, height: 41.0 }
 };
 
 Soldier.prototype.muzzle = function () {

@@ -72,7 +72,7 @@ var TowerPreview3D = (function () {
   // convention is FORWARD = +X. Copied deliberately rather than imported --
   // it is four characters of rule and gl-world keeps it private -- and it dies
   // in both places on the day the geometry is re-authored.
-  var FRONT_PLUS_Y = /^(blub-|summoner-|siphon-)/;
+  var FRONT_PLUS_Y = /^(blub-|summoner-|siphon-|rifleman-)/;
 
   // --- the icon camera ------------------------------------------------------
   //

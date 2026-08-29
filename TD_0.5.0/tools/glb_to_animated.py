@@ -300,6 +300,25 @@ class Animation(object):
         self.channels = {}              # node index -> {path: (times, values)}
         self.duration = 0.0
         for channel in anim["channels"]:
+            # A CHANNEL WITH NO TARGET NODE IS TO BE IGNORED, and that is the
+            # spec's own word: glTF 2.0 says of `channel.target.node` that
+            # "when undefined, the animated object MAY be defined by an
+            # extension" and that such a channel SHOULD be skipped by a reader
+            # that knows no such extension.
+            #
+            # Three.js's GLTFExporter emits them. The Rifleman package's
+            # `fire_single` carries two and its `burst_cycle` six: they drive
+            # the casing and the muzzle flash, which are animated by VISIBILITY
+            # rather than by transform, so the exporter writes the track and
+            # then has no node to point it at. Reading them as `KeyError` --
+            # which is what this did -- turned nine importable models into
+            # nine crashes.
+            #
+            # Visibility is not part of this format anyway (a group is posed by
+            # a 4x4 and nothing here hides one), so there is nothing lost by
+            # skipping them; the flash is drawn by gl-world's own effect.
+            if "node" not in channel["target"]:
+                continue
             sampler = anim["samplers"][channel["sampler"]]
             interp = sampler.get("interpolation", "LINEAR")
             if interp != "LINEAR":

@@ -6414,6 +6414,108 @@ test("the armoury opens from the menu and draws both tabs", function (t) {
   t.eq(h.game.enemies.length, before, "ten seconds in the armoury spawns nothing");
 });
 
+group("the Rifleman's revamped bodies");
+
+// 2026-08-29: nine authored bodies with a full clip set replaced five
+// hand-posed ones. Presentation only -- the owner's instruction was "replace
+// old model and animations, do not replace the recruits" -- so what these pin
+// is that every tier still resolves to a body, that the two NEW bodies sit
+// where the package says, and that the recruits were left alone.
+
+test("every body a Soldier can wear is registered", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  // WALKED, not listed: the tiers come from the tower's own rule, so a new
+  // upgrade that returns a new body name fails here rather than drawing
+  // nothing. A missing model is not an error anywhere in the renderer -- it
+  // draws no tower at all -- which is exactly why this is asserted.
+  var seen = {};
+  [[], ["A1"], ["A1", "A2"], ["A1", "A2", "A3"], ["A1", "A2", "A3", "A4"],
+   ["A1", "A2", "A3", "A4", "A5"], ["B1"], ["B1", "B2"], ["B1", "B2", "B3"],
+   ["B1", "B2", "B3", "B4"], ["B1", "B2", "B3", "B4", "B5"]].forEach(function (path) {
+    var s = new g.Soldier(-1000, -1000, g.path);
+    path.forEach(function (id) { s.applyUpgrade(id); });
+    seen[s.bodyTier()] = true;
+  });
+
+  t.deep(Object.keys(seen).sort(),
+    ["a3", "a4", "a5", "b3", "b4", "b5", "base", "t1", "t2"],
+    "eleven upgrade routes reach exactly nine bodies");
+
+  Object.keys(seen).forEach(function (tier) {
+    t.ok(g.GLModels.has("rifleman-" + tier),
+      "rifleman-" + tier + " is registered");
+    t.ok(g.Soldier.MUZZLE_UL[tier],
+      "and " + tier + " has a muzzle, so its shot leaves the barrel");
+  });
+});
+
+test("the two early bodies arrive at tier 1 and 2, on either path", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  function tierAfter(ids) {
+    var s = new g.Soldier(-1000, -1000, g.path);
+    ids.forEach(function (id) { s.applyUpgrade(id); });
+    return s.bodyTier();
+  }
+
+  t.eq(tierAfter([]), "base", "an unbought Soldier is the base body");
+  t.eq(tierAfter(["A1"]), "t1", "A1 buys the first body");
+  t.eq(tierAfter(["B1"]), "t1", "and so does B1 -- the paths do not diverge yet");
+  t.eq(tierAfter(["A1", "A2"]), "t2", "A2 buys the second");
+  t.eq(tierAfter(["B1", "B2"]), "t2", "and so does B2");
+
+  // THE RULE THAT MATTERS, and the one a crosspath would break: a path-specific
+  // body is never replaced by a cheaper purchase on the other branch.
+  t.eq(tierAfter(["A1", "A2", "A3", "B1"]), "a3",
+    "an A3 who then buys B1 is still a3 -- crosspath buys stats, not a costume");
+  t.eq(tierAfter(["A1", "A2", "A3", "B1", "B2"]), "a3", "and still a3 after B2");
+  t.eq(tierAfter(["B1", "B2", "B3", "A1", "A2"]), "b3", "the same both ways round");
+});
+
+test("the muzzle is measured off the body it belongs to", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  // The weapons get longer along path A and stay short along B, which is what
+  // the two paths ARE -- A grafts a bigger gun on, B buys sight and people.
+  var M = g.Soldier.MUZZLE_UL;
+  t.ok(M.a5.forward > M.a3.forward, "path A's barrel grows (" +
+    M.a3.forward + " -> " + M.a5.forward + ")");
+  t.ok(M.b5.forward < M.a5.forward, "path B's does not (" + M.b5.forward + ")");
+  t.eq(M.t1.forward, M.base.forward, "t1 shares the base barrel");
+  t.ok(M.t2.forward > M.t1.forward, "and t2's brake is longer");
+
+  // EVERY BODY SHOULDERS THE WEAPON NOW. The old meshes held it at the chest
+  // around 31 u.l.; these are all around 41, and a height that stayed behind
+  // would put a round through the man's own shoulder.
+  Object.keys(M).forEach(function (tier) {
+    t.ok(M[tier].height > 38 && M[tier].height < 44,
+      tier + " fires from the shoulder (" + M[tier].height + " u.l.)");
+  });
+});
+
+test("the recruits were not part of the revamp", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  // The owner's words: "do not replace the recruits". They are separate actors
+  // with their own two models, and nothing about them is a `rifleman-` body.
+  t.ok(g.GLModels.has("recruit-b4"), "recruit-b4 is still registered");
+  t.ok(g.GLModels.has("recruit-b5"), "and recruit-b5");
+  t.ok(!g.GLModels.has("rifleman-recruit-b4"),
+    "and neither was renamed into the tower's family");
+
+  // The tower's own bodies never answer for a recruit: `bodyTier` is a tower
+  // rule and a recruit has no upgrades at all.
+  var b5 = new g.Soldier(-1000, -1000, g.path);
+  ["B1", "B2", "B3", "B4", "B5"].forEach(function (id) { b5.applyUpgrade(id); });
+  t.eq(b5.bodyTier(), "b5", "a B5 tower wears b5");
+  t.eq(b5.recruits.length, 0, "and its recruits are a separate list entirely");
+});
+
 group("the Soldier");
 
 // The Soldier's build slot, looked up rather than typed: it is the fifth today
