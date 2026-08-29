@@ -44,6 +44,40 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — The muzzle flash points somewhere, and t1/t2 stop firing the loudest round in the game.**
+
+Owner: *"work more on each barrel explosion, it's kinda goofy right now, they're
+not the same and still very unrealistic"*, and then *"also some don't even have
+them"*. Three separate faults behind that.
+
+**It was a four-armed star.** Symmetrical, centred on the muzzle, so it read the
+same whichever way he faced and looked closer to a sparkle than to a rifle going
+off. What leaves a barrel is a short cone of burning gas going FORWARD, and the
+asymmetry is the whole read — you should be able to see which way he shot. It is
+a filled cone now with a hotter core inside it and a small bloom at the muzzle,
+and its direction comes from `barrelAxis` taken ON SCREEN, because under a
+turning camera the barrel's world direction and its screen direction are not the
+same angle.
+
+**It was sized off the BULLET.** So toning the rounds down the same day shrank
+every flash with them, and left them disagreeing with each other — a round's
+size is about damage, a flash is about how much powder burns at the end of a
+barrel. `RIFLEMAN_FLASH` sizes them off the weapon: nine entries for nine
+bodies, path A growing with its grafted gun, path B staying near the carbine
+until B5's heavy slug. Measured on the board, every tier now draws one and they
+order exactly as authored — base 275 changed pixels, t2 344, a3 418, a4 679,
+a5 907, b3 257, b4 283, b5 549.
+
+**And `RIFLEMAN_SHOTS` had seven rows against nine bodies.** The revamp added
+`t1` and `t2` and this table was never extended, so those two fell through to
+`drawRound`'s own fallback — a radius-3.0 bolt written before the tone-down and
+therefore, after it, the loudest round in the game. An early Rifleman fired fat
+bright bolts while every other tier fired small ones, which is exactly the
+"they're not the same" the owner saw. Both tables have the two rows now, the
+fallback is the base round rather than a bigger one, and the test that compares
+the two renderers walks `bodyTier()` and demands a round for every body it can
+return — verified failing with the rows removed.
+
 **2026-08-29 — The rounds stop shouting, and the flare is an actual flare.**
 
 Owner, after playing the revamp: *"the bullets — if you can make them more

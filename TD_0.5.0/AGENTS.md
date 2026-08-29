@@ -7662,6 +7662,28 @@ families already use, rather than by rotating geometry at import: the import
 stays faithful to what the package says it is. **`recruit-` does not match**,
 which is what keeps the recruits out of it.
 
+**THE MUZZLE FLASH IS A CONE, AND IT IS SIZED OFF THE WEAPON.** Owner, on the
+first pass: *"work more on each barrel explosion, it's kinda goofy right now,
+they're not the same and still very unrealistic"* — and *"some don't even have
+them"*. Three faults, all real:
+
+- It was a **four-armed star** centred on the muzzle. Symmetrical, so it read
+  the same whichever way he faced, and closer to a sparkle than to a rifle going
+  off. It is a forward cone now — a filled shape with a hotter core inside it
+  and a small bloom at the muzzle — and the direction comes from `barrelAxis`,
+  taken ON SCREEN, because under a turning camera the barrel's world direction
+  and its screen direction are different angles.
+- Its size came from the **ROUND's radius**, so toning the rounds down shrank
+  every flash with them and made them disagree — a round's size is about damage,
+  a flash is about how much powder burns. `RIFLEMAN_FLASH` sizes them off the
+  weapon instead, nine entries for nine bodies.
+- **`RIFLEMAN_SHOTS` had seven rows against nine bodies.** t1 and t2 fell
+  through to `drawRound`'s own fallback, which nobody had toned down — so the
+  two early bodies fired the loudest bolt in the game while every other tier
+  fired a small one. That is the "they're not the same" the owner saw. The
+  fallback is `RIFLEMAN_SHOTS.base` now, and a test walks `bodyTier()` and
+  demands a round for every body it can return.
+
 **THE ROUNDS AND THE HIT WERE TONED DOWN, and the flare was given something to
 draw** (2026-08-29, same day, after play). A round was a fat disc with a halo
 nearly twice its width and a trail at 1.5× its own radius — the brightest thing

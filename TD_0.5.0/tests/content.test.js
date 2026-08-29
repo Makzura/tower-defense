@@ -6597,6 +6597,7 @@ test("a model with no bands is left to the generic driver", function (t) {
 // Toned down together on 2026-08-29: "make them more realistic... right now
 // it's way too much, it overpowers everything else."
 test("the Rifleman's rounds are spelled the same in both renderers", function (t) {
+  var h = harness.boot();
   var fs = require("fs");
   var pathOf = require("path");
   var root = pathOf.join(__dirname, "..");
@@ -6619,9 +6620,28 @@ test("the Rifleman's rounds are spelled the same in both renderers", function (t
   var world = tableOf("js/gl/gl-world.js");
   var pack = tableOf("js/skins/draw-pack.js");
 
-  t.eq(Object.keys(world).length, 9, "nine rounds in gl-world");
+  // EVERY BODY A SOLDIER CAN WEAR NEEDS A ROUND, and this is the assertion
+  // that would have caught the revamp shipping nine bodies against seven rows:
+  // t1 and t2 fell through to a fallback nobody had toned down and fired the
+  // loudest bolt in the game. Walked off `bodyTier()` rather than listed.
+  var g = h.game;
+  var wearable = {};
+  [[], ["A1"], ["A1", "A2"], ["A1", "A2", "A3"], ["A1", "A2", "A3", "A4"],
+   ["A1", "A2", "A3", "A4", "A5"], ["B1", "B2", "B3"],
+   ["B1", "B2", "B3", "B4"], ["B1", "B2", "B3", "B4", "B5"]].forEach(function (ids) {
+    var s2 = new g.Soldier(-1000, -1000, g.path);
+    ids.forEach(function (id) { s2.applyUpgrade(id); });
+    wearable[s2.bodyTier()] = true;
+  });
+  Object.keys(wearable).forEach(function (tier) {
+    t.ok(world[tier], tier + " has a round of its own in gl-world");
+    t.ok(pack[tier], "and one in draw-pack");
+  });
+
   t.deep(Object.keys(world).sort(), Object.keys(pack).sort(),
-    "and the same nine in draw-pack");
+    "both renderers carry exactly the same set");
+  t.ok(world["recruit-b4"] && world["recruit-b5"],
+    "including the two the recruits fire");
   var wrong = [];
   Object.keys(world).forEach(function (id) {
     if (JSON.stringify(world[id]) !== JSON.stringify(pack[id])) {

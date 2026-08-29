@@ -2458,6 +2458,10 @@
     // Toned down 2026-08-29 with gl-world's copy -- see the note there. The two
     // tables are identical by design and a retune has to move both.
     base:         ["#FFE6A8", "255,206,120", 1.4, 10, 0.16],
+    // The two early bodies, added 2026-08-29 -- nine bodies had been shipping
+    // against seven rows. See the note in gl-world's copy.
+    t1:           ["#FFE6A8", "255,206,120", 1.4, 10, 0.16],
+    t2:           ["#FFEBB4", "255,212,132", 1.5, 11, 0.17],
     a3:           ["#FFE6A8", "255,206,120", 1.5, 12, 0.18],
     // A4 and A5 are a mounted gun and then a four-barrel battery. Bigger,
     // whiter, and long enough to read as a stream when five leave at once.

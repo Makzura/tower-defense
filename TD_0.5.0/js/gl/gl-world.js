@@ -5185,8 +5185,11 @@ var World3D = (function () {
   // recruit carbine and a 20-damage B5 slug are visibly not the same round --
   // which they were, for as long as every shot in the game was one yellow dot.
   function drawRound(ctx, shot) {
-    var spec = RIFLEMAN_SHOTS[shot.shotBody] ||
-      ["#ffe08c", "255,202,92", 3.0, 12, 0.30];
+    // The fallback is the BASE round, not a bigger one. It used to be a
+    // radius-3.0 bolt written before the table was toned down, so any body that
+    // slipped through fired the loudest round in the game -- which is exactly
+    // what t1 and t2 did for a day.
+    var spec = RIFLEMAN_SHOTS[shot.shotBody] || RIFLEMAN_SHOTS.base;
     var lift = shotLift(shot);
     var head = project(shot.x, shot.y, lift);
     if (!head) return;
@@ -5424,6 +5427,14 @@ var World3D = (function () {
   // thing on the board.
   var RIFLEMAN_SHOTS = {
     base: ["#FFE6A8", "255,206,120", 1.4, 10, 0.16],
+    // t1 AND t2 WERE MISSING UNTIL 2026-08-29 and it showed. Nine bodies
+    // arrived with the revamp and this table still had seven rows, so an early
+    // Rifleman fell through to `drawRound`'s own fallback -- which nobody had
+    // toned down, leaving it a radius-3.0 bolt while every other tier fired a
+    // 1.4. The owner saw it as "they're not the same". They share the base
+    // weapon, so they share its round; t2's compact brake is a shade hotter.
+    t1: ["#FFE6A8", "255,206,120", 1.4, 10, 0.16],
+    t2: ["#FFEBB4", "255,212,132", 1.5, 11, 0.17],
     a3: ["#FFE6A8", "255,206,120", 1.5, 12, 0.18],
     a4: ["#FFF2CE", "255,224,150", 1.9, 15, 0.22],
     a5: ["#FFFFFF", "255,236,180", 2.3, 20, 0.28],
@@ -5976,32 +5987,95 @@ var World3D = (function () {
   // The Rifleman's muzzle flash. Cordite, not enchantment -- the one piece of
   // light that tower is allowed, and it lasts exactly as long as a shot does.
   // `sinceShot` ages to null on its own, so nothing is stored for this.
+  // HOW BIG EACH WEAPON'S FLASH IS, as a multiple of the base carbine's.
+  //
+  // OFF THE WEAPON, not off the bullet. The flash used to take its size from
+  // the ROUND's radius, which meant toning the rounds down on 2026-08-29 also
+  // shrank every flash -- and made them disagree with each other, because a
+  // round's size is about damage while a flash is about how much powder went
+  // off at the end of a barrel. The owner saw both: "they're not the same" and
+  // "some don't even have them".
+  //
+  // Nine entries, because there are nine bodies. Path A grafts on a bigger and
+  // bigger gun and its flash grows with it; path B never gets a hotter weapon,
+  // so its flashes stay near the carbine's until B5's heavy slug.
+  var RIFLEMAN_FLASH = {
+    base: 1.00, t1: 1.00, t2: 1.10,
+    a3: 1.22, a4: 1.55, a5: 1.80,
+    b3: 0.95, b4: 1.00, b5: 1.40
+  };
+
+  // A MUZZLE FLASH POINTS SOMEWHERE, which the old one did not.
+  //
+  // It was a four-armed star centred on the muzzle -- symmetrical, so it read
+  // the same whichever way he faced, and closer to a sparkle than to a rifle
+  // going off. What actually leaves a barrel is a short cone of burning gas
+  // going FORWARD, brightest at the crown, with a small bloom at the muzzle
+  // itself and almost nothing behind. That asymmetry is the whole read: you can
+  // see which way he shot.
+  //
+  // THE DIRECTION IS TAKEN ON SCREEN, not from `tower.aim`. Under a turning
+  // camera the barrel's direction in the world and its direction on screen are
+  // different angles, and `barrelAxis` is the seam this file already keeps for
+  // that -- it projects two model-space points and subtracts them.
+  //
+  // Deliberately brief. A rifle flash is about a hundredth of a second; this
+  // runs 0.055 s so it survives a frame at 60 Hz, and heavy weapons hold it a
+  // little longer because more powder burns for longer.
   function drawRiflemanFlash(ctx, tower, group) {
     var age = (typeof tower.sinceShot === "function") ? tower.sinceShot() : null;
-    if (age === null || age > 0.055) return;
-    var fade = 1 - age / 0.055;
-    var spec = RIFLEMAN_SHOTS[group] || RIFLEMAN_SHOTS.base;
-    var p = anchor(tower, RIFLEMAN_FX_MUZZLE[group] || RIFLEMAN_FX_MUZZLE.base);
+    if (age === null) return;
+    var scale = RIFLEMAN_FLASH[group] || RIFLEMAN_FLASH.base;
+    var life = 0.055 + (scale - 1) * 0.02;
+    if (age > life) return;
+    var fade = 1 - age / life;
+
+    var pt = RIFLEMAN_FX_MUZZLE[group] || RIFLEMAN_FX_MUZZLE.base;
+    var p = anchor(tower, pt);
     if (!p) return;
-    var world = (4 + spec[2] * 1.5) * (0.5 + fade);   // board px
-    var size = world * p.scale;                       // screen px, for strokes
-    if (size < 0.4) return;
-    // The star: a short cross of flame across the muzzle, which is what a rifle
-    // actually throws. A plain disc reads as a light bulb.
-    ctx.strokeStyle = "rgba(" + spec[1] + "," + (0.55 * fade).toFixed(3) + ")";
-    ctx.lineWidth = size * 0.5;
-    ctx.lineCap = "round";
-    for (var i = 0; i < 4; i++) {
-      var th = i * Math.PI / 2 + 0.4;
-      var len = size * (i % 2 ? 1.0 : 1.9);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + Math.cos(th) * len, p.y + Math.sin(th) * len);
-      ctx.stroke();
-    }
-    ctx.lineCap = "butt";
-    glow(ctx, p, world, "rgba(" + spec[1] + "," + (0.7 * fade).toFixed(3) + ")",
-      0.95 * fade);
+
+    // Along the barrel, on screen: the muzzle against a point a little behind
+    // it on the same line. Falls back to the aim if the two project on top of
+    // each other, which only happens looking straight down the bore.
+    var behind = [pt[0] - 0.55, pt[1], pt[2]];
+    var axis = barrelAxis(tower, behind, pt);
+    var ax = axis ? axis.x : Math.cos(tower.aim || 0);
+    var ay = axis ? axis.y : Math.sin(tower.aim || 0);
+    var nx = -ay, ny = ax;
+
+    var size = 5.2 * scale * p.scale * (0.55 + 0.45 * fade);
+    if (size < 0.35) return;
+    var rgb = "255,214,150";
+
+    // THE CONE. Four points: the muzzle, two shoulders either side of it, and
+    // the crown out along the barrel. Drawn as a filled shape rather than as
+    // strokes so it reads as a body of flame instead of as lines.
+    var crown = size * 2.5, wide = size * 0.62;
+    ctx.fillStyle = "rgba(" + rgb + "," + (0.55 * fade).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.moveTo(p.x - ax * size * 0.3, p.y - ay * size * 0.3);
+    ctx.lineTo(p.x + nx * wide, p.y + ny * wide);
+    ctx.lineTo(p.x + ax * crown, p.y + ay * crown);
+    ctx.lineTo(p.x - nx * wide, p.y - ny * wide);
+    ctx.closePath();
+    ctx.fill();
+
+    // A hotter, shorter core inside it, so the flash has a temperature
+    // gradient rather than being one flat colour.
+    ctx.fillStyle = "rgba(255,246,224," + (0.7 * fade * fade).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.moveTo(p.x - ax * size * 0.2, p.y - ay * size * 0.2);
+    ctx.lineTo(p.x + nx * wide * 0.45, p.y + ny * wide * 0.45);
+    ctx.lineTo(p.x + ax * crown * 0.5, p.y + ay * crown * 0.5);
+    ctx.lineTo(p.x - nx * wide * 0.45, p.y - ny * wide * 0.45);
+    ctx.closePath();
+    ctx.fill();
+
+    // The bloom at the muzzle -- small, and the only round part of this.
+    ctx.fillStyle = "rgba(" + rgb + "," + (0.34 * fade).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, size * 0.85, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // THE FORGE-SLAM LANDING.
