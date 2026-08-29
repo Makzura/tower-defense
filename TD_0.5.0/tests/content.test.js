@@ -6587,6 +6587,64 @@ test("a model with no bands is left to the generic driver", function (t) {
   t.eq(got.band, 0, "and reports band 0");
 });
 
+// THE TWO SHOT TABLES ARE ONE TABLE, and each file says so about the other.
+// gl-world draws the rounds on the 3D board and draw-pack draws them in the 2D
+// fallback, and a retune that moved one and not the other would give the same
+// weapon two different rounds depending on which renderer was running -- which
+// nothing else in the suite could see, because neither number reaches the
+// simulation. Read out of the SOURCE, because both are module-private.
+//
+// Toned down together on 2026-08-29: "make them more realistic... right now
+// it's way too much, it overpowers everything else."
+test("the Rifleman's rounds are spelled the same in both renderers", function (t) {
+  var fs = require("fs");
+  var pathOf = require("path");
+  var root = pathOf.join(__dirname, "..");
+
+  function tableOf(file) {
+    var src = fs.readFileSync(pathOf.join(root, file), "utf8");
+    var at = src.indexOf("var RIFLEMAN_SHOTS = {");
+    t.ok(at !== -1, file + " declares RIFLEMAN_SHOTS");
+    var end = src.indexOf("};", at);
+    var body = src.slice(at, end);
+    var rows = {};
+    var re = /"?([a-z0-9-]+)"?:\s*\[\s*"(#[0-9A-Fa-f]{6})",\s*"([0-9, ]+)",\s*([0-9.]+),\s*([0-9.]+),\s*([0-9.]+)\s*\]/g;
+    var m;
+    while ((m = re.exec(body)) !== null) {
+      rows[m[1]] = [m[2], m[3], Number(m[4]), Number(m[5]), Number(m[6])];
+    }
+    return rows;
+  }
+
+  var world = tableOf("js/gl/gl-world.js");
+  var pack = tableOf("js/skins/draw-pack.js");
+
+  t.eq(Object.keys(world).length, 9, "nine rounds in gl-world");
+  t.deep(Object.keys(world).sort(), Object.keys(pack).sort(),
+    "and the same nine in draw-pack");
+  var wrong = [];
+  Object.keys(world).forEach(function (id) {
+    if (JSON.stringify(world[id]) !== JSON.stringify(pack[id])) {
+      wrong.push(id + ": " + JSON.stringify(world[id]) + " against " +
+        JSON.stringify(pack[id]));
+    }
+  });
+  t.eq(wrong.join(" | "), "", "every round is spelled identically in both");
+
+  // AND THEY STAY RESTRAINED. These are the ceilings the 2026-08-29 pass
+  // brought them under; a round brighter or fatter than this is the thing the
+  // owner asked to be rid of, and it should fail here rather than on his
+  // screen. The heavy A5 and B5 slugs are the top of the range by design.
+  Object.keys(world).forEach(function (id) {
+    var radius = world[id][2], glow = world[id][4];
+    t.ok(radius <= 2.6, id + " is a bullet, not an orb (radius " + radius + ")");
+    t.ok(glow <= 0.30, id + " does not outshine the board (glow " + glow + ")");
+  });
+  t.ok(world.a5[2] > world.base[2], "path A's rounds are still the bigger ones");
+  t.ok(world["recruit-b4"][2] < world.base[2],
+    "and a recruit's carbine is still visibly the weakest thing firing");
+});
+
 test("the recruits were not part of the revamp", function (t) {
   var h = harness.boot();
   var g = h.game;

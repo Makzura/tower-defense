@@ -2455,22 +2455,24 @@
   // the built-in bolt untouched.
   var RIFLEMAN_SHOTS = {
     // core, trail, radius, trail length, glow
-    base:         ["#FFE6A8", "255,206,120", 2.6, 11, 0.30],
-    a3:           ["#FFE6A8", "255,206,120", 2.9, 13, 0.34],
+    // Toned down 2026-08-29 with gl-world's copy -- see the note there. The two
+    // tables are identical by design and a retune has to move both.
+    base:         ["#FFE6A8", "255,206,120", 1.4, 10, 0.16],
+    a3:           ["#FFE6A8", "255,206,120", 1.5, 12, 0.18],
     // A4 and A5 are a mounted gun and then a four-barrel battery. Bigger,
     // whiter, and long enough to read as a stream when five leave at once.
-    a4:           ["#FFF2CE", "255,224,150", 3.5, 17, 0.42],
-    a5:           ["#FFFFFF", "255,236,180", 4.3, 24, 0.55],
+    a4:           ["#FFF2CE", "255,224,150", 1.9, 15, 0.22],
+    a5:           ["#FFFFFF", "255,236,180", 2.3, 20, 0.28],
     // Path B never gets hotter, it gets FASTER -- so its rounds are small and
     // pale and the read comes from how many of them there are.
-    b3:           ["#EAF0F6", "214,228,240", 2.3, 9, 0.26],
-    b4:           ["#EAF0F6", "214,228,240", 2.5, 10, 0.30],
+    b3:           ["#EAF0F6", "214,228,240", 1.2, 8, 0.14],
+    b4:           ["#EAF0F6", "214,228,240", 1.3, 9, 0.16],
     // Twenty flat damage, once. One heavy slug with weight behind it.
-    b5:           ["#FFF6E0", "246,214,150", 5.0, 20, 0.62],
+    b5:           ["#FFF6E0", "246,214,150", 2.6, 17, 0.30],
     // The people he armed. Dull, small, and visibly less than anything the
     // tower itself fires -- 1 damage should not look like 8.
-    "recruit-b4": ["#D8C79A", "186,168,126", 1.7, 6, 0.16],
-    "recruit-b5": ["#E4D6AC", "204,186,142", 2.1, 8, 0.20]
+    "recruit-b4": ["#D8C79A", "186,168,126", 0.9, 5, 0.10],
+    "recruit-b5": ["#E4D6AC", "204,186,142", 1.1, 7, 0.12]
   };
 
   VisualModels.register("projectile", "bullet", function (ctx, shot) {

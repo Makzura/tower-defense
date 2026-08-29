@@ -848,7 +848,14 @@ var BASELINE = [
     // the render loop, stopped the game. It is `World3D.riflemanBand` now and
     // these two drive it with a hand-built model, so it runs on every suite
     // pass with no GPU anywhere. Verified failing on the broken code first.
-    file: "tests/content.test.js", pass: 320, fail: 0,
+    // ---- 321 on 2026-08-29, the rounds toned down ------------------------
+    // 320 -> 321: one added. gl-world and draw-pack each carry a copy of
+    // RIFLEMAN_SHOTS and each says the other is identical; a retune that moved
+    // one and not the other would give one weapon two rounds depending on the
+    // renderer, and no other test could see it because neither number reaches
+    // the simulation. It reads both out of the source and also holds the
+    // ceilings the tone-down brought them under.
+    file: "tests/content.test.js", pass: 321, fail: 0,
     failing: []
   },
   {

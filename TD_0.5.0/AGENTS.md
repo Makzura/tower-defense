@@ -7662,6 +7662,30 @@ families already use, rather than by rotating geometry at import: the import
 stays faithful to what the package says it is. **`recruit-` does not match**,
 which is what keeps the recruits out of it.
 
+**THE ROUNDS AND THE HIT WERE TONED DOWN, and the flare was given something to
+draw** (2026-08-29, same day, after play). A round was a fat disc with a halo
+nearly twice its width and a trail at 1.5× its own radius — the brightest thing
+on a board that also has a boss on it. Radii roughly halved, glow alphas halved
+again, trail narrowed to 0.7× the radius and the halo to 1.35× at a fifth of its
+strength; trail LENGTHS barely moved, because length is what makes a tracer read
+as one. **Both copies of `RIFLEMAN_SHOTS` move together** — gl-world's and
+draw-pack's — and a test reads them out of the source and compares them, since
+neither number reaches the simulation and nothing else could see them drift.
+
+A rifle hit no longer goes through `drawShockwave`: an expanding ground ring is
+right for a hammer and wrong for a carbine, and an automatic B3 printed two a
+second. `drawBulletHit` is a collapsing flash plus four sparks (six heavy),
+deterministic off the impact seed.
+
+**`drawRecruitFlare` is the signal round**, and it exists because the owner
+could not tell what `call_recruits` was: "he just puts his hand up and we don't
+understand". It lobs from the pistol at the clip's own `signal_fire` marker
+(0.62 s), burns 2.6 s, trails the curve it actually flew, and gutters out. B4
+orange, B5 red and about twice as bright — path B's read is "how many", and this
+is the only moment that says which. **Nothing is stored and nothing is spawned**:
+the flight is a function of `recruitCooldown` counting down from 45, the same
+arrangement the muzzle flash has with `sinceShot()`.
+
 **THE MUZZLES WERE RE-MEASURED, off `socket_muzzle` at `aim_idle` rather than
 off a Blender print.** `Soldier.MUZZLE_UL` and gl-world's `RIFLEMAN_FX_MUZZLE`
 are the same nine measurements, converted once by 30.58 u.l. per world unit, so

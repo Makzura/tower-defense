@@ -44,6 +44,50 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — The rounds stop shouting, and the flare is an actual flare.**
+
+Owner, after playing the revamp: *"the bullets — if you can make them more
+realistic, same for the effects. A realistic bullet with a bit of a trail
+behind, but not too much. Right now it's way too much, it overpowers everything
+else. Also add an animation for the flare itself, because right now he just puts
+his hand up and we don't understand — make him shoot an actual flare when
+calling the recruits. B4 orange, B5 red and a bit brighter."*
+
+**The rounds were the wrong SHAPE, not just the wrong size.** Each was a fat
+disc with a halo nearly twice its width and a trail drawn at one and a half
+times its own radius, so a burst read as three glowing orbs dragging smears —
+and the brightest thing on a board that also has a boss on it was a rifle
+bullet. Radii roughly halved, glow alphas cut by half again, the trail narrowed
+to two thirds of the radius and the halo brought in to 1.35× at a fifth of its
+old strength. **Trail LENGTHS are barely touched**: length is what makes a
+tracer read as a tracer, and it was the width and the glow that were shouting.
+The relative order is untouched — path A still gets hotter and whiter, path B
+stays small and pale, a recruit's carbine is still the weakest thing firing.
+Both copies of the table moved together and a test now reads them out of the
+source and compares them.
+
+**A bullet hitting something is not an explosion.** A rifle hit went through
+`drawShockwave` — an expanding ring lying on the ground, which is right for a
+hammer landing and wrong for a 1-damage carbine, and an automatic B3 printed two
+a second. `drawBulletHit` replaces it: a small hot flash that COLLAPSES rather
+than expands, and four sparks (six for the heavy rounds) thrown along the way
+the round came, deterministic off the impact's own seed. No ring, nothing on the
+ground.
+
+**The flare.** The revamped B4 and B5 play `call_recruits` — draw the pistol,
+raise it, holster it — and the package marks the instant the shot leaves at
+`signal_fire`, 0.62 s in. Nothing was drawn for it, so the clip read as a man
+waving. There is a signal round now: it lobs up and forward, burns for 2.6 s,
+trails the curve it actually flew, and guts out rather than blinking off. **B4
+orange, B5 red and about twice as bright** — path B's read has always been "how
+many", and the flare is the only moment that says which.
+
+**Nothing is stored and nothing is spawned.** The whole flight is a function of
+`recruitCooldown`, which the simulation already counts down from 45 — the same
+arrangement the muzzle flash has with `sinceShot()`. Measured across the arc at
+play distance: visible from launch to 3.15 s and cleanly gone by 3.30, ~1 000
+changed pixels for B4 against ~1 800 for B5.
+
 **2026-08-29 — The Rifleman's clip selector crashed the game, and could not be tested.**
 
 Owner, within a minute of the revamp landing: *"placing the rifleman make the

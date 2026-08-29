@@ -4368,7 +4368,9 @@ var World3D = (function () {
             // says a tower which has stopped firing is busy rather than broken.
             drawChambers(ctx, t);
           } else if (id === "soldier") {
-            drawRiflemanFlash(ctx, t, riflemanGroup(t));
+            var rGroup = riflemanGroup(t);
+            drawRiflemanFlash(ctx, t, rGroup);
+            drawRecruitFlare(ctx, t, rGroup);
           }
         };
       })(fxT, fxId));
@@ -5065,6 +5067,66 @@ var World3D = (function () {
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   }
 
+  // A BULLET HITTING SOMETHING IS NOT AN EXPLOSION.
+  //
+  // 2026-08-29, with the same instruction the rounds got: "same for the
+  // effects... more realistic, not too much". Until now a rifle hit went
+  // through `drawShockwave` -- an expanding ring lying on the ground plane,
+  // which is the right picture for a hammer landing and the wrong one for a
+  // 1-damage carbine round. Every shot printed a growing halo on the floor, and
+  // an automatic B3 printed two a second.
+  //
+  // What replaces it is what a bullet actually does: a small hot flash at the
+  // point of impact that COLLAPSES rather than expands, and three or four short
+  // sparks thrown back along the way it came. No ring, nothing on the ground,
+  // and the whole thing is gone inside its own short life.
+  //
+  // Deterministic from the impact's own seed, so a hit never flickers
+  // differently between two draws of one frame -- the same rule the debris fan
+  // and the forge-slam cracks follow.
+  function drawBulletHit(ctx, impact, progress) {
+    var fade = 1 - progress;
+    if (fade <= 0) return;
+    var spec = RIFLEMAN_SHOTS[impact.shotBody] || RIFLEMAN_SHOTS.base;
+    var rgb = spec[1];
+    var heavy = impact.shotBody === "a5" || impact.shotBody === "b5";
+
+    // At the body, not on the floor: a round hits something standing up.
+    var at = project(impact.x, impact.y, ul(14));
+    if (!at) return;
+    var px = at.scale;
+
+    // The flash, collapsing. Bright for the first third of its life and gone by
+    // the end, which is the shape of a spark rather than of a blast.
+    var core = spec[2] * px * (heavy ? 2.1 : 1.5) * fade;
+    if (core > 0.3) {
+      ctx.fillStyle = "rgba(" + rgb + "," + (0.5 * fade).toFixed(3) + ")";
+      ctx.beginPath(); ctx.arc(at.x, at.y, core * 1.7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,250,238," + (0.85 * fade * fade).toFixed(3) + ")";
+      ctx.beginPath(); ctx.arc(at.x, at.y, core, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Sparks, thrown back along the round's own heading and falling as they go.
+    // Short, thin, and few -- four for a carbine, six for the heavy rounds.
+    var seed = (impact.seed || 1) * 9301 + 49297;
+    var rays = heavy ? 6 : 4;
+    var reach = spec[2] * px * (heavy ? 9 : 6);
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(0.5, px * (heavy ? 0.9 : 0.6));
+    ctx.strokeStyle = "rgba(" + rgb + "," + (0.7 * fade).toFixed(3) + ")";
+    for (var i = 0; i < rays; i++) {
+      seed = (seed * 9301 + 49297) % 233280;
+      var th = (seed / 233280) * Math.PI * 2;
+      var len = reach * (0.45 + (seed % 100) / 220) * (0.35 + fade * 0.65);
+      var drop = progress * progress * reach * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(at.x, at.y);
+      ctx.lineTo(at.x + Math.cos(th) * len, at.y + Math.sin(th) * len * 0.6 + drop);
+      ctx.stroke();
+    }
+    ctx.lineCap = "butt";
+  }
+
   // B5's covenant round: a violet slug wrapped in a rotating seal, with two
   // sigils riding alongside it. Heavy, slow-looking and obviously different
   // from the four rounds before it.
@@ -5145,16 +5207,23 @@ var World3D = (function () {
     var g = ctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
     g.addColorStop(0, "rgba(" + rgb + ",0)");
     g.addColorStop(1, "rgba(" + rgb + "," + glowA.toFixed(2) + ")");
+    // A THIN STREAK, not a smear. This was `radius * 1.5` -- a trail as wide as
+    // the round was across -- which is what turned a burst into three glowing
+    // slugs pulling banners. Two thirds of the radius reads as the round's own
+    // width seen in motion, which is what a tracer actually is.
     ctx.strokeStyle = g;
-    ctx.lineWidth = radius * 1.5;
+    ctx.lineWidth = Math.max(0.5, radius * 0.7);
     ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(head.x, head.y);
     ctx.stroke();
     ctx.lineCap = "butt";
 
-    ctx.fillStyle = "rgba(" + rgb + "," + (glowA * 0.42).toFixed(2) + ")";
+    // The halo was `radius * 1.8` at 42% of the glow alpha, which put a lamp
+    // around every bullet. It is a suggestion of heat now -- barely wider than
+    // the round and half as strong -- and the round itself carries the read.
+    ctx.fillStyle = "rgba(" + rgb + "," + (glowA * 0.22).toFixed(2) + ")";
     ctx.beginPath();
-    ctx.arc(head.x, head.y, radius * 1.8, 0, Math.PI * 2);
+    ctx.arc(head.x, head.y, radius * 1.35, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = spec[0];
     ctx.beginPath();
@@ -5197,9 +5266,9 @@ var World3D = (function () {
       if (kind === "arcane-empowered-hit") { drawCovenantHit(ctx, impact); continue; }
       if (kind === "b5-strike") { drawStrike(ctx, impact); continue; }
       var progress = 1 - impact.life / impact.maxLife;
+      if (kind === "rifleman-hit") { drawBulletHit(ctx, impact, progress); continue; }
       var arcane = kind.indexOf("arcane") === 0;
-      var rgb = kind === "rifleman-hit" ? "255,214,140"
-        : arcane ? "188,160,255" : "238,184,108";
+      var rgb = arcane ? "188,160,255" : "238,184,108";
       drawShockwave(ctx, impact.x, impact.y, impact.radius, progress, rgb);
       if (impact.radius > 14) drawDebrisFan(ctx, impact, progress, rgb);
     }
@@ -5336,16 +5405,33 @@ var World3D = (function () {
   // table draw-pack carries -- path A's rounds get hotter and whiter, path B's
   // stay small and pale because its read comes from how MANY there are, and the
   // people he arms fire something visibly poorer than anything he does.
+  // TONED DOWN 2026-08-29, at the owner's word: "make them more realistic...
+  // a realistic bullet with a bit of a trail behind, but not too much. Right
+  // now it's way too much, it overpowers everything else."
+  //
+  // He was right, and the fault was in the SHAPE more than the size. A round
+  // was a fat disc with a halo nearly twice its width and a trail drawn at one
+  // and a half times its own radius -- so a burst read as three glowing orbs
+  // dragging smears, and the brightest thing on a board that also has a boss on
+  // it was a rifle bullet. A real tracer is a small hot point with a thin
+  // streak behind it that thins to nothing.
+  //
+  // Radii roughly halved and the glow alphas cut by half again; the trail
+  // LENGTHS are barely touched, because length is what makes it read as a
+  // tracer at all -- it is the width and the glow that were shouting. The
+  // relative order is untouched: path A still gets hotter and whiter, path B
+  // stays small and pale, and a recruit's carbine is still visibly the weakest
+  // thing on the board.
   var RIFLEMAN_SHOTS = {
-    base: ["#FFE6A8", "255,206,120", 2.6, 11, 0.30],
-    a3: ["#FFE6A8", "255,206,120", 2.9, 13, 0.34],
-    a4: ["#FFF2CE", "255,224,150", 3.5, 17, 0.42],
-    a5: ["#FFFFFF", "255,236,180", 4.3, 24, 0.55],
-    b3: ["#EAF0F6", "214,228,240", 2.3, 9, 0.26],
-    b4: ["#EAF0F6", "214,228,240", 2.5, 10, 0.30],
-    b5: ["#FFF6E0", "246,214,150", 5.0, 20, 0.62],
-    "recruit-b4": ["#D8C79A", "186,168,126", 1.7, 6, 0.16],
-    "recruit-b5": ["#E4D6AC", "204,186,142", 2.1, 8, 0.20]
+    base: ["#FFE6A8", "255,206,120", 1.4, 10, 0.16],
+    a3: ["#FFE6A8", "255,206,120", 1.5, 12, 0.18],
+    a4: ["#FFF2CE", "255,224,150", 1.9, 15, 0.22],
+    a5: ["#FFFFFF", "255,236,180", 2.3, 20, 0.28],
+    b3: ["#EAF0F6", "214,228,240", 1.2, 8, 0.14],
+    b4: ["#EAF0F6", "214,228,240", 1.3, 9, 0.16],
+    b5: ["#FFF6E0", "246,214,150", 2.6, 17, 0.30],
+    "recruit-b4": ["#D8C79A", "186,168,126", 0.9, 5, 0.10],
+    "recruit-b5": ["#E4D6AC", "204,186,142", 1.1, 7, 0.12]
   };
 
   // Blender units -> board pixels. Read from the registry rather than written
@@ -5766,6 +5852,125 @@ var World3D = (function () {
       }
     }
     ctx.lineCap = "butt";
+  }
+
+  // THE SIGNAL FLARE, which is how the recruits are actually called.
+  //
+  // 2026-08-29, the owner: "add an animation for when he shoots his flare --
+  // for the flare itself, because right now he just puts his hand up and we
+  // don't understand. Make him shoot an actual flare when calling the recruits.
+  // B4 orange, B5 red and a bit brighter."
+  //
+  // The revamped B4 and B5 bodies play `call_recruits`, which draws the pistol,
+  // raises it and holsters it again -- and the package's manifest marks the
+  // instant the shot leaves at `signal_fire`, 0.62 s in. Nothing was drawn for
+  // it, so the clip read as a man waving.
+  //
+  // NOTHING IS STORED, and there is no spawn. The flare's whole flight is a
+  // FUNCTION of one number the simulation already keeps: `recruitCooldown`
+  // counts down from `recruitCooldownSeconds` (45), so the age of the call is
+  // the difference, and the round's height, drift and brightness are read off
+  // that age every frame. The same arrangement the muzzle flash has with
+  // `sinceShot()`, and the reason neither needs a frame of state.
+  var FLARE_SIGNAL = 0.62;        // the clip's own marker, in seconds
+  var FLARE_LIFE = 2.6;           // how long the star burns after it is fired
+  var FLARE_COLOUR = {
+    // Orange for the man who calls two; red and brighter for the one who
+    // calls four. Path B's read has always been "how many", and the flare is
+    // the only moment that says which.
+    b4: { rgb: "255,150,44", glow: 0.55, size: 1.0 },
+    b5: { rgb: "255,58,38", glow: 0.78, size: 1.35 }
+  };
+
+  function drawRecruitFlare(ctx, tower, group) {
+    var spec = FLARE_COLOUR[group];
+    if (!spec) return;                       // only B4 and B5 carry the pistol
+    var full = tower.recruitCooldownSeconds;
+    if (!(full > 0)) return;
+    var since = full - (tower.recruitCooldown || 0);
+    var t = since - FLARE_SIGNAL;
+    if (t < 0 || t > FLARE_LIFE) return;     // not in the air
+
+    // A LOB, NOT A BULLET. It leaves the pistol at a steep angle, coasts up,
+    // and falls back -- so the arc peaks about a third of the way through and
+    // the star is still bright coming down. Heights are in board pixels, the
+    // same unit `project`'s third argument takes.
+    var rise = 118 * spec.size;
+    var h = ul(40) + rise * (t / FLARE_LIFE) * 3.1 -
+      rise * Math.pow(t / FLARE_LIFE, 2) * 3.1;
+    if (h < 0) h = 0;
+    // A little forward of him, along the way he is facing, and never far: a
+    // signal is meant to be seen above the position, not delivered somewhere.
+    var reach = ul(26) + ul(30) * (t / FLARE_LIFE);
+    var x = tower.x + Math.cos(tower.aim || 0) * reach;
+    var y = tower.y + Math.sin(tower.aim || 0) * reach;
+
+    var head = project(x, y, h);
+    if (!head) return;
+    var px = head.scale;
+
+    // It burns down over its life, and gutters out rather than blinking off.
+    var burn = t < 0.12 ? (t / 0.12) : Math.min(1, (FLARE_LIFE - t) / 0.9);
+    if (burn <= 0) return;
+    // A slow flicker, deterministic off the flight time so it cannot judder
+    // between two draws of one frame.
+    var flicker = 0.86 + 0.14 * Math.sin(t * 37);
+    var alpha = spec.glow * burn * flicker;
+
+    // THE SMOKE TRAIL, sampled back along the arc it actually flew rather than
+    // drawn as a straight line -- a lobbed round leaves a curve, and a straight
+    // streak behind one is the thing that reads as a laser.
+    ctx.lineCap = "round";
+    var steps = 6;
+    for (var i = steps; i >= 1; i--) {
+      var bt = t - i * 0.075;
+      if (bt < 0) continue;
+      var bh = ul(40) + rise * (bt / FLARE_LIFE) * 3.1 -
+        rise * Math.pow(bt / FLARE_LIFE, 2) * 3.1;
+      if (bh < 0) bh = 0;
+      var br = ul(26) + ul(30) * (bt / FLARE_LIFE);
+      var bp = project(tower.x + Math.cos(tower.aim || 0) * br,
+                       tower.y + Math.sin(tower.aim || 0) * br, bh);
+      var np = (i === 1) ? head : project(
+        tower.x + Math.cos(tower.aim || 0) * (ul(26) + ul(30) * ((bt + 0.075) / FLARE_LIFE)),
+        tower.y + Math.sin(tower.aim || 0) * (ul(26) + ul(30) * ((bt + 0.075) / FLARE_LIFE)),
+        ul(40) + rise * ((bt + 0.075) / FLARE_LIFE) * 3.1 -
+          rise * Math.pow((bt + 0.075) / FLARE_LIFE, 2) * 3.1);
+      if (!bp || !np) continue;
+      var seg = (1 - i / (steps + 1));
+      // Strong enough to read as the path the round flew. At 0.30 it was a
+      // hint and the star looked like it had simply appeared in the sky, which
+      // is the opposite of "make him shoot an actual flare".
+      ctx.strokeStyle = "rgba(" + spec.rgb + "," + (alpha * 0.48 * seg).toFixed(3) + ")";
+      ctx.lineWidth = Math.max(0.8, px * 2.2 * spec.size * seg);
+      ctx.beginPath(); ctx.moveTo(bp.x, bp.y); ctx.lineTo(np.x, np.y); ctx.stroke();
+    }
+    ctx.lineCap = "butt";
+
+    // The star: a soft halo, a coloured body and a white-hot centre. This is
+    // the one light on the Rifleman that is ALLOWED to be bright -- it is a
+    // signal, and the point of it is that you look up.
+    var r = 3.4 * px * spec.size;
+    ctx.fillStyle = "rgba(" + spec.rgb + "," + (alpha * 0.30).toFixed(3) + ")";
+    ctx.beginPath(); ctx.arc(head.x, head.y, r * 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(" + spec.rgb + "," + (alpha * 0.75).toFixed(3) + ")";
+    ctx.beginPath(); ctx.arc(head.x, head.y, r * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,246,232," + (alpha * 0.95).toFixed(3) + ")";
+    ctx.beginPath(); ctx.arc(head.x, head.y, r * 0.6, 0, Math.PI * 2); ctx.fill();
+
+    // The launch, for the two hundredths it lasts: a hard flash at the pistol
+    // so the shot has a source and the raised hand finally means something.
+    if (t < 0.09) {
+      var mp = project(tower.x + Math.cos(tower.aim || 0) * ul(14),
+                       tower.y + Math.sin(tower.aim || 0) * ul(14), ul(40));
+      if (mp) {
+        var mf = 1 - t / 0.09;
+        ctx.fillStyle = "rgba(" + spec.rgb + "," + (0.7 * mf).toFixed(3) + ")";
+        ctx.beginPath();
+        ctx.arc(mp.x, mp.y, 5 * mp.scale * spec.size * mf, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 
   // The Rifleman's muzzle flash. Cordite, not enchantment -- the one piece of
