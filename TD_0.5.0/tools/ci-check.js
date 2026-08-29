@@ -518,7 +518,13 @@ var BASELINE = [
     // Nothing here moved for the Fractal Slime: the composition gate, the
     // spine, the roster rule, the wave-35 landmarks, the summary and the purse
     // were all EDITED rather than added to, name for name.
-    file: "tests/run.js", pass: 233, fail: 0,
+    // ---- 236 on 2026-08-29, the Arcane Sniper's lead ---------------------
+    // 233 -> 236: three added, none removed, all under `the sniper's lead`.
+    // predictedPosition read the TYPE's walking speed instead of
+    // currentSpeedUlps(), so a body that had stopped was aimed in front of --
+    // and a rooted Revenant standing side-on past ~157 u.l. could not be hit
+    // at all. Verified failing on the old code before they were kept.
+    file: "tests/run.js", pass: 236, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []

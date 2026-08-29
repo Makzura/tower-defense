@@ -753,13 +753,46 @@ LongshotTower.prototype.shotSpeedUlps = function () {
   return Bullet.BASE_SPEED_ULPS;
 };
 
+// LEAD AT THE SPEED THE BODY IS ACTUALLY WALKING, which is
+// `currentSpeedUlps()` and not `speedUlps`.
+//
+// `speedUlps` is what the TYPE walks at and nothing else reads it for a live
+// question -- js/enemy.js says so where it is declared, and `currentSpeedUlps`
+// is described there as "the one place those three are combined", naming the
+// targeting mode that used to do this arithmetic inline as the bug it fixed.
+// This function was the copy nobody found.
+//
+// WHAT IT COST, because "the lead is a little off" is not what it looked like
+// in play. The lead runs ALONG THE ROAD; the shot flies along the line from
+// the muzzle, so the part of the lead that becomes error is the part
+// perpendicular to that line. A tower firing up the road misses by nothing. A
+// tower firing ACROSS it misses by the whole lead -- and a `PierceBullet` only
+// touches what comes within HIT_RADIUS_UL (12) of its line.
+//
+// So a body that had STOPPED was aimed at as though it were still walking, and
+// past the distance where the lead exceeds 12 u.l. the shot went by in front of
+// it, every time, for ever. Measured on a rooted Revenant standing side-on: at
+// 160 u.l. and beyond, thirty shots in sixty seconds and its health never moved
+// (16 -> 16); at 140 u.l. the same tower killed it in two. The owner found it
+// as "the corpse can't be killed", which is exactly right -- a revive roots the
+// body where it fell (`revive.roots`, js/enemy.js), and a rooted body is the
+// one thing on the board that never walks out of the dead zone.
+//
+// A REVENANT IS ONLY THE VISIBLE HALF. Everything `currentSpeedUlps` accounts
+// for was mispredicted the same way: a stunned body (the Warbringer's
+// earthquake), one standing still through an attack wind-up or an attack
+// posture, a fractal child inside its spawn stun, anything slowed by a Siphon
+// beam or standing in a Farm's field -- all over-led -- and a hasted body or a
+// sprinting Vanguard under-led. One call fixes the set, because that function
+// is where every one of those channels already meets.
 LongshotTower.prototype.predictedPosition = function (enemy) {
   var dx = enemy.pos.x - this.x;
   var dy = enemy.pos.y - this.y;
   var flightSeconds = Math.sqrt(dx * dx + dy * dy) / ul(this.shotSpeedUlps());
   // A tower beside one entrance may target a body on another entrance; predict
   // along the enemy's own route, not the route nearest the tower.
-  return enemy.path.pointAt(enemy.progress + ul(enemy.speedUlps) * flightSeconds);
+  return enemy.path.pointAt(
+    enemy.progress + ul(enemy.currentSpeedUlps()) * flightSeconds);
 };
 
 // The footprint is the physical extent, the collision radius AND the click

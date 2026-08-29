@@ -5569,6 +5569,157 @@ test("a bullet releases its claim when its target dies to someone else", functio
 });
 
 
+group("the sniper's lead");
+
+// THE ARCANE SNIPER IS THE ONE TOWER THAT LEADS ITS SHOTS, and the lead is the
+// only place in the game where "how fast is this body going" is asked about the
+// FUTURE. It fires a straight-line PierceBullet that has to physically reach
+// the body, so a wrong lead is a miss and not a rounding error.
+//
+// Owner, 2026-08-29: "if a revenant is only in a sniper range it gets killed
+// but the corpse can't be killed because it stops moving and the sniper tries
+// to preshoot movement on an unmoving target so it never touches."
+//
+// Exactly right, and the reason is one word: `predictedPosition` read
+// `enemy.speedUlps` -- what the TYPE walks at -- instead of
+// `enemy.currentSpeedUlps()`, which is what it is walking at now. A revive
+// roots a Revenant where it fell, so it is the one body that can sit still in
+// the dead zone for ever.
+test("a body that has stopped is aimed AT, not in front of", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  h.clearBoard();
+
+  var sniper = new g.LongshotTower(600, 505, g.path);
+  var walker = new g.Enemy(g.path, undefined, "revenant");
+  walker.progress = g.ul(300);
+  walker.refreshPos();
+
+  // The lead a WALKING body gets is unchanged -- this is the case that always
+  // worked, and the fix must not move it.
+  var moving = sniper.predictedPosition(walker);
+  t.ok(Math.hypot(moving.x - walker.pos.x, moving.y - walker.pos.y) > 0,
+    "a walking body is led");
+
+  // Every reason a body can be standing still, one at a time, through the same
+  // function the movement loop reads (`currentSpeedUlps`). Each one used to be
+  // led as though the body were at full walk.
+  // MEASURED AGAINST THE CENTRELINE, not against `enemy.pos`. A body walks a
+  // LANE -- `laneOffsetUl`, a few u.l. off the middle of the road and different
+  // per body -- and `predictedPosition` has always answered a point on the
+  // centreline. That standing offset is a couple of u.l. against a 12 u.l. hit
+  // radius and is not what this test is about; the lead is, and a lead of zero
+  // is `path.pointAt(progress)` exactly.
+  [["rooted by a revive", function (e) { e.tryRevive(); }],
+   ["stunned", function (e) { e.applyStun(3); }]].forEach(function (row) {
+    var e = new g.Enemy(g.path, undefined, "revenant");
+    e.progress = g.ul(300);
+    e.refreshPos();
+    row[1](e);
+    t.eq(e.currentSpeedUlps(), 0, row[0] + ": it is not moving");
+
+    var aim = sniper.predictedPosition(e);
+    var here = g.path.pointAt(e.progress);
+    t.eq(Math.round(Math.hypot(aim.x - here.x, aim.y - here.y)), 0,
+      row[0] + ": no lead is added at all");
+
+    // And the shot's aim point is well inside the radius a PierceBullet
+    // touches, which is the property that decides whether it connects.
+    t.ok(Math.hypot(aim.x - e.pos.x, aim.y - e.pos.y) <
+      g.ul(g.PierceBullet.HIT_RADIUS_UL) * 0.5,
+      row[0] + ": and the aim sits well inside the shot's hit radius");
+  });
+});
+
+// THE END TO END, because the arithmetic above cannot show what it cost.
+//
+// The lead runs ALONG THE ROAD and the shot flies along the line from the
+// muzzle, so the error is the part of the lead PERPENDICULAR to that line: a
+// tower firing up the road misses by nothing, one firing across it misses by
+// the whole lead, and a PierceBullet only touches what comes within
+// HIT_RADIUS_UL of its line. So the tower is put side-on, which is the
+// ordinary case on a board where the road crosses its field of fire.
+//
+// Measured before the fix: at 160 u.l. and beyond, thirty shots in sixty
+// seconds and the body's health never moved. Under it, dead in two.
+test("a rooted Revenant side-on to a sniper dies at every range", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+
+  function trial(distUl) {
+    h.clearBoard();
+    h.run("enemies.length = 0; bullets.length = 0; towers.length = 0;" +
+          "cash = 1000000; waveIndex = WAVES.length;");
+    var e = new g.Enemy(g.path, undefined, "revenant");
+    e.progress = g.ul(300);
+    e.refreshPos();
+    var tan = g.path.tangentAt(e.progress);
+    // Off to the side: the normal to the road at the body's own position.
+    var d = g.ul(distUl);
+    var tower = new g.LongshotTower(e.pos.x - tan.y * d, e.pos.y + tan.x * d, g.path);
+    g.towers.push(tower);
+    g.enemies.push(e);
+
+    e.takeDamage(1e9);                      // spend the revive; it roots here
+    t.ok(e.rooted && !e.dead, distUl + " u.l.: the body is rooted and standing");
+
+    var shots = 0;
+    for (var i = 0; i < 60 * 60 && !e.dead; i++) {
+      var before = g.bullets.length;
+      h.run("update(FIXED_STEP)");
+      if (g.bullets.length > before) shots++;
+    }
+    return { killed: e.dead, shots: shots, health: e.health };
+  }
+
+  [240, 200, 160, 120].forEach(function (d) {
+    var r = trial(d);
+    t.ok(r.killed, d + " u.l.: the sniper finishes it (" + r.shots +
+      " shots, health " + r.health.toFixed(1) + ")");
+  });
+});
+
+// AND THE SET IT BELONGS TO. A Revenant is the visible half; everything
+// `currentSpeedUlps` accounts for was mispredicted the same way, in both
+// directions. The Vanguard is the one that was UNDER-led -- it sprints its
+// opening 400 u.l. at twice its own walk, which is the phase the wave is
+// designed around, and the sniper was aiming at half the distance it covers.
+test("the lead follows every channel that changes a body's speed", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  h.clearBoard();
+  var sniper = new g.LongshotTower(600, 505, g.path);
+
+  function leadPx(enemy) {
+    var aim = sniper.predictedPosition(enemy);
+    return Math.hypot(aim.x - enemy.pos.x, aim.y - enemy.pos.y);
+  }
+
+  var slowed = new g.Enemy(g.path, undefined, "normal");
+  slowed.progress = g.ul(300);
+  slowed.refreshPos();
+  var full = leadPx(slowed);
+  slowed.applySlow(0.5, 5);
+  t.ok(leadPx(slowed) < full * 0.75,
+    "a slowed body is led less far (" + leadPx(slowed).toFixed(1) +
+    " px against " + full.toFixed(1) + ")");
+
+  // The sprinter, at a progress inside its own sprint window.
+  var sprinter = new g.Enemy(g.path, undefined, "boss_fast");
+  sprinter.progress = g.ul(50);
+  sprinter.refreshPos();
+  t.ok(sprinter.currentSpeedUlps() > sprinter.speedUlps,
+    "the Vanguard is sprinting here (" + sprinter.currentSpeedUlps() +
+    " against its walk of " + sprinter.speedUlps + ")");
+  var sprintLead = leadPx(sprinter);
+  var walkLead = g.ul(sprinter.speedUlps) *
+    (Math.hypot(sprinter.pos.x - sniper.x, sprinter.pos.y - sniper.y) /
+     g.ul(sniper.shotSpeedUlps()));
+  t.ok(sprintLead > walkLead * 1.5,
+    "and it is led for the sprint, not for the walk (" + sprintLead.toFixed(1) +
+    " px against " + walkLead.toFixed(1) + ")");
+});
+
 group("balance");
 
 test("wave arithmetic records the incoming burst and total health", function (t) {

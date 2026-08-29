@@ -44,6 +44,46 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — The Arcane Sniper stops leading bodies that have stopped.**
+
+Owner's report: *"if a revenant is only in a sniper range it gets killed but the
+corpse can't be killed because it stops moving and the sniper tries to preshoot
+movement on an unmoving target so it never touches."* Exactly right, and the
+cause is one word.
+
+The Sniper is the only tower that leads its shots — it fires a straight-line
+`PierceBullet` that has to physically reach the body, so `predictedPosition`
+aims where the target will be. It computed that from `enemy.speedUlps`, which is
+what the TYPE walks at, instead of `enemy.currentSpeedUlps()`, which is what the
+body is walking at now. A revive roots a Revenant where it fell, so it is the
+one thing on the board that can stand still for ever — and it was aimed at as
+though it were still walking.
+
+**It read as unkillable rather than as slightly inaccurate, and the geometry is
+why.** The lead runs along the road; the shot flies along the line from the
+muzzle. The error is the part of the lead PERPENDICULAR to that line — nothing
+for a tower firing up the road, the whole lead for one firing across it — and a
+`PierceBullet` only touches what comes within 12 u.l. of its line. Measured on a
+rooted Revenant standing side-on: at 160 u.l. and beyond, **thirty shots in
+sixty seconds and its health never moved**, 16 → 16. At 140 u.l. the same tower
+killed it in two. After the fix the shot passes 0 u.l. from the body at every
+range tested and it dies in two everywhere.
+
+**A Revenant was only the visible half.** Every channel `currentSpeedUlps` folds
+together was mispredicted the same way: a stunned body, one standing through an
+attack wind-up or posture, a fractal child inside its spawn stun, anything
+slowed by a Siphon beam or a Farm field — all over-led — and a hasted body or
+the Vanguard sprinting its opening 400 u.l. under-led, that last one by half.
+One call fixes the set, because that function is where those channels already
+meet. Twenty-four of the twenty-five roster types are bit-identical while
+walking normally; the Vanguard's sprint is the only ordinary walk whose lead
+moved.
+
+`AGENTS.md` had a paragraph promising a rooted Revenant could not soft-lock a
+run because "a tower already covers that spot". It now says what "covers" has to
+mean. Three tests under `group("the sniper's lead")` in `tests/run.js`, verified
+failing on the old code first.
+
 **2026-08-29 — The Fractal Slime comes off the EASY campaign.**
 
 At the owner's instruction: *"take out the fractal slime, all of them, from easy

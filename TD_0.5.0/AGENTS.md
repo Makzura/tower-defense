@@ -4012,7 +4012,8 @@ records nothing and anything left inside a `draw()` is untestable.
   gl-world's overlay pass — because the two renderers put a body in different
   places. This is anchored to the canvas, so the 3D board gets it for free.
 - **Live numbers off the BODY, trait rows off its TYPE.** The speed row reads
-  `currentSpeedUlps()`, which is where a Herald's haste, a frost slow, a
+  `currentSpeedUlps()` — as must anything else asking how fast a body is going;
+  see "THE SNIPER'S LEAD" — which is where a Herald's haste, a frost slow, a
   Vanguard's opening sprint, a route's pace profile and a Bulwark whose shield
   has just broken are already summed — so the row reports all five without
   knowing any of them exist. A fractal's tier goes in the NAME (`Fractal Slime
@@ -5633,7 +5634,14 @@ permanent `rooted` flag that `currentSpeedUlps()` reads as zero.
 
 **A rooted Revenant cannot soft-lock a run, and the reason is structural rather
 than lucky:** it comes back exactly where it fell, and it fell because
-something shot it there — so a tower already covers that spot. The only way to
+something shot it there — so a tower already covers that spot. **"Covers" has
+to mean CAN HIT, and for one tower it did not** (2026-08-29): the Arcane Sniper
+leads its shots, its lead read the type's walking speed rather than
+`currentSpeedUlps()`, and a rooted body was therefore aimed at as though it were
+still walking. Standing side-on beyond about 157 u.l. the shot passed in front
+of it every time — thirty shots in sixty seconds, health unmoved. One tower
+covering the spot was not enough, and it looked exactly like a soft-lock. See
+"THE SNIPER'S LEAD" below. The only way to
 strand one is to sell or lose that tower afterwards, and the answer to that is
 to build within reach of it, which the player can always do. Waves are
 unaffected either way: a wave still ends on its own `duration` whether or not
@@ -5641,6 +5649,58 @@ the board is clear, so a rooted Revenant delays a wave at most until that
 ceiling (it does keep its wave from ever being ELIMINATED, and it keeps the
 victory screen away, since victory asks about the whole road). Do not "fix" this with a decay timer; it would delete the
 mechanic to protect against a case the player already controls.
+
+### THE SNIPER'S LEAD, and the one question it has to ask correctly
+
+The Arcane Sniper is **the only tower that leads its shots.** It fires a
+straight-line `PierceBullet` that has to physically reach the body, so it aims
+where the target WILL be — `LongshotTower.predictedPosition`, which walks the
+enemy's own route forward by `speed × flight time` and converts back to a point
+(in PATH PROGRESS, so it stays correct around corners).
+
+**It must read `enemy.currentSpeedUlps()`, never `enemy.speedUlps`.**
+`speedUlps` is what the TYPE walks at and is not a live number. This is the same
+rule the "fastest" targeting mode already follows, and `predictedPosition` was
+the copy that did not — found 2026-08-29, from the owner's report that a
+Revenant's rooted body could not be killed.
+
+**Why it read as unkillable rather than as slightly inaccurate.** The lead runs
+ALONG THE ROAD; the shot flies along the line from the muzzle. The error is
+therefore the component of the lead PERPENDICULAR to that line — zero for a
+tower firing up the road, the whole lead for one firing across it — and a
+`PierceBullet` only touches what comes within `HIT_RADIUS_UL` (12) of its line.
+So past the range where the lead exceeds 12 u.l., a stopped body was missed
+**every single time**, for ever. Measured on a rooted Revenant standing side-on:
+at 160 u.l. and beyond, thirty shots in sixty seconds and its health never moved
+(16 → 16); at 140 u.l. the same tower killed it in two.
+
+**A Revenant is only the visible half of the set.** Everything
+`currentSpeedUlps` folds together was mispredicted the same way, in both
+directions:
+
+| body | was led as if | actually |
+|---|---|---|
+| rooted Revenant | walking at 42.5 | standing still |
+| stunned (Warbringer earthquake) | walking | standing still |
+| mid attack wind-up or attack posture | walking | standing still |
+| fractal child inside its spawn stun | walking | standing still |
+| slowed by a Siphon beam or a Farm field | full walk | slower |
+| hasted by a Herald | own walk | faster |
+| Vanguard sprinting its opening 400 u.l. | 87.5 | **175** |
+
+One call fixes all seven, because that function is where every one of those
+channels already meets. Twenty-four of the twenty-five roster types are
+bit-identical while walking normally — the Vanguard's sprint is the only case
+where an ordinary walking body's lead moved at all.
+
+Pinned by three tests in `tests/run.js` under `group("the sniper's lead")`,
+including the end-to-end side-on kill at 240 / 200 / 160 / 120 u.l.
+
+**A standing lane offset remains and is deliberate.** `predictedPosition`
+answers a point on the CENTRELINE while a body walks its own lane a few u.l.
+off it (`laneOffsetUl`). That is a couple of u.l. against a 12 u.l. hit radius,
+it applies equally to a moving and a stopped body, and it has never on its own
+caused a miss.
 
 **Spawners (v0.4.7).**
 `spawns: { count, type, intervalSeconds, health?, shieldRatio?, noBounty?, armor?, defense? }`.
