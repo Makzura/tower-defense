@@ -1314,7 +1314,19 @@ var World3D = (function () {
     recruits: "call_recruits"
   };
 
-  function riflemanBandNow(m, tower) {
+  // `now` IS PASSED IN, and that is not a style choice -- it is the bug this
+  // function shipped with. It read `state.now` directly, and `state` is a
+  // PARAMETER of `drawWorld` while this is a module-level helper, so the
+  // reference resolved to nothing and threw `state is not defined` on the first
+  // frame a Rifleman was drawn. The render loop has no try/catch around it, so
+  // the whole game stopped: the owner's report was "placing the rifleman makes
+  // the game crash", and it was exactly that.
+  //
+  // It survived my own check because the page I verified against was serving
+  // five stale model files with no bands, which took the guard at the call site
+  // and never reached here. `World3D.riflemanBand` below exists so the suite
+  // can call this without a GPU, which is what actually catches it.
+  function riflemanBandNow(m, tower, now) {
     var bands = m.bands, seconds = m.bandSeconds, names = m.bandNames;
     if (!bands || bands.length < 2 || !seconds || !names) {
       return { band: 0, frame: 0 };
@@ -1375,13 +1387,14 @@ var World3D = (function () {
       else if (low > 0) idleBand = low;
     }
 
-    // ON THE TOWER'S OWN CLOCK where it has one, and on wall time where it does
-    // not. A Soldier accumulates no `animClock`; its idles are a breath rather
-    // than a picture of production, so a paused board holding its breath is
-    // the wrong read and `state.now` is right -- the same choice the Summoner's
-    // idle documents above.
+    // ON WALL TIME, handed in by the caller. A Soldier accumulates no
+    // `animClock`; his idles are a breath rather than a picture of production,
+    // so a paused board holding its breath is the wrong read -- the same choice
+    // the Summoner's idle documents above. A caller with no clock gets 0, which
+    // is a held pose rather than a crash.
     var loop = seconds[idleBand] > 0 ? seconds[idleBand] : 4;
-    var phase = (((state.now / 1000 / loop) % 1) + 1) % 1;
+    var clock = (typeof now === "number" && isFinite(now)) ? now : 0;
+    var phase = (((clock / 1000 / loop) % 1) + 1) % 1;
     return frameAt(idleBand, phase, false);
   }
 
@@ -2542,7 +2555,7 @@ var World3D = (function () {
         // revamp -- cannot fall into it.
         if (m && m.bands && m.bands.length > 1 &&
             /^rifleman-/.test(model)) {
-          frame = riflemanBandNow(m, t).frame;
+          frame = riflemanBandNow(m, t, state.now).frame;
         }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from
@@ -6376,6 +6389,11 @@ var World3D = (function () {
     // owning a second copy of five tier selectors and a band validator.
     modelFor: towerModel,
     enemyModelFor: enemyModel,
+    // The Rifleman's clip selector, exposed for the same reason `walkBand` and
+    // `gaitBand` beside it are: it is pure arithmetic over a model and a tower,
+    // it decides what the player sees, and without a door the only way to
+    // exercise it is a GPU. It shipped broken behind exactly that gap.
+    riflemanBand: riflemanBandNow,
     walkBand: walkBand,
     // AND WHICH BAND THIS PARTICULAR BODY IS IN, which `walkBand` cannot say:
     // it takes a model and the model does not know how far down the road the

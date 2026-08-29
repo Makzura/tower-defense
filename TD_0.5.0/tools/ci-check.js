@@ -840,7 +840,15 @@ var BASELINE = [
     // t2) arrive on either path without a crosspath ever overwriting a
     // path body, the muzzles are measured off the sockets they belong to, and
     // the recruits -- which the owner said not to touch -- are untouched.
-    file: "tests/content.test.js", pass: 318, fail: 0,
+    // ---- 320 on 2026-08-29, the Rifleman's clip selector ----------------
+    // 318 -> 320: two added after the revamp shipped a crash. The selector
+    // read `state.now`, and `state` is a PARAMETER of drawWorld while the
+    // selector is a module-level helper -- so it threw `state is not defined`
+    // on the first frame a Rifleman was drawn and, with no try/catch around
+    // the render loop, stopped the game. It is `World3D.riflemanBand` now and
+    // these two drive it with a hand-built model, so it runs on every suite
+    // pass with no GPU anywhere. Verified failing on the broken code first.
+    file: "tests/content.test.js", pass: 320, fail: 0,
     failing: []
   },
   {

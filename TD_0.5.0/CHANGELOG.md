@@ -44,6 +44,32 @@ that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
 Its rule is its own — two paths at most, one past tier 2 — and the note states
 the half that is true of the board in front of you.
 
+**2026-08-29 — The Rifleman's clip selector crashed the game, and could not be tested.**
+
+Owner, within a minute of the revamp landing: *"placing the rifleman make the
+game crash"*. Exactly that. `riflemanBandNow` read `state.now`, and `state` is a
+**parameter of `drawWorld`** while the selector is a module-level helper — so
+the reference resolved to nothing and threw `state is not defined` on the first
+frame a Rifleman was drawn. There is no try/catch around the render loop, so the
+whole game stopped.
+
+The clock is passed in now, and a caller with none gets a held pose rather than
+a throw.
+
+**WHY MY OWN CHECK MISSED IT, which is the part worth keeping.** I verified
+against a page that was serving five STALE model files — the four new bodies had
+arrived but `base`, `a3`, `a5`, `b3` and `b5` were cached copies of the old
+meshes, which carry no bands. The guard at the call site is `m.bands &&
+m.bands.length > 1`, so on every tier I happened to test the selector was never
+entered at all. A base Rifleman on a clean load takes it immediately.
+
+**So the selector is `World3D.riflemanBand` now**, exposed beside `walkBand` and
+`gaitBand` which were already there for the same reason: it is pure arithmetic
+over a model and a tower, it decides what the player sees, and the only way to
+exercise it was a GPU. Two tests drive it with a hand-built model across every
+state and a whole clock loop, checking each frame lands inside its own band —
+verified failing on the broken code before they were kept.
+
 **2026-08-29 — The Rifleman's nine new bodies, and their clips.**
 
 Owner, handing over a package: *"replace old model and animations, do not

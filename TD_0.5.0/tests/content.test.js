@@ -6497,6 +6497,96 @@ test("the muzzle is measured off the body it belongs to", function (t) {
   });
 });
 
+// THE CLIP SELECTOR, RUN WITHOUT A GPU. It shipped referencing `state.now` --
+// `state` is a PARAMETER of `drawWorld` and this is a module-level helper, so
+// the reference threw `state is not defined` on the first frame a Rifleman was
+// drawn, and with no try/catch around the render loop the whole game stopped.
+// The owner found it in about a minute: "placing the rifleman make the game
+// crash".
+//
+// It survived my own check because the page I verified against was serving five
+// stale model files that carried no bands, so the guard at the call site was
+// never taken. That is the gap these tests close: the selector is exposed as
+// `World3D.riflemanBand` and driven here with a model built by hand, so it runs
+// on every suite pass whether or not anything can render.
+function bandedModel(names, framesPer) {
+  var bands = [], seconds = [], first = 0;
+  for (var i = 0; i < names.length; i++) {
+    bands.push([first, framesPer]);
+    seconds.push(1 + i * 0.1);
+    first += framesPer;
+  }
+  return { bands: bands, bandSeconds: seconds, bandNames: names,
+           frames: new Array(first) };
+}
+
+test("the Rifleman's clip selector runs, and never leaves its model", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  var band = g.World3D.riflemanBand;
+  t.ok(typeof band === "function", "the selector is reachable without a renderer");
+
+  var m = bandedModel(["idle_low_ready", "aim_idle", "ready_weapon",
+    "lower_weapon", "fire_single", "burst_brace", "burst_recover",
+    "burst_cycle", "placement_ready", "hit_react", "destroyed",
+    "reload_showcase"], 8);
+  var s = new g.Soldier(-1000, -1000, g.path);
+
+  // EVERY STATE THE DRIVER CAN BE IN, and the clock walked across a whole loop
+  // so the idle branch -- the one that threw -- is entered many times.
+  var states = [
+    { label: "idle", set: function () { s.cooldown = 0; s.burstShotsLeft = 0; s.shotTimer = 0; } },
+    { label: "mid-burst", set: function () { s.cooldown = 0.5; s.burstShotsLeft = 2; s.shotTimer = 0; } },
+    { label: "just fired", set: function () { s.cooldown = 0.5; s.burstShotsLeft = 2; s.shotTimer = s.shotSpacing * 0.5; } }
+  ];
+  var wrong = [];
+  states.forEach(function (st) {
+    st.set();
+    for (var ms = 0; ms < 6000; ms += 250) {
+      var got;
+      try {
+        got = band(m, s, ms);
+      } catch (err) {
+        wrong.push(st.label + " @" + ms + "ms threw: " + err.message);
+        return;
+      }
+      if (!got || !(got.frame >= 0) || got.frame >= m.frames.length) {
+        wrong.push(st.label + " @" + ms + "ms gave frame " +
+          (got && got.frame) + " of " + m.frames.length);
+        return;
+      }
+      var b = m.bands[got.band];
+      if (got.frame < b[0] || got.frame >= b[0] + b[1]) {
+        wrong.push(st.label + " @" + ms + "ms: frame " + got.frame +
+          " is outside band " + got.band);
+        return;
+      }
+    }
+  });
+  t.eq(wrong.join(" | "), "", "every state gives a frame inside its own band");
+
+  // AND IT PICKS THE RIGHT CLIP, which is the point of having named bands.
+  var names = m.bandNames;
+  s.cooldown = 0; s.burstShotsLeft = 0; s.shotTimer = 0;
+  t.eq(names[band(m, s, 0).band], "idle_low_ready", "an idle Rifleman is at low ready");
+  s.cooldown = 0.5;
+  t.eq(names[band(m, s, 0).band], "aim_idle", "one with its burst clock running is shouldered");
+  s.shotTimer = s.shotSpacing * 0.5;
+  t.eq(names[band(m, s, 0).band], "fire_single", "and one with a round in flight is firing");
+});
+
+test("a model with no bands is left to the generic driver", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  // The five bodies carried a plain frame strip before the revamp, and a model
+  // that somehow arrives without bands must not be indexed as though it had
+  // them -- frame 0 is a rest pose and is always safe.
+  var got = g.World3D.riflemanBand({ frames: [0, 1, 2, 3] },
+    new g.Soldier(-1000, -1000, g.path), 1234);
+  t.eq(got.frame, 0, "a bandless model holds its rest pose");
+  t.eq(got.band, 0, "and reports band 0");
+});
+
 test("the recruits were not part of the revamp", function (t) {
   var h = harness.boot();
   var g = h.game;
