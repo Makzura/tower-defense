@@ -34,8 +34,7 @@ TowerPerks.register({
       id: "war_n1",
       name: "[W-N] Base range",
       icon: 4,
-      blurb: "+5 u.l. of base reach — 40 becomes 45 — for 100 more mana a " +
-             "Warbringer: 600 becomes 700. No in-run upgrade price changes.",
+      blurb: "+5 u.l. base range (40 → 45). Placement 600 → 700.",
       cost: 100,
       minLevel: 0,
       at: { x: 0, y: -1 },
@@ -57,11 +56,8 @@ TowerPerks.register({
       id: "war_a1",
       name: "[W-A] Path A speed",
       icon: 5,
-      blurb: "From A4 onward the Warbringer swings 0.15 attacks a second " +
-             "faster — on a pure path A that is 0.33/s becoming 0.48/s, about " +
-             "one swing every 2.07 s instead of every 3. A4 costs 250 more " +
-             "mana (1650); A1, A2, A3 and A5 are unchanged, and the bonus does " +
-             "nothing before A4 is bought.",
+      blurb: "From A4: +0.15 attacks a second (0.33 → 0.48 on a pure path A). " +
+             "A4 costs +250 mana. Nothing before A4.",
       cost: 120,
       minLevel: 0,
       at: { x: -1, y: 0 },
@@ -80,9 +76,7 @@ TowerPerks.register({
       id: "war_a2",
       name: "[W-A2] Path A prices",
       icon: 6,
-      blurb: "A1 to A4 each cost 50 less mana: 200, 350, 550 and 1350. A5 is " +
-             "unchanged at 1950. No stat changes at all — this node is only " +
-             "about what path A costs to climb.",
+      blurb: "A1 to A4 each cost 50 less mana. A5 unchanged. No stat changes.",
       cost: 150,
       minLevel: 0,
       requires: ["war_a1"],
@@ -108,12 +102,8 @@ TowerPerks.register({
       id: "war_b1",
       name: "[W-B] Path B damage",
       icon: 7,
-      blurb: "Path B hits harder: B2 adds 2 damage instead of 1, B3 adds 5 " +
-             "instead of 4, B4 adds 7 instead of 6 — so a B4 or B5 Warbringer " +
-             "carries 3 more damage a swing than normal. B4's chain blast goes " +
-             "from 15 to 18. B2, B3 and B4 each cost 50 more mana (500, 950, " +
-             "1950); B5 is unchanged. The blast's radius and its chaining are " +
-             "not touched.",
+      blurb: "B2, B3 and B4 each add 1 more damage — +3 in all by B4. Chain " +
+             "blast 15 → 18. Those three tiers cost +50 mana each.",
       cost: 120,
       minLevel: 0,
       at: { x: 1, y: 0 },
@@ -145,11 +135,9 @@ TowerPerks.register({
       id: "war_s1",
       name: "[W-S] Range rebuild",
       icon: 8,
-      blurb: "+17.5 u.l. of base reach — 40 becomes 57.5 — for 50 more mana a " +
-             "Warbringer (650). Path B then gives less: B1 adds 3 instead of " +
-             "5, B2 adds 11 instead of 20, B4 adds 6 instead of 10. B3 still " +
-             "adds none and B5 still adds 15, so the path reads 60.5, 71.5, " +
-             "71.5, 77.5 and 92.5. No B upgrade price changes.",
+      blurb: "+17.5 u.l. base range (40 → 57.5). Placement 600 → 650. Path B " +
+             "then gives +3 / +11 / +6 instead of +5 / +20 / +10, reading " +
+             "60.5, 71.5, 71.5, 77.5, 92.5. No B price changes.",
       cost: 80,
       minLevel: 0,
       at: { x: 0, y: 1 },

@@ -4304,9 +4304,16 @@ of the authored B bonuses would have reached 107.5 at B5 and swallowed what each
 tier promises, so the tiers are rebuilt to +3/+11/+6 and the player receives
 57.5 / 60.5 / 71.5 / 71.5 / 77.5 / 92.5.
 
-**The remaining four trees are still the first authored pass** and are content
-the owner has not specified. They are not load-bearing; deleting one leaves that
-tower with an empty tree, which is a legal state the screens draw as empty.
+**The other four towers have NO TREE, and that is the shipping state.** The
+Arcane Sniper, the Siphon, the Summoner and the Farm each carried a first
+authored pass for a few hours on 2026-08-30 and it was deleted at the owner's
+instruction — the content is his to write, and invented placeholder trees on
+four of six towers were four trees somebody would eventually have to argue with.
+
+A tower with no `js/perks/*-perks.js` file has an EMPTY tree: no nodes, empty
+inventory, empty loadout, nothing to refund, and its type's own build price. The
+screens draw it as empty rather than as broken, and a test pins that. **Adding a
+tower's tree is adding one file and one `<script>` tag, and nothing else.**
 
 ### Authoring a tree
 
@@ -4319,6 +4326,37 @@ for every existing player.
 A tower with no tree is a legal state the screens draw as empty. A test asserts
 every tree is well formed: no duplicate id, no dangling parent, no free node, no
 self-reference, no conditional price, and at least one root.
+
+**The AND-convergence and the level gate are tested against a PROBE tree**, not
+against authored content: they are engine rules, the two shipping trees hold
+neither shape today, and a rule that is only tested where content happens to use
+it stops being tested the moment the content changes.
+
+### The cheat panel — `js/debug-cheats.js`, and it is meant to be deleted
+
+A DOM panel on the shipping page (opened with the key left of "1", or F8, or the
+dim corner chip) that grants coins, sets levels 0–5, buys or clears a whole
+tree, clears reset cooldowns, fills or empties perk loadouts, unlocks the
+roster, wipes the profile, and — during a run — grants mana, closes the wave
+through `endWave` so it pays its real xp, and heals the base. It also prints the
+one thing no screen shows: the wave's xp budget and the live investment split.
+
+**It comes out in three deletes: the file, its one `<script>` tag in
+`index.html`, and `MetaProgress.debugPatch`.** Nothing else in the repository
+refers to any of the three — `game.js` was not edited for it and no screen calls
+it — and the removal was rehearsed, not asserted.
+
+**It loads from `index.html` and not from `sandbox.html`**, against the usual
+rule for a testing aid, because the sandbox banks no permanent progression at
+all and is therefore the one page none of this can be tested on. The `debug-`
+prefix is what makes that safe: `tests/harness.js` skips it when reading the
+page's script list and `tools/check-script-manifest.js` exempts it.
+
+**Every mutation still goes through `MetaProgress` and `TowerPerks`.**
+`debugPatch` is the single door, and it merges a partial profile through the
+same `sanitise` a file off disk goes through — so no cheat can produce a save
+this build would refuse to load. The two things it exists for are the two the
+shipping API will not do: coins from nowhere, and xp that goes down.
 
 ---
 

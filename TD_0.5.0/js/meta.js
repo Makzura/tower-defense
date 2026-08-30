@@ -1240,6 +1240,49 @@ var MetaProgress = (function () {
     slotConstructors: slotConstructors,
     unlockAll: unlockAll,
     reset: reset,
+    // THE CHEAT PANEL'S ONE DOOR, AND IT IS MEANT TO BE DELETED WITH IT.
+    //
+    // `js/debug-cheats.js` needs two things this module deliberately does not
+    // offer: coins from nowhere, and xp that goes DOWN. Both are refused by the
+    // shipping API on purpose -- `addXp` only ever adds, and coins are only
+    // ever paid by `awardRun` -- and a playtest panel that reached around those
+    // rules by writing into the profile object would be able to create states
+    // the save cannot hold.
+    //
+    // So it goes through here instead: a partial profile is merged onto the
+    // live one, put through the SAME `sanitise` a file off disk goes through,
+    // and saved. Every invariant survives -- a perk in a slot the level has not
+    // opened is still dropped, an unowned tower's row is still discarded --
+    // which means no cheat can leave a profile this build would refuse to load.
+    //
+    // TO REMOVE THE CHEAT PANEL: delete `js/debug-cheats.js`, its one <script>
+    // tag in index.html, and this function. Nothing else refers to any of them.
+    debugPatch: function (patch) {
+      var current = ensure();
+      var merged = {
+        coins: (patch && typeof patch.coins === "number") ? patch.coins : current.coins,
+        owned: (patch && patch.owned) || current.owned.slice(),
+        equipped: (patch && patch.equipped) || current.equipped.slice(),
+        runs: current.runs,
+        bestWave: current.bestWave,
+        milestones: current.milestones.slice(),
+        routesWon: current.routesWon.slice(),
+        progress: {}
+      };
+      merged.owned.forEach(function (id) {
+        var row = (patch && patch.progress && patch.progress[id]) || current.progress[id];
+        if (row) {
+          merged.progress[id] = {
+            xp: row.xp, nodes: (row.nodes || []).slice(),
+            equipped: (row.equipped || []).slice(), resetAt: row.resetAt || 0
+          };
+        }
+      });
+      state = sanitise(merged);
+      save();
+      return snapshot();
+    },
+
     // Load a RAW profile object through the same `sanitise` a file goes
     // through, without touching storage. It exists so the migration and the
     // hostile-data rules can be tested against the real guard rather than

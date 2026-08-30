@@ -46,9 +46,8 @@ TowerPerks.register({
       id: "rif_n1",
       name: "[R-N] Base damage",
       icon: 0,
-      blurb: "+1 base damage a shot — 1 becomes 2. Every in-run upgrade costs " +
-             "50 more mana: A1 250, A2 375, A3 750, A4 1950, A5 3325, B1 250, " +
-             "B2 400, B3 800, B4 2150, B5 3850. Placement stays 300.",
+      blurb: "+1 base damage (1 → 2). Every A/B upgrade costs 50 more mana. " +
+             "Placement unchanged.",
       cost: 100,
       minLevel: 0,
       at: { x: 0, y: -1 },
@@ -73,8 +72,7 @@ TowerPerks.register({
       id: "rif_s1",
       name: "[R-S] Build price",
       icon: 1,
-      blurb: "Riflemen cost 50 less to place — 300 becomes 250. No in-run " +
-             "upgrade price changes, and no stat changes.",
+      blurb: "Placement 300 → 250. Nothing else changes.",
       cost: 60,
       minLevel: 0,
       at: { x: 0, y: 1 },
@@ -101,11 +99,8 @@ TowerPerks.register({
       id: "rif_a1",
       name: "[R-A] Path A burst",
       icon: 2,
-      blurb: "Path A fires more rounds a burst: A2 goes 4 → 6, A3 goes 4 → 7, " +
-             "A4 and A5 go 5 → 8. A2 costs 200 more mana (525) and A3 costs " +
-             "100 more (800); A1, A4 and A5 are unchanged. Damage a round, " +
-             "spacing and every other stat stay as the tiers set them, and an " +
-             "automatic Rifleman (B3) gains nothing from this.",
+      blurb: "Burst shots: A2 → 6, A3 → 7, A4 and A5 → 8. A2 costs +200 mana, " +
+             "A3 +100. An automatic Rifleman (B3) gains nothing.",
       cost: 120,
       minLevel: 0,
       at: { x: -1, y: 0 },
@@ -134,10 +129,8 @@ TowerPerks.register({
       id: "rif_b1",
       name: "[R-B] Path B recruits",
       icon: 3,
-      blurb: "Path B calls in one more recruit: B4 sends 3 instead of 2, B5 " +
-             "sends 5 instead of 4. B4 costs 200 more mana (2300) and B5 costs " +
-             "350 more (4150). Recruit hit points, damage, range, rate of fire " +
-             "and the call's cooldown are all unchanged — only how many arrive.",
+      blurb: "B4 sends 3 recruits, B5 sends 5. B4 costs +200 mana, B5 +350. " +
+             "No other recruit stat changes.",
       cost: 120,
       minLevel: 0,
       at: { x: 1, y: 0 },

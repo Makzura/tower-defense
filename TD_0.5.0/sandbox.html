@@ -353,15 +353,13 @@
 
 <!-- ONE TREE PER TOWER, and no two the same shape -- that is the design, not a
      filing convention. Each of these calls TowerPerks.register at load, so they
-     must come after js/systems/tower-perks.js; they read nothing else. A tower
-     with no file here has an empty tree, which is a legal state the screens
-     draw as empty rather than as broken. -->
+     must come after js/systems/tower-perks.js; they read nothing else.
+     THE TWO STARTERS ARE THE ONLY TREES THAT EXIST, and that is deliberate: a
+     tower with no file here has an EMPTY tree, which is a legal state the
+     screens draw as empty rather than as broken. Adding a tower's tree is
+     adding a file and a tag, and nothing else. -->
 <script src="js/perks/soldier-perks.js"></script>
 <script src="js/perks/smasher-perks.js"></script>
-<script src="js/perks/longshot-perks.js"></script>
-<script src="js/perks/siphon-perks.js"></script>
-<script src="js/perks/blub-perks.js"></script>
-<script src="js/perks/farm-perks.js"></script>
 <!-- The Upgrades screen and the Tree screen. Same shape as store.js: it draws
      what meta.js and TowerPerks answer and mutates nothing itself. -->
 <script src="js/upgrades.js"></script>

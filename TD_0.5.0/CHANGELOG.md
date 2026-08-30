@@ -13,6 +13,56 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — A playtest cheat panel, and four invented trees deleted.**
+
+**`js/debug-cheats.js` exists so the progression can be tested in an afternoon
+instead of over thirty-five runs.** Coins from nowhere, levels set to any of
+0–5, a whole tree bought or cleared, reset cooldowns wiped, perk loadouts filled
+or emptied, the roster unlocked, the profile wiped — and during a run, mana,
+"finish this wave" through the game's own `endWave` so it pays its real xp, and
+a heal. It also prints the two numbers no screen shows: what the current wave's
+xp budget is and how the investment is splitting it live.
+
+**It comes out in three deletes: the file, its one `<script>` tag in
+`index.html`, and `MetaProgress.debugPatch`.** Nothing else refers to any of the
+three — `game.js` was not edited for it and no screen calls it. That was
+rehearsed rather than asserted: the three deletes were made, the suites run
+green, the page booted clean and the Upgrades and Tree screens opened with no
+trace left, and then it was put back.
+
+**It loads from `index.html`, against the house rule for a testing aid**, and
+the reason is that the sandbox banks no permanent progression at all — it is
+precisely the one page none of this can be tested on. The `debug-` prefix is
+what keeps that safe: the harness skips it when reading the page's script list,
+and the manifest gate exempts it, so no suite can ever come to depend on it and
+deleting the file passes the gate on the way out.
+
+**Every cheat still goes through `MetaProgress` and `TowerPerks`.** `debugPatch`
+is one door and it merges a partial profile through the same `sanitise` a file
+off disk goes through, so no cheat can produce a save this build would refuse to
+load. It exists for the only two things the shipping API will not do: coins from
+nowhere, and xp that goes down.
+
+**The four invented trees are gone.** The Arcane Sniper, the Siphon, the
+Summoner and the Farm each carried a first authored pass for a few hours and it
+was deleted at the owner's instruction: the content is his to write, and
+placeholder trees on four of six towers were four trees somebody would
+eventually have had to argue with. A tower with no `js/perks/*-perks.js` file
+has an EMPTY tree — no nodes, empty inventory, empty loadout, nothing to refund,
+its type's own build price — which the screens draw as empty rather than as
+broken, and a test now pins that.
+
+**The AND-convergence and the level-gate tests moved onto a PROBE tree.** They
+were reading whichever authored tree happened to hold those shapes, and the two
+that remain hold neither. They are engine rules, so they are tested against an
+engine fixture; a rule tested only where content happens to use it stops being
+tested the moment the content changes.
+
+**The nine node descriptions were cut to one line each**, at the owner's
+instruction, with every trade-off still in the line — the build price, the mana
+surcharges and what does not change. The long form lives in the files' comments,
+where it is for whoever edits the tree rather than for whoever reads the card.
+
 **2026-08-30 — The Rifleman's four roots and the Warbringer's five.**
 
 **THE FIRST CONTENT THE OWNER ACTUALLY SPECIFIED**, replacing the first pass

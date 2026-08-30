@@ -9959,51 +9959,50 @@ function (t) {
   var h = bootProgress();
   bankCoins(h, 20);
 
-  // FIND THE SHAPES RATHER THAN NAMING THEM: whichever tree holds an AND-node
-  // and a level-gated node, these are the rules they follow.
-  var found = h.run("(function () {" +
-    "  var out = { conv: null, gated: null };" +
-    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
-    "    TowerPerks.nodes(towerId).forEach(function (n) {" +
-    "      if (!out.conv && n.requires && n.requires.length >= 2)" +
-    "        out.conv = { tower: towerId, id: n.id, parents: n.requires };" +
-    "      if (!out.gated && n.minLevel > 0)" +
-    "        out.gated = { tower: towerId, id: n.id, level: n.minLevel," +
-    "                      parents: n.requires || [] };" +
-    "    });" +
-    "  });" +
-    "  return out; })()");
+  // A PROBE TREE, NOT AUTHORED CONTENT, and deliberately so: these are ENGINE
+  // rules and the shipping trees are not obliged to exercise them. The two
+  // authored ones -- the Rifleman's four roots and the Warbringer's four plus a
+  // one-parent child -- happen to hold neither shape today, and the rules must
+  // be pinned whether or not any content is currently using them.
+  //
+  // It registers on the Farm, which has no tree of its own, so it collides with
+  // nothing; each test boots its own context, so it does not leak either.
+  h.run("TowerPerks.register({ towerId: 'farm', nodes: [" +
+    "  { id: 'p_a', name: 'Probe A', cost: 5, at: { x: -1, y: 0 } }," +
+    "  { id: 'p_b', name: 'Probe B', cost: 5, at: { x: 1, y: 0 } }," +
+    "  { id: 'p_both', name: 'Probe convergence', cost: 5," +
+    "    requires: ['p_a', 'p_b'], at: { x: 0, y: -1 } }," +
+    "  { id: 'p_level', name: 'Probe level gate', cost: 5," +
+    "    minLevel: 3, requires: ['p_a'], at: { x: 0, y: 1 } }" +
+    "] })");
 
-  t.ok(found.conv !== null, "some tree has a node with two or more parents");
-  t.ok(found.gated !== null, "and some tree has a node behind a level");
+  // ONE PARENT IS NEVER ENOUGH. `requires` is AND, never OR.
+  h.run("TowerPerks.buy('farm', 'p_a')");
+  var half = h.run("TowerPerks.stateOf('farm', 'p_both')");
+  t.eq(half.state, "locked", "half the parents leaves the convergence locked");
+  t.deep(half.missing, ["p_b"], "and it names exactly what is missing");
+  t.eq(h.run("TowerPerks.buy('farm', 'p_both').ok"), false,
+    "the purchase is refused too, and with the same sentence");
 
-  // ONE PARENT IS NEVER ENOUGH.
-  h.run("MetaProgress.addXp('" + found.conv.tower + "', 100000)");
-  h.run("MetaProgress.buyNode('" + found.conv.tower + "', '" +
-        found.conv.parents[0] + "', 0)");
-  var half = h.run("TowerPerks.stateOf('" + found.conv.tower + "', '" +
-        found.conv.id + "')");
-  t.eq(half.state, "locked", "half the parents leaves it locked");
-  t.ok(half.missing.length >= 1, "and it names what is missing");
-  t.eq(h.run("TowerPerks.buy('" + found.conv.tower + "', '" + found.conv.id +
-        "').ok"), false, "the purchase is refused too");
+  h.run("TowerPerks.buy('farm', 'p_b')");
+  t.eq(h.run("TowerPerks.stateOf('farm', 'p_both').state"), "buyable",
+    "the second parent opens it");
 
-  found.conv.parents.forEach(function (p) {
-    h.run("MetaProgress.buyNode('" + found.conv.tower + "', '" + p + "', 0)");
-  });
-  t.eq(h.run("TowerPerks.stateOf('" + found.conv.tower + "', '" +
-        found.conv.id + "').state"), "buyable", "every parent opens it");
+  // A LEVEL GATE IS ITS OWN GATE: prerequisites and coins are not enough, and
+  // the refusal says which of the three is missing.
+  var gated = h.run("TowerPerks.stateOf('farm', 'p_level')");
+  t.eq(gated.state, "level", "prerequisites and coins alone do not open it");
+  t.ok(/level 3/.test(gated.reason), "and it says which level: " + gated.reason);
 
-  // A LEVEL GATE IS ITS OWN GATE: prerequisites and coins are not enough.
-  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
-  bankCoins(h, 20);
-  (found.gated.parents || []).forEach(function (p) {
-    h.run("MetaProgress.buyNode('" + found.gated.tower + "', '" + p + "', 0)");
-  });
-  var gated = h.run("TowerPerks.stateOf('" + found.gated.tower + "', '" +
-        found.gated.id + "')");
-  t.eq(gated.state, "level", "prerequisites and coins are not enough at level 0");
-  t.ok(/level/.test(gated.reason), "and it says which level: " + gated.reason);
+  h.run("MetaProgress.addXp('farm', 5000)");     // level 3
+  t.eq(h.run("TowerPerks.stateOf('farm', 'p_level').state"), "buyable",
+    "reaching the level opens it");
+
+  // AND POVERTY IS A FOURTH, DISTINCT STATE.
+  h.run("MetaProgress.debugPatch({ coins: 0 })");
+  var poor = h.run("TowerPerks.stateOf('farm', 'p_level')");
+  t.eq(poor.state, "poor", "with everything met but the coins it reads poor");
+  t.ok(/coins/.test(poor.reason), "and says so: " + poor.reason);
 });
 
 test("a purchase spends once, and every part of it survives a reload", function (t) {
@@ -10327,14 +10326,14 @@ function (t) {
 test("the tree screen shows the whole tree, navigates it, and comes back to its tower",
 function (t) {
   var h = bootProgress();
-  h.run("openMenu(); Upgrades.open(); Upgrades.selectTower('farm'); Upgrades.openTree()");
+  h.run("openMenu(); Upgrades.open(); Upgrades.selectTower('smasher'); Upgrades.openTree()");
   t.eq(h.game.screen, "tree", "the tree opens");
 
   // THE WHOLE TREE IS FRAMED BY RECENTRING, whatever size it is -- that is what
   // "come back to a usable view" has to mean when a tree may be any shape.
   var framed = h.run("(function () {" +
     "  var board = Upgrades.boardRect();" +
-    "  return TowerPerks.nodes('farm').every(function (n) {" +
+    "  return TowerPerks.nodes('smasher').every(function (n) {" +
     "    var p = Upgrades.nodeScreenPoint(n);" +
     "    return p.x > board.x && p.x < board.x + board.w &&" +
     "           p.y > board.y && p.y < board.y + board.h; }); })()");
@@ -10355,7 +10354,35 @@ function (t) {
   // LEAVING KEEPS THE TOWER. That is the whole reason this is a screen.
   h.run("Upgrades.onKey('Escape')");
   t.eq(h.game.screen, "upgrades", "Escape goes back to Upgrades");
-  t.eq(h.run("Upgrades.state().selected"), "farm", "with the same tower selected");
+  t.eq(h.run("Upgrades.state().selected"), "smasher", "with the same tower selected");
+});
+
+test("a tower with no tree is an empty tree, not a broken one", function (t) {
+  var h = bootProgress();
+
+  // FOUR OF THE SIX TOWERS HAVE NO TREE, and that is the shipping state: only
+  // the two starters have authored content. An unauthored tower must read as
+  // empty everywhere rather than as missing.
+  var without = h.run("MetaProgress.snapshot().owned.filter(function (id) {" +
+    "  return TowerPerks.nodes(id).length === 0; })");
+  t.ok(without.length > 0, "some owned tower has no tree yet");
+
+  var id = without[0];
+  t.eq(h.run("TowerPerks.treeOf('" + id + "')"), null, "it has no tree registered");
+  t.deep(h.run("TowerPerks.inventory('" + id + "')"), [], "its inventory is empty");
+  t.deep(h.run("TowerPerks.loadout('" + id + "')"),
+    [null, null, null, null, null], "and so is its loadout");
+  t.eq(h.run("TowerPerks.refundValue('" + id + "')"), 0, "nothing to refund");
+  t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('" + id + "'))"),
+    h.run("MetaProgress.constructorOf('" + id + "').COST"),
+    "and it costs exactly what its type costs");
+
+  // The screens open on it without throwing, which is the whole claim.
+  h.run("openMenu(); Upgrades.open(); Upgrades.selectTower('" + id + "');" +
+        "Upgrades.openTree()");
+  t.eq(h.game.screen, "tree", "its tree screen opens");
+  h.draw();
+  t.eq(h.game.screen, "tree", "and draws");
 });
 
 test("every authored tree is well formed", function (t) {
