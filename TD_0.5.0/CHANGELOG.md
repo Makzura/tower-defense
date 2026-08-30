@@ -13,6 +13,23 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Rifleman's burst node cut from three shots to one.**
+
+`[R-A]` granted two extra rounds a burst at A2 and a third at A3 — 6, 7, 8, 8
+across A2 to A5 — and charged A2 200 mana for the first half. The owner's read
+after playing it: *"way too strong"*. It now grants **one** shot, and **only
+from A3**: 3, 4, 5, 6, 6. The A2 group and the A2 surcharge are both gone, so
+the node is A3's alone and A2 pays its authored 325 again.
+
+The shot still persists upward — `hasA3` stays true once bought, so A4 and A5
+keep it — and it still cannot leak into automatic fire, for the reason the file
+has always given: B3 fires on `shotsPerSecond`, derived from the auto base and
+never from `shotsPerBurst`.
+
+Its own price (120 coins) and A3's surcharge (100 mana) were **not** touched.
+Nothing was asked about either, and re-pricing a node the same day it was
+retuned would make the next reading of it a reading of two changes at once.
+
 **2026-08-30 — A playtest cheat panel, and four invented trees deleted.**
 
 **`js/debug-cheats.js` exists so the progression can be tested in an afternoon

@@ -4281,7 +4281,7 @@ the icon can be replaced at any time without a player losing a node.
 |---|---|---:|
 | `rif_n1` | +1 base damage (1→2); +50 mana on all ten tiers; placement unchanged | 100 |
 | `rif_s1` | placement 300→250; nothing else | 60 |
-| `rif_a1` | burst shots 3/6/7/8/8 at A1–A5; A2 +200, A3 +100 | 120 |
+| `rif_a1` | one more burst shot from A3 — 3/4/5/6/6 at A1–A5; A3 +100 | 120 |
 | `rif_b1` | B4 sends 3, B5 sends 5; B4 +200, B5 +350 | 120 |
 | `war_n1` | +5 u.l. base reach (40→45); placement 600→700 | 100 |
 | `war_a1` | +0.15 attacks/s from A4; A4 +250 | 120 |
@@ -4293,6 +4293,12 @@ the icon can be replaced at any time without a player losing a node.
 owned and the coins are there, and equippable by none of them until the tower
 reaches level 1. That is the first content where "buying is not equipping"
 really bites.
+
+**`rif_a1` was cut from three shots to one on 2026-08-30**, at the owner's word
+("way too strong"). It granted two at A2 and a third at A3 — 6/7/8/8 — and
+charged A2 200 mana for the first half. The A2 group and the A2 surcharge are
+both gone; the node is A3's alone. Its own 120 coins and A3's 100-mana surcharge
+were left where they were.
 
 Three of them are worth reading the note in the file for. `rif_a1` **cannot leak
 into automatic fire**, and not by care: B3 switches the Rifleman to

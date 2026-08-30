@@ -8,8 +8,7 @@
 //
 //   north  more base damage, and every in-run tier costs more
 //   south  a cheaper Rifleman to place
-//   west   path A -- more shots in a burst, and the two tiers that grant them
-//          cost more
+//   west   path A -- one more shot in a burst from A3, and A3 costs more
 //   east   path B -- one more recruit, and the two tiers that call them cost
 //          more
 //
@@ -79,37 +78,38 @@ TowerPerks.register({
       effects: { price: { add: -50 } }
     },
 
-    // --- west: path A, more shots in the burst -------------------------------
+    // --- west: path A, one more shot in the burst ----------------------------
     //
-    // TWO CONDITIONAL GROUPS, NOT ONE, and that is the whole shape of it: A2
-    // grants two shots and A3 grants a third, and both persist upward because
-    // `hasA2` and `hasA3` stay true once bought. So A2 reads 6, A3 reads 7, and
-    // A4 and A5 read 8 -- the table below, exactly.
+    // ONE GROUP, ON A3, AND IT PERSISTS UPWARD. `hasA3` stays true once A3 is
+    // bought, so the shot is still there at A4 and A5:
     //
-    //   A1  3 + 0 = 3      A2  4 + 2 = 6      A3  4 + 3 = 7
-    //   A4  5 + 3 = 8      A5  5 + 3 = 8
+    //   A1  3 + 0 = 3      A2  4 + 0 = 4      A3  4 + 1 = 5
+    //   A4  5 + 1 = 6      A5  5 + 1 = 6
+    //
+    // CUT FROM THREE SHOTS TO ONE (2026-08-30, the owner: "way too strong").
+    // It granted two at A2 and a third at A3 -- 6/7/8/8 -- and charged A2 200
+    // mana for the first half. Both the A2 group and the A2 surcharge are gone;
+    // this node is A3's alone now, and its own price and A3's surcharge are
+    // unchanged at 120 coins and 100 mana.
     //
     // IT CANNOT LEAK INTO AUTOMATIC FIRE, and not by care -- by construction.
     // B3 switches the Rifleman to `automatic`, and an automatic Rifleman fires
     // on `shotsPerSecond`, which `recalcStats` derives from
     // BASE_AUTO_SHOTS_PER_SECOND and the fire-rate bonuses and never from
-    // `shotsPerBurst`. A crosspath that reaches B3 keeps its extra burst shots
+    // `shotsPerBurst`. A crosspath that reaches B3 keeps its extra burst shot
     // in a field nothing is reading.
     {
       id: "rif_a1",
       name: "[R-A] Path A burst",
       icon: 2,
-      blurb: "Burst shots: A2 → 6, A3 → 7, A4 and A5 → 8. A2 costs +200 mana, " +
-             "A3 +100. An automatic Rifleman (B3) gains nothing.",
+      blurb: "Burst shots: A3 → 5, A4 and A5 → 6. A3 costs +100 mana. Nothing " +
+             "at A1 or A2, and an automatic Rifleman (B3) gains nothing.",
       cost: 120,
       minLevel: 0,
       at: { x: -1, y: 0 },
       effects: {
-        when: [
-          { has: "hasA2", add: { shotsPerBurst: 2 } },
-          { has: "hasA3", add: { shotsPerBurst: 1 } }
-        ],
-        tiers: { A2: { cost: 200 }, A3: { cost: 100 } }
+        when: [{ has: "hasA3", add: { shotsPerBurst: 1 } }],
+        tiers: { A3: { cost: 100 } }
       }
     },
 

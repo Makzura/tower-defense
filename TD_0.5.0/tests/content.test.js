@@ -10565,7 +10565,7 @@ function (t) {
   t.eq(h.run(s + ".upgradeCost('B5')"), 3800, "including the last one");
 });
 
-test("[R-A] gives path A 6, 7, 8 and 8 shots a burst, and never automatic ones",
+test("[R-A] gives path A one more burst shot from A3, and never an automatic one",
 function (t) {
   var h = bootContent();
 
@@ -10577,17 +10577,19 @@ function (t) {
       "normal " + row[0] + " fires " + row[1]);
   });
 
-  [["A1", 3], ["A2", 6], ["A3", 7], ["A4", 8], ["A5", 8]].forEach(function (row, i) {
+  // ONE SHOT, FROM A3, AND IT PERSISTS. Nothing at A1 or A2 -- the node granted
+  // two at A2 and a third at A3 until the owner cut it on 2026-08-30.
+  [["A1", 3], ["A2", 4], ["A3", 5], ["A4", 6], ["A5", 6]].forEach(function (row, i) {
     var tiers = ["A1", "A2", "A3", "A4", "A5"].slice(0, i + 1);
     var s = towerWith(h, "soldier", ["rif_a1"], tiers);
     t.eq(h.run(s + ".shotsPerBurst"), row[1],
       "with [R-A] " + row[0] + " fires " + row[1]);
   });
 
-  // The two surcharges, and only those two.
+  // ONE SURCHARGE, AND ONLY ONE. A2's went with the shots it was paying for.
   var s = towerWith(h, "soldier", ["rif_a1"], []);
   t.eq(h.run(s + ".upgradeCost('A1')"), 200, "A1 is unchanged");
-  t.eq(h.run(s + ".upgradeCost('A2')"), 525, "A2 costs 200 more");
+  t.eq(h.run(s + ".upgradeCost('A2')"), 325, "A2 is unchanged");
   t.eq(h.run(s + ".upgradeCost('A3')"), 800, "A3 costs 100 more");
   t.eq(h.run(s + ".upgradeCost('A4')"), 1900, "A4 is unchanged");
   t.eq(h.run(s + ".upgradeCost('A5')"), 3275, "A5 is unchanged");
@@ -10655,27 +10657,31 @@ test("the Rifleman's roots stack exactly as authored", function (t) {
   t.eq(h.run(nb5 + ".recruitCount"), 5, "and five at B5");
 
   var na = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2"]);
-  t.eq(h.run(na + ".upgradeCost('A2')"), 575, "north + west: A2 costs 575");
-  t.eq(h.run(na + ".shotsPerBurst"), 6, "and fires 6");
+  t.eq(h.run(na + ".upgradeCost('A2')"), 375, "north + west: A2 pays north's 50 only");
+  t.eq(h.run(na + ".shotsPerBurst"), 4, "and still fires 4");
   var na3 = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2", "A3"]);
-  t.eq(h.run(na3 + ".upgradeCost('A3')"), 850, "A3 costs 850");
-  t.eq(h.run(na3 + ".shotsPerBurst"), 7, "and fires 7");
+  t.eq(h.run(na3 + ".upgradeCost('A3')"), 850, "A3 pays both, so 850");
+  t.eq(h.run(na3 + ".shotsPerBurst"), 5, "and fires 5");
   var na4 = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2", "A3", "A4"]);
   t.eq(h.run(na4 + ".upgradeCost('A4')"), 1950, "A4 costs 1950");
-  t.eq(h.run(na4 + ".shotsPerBurst"), 8, "and fires 8");
+  t.eq(h.run(na4 + ".shotsPerBurst"), 6, "and fires 6");
   var na5 = towerWith(h, "soldier", ["rif_n1", "rif_a1"],
     ["A1", "A2", "A3", "A4", "A5"]);
   t.eq(h.run(na5 + ".upgradeCost('A5')"), 3325, "A5 costs 3325");
-  t.eq(h.run(na5 + ".shotsPerBurst"), 8, "and still fires 8");
+  t.eq(h.run(na5 + ".shotsPerBurst"), 6, "and still fires 6");
 
   // ALL FOUR AT ONCE.
+  // A3 is bought here, so the tier's own damage is in play too -- the claim is
+  // that north still adds its one point on top, measured rather than assumed.
+  var plainA3 = h.run(towerWith(h, "soldier", [], ["A1", "A2", "A3"]) + ".damage");
   var all = towerWith(h, "soldier", ["rif_n1", "rif_s1", "rif_a1", "rif_b1"],
-    ["A1", "A2"]);
+    ["A1", "A2", "A3"]);
   t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "all four: placed for 250");
-  t.eq(h.run(all + ".damage"), 2, "2 base damage");
-  t.eq(h.run(all + ".shotsPerBurst"), 6, "path A's burst bonus is live");
-  t.eq(h.run(all + ".upgradeCost('A2')"), 575, "A2 pays both surcharges once");
-  t.eq(h.run(all + ".upgradeCost('B4')"), 2350, "and so does B4");
+  t.eq(h.run(all + ".damage"), plainA3 + 1, "north's point of damage on top");
+  t.eq(h.run(all + ".shotsPerBurst"), 5, "path A's burst bonus is live at A3");
+  t.eq(h.run(all + ".upgradeCost('A3')"), 850, "A3 pays both surcharges once");
+  t.eq(h.run(all + ".upgradeCost('A2')"), 375, "A2 pays only north's");
+  t.eq(h.run(all + ".upgradeCost('B4')"), 2350, "and B4 pays both");
 });
 
 test("unequipping a Rifleman perk restores the normal numbers without un-buying it",
