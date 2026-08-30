@@ -4003,15 +4003,29 @@ Two things to take from that, and one trap:
 Absolute numbers in that table are not comparable with the browser-console
 table in Balance math below — different method, same caveat as always.
 
-**Two ways to make an unplayable bar, and `MetaProgress.unequip` refuses
-both:** an empty bar, and a bar whose cheapest tower costs more than
-`STARTING_CASH`. The second is the same deadlock with an extra step — stripping
-the bar down to the $800 Siphon alone, against a $600 stake, is a board you can
-never build on. AGENTS has always stated this invariant as "STARTING_CASH must
-exceed the cost of the cheapest tower"; it used to be guaranteed by
-`BUILD_SLOTS` being a constant with the gunner in it, and now that the player
-edits the bar it needs enforcing. It is enforced in `meta.js`, not in the
-screen, so no other caller can route around it.
+**Two ways to make an unplayable bar:** an empty bar, and a bar whose cheapest
+tower costs more than `STARTING_CASH`. The second is the same deadlock with an
+extra step — stripping the bar down to the $800 Siphon alone, against a $600
+stake, is a board you can never build on. AGENTS has always stated this
+invariant as "STARTING_CASH must exceed the cost of the cheapest tower"; it
+used to be guaranteed by `BUILD_SLOTS` being a constant with the gunner in it.
+
+**`MetaProgress.unequip` used to refuse both shapes, and that was the wrong
+place (2026-08-30).** Both branches fired on the one tower every profile
+starts with: a bar holding the Rifleman alone was the empty-bar case, and a bar
+holding it beside anything dearer than the stake — Siphon 800, Arcane Sniper
+900, Farm 1200 — was the stranding case. Between them there was no bar the
+Rifleman could be taken out of, so the starter tower was welded into the build
+bar for the life of the save.
+
+**The invariant now lives at the door to a run.** `MetaProgress.loadoutProblem()`
+returns `null` or the sentence naming the fault, and `openMapSelect()` — the
+single door, taken by the PLAY plate, by ENTER/1 and by both run-over overlays'
+"choose another route" — refuses to open the chooser while it answers. The
+title screen draws PLAY dead and prints the sentence under it, and the armoury
+prints it under the build-bar row, both off that same function. `sanitise()` no
+longer repairs an unplayable saved bar either: an emptied bar is a deliberate
+edit and must survive a reload, or the armoury reads as broken.
 
 **The test harness calls `MetaProgress.unlockAll()`** before `init()`. That is
 a real entry point, not a back door in the gate: the suite is about what towers

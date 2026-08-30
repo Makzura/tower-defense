@@ -13,6 +13,51 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Rifleman can be taken out of the build bar.**
+
+**It could not be, and there were two separate reasons for that.** Either one
+alone would have been enough, which is why the tower every profile starts with
+had been welded into the bar since the armoury shipped.
+
+**The first was the click, and it never reached the row.** `Store.onClick`
+hit-tested the catalogue cards and then the build-bar row, while `draw` paints
+the cards and then the row on top of them. The row sits at y 560; the sixth
+catalogue card runs 534 to 620 across x 60 to 520. That buries the first slot's
+whole 84px square inside a card and clips the second — and the first slot is
+where `defaultLoadout` puts the one tower a fresh profile owns. Clicking the
+Rifleman selected the Summoner's card underneath it. **Hit-test order follows
+paint order, topmost first**, so the row moved above the cards, and a test
+asserts the slot's centre really is inside a card before asserting the row wins
+the press. Adding a catalogue row pushes the cards down and buries more of this
+row, so the seam only tightens with each new tower.
+
+**The second was the refusal, and it was in the wrong place.**
+`MetaProgress.unequip` enforced "no unplayable bar" by refusing to make one:
+`remaining <= 1` for the empty bar, `wouldStrand` for a bar whose cheapest tower
+beats the $600 opening stake. Both branches fired on the Rifleman and nothing
+else — a bar holding it alone was the first case, and a bar holding it beside
+the Siphon (800), the Arcane Sniper (900) or the Farm (1200) was the second. So
+the armoury said no down every route and offered none that led anywhere.
+
+**The invariant moved to the door to a run.** `MetaProgress.loadoutProblem()`
+answers `null` or the sentence naming the fault, and `openMapSelect()` — the one
+door, taken by the PLAY plate, by ENTER/1 and by both run-over overlays' "choose
+another route" — will not open the chooser while it answers. Same guarantee,
+enforced once instead of twice, and the armoury is allowed to be an armoury.
+
+**The refusal is silent because the reason is already on screen.** The title
+draws the PLAY plate dead — no pulse, no hover wake, a dimmed label and a muted
+accent — and prints the sentence in the gap between the primary and the rail.
+The armoury prints it under the build-bar row, because that is the only screen
+that can create the fault and a player should not have to walk back to the menu
+and press a dead plate to learn what emptying the bar cost them. Both read the
+same function, so the screen cannot offer a run the button then declines.
+
+**`sanitise()` no longer repairs an unplayable saved bar.** Throwing it away for
+the default was safe while `unequip` refused to create one; now that emptying
+the bar is a deliberate edit, the repair would quietly put the Rifleman back on
+the next page load and the armoury would read as broken.
+
 **2026-08-29 — The Farm gets its picture and its words.**
 
 **Its body was on the board and its picture was not.** `TowerPreview3D` resolves

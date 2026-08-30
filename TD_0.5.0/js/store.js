@@ -16,9 +16,11 @@
 // screen is a view onto that and a set of buttons that call into it.
 //
 // The one rule worth preserving: EVERY MUTATION GOES THROUGH MetaProgress.
-// Do not adjust coins or splice the loadout here. That module refuses an
-// empty build bar, refuses to equip what is not owned, and saves after every
-// change; a shortcut taken in this file would skip all three.
+// Do not adjust coins or splice the loadout here. That module refuses to equip
+// what is not owned and saves after every change; a shortcut taken in this
+// file would skip both. It does NOT refuse an empty bar -- emptying the bar is
+// the player's to do, and what a bar that cannot start a run costs is a shut
+// PLAY plate on the title screen. See MetaProgress.loadoutProblem().
 // ---------------------------------------------------------------------------
 
 var Store = (function () {
@@ -69,15 +71,26 @@ var Store = (function () {
     if (pointInRect(x, y, tabRect(0))) { tab = "store"; flash = null; return; }
     if (pointInRect(x, y, tabRect(1))) { tab = "inventory"; flash = null; return; }
 
-    var list = catalogue();
-
-    for (var i = 0; i < list.length; i++) {
-      if (pointInRect(x, y, cardRect(i))) { picked = list[i].id; flash = null; return; }
-    }
-
-    // The loadout row is a shortcut for unequipping: click the slot, the
-    // tower comes out. Equipping is done from the card, because a free slot
-    // is not a thing you can meaningfully click.
+    // THE LOADOUT ROW IS HIT-TESTED BEFORE THE CARDS, AND IT HAS TO BE:
+    // HIT-TEST ORDER FOLLOWS PAINT ORDER, TOPMOST FIRST.
+    //
+    // draw() paints the cards and then the row, so the row is on top. The row
+    // sits at y 560 and the sixth catalogue card runs 534 to 620 across x 60
+    // to 520, which swallows the first slot whole (x 402 to 486) and clips the
+    // second. Tested after the cards, as this block used to be, a click on the
+    // first slot selected the card UNDERNEATH it and the row never saw the
+    // press -- and the first slot is exactly where defaultLoadout puts the one
+    // tower a fresh profile owns, so the Rifleman could not be taken out by
+    // clicking the thing that draws it. That is half of "you can never
+    // unequip the Rifleman"; the other half was the refusal in
+    // MetaProgress.unequip, which is gone.
+    //
+    // Adding a catalogue row moves the cards down and can only bury more of
+    // this row, so the order matters more with every tower, not less.
+    //
+    // The row is a shortcut for UNEQUIPPING only: click the slot, the tower
+    // comes out. Equipping is done from the card, because a free slot is not
+    // a thing you can meaningfully click.
     if (tab === "inventory") {
       var loadout = MetaProgress.equipped();
       for (var s = 0; s < loadout.length; s++) {
@@ -88,6 +101,12 @@ var Store = (function () {
         if (out.ok) rebuildBuildBar();
         return;
       }
+    }
+
+    var list = catalogue();
+
+    for (var i = 0; i < list.length; i++) {
+      if (pointInRect(x, y, cardRect(i))) { picked = list[i].id; flash = null; return; }
     }
 
     if (picked && pointInRect(x, y, actionRect())) {
@@ -357,6 +376,19 @@ var Store = (function () {
       ctx.fillStyle = "rgba(255,215,110,0.7)";
       ctx.fillText(String(i + 1), r.x + 10, r.y + 6);
     });
+
+    // THE SAME SENTENCE THE TITLE SCREEN PRINTS, off the same function. This
+    // is the screen that can create the problem -- it is the only place the
+    // bar can be emptied -- so it is the screen that has to name it. A player
+    // who takes the last tower out should not have to walk back to the menu
+    // and press a dead plate to find out what that cost them.
+    var problem = MetaProgress.loadoutProblem();
+    if (problem) {
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,138,96,0.95)";
+      ctx.fillText("No run can start: " + problem + ".", VIEW_WIDTH / 2, 656);
+    }
+
     ctx.textAlign = "left";
   }
 

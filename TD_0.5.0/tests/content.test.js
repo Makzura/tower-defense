@@ -6334,7 +6334,8 @@ test("buying a tower spends coins and puts it in the bar", function (t) {
     "a purchase goes straight into the bar");
 });
 
-test("the inventory equips and unequips, and refuses an unplayable bar", function (t) {
+test("the inventory equips and unequips, and the RUN is what refuses an unplayable bar",
+function (t) {
   var h = bootStore();
   h.run("MetaProgress.unlockAll(); rebuildBuildBar()");
   h.run("Store.onClick(" + JSON.stringify(0) + ", 0)");   // harmless: no rect there
@@ -6353,31 +6354,91 @@ test("the inventory equips and unequips, and refuses an unplayable bar", functio
   t.eq(h.run("MetaProgress.isEquipped('siphon')"), false, "on the inventory tab it comes out");
   t.eq(h.run("BUILD_SLOTS[" + slot + "]"), null, "and the bar follows");
 
-  // The invariant AGENTS.md states as "STARTING_CASH must exceed the cost of
-  // the cheapest tower". BUILD_SLOTS used to be a constant with the gunner in
-  // it; now the player edits it, so it has to be enforced.
-  h.run("MetaProgress.unlockAll()");
-  var stranded = h.run("(function () {" +
-    "  var ids = MetaProgress.equipped().filter(function (x) { return x !== null; });" +
+  // THE BAR EMPTIES ALL THE WAY DOWN, THE STARTER TOWER INCLUDED (2026-08-30).
+  // unequip() used to refuse the last tower and refuse any removal that left
+  // nothing affordable, and between those two branches the Rifleman could
+  // never come out of the bar at all -- it is the one tower a fresh profile
+  // owns, so it was always either the last one or the only one under the $600
+  // stake. Both refusals are gone.
+  h.run("MetaProgress.unlockAll(); rebuildBuildBar()");
+  var emptied = h.run("(function () {" +
     "  var refusals = [];" +
-    "  ids.forEach(function (id) { var r = MetaProgress.unequip(id); if (!r.ok) refusals.push(id); });" +
+    "  MetaProgress.equipped().filter(function (x) { return x !== null; })" +
+    "    .forEach(function (id) {" +
+    "      if (!MetaProgress.unequip(id).ok) refusals.push(id); });" +
     "  return { left: MetaProgress.equipped().filter(function (x) { return x !== null; })," +
     "           refusals: refusals }; })()");
-  t.ok(stranded.left.length >= 1, "something is always left in the bar");
+  t.deep(emptied.refusals, [], "every tower comes out when asked");
+  t.eq(emptied.left.length, 0, "and the bar can be left with nothing in it");
+
+  // The invariant AGENTS.md states as "STARTING_CASH must exceed the cost of
+  // the cheapest tower" is still enforced -- at THE DOOR TO A RUN, which is
+  // the only thing that ever needed it. An empty bar cannot open the chooser.
+  t.eq(h.run("MetaProgress.loadoutProblem() === null"), false,
+    "an empty bar knows it cannot play");
+  h.run("rebuildBuildBar(); openMenu(); openMapSelect()");
+  t.eq(h.game.screen, "menu", "and PLAY does not open the chooser");
+
+  // A bar holding nothing but a tower dearer than the stake is the same
+  // deadlock with an extra step, and is refused at the same door.
+  h.run("MetaProgress.equip('siphon'); rebuildBuildBar(); openMapSelect()");
+  t.eq(h.run("BeamTower.COST > STARTING_CASH"), true,
+    "the Siphon costs more than the opening stake");
+  t.eq(h.game.screen, "menu", "so a bar of only Siphon stays shut out too");
+
+  // Put one affordable tower back and the door opens.
+  h.run("MetaProgress.equip('soldier'); rebuildBuildBar(); openMapSelect()");
+  t.eq(h.run("MetaProgress.loadoutProblem() === null"), true, "the bar can play again");
+  t.eq(h.game.screen, "select", "and the chooser opens");
 
   var cheapest = h.run("(function () {" +
     "  return BUILD_SLOTS.reduce(function (min, T) {" +
     "    return (T && T.COST < min) ? T.COST : min; }, Infinity); })()");
   t.ok(cheapest <= h.game.STARTING_CASH,
-    "and it is always something the opening stake can afford ($" + cheapest + ")");
+    "on a bar the door let through, the stake affords something ($" + cheapest + ")");
+});
+
+test("the build-bar row answers the click, not the card drawn under it", function (t) {
+  var h = bootStore();
+
+  // HIT-TEST ORDER FOLLOWS PAINT ORDER, and this row is the case that proves
+  // it. draw() paints the cards and then the row, so the row is on top -- but
+  // Store.onClick used to test the cards first, and the row sits at y 560
+  // while the sixth catalogue card runs 534 to 620 across x 60 to 520. That
+  // buries the whole first slot inside a card, and the first slot is where
+  // defaultLoadout puts the one tower a fresh profile owns: the press picked
+  // the Summoner's card and the Rifleman could not be taken out at all.
+  //
+  // Adding a catalogue row pushes the cards further down and buries more of
+  // this row, so this test guards a seam that only tightens.
+  var tab = h.run("Store.tabRect(1)");
+  h.run("Store.onClick(" + (tab.x + 10) + ", " + (tab.y + 10) + ")");
+
+  var slot = h.run("MetaProgress.equipped().indexOf('soldier')");
+  t.eq(slot, 0, "a fresh profile's only tower is in the first slot");
+
+  var r = h.run("Store.loadoutSlotRect(" + slot + ")");
+  var cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  t.eq(h.run("MetaProgress.catalogue().some(function (e, i) {" +
+    "  return pointInRect(" + cx + ", " + cy + ", Store.cardRect(i)); })"), true,
+    "and its centre really does lie inside a catalogue card");
+
+  h.run("Store.onClick(" + cx + ", " + cy + ")");
+  t.eq(h.run("MetaProgress.isEquipped('soldier')"), false,
+    "the row wins the press and the tower comes out");
+  t.eq(h.run("Store.state().picked === null"), true,
+    "and the card underneath was not selected instead");
+  t.eq(h.run("BUILD_SLOTS[0] === null"), true, "the bar follows");
 });
 
 test("a corrupt or tampered profile is repaired, not honoured", function (t) {
   var h = harness.boot();
 
-  // Equipping something you do not own, a bar of nothing but the $800 Siphon,
-  // negative coins: all shapes a hand-edited save takes. None may reach the
-  // board.
+  // Equipping something you do not own and negative coins are shapes a
+  // hand-edited save takes, and sanitise repairs both. A bar of nothing but
+  // the $800 Siphon is NO LONGER repaired -- since 2026-08-30 that is a bar a
+  // player can build on purpose, so it is honoured on load and stopped at the
+  // door to a run instead. See the inventory test above.
   var repaired = h.run("MetaProgress.load.call(null), (function () {" +
     "  return MetaProgress; })()");
   t.ok(repaired !== null, "load() is callable");

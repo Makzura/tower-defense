@@ -2982,6 +2982,18 @@ function startRun(map) {
 }
 
 function openMapSelect() {
+  // THE DOOR TO A RUN, and the one place the playable-bar invariant is kept
+  // now that MetaProgress.unequip() no longer keeps it by refusing (see
+  // MetaProgress.loadoutProblem, which explains why refusing was the wrong
+  // place). EVERY way in comes through here -- the PLAY plate, ENTER/1, and
+  // both run-over overlays' "choose another route" -- so a bar that cannot
+  // build has no route onto a board, and nothing downstream needs a second
+  // copy of the rule.
+  //
+  // The refusal is SILENT because the reason is already on the screen before
+  // the click: drawMenu shuts the PLAY plate down and prints the sentence
+  // under it, read off this same function.
+  if (MetaProgress.loadoutProblem()) return;
   screen = "select";
 }
 
@@ -9960,8 +9972,11 @@ function menuPlatePath(r, cut, dx, dy) {
 //
 // The signature is unchanged (r, label, key, rgb, primary): the title screen
 // test counts calls through it, and the hit rectangles are still the callers'.
-function drawMenuButton(r, label, key, rgb, primary) {
-  var hot = pointInRect(mouse.x, mouse.y, r);
+// `dead` is a control that is drawn but will not answer: no pulse, no hover
+// wake, a dimmed label. The caller passes the muted accent to go with it, so
+// this stays a switch about LIGHT rather than a second palette living here.
+function drawMenuButton(r, label, key, rgb, primary, dead) {
+  var hot = pointInRect(mouse.x, mouse.y, r) && !dead;
   var t = menuClock();
   var detail = label === "PLAY" ? "HOLD THE LAST GATE"
     : (label === "ARMOURY" ? "SALVAGE & LOADOUT"
@@ -9969,8 +9984,8 @@ function drawMenuButton(r, label, key, rgb, primary) {
   var cut = primary ? 22 : 14;
   // The primary breathes; the rail lights only under the cursor. One ambient
   // pulse on the screen's controls, as before -- the scene carries the rest.
-  var pulse = primary ? 0.5 + Math.sin(t * 1.9) * 0.5 : 0;
-  var live = hot ? 1 : (primary ? 0.25 + pulse * 0.3 : 0);
+  var pulse = (primary && !dead) ? 0.5 + Math.sin(t * 1.9) * 0.5 : 0;
+  var live = hot ? 1 : ((primary && !dead) ? 0.25 + pulse * 0.3 : 0);
 
   // Ley-light bleeding out from under the plate.
   if (live > 0.02) {
@@ -10105,7 +10120,7 @@ function drawMenuButton(r, label, key, rgb, primary) {
   ctx.font = (primary ? "42px " : "22px ") + MENU_DISPLAY_FONT;
   ctx.fillStyle = "rgba(0,0,0,0.7)";
   drawMenuText(label, textX + 2, labelY + 2, primary ? 7 : 4);
-  ctx.fillStyle = hot ? "#fff3e2" : "#e8d3bd";
+  ctx.fillStyle = dead ? "#8b7a73" : (hot ? "#fff3e2" : "#e8d3bd");
   drawMenuText(label, textX, labelY, primary ? 7 : 4);
 
   ctx.font = (primary ? "10px " : "9px ") + MENU_TECH_FONT;
@@ -10200,10 +10215,29 @@ function drawMenu() {
   ctx.fillStyle = "rgba(146,250,224,0.86)";
   drawMenuText("SELECT DIRECTIVE", VIEW_WIDTH / 2, 294, 3.4);
 
-  drawMenuButton(playButtonRect(), "PLAY", "1", "255,146,60", true);
+  // WHY THE PLATE IS DARK. Read off the SAME MetaProgress.loadoutProblem()
+  // that openMapSelect() refuses on -- the rule this file follows everywhere
+  // else, so the screen cannot offer a run the button then declines to open.
+  // A healthy profile never sees either half of this.
+  var barProblem = MetaProgress.loadoutProblem();
+
+  drawMenuButton(playButtonRect(), "PLAY", "1",
+    barProblem ? "134,116,108" : "255,146,60", true, !!barProblem);
   drawMenuButton(storeButtonRect(), "ARMOURY", "2", "230,168,84", false);
   drawMenuButton(indexButtonRect(), "INDEX", "3", "116,240,214", false);
   drawMenuButton(sandboxButtonRect(), "SANDBOX", "4", "168,132,255", false);
+
+  // The sentence itself, in the gap between the primary and the rail that is
+  // empty on every other profile.
+  if (barProblem) {
+    var shut = "PLAY IS SHUT \u00b7 " + barProblem.toUpperCase() +
+      " \u00b7 FIX IT IN THE ARMOURY";
+    ctx.font = "11px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    drawMenuText(shut, VIEW_WIDTH / 2 + 1, 438, 1.8);
+    ctx.fillStyle = "rgba(255,138,96,0.95)";
+    drawMenuText(shut, VIEW_WIDTH / 2, 437, 1.8);
+  }
 
   // The salvage chit, top right. On the title screen because that is where the
   // decision it funds gets made, and because a currency you cannot see is a

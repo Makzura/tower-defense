@@ -234,18 +234,14 @@ var MetaProgress = (function () {
       equipped.push((owned.indexOf(id) !== -1 && equipped.indexOf(id) === -1) ? id : null);
     }
 
-    // A saved bar that could not start a run gets thrown away for the default
-    // one. unequip() refuses to create such a bar, so this can only come from
-    // a hand-edited file or a profile written before that rule existed -- and
-    // silently honouring it would drop the player onto a board they can never
-    // build on. See wouldStrand().
-    var cheapest = Infinity;
-    equipped.forEach(function (id) {
-      if (id === null) return;
-      var ctor = constructorOf(id);
-      if (ctor && typeof ctor.COST === "number") cheapest = Math.min(cheapest, ctor.COST);
-    });
-    if (cheapest > startingCash()) equipped = defaultLoadout(owned);
+    // A SAVED BAR IS HONOURED EVEN WHEN IT COULD NOT START A RUN, and that is
+    // the 2026-08-30 change rather than a hole left in the guard. This used to
+    // throw such a bar away for the default one, which was safe only while
+    // unequip() refused to create one. Now that the player may empty the bar
+    // deliberately, the repair would quietly put the Rifleman back on the next
+    // page load and the armoury would read as broken. An unplayable bar is
+    // stopped at the door to a run instead -- see loadoutProblem(), and
+    // openMapSelect() in js/game.js, which is the door.
 
     return {
       coins: wholeAtLeastZero(raw.coins),
@@ -719,43 +715,57 @@ var MetaProgress = (function () {
     return (typeof value === "number") ? value : 600;
   }
 
-  // What the bar would look like without `id`, and whether that is a bar you
-  // could actually play a run with.
+  // Whether the bar AS IT STANDS could start a run: null when it could, and
+  // the sentence to show the player when it could not.
   //
   // TWO ways to make an unplayable loadout, and they are the same failure:
   //
   //   1. an empty bar -- no tower, no damage, no cash, ever;
   //   2. a bar whose cheapest tower costs more than the opening stake, which
-  //      is the identical deadlock with an extra step. Unequipping the gunner
-  //      and leaving only the $800 Siphon is a board you can never build on.
+  //      is the identical deadlock with an extra step. A bar holding only the
+  //      $800 Siphon is a board you can never build on.
   //
   // AGENTS.md states the invariant as "STARTING_CASH must exceed the cost of
   // the cheapest tower". That used to be guaranteed by BUILD_SLOTS being a
-  // constant with the gunner in it. Now the player edits the bar, so the
-  // invariant needs enforcing, and it is enforced HERE rather than in
-  // js/store.js so that no other caller can route around it.
-  function wouldStrand(idRemoved) {
+  // constant with the gunner in it, and then, once the player could edit the
+  // bar, by unequip() REFUSING to make either shape.
+  //
+  // REFUSING WAS THE WRONG PLACE (2026-08-30). Both branches fired on the one
+  // tower every profile starts with: a bar holding the Rifleman alone was the
+  // empty-bar case, and a bar holding it beside anything dearer than the $600
+  // stake -- the Siphon at 800, the Arcane Sniper at 900, the Farm at 1200 --
+  // was the stranding case. Between them there was no bar you could take the
+  // Rifleman out of, so the starter tower was permanently welded into the
+  // build bar and the armoury said no to every route.
+  //
+  // So the invariant moved to THE DOOR TO A RUN. Edit the bar into any shape
+  // you like; openMapSelect() is what will not carry an unplayable one onto a
+  // board, and the title screen prints this sentence under the PLAY plate.
+  // Same guarantee, one gate instead of two refusals, and the armoury is
+  // allowed to be an armoury.
+  function loadoutProblem() {
     var s = ensure();
     var cheapest = Infinity;
     s.equipped.forEach(function (id) {
-      if (id === null || id === idRemoved) return;
+      if (id === null) return;
       var ctor = constructorOf(id);
       if (ctor && typeof ctor.COST === "number") cheapest = Math.min(cheapest, ctor.COST);
     });
-    return cheapest > startingCash();
+    if (cheapest === Infinity) return "your build bar is empty";
+    if (cheapest > startingCash()) {
+      return "nothing in your bar costs less than the $" + startingCash() +
+             " opening stake";
+    }
+    return null;
   }
 
+  // Takes the tower out, whatever that leaves behind -- including nothing.
+  // See loadoutProblem() for why this no longer has an opinion about the bar
+  // it leaves, and where that opinion went.
   function unequip(id) {
     var s = ensure();
     var slot = s.equipped.indexOf(id);
     if (slot === -1) return { ok: false, reason: "not equipped" };
-
-    var remaining = s.equipped.filter(function (x) { return x !== null; }).length;
-    if (remaining <= 1) return { ok: false, reason: "the bar cannot be empty" };
-    if (wouldStrand(id)) {
-      return { ok: false, reason: "you could not afford a first tower without it" };
-    }
-
     s.equipped[slot] = null;
     save();
     return { ok: true, slot: slot };
@@ -844,6 +854,7 @@ var MetaProgress = (function () {
     isEquipped: isEquipped,
     equip: equip,
     unequip: unequip,
+    loadoutProblem: loadoutProblem,
     slotConstructors: slotConstructors,
     unlockAll: unlockAll,
     reset: reset,
