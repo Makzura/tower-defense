@@ -27,7 +27,7 @@
 var fs = require("fs"), path = require("path"), os = require("os");
 var cdp = require("./cdp"), serve = require("./serve");
 var PORT = 8801, DEVTOOLS = 9341;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var TYPE = "normal";            // 8 frames, the plainest chassis
 var SPOT = 1450;
 

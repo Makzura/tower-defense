@@ -33,7 +33,7 @@ var serve = require("./serve");
 
 var PORT = 8796, DEVTOOLS = 9336;
 var TYPE = "fractal_slime";
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var INK = [13, 64, 47];
 var WRONG_INK = [190, 255, 205];
 var PHASE = 0.25;

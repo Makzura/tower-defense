@@ -152,7 +152,7 @@ if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
     while IFS= read -r f; do
       [ -z "$f" ] && continue
       case "$f" in
-        TD_0.5.0/js/gl/models/*.js) ;;
+        game/js/gl/models/*.js) ;;
         *) GENERATED_ONLY=0 ;;
       esac
     done < "$UNMERGED_LIST"
@@ -176,7 +176,7 @@ if [ -n "$REMOTE" ] && [ "$BASE" != "$REMOTE" ]; then
       while IFS= read -r f; do
         [ -z "$f" ] && continue
         case "$f" in
-          TD_0.5.0/js/gl/models/*.js) ;;
+          game/js/gl/models/*.js) ;;
           *) echo "        kept local, overwrote the remote version of: $f" ;;
         esac
       done < "$UNMERGED_LIST"

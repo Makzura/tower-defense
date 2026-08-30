@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tower Defense v0.5.0 — Sandbox</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #12131a;
+    overflow: hidden;
+    font: 13px system-ui, sans-serif;
+    color: #d8e0f0;
+  }
+  body { display: flex; }
+
+  #sidebar {
+    width: 300px;
+    flex: 0 0 auto;
+    background: #181a22;
+    border-right: 1px solid rgba(140,199,255,0.18);
+    padding: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  #stage {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+  canvas {
+    display: block;
+    background: #1c1e26;
+    width: min(100%, calc(100vh * 16 / 9));
+    height: auto;
+    aspect-ratio: 16 / 9;
+    cursor: crosshair;
+  }
+
+  h1 { font-size: 15px; margin: 0 0 2px 0; }
+  .sub { color: #8a93ab; font-size: 11px; line-height: 1.45; }
+
+  section {
+    margin-bottom: 12px;
+    border-top: 1px solid rgba(140,199,255,0.12);
+    padding-top: 9px;
+  }
+  section h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8cb3e6;
+    margin: 0 0 6px 0;
+  }
+
+  button {
+    font: 600 12px system-ui, sans-serif;
+    color: #dbe7ff;
+    background: rgba(140,199,255,0.12);
+    border: 1px solid rgba(140,199,255,0.4);
+    border-radius: 4px;
+    padding: 6px 9px;
+    cursor: pointer;
+    margin: 0 4px 4px 0;
+  }
+  button:hover:not(:disabled) { background: rgba(140,199,255,0.22); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button.armed {
+    background: rgba(108,230,133,0.20);
+    border-color: rgba(108,230,133,0.95);
+    color: #dcffe4;
+  }
+  button.wide { display: block; width: 100%; margin-right: 0; }
+  select.wide { display: block; width: 100%; box-sizing: border-box; }
+
+  .towerbtn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
+  .towerbtn canvas { width: 28px; height: 28px; background: none; flex: 0 0 auto; }
+  .towerbtn .meta { display: flex; flex-direction: column; line-height: 1.3; }
+  .towerbtn .meta small { color: #8a93ab; font-weight: 400; }
+
+  table.stats { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.stats td { padding: 1px 0; }
+  table.stats td:first-child { color: #8a93ab; }
+  table.stats td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+  label.check { display: block; margin: 3px 0; cursor: pointer; font-size: 12px; }
+  input[type="number"] {
+    width: 66px; font: 12px system-ui, sans-serif; color: #fff;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(140,199,255,0.45);
+    border-radius: 4px; padding: 3px 5px;
+  }
+
+  #log {
+    height: 92px; overflow-y: auto;
+    background: #10121a;
+    border: 1px solid rgba(140,199,255,0.12);
+    border-radius: 4px;
+    padding: 5px 7px;
+    font-size: 11px; line-height: 1.5; color: #a9b4cc;
+  }
+  #log div:first-child { color: #dbe7ff; }
+  #upgradeNote { margin-top: 5px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>Sandbox</h1>
+  <div class="sub">The real game — enemies walk the path to your base, towers shoot them, leaks cost base HP. Only the money and the spawning are yours to control.</div>
+
+  <section>
+    <h2>Towers</h2>
+    <div id="towerList"></div>
+    <div class="sub">Pick one, then click the map to place it. Click a placed tower to inspect or upgrade it. Esc cancels, Delete sells.</div>
+  </section>
+
+  <section>
+    <h2>Route</h2>
+    <div id="mapList"></div>
+    <div class="sub">Switching route restarts the board. Difficulty is measured from the geometry, not typed in.</div>
+  </section>
+
+  <section>
+    <h2>Economy</h2>
+    <div>
+      Mana <input id="goldInput" type="number" step="1000" min="0">
+      <button id="setGold">Set</button>
+    </div>
+    <div id="goldPresets" style="margin-top:4px;"></div>
+    <label class="check"><input id="lockGold" type="checkbox" checked> Keep mana topped up (infinite)</label>
+    <div class="sub">Setting a value turns the top-up off, otherwise it would be overwritten on the next frame. The beam tower's A5 reads mana live, so these presets are its tier boundaries.</div>
+
+    <div style="margin-top:8px;">
+      Base HP <input id="baseHpInput" type="number" step="100" min="0">
+      <button id="setBaseHp">Set</button>
+    </div>
+    <div id="baseHpPresets" style="margin-top:4px;"></div>
+    <div class="sub">Base HP has no ceiling. 10 000 is what the beam tower's B5 needs before it can be bought.</div>
+  </section>
+
+  <section>
+    <h2>Spawn enemies</h2>
+    <div>
+      <select id="enemyType"></select>
+    </div>
+    <div>
+      HP <input id="enemyHp" type="number" min="1" step="1" placeholder="type's own">
+      <button id="spawnOne">Spawn 1</button>
+      <button id="spawnFive">Spawn 5</button>
+    </div>
+    <div>
+      Tier <select id="enemyTier" disabled>
+        <option value="">Default</option>
+        <option value="0">T0</option>
+        <option value="1">T1</option>
+        <option value="2">T2</option>
+        <option value="3">T3</option>
+        <option value="4">T4</option>
+        <option value="5">T5</option>
+      </select>
+    </div>
+    <div id="slimeTiers" style="margin-top:4px;"></div>
+    <div class="sub">Fractal Slimes, one click each — the buttons are built from the type's own tier ladder, so they follow it if it moves. Every tier is the same mesh at a different size (0.65 + 0.35 per tier, so a T5 is 3.7× a T0 across) and four times the health of the one below. "Ladder" puts one of each on the road at once, biggest first, which is the view that shows the size steps.</div>
+    <div>
+      <button id="spawnWave1">Wave 1 (5 × 3 HP)</button>
+      <button id="spawnWave2">Wave 2 (8 × 4 HP)</button>
+    </div>
+    <div>
+      <button id="spawnTanky">1 × 500 HP</button>
+      <button id="clearEnemies">Clear all</button>
+    </div>
+    <label class="check"><input id="autoWaves" type="checkbox"> Run the wave schedule</label>
+    <div>
+      <label for="scheduleDifficulty">Schedule</label>
+      <select id="scheduleDifficulty"></select>
+    </div>
+    <div class="sub">Plays a campaign's 35 waves. The picker chooses WHICH campaign — the same two authored schedules the game's difficulty step offers, selected through the same setDifficulty() the chooser calls, so a wave you watch here is the wave that arrives in a run. Changing either the checkbox or the schedule restarts the wave counter; manual enemy spawning remains available with waves off.</div>
+    <div style="margin-top:6px;">
+      <select id="waveJump" class="wide"></select>
+    </div>
+    <div>
+      <button id="playWave">Play this wave</button>
+      <button id="playFromWave">Play from here</button>
+    </div>
+    <div class="sub">Jump straight to any wave of the schedule above, rather than sitting through the ones in front of it. <b>Play this wave</b> runs that one and then parks the scheduler — whatever it put on the road keeps walking, nothing further arrives. <b>Play from here</b> starts the campaign at that wave and carries on into the rest of it. Either turns the schedule on if it is off, and the board is cleared first; picking a different schedule rebuilds this list, because a wave number only means something inside one.</div>
+  </section>
+
+  <section>
+    <h2>Selected tower</h2>
+    <div id="selectedName" class="sub">Nothing selected.</div>
+    <table class="stats" id="selectedStats"></table>
+    <div id="upgradeControls" style="display:none;">
+      <button id="buyA">Buy next A tier</button>
+      <button id="buyB">Buy next B tier</button>
+      <button id="reaimCone">Re-aim cone</button>
+      <button id="useAbility">Use ability</button>
+      <div id="upgradeNote" class="sub"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Debug overlay</h2>
+    <label class="check"><input id="showRange" type="checkbox" checked> Range</label>
+    <label class="check"><input id="showDeadzone" type="checkbox" checked> Deadzone / cone</label>
+    <label class="check"><input id="showFootprint" type="checkbox" checked> Footprint</label>
+    <label class="check"><input id="showLabels" type="checkbox" checked> u.l. labels</label>
+    <div style="margin-top:6px;">UNIT_LENGTH <input id="unitLength" type="number" step="0.1" min="0.1"> px/u.l.</div>
+    <div class="sub">Shapes are drawn for the selected tower, labelled in u.l. This is how UNIT_LENGTH gets tuned.</div>
+    <button id="maxField" class="wide">Max field · A2 / B5 + AUTO</button>
+    <div id="maxFieldStatus" class="sub">Maxes every placed tower, fires its ability and leaves AUTO on.</div>
+  </section>
+
+  <section>
+    <h2>Run</h2>
+    <button id="resetBoard" class="wide">Reset board</button>
+    <button id="exitToMenu" class="wide">← Back to main menu</button>
+    <div class="sub" id="runState"></div>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</div>
+
+<div id="stage">
+  <!-- The 3D board sits BEHIND the game canvas, matched to it pixel for
+     pixel by World3D.resize(). The game canvas keeps every HUD, panel and
+     menu and stops painting its own background while the world shows
+     through. Two canvases because the HUD wants crisp screen-space 2D and
+     the board wants a depth buffer. -->
+<canvas id="gl"></canvas>
+<style>
+  #gl { position: fixed; left: 0; top: 0; z-index: 0; }
+  #game { position: relative; z-index: 1; background: transparent; }
+</style>
+<canvas id="game"></canvas>
+</div>
+
+<!--
+  The REAL game, loaded exactly as index.html loads it -- same path, enemies,
+  bullets, gunner, loop, placement rules and drawing. The sandbox adds to it
+  rather than reimplementing it, so what you test here is what ships.
+
+  Classic scripts, no type="module": this must keep working from file://.
+  Order matters; units.js first, game.js after everything it uses.
+-->
+<script src="js/units.js"></script>
+<!-- Identical to index.html's pair, and for the same reason: the sandbox is
+     only useful while it loads the same code the game does. -->
+<script src="js/visual-models.js"></script>
+<script src="js/visuals.js"></script>
+<!-- Same art pack the game loads, so the sandbox is checking the models the
+     player will actually see. Renderers only; delete to fall back to the
+     built-in procedural bodies. -->
+<script src="js/skins/draw-pack.js"></script>
+<script src="js/path.js"></script>
+<!-- Mitigation is global: every damage source goes through Enemy.takeDamage,
+     which applies it. Must load before enemy.js. -->
+<script src="js/systems/mitigation.js"></script>
+<script src="js/systems/damage-amp.js"></script>
+<script src="js/enemy.js"></script>
+<script src="js/bullet.js"></script>
+<!-- Targeting MODES (which enemy to shoot). Must load before the towers. -->
+<script src="js/targeting.js"></script>
+<!-- Shared health-for-damage collision rule for Rifleman recruits and every
+     future friendly summon. Must follow TowerScore and precede soldier.js. -->
+<script src="js/systems/summon-contact.js"></script>
+<!-- One vocabulary for the numbers every tower reports (damage, range,
+     attack speed, DPS). Must load before the towers, which build their
+     panel rows out of it. -->
+<script src="js/systems/tower-stats.js"></script>
+<!-- Towers have hit points and die at zero. Shared by all four types, so it
+     must load before any of them. -->
+<script src="js/systems/tower-health.js"></script>
+<!-- Hazards a death leaves on a fuse (the Volatile's charge). Simulation, not
+     presentation: towers lose real hit points to it, so it is stepped from
+     update(). Reads a type's `deathEffect` block and knows no type ids. -->
+<script src="js/systems/hazards.js"></script>
+<!-- Missiles an enemy attack put in the air (the Dinomech's silo salvo).
+     Simulation for the hazards reason: a tower loses real hit points when one
+     arrives, so the arrival time is a fact about the game and the flight is
+     stepped from update(). Reads an attack's `salvo` block and knows no type
+     ids. -->
+<script src="js/systems/missiles.js"></script>
+<script src="js/tower.js"></script>
+
+<!-- Longshot: config + systems + runtime, then the adapter that gives it the
+     game's tower interface. -->
+<script src="js/towers/long-range-dps.config.js"></script>
+<script src="js/systems/stat-resolver.js"></script>
+<script src="js/systems/crosspath.js"></script>
+<!-- THE WORLD CLOCK AND WHAT IT LOOKS LIKE. Before game.js, which ticks the
+     cycle from its fixed step, and before gl-world.js, which reads the
+     composed result off the render state. Neither of these two files knows
+     what a tower is; nothing that knows what a tower is owns the time. -->
+<script src="js/systems/environment-cycle.js"></script>
+<script src="js/systems/environment-lighting.js"></script>
+<script src="js/systems/map-geometry.js"></script>
+<script src="js/systems/range-filter.js"></script>
+<script src="js/systems/pierce.js"></script>
+<script src="js/systems/execute.js"></script>
+<script src="js/systems/damage-pipeline.js"></script>
+<script src="js/systems/buff-stacks.js"></script>
+<script src="js/systems/reload.js"></script>
+<script src="js/systems/active-ability.js"></script>
+<script src="js/systems/upgrade-effects.js"></script>
+<!-- The auto ON/OFF switch on ability buttons. After upgrade-effects.js, whose
+     card() it calls; before any tower that hangs a switch on a button. -->
+<script src="js/systems/auto-ability.js"></script>
+<script src="js/towers/tower-runtime.js"></script>
+<script src="js/towers/longshot-adapter.js"></script>
+
+<!-- Beam tower (tower_beam): config, its mechanic modules, then its adapter. -->
+<script src="js/towers/beam.config.js"></script>
+<script src="js/systems/ramp.js"></script>
+<script src="js/systems/charge-gold.js"></script>
+<script src="js/systems/gold-power.js"></script>
+<script src="js/systems/death-denial.js"></script>
+<script src="js/systems/healing-ledger.js"></script>
+<script src="js/towers/beam-adapter.js"></script>
+
+<!-- The Smasher and the fused authored/generated route roster. maps.js reads
+     the reference Rifleman and buildClearancePx when it measures difficulty,
+     so it loads after the towers and before game.js. -->
+<script src="js/smasher.js"></script>
+<!-- The Soldier: the Rifleman. See index.html -- this block
+     must stay identical to that one. -->
+<script src="js/soldier.js"></script>
+<script src="js/blub.js"></script>
+<script src="js/farm.js"></script>
+<script src="js/maps.js"></script>
+<!-- Cosmetic feedback, same as index.html. game.js guards every reference
+     with typeof, so the sandbox would also run without it. -->
+<script src="js/effects.js"></script>
+<!-- The index screen. Unreachable from the sandbox (it boots straight onto a
+     board and its menu route leaves for index.html), but the two script
+     lists must stay identical -- see AGENTS.md. -->
+<script src="js/codex.js"></script>
+<!-- Meta progression and the armoury screen. Neither is reachable from the
+     sandbox (it boots straight onto a board), but the two script lists must
+     stay identical -- see AGENTS.md -- and game.js reads the loadout to build
+     BUILD_SLOTS at load time, before sandbox.js overwrites it with the full
+     roster. -->
+<script src="js/meta.js"></script>
+<script src="js/store.js"></script>
+
+<!-- The 3D board. Loaded BEFORE game.js so the hooks in draw() and
+     screenToWorld() find World3D already defined. If WebGL is unavailable the
+     install below fails cleanly and the 2D renderer takes over unchanged. -->
+<script src="js/gl/gl-math.js"></script>
+<script src="js/gl/gl-renderer.js"></script>
+<script src="js/gl/gl-camera.js"></script>
+<!-- THE SECOND RENDERER, for hero units (the Dinomech today). IDENTICAL to
+     index.html's block, and it must stay that way for the reason the
+     tower/systems block above says in full: the sandbox's whole promise is
+     that what you learn here is true in the game, and that stops being so the
+     moment the two pages load different code.
+
+     THIS WAS MISSED WHEN THE PATH SHIPPED ON 2026-08-29, and the symptom is
+     worth writing down because it looks nothing like a missing file. Without
+     these three tags `ThreeGL` is simply undefined, `heroBody` in gl-world.js
+     returns false exactly as it does for a model still loading, and the BAKED
+     flat body draws instead. No error, no warning, no 404 -- the boss just
+     renders as the chunky untextured mesh it used to be, on this page only,
+     while index.html shows it correctly. That is a fallback behaving exactly
+     as designed, hiding a page that was never wired. -->
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/GLTFLoader.js"></script>
+<script src="js/gl/three-loader.js"></script>
+<script src="js/gl/gl-geometry.js"></script>
+<!-- Organic colour strata for Ironwood's otherwise-flat gameplay ground. -->
+<script src="js/gl/ironwood-ground.js"></script>
+<!-- The authored dirt/moss module, bent along Ironwood's live route. -->
+<script src="js/gl/ironwood-path.js"></script>
+<!-- The sky pass. Before gl-world.js, which creates it on the first outdoor
+     frame and hands it the composed environment. -->
+<script src="js/gl/gl-sky.js"></script>
+<script src="js/gl/gl-parts.js"></script>
+<script src="js/gl/gl-models.js"></script>
+<script src="js/gl/gl-world.js"></script>
+<script src="js/gl/tower-preview.js"></script>
+<script src="js/gl/model-viewer.js"></script>
+<script src="js/gl/siphon-beam-spec.js"></script>
+<script src="js/gl/siphon-beam-draw.js"></script>
+<script src="js/gl/siphon-ritual.js"></script>
+<!-- The Summoner's effect modules. Presentation only: each one reads the
+     live objects, keeps its own records beside them and draws. They are called
+     from gl-world.js through bound helper objects, and every entry point
+     no-ops if bind() never ran -- so they load AFTER it and the order between
+     them does not matter.
+     blub-summon.js sits after blub-circles.js because its descentLift() ADDS
+     to that one's -- a reading order, not a load-order dependency: the
+     reference is resolved per call. -->
+<script src="js/gl/blub-circles.js"></script>
+<script src="js/gl/blub-summon.js"></script>
+<script src="js/gl/blub-projectiles.js"></script>
+<script src="js/gl/blub-systems.js"></script>
+<!-- What is left after a flier dies: the fall, the bounce and the fade.
+     Presentation only; every entry point no-ops until gl-world binds it. -->
+<script src="js/gl/enemy-wreck.js"></script>
+<script src="js/gl/models/sniper-base.js"></script>
+<script src="js/gl/models/sniper-a3.js"></script>
+<script src="js/gl/models/sniper-a4.js"></script>
+<script src="js/gl/models/sniper-a5.js"></script>
+<script src="js/gl/models/sniper-b3.js"></script>
+<script src="js/gl/models/sniper-b4.js"></script>
+<script src="js/gl/models/sniper-b5.js"></script>
+<script src="js/gl/models/rifleman-base.js"></script>
+<script src="js/gl/models/rifleman-a3.js"></script>
+<script src="js/gl/models/rifleman-a5.js"></script>
+<script src="js/gl/models/rifleman-b3.js"></script>
+<script src="js/gl/models/rifleman-b5.js"></script>
+<script src="js/gl/models/warbringer-base.js"></script>
+<script src="js/gl/models/warbringer-a3.js"></script>
+<script src="js/gl/models/warbringer-a4.js"></script>
+<script src="js/gl/models/warbringer-a5.js"></script>
+<script src="js/gl/models/warbringer-b3.js"></script>
+<script src="js/gl/models/warbringer-b4.js"></script>
+<script src="js/gl/models/warbringer-b5.js"></script>
+<script src="js/gl/models/blub-blub1.js"></script>
+<script src="js/gl/models/blub-blub2.js"></script>
+<script src="js/gl/models/blub-blub3.js"></script>
+<script src="js/gl/models/blub-cyber.js"></script>
+<script src="js/gl/models/blub-hungry.js"></script>
+<script src="js/gl/models/blub-mark-a1-cyber.js"></script>
+<script src="js/gl/models/blub-mark-a1-mecha.js"></script>
+<script src="js/gl/models/blub-mark-a1-mecha2.js"></script>
+<script src="js/gl/models/blub-mark-a1-superb.js"></script>
+<script src="js/gl/models/blub-mark-a2-cyber.js"></script>
+<script src="js/gl/models/blub-mark-a2-mecha.js"></script>
+<script src="js/gl/models/blub-mark-a2-mecha2.js"></script>
+<script src="js/gl/models/blub-mark-a2-superb.js"></script>
+<script src="js/gl/models/blub-mark-b1-blub1.js"></script>
+<script src="js/gl/models/blub-mark-b1-blub2.js"></script>
+<script src="js/gl/models/blub-mark-b1-blub3.js"></script>
+<script src="js/gl/models/blub-mark-b1-hungry.js"></script>
+<script src="js/gl/models/blub-mark-b1-mini1.js"></script>
+<script src="js/gl/models/blub-mark-b1-mini2.js"></script>
+<script src="js/gl/models/blub-mark-b2-blub1.js"></script>
+<script src="js/gl/models/blub-mark-b2-blub2.js"></script>
+<script src="js/gl/models/blub-mark-b2-blub3.js"></script>
+<script src="js/gl/models/blub-mark-b2-hungry.js"></script>
+<script src="js/gl/models/blub-mark-b2-mini1.js"></script>
+<script src="js/gl/models/blub-mark-b2-mini2.js"></script>
+<script src="js/gl/models/blub-mecha.js"></script>
+<script src="js/gl/models/blub-mecha2.js"></script>
+<script src="js/gl/models/blub-mini1.js"></script>
+<script src="js/gl/models/blub-mini2.js"></script>
+<script src="js/gl/models/blub-monster-t0.js"></script>
+<script src="js/gl/models/blub-monster-t1.js"></script>
+<script src="js/gl/models/blub-monster-t2.js"></script>
+<script src="js/gl/models/blub-monster-t3.js"></script>
+<script src="js/gl/models/blub-monster-t4.js"></script>
+<script src="js/gl/models/blub-superb.js"></script>
+<script src="js/gl/models/summoner-a3.js"></script>
+<script src="js/gl/models/summoner-a4.js"></script>
+<script src="js/gl/models/summoner-a5.js"></script>
+<script src="js/gl/models/summoner-b3.js"></script>
+<script src="js/gl/models/summoner-b4.js"></script>
+<script src="js/gl/models/summoner-b5.js"></script>
+<script src="js/gl/models/summoner-base.js"></script>
+<script src="js/gl/models/summoner-mark-a1.js"></script>
+<script src="js/gl/models/summoner-mark-a2.js"></script>
+<script src="js/gl/models/summoner-mark-b1.js"></script>
+<script src="js/gl/models/summoner-mark-b2.js"></script>
+<script src="js/gl/models/siphon-a1.js"></script>
+<script src="js/gl/models/siphon-a2.js"></script>
+<script src="js/gl/models/siphon-a3.js"></script>
+<script src="js/gl/models/siphon-a4.js"></script>
+<script src="js/gl/models/siphon-a5.js"></script>
+<script src="js/gl/models/siphon-b1.js"></script>
+<script src="js/gl/models/siphon-b2.js"></script>
+<script src="js/gl/models/siphon-b3.js"></script>
+<script src="js/gl/models/siphon-b4.js"></script>
+<script src="js/gl/models/siphon-b5.js"></script>
+<script src="js/gl/models/siphon-base.js"></script>
+<script src="js/gl/models/farm-base.js"></script>
+<script src="js/gl/models/farm-t1.js"></script>
+<script src="js/gl/models/farm-t2.js"></script>
+<script src="js/gl/models/farm-t3a.js"></script>
+<script src="js/gl/models/farm-t3b.js"></script>
+<script src="js/gl/models/farm-t3c.js"></script>
+<script src="js/gl/models/farm-t4a.js"></script>
+<script src="js/gl/models/farm-t4b.js"></script>
+<script src="js/gl/models/farm-t4c.js"></script>
+<script src="js/gl/models/farm-t5a.js"></script>
+<script src="js/gl/models/farm-t5b.js"></script>
+<script src="js/gl/models/farm-t5c.js"></script>
+<script src="js/gl/models/siphon-beam-chain.js"></script>
+<script src="js/gl/models/siphon-beam-column.js"></script>
+<script src="js/gl/models/siphon-beam-gold.js"></script>
+<script src="js/gl/models/siphon-beam-ramp.js"></script>
+<script src="js/gl/models/siphon-beam-saturated.js"></script>
+<script src="js/gl/models/siphon-beam-seeking.js"></script>
+<script src="js/gl/models/siphon-beam-tendon.js"></script>
+<script src="js/gl/models/siphon-beam-thread.js"></script>
+<script src="js/gl/models/recruit-b4.js"></script>
+<script src="js/gl/models/recruit-b5.js"></script>
+<script src="js/gl/models/enemy-normal.js"></script>
+<script src="js/gl/models/enemy-swarm.js"></script>
+<script src="js/gl/models/enemy-brute.js"></script>
+<script src="js/gl/models/enemy-hive.js"></script>
+<script src="js/gl/models/enemy-flying.js"></script>
+<script src="js/gl/models/enemy-armored.js"></script>
+<script src="js/gl/models/enemy-fast.js"></script>
+<script src="js/gl/models/enemy-slow.js"></script>
+<script src="js/gl/models/enemy-angry.js"></script>
+<script src="js/gl/models/enemy-camo_normal.js"></script>
+<script src="js/gl/models/enemy-midboss.js"></script>
+<script src="js/gl/models/enemy-shielded.js"></script>
+<script src="js/gl/models/enemy-shielded-broken.js"></script>
+<script src="js/gl/models/enemy-revenant.js"></script>
+<script src="js/gl/models/enemy-revenant-undead.js"></script>
+<script src="js/gl/models/enemy-shieldbearer.js"></script>
+<script src="js/gl/models/enemy-healer.js"></script>
+<script src="js/gl/models/enemy-fractal_slime.js"></script>
+<script src="js/gl/models/enemy-colossus.js"></script>
+<script src="js/gl/models/enemy-boss_fast.js"></script>
+<script src="js/gl/models/enemy-boss_fast-shattered.js"></script>
+<script src="js/gl/models/enemy-boss.js"></script>
+<script src="js/gl/models/enemy-herald.js"></script>
+<script src="js/gl/models/enemy-sapper.js"></script>
+<script src="js/gl/models/enemy-dinomech.js"></script>
+<script src="js/gl/models/enemy-volatile.js"></script>
+<script src="js/gl/models/missile.js"></script>
+
+<script src="js/game.js"></script>
+
+<!-- The field-max command behind the sidebar button. Sandbox-only: index.html
+     does not name it, so it is absent from the shipping page. -->
+<script src="js/sandbox/sandbox-max-field.js"></script>
+
+<!-- Sandbox wiring last: it edits BUILD_SLOTS and wraps update() before
+     init() runs, so the game boots straight into sandbox rules. -->
+<script src="js/sandbox/sandbox.js"></script>
+
+
+<!-- Turn the 3D board on. Last, so both canvases exist and game.js has run.
+     On failure World3D stays disabled and every hook falls through to 2D. -->
+<script>
+(function () {
+  var ok = World3D.install({
+    glCanvas: document.getElementById("gl"),
+    uiCanvas: document.getElementById("game")
+  });
+  if (!ok) { console.warn("3D unavailable; using the 2D board."); return; }
+  World3D.resize();
+  window.addEventListener("resize", World3D.resize);
+  window.TD3D = {
+    camera: function () { return World3D.camera(); },
+    renderer: function () { return World3D.renderer(); }
+  };
+})();
+</script>
+</body>
+</html>

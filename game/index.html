@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tower Defense v0.5.0</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #12131a;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    /* Fixed 1280x720 LOGICAL world, scaled to FILL the window. game.js gives
+       the canvas an adaptive physical backing store (CSS pixels times DPR,
+       capped at native 4K), so a large display stays sharp without changing
+       any game, UI, or input coordinates.
+
+       This used to be max-width/max-height: 100%, which never worked: those
+       properties can only shrink an element below its intrinsic size, never
+       grow it. On any window wider than 1280 the canvas just sat at 1280x720
+       with dead space around it.
+
+       min() of "as wide as the window" and "as wide as the window's height
+       allows at 16:9" gives exactly the letterboxed box. Sizing the ELEMENT
+       to that (rather than reaching for object-fit) keeps
+       getBoundingClientRect equal to the drawn area, which is what game.js
+       divides by to turn a click into world coordinates -- see toCanvasPos.
+       Letterbox with object-fit and every click below the halfway line would
+       land in the wrong place.
+
+       Nothing about the simulation changes: the world is still 1280x720 and
+       every distance is still u.l. This is presentation only. */
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: min(100vh, calc(100vw * 9 / 16));
+    display: block;
+    cursor: crosshair;
+    background: #1c1e26;
+  }
+</style>
+</head>
+<body>
+
+<!-- The 3D board sits BEHIND the game canvas, matched to it pixel for
+     pixel by World3D.resize(). The game canvas keeps every HUD, panel and
+     menu and stops painting its own background while the world shows
+     through. Two canvases because the HUD wants crisp screen-space 2D and
+     the board wants a depth buffer. -->
+<canvas id="gl"></canvas>
+<style>
+  #gl { position: fixed; left: 0; top: 0; z-index: 0; }
+  #game { position: relative; z-index: 1; background: transparent; }
+</style>
+<canvas id="game"></canvas>
+
+<!--
+  Loaded as classic scripts (no type="module") on purpose: browsers block
+  ES modules over file://, and this game is meant to run by double-clicking.
+  Order matters -- game.js depends on the others.
+-->
+<script src="js/units.js"></script>
+<!-- Presentation only, and deliberately first: visual-models.js is the registry
+     a skin pack replaces models through, visuals.js the shared three-quarter
+     vocabulary every renderer below draws with. Neither is read back by the
+     simulation, so nothing that follows depends on them being correct. -->
+<script src="js/visual-models.js"></script>
+<script src="js/visuals.js"></script>
+<!-- Art packs load after visuals.js and register renderers only. Removing
+     this line restores the built-in procedural models with no other change. -->
+<script src="js/skins/draw-pack.js"></script>
+<script src="js/path.js"></script>
+<!-- Mitigation is global: every damage source goes through Enemy.takeDamage,
+     which applies it. Must load before enemy.js. -->
+<script src="js/systems/mitigation.js"></script>
+<script src="js/systems/damage-amp.js"></script>
+<script src="js/enemy.js"></script>
+<script src="js/bullet.js"></script>
+<!-- Targeting MODES (which enemy to shoot). Must load before the towers. -->
+<script src="js/targeting.js"></script>
+<!-- Shared health-for-damage collision rule for Rifleman recruits and every
+     future friendly summon. Must follow TowerScore and precede soldier.js. -->
+<script src="js/systems/summon-contact.js"></script>
+<!-- One vocabulary for the numbers every tower reports (damage, range,
+     attack speed, DPS). Must load before the towers, which build their
+     panel rows out of it. -->
+<script src="js/systems/tower-stats.js"></script>
+<!-- Towers have hit points and die at zero. Shared by all four types, so it
+     must load before any of them. -->
+<script src="js/systems/tower-health.js"></script>
+<!-- Hazards a death leaves on a fuse (the Volatile's charge). Simulation, not
+     presentation: towers lose real hit points to it, so it is stepped from
+     update(). Reads a type's `deathEffect` block and knows no type ids. -->
+<script src="js/systems/hazards.js"></script>
+<!-- Missiles an enemy attack put in the air (the Dinomech's silo salvo).
+     Simulation for the hazards reason: a tower loses real hit points when one
+     arrives, so the arrival time is a fact about the game and the flight is
+     stepped from update(). Reads an attack's `salvo` block and knows no type
+     ids. -->
+<script src="js/systems/missiles.js"></script>
+<script src="js/tower.js"></script>
+
+<!-- Longshot: config + systems + runtime, then the adapter that gives it the
+     game's tower interface. This block is IDENTICAL to sandbox.html's, and
+     must stay that way -- the sandbox's whole promise is that what you learn
+     there is true here, which stops being so the moment the two pages load
+     different code. pierce.js in particular is not optional any more: the
+     shipping game now has a piercing tower and PierceBullet reads the falloff
+     formula out of it. -->
+<script src="js/towers/long-range-dps.config.js"></script>
+<script src="js/systems/stat-resolver.js"></script>
+<script src="js/systems/crosspath.js"></script>
+<!-- THE WORLD CLOCK AND WHAT IT LOOKS LIKE. Before game.js, which ticks the
+     cycle from its fixed step, and before gl-world.js, which reads the
+     composed result off the render state. Neither of these two files knows
+     what a tower is; nothing that knows what a tower is owns the time. -->
+<script src="js/systems/environment-cycle.js"></script>
+<script src="js/systems/environment-lighting.js"></script>
+<script src="js/systems/map-geometry.js"></script>
+<script src="js/systems/range-filter.js"></script>
+<script src="js/systems/pierce.js"></script>
+<script src="js/systems/execute.js"></script>
+<script src="js/systems/damage-pipeline.js"></script>
+<script src="js/systems/buff-stacks.js"></script>
+<script src="js/systems/reload.js"></script>
+<script src="js/systems/active-ability.js"></script>
+<script src="js/systems/upgrade-effects.js"></script>
+<!-- The auto ON/OFF switch on ability buttons. After upgrade-effects.js, whose
+     card() it calls; before any tower that hangs a switch on a button. -->
+<script src="js/systems/auto-ability.js"></script>
+<script src="js/towers/tower-runtime.js"></script>
+<script src="js/towers/longshot-adapter.js"></script>
+
+<!-- Siphon (tower_beam): config, its mechanic modules, then its adapter. -->
+<script src="js/towers/beam.config.js"></script>
+<script src="js/systems/ramp.js"></script>
+<script src="js/systems/charge-gold.js"></script>
+<script src="js/systems/gold-power.js"></script>
+<script src="js/systems/death-denial.js"></script>
+<script src="js/systems/healing-ledger.js"></script>
+<script src="js/towers/beam-adapter.js"></script>
+
+<!-- The Smasher and the fused authored/generated route roster. maps.js reads
+     the reference Rifleman and buildClearancePx when it measures difficulty,
+     so it loads after the towers and before game.js. -->
+<script src="js/smasher.js"></script>
+<!-- The Soldier: the Rifleman. Reads Tower (footprint),
+     Enemy (walking speed, for its recruits) and UpgradeEffects, all of which
+     are loaded above. -->
+<script src="js/soldier.js"></script>
+<script src="js/blub.js"></script>
+<script src="js/farm.js"></script>
+<script src="js/maps.js"></script>
+<!-- Cosmetic feedback (death bursts, popups, wave banner). Presentation only:
+     the simulation never reads anything back out of it. -->
+<script src="js/effects.js"></script>
+<!-- The index screen (field guide). Reads the towers and enemies it lists
+     through their own panelActions/statLines/TYPES, so it cannot go stale. -->
+<script src="js/codex.js"></script>
+<!-- Meta progression: coins, owned towers, the equipped loadout, and the only
+     thing in the game that is saved. game.js builds BUILD_SLOTS out of it, so
+     it must load before game.js; it resolves tower constructors lazily, so it
+     does not care that it loads after them. -->
+<script src="js/meta.js"></script>
+<!-- The armoury screen (store + inventory). Reads meta.js and each tower's own
+     statLines/drawIcon, so like the index it has no second copy to go stale. -->
+<script src="js/store.js"></script>
+
+<!-- The 3D board. Loaded BEFORE game.js so the hooks in draw() and
+     screenToWorld() find World3D already defined. If WebGL is unavailable the
+     install below fails cleanly and the 2D renderer takes over unchanged. -->
+<script src="js/gl/gl-math.js"></script>
+<script src="js/gl/gl-renderer.js"></script>
+<script src="js/gl/gl-camera.js"></script>
+<!-- THE SECOND RENDERER, for towers and bosses only. Three.js r147 -- the last
+     release line that ships a UMD build and a plain-script GLTFLoader, so this
+     is classic <script> tags like everything else and nothing needs a module,
+     a bundler or a server. The nineteen baked enemy bodies do not go through
+     it and are not affected by it; see the header of js/gl/three-loader.js for
+     why a hero unit needs a different pipeline than an enemy does.
+
+     vendor/ rather than js/ ON PURPOSE: this is third-party source and is not
+     written in the project's ES5 house style, and tools/check-constraints.js
+     rightly holds everything under js/ to that style. js/gl/three-loader.js --
+     the part we actually wrote -- is under js/ and passes it.
+
+     If these two files are removed, ThreeGL.install() returns false, every
+     hero unit falls back to its stand-in and the rest of the board is
+     unchanged. -->
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/GLTFLoader.js"></script>
+<script src="js/gl/three-loader.js"></script>
+<script src="js/gl/gl-geometry.js"></script>
+<!-- Organic colour strata for Ironwood's otherwise-flat gameplay ground. -->
+<script src="js/gl/ironwood-ground.js"></script>
+<!-- The authored dirt/moss module, bent along Ironwood's live route. -->
+<script src="js/gl/ironwood-path.js"></script>
+<!-- The sky pass. Before gl-world.js, which creates it on the first outdoor
+     frame and hands it the composed environment. -->
+<script src="js/gl/gl-sky.js"></script>
+<script src="js/gl/gl-parts.js"></script>
+<script src="js/gl/gl-models.js"></script>
+<script src="js/gl/gl-world.js"></script>
+<script src="js/gl/tower-preview.js"></script>
+<script src="js/gl/model-viewer.js"></script>
+<script src="js/gl/siphon-beam-spec.js"></script>
+<script src="js/gl/siphon-beam-draw.js"></script>
+<script src="js/gl/siphon-ritual.js"></script>
+<!-- The Summoner's effect modules. Presentation only: each one reads the
+     live objects, keeps its own records beside them and draws. They are called
+     from gl-world.js through bound helper objects, and every entry point
+     no-ops if bind() never ran -- so they load AFTER it and the order between
+     them does not matter.
+     blub-summon.js sits after blub-circles.js because its descentLift() ADDS
+     to that one's -- a reading order, not a load-order dependency: the
+     reference is resolved per call. -->
+<script src="js/gl/blub-circles.js"></script>
+<script src="js/gl/blub-summon.js"></script>
+<script src="js/gl/blub-projectiles.js"></script>
+<script src="js/gl/blub-systems.js"></script>
+<!-- What is left after a flier dies: the fall, the bounce and the fade.
+     Presentation only; every entry point no-ops until gl-world binds it. -->
+<script src="js/gl/enemy-wreck.js"></script>
+<script src="js/gl/models/sniper-base.js"></script>
+<script src="js/gl/models/sniper-a3.js"></script>
+<script src="js/gl/models/sniper-a4.js"></script>
+<script src="js/gl/models/sniper-a5.js"></script>
+<script src="js/gl/models/sniper-b3.js"></script>
+<script src="js/gl/models/sniper-b4.js"></script>
+<script src="js/gl/models/sniper-b5.js"></script>
+<script src="js/gl/models/rifleman-base.js"></script>
+<script src="js/gl/models/rifleman-a3.js"></script>
+<script src="js/gl/models/rifleman-a5.js"></script>
+<script src="js/gl/models/rifleman-b3.js"></script>
+<script src="js/gl/models/rifleman-b5.js"></script>
+<script src="js/gl/models/warbringer-base.js"></script>
+<script src="js/gl/models/warbringer-a3.js"></script>
+<script src="js/gl/models/warbringer-a4.js"></script>
+<script src="js/gl/models/warbringer-a5.js"></script>
+<script src="js/gl/models/warbringer-b3.js"></script>
+<script src="js/gl/models/warbringer-b4.js"></script>
+<script src="js/gl/models/warbringer-b5.js"></script>
+<script src="js/gl/models/blub-blub1.js"></script>
+<script src="js/gl/models/blub-blub2.js"></script>
+<script src="js/gl/models/blub-blub3.js"></script>
+<script src="js/gl/models/blub-cyber.js"></script>
+<script src="js/gl/models/blub-detail-blub1.js"></script>
+<script src="js/gl/models/blub-detail-blub2.js"></script>
+<script src="js/gl/models/blub-detail-blub3.js"></script>
+<script src="js/gl/models/blub-detail-cyber.js"></script>
+<script src="js/gl/models/blub-detail-hungry.js"></script>
+<script src="js/gl/models/blub-detail-mecha.js"></script>
+<script src="js/gl/models/blub-detail-mecha2.js"></script>
+<script src="js/gl/models/blub-detail-mini1.js"></script>
+<script src="js/gl/models/blub-detail-mini2.js"></script>
+<script src="js/gl/models/blub-detail-superb.js"></script>
+<script src="js/gl/models/blub-hungry.js"></script>
+<script src="js/gl/models/blub-mark-a1-cyber.js"></script>
+<script src="js/gl/models/blub-mark-a1-mecha.js"></script>
+<script src="js/gl/models/blub-mark-a1-mecha2.js"></script>
+<script src="js/gl/models/blub-mark-a1-superb.js"></script>
+<script src="js/gl/models/blub-mark-a2-cyber.js"></script>
+<script src="js/gl/models/blub-mark-a2-mecha.js"></script>
+<script src="js/gl/models/blub-mark-a2-mecha2.js"></script>
+<script src="js/gl/models/blub-mark-a2-superb.js"></script>
+<script src="js/gl/models/blub-mark-b1-blub1.js"></script>
+<script src="js/gl/models/blub-mark-b1-blub2.js"></script>
+<script src="js/gl/models/blub-mark-b1-blub3.js"></script>
+<script src="js/gl/models/blub-mark-b1-hungry.js"></script>
+<script src="js/gl/models/blub-mark-b1-mini1.js"></script>
+<script src="js/gl/models/blub-mark-b1-mini2.js"></script>
+<script src="js/gl/models/blub-mark-b2-blub1.js"></script>
+<script src="js/gl/models/blub-mark-b2-blub2.js"></script>
+<script src="js/gl/models/blub-mark-b2-blub3.js"></script>
+<script src="js/gl/models/blub-mark-b2-hungry.js"></script>
+<script src="js/gl/models/blub-mark-b2-mini1.js"></script>
+<script src="js/gl/models/blub-mark-b2-mini2.js"></script>
+<script src="js/gl/models/blub-mecha.js"></script>
+<script src="js/gl/models/blub-mecha2.js"></script>
+<script src="js/gl/models/blub-mini1.js"></script>
+<script src="js/gl/models/blub-mini2.js"></script>
+<script src="js/gl/models/blub-monster-t0.js"></script>
+<script src="js/gl/models/blub-monster-t1.js"></script>
+<script src="js/gl/models/blub-monster-t2.js"></script>
+<script src="js/gl/models/blub-monster-t3.js"></script>
+<script src="js/gl/models/blub-monster-t4.js"></script>
+<script src="js/gl/models/blub-superb.js"></script>
+<script src="js/gl/models/summoner-a3.js"></script>
+<script src="js/gl/models/summoner-a4.js"></script>
+<script src="js/gl/models/summoner-a5.js"></script>
+<script src="js/gl/models/summoner-b3.js"></script>
+<script src="js/gl/models/summoner-b4.js"></script>
+<script src="js/gl/models/summoner-b5.js"></script>
+<script src="js/gl/models/summoner-base.js"></script>
+<script src="js/gl/models/summoner-mark-a1.js"></script>
+<script src="js/gl/models/summoner-mark-a2.js"></script>
+<script src="js/gl/models/summoner-mark-b1.js"></script>
+<script src="js/gl/models/summoner-mark-b2.js"></script>
+<script src="js/gl/models/siphon-a1.js"></script>
+<script src="js/gl/models/siphon-a2.js"></script>
+<script src="js/gl/models/siphon-a3.js"></script>
+<script src="js/gl/models/siphon-a4.js"></script>
+<script src="js/gl/models/siphon-a5.js"></script>
+<script src="js/gl/models/siphon-b1.js"></script>
+<script src="js/gl/models/siphon-b2.js"></script>
+<script src="js/gl/models/siphon-b3.js"></script>
+<script src="js/gl/models/siphon-b4.js"></script>
+<script src="js/gl/models/siphon-b5.js"></script>
+<script src="js/gl/models/siphon-base.js"></script>
+<script src="js/gl/models/farm-base.js"></script>
+<script src="js/gl/models/farm-t1.js"></script>
+<script src="js/gl/models/farm-t2.js"></script>
+<script src="js/gl/models/farm-t3a.js"></script>
+<script src="js/gl/models/farm-t3b.js"></script>
+<script src="js/gl/models/farm-t3c.js"></script>
+<script src="js/gl/models/farm-t4a.js"></script>
+<script src="js/gl/models/farm-t4b.js"></script>
+<script src="js/gl/models/farm-t4c.js"></script>
+<script src="js/gl/models/farm-t5a.js"></script>
+<script src="js/gl/models/farm-t5b.js"></script>
+<script src="js/gl/models/farm-t5c.js"></script>
+<script src="js/gl/models/siphon-beam-chain.js"></script>
+<script src="js/gl/models/siphon-beam-column.js"></script>
+<script src="js/gl/models/siphon-beam-gold.js"></script>
+<script src="js/gl/models/siphon-beam-ramp.js"></script>
+<script src="js/gl/models/siphon-beam-saturated.js"></script>
+<script src="js/gl/models/siphon-beam-seeking.js"></script>
+<script src="js/gl/models/siphon-beam-tendon.js"></script>
+<script src="js/gl/models/siphon-beam-thread.js"></script>
+<script src="js/gl/models/recruit-b4.js"></script>
+<script src="js/gl/models/recruit-b5.js"></script>
+<script src="js/gl/models/enemy-normal.js"></script>
+<script src="js/gl/models/enemy-swarm.js"></script>
+<script src="js/gl/models/enemy-brute.js"></script>
+<script src="js/gl/models/enemy-hive.js"></script>
+<script src="js/gl/models/enemy-flying.js"></script>
+<script src="js/gl/models/enemy-armored.js"></script>
+<script src="js/gl/models/enemy-fast.js"></script>
+<script src="js/gl/models/enemy-slow.js"></script>
+<script src="js/gl/models/enemy-angry.js"></script>
+<script src="js/gl/models/enemy-camo_normal.js"></script>
+<script src="js/gl/models/enemy-midboss.js"></script>
+<script src="js/gl/models/enemy-shielded.js"></script>
+<script src="js/gl/models/enemy-shielded-broken.js"></script>
+<script src="js/gl/models/enemy-revenant.js"></script>
+<script src="js/gl/models/enemy-revenant-undead.js"></script>
+<script src="js/gl/models/enemy-shieldbearer.js"></script>
+<script src="js/gl/models/enemy-healer.js"></script>
+<script src="js/gl/models/enemy-fractal_slime.js"></script>
+<script src="js/gl/models/enemy-colossus.js"></script>
+<script src="js/gl/models/enemy-boss_fast.js"></script>
+<script src="js/gl/models/enemy-boss_fast-shattered.js"></script>
+<script src="js/gl/models/enemy-boss.js"></script>
+<script src="js/gl/models/enemy-herald.js"></script>
+<script src="js/gl/models/enemy-sapper.js"></script>
+<script src="js/gl/models/enemy-dinomech.js"></script>
+<script src="js/gl/models/enemy-volatile.js"></script>
+<script src="js/gl/models/missile.js"></script>
+
+<script src="js/game.js"></script>
+
+
+<!-- Turn the 3D board on. Last, so both canvases exist and game.js has run.
+     On failure World3D stays disabled and every hook falls through to 2D. -->
+<script>
+(function () {
+  var ok = World3D.install({
+    glCanvas: document.getElementById("gl"),
+    uiCanvas: document.getElementById("game")
+  });
+  if (!ok) { console.warn("3D unavailable; using the 2D board."); return; }
+  World3D.resize();
+  window.addEventListener("resize", World3D.resize);
+  window.TD3D = {
+    camera: function () { return World3D.camera(); },
+    renderer: function () { return World3D.renderer(); }
+  };
+})();
+</script>
+</body>
+</html>

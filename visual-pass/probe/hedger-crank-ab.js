@@ -19,7 +19,7 @@ var serve = require("./serve");
 var identity = require("./model-identity");
 
 var PORT = 8798, DEVTOOLS = 9338;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var ROOT = path.resolve(__dirname, "..", "..");
 var TMP = path.join(ROOT, "visual-pass", "tmp");
 var OUT = path.join(ROOT, "visual-pass", "captures", "hedger-crank");
@@ -52,7 +52,7 @@ async function main() {
   fs.mkdirSync(OUT, { recursive: true });
 
   SIDES.forEach(function (s) {
-    var lf = Buffer.from(sh("git show " + s.commit + ":TD_0.5.0/js/gl/models/" + MODEL + ".js"));
+    var lf = Buffer.from(sh("git show " + s.commit + ":game/js/gl/models/" + MODEL + ".js"));
     s.src = lf.toString("utf8");
     // BOTH md5 FORMS. git show yields LF; a checked-out working tree on this
     // repo is CRLF, and that is the hash anyone verifying the file on disk will

@@ -31,7 +31,7 @@ var fs = require("fs"), path = require("path"), os = require("os");
 var cdp = require("./cdp"), serve = require("./serve");
 
 var PORT = 8813, DEVTOOLS = 9353;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 // Pair from argv, so the same rig serves Courier/Drudge and Tender/Drudge
 // rather than a second copy drifting away from this one.
 var A = process.argv[2] || "shielded";      // Courier by default

@@ -50,11 +50,11 @@ function launchChrome(port, dir) {
 function pad(x, w) { x = String(x); while (x.length < w) x = " " + x; return x; }
 
 async function main() {
-  var gameJs = path.resolve(__dirname, "..", "..", "TD_0.5.0", "js", "game.js");
+  var gameJs = path.resolve(__dirname, "..", "..", "game", "js", "game.js");
   var src = fs.readFileSync(gameJs);
   var head = "";
   try {
-    head = childProcess.execSync("git show HEAD:TD_0.5.0/js/game.js",
+    head = childProcess.execSync("git show HEAD:game/js/game.js",
       { cwd: path.resolve(__dirname, "..", ".."), maxBuffer: 1 << 26 }).toString();
   } catch (e) { head = ""; }
   var provenance = {
@@ -83,7 +83,7 @@ async function main() {
               secondsPerScan: SECONDS, waves: [] };
   try {
     await cdp.waitForDevTools(PORT, 80);
-    var o = await cdp.open(PORT, "http://127.0.0.1:" + HTTP + "/TD_0.5.0/index.html");
+    var o = await cdp.open(PORT, "http://127.0.0.1:" + HTTP + "/game/index.html");
     var s = o.session;
     await cdp.sleep(2500);
     var J = async function (e) { return JSON.parse(await s.evaluate("JSON.stringify(" + e + ")")); };

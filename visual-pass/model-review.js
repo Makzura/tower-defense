@@ -55,7 +55,7 @@ var fs = require("fs");
 var vm = require("vm");
 var path = require("path");
 
-var ROOT = path.join(__dirname, "..", "TD_0.5.0");
+var ROOT = path.join(__dirname, "..", "game");
 var UNITS_TO_PX = 31.8032;      // board px per Blender unit
 var CROWN_PAD_PX = 10;          // crownOf()'s flat headroom, board px
 var RADIUS_PX = 11;             // Enemy.RADIUS_PX

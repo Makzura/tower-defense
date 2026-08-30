@@ -21,7 +21,7 @@
 var fs = require("fs"), path = require("path"), os = require("os");
 var cdp = require("./cdp"), serve = require("./serve");
 var PORT = 8802, DEVTOOLS = 9342;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var SPOT = 1450;   // the three-quarter/broadside spot the separation table chose
 
 async function main() {

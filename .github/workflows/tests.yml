@@ -25,7 +25,7 @@ jobs:
       # failures rise or tests disappear, and reports improvements so the
       # baseline can be tightened deliberately.
       - name: Suites against the measured baseline
-        working-directory: TD_0.5.0
+        working-directory: game
         run: node tools/ci-check.js
 
       # Three winding bugs turned up during the visual pass and all three were
@@ -42,7 +42,7 @@ jobs:
           python-version: '3.12'
 
       - name: Primitives are wound outward
-        working-directory: TD_0.5.0
+        working-directory: game
         env:
           PYTHON: python
         run: node tools/check-winding.js
@@ -83,7 +83,7 @@ jobs:
           python-version: '3.12'
 
       - name: Rebuild the td_mesh-authored models
-        working-directory: TD_0.5.0/tools/blender
+        working-directory: game/tools/blender
         run: |
           python tower_warbringer.py
           python tower_summoner.py
@@ -97,11 +97,11 @@ jobs:
       - name: The rebuild must be byte-identical
         shell: bash
         run: |
-          if ! git diff --quiet -- TD_0.5.0/js/gl/models; then
+          if ! git diff --quiet -- game/js/gl/models; then
             echo "Regenerating the models changed the tree."
             echo "Either a generated file was hand-edited, or a build script is"
             echo "not deterministic. Both matter: the models are the shipped art."
-            git diff --stat -- TD_0.5.0/js/gl/models
+            git diff --stat -- game/js/gl/models
             exit 1
           fi
           echo "All regenerated models are byte-identical."

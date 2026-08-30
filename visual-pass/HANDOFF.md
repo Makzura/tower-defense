@@ -19,7 +19,7 @@ node "<scratchpad>/static-server.js"  "C:/Users/Superuser/Downloads/TD_0.5.1" 87
   owner's power cuts mid-session; a post-commit hook is NOT enough because
   agents write files for 20–30 minutes between manual commits and everything in
   that window was being lost. This is the fix. **Restart it after every reboot.**
-* Game URL: `http://127.0.0.1:8792/TD_0.5.0/index.html`. Serve over HTTP, not
+* Game URL: `http://127.0.0.1:8792/game/index.html`. Serve over HTTP, not
   `file://` — the preview pane silently ignores reloads on `file://`, and the
   Chrome MCP forces `https://` onto every URL so it can never open a file URL.
 
@@ -43,10 +43,10 @@ at, and it was a cone.
 ## 3. Build and gate commands
 
 ```
-cd TD_0.5.0/tools/blender && python <script>.py            # colour build
-cd TD_0.5.0/tools/blender && python <script>.py --silhouette   # review only
-cd TD_0.5.0 && node tools/ci-check.js                      # suites vs baseline
-cd TD_0.5.0 && PYTHON=<python> node tools/check-winding.js  # 12 primitives
+cd game/tools/blender && python <script>.py            # colour build
+cd game/tools/blender && python <script>.py --silhouette   # review only
+cd game && node tools/ci-check.js                      # suites vs baseline
+cd game && PYTHON=<python> node tools/check-winding.js  # 12 primitives
 ```
 
 Python 3.12 at `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`.

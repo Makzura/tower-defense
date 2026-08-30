@@ -60,13 +60,13 @@ async function scene(S,dist){
   var out=out0; 
   try{
     // OLD build (pre-fix, = HEAD)
-    var O=await boot("http://127.0.0.1:"+PORT+"/visual-pass/tmp/accept-base/TD_0.5.0/index.html");
+    var O=await boot("http://127.0.0.1:"+PORT+"/visual-pass/tmp/accept-base/game/index.html");
     await scene(O,null); await O.evaluate("TDProbe.cap('old')");
     var oldHash=await O.evaluate("(function(){var b=TDProbe.frames['old'],h=0;for(var i=0;i<b.length;i+=4){h=(h*31+b[i]+b[i+1]*7+b[i+2]*13)|0;}return h;})()");
     var oldCalls=await O.evaluate("(function(){draw();return World3D.renderer().drawCalls;})()");
 
     // NEW build
-    var N=await boot("http://127.0.0.1:"+PORT+"/TD_0.5.0/index.html");
+    var N=await boot("http://127.0.0.1:"+PORT+"/game/index.html");
     await scene(N,null);
     var newCalls=await N.evaluate("(function(){draw();return World3D.renderer().drawCalls;})()");
     // CONDITION 2b: stub the fix -> must reproduce the old build EXACTLY

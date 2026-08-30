@@ -26,7 +26,7 @@ var serve = require("./serve");
 
 var PORT = 8794, DEVTOOLS = 9334;
 var TYPE = process.argv[2] || "camo_normal";
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 
 async function main() {
   var server = await new Promise(function (res, rej) {

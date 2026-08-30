@@ -29,7 +29,7 @@ var PORT = 8795, DEVTOOLS = 9335;
 var TYPE = "fractal_slime";
 var PROGRESS = 60;                 // the stretch the model probe used; tangent checked straight
 var TIERS = [0, 3, 5];
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 
 var INK = [13, 64, 47];            // the authored stencil colour
 var WRONG_INK = [190, 255, 205];   // the camo ring's colour -- must NOT fit

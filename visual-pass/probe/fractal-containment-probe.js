@@ -45,7 +45,7 @@ var PORT = 8797, DEVTOOLS = 9337;
 var TYPE = "fractal_slime";
 var PROGRESS = 200;
 var PHASE = 0.25;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 
 function predict(k) { return 2 * (k * k - 1) / (k * k + 1); }
 

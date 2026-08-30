@@ -14,7 +14,7 @@ if(!NAMES.length) NAMES=["enemy-shielded","enemy-armored","enemy-normal"];
   var server=await new Promise(function(r,j){serve.start(PORT,function(e,s){e?j(e):r(s);});});
   var chrome=cdp.launch(DEVTOOLS,path.join(os.tmpdir(),"td-probe-mtop"));
   await cdp.waitForDevTools(DEVTOOLS);
-  var conn=await cdp.open(DEVTOOLS,"http://127.0.0.1:"+PORT+"/TD_0.5.0/index.html");
+  var conn=await cdp.open(DEVTOOLS,"http://127.0.0.1:"+PORT+"/game/index.html");
   var S=conn.session;
   try{
     for(var i=0;i<80;i++){ if(await S.evaluate("typeof startRun==='function' && typeof World3D!=='undefined'"))break; await cdp.sleep(250);}

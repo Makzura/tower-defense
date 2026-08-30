@@ -11,7 +11,7 @@
 var fs = require("fs"), path = require("path"), os = require("os");
 var cdp = require("./cdp"), serve = require("./serve");
 var PORT = 8799, DEVTOOLS = 9339;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 
 async function main() {
   var server = await new Promise(function (r, j) {

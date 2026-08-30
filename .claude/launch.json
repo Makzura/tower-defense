@@ -4,7 +4,7 @@
     {
       "name": "tower-defense",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8734", "--directory", "TD_0.5.0"],
+      "runtimeArgs": ["-m", "http.server", "8734", "--directory", "game"],
       "port": 8734
     }
   ]

@@ -30,8 +30,8 @@ var serve = require("./serve");
 var PORT = 8799, DEVTOOLS = 9339;
 var ROOT = path.resolve(__dirname, "..", "..");
 var BASE = path.join(ROOT, "visual-pass", "tmp", "camo-base");
-var NEW_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
-var OLD_URL = "http://127.0.0.1:" + PORT + "/visual-pass/tmp/camo-base/TD_0.5.0/index.html";
+var NEW_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
+var OLD_URL = "http://127.0.0.1:" + PORT + "/visual-pass/tmp/camo-base/game/index.html";
 
 function sh(c) { return cp.execSync(c, { cwd: ROOT }).toString(); }
 
@@ -80,7 +80,7 @@ async function main() {
   fs.mkdirSync(BASE, { recursive: true });
   // HEAD is the pre-change tree; the edit under test is uncommitted.
   sh('git archive HEAD | tar -x -C "' + BASE.replace(/\\/g, "/") + '"');
-  if (!fs.existsSync(path.join(BASE, "TD_0.5.0", "js", "gl", "gl-world.js"))) {
+  if (!fs.existsSync(path.join(BASE, "game", "js", "gl", "gl-world.js"))) {
     throw new Error("base tree did not extract");
   }
   var out = { note: "old = HEAD (pre-change), new = working tree" };
