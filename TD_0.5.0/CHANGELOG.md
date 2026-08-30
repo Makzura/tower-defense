@@ -837,6 +837,656 @@ telegraph, a fizzle draws nothing, and an ordinary attack still draws the plain
 bolt). The data-not-branches sweep now walks FOUR ids and reads
 `js/systems/missiles.js` as well as `js/systems/hazards.js`.
 
+---
+
+**2026-08-29 — The Farm gets its picture and its words.**
+
+**Its body was on the board and its picture was not.** `TowerPreview3D` resolves
+a tower type to a mesh through a family map; a type missing from it answers null
+and every call site quietly falls back to the flat 2D glyph. So the armoury card,
+the loadout row, the build bar and the index rail all drew a picture of nothing
+in particular while twelve authored bodies stood on the battlefield, and nothing
+anywhere reported a problem. Six characters, plus a test that asserts the
+resolution for every catalogue tower so the sixth is not the last one found this
+way.
+
+**The index showed a 1200-mana economy tower as one line.** The index and the
+armoury show a specimen and drop its history — by counting two rows off the
+front of `statLines`, on the assumption that every tower opens with "Damage
+dealt" and "Kills". The Farm has neither and keeps its own totals at the bottom,
+under the production rate a player opens the panel for, so the count ate that
+rate and left "Tower HP 200 / 200". The mark travels with the row now
+(`TowerStats.total`), so the drop is by identity.
+
+**Four tiers said "No description written for this one yet."** — A4, A5, B5 and
+the C dice, which is every tier those paths are taken for. They have sentences
+now, and their names in words rather than as flag ids, with every number handed
+in from the Farm's own constants and the tier's own row. All four measured
+against `tooltipLines`' five-line budget at the card's real width: a description
+clipped at "…" is a description missing its point.
+
+**And the one consequence a price tag cannot show.** Every other tower warns
+that tier 3 commits it; the Farm, the only tower with three paths, said nothing.
+Its rule is its own — two paths at most, one past tier 2 — and the note states
+the half that is true of the board in front of you.
+
+**2026-08-29 — The Fractal Slime comes off the EASY campaign.**
+
+At the owner's instruction: *"take out the fractal slime, all of them, from easy
+mode, and replace them by, in order, colossus > hive > slow > normal, matching
+the HP total"*, and then *"don't change normal"*. All ten roots came off
+`EASY_WAVES`. **`NORMAL_WAVES` is untouched** — it still sends four rungs, in
+waves 17, 27, 32 and 35 — and the type itself is untouched: the ladder, the
+division, the AoE resistance and the half-price bounty are all still live. It
+carries **no** `sandboxOnly` flag for exactly that reason; the flag means "keep
+this out of the fixed campaign" and `tests/run.js` reads it in both directions,
+so on a type Normal still schedules it would have been a false claim. (It was
+written that way for an afternoon, on a branch that predated the second
+campaign, and the merge is what caught it.)
+
+**The substitution.** Each root became ONE body of the first type in that ladder
+whose own health fits inside the root's, with a `health` override equal to the
+root: four Normals at 1 in wave 16, two at 4 in wave 17, a Slow at 16 in 22, a
+Slow at 64 in 25, a Hive at 256 in 33, and a Colossus at 1024 last in wave 35.
+Every `at`, `count` and `interval` is untouched, so when a body enters and into
+what is exactly what it was.
+
+**Easy's authored HP did not move — 25 939, wave for wave — and that is the one
+number not to read as "nothing changed".** `waveEffectiveHealth` counts the root only,
+so matching each root point for point holds it still; the wave-clear bonus is a
+tenth of health and holds still with it. But a cleared cascade was 7 748 points
+across 1 826 born bodies where the six roots authored 1 372, and all of that is
+gone. Waves 22, 25, 33 and 35 are materially easier to clear and quieter on the
+road, and the finale now ends on the longest single kill in the game instead of
+on a clearing problem. Kill bounty rose $22 987 → $23 132: these four types are
+worth $1 a point where the Slime's row was written at $0.50. The $3 188 the
+cascades used to pay outside every table is gone with them.
+
+**One test found a real trap on the way.** The v0.4.4 spine matcher summed every
+body of a type in a wave and then read `health` off whichever group came last.
+Wave 17's two new 4 HP Normals brought its Normal count to sixteen, so it matched
+old wave 11 ahead of wave 19 — its authored home — and then reported the spine
+as WEAKER off the two-body salvo. It buckets by health now and asks for a bucket
+of the right size, which is what a split salvo actually looks like.
+
+The index derives everything it says about this enemy from the schedules, and it
+keeps a wave list PER DIFFICULTY — so the card now reads "Easy: none, Normal:
+17, 27, 32, 35" with no edit to `js/codex.js`. That per-difficulty split, which
+arrived with the Normal campaign, is the thing that stops the guide sending an
+Easy player to look for a body that is not on their road.
+
+**2026-08-29 — The Farm's crosspath, its eye, and a tidier end screen.**
+
+**The crosspath was wrong in both directions.** `lockedBranch` alone refused
+every other branch outright once one reached T3 — so a farm going up A could
+never buy B1, though the secondary is meant to reach tier 2 — and nothing counted
+branches, so before any T3 a farm could put two tiers on all three and only then
+find itself stuck. It is two rules now, in the order a player meets them: a third
+branch is never started, and only one branch passes tier 2. One to five, the
+other to two, which is what the brief always said.
+
+**A5's boost refuses at the press when there is nothing to aim at.** It only
+lands on a tower at tier 5 or above; on a board with none, arming opened a mode
+whose every click was refused after the fact, which reads exactly like a broken
+button. Verified with real mouse clicks that the flow itself works — the banner
+reads "Warbringer — boosted" and its damage goes 65 → 97.5 — so what was missing
+was the refusal, not the mechanism.
+
+**Only the eye turns now.** Tracking was done by turning the tower's `aim`, which
+swung the skid, the pylons and the operator with it. The bearing lives on
+`viewYaw` and gl-world spends it on ONE group, about its own axis, through the
+per-group override the recruit's rifle recoil already uses — with the pivot from
+the model's new `pivots` map, because an eye turned about the middle of its own
+mesh swings off its mount. Only while the field idle is playing, which is what
+makes it safe: those clips leave the eye alone. Measured: 380 px change when it
+turns while watching, 0 px when the field is empty and the authored patrol has
+it. Eased on `1 - exp(-6·dt)`, the short way round.
+
+**And the end screen stopped inventing rows.** A summoned blub is not a tower
+there — each one had been getting an entry of its own, so a finished Summoner
+filled the screen — and a total of zero is no longer printed at all, which is the
+"no invented zeroes" rule that screen already says it is built on.
+
+**2026-08-29 — Four corrections to the farms, from a playtest.**
+
+**A5's boost could not pick its target.** Arming the mode left the panel up, and
+the panel eats every click that lands on it before `pickTower` runs — so a tower
+drawn behind that 268 px slab was unclickable. Measured: a Warbringer at x 741
+inside a panel spanning 733–977, its click never reaching the board. Arming now
+clears the panel. Aiming a cone deliberately still keeps it: that picks a
+direction, and the player can choose one that is not under the panel.
+
+**A farm with a field now turns to watch it.** Every other tower faces what it is
+working on; the Farm stared at a fixed bearing whatever walked through its
+circle. It follows the nearest COVERED body — the sight rule still applies, so it
+will not track something behind a rock — found by the same sweep that already
+looks for the lock edge. An empty field leaves the last bearing rather than
+snapping back.
+
+**The purge was permanent, and that was the importer's fault.** `idle_poses`
+took an action clip's FINAL pose as the idle for any node the idle does not key
+— a rule generalised from one case. T5-C's wedges are keyed only by the two
+purge clips, which start at the authored rest and deliberately end sunk, so the
+sectors sank once and stayed. The rule is gone: the authored rest is the idle
+pose, which is what the exporter wrote and what every one-shot starts from.
+
+**And the dice show their faces.** One number per die over the tower, coloured by
+what that face was worth — green a gain, red a loss, gold a double, blue a reset.
+The reading comes from the tower, which owns the dice table; the renderer only
+places it, the same division as the Summoner's counter. Verified on a mixed
+throw: 3 red, 14 green, 21 gold.
+
+**2026-08-29 — The T5 farms, and the set is complete.** `farm-t5a` the Mana
+Vault Engine, `farm-t5b` the Azure Panopticon, `farm-t5c` The House Always Wins.
+Twelve of twelve bodies: a base, a shared T1 and T2, and one per path at T3, T4
+and T5. Nothing falls back to a lower tier's model any more.
+
+**The T5 clips reach mechanics the earlier bodies could not show.** A5's two
+investments are separate clips — a long beam for the permanent boost, a short
+burst for the surge — told apart by a flag beside the shared stamp, because they
+are one press with two costs. B5 has `execute`, stamped inside `Farms.executes`
+on every farm whose field actually took the body. And C5 has a body for each of
+its own faces.
+
+**The four clips that shipped unwired on C4 are wired here.** Recording a prep
+effect and spending it are two moments and T5-C draws them differently: a plaque
+sliding into its slot, then firing. `resolve` stamps `queue_modifier` when a
+face banks one; `applyPrep` stamps `reroll_eight`, `purge_under_nine` or
+`pre_roll_modifiers` when the next series consumes it. C4 keeps its own four
+unplayed — its model has no such states to land in, and a farm wearing it has
+not bought C5 anyway.
+
+**The C5 table's two doubles name themselves.** Face 21 arms the next one, face
+22 purges everything under nine as well, and each has a clip; a C3 or C4 double
+has no such face and stays the generic critical. `outcomeOf` checks the numbers
+only when the farm's table IS `C5`.
+
+Measured in the running game: 8 069 tower pixels drawn across the three, and
+every clip visibly taking over from its idle — 351 px for A5's tick, 356 and 347
+for the two empowers (different clips, as intended), 1 112 for B5's execution
+peaking at 0.53 s, 930 for C5's three-second throw peaking at 0.93 s with the
+dice in flight. Twelve farm models, 7.4 MB, and the page still loads in 234 ms.
+
+**2026-08-29 — The farms have their colour, and they shine.** Owner: *"il n'y a
+pas de shine ni de couleur — le A path est censé avoir du violet, le C orange
+plus vibrant, le B briller quand il y a des interactions."* Two separate causes,
+both real, neither the models' fault.
+
+**Glass ships opaque, so it walled the mana in.** The design paints glass at 35%
+opacity; a palette row here is `[r, g, b, emission]` with no fourth channel. So
+every glass shell arrived solid with the mana sealed inside — A4's reservoir was
+a white cylinder. They are `--exclude`d at import now, the same argument the
+Bulwark's shield pane settled. No glass node carries mana as a child, so the
+subtree goes without taking anything with it, and the caps and bands stay. C3
+and C4 have no glass at all, which is exactly why their gold read from the start.
+
+**Emission is a route to white, so what did show was washed.** `expand` bakes
+`min(1, emit * 0.16)` into every linear channel; at the authored 1.15–2.6 the
+purple goes from `#794aff` to `#cdb9ff`, saturation 0.71 down to 0.27. Capped at
+0.8 it lands at `#9a7bff` and stays mana.
+
+**And a farm had no glow at all** — `towerGlow` returns 0 for anything with no
+swing and no core. It now has a steady pilot light plus a flash that decays over
+0.6 s on every event it already stamps. `vEmi` is per material, so this
+brightens the mana, the coils, the dice and the orrery's core and never the
+wood: one number doing the work of the handoff's per-material curves, because
+the shader is already selecting the right surfaces.
+
+**The tint is the path's, in LINEAR** — and that distinction is the whole
+difference between a purple flash and a pink one. The shader adds
+`uGlowTint * (vEmi * uGlow)` before its single sRGB conversion, so the sRGB
+triplet for `#7a4bff` pours two and a half times too much red in. Converted, the
+hue holds through the flash.
+
+Measured on the board: 92 tower pixels brighten on a flash, strongest
+`#47616a → #82aeb2`. Looked at, magnified, at rest and mid-flash: A4 violet,
+B4 cyan, C4 gold.
+
+**2026-08-29 — The three T4 farms.** `farm-t4a` a storage-and-cloning
+generator, `farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate
+manipulator. Nine of the twelve bodies now exist.
+
+**The handoff shipped no GLBs this time** — only the three.js builders and the
+workshop page that exports them. Rather than ask for six more downloads, the
+page was served locally and driven to export the three files through its own
+`GLTFExporter`, with every clip and the gameplay events it puts in the root's
+extras. `tools/glb_to_animated.py` then read them like any other import. The
+exporter's settings are the page's own, so what shipped is what the workshop
+would have handed over.
+
+**These carry far more than an idle**: four clips on A4, five on B4, and eleven
+on C4. Wired to the events they depict — a production tick, the stock cloning at
+a wave boundary, the player collecting it, a body entering the zone or dying in
+it, the base being given its hit points, and the network throwing its dice.
+
+**`field_pulse` is a second IDLE rather than a one-shot**, a seamless 1.5 s loop
+that replaces band 0 while B4's zone holds a body. The tower already knew that:
+`fieldHeld` was there for the lock edge.
+
+**And the simulation names its own outcome.** C4 has a body for each way a throw
+can go, so `outcomeOf` decides which by reading that farm's own dice and the
+network's movement. The order is the decision: a reset from a high P is a bigger
+loss than any other face can deal, so testing "P halved" first would swallow face
+8 and play a generic catastrophe where the shrine has a body for exactly that.
+
+Measured in the running game, every clip against its own idle: 32 px for the
+tick peaking at 0.99 s (the pulse reaching the manifold, 0.70–1.10 per the
+handoff), 40 px for the clone at 1.79 s, 29 px for the withdrawal at 1.01 s (the
+pulse leaving the hose, 0.55–0.95), 11 px for the capture at 0.59 s (the cable
+into the vial, 0.60–0.80), 40 px for the wave gain at 0.47 s (the ring tilts
+aligning, 0.45–0.55), 47 px for the throw. Every clip reproduces its source to
+1e-5 model units.
+
+**Two clips deliberately do NOT end on the idle pose**, and that is the design:
+A4's `withdraw` leaves the worker at the storage valve, a different handwheel,
+and C4's `queue_fate` is documented as persistent state. Everything else lands
+bit-exact.
+
+**Four of C4's eleven clips are not wired**: `queue_fate`, `pre_roll_modifier`
+and the two `reroll_eight_*`. They belong to C5's prep effects, which the network
+records but does not attribute to one farm's die. They ship and never play.
+
+**2026-08-29 — The three T3 farms, and the animations they act out.**
+`farm-t3a` a relic piston refinery, `farm-t3b` a targeting array on a gimbal,
+`farm-t3c` a d20 fate altar — one per path, from a Claude Design handoff. Six of
+the twelve now exist, and from T3 the PATH picks the body.
+
+**These carry more than an idle**, which is what the work here was. Each ships
+one-shot clips beside its loop, and every one of them depicts something the
+tower already does: A3's `produce_tick` is a production tick, B3's `target_lock`
+is a body entering the field and `kill_capture` is one dying in it, C3's
+`end_wave_roll` is the network rolling its dice. So they are wired to those
+events rather than to a timer.
+
+The simulation records WHEN, as animClock stamps (`lastTick`, `lastLock`,
+`lastCapture`, `lastRoll`, -1 for never); `farmFrame` in gl-world decides
+whether that is recent enough to still be playing, and picks the most recent
+one-shot still inside its own duration, else the idle. Clips are matched **by
+name** through the model's `bandNames`, never by band index — B3 already carries
+two one-shots where the others carry one.
+
+**Two things the importer learned.** Groups are decided by the union of every
+clip's nodes, not the idle's alone: A3's valve and its three liquid levels are
+keyed by `produce_tick` and nothing else, and grouping off the idle would weld
+them into the static body. And a node keyed ONLY by an action clip has no idle
+pose in the file — `b3_capture_pulse` exports with a rest scale of 2, so falling
+back to the authored transform parked a full-size orb on the scanner's lens
+forever. Its idle pose is recovered from the data: an action ends on the idle
+pose, so the pose is that clip's own final one, which matches the design
+source's `pulse.scale.setScalar(0.001)` exactly.
+
+Actions are sampled at the source's 24 fps and idles at 8: `target_lock` lasts
+0.35 s, which at 8 fps is three frames — a stutter, not a snap.
+
+Verified in the running game: three T3 farms drawn (646 px), 63–91 px of them
+moving every second at idle, and each one-shot visibly taking over — up to 31, 23,
+19 and 49 pixels differing from the idle, each peaking exactly where the handoff
+says the motion is (the valve turn at 0.65 s, the yaw snap at 0.14 s, the pulse
+reaching the vial at 0.31 s, the die at the top of its arc at 0.35 s). Every
+clip reproduces its source to 8.5e-6 model units, and all four end bit-exact on
+the idle's first pose.
+
+**Emissive pulses are not imported.** The handoff specifies them per material;
+a palette row here carries one static emission scalar and the only runtime knob
+lights a whole tower. The bodies move correctly and do not pulse — a known gap.
+
+**2026-08-29 — The Farm's parts are where they belong.** The first import
+posed every animated group RELATIVE to its own pivot, but the format applies a
+frame matrix as `instance * pose` and expects it to land points in model space —
+so each group was drawn shifted by `-pivot`. Owner: *"pour la base y a pas de
+seau ni de corde et les mains sont dans le puits, et pour les deux autres les
+mains et le shaft sont dans le sol"*. The bucket and the rope hang from a node
+1.44 units up, so they were pushed out of frame entirely; the novice's hands
+came back into the well; the pumps' levers sank into the plank.
+
+Geometry now ships in MODEL space with every pivot at zero, which is what the
+walker rigs already do (`origin_pivot`) and what `GLModels.expand` wants anyway
+— it reads `model.top` off the raw positions with no group matrix applied.
+
+Checked properly this time, and the check is the reusable part: pose each
+group's rest origin by its own frame matrix and compare against the glTF sampled
+at the same instant. Bucket, rope, pulley, crank and both hands agree with the
+source to 8e-6 model units. On the board the tower went from 12–25 moving pixels
+a second to 20–67, because the bucket and rope are in the picture again.
+
+**2026-08-28 — The Farm has three real bodies, and they move.** Imported from
+Claude Design: `farm-base` is a stone mana well with a crank, a pulley, a rope,
+a bucket and a novice working it; `farm-t1` is a hand pump with a lever, a
+piston, a hose and a bottle; `farm-t2` is that pump reinforced with a flywheel
+and a pressure tank. Three of the twelve planned, and `farmGroup` answers with
+the highest model that has been AUTHORED rather than the highest tier bought, so
+a T5 farm wears the T2 body until its own exists.
+
+**They arrived with their motion in them**, which nothing in this repo had done
+before: one looping glTF animation each, keyed at 24 fps — 8 s for the well,
+7.5 s for the pumps — on named nodes. So `tools/glb_to_animated.py` is a second
+importer beside `glb_to_model.py`, and not a variant of it: that one answers
+"what should this body do" and solves a cycle, this one answers "what does this
+file already do" and bakes the samplers it finds. It shares the reader, the mesh
+walk, the palette, the axis convention and the format by importing them.
+
+The first export had **no animation at all** (`animations: 0`, `skins: 0`,
+measured on all three), which is why there was a second download. Worth knowing
+before debugging a still model.
+
+**Two things this cost, both worth keeping:**
+
+`GLModels.register` copies fields explicitly, so `loopSeconds` had to be added
+there — the same silent hole `bands` fell into on eight models. And
+`Animation.sample` has to fall back to a node's authored value for every channel
+the animation does not drive: `well_pulley` is keyed on rotation alone, and
+rebuilding its matrix from the animation dropped the translation holding it up
+on the beam, leaving a residual -1.44 in z. Checkable in one line — a group
+turning about its own pivot must have a frame translation of zero.
+
+**The animation runs on the SIMULATION clock.** `FarmTower.animClock` is
+accumulated in `update(dt)`, so the well turns three times as fast at 3× speed
+and stops when the run freezes. `state.now` is `performance.now()` — which is
+why the Summoner's idle keeps chanting over a paused board — and a farm's
+animation is a picture of its production, so it must not do that.
+
+Verified on the real board: 403 pixels of geometry where the tower stands, and
+12 to 25 of them changing every simulated second.
+
+**2026-08-28 — C5 is priced like the thing it is.** The owner's figures,
+applied exactly: 9 000 mana → **250 000**, the sale refunds **none** of it
+(50% → 0%), and its own production comes down from +500 a wave to **+400**.
+
+Every gain face on its table was cut with it: 9 +75→+65, 10 +110→+95,
+11 +150→+130, 12 +200→+175, 14 +400→+350, 15 max(+450,+10%)→max(+425,+10%),
+16 +250→+225, 17 next gain max(+700,+35%)→max(+650,+35%),
+18 max(+550,+15%)→max(+525,+15%), 20 +750→+700 then +20%. The loss faces, the
+reset, the reroll, the cull, the multiplier and the two doubles are untouched.
+
+**The no-refund half is a tier flag rather than a Farm rule**: `noRefund` on the
+row, `unrefundableSpent` on the tower, and `sellValue` subtracts it before the
+refund fraction — so any future tier can be sunk the same way, and `totalSpent`
+stays honest about what was paid for the end-of-run screen. The button now reads
+“no refund on sale” and the card spells it out, because a quarter of a million
+mana that a sale gives nothing back for has to be said before the press.
+
+Verified in the running game: 250 000 paid, sell value 3 600 before and 3 600
+after, `totalSpent` 257 200 with 250 000 of it sunk, nominal production 900 and
+the network's baseline with it, and all ten faces carrying their new numbers.
+
+**2026-08-28 — Path B's hit points are real, and its field needs to see.** Two
+reports from the same playtest.
+
+**“hp gain of B doesn't work at all.”** It fired every wave — but it raised the
+base's MAXIMUM and nothing else, on the brief's word that a Farm buys headroom
+rather than repair. Nothing in the game heals the base except a Siphon's
+lifesteal, so a B3 farm bought +150 a wave and the bar read *Base 100 / 400*
+while the player's health had never moved. `growBaseMaxHp` now grants the hit
+points as well. Damage already taken is still taken: at 50/100 a grant of 150
+gives 200/250, never 250/250.
+
+**“Make sure when a tower doesn't have vision the buff and debuff don't
+apply.”** `FarmTower.covers` was a plain radius test — the one reach on the board
+that ignored terrain. A farm behind a stump slowed, amplified, executed and got
+paid for bodies it could not see, while the red blind-spot overlay drawn over
+that same circle said the opposite. It now asks `RangeFilter.sightClear`, the
+door the Warbringer's acquisition and the Siphon's lock check already use, with
+the ground under the farm as the eye — so a farm on a stump still sees over
+everything at or below its own height.
+
+Measured on Ironwood: a point 107 px away inside a 156 px reach, with a 40 px
+stump 20 units tall between them, is refused by `covers`, `killBonusAt`,
+`slowAt` and `damageAmpAt`, and the overlay paints 8 063 red pixels over that
+side of the circle. The cost was measured rather than assumed: 2 µs per body for
+the whole sweep, against ~15 µs for the camo ground ring, in a 0.84 ms frame.
+
+**2026-08-28 — Path A is worth buying, and the Farm shows its work.** Four
+reports from one playtest, all of them the tower doing something invisible or
+doing less than it charged for.
+
+**A3 adds its tick instead of replacing the per-wave figure.** Owner: *“it stops
+producing mana every wave from the moment it starts producing every five
+seconds… it's way too weak. It should continue producing as it already did.”*
+1600 mana used to trade 400 a wave for 50 every five seconds and switch off the
+crosspathed B2 as well. Nothing a farm buys turns off something else it bought.
+
+**The stock has a door.** `collect()` takes the whole stock into the purse
+whenever the player likes — *“we can't take the mana stored whenever we want,
+which is supposed to be the point.”* The trade is the one the design already
+had: what you leave in clones 5% a wave, so collecting every wave is the same
+tower without its stock.
+
+**A5's investment is aimed, and the permanent one lands once per tower.** It was
+a board-wide figure no tower read, so the press spent the stock and changed
+nothing. Now: press the button, click a tier-5 tower, and that tower gets +5%
+damage, attack speed and range per tranche — permanently and once ever, or as a
+thirty-second surge at five times the bonus, re-pressable. Range is applied in
+`elevatedRangePx` and damage/speed at the end of each type's own recompute, so
+the bonus reaches the Siphon's beam and the Summoner's blubs without either file
+knowing what a tranche is. A mis-press costs nothing: the mode arms, and only
+the click on a target spends.
+
+**And all of it is visible.** A payment throws a popup, including the clone —
+the one gain that happens between waves, when nothing else explains the stock
+rising. A path-B farm's share of a kill is its own green popup above the gold
+bounty rather than a bigger bounty: *“+4 and +1, not +5.”* And a body that farm
+will be paid for wears a ring while it is still alive.
+
+Three of those four were found not working on the 3D board after they worked on
+the flat one — the popup colour honoured in one renderer and not the other, the
+target ring called only inside `if (!world3D)`, and a label raised by `y` (a
+world coordinate) instead of by `lift` (a height). Measured each time by reading
+pixels back out of the real game rather than by looking at it.
+
+Twenty-three tests: the two production columns, collect through the real action
+door, the aim, the once-only rule, what the bonus does and does not touch, the
+surge's clock and its death with its farm, the additive stacking, the mode the
+button arms, the clone's announcement, the separated kill popups, and the mark
+on a living body.
+
+**2026-08-28 — The run currency is called MANA everywhere a player can read
+it.** Owner: *"j'ai décidé de changer l'argent pour du mana, donc change s'il te
+plaît toute instance de argent, gold, coins en mana — change pas encore les
+metas coins"*. Prices now read `250 mana` rather than `$250`, the purse reads
+`12345 mana`, a refusal reads `not enough mana`, the sell button reads
+`Sell  600 mana`, the armoury reads `600 MANA IN A RUN`, an enemy's kill bounty
+reads `3 mana`, and the Siphon's A3/A5 read *charges → mana* and *mana → power*.
+
+**The code did not move.** `cash`, `formatCash`, `goldGenerated`, `bonusGold`,
+`charge_to_gold`, `gold_to_power`, `GoldPower`, the sandbox's `lockGold`: all
+kept. They are identifiers and config keys, and `gold_to_power` is read out of
+`js/towers/beam.config.js` — renaming them buys nothing a player can see and
+breaks things a player cannot.
+
+**The meta coins are a different currency and kept their name**, explicitly
+excluded by the owner. `META COINS`, the `⬡` prices and `needs N more coins` are
+untouched. Anything that spends `MetaProgress.coins()` is coins; anything that
+spends `cash` is mana.
+
+Verified by instrumenting `CanvasRenderingContext2D.fillText` in the real game
+and reading back every string it was asked to draw across the menu, the board,
+the armoury and the index: 679 strings, zero matches for `$`, `gold`, `coins` or
+`cash` outside the meta-coin lines. A source grep alone would not have settled
+it — the armoury draws letter by letter through `drawMenuText`. Eleven suite
+assertions that pinned the old `$` spelling were re-pinned.
+
+**2026-08-28 — The Farm keeps two lifetime totals, because its production was
+invisible.** Owner, having placed one and watched a run: *"the tower is supposed
+to produce mana, and it doesn't rn"*. It did — 200 a wave, measured against a
+farmless run at the same seed, in the browser and in the harness. Nothing on the
+screen said so: the payment lands at a wave boundary, into a purse that bounties
+are already moving, with no popup and no row.
+
+`manaProduced` and `baseHpProduced` are on the tower, never go down, and print
+on the panel and on the end-of-run screen. Every door credits its own farm: the
+per-wave figure and the tick through `produce()`, the stock and its clone (mana
+kept is still mana made), a kill in a path-B field, and **the C network's payout
+split across its members by their share of `B`** — without that a C-path farm
+would read zero for a whole run while paying the player every wave. Spending the
+stock through A5 does not take the total back; it is not a balance.
+
+`Effects.farmProduced` also puts a `+200 mana` popup over the farm, the same one
+an enemy's bounty gets, saying `stored` instead when A4 kept it. Presentation
+only, and the simulation never reads it back.
+
+Nine tests, one per door plus the panel, the result screen and the popup.
+
+**2026-08-27 — The Farm: a tower that produces mana, and the first with three
+paths.** A fully specified brief, integrated whole: `js/farm.js`, 1200 mana,
+200 HP, a 35 u.l. footprint, 200 mana a wave, and three five-tier branches.
+
+**The word is mana and only the word.** Every string it puts on screen says
+mana, never gold, cash, coins or a dollar sign. The quantity is the game's
+ordinary `cash` — there is one run currency and inventing a second would be a
+change to the economy rather than to this tower — so `Farms.pay` is the one door
+onto that global. A test reads every panel string and every stat row and fails
+on the sight of a `$`.
+
+**A sixth TYPE, not a sixth slot.** The bar is five and stays five; the armoury
+already picks which five of the owned types are equipped, which is exactly the
+case a sixth type needs. The sandbox shows six because a workbench is a preview
+of the towers rather than of the bar, and it re-derives the bar's width so the
+extra slot is not drawn off the end of one centred for five.
+
+**Path A** adds to the per-wave figure, then REPLACES it with a tick (50/75/150
+every 5 s) driven from `update(dt)` so it runs on the game's clock rather than
+on a wave hook. From A4 the production stops reaching the purse and fills the
+tower's own stock, which clones 5% a wave (capped at 1000, then 3000); A5 invests
+whole 10 000 tranches, ten at a time, at +5% damage, attack speed and range each
+— or five times that for thirty seconds. The incomplete tranche stays stored.
+
+**Path B** raises the base's MAXIMUM every wave and never heals it, which is why
+`baseMaxHp` is run state now while `BASE_MAX_HP` stays the constant a run begins
+at. Its circle pays for kills inside it, several farms stacking in full, and a
+summoned body pays nothing. **Its field is its own channel** rather than a slow
+or a DamageAmp stack: `applySlow` takes the strongest and would have let a
+Warbringer's 65% swallow a Farm's 5%, and the brief asks for these to stack
+additively — so the slow multiplies alongside the timed one and the amplifier is
+SUMMED with DamageAmp's fraction. With no farms on the board that sum is
+DamageAmp's own multiplier to the float, which is what left every existing
+figure in the suite where it was. B5 executes under the higher of 10 HP and 5%,
+asked AFTER the blow: a body that walks through untouched is never executed.
+
+**Path C** links every C3+ farm into one network. B is the sum of the members'
+nominal productions; P is what the dice batter and what the next wave pays,
+without consuming it. A networked farm is never paid twice — its production is
+already inside P. The dice are a seeded xorshift, never `Math.random`, for the
+reason lane offsets are: a run that cannot be replayed cannot be tested.
+
+**A face is a descriptor and the resolver never branches on a number**, so three
+tables differ by their numbers alone and all sixty-two faces are asserted
+individually against a scripted die. **C5's table has twenty-two faces** — the
+brief calls it a D20 and then lists 21 and 22, so the table is the harder
+constraint; recorded rather than quietly reconciled. Its deferred effects
+resolve in the mandated order, and a +2 landing exactly on 8 becomes 9 while a
++1 on 8 is left alone.
+
+**Three defects the suite found, all in this change:** `Farms.network` was
+handed out by reference and `reset()` REBOUND it, so every network figure a
+panel or a test read came from the orphaned object of the previous run;
+`Farms.reset()` did not clear the wave latch, so a second run would silently
+skip its own wave 1; and the surge timer tested a float against zero, which
+`30 - 29.9 - 0.1` never reaches.
+
+**The index screen was two hardcoded columns** and is now laid out from each
+tower's own branch list, inside the same rectangle the two used. A third path
+would otherwise have been two thirds visible with nothing reporting a problem.
+
+**The visual is a placeholder and is meant to look it.** The brief names twelve
+final models — the base, a T1 shared by A1/B1/C1, a T2 shared by A2/B2/C2, and
+one each for A3-A5, B3-B5, C3-C5, with no crosspath ever getting a body of its
+own. None are built. What ships is a canvas glyph reduced to the four shapes
+that read from the top down (platform, cauldron, mana, hood) and gl-world's
+existing stand-in cylinder on the 3D board.
+
+`tests/farm.test.js` is 35 tests: the three paths, the uniqueness rules, the
+field, the executions, the network's persistence, every face of the three
+tables, the deferred C5 ordering, the global sort, the panel fitting above the
+build bar in all five shapes, and the three-column index.
+
+**2026-08-27 — The Warbringer is worth its slot, and its first four tiers cost
+fifty more.** The owner's words: *"il est trop faible, il n'aide pas assez, il
+est trop cher"*, and then the shape of the fix — **the build price does not
+move**, A1/A2/B1/B2 each cost $50 more, and each of those four plus the body
+itself gains a little range, a little attack speed and a little damage.
+
+**The body as placed:** 12 → 14 damage, 3.5 → 3.2 seconds a swing, 37.5 → 40
+u.l. **3.43 DPS becomes 4.38, a 28% rise on the one number that decides whether
+the tower is worth the slot before an upgrade is bought at all.** Nothing about
+the arc, the hit points or the $600 changed.
+
+| tier | was | is |
+|---|---|---|
+| A1 | $200, +4 dmg | $250, +5 dmg, +5 u.l., 3.1 s |
+| A2 | $350, +5 dmg | $400, +6 dmg, +5 u.l., 3.0 s |
+| B1 | $200, 3.0 s | $250, +1 dmg, +5 u.l., 2.9 s |
+| B2 | $400, +15 u.l., 2.2 s | $450, +1 dmg, +20 u.l., 2.1 s |
+
+The back halves are untouched; what they inherit is what the first two tiers
+now pass up the ladder. Full A goes 17.4 → 21.7 DPS and 62.5 → 72.5 u.l.; full
+B 13.6 → 16.2 DPS and 77.5 → 90; the A1+A2+full-B crosspath reaches 103.75.
+
+**A1's absolute `rangeUl` is GONE rather than raised, and that is the
+interesting half.** It granted 37.50; the 2026-08-26 base rise met that number
+exactly, and under the longest-owned-wins rule the tier silently stopped selling
+any reach at all — a value equal to the max can never win it. Its five units are
+a `rangeBonusUl` now, summed after the max, so no base rise can swallow them and
+they carry up path A the way path B's always have. A2 keeps its absolute 43.75,
+which still beats the 40 base, and takes its five on top. The failure is
+structural now rather than remembered.
+
+**One fixture was broken by the range, not by the numbers, and it is the one
+worth recording.** `CHAIN_CONTROL` stood 72.6 px from the tower; a full-B reach
+went from 77.5 u.l. to 90, so the control came inside the swing — and being the
+furthest body along the road, "first" targeting turned the wedge onto it and
+dragged it off the chain, leaving three of the five links outside the arc. A
+control that is in range is not a control. It is at +200 now, 133.8 px out
+against a 93.6 px reach. Every other moved figure is a pinned number re-derived
+from the new table, not copied from the run.
+
+**Also corrected while reading:** the Current values row said the Warbringer
+cost $700 while `Smasher.COST` has been 600 since 2026-08-26, and the full-A and
+full-B totals were footed on that $700. They are footed on $600 now, and both
+come to the same $5200 / $7000 they always claimed — by arithmetic this time.
+
+**Not re-measured against a real board.** `simulate-campaign.js` and
+`measure-starter-kit.js` live in `THE_COMPANY` and a clone of this repo cannot
+run them, so the campaign effect of a 28% stronger Warbringer body is unknown.
+The schedule was not touched.
+
+**2026-08-27 — The cursor lands on the surface, and so does everything painted
+about it.** The other half of the click-target change, and the owner asked for it
+by name: the build ghost on a stump. `screenToWorld` is THE ONE FUNNEL every
+world-space input goes through, and it cast the cursor at the ground plane — so
+hovering a stump to place a tower answered with the dirt below it.
+
+**Measured in a browser: pointing at the middle of the tallest stump answered a
+point 40.3 units away, on height 0 — outside a stump of radius 36 entirely.**
+The ghost, `whyCannotBuild` and `blockReason` all inherited that, so a tower
+could not be put where the cursor said it would go. It answers the centre
+exactly now, on height 25.
+
+`OrbitCamera.planeAt(x, y, z)` is the old `groundAt` with the plane as an
+argument rather than a literal zero — the plane was always there, just written
+into the solver — and two of them bracket the ray between the top of the height
+field and its bottom. **The walk is bounded by the terrain's own height, not by
+the view distance:** on 25-unit stumps at the default pitch that segment is
+about 37 world units, half a dozen samples and a bisection. A board whose band
+is empty skips it entirely, so the six boards with no terrain are byte-identical
+by construction, and flat ground on Ironwood answers the same point it always
+did, to the float. Sampling from the top means the nearest surface wins, which
+is what "you cannot point at ground you cannot see" means.
+
+**And the rules painted about the cursor moved with it.** `projectRing` drew
+every ground decal at z = 0 — the road band, the blockers, the ground other
+towers have taken, the rim you may not cross. Invisible while the cursor was
+flat too; a 28.9 px lie the moment it was not, with the ghost standing on the
+stump and every rule about it sitting below the surface. It drapes per point
+now, which is clause 1b's rule for a ground decal. Two rings declare their
+height instead (`ring.z`): a stump's rim and a tower's footprint, because both
+lie exactly ON a discontinuity — measured, the tallest stump's 28-point rim
+samples 20 points at the floor and 8 on the stump, and one of the six reads six
+different levels because the ramp runs past it. An authored height is the exact
+answer where there is one.
+
+Test 29 pins the seam (`planeAt` at zero is `groundAt` to the float; a higher
+plane is hit sooner, linearly) and what the feedback is painted on. The walk
+itself needs WebGL and is measured in a browser, not asserted here.
 **2026-08-28 — The pause button stops the clock instead of opening a menu.**
 
 At the owner's instruction: the bottom-right pause button should freeze the

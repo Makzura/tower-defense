@@ -100,12 +100,23 @@
   // as the line above about the gunner, pointed the other way: a tower you CAN
   // build in the shipping game has to be on this bar, or the workbench stops
   // being a truthful preview of it.
-  var ROSTER = [Smasher, LongshotTower, BeamTower, Soldier, BlubTower];
+  // SIX ON THE WORKBENCH AGAINST FIVE IN THE GAME, since 2026-08-27. The
+  // shipping bar is five slots and the armoury decides which five of the
+  // owned types fill them; a workbench has no coins to spend, so it shows
+  // every type there is and its bar is one slot longer. That divergence is
+  // the same kind as the 100 000 base HP and the 20x speed -- the sandbox is
+  // not a preview of the BAR, it is a preview of the TOWERS.
+  var ROSTER = [Smasher, LongshotTower, BeamTower, Soldier, BlubTower, FarmTower];
 
   function installRoster() {
     for (var i = 0; i < ROSTER.length; i++) {
       BUILD_SLOTS[i] = ROSTER[i];
     }
+    // The bar's width and its left edge are derived from the slot count at
+    // load, so a longer roster has to re-derive them or the extra slot is
+    // drawn off the end of a bar that is still centred for five.
+    BAR_WIDTH = BUILD_SLOTS.length * SLOT_SIZE + (BUILD_SLOTS.length - 1) * SLOT_GAP;
+    BAR_X = (VIEW_WIDTH - BAR_WIDTH) / 2;
   }
 
   // --- the extended speed ladder -------------------------------------------
@@ -292,7 +303,7 @@
       (currentMap ? currentMap.name + "  ·  " : "") +
       "Base " + Math.round(baseHp) +
       (baseHp > BASE_MAX_HP ? "" : " / " + BASE_MAX_HP) +
-      "  ·  " + formatCash(cash) + " gold" + (lockGold ? " (topped up)" : "") +
+      "  ·  " + formatCash(cash) + " mana" + (lockGold ? " (topped up)" : "") +
       "  ·  " + enemies.length + " enemies  ·  " + towers.length + " towers" +
       (gameOver ? "  ·  BASE DESTROYED" : "");
   }
@@ -668,7 +679,7 @@
       els.lockGold.checked = false;
       els.goldInput.value = value;
       refreshBlockReason();          // affordability just changed
-      log("gold set to " + value);
+      log("mana set to " + value);
       refreshSidebar();
     }
 
@@ -714,7 +725,7 @@
 
     els.lockGold.addEventListener("change", function () {
       lockGold = els.lockGold.checked;
-      log(lockGold ? "gold top-up ON" : "gold top-up OFF");
+      log(lockGold ? "mana top-up ON" : "mana top-up OFF");
     });
 
     // Route switcher. Goes through startRun, the same entry point the chooser
@@ -987,7 +998,7 @@
     // would put a state on the screen that no run can ever reach.
     if (typeof Effects !== "undefined") Effects.reset();
 
-    log("sandbox ready — infinite cash, waves off, base " +
+    log("sandbox ready — infinite mana, waves off, base " +
       BASE_MAX_HP + " HP, speeds " + GAME_SPEEDS.join("/") + "×, map " +
       Math.round(path.length / UNIT_LENGTH) + " u.l. long");
   });

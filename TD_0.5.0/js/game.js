@@ -511,100 +511,78 @@ var EASY_WAVES = [
     { at: 4, count: 2, interval: 0.6, type: "shielded", health: 15 },
     { at: 8, count: 2, interval: 0.6, type: "shielded", health: 15 }
   ] },
-  // --- THE FRACTAL SLIME'S TIER LADDER, 16 / 17 / 22 / 25 / 33 / 35 -------
+  // --- WHERE THE FRACTAL SLIME'S TIER LADDER USED TO BE, 16 / 17 / 22 / 25 / 33 / 35
   //
-  // 2026-08-20, at the owner's instruction: "i want the slime tiers to spawn
-  // in accordance to their HP as stated in the index and behave in that
-  // manner". The index has always printed all six rungs -- T0 = 1, T1 = 4,
-  // T2 = 16, T3 = 64, T4 = 256, T5 = 1024 -- and until this patch the campaign
-  // sent exactly one of them, the T3 in wave 25. The other five existed only
-  // as somebody else's split children, so the guide was advertising a ladder
-  // the schedule never climbed.
+  // 2026-08-29, at the owner's instruction: "take out the fractal slime, all of
+  // them, from easy mode, and replace them by, in order, colossus > hive > slow
+  // > normal, matching the HP total". EASY_WAVES is the campaign, so this took
+  // the type off the road entirely -- `fractal_slime` is still a live enemy
+  // definition (js/enemy.js), still sendable from the sandbox and still walked
+  // by the tests that own the division rules, but nothing schedules it.
   //
-  // ONE RUNG PER WAVE, ASCENDING, AND THE HP IS THE PLACEMENT RULE. Each tier
-  // sits in the first wave heavy enough to carry it, which is why the gaps
-  // widen as they do: 1 and 4 points are texture in an early mixed wave, 16
-  // is a body, 64 is the event wave 25 was already built around, 256 is a
-  // second boss-weight body in 33, and 1024 has exactly one home in a
-  // thirty-five wave schedule.
+  // THE SUBSTITUTION RULE, applied to all ten groups and to nothing else. Each
+  // root became ONE body of the first type in that ladder whose own health
+  // fits inside the root's, carrying a `health` override that reproduces the
+  // root exactly:
   //
-  // WHAT A RUNG ACTUALLY COSTS IS NOT ITS ROOT. A tier T root takes
-  // root x (T + 1) points to clear -- it conserves health as it divides, four
-  // bodies at a quarter each -- and leaves 4^T terminal T0s walking:
+  //     wave 16   4 x T0     1 HP each   ->  4 x Normal    @ 1
+  //     wave 17   2 x T1     4 HP each   ->  2 x Normal    @ 4
+  //     wave 22   1 x T2    16 HP        ->  1 x Slow      @ 16
+  //     wave 25   1 x T3    64 HP        ->  1 x Slow      @ 64
+  //     wave 33   1 x T4   256 HP        ->  1 x Hive      @ 256
+  //     wave 35   1 x T5  1024 HP        ->  1 x Colossus  @ 1024
   //
-  //     T0     1 HP        1 point        1 body
-  //     T1     4 HP        8 points       5 bodies
-  //     T2    16 HP       48 points      21 bodies
-  //     T3    64 HP      256 points      85 bodies
-  //     T4   256 HP    1 280 points     341 bodies
-  //     T5  1024 HP    6 144 points   1 365 bodies
+  // Every `at`, `count` and `interval` is untouched, so the schedule's shape --
+  // when a body enters, and into what -- is exactly what it was. The overrides
+  // are how this file has always spelled "this type, at this wave's weight"
+  // (the Hive walks wave 33 at 200 and wave 26 at 220); the ladder simply
+  // decides WHICH type carries the weight, biggest first.
   //
-  // The base has 100 HP and a leak costs the leaker's remaining health, so the
-  // right column is the difficulty that matters: a T5 that is not cleared is
-  // 1 024 separate points of base damage arriving one at a time. That, not the
-  // root, is why T4 waits for 33 and T5 for the Tyrant's wave.
+  // WHAT MOVED, MEASURED RATHER THAN ASSUMED:
   //
-  // THE SCHEDULE PAID FOR IT RATHER THAN GROWING BY IT. Authored effective HP
-  // moved 25 898 -> 25 939, +0.16%: wave 33 funds its T4 exactly (two Bulwarks
-  // and a Brute), wave 35 covers -340 of the T5's 1024 and waves 27, 29, 30,
-  // 31, 32 and 34 give up 641 more at 5-9% each -- 1 267 trimmed against 1 308
-  // added, and the 41 points of difference ARE the whole rise. NOTHING WAS TAKEN
-  // OFF A SPINE OPENER or off a mechanism body -- see the retune note above:
-  // halving a Hive, Shieldbearer, Healer or Colossus is a design change, not a
-  // trim -- so what got thinner is ordinary escort. The curve someone measured
-  // is still the curve; tests/run.js pins both totals.
+  //   * Authored HP: 25 939 -> 25 939. Unchanged, wave for wave, because the
+  //     override matches each root point for point -- which is what "matching
+  //     the HP total" was asked for. waveEffectiveHealth counts the root only
+  //     (it never counted a cascade), so it does not move either.
+  //   * Kill bounty: 22 987 -> 23 132, +145. Enemy.bountyOf prices a body as
+  //     its type's value scaled to its health, and these four types are worth
+  //     more per point than a Slime was. The end-of-wave bonus is a tenth of
+  //     the HP and therefore does not move at all.
+  //   * REAL load fell, and this is the honest part. A cleared cascade was
+  //     7 748 points across 1 826 born bodies where the six roots authored
+  //     1 372; that work is gone. What replaces it is 1 372 points in ten
+  //     bodies, plus one Hive brood -- five shielded hatchlings, worth nothing
+  //     -- on wave 33. Waves 22, 25, 33 and 35 are materially easier to clear
+  //     and materially quieter on the road. Do not read the unchanged authored
+  //     total as an unchanged wave.
   //
-  // AND THE REAL LOAD DID GO UP, WHICH IS THE POINT. Authored says +41; a
-  // board that clears every cascade removes 7 748 points where the six roots
-  // count 1 372, and it earns the difference back at half rate ($3 874 across
-  // the generations against the $686 of roots the purse counts). 1 826 bodies
-  // are born to do it. Do not quote the authored figure as if the schedule
-  // were unchanged.
-  //
-  // DO NOT GIVE A FRACTAL GROUP A `health` OVERRIDE, here or in any later
-  // retune. `fractal_slime` DISCARDS one at every value: `fractalTierOf`
-  // resolves undefined to the default tier, so the constructor always holds a
-  // tier and `Enemy.healthOf` takes the tier branch. Writing `health` would be
-  // a no-op on the body and NOT a no-op on the accounting -- `waveKillBounty`
-  // would declare income for a body that never got tougher. Scale the TIER, or
-  // scale the type row in js/enemy.js; not this. tests/content.test.js checks
-  // the whole schedule for one, because the mistake is invisible in play.
-  //
-  // A RUNG IS ONE `at`, NOT ONE GROUP, since the timeline. Wave 16's four T0s
-  // are four one-body groups at 1, 5, 9 and 13 s rather than one group of four
-  // at 0.9 spacing -- same four bodies, same tier, spread across the wave
-  // instead of bunched at the end of it. Read the ladder off the tiers, never
-  // off the group count.
-  //
-  // T0 OPENS THE LADDER IN 16 AND IS THE ONE RUNG THAT DOES NOT DIVIDE. Four
-  // 1 HP bodies among two dozen Swarm: the player meets the terminal rung as
-  // harmless texture first, so that when wave 17's T1 breaks apart, what it
-  // breaks into is already familiar. It is deliberately NOT in wave 12 -- that
-  // wave is the suite's mixed-wave fixture (tests/run.js), and a fixture that
-  // changes shape whenever content lands is a fixture that stops testing the
-  // scheduler.
+  // Wave 16's four one-point Normals are the one place the ladder had to reach
+  // its bottom rung: no body in the game weighs one point on its own, and a
+  // Normal at `health: 1` is what a T0 always was in play -- a body that dies
+  // to a single shot. They keep their four separate `at` times rather than
+  // being folded into one group, because wave 16's other groups are timed
+  // around them.
   { duration: 58, groups: [                                       // 406 HP  old 10 + company -- RETUNED
     { at: 0,   count: 14, interval: 0.8,  type: "slow", health: 15 },
-    { at: 1,   count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 },
+    { at: 1,   count: 1,  interval: 0.9,  type: "normal", health: 1 },
     { at: 1.5, count: 24, interval: 0.18, type: "swarm", health: 3 },
-    { at: 5,   count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 },
+    { at: 5,   count: 1,  interval: 0.9,  type: "normal", health: 1 },
     { at: 5.5, count: 24, interval: 0.55, type: "armored", health: 5 },
-    { at: 9,   count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 },
-    { at: 13,  count: 1,  interval: 0.9,  type: "fractal_slime", tier: 0 }
+    { at: 9,   count: 1,  interval: 0.9,  type: "normal", health: 1 },
+    { at: 13,  count: 1,  interval: 0.9,  type: "normal", health: 1 }
   ] },
-  // T1, AND THE FIRST DIVISION THE PLAYER EVER SEES. Two 4 HP bodies that
-  // each leave four of wave 16's T0s behind: eight points of scheduled health
-  // teaching a mechanic that will later arrive as 6 144. Cheap on purpose --
-  // the lesson has to be survivable by a board that has not been built for it.
-  // The two roots are 6.5 s apart, at 4 and 10.5, so the second division
-  // happens while the first cascade is still on the road: the lesson is shown
-  // once and then immediately asked for.
+  // THE TWO BODIES AT 4 AND 10.5 were the T1 roots -- the first division the
+  // player ever saw, four points each that broke into four of wave 16's T0s.
+  // Four points is a Normal at its own weight, so that is what walks now. The
+  // 6.5 s between them was the gap that let the second cascade start while the
+  // first was still on the road; nothing cascades any more, so the spacing is
+  // simply two stragglers behind the Fast group and costs the wave nothing.
   { duration: 55, groups: [                                       // 383 HP
     { at: 0,    count: 27, interval: 0.18, type: "swarm", health: 3 },
     { at: 2,    count: 14, interval: 0.55, health: 13 },
-    { at: 4,    count: 1,  interval: 2,    type: "fractal_slime", tier: 1 },
+    { at: 4,    count: 1,  interval: 2,    type: "normal", health: 4 },
     { at: 4.5,  count: 16, interval: 0.3,  type: "fast", health: 7 },
-    { at: 10.5, count: 1,  interval: 2,    type: "fractal_slime", tier: 1 }
+    { at: 10.5, count: 1,  interval: 2,    type: "normal", health: 4 }
   ] },
   { duration: 38, groups: [                                       // 108 HP  camo again -- PURE
     { at: 0, count: 4, interval: 0.25, type: "camo_fast", health: 9 },
@@ -661,13 +639,13 @@ var EASY_WAVES = [
     { at: 0,   count: 12, interval: 0.4,  type: "fast", health: 18 },
     { at: 1.6, count: 4,  interval: 2.2,  type: "brute", health: 85 },
     { at: 3,   count: 20, interval: 0.15, type: "swarm", health: 4 },
-    // T2: 16 points that become 21 bodies. The first rung that is a BODY
-    // rather than texture, and the first that asks for a second answer -- the
-    // Brutes above it want the Longshot's flat 10, and twenty-one small
-    // slimes want coverage. It enters at 11 s, which is 2.8 s after the last
-    // Brute and 5.1 s after the last speck, so the two questions are not
-    // asked in the same breath.
-    { at: 11,  count: 1,  interval: 1,    type: "fractal_slime", tier: 2 }
+    // 16 points, arriving alone at 11 s -- 2.8 s after the last Brute and
+    // 5.1 s after the last speck, which is the beat this group was placed on
+    // and keeps. It was a T2 root that became twenty-one bodies and asked the
+    // board for coverage; a Slow at sixteen asks for the opposite, one patient
+    // body that walks at 35 u.l./s and gives the guns time. The wave's other
+    // three groups are untouched and still carry its shape.
+    { at: 11,  count: 1,  interval: 1,    type: "slow", health: 16 }
   ] },
   { duration: 65, groups: [                                       // 760 HP  old 13 + company
     { at: 0,   count: 14, interval: 0.7, type: "slow", health: 26 },
@@ -701,39 +679,28 @@ var EASY_WAVES = [
     { at: 6, count: 4, interval: 0.35, type: "flying", health: 9 }
   ] },
 
-  // T3, the middle rung and the wave this whole cascade was designed around.
-  // One 64 HP body which divides through T2, T1 and T0 when killed. Only the
-  // root is authored here; all 84 descendants are produced by the one type's
-  // `fractal` block.
+  // THE BODY AT 15 s was the T3 root -- 64 points that divided through T2, T1
+  // and T0 into 84 descendants, and the wave this whole cascade was once
+  // designed around. It is a Slow at 64 now, which is the same 64 points
+  // arriving as one body instead of eighty-five.
   //
-  // NO LONGER THE INTRODUCTION. Until 2026-08-20 this was the only Fractal
-  // Slime in the campaign, so it had to be first sight, first division and
-  // first cascade all at once; 16, 17 and 22 now do that work, and what is
-  // left here is the escalation this wave was already sized for. Nothing about
-  // the group changed -- it is the same T3, the same one body, and it still
-  // arrives alone at the end of the deploy.
+  // THE GAP IS STILL THE POINT AND STILL WORTH KEEPING. The rest of the wave
+  // is done at 10.3, so this walks into a silence -- the same property the old
+  // `lead: 6` bought, stated as an absolute time rather than as a pause
+  // appended to whatever ran before it. It used to buy ROOM for a cascade to
+  // resolve on an emptying road; it now buys a board that has just finished
+  // twenty Normals, five Bulwarks and ten Armored one heavy body to work on
+  // alone, which is the same beat asked of a different creature.
   //
-  // THE ROOT ENTERS AT 15 s AND THE REST OF THE WAVE IS DONE AT 10.3, so it
-  // still walks into a silence -- that is the same property the old `lead: 6`
-  // bought, now stated as an absolute time instead of as a pause appended to
-  // whatever ran before it. Until 2026-08-12 the tier never reached the
-  // spawner, so this group put a 4 HP T1 on the road and the gap did not
-  // matter; with the tier arriving, the same beat has to cover a body that
-  // divides four times. The gap lets the wave's other 35 bodies clear first,
-  // so the cascade resolves on an emptying road instead of on top of the
-  // Armored. It buys ROOM, not difficulty: the cascade conserves health --
-  // four bodies at a quarter each, so never more than the root's 64 points are
-  // in flight -- and measured peak concurrency does not rise.
-  //
-  // IT IS NOW A REAL GAP AND NOT A DRIFTING ONE. Under the old scheduler the
-  // root's entrance was the sum of every interval and lead above it, so
-  // re-timing any group in this wave silently moved the cascade. `at: 15` is
-  // the one number that decides it.
-  { duration: 78, groups: [                                       // 984 effective HP + split generations
+  // IT IS A REAL GAP AND NOT A DRIFTING ONE. Under the old scheduler this
+  // entrance was the sum of every interval and lead above it, so re-timing any
+  // group in this wave silently moved it. `at: 15` is the one number that
+  // decides it.
+  { duration: 78, groups: [                                       // 784 HP
     { at: 0,  count: 20, interval: 0.45, health: 22 },
     { at: 2,  count: 5,  interval: 0.9,  type: "shielded", health: 20 },
     { at: 4,  count: 10, interval: 0.7,  type: "armored", health: 18 },
-    { at: 15, count: 1,  interval: 1,    type: "fractal_slime", tier: 3 }
+    { at: 15, count: 1,  interval: 1,    type: "slow", health: 64 }
   ] },
   { duration: 75, groups: [                                       // 440 HP  first spawner -- its BROOD is the cost
     { at: 0,   count: 1, interval: 5, type: "hive", health: 220 },
@@ -867,16 +834,14 @@ var EASY_WAVES = [
     { at: 3,  count: 4,  interval: 1.6,  type: "shielded", health: 26 },
     { at: 5,  count: 3,  interval: 2.2,  type: "brute", health: 100 },
     { at: 7,  count: 1,  interval: 5,    type: "hive", health: 200 },
-    // T4. 256 points of root, 1 280 to clear, and 256 terminal bodies against
-    // a 100 HP base -- so this is the wave that asks whether the board can
-    // WIPE rather than snipe, one wave before the two that end the campaign.
-    // It cost this wave exactly what it is worth: the fourth Brute and two of
-    // the six Bulwarks paid for it, and 1952 HP is unchanged.
-    //
-    // At 15 s it lands 5.6 s after the last Brute, on a road that still has
-    // two Hives seeding on it -- the cascade and the broods overlap, which is
-    // the rehearsal for 35.
-    { at: 15, count: 1,  interval: 1,    type: "fractal_slime", tier: 4 }
+    // 256 points at 15 s, 5.6 s after the last Brute. This was the T4 root --
+    // 1 280 points to clear and 256 terminal bodies against a 100 HP base, the
+    // wave that asked whether the board could WIPE rather than snipe. A third
+    // Hive is what carries the weight now, and it keeps the question in the
+    // wave's own vocabulary: this is already the two-Hive wave, so the answer
+    // it wants is still coverage over time rather than one big hit. It brings
+    // a third brood onto a road that has two seeding on it.
+    { at: 15, count: 1,  interval: 1,    type: "hive", health: 256 }
   ] },
 
   // --- 34: THE VANGUARD. The first of the two boss waves. ----------------
@@ -955,20 +920,19 @@ var EASY_WAVES = [
     { at: 13, count: 1,  interval: 1,    type: "boss" },
     { at: 15, count: 7,  interval: 1.1,  type: "angry", health: 40 },
     { at: 17, count: 4,  interval: 1.5,  type: "shielded", health: 30 },
-    // T5, LAST IN THE LAST WAVE, and the only place 1024 points fit. It walks
-    // in at 28 s, which is 6.5 s behind the final Bulwark and fifteen behind
-    // the Tyrant -- deliberately: the boss is still the wave's centre, and the
-    // cascade is what the run ends on rather than something the Tyrant fights
-    // alongside.
+    // LAST IN THE LAST WAVE, and the only place 1024 points fit. It walks in
+    // at 28 s, which is 6.5 s behind the final Bulwark and fifteen behind the
+    // Tyrant -- deliberately: the boss is still the wave's centre, and this is
+    // what the run ends on rather than something the Tyrant fights alongside.
     //
-    // 6 144 points across six generations, ending in 1 024 one-point bodies.
-    // A board that cannot clear them loses on leaks alone, which is the
-    // intended shape of a finale and the reason no earlier wave carries this
-    // rung. The 30 opening Normals are untouched -- they are the v0.4.4
-    // spine's twentieth wave and cannot be trimmed to fund anything. They are
-    // sent as two salvos of fifteen now; the thirty bodies and their 30 HP
-    // override are exactly what they were.
-    { at: 28, count: 1,  interval: 1,    type: "fractal_slime", tier: 5 }
+    // It was the T5 root: 6 144 points across six generations ending in 1 024
+    // one-point bodies, a wave a board could lose on leaks alone. It is a
+    // Colossus at 1024 now -- one body, no ability, 17.5 u.l./s -- so the
+    // finale ends on the longest single kill in the game instead of on a
+    // clearing problem. The 30 opening Normals are untouched either way: they
+    // are the v0.4.4 spine's twentieth wave and cannot be trimmed to fund
+    // anything.
+    { at: 28, count: 1,  interval: 1,    type: "colossus", health: 1024 }
   ] }
 ];
 
@@ -2348,7 +2312,7 @@ function payWaveBounty() {
 
   cash += amount;
   if (typeof Effects !== "undefined") {
-    Effects.announce("Wave " + number + " cleared", "+$" + amount);
+    Effects.announce("Wave " + number + " cleared", "+" + amount + " mana");
   }
   return amount;
 }
@@ -2392,7 +2356,7 @@ var STARTING_CASH = 600;
 var SELL_REFUND_FRACTION = 0.5;
 
 // Cash is a float -- lifesteal ratios, charge multipliers and damage
-// mitigation all produce fractions -- but "$8.454662500000001" is not a
+// mitigation all produce fractions -- but "8.454662500000001 mana" is not a
 // readout. Kept exact internally, shown to at most one decimal, and with no
 // pointless ".0" on whole numbers.
 function formatCash(value) {
@@ -2406,7 +2370,14 @@ function formatCash(value) {
 // economy rule, not a per-tower one, which is why it lives here.
 function sellValue(tower) {
   var spent = (typeof tower.totalSpent === "number") ? tower.totalSpent : tower.cost;
-  return Math.ceil(spent * SELL_REFUND_FRACTION);
+  // MANA THAT IS SUNK RATHER THAN INVESTED. `unrefundableSpent` is subtracted
+  // before the refund fraction, so a tier marked `noRefund` gives back nothing
+  // at all while every other mana on the tower gives back half. Exactly one
+  // tier uses it -- the Farm's C5 (2026-08-28) -- and `totalSpent` stays honest
+  // about what was paid, which is what the end-of-run screen reports.
+  var sunk = (typeof tower.unrefundableSpent === "number")
+    ? tower.unrefundableSpent : 0;
+  return Math.ceil(Math.max(0, spent - sunk) * SELL_REFUND_FRACTION);
 }
 
 // The path, in u.l. -- like every other distance in the game (see
@@ -2540,6 +2511,32 @@ var bullets = [];
 
 var cash = STARTING_CASH;
 var baseHp = BASE_MAX_HP;
+
+// THE BASE'S MAXIMUM IS RUN STATE NOW, not the constant it starts from
+// (2026-08-27, with the Farm). `BASE_MAX_HP` is still where a run begins and
+// is still what the sandbox overrides; this is what the run is CURRENTLY
+// playing with, and a path-B Farm raises it every wave and on every kill in
+// its circle.
+//
+// GRANTED HIT POINTS ARE REAL HIT POINTS, and the maximum moves with them
+// (2026-08-28). This read "raising the maximum does not heal" until a playtest,
+// on the brief's word, and the result was a tier that could not be felt: a B3
+// farm bought +150 a wave, the bar read "Base 100 / 400" after two of them, and
+// the player's actual health had not moved once -- nothing in the game heals the
+// base except a Siphon's lifesteal, so the headroom was room to repair into with
+// no repair. Owner: "hp gain of B doesn't work at all."
+//
+// What is still NOT undone is damage already taken: at 50/100 a grant of 150
+// gives 200/250, not 250/250. The two variables stay separate for exactly that
+// -- the farm gives what it makes, and gives back nothing that was lost.
+var baseMaxHp = BASE_MAX_HP;
+
+function growBaseMaxHp(amount) {
+  if (!(amount > 0)) return 0;
+  baseMaxHp += amount;
+  baseHp += amount;
+  return amount;
+}
 var gameOver = false;
 
 // The run is WON when every scheduled wave has fully deployed and the last
@@ -2765,6 +2762,17 @@ var frozen = false;
 // While this is set it consumes the next map click, ahead of building and
 // inspecting, and Escape cancels it.
 var aimingTower = null;
+
+// SET WHILE A FARM'S INVESTMENT IS WAITING FOR ITS TARGET, as
+// `{ farm, temporary }`. The same shape as `aimingTower` above and for the same
+// reason: an action that needs a second click is a MODE, and a mode has to be
+// cancellable, has to be cleared when the thing that opened it leaves the
+// board, and has to consume the next click ahead of building and inspecting.
+//
+// Owner: "we're supposed to click on the ability, then click on the tower, and
+// that target boosted." Before this the press spent the stock and picked
+// nothing, because there was nothing to pick with.
+var investingFarm = null;
 
 // Extra things to draw in world space, between the map and the interface.
 // Push a function(ctx) to add one; the sandbox's u.l. debug overlay uses this
@@ -3075,6 +3083,9 @@ function restartGame() {
 
   cash = STARTING_CASH;
   baseHp = BASE_MAX_HP;
+  baseMaxHp = BASE_MAX_HP;
+  // Farms are board state and a network is run state: both die with the run.
+  if (typeof Farms !== "undefined") Farms.reset();
   gameOver = false;
   victory = false;
   allWavesDeployed = false;
@@ -3088,6 +3099,7 @@ function restartGame() {
   selectedSlot = null;
   inspected = null;
   aimingTower = null;
+  investingFarm = null;
   blockReason = null;
   paused = false;
   // Run state, exactly as the pause is: a run that begins on a stopped clock
@@ -3378,6 +3390,7 @@ function onRightClick(event) {
   selectedSlot = null;
   inspected = null;
   aimingTower = null;
+  investingFarm = null;
   refreshBlockReason();
 }
 
@@ -3644,6 +3657,30 @@ function onClick(event) {
   // and on a board with height in it that is not the world point under the
   // cursor. See `pickTower`.
   var hit = pickTower(p.x, p.y);
+
+  // A FARM'S INVESTMENT IS WAITING FOR ITS TARGET. It consumes this click
+  // whatever it lands on: on a tower it spends, and on open ground it cancels,
+  // because a mode you cannot get out of by clicking away is a trap. Ahead of
+  // inspecting for the same reason `aimingTower` is: while a mode is up it owns
+  // the click.
+  if (investingFarm) {
+    var farm = investingFarm.farm;
+    var temporary = investingFarm.temporary;
+    investingFarm = null;
+    if (hit) {
+      var refused = farm.invest(hit, temporary);
+      Sound.playUIClick();
+      if (refused) {
+        Effects.announce(farm.name, refused);
+      } else {
+        inspected = hit;
+        Effects.announce(hit.name || "Tower",
+          temporary ? "surge  ·  " + FarmTower.TEMP_SECONDS + " s" : "boosted");
+      }
+    }
+    return;
+  }
+
   if (hit) {
     Sound.playUIClick();
     inspected = hit;
@@ -3718,6 +3755,9 @@ function sellTower(tower, options) {
 
   if (inspected === tower) inspected = null;
   if (aimingTower === tower) aimingTower = null;   // it cannot aim once sold
+  // A sold farm is not paying for an investment it never landed, and a sold
+  // TARGET cannot receive one. Either way the mode goes with the tower.
+  if (investingFarm && (investingFarm.farm === tower)) investingFarm = null;
   refreshBlockReason();          // the ground it stood on may now be buildable
 }
 
@@ -3737,7 +3777,7 @@ function buyUpgrade(tower, id) {
   if (reason) return reason;
 
   var price = tower.upgradeCost(id);
-  if (cash < price) return "not enough cash";
+  if (cash < price) return "not enough mana";
 
   cash -= price;
   tower.applyUpgrade(id);
@@ -3867,7 +3907,41 @@ function runPanelAction(x, y) {
     spend: function (amount) { cash -= amount; },
     enemies: enemies,
     damage: function (enemy, amount) { enemy.takeDamage(amount); },
-    beginAiming: function (tower) { aimingTower = tower; }
+    beginAiming: function (tower) { aimingTower = tower; },
+    // The Farm's investment, which needs a target the panel cannot know. Same
+    // seam and the same shape as beginAiming above: the tower says what it
+    // wants, game.js owns the mode.
+    beginInvesting: function (farm, temporary) {
+      // NOTHING TO AIM AT IS A REFUSAL, NOT A MODE. The investment only lands
+      // on a tower at TIER 5 OR ABOVE -- the Farm's brief says so and the panel
+      // button says so -- and on a board with none, arming opens a mode whose
+      // every click is refused after the fact. That reads exactly like a broken
+      // button: owner, twice, "I can't select a tower with A5's ability".
+      //
+      // So the board is asked first, and the answer comes back through the same
+      // channel every other refusal uses.
+      var eligible = false;
+      for (var i = 0; i < towers.length && !eligible; i++) {
+        if (!FarmBoost.whyCannotBoost(towers[i], !temporary)) eligible = true;
+      }
+      if (!eligible) return false;
+
+      investingFarm = { farm: farm, temporary: !!temporary };
+      // AND THE PANEL GOES, because it is standing on the thing to be clicked.
+      // It is a 268 px slab down the right third of the board and it eats every
+      // click that lands on it (`runPanelAction` runs before `pickTower`), so a
+      // tower behind it could not be picked at all -- owner: "A5 ability is
+      // kinda bugged because I can't select the tower to empower". Measured: a
+      // Warbringer drawn at x 741 is inside a panel spanning 733..977 and its
+      // click never reached the board; the same tower at 696 worked.
+      //
+      // Aiming (`beginAiming`) deliberately keeps the panel, and the two are
+      // not the same case: a cone is aimed at a DIRECTION, and the player can
+      // pick one that is not under the panel. A target is a specific tower,
+      // and it is wherever it was built.
+      inspected = null;
+      return true;
+    }
   });
 
   refreshBlockReason();                 // spending may have changed what is affordable
@@ -4046,10 +4120,12 @@ function onKeyDown(event) {
   // Opening a menu over a half-placed tower would be the wrong answer to
   // "get me out of this".
   if (event.key === "Escape") {
-    if (selectedSlot !== null || inspected !== null || aimingTower !== null) {
+    if (selectedSlot !== null || inspected !== null || aimingTower !== null ||
+        investingFarm !== null) {
       selectedSlot = null;
       inspected = null;
       aimingTower = null;
+      investingFarm = null;
       refreshBlockReason();
       return;
     }
@@ -4342,7 +4418,7 @@ function whyCannotBuild(x, y, type) {
   }
 
   if (cash < type.COST) {
-    return "not enough cash";
+    return "not enough mana";
   }
 
   if (x < 0 || y < 0 || x > VIEW_WIDTH || y > VIEW_HEIGHT) {
@@ -4745,6 +4821,8 @@ function update(dt) {
     // dead tower would offer to sell something that is not there.
     if (inspected && inspected.isDestroyed && inspected.isDestroyed()) inspected = null;
     if (aimingTower && aimingTower.isDestroyed && aimingTower.isDestroyed()) aimingTower = null;
+    if (investingFarm && investingFarm.farm.isDestroyed &&
+        investingFarm.farm.isDestroyed()) investingFarm = null;
   }
 
   // A tower's update returns the DAMAGE it landed itself this step. Cash no
@@ -4827,6 +4905,12 @@ function update(dt) {
       runKills++;
       var killBounty = gone.bounty();
       cash += killBounty;
+      // A path-B Farm is paid for a body that dies inside its circle, and
+      // several of them stack in full. Here rather than in takeDamage for
+      // the reason the bounty is here: this sweep is the one place a fate is
+      // decided exactly once. A summoned body pays nothing, the same rule a
+      // Hive's brood already lives under.
+      if (typeof Farms !== "undefined") Farms.onEnemyKilled(gone);
       // Death-created enemies are collected and appended only after this
       // sweep. That gives every parent exactly one payout/removal and prevents
       // newly born children from being visited halfway through the same loop.
@@ -4926,6 +5010,9 @@ function update(dt) {
       // wave to announce and no transition to open: the win is decided by the
       // whole-road check below, on this same step.
       payWaveBounty();
+      // Wave 35 never reaches `endWave`, so this is the only door its farms
+      // have. `deployed` is already the 1-based number.
+      if (typeof Farms !== "undefined") Farms.settleWave(deployed);
     } else {
       endWave(WAVE_CLEAR_DELAY);
     }
@@ -5014,11 +5101,11 @@ function updateLowHealthAlert(dt) {
     return;
   }
 
-  if (!lowHealthActive && baseHp <= BASE_MAX_HP * LOW_HEALTH_FRACTION) {
+  if (!lowHealthActive && baseHp <= baseMaxHp * LOW_HEALTH_FRACTION) {
     lowHealthActive = true;
     lowHealthTimer = 0;
     lowHealthPulse = 0;
-  } else if (lowHealthActive && baseHp > BASE_MAX_HP * LOW_HEALTH_CLEAR_FRACTION) {
+  } else if (lowHealthActive && baseHp > baseMaxHp * LOW_HEALTH_CLEAR_FRACTION) {
     lowHealthActive = false;
     Sound.stopAlert();
     return;
@@ -5437,6 +5524,7 @@ function callNextWave(delaySeconds) {
   // ordinarily a no-op -- kept because the latch makes it free, and because a
   // countdown moved by hand (the sandbox, a fixture) has no gate behind it.
   payWaveBounty();
+  if (typeof Farms !== "undefined") Farms.settleWave(waveIndex);
   return true;
 }
 
@@ -5529,6 +5617,12 @@ function endWave(delaySeconds, overshoot) {
   // ended it, and the latch inside payWaveBounty is what makes a second gate
   // firing on the same step cost nothing.
   payWaveBounty();
+  // And the farms, on the same terms and for the same reason: `settleWave`
+  // is latched on the wave NUMBER, so the three gates plus the two safety
+  // nets cannot pay a wave's production twice. `waveIndex` is still the wave
+  // that just ended at this point -- it is incremented below -- so the
+  // 1-based number the player was shown is waveIndex + 1.
+  if (typeof Farms !== "undefined") Farms.settleWave(waveIndex + 1);
 
   var spent = overshoot > 0 ? overshoot : 0;
   waveIndex++;
@@ -5692,6 +5786,14 @@ function beginWave() {
   // latch makes it free. BEFORE the banner, so the two land in the order the
   // player earned them.
   payWaveBounty();
+  // The same safety net for the farms -- a cursor moved without a gate has not
+  // settled the wave it left -- and then the C network's payout, which is what
+  // "au debut de la vague suivante, le joueur recoit P mana" means. The payment
+  // does not consume P: it is a standing production, not a stock.
+  if (typeof Farms !== "undefined") {
+    Farms.settleWave(waveIndex);
+    Farms.openWave();
+  }
 
   if (typeof Effects !== "undefined") {
     Effects.announce(
@@ -6123,6 +6225,7 @@ function draw() {
   drawPlacementFeedback();
   drawBuildPreview();
   drawAimPreview();
+  drawInvestPreview();
 
   // World overlays: drawn in WORLD space, on top of the map but UNDER every
   // piece of interface. Debug shapes belong here -- drawn after the panel
@@ -6151,6 +6254,14 @@ function draw() {
   // with the board.
   if (world3D) {
     drawPlacementFeedback();
+    // AND THE INVESTMENT'S TARGETS, which are interface attached to world
+    // actors exactly as the placement feedback is. It has to be called on both
+    // branches: the call in the 2D block above is inside `if (!world3D)` and so
+    // never runs on this board -- which is why the ring stroked and nothing
+    // appeared, measured as zero changed pixels between a frame with the mode
+    // armed and one without. drawInvestPreview projects through the camera when
+    // there is one, so the same function is correct in both places.
+    drawInvestPreview();
     World3D.drawOverlays(ctx, worldRenderState());
   }
 
@@ -6547,19 +6658,43 @@ function noBuildRings(type) {
   // its ground, so it is not painted -- the same sweep whyCannotBuild skips.
   for (i = 0; i < towers.length; i++) {
     if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
-    rings.push(circleRing(towers[i].x, towers[i].y,
-      ul(towers[i].footprintRadiusUl), 16));
+    var taken = circleRing(towers[i].x, towers[i].y,
+      ul(towers[i].footprintRadiusUl), 16);
+    // ON THE SURFACE IT STANDS ON, declared rather than sampled: a tower on a
+    // stump has its footprint on the stump's top, and that circle runs right up
+    // to the rim where a sampled height flickers between two levels.
+    taken.z = towers[i].groundHeight || 0;
+    rings.push(taken);
   }
   return rings;
 }
 
 // A world ring projected to screen, or null if any of it is behind the eye.
+//
+// DRAPED OVER THE BOARD, PER POINT, which is the rule for a ground decal — see
+// clause 1b of the model contract, where `project()` samples the height under
+// each point precisely so a ring lies on the surface instead of cutting through
+// it. This projected flat at z = 0 until 2026-08-27, and that was invisible for
+// as long as the cursor was flat too: once the cursor resolved onto a stump,
+// the ghost stood on the top while every rule painted about it — the road band,
+// the blockers, the ground other towers have taken, the rim you may not cross —
+// sat **28.9 px** below the surface they describe.
+//
+// A ring may instead DECLARE its height in `ring.z`, and two of them do. A
+// stump's rim and a tower's footprint lie on a plateau at a known height, and
+// they lie exactly ON the edge of it: sampling a coarse height grid along that
+// edge answers 25 on one point and 0 on the next, so the ring would come back
+// jagged. An authored height is the exact answer where there is one.
 function projectRing(ring, cam) {
   var out = [], i;
+  var fixed = (typeof ring.z === "number") ? ring.z : null;
+  var ground = (fixed === null && typeof World3D !== "undefined" &&
+                World3D.groundHeightAt) ? World3D.groundHeightAt : null;
   for (i = 0; i < ring.length; i++) {
     var x = ring[i][0], y = ring[i][1];
     if (cam) {
-      var p = cam.worldToScreen(x, y, 0);
+      var p = cam.worldToScreen(x, y,
+        fixed !== null ? fixed : (ground ? ground(x, y) : 0));
       if (!p) return null;
       x = p.x; y = p.y;
     }
@@ -6614,8 +6749,13 @@ function drawNoBuildOverlay(type) {
   if (geo.any && geo.platforms.length) {
     ctx.beginPath();
     for (i = 0; i < geo.platforms.length; i++) {
-      var rim = projectRing(circleRing(geo.platforms[i].x, geo.platforms[i].y,
-        geo.platforms[i].radius, 28), cam);
+      // AT THE TOP OF THE STUMP, which is the edge this line is about. The rim
+      // is the one thing on the board that IS the height discontinuity, so its
+      // own authored height is the only reading of it that does not flicker.
+      var rimRing = circleRing(geo.platforms[i].x, geo.platforms[i].y,
+        geo.platforms[i].radius, 28);
+      rimRing.z = geo.platforms[i].height;
+      var rim = projectRing(rimRing, cam);
       if (!rim) continue;
       ctx.moveTo(rim[0][0], rim[0][1]);
       for (k = 1; k < rim.length; k++) ctx.lineTo(rim[k][0], rim[k][1]);
@@ -7155,6 +7295,75 @@ function drawBuildPreview() {
   }
 }
 
+// WHILE A FARM'S INVESTMENT IS WAITING FOR ITS TARGET, say so on the board and
+// mark what can take it. Same job as drawAimPreview below and drawn beside it:
+// a mode with no sign on screen is a click the player has forgotten they owe.
+//
+// The eligible towers wear a ring; a tower that already carries a permanent
+// boost does not, because for a permanent press it is not eligible -- which is
+// the once-only rule made visible before the click rather than explained after
+// it in a refusal.
+function drawInvestPreview() {
+  if (!investingFarm) return;
+
+  // THROUGH THE CAMERA, like every other world ring on this board. A plain
+  // `ctx.arc` at a world coordinate is only correct on the flat fallback: on
+  // the 3D board the world transform is a projection the 2D context cannot
+  // express, which is why drawSightShadows and the range circles all go through
+  // projectRing. Measured before this was fixed: the ring drew 23 stray pixels
+  // somewhere off the tower rather than around it.
+  var cam = (typeof World3D !== "undefined" && World3D.isEnabled() &&
+             World3D.camera) ? World3D.camera() : null;
+  var temporary = investingFarm.temporary;
+
+  ctx.save();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(150,225,160,0.9)";
+  for (var i = 0; i < towers.length; i++) {
+    var t = towers[i];
+    if (FarmBoost.whyCannotBoost(t, !temporary)) continue;
+
+    var radius = t.footprintPx + 8;
+    var ring = [];
+    for (var k = 0; k <= 48; k++) {
+      var a = k / 48 * Math.PI * 2;
+      ring.push([t.x + Math.cos(a) * radius, t.y + Math.sin(a) * radius]);
+    }
+    var r = projectRing(ring, cam);
+    if (!r || r.length < 3) continue;
+    ctx.beginPath();
+    ctx.moveTo(r[0][0], r[0][1]);
+    for (k = 1; k < r.length; k++) ctx.lineTo(r[k][0], r[k][1]);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  if (mouse.x < -100) return;
+
+  // The label follows the CURSOR, so it is placed in screen space on the 3D
+  // board and in world space on the flat one -- which are the same point, said
+  // in whichever coordinates that board's overlay pass is working in.
+  var lx = worldMouse.x, ly = worldMouse.y + 16;
+  if (cam) {
+    var at = cam.worldToScreen(worldMouse.x, worldMouse.y,
+      (typeof World3D !== "undefined" && World3D.groundHeightAt)
+        ? World3D.groundHeightAt(worldMouse.x, worldMouse.y) : 0);
+    if (!at) return;
+    lx = at.x; ly = at.y + 18;
+  }
+
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(170,235,180,0.95)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText(
+    (temporary ? "click a tower to surge" : "click a tower to boost") +
+      "  ·  Esc to cancel", lx, ly);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
 // While a cone tower is waiting for a direction, show where it would point
 // if you clicked now -- the cone follows the cursor, so the commitment is
 // visible before it is spent (re-aiming is on a 10s cooldown).
@@ -7217,7 +7426,7 @@ function drawStatus() {
   ctx.fillStyle = "#ffd76e";
   ctx.font = "600 30px system-ui, sans-serif";
   ctx.textBaseline = "top";
-  ctx.fillText("$" + formatCash(cash), VIEW_WIDTH - 24, 16);
+  ctx.fillText(formatCash(cash) + " mana", VIEW_WIDTH - 24, 16);
 
   ctx.fillStyle = "rgba(255,215,110,0.55)";
   ctx.font = "13px system-ui, sans-serif";
@@ -7229,7 +7438,7 @@ function drawStatus() {
   // below where it began, and drops the denominator once it is above -- a
   // "12500 / 100" would just read as broken.
   ctx.textAlign = "left";
-  ctx.fillStyle = baseHp > BASE_MAX_HP * 0.25 ? "#8ce69d" : "#e0736e";
+  ctx.fillStyle = baseHp > baseMaxHp * 0.25 ? "#8ce69d" : "#e0736e";
   ctx.font = "600 24px system-ui, sans-serif";
 
   // THE VISUAL HALF OF THE LOW-HEALTH ALERT. The readout has been red below a
@@ -7247,9 +7456,9 @@ function drawStatus() {
     ctx.fillStyle = "#e0736e";
   }
 
-  ctx.fillText(baseHp > BASE_MAX_HP
+  ctx.fillText(baseHp > baseMaxHp
     ? "Base " + Math.round(baseHp) + " HP"
-    : "Base " + Math.round(baseHp) + " / " + BASE_MAX_HP + " HP", 22, 48);
+    : "Base " + Math.round(baseHp) + " / " + Math.round(baseMaxHp) + " HP", 22, 48);
 
   ctx.fillStyle = "#8cb3e6";
   ctx.font = "600 16px system-ui, sans-serif";
@@ -7883,7 +8092,7 @@ function drawBuildBar() {
 
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillStyle = affordable ? "#ffd76e" : "#e0736e";
-    ctx.fillText("$" + type.COST, r.x + r.w / 2, r.y + 68);
+    ctx.fillText(type.COST + " mana", r.x + r.w / 2, r.y + 68);
   }
 
   ctx.textAlign = "left";
@@ -8769,7 +8978,7 @@ function drawInspection() {
   ctx.textBaseline = "middle";
   ctx.font = "600 13px system-ui, sans-serif";
   ctx.fillStyle = hovering ? "#ffd76e" : "#e8b96a";
-  ctx.fillText(fitText(ctx, "Sell  $" + sellValue(t), b.w - 26),
+  ctx.fillText(fitText(ctx, "Sell  " + sellValue(t) + " mana", b.w - 26),
     b.x + b.w / 2, b.y + b.h / 2 + 1);
   drawKeyHint(b, "X", hovering);
 
@@ -11501,19 +11710,49 @@ function resultButtonAt(x, y) {
 // lets through is a lie. A tower that keeps a total nothing else keeps adds its
 // label here; a tower that keeps none simply has no rows, which is the rule
 // this screen is built on -- no invented zeroes.
+//
+// "Mana made" and "Mana generated" match nothing today and did not match
+// anything as "Gold made" / "Gold generated" either -- they are older spellings
+// of a row no tower emits. Kept rather than deleted because an allow-list entry
+// costs nothing and a missing one is a missing line; the Siphon's own total is
+// labelled "Bonus mana" and is deliberately NOT here, which is how it has
+// always been.
 var RESULT_TOTAL_LABELS = [
   "Damage dealt", "Kills", "Healed", "Healing done",
-  "Gold made", "Gold generated", "Blubs summoned", "Recruits sent"
+  "Mana made", "Mana generated", "Mana produced", "Base HP produced",
+  "Blubs summoned", "Recruits sent"
 ];
+
+// Whether a formatted total reads as nothing at all. `TowerStats.formatTotal`
+// thins big numbers to "12.3k", so this tests the STRING the screen would show
+// rather than re-deriving a number the row no longer carries: "0" is nothing,
+// "0.0k" cannot occur, and "0 / 80" is a health line that never reaches here.
+function isZeroTotal(value) {
+  return String(value).replace(/[^0-9.]/g, "") === "0";
+}
 
 function resultTowerRows() {
   var rows = [];
   for (var i = 0; i < towers.length; i++) {
     var tw = towers[i];
+    // A SUMMONED BODY IS NOT A TOWER ON THIS SCREEN. Blubs live in `towers`
+    // (see js/blub.js for why) and each one was getting a row of its own, so a
+    // finished Summoner filled the screen with a dozen entries for units the
+    // player never placed. The Summoner is the thing that was built and the
+    // thing whose figures matter; its brood is counted inside its own totals.
+    if (tw.isSummon) continue;
+
     var lines = (typeof tw.statLines === "function") ? tw.statLines() : [];
     var totals = [];
     for (var j = 0; j < lines.length; j++) {
-      if (RESULT_TOTAL_LABELS.indexOf(lines[j][0]) !== -1) totals.push(lines[j]);
+      if (RESULT_TOTAL_LABELS.indexOf(lines[j][0]) === -1) continue;
+      // NO INVENTED ZEROES, which is the rule this screen already says it is
+      // built on -- it just was not applied to a total that happens to BE zero.
+      // "Mana produced 0" on a farm that never settled a wave, or "Kills 0" on
+      // a tower that killed nothing, is a row that tells the player something
+      // did not happen; the absence tells them the same thing more quietly.
+      if (isZeroTotal(lines[j][1])) continue;
+      totals.push(lines[j]);
     }
     rows.push({
       name: (typeof tw.displayName === "function" ? tw.displayName()
@@ -11545,7 +11784,7 @@ function drawResultScreen() {
     "   ·   wave " + reachedWave() + " of " + WAVES.length +
     "   ·   " + wavesCompleted() + " finished" +
     "   ·   base " + Math.max(0, Math.round(baseHp)) + " HP" +
-    "   ·   $" + Math.round(cash) +
+    "   ·   " + Math.round(cash) + " mana" +
     "   ·   " + runKills + " destroyed", VIEW_WIDTH / 2, 98);
 
   // WHERE THE COINS CAME FROM, read straight off the award. This panel never
@@ -11585,7 +11824,7 @@ function drawResultScreen() {
   for (var ri = 0; ri < rows.length && y < limit; ri++) {
     var r = rows[ri];
     var bits = [];
-    if (r.spent !== null) bits.push("$" + r.spent);
+    if (r.spent !== null) bits.push(r.spent + " mana");
     for (var ei = 0; ei < r.totals.length; ei++) {
       bits.push(r.totals[ei][1] + " " + r.totals[ei][0].toLowerCase());
     }

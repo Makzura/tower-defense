@@ -201,7 +201,7 @@ LongshotTower.prototype.panelActions = function () {
       // Short enough for the button; the full reason is in the log/sidebar.
       detail = maxed ? "maxed" : "locked";
     } else {
-      detail = "$" + cost;
+      detail = cost + " mana";
     }
 
     // What the tier actually DOES, shown before it is bought -- read off the
@@ -342,7 +342,7 @@ LongshotTower.prototype.upgradeCard = function (pathName, refusal) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  path " + pathName + " tier " + preview.tier.tier,
-    subtitle: refusal ? refusal : "$" + preview.cost,
+    subtitle: refusal ? refusal : preview.cost + " mana",
     changes: preview.changes,
     abilities: preview.abilities,
     note: note
@@ -361,7 +361,7 @@ LongshotTower.prototype.performAction = function (id, context) {
     var check = Crosspath.canPurchaseNext(this.core.purchased, pathName, this.core.config);
 
     if (!check.ok) return check.reason;
-    if (context.cash < cost) return "not enough cash";
+    if (context.cash < cost) return "not enough mana";
 
     var result = this.purchase(pathName);
     if (!result.ok) return result.reason;

@@ -125,6 +125,20 @@ var Codex = (function () {
     try { return World3D.modelFor(t); } catch (e) { return null; }
   }
 
+  // The branch letters this tower actually offers, in the order its own panel
+  // lists them. Read off `panelActions` rather than off a table, so a tower
+  // that grows a fourth path needs no edit here.
+  function branchesOf(tower) {
+    if (typeof tower.panelActions !== "function") return [];
+    var seen = [];
+    tower.panelActions().forEach(function (a) {
+      if (a.tone === "upgrade" && a.branch && seen.indexOf(a.branch) === -1) {
+        seen.push(a.branch);
+      }
+    });
+    return seen;
+  }
+
   function walkBranch(Type, branch) {
     var t = new Type(-1000, -1000, path);
     var tiers = [];
@@ -164,7 +178,7 @@ var Codex = (function () {
 
       var entry = {
         id: action.upgradeId,
-        price: action.detail,          // "$850", or the gate's reason
+        price: action.detail,          // "850 mana", or the gate's reason
         effects: action.effects || "",
         reason: action.reason || null,
         // Resolved NOW, not kept as a thunk: the thunk reads the instance,
@@ -194,20 +208,31 @@ var Codex = (function () {
     return roster().map(function (Type) {
       var base = new Type(-1000, -1000, path);
 
-      // Drop the lifetime-total rows (damage dealt, kills): a specimen in a
-      // field guide has no history. Sliced by COUNT off the front rather than
-      // matched by label, so renaming a row cannot silently break this.
-      var totalRows = TowerStats.totals(base).length;
+      // Drop the lifetime-total rows: a specimen in a field guide has no
+      // history. Asked of the ROWS rather than counted off the front -- the
+      // count assumed every tower opens with "Damage dealt" and "Kills", and
+      // the Farm has neither, so the guide was slicing away its production
+      // rate and showing a 1200-mana economy tower as a single HP line. See
+      // TowerStats.total.
 
       return {
         type: Type,
         name: Type.DISPLAY_NAME,
         cost: Type.COST,
-        stats: base.statLines().slice(totalRows),
+        stats: TowerStats.withoutTotals(base.statLines()),
         // The unbought body, from the same resolver every tier uses.
         model: bodyOf(base),
+        // WHICH BRANCHES A TOWER HAS IS ITS OWN ANSWER, not two letters typed
+        // here. Four types have A and B; the Farm has A, B and C, and a
+        // hard-coded pair would have shown two thirds of it with nothing
+        // anywhere reporting a problem -- the index derives everything else it
+        // shows for exactly this reason.
+        branchIds: branchesOf(base),
         branches: (typeof base.panelActions === "function")
-          ? { A: walkBranch(Type, "A"), B: walkBranch(Type, "B") }
+          ? branchesOf(base).reduce(function (acc, id) {
+              acc[id] = walkBranch(Type, id);
+              return acc;
+            }, {})
           : null
       };
     });
@@ -394,11 +419,29 @@ var Codex = (function () {
     return { x: 32, y: 148 + i * 86, w: 240, h: 76 };
   }
 
-  var TREE_X = { A: 600, B: 780 };
+  // THE COLUMNS ARE LAID OUT FROM HOW MANY THERE ARE. Two branches sit where
+  // they always did; a third is fitted beside them by narrowing all three,
+  // which keeps the tree inside the same rectangle rather than pushing it off
+  // the right of the screen.
+  var TREE_X0 = 600;
   var TREE_Y = 196;
+  var TREE_SPAN = 344;                 // 600..944, what the two columns used
 
-  function tierRect(branch, i) {
-    return { x: TREE_X[branch], y: TREE_Y + i * 54, w: 164, h: 46 };
+  function treeColumns(model) {
+    var ids = (model && model.branchIds && model.branchIds.length)
+      ? model.branchIds : ["A", "B"];
+    var gap = 16;
+    var w = Math.floor((TREE_SPAN - gap * (ids.length - 1)) / ids.length);
+    var out = {};
+    ids.forEach(function (id, i) {
+      out[id] = { x: TREE_X0 + i * (w + gap), w: w };
+    });
+    return out;
+  }
+
+  function tierRect(model, branch, i) {
+    var col = treeColumns(model)[branch] || { x: TREE_X0, w: 164 };
+    return { x: col.x, y: TREE_Y + i * 54, w: col.w, h: 46 };
   }
 
   // THE TURNING BODY, LEFT OF THE UPGRADE TREE. The owner asked for exactly
@@ -540,9 +583,9 @@ var Codex = (function () {
     var model = towerModels[towerIndex];
     if (!model.branches) return;
 
-    ["A", "B"].forEach(function (branch) {
+    model.branchIds.forEach(function (branch) {
       model.branches[branch].forEach(function (tier, i) {
-        if (pointInRect(x, y, tierRect(branch, i))) {
+        if (pointInRect(x, y, tierRect(model, branch, i))) {
           pick = { branch: branch, tier: i };
         }
       });
@@ -698,7 +741,7 @@ var Codex = (function () {
         r.x + 74, r.y + r.h / 2 - 10);
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,215,110,0.75)";
-      ctx.fillText("$" + model.cost, r.x + 74, r.y + r.h / 2 + 10);
+      ctx.fillText(model.cost + " mana", r.x + 74, r.y + r.h / 2 + 10);
     });
 
     var model = towerModels[towerIndex];
@@ -711,7 +754,7 @@ var Codex = (function () {
     ctx.fillText(model.name, 300, 150);
     ctx.font = "600 15px system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,215,110,0.85)";
-    ctx.fillText("$" + model.cost, 300 + ctx.measureText(model.name).width + 60, 156);
+    ctx.fillText(model.cost + " mana", 300 + ctx.measureText(model.name).width + 60, 156);
 
     var statW = 270;
     model.stats.forEach(function (row, i) {
@@ -735,18 +778,20 @@ var Codex = (function () {
       ctx.font = "14px system-ui, sans-serif";
       ctx.fillStyle = "rgba(186,158,140,0.55)";
       ctx.fillText("No upgrade paths — the " + model.name.toLowerCase() +
-        " is the reference tower.", TREE_X.A, TREE_Y + 4);
+        " is the reference tower.", TREE_X0, TREE_Y + 4);
       return;
     }
 
-    ["A", "B"].forEach(function (branch) {
+    var cols = treeColumns(model);
+    model.branchIds.forEach(function (branch) {
       ctx.font = "600 14px system-ui, sans-serif";
       ctx.fillStyle = "rgba(140,230,157,0.85)";
       ctx.textAlign = "center";
-      ctx.fillText("Path " + branch, TREE_X[branch] + 82, TREE_Y - 24);
+      ctx.fillText("Path " + branch,
+        cols[branch].x + cols[branch].w / 2, TREE_Y - 24);
 
       model.branches[branch].forEach(function (tier, i) {
-        var r = tierRect(branch, i);
+        var r = tierRect(model, branch, i);
         var active = pick && pick.branch === branch && pick.tier === i;
         var hot = pointInRect(mouse.x, mouse.y, r);
 
@@ -983,7 +1028,7 @@ var Codex = (function () {
         s.shield + " / " + s.intervalSeconds + " s, stacks"];
     }
 
-    return ["Bounty", "$" + model.bounty];
+    return ["Bounty", model.bounty + " mana"];
   }
 
   function drawEnemiesGridLegacy(ctx) {
@@ -1572,7 +1617,7 @@ var Codex = (function () {
       if (model.spawns.shieldRatio) {
         spawnText += ", each with a " + model.spawns.shieldRatio + "× health shield";
       }
-      if (model.spawns.noBounty) spawnText += " and a $0 bounty";
+      if (model.spawns.noBounty) spawnText += " and no bounty at all";
       lines.push(spawnText + ". Damage to the brood still counts on towers.");
       hasMechanic = true;
     }
@@ -1745,7 +1790,7 @@ var Codex = (function () {
       ctx.fillText(String(model.health) + " HP", r.x + r.w - 84, r.y + 17);
       ctx.font = "600 13px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,215,110,0.9)";
-      ctx.fillText("$" + model.bounty, r.x + r.w - 14, r.y + 17);
+      ctx.fillText(model.bounty + " mana", r.x + r.w - 14, r.y + 17);
 
       // Speed under the money, so the two columns each carry a "how much" and
       // a "how fast" rather than the row being three numbers in a line.
@@ -1817,7 +1862,7 @@ var Codex = (function () {
       ["Base health", model.health + " HP"],
       ["Highest campaign HP", model.maxHp + " HP"],
       ["Starting effective HP", effective + " HP"],
-      ["Kill bounty", "$" + model.bounty],
+      ["Kill bounty", model.bounty + " mana"],
       ["Movement speed", roundStat(model.speed) + " u.l./s (" + model.multiplier + "×)"],
       ["Reference crossing", "~" + Math.round(model.crossing) + " s"],
       ["Flat armor", String(model.armor)],
@@ -2164,7 +2209,14 @@ var Codex = (function () {
     // clicks.
     tabRect: tabRect,
     towerCardRect: towerCardRect,
-    tierRect: tierRect,
+    // THE PUBLIC SIGNATURE IS STILL (branch, tier). A caller outside this
+    // module is asking about the tower that is OPEN, and having to hand the
+    // model back in would be asking it to know something the screen already
+    // knows. The private form takes the model because the column widths now
+    // depend on how many branches that tower has.
+    tierRect: function (branch, i) {
+      return tierRect(towerModels[towerIndex], branch, i);
+    },
     enemyCardRect: enemyCardRect,
     enemyListViewport: enemyListViewport,
     enemyVisibleRows: function () { return ENEMY_VISIBLE_ROWS; },

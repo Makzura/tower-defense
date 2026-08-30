@@ -60,6 +60,31 @@ var GLModels = (function () {
       // everywhere and any reader would have silently taken the fallback on
       // every body while appearing to work.
       bands: data.bands || null,
+      // HOW LONG THIS MODEL'S OWN LOOP LASTS, in seconds, for a body whose
+      // animation is AUTHORED rather than solved -- the Farm's three imports
+      // (tools/glb_to_animated.py). gl-world divides the world clock by it to
+      // pick a frame; 0 or absent means "this model does not carry a loop",
+      // and every reader of a solved cycle ignores it.
+      //
+      // COPIED EXPLICITLY, and the field above is why that sentence is here:
+      // `bands` shipped on eight models while `register` quietly dropped it,
+      // so every reader took the documented fallback and the whole thing
+      // looked like it worked. A missing `loopSeconds` fails the same way --
+      // the animation plays at a default rate nobody chose.
+      loopSeconds: data.loopSeconds || 0,
+      // A BAND'S LENGTH IN FRAMES SAYS NEITHER HOW LONG IT LASTS NOR WHAT IT
+      // IS, so an animated model that carries more than one clip carries these
+      // beside `bands`. `bandSeconds[i]` is that clip's duration and
+      // `bandNames[i]` is its authored name -- `idle_work`, `produce_tick`,
+      // `kill_capture`. gl-world matches on the NAME rather than on an index,
+      // because an index silently points at a different clip the day a model
+      // gains one. Copied explicitly, like everything else here.
+      bandSeconds: data.bandSeconds || null,
+      bandNames: data.bandNames || null,
+      // WHERE EACH GROUP TURNS, in model units. Nothing in the animation needs
+      // it -- frame matrices are model-space deltas -- but a RUNTIME pose does:
+      // gl-world aims a scanner's eye by rotating its group about this point.
+      pivots: data.pivots || null,
       expanded: null,
       gpu: null
     };

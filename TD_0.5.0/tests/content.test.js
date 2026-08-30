@@ -84,17 +84,23 @@ var BEYOND = SMASH_AT + 45;      // outside a bare swing and outside that blast
 // to stop short of +58. CHAIN_4 was inside the swing, and "only a chain can
 // reach them" quietly stopped being true.
 //
-// Each link is 12 px from the one before it, inside the 19.5 px blast; CHAIN_1
-// to CHAIN_3 sit inside a B4 swing and CHAIN_4 onward outside it, so only a
-// chain can reach those two. CHAIN_CONTROL is 58 px past the last link, 54 px
-// from it and well beyond any blast. Measured against the real path geometry,
-// not estimated; if a rescale moves them, the chain test is where it shows.
+// Each link is 12 px from the one before it, inside the 19.5 px blast.
+//
+// CHAIN_CONTROL MOVED FROM +114 TO +200 ON 2026-08-27, and it is the fixture
+// the Warbringer retune broke rather than a number that drifted. At +114 it
+// stood 72.6 px from the tower; a full-B reach went from 77.5 u.l. to 90, so
+// the control came INSIDE the swing -- and being the furthest body along the
+// road, "first" targeting turned the wedge onto it and dragged it off the
+// chain, leaving three of the five links outside the arc. A control that is
+// in range is not a control. At +200 it is 133.8 px out against a 93.6 px
+// reach. Measured against the real path geometry, not estimated; if a rescale
+// or a range grant moves them, the chain test is where it shows.
 var CHAIN_1 = SMASH_AT + 8;
 var CHAIN_2 = SMASH_AT + 20;
 var CHAIN_3 = SMASH_AT + 32;
 var CHAIN_4 = SMASH_AT + 44;
 var CHAIN_5 = SMASH_AT + 56;
-var CHAIN_CONTROL = SMASH_AT + 114;
+var CHAIN_CONTROL = SMASH_AT + 200;
 
 // WHAT ACTUALLY HIT A BODY, by amount and kind.
 //
@@ -331,99 +337,74 @@ test("the roster matches the agreed numbers", function (t) {
 
 
 // ---------------------------------------------------------------------------
-// THE TIER LADDER IS SCHEDULED, AND ITS HP IS THE HP THE INDEX PRINTS.
+// THE TIER LADDER IS OFF THE EASY CAMPAIGN, AND WHAT REPLACED IT MATCHES IT
+// POINT FOR POINT.
 //
-// 2026-08-20, at the owner's instruction: "i want the slime tiers to spawn in
-// accordance to their HP as stated in the index and behave in that manner".
-// The mechanic was already right -- a T4 spawned by hand has always had its
-// 256 points -- but the CAMPAIGN only ever sent one rung of the six, so five
-// of the tiers the index advertises were unreachable except as something
-// else's split children.
+// 2026-08-29, at the owner's instruction: "take out the fractal slime, all of
+// them, from easy mode, and replace them by, in order, colossus > hive > slow
+// > normal, matching the HP total". This block used to pin the opposite claim
+// -- that all six rungs were scheduled in Easy, ascending, at the HP the index
+// prints -- and it is rewritten rather than deleted, because the two halves it
+// was protecting both outlived the schedule it was written against:
 //
-// What this pins is the correspondence itself, in both directions:
+//   * the LADDER ITSELF is still a live mechanic, still what the index draws,
+//     and still spent by NORMAL. It is asserted here off the type's own
+//     `fractal` block, with no wave involved, so a retune of the rungs fails
+//     here whichever campaign is looked at.
+//   * the SUBSTITUTION is the new claim. Ten roots came off six Easy waves, and
+//     the only thing that made that safe was that every one of them was
+//     replaced by the same number of points. That is checked wave by wave
+//     against the figures the schedule itself carries.
 //
-//   every rung the index states is somewhere in the schedule,
-//   every scheduled rung spawns at exactly the HP stated for it,
-//   and the rungs arrive in ascending order, each in a heavier wave.
-//
-// It reads the tier ladder out of the type's own `fractal` block and the
-// health out of Enemy.healthOf -- the two things js/codex.js reads to draw the
-// index -- so a retune of the ladder moves the index and this test together
-// and neither can quietly stop describing the other.
-//
-// NO `health` OVERRIDE ON A FRACTAL GROUP, ever: `Enemy.healthOf` takes the
-// tier branch and discards it, so an override would be a no-op on the body and
-// a lie in waveKillBounty. The schedule is checked for one here because the
-// hazard is invisible at every other altitude -- see the note in js/game.js.
-test("the campaign spends the whole tier ladder, at the index's own HP",
+// EASY ONLY. "From easy mode" was the whole scope of the instruction and
+// NORMAL_WAVES was not touched, which is why the type carries no `sandboxOnly`
+// flag -- it is still scheduled, in the other campaign, and saying otherwise
+// would be a false claim tests/run.js reads in both directions.
+test("Easy schedules no Fractal Slime, and the ladder is intact anyway",
 function (t) {
   var h = harness.boot();
   var Enemy = h.game.Enemy;
   var spec = Enemy.TYPES.fractal_slime.fractal;
 
-  // ONE RUNG PER WAVE, NOT ONE RUNG PER GROUP (2026-08-25). The timeline
-  // rewrite cut waves into the salvos they actually arrive in, so wave 16's
-  // four T0 slimes are four groups and wave 17's two T1s are two -- ten groups
-  // carrying six rungs. Counting GROUPS made this read a ladder twice as long
-  // as the one the campaign spends, with T1 landing where T0 should be. The
-  // ladder is a per-wave claim and is now counted per wave.
-  //
-  // A wave that mixed two tiers would be a real error and is still caught: the
-  // tier is read off the first group of the wave and every later group of the
-  // same type is checked against it.
   var scheduled = [];
-  h.game.WAVES.forEach(function (wave, i) {
-    var tier;
-    var found = false;
+  h.game.EASY_WAVES.forEach(function (wave, i) {
     h.game.waveGroups(wave).forEach(function (g) {
-      if (g.type !== "fractal_slime") return;
-      if (found) {
-        t.eq(g.tier, tier,
-          "wave " + (i + 1) + " sends one tier of Fractal Slime, not two");
-        return;
-      }
-      found = true;
-      tier = g.tier;
-      scheduled.push({ wave: i + 1, group: g });
+      if (g.type === "fractal_slime") scheduled.push(i + 1);
     });
   });
+  t.deep(scheduled, [], "Easy sends no Fractal Slime");
+  t.eq(Enemy.TYPES.fractal_slime.sandboxOnly, undefined,
+    "and the type claims no sandbox-only flag, because Normal still sends it");
 
-  t.eq(scheduled.length, spec.maxTier - spec.minTier + 1,
-    "one scheduled WAVE per rung of the ladder");
-
-  var previousWave = 0;
-  var previousHp = 0;
-  scheduled.forEach(function (entry, i) {
-    var tier = spec.minTier + i;
-    var stated = spec.tierZeroHealth * Math.pow(spec.healthMultiplier, tier);
-    var body = new Enemy(h.game.path, entry.group.health, "fractal_slime",
-      { tier: entry.group.tier });
-
-    t.eq(entry.group.tier, tier,
-      "wave " + entry.wave + " carries T" + tier + ", the next rung up");
-    t.eq(entry.group.health, undefined,
-      "and authors no health override on it");
-    t.eq(Enemy.healthOf("fractal_slime", undefined, entry.group.tier), stated,
-      "T" + tier + " is stated at " + stated + " HP");
-    t.eq(body.maxHealth, stated,
-      "and the body that walks out of the gate has exactly that");
-    t.eq(body.fractalTier, tier, "carrying the tier it was scheduled at");
-
-    t.ok(entry.wave > previousWave,
-      "T" + tier + " arrives after T" + (tier - 1) + " (wave " + entry.wave + ")");
-    t.ok(stated > previousHp, "and is heavier than the rung below it");
-    previousWave = entry.wave;
-    previousHp = stated;
+  var inNormal = [];
+  h.game.NORMAL_WAVES.forEach(function (wave, i) {
+    h.game.waveGroups(wave).forEach(function (g) {
+      if (g.type === "fractal_slime") inNormal.push(i + 1);
+    });
   });
+  t.deep(inNormal, [17, 17, 27, 32, 35],
+    "Normal's own rungs are untouched -- two roots in 17, then 27, 32 and 35");
 
-  // BEHAVING IN THAT MANNER: the scheduled tier is not just a health number,
-  // it is how many generations the wave has to be cleared through. A rung at
-  // tier T costs root x (T+1) in total damage and leaves 4^T terminal bodies
-  // walking, which is the real reason a T5 belongs in the finale and nowhere
-  // earlier.
-  var top = scheduled[scheduled.length - 1];
+  // EVERY RUNG STILL WEIGHS WHAT THE INDEX PRINTS. Read off the `fractal` block
+  // and Enemy.healthOf -- the two things js/codex.js reads to draw the index --
+  // so a retune of the ladder moves the index and this test together.
+  var previousHp = 0;
+  for (var tier = spec.minTier; tier <= spec.maxTier; tier++) {
+    var stated = spec.tierZeroHealth * Math.pow(spec.healthMultiplier, tier);
+    var body = new Enemy(h.game.path, undefined, "fractal_slime", { tier: tier });
+    t.eq(Enemy.healthOf("fractal_slime", undefined, tier), stated,
+      "T" + tier + " is stated at " + stated + " HP");
+    t.eq(body.maxHealth, stated, "and a body built at that tier has exactly that");
+    t.eq(body.fractalTier, tier, "carrying the tier it was built at");
+    t.ok(stated > previousHp, "and it is heavier than the rung below it");
+    previousHp = stated;
+  }
+
+  // AND IT STILL DIVIDES. A tier T root costs root x (T+1) in total damage and
+  // ends in 4^T terminal bodies; that is the reason the T5 was a finale body
+  // and the reason nothing else in the game costs what it cost.
   var queue = [new Enemy(h.game.path, undefined, "fractal_slime",
-    { tier: top.group.tier })];
+    { tier: spec.maxTier })];
   var totalHp = 0;
   var terminal = 0;
   while (queue.length) {
@@ -434,11 +415,74 @@ function (t) {
     if (children) queue = queue.concat(children);
     else terminal++;
   }
-  t.eq(top.wave, h.game.WAVES.length, "the top rung is in the last wave");
-  t.eq(totalHp, 1024 * (top.group.tier + 1),
-    "clearing the T5 takes 6 144 points across six generations");
-  t.eq(terminal, Math.pow(spec.splitCount, top.group.tier),
-    "and ends in 1 024 terminal T0s, one point of base damage each");
+  t.eq(totalHp, 1024 * (spec.maxTier + 1),
+    "clearing a T5 still takes 6 144 points across six generations");
+  t.eq(terminal, Math.pow(spec.splitCount, spec.maxTier),
+    "and still ends in 1 024 terminal T0s");
+});
+
+// WHAT STANDS WHERE EACH ROOT STOOD, and that it weighs the same.
+//
+// The ladder the owner named is descending, and it was applied that way: each
+// root became ONE body of the first type in colossus > hive > slow > normal
+// whose own health fits inside the root's, carrying a `health` override equal
+// to the root. The table below is the whole substitution, and it is checked
+// against the LIVE schedule -- the group has to be there, at that `at`, at that
+// weight -- rather than against a total, because a total hides a swap.
+test("the bodies that replaced the tier ladder match it point for point",
+function (t) {
+  var h = harness.boot();
+  var Enemy = h.game.Enemy;
+
+  //  wave   at     type        HP   (the root it stands in for)
+  var STANDS_IN = [
+    [16,  1,    "normal",      1,    "T0"],
+    [16,  5,    "normal",      1,    "T0"],
+    [16,  9,    "normal",      1,    "T0"],
+    [16, 13,    "normal",      1,    "T0"],
+    [17,  4,    "normal",      4,    "T1"],
+    [17, 10.5,  "normal",      4,    "T1"],
+    [22, 11,    "slow",       16,    "T2"],
+    [25, 15,    "slow",       64,    "T3"],
+    [33, 15,    "hive",      256,    "T4"],
+    [35, 28,    "colossus", 1024,    "T5"]
+  ];
+
+  var ladder = ["colossus", "hive", "slow", "normal"];
+  STANDS_IN.forEach(function (row) {
+    // EASY_WAVES by name, not the active `WAVES`: this is a claim about the
+    // Easy campaign specifically, and Normal's ladder is deliberately intact.
+    var wave = h.game.EASY_WAVES[row[0] - 1];
+    var found = h.game.waveGroups(wave).filter(function (g) {
+      return g.at === row[1] && g.type === row[2] && g.health === row[3];
+    });
+    t.eq(found.length, 1, "wave " + row[0] + " sends one " + row[2] + " at " +
+      row[3] + " HP, " + row[1] + " s in, where the " + row[4] + " root stood");
+    t.eq(found[0].count, 1, "as a single body, the way the root was");
+    t.eq(found[0].tier, undefined, "and with no tier of its own");
+
+    // THE LADDER IS A PRIORITY, not a free choice: nothing earlier in the list
+    // would have fitted inside this body's health. That is the rule that made
+    // the mapping deterministic, and it is the half a later retune would break
+    // by reaching for a heavier body because it reads better.
+    ladder.slice(0, ladder.indexOf(row[2])).forEach(function (heavier) {
+      t.ok(Enemy.TYPES[heavier].health > row[3],
+        "a " + heavier + " would not fit inside " + row[3] + " HP");
+    });
+  });
+
+  // AND NOTHING ELSE MOVED. The six waves carry exactly the health they carried
+  // with the roots in them, which is what "matching the HP total" was asked
+  // for -- these are the authored figures from before the substitution.
+  var BEFORE = { 16: 406, 17: 383, 22: 652, 25: 784, 33: 1744, 35: 7444 };
+  Object.keys(BEFORE).forEach(function (n) {
+    var wave = h.game.EASY_WAVES[Number(n) - 1];
+    var hp = 0;
+    h.game.waveGroups(wave).forEach(function (g) {
+      hp += g.count * Enemy.healthOf(g.type, g.health, g.tier);
+    });
+    t.eq(hp, BEFORE[n], "wave " + n + " still authors " + BEFORE[n] + " points");
+  });
 });
 
 
@@ -1855,9 +1899,9 @@ test("a swing lands on camo caught in the zone, without detection", function (t)
 
   var dealt = runSwing(s, h);
 
-  t.eq(visible.health, 38, "the enemy it aimed at took the 12");
-  t.eq(camo.health, 38, "and so did the camo standing beside it");
-  t.eq(dealt, 24, "both are paid for -- damage landed is damage earned");
+  t.eq(visible.health, 36, "the enemy it aimed at took the 14");
+  t.eq(camo.health, 36, "and so did the camo standing beside it");
+  t.eq(dealt, 28, "both are paid for -- damage landed is damage earned");
 });
 
 // The other half, and the reason the schedule survives this change: a wave
@@ -2521,9 +2565,9 @@ test("a base smasher matches the agreed numbers", function (t) {
   var s = h.placeSmasher(600, 500);
 
   t.eq(h.game.Smasher.COST, 600, "cost");
-  t.eq(s.damage, 12, "damage");
-  t.eq(s.cooldownSeconds, 3.5, "hit speed");
-  t.eq(s.rangeUl, 37.5, "range");
+  t.eq(s.damage, 14, "damage");
+  t.eq(s.cooldownSeconds, 3.2, "hit speed");
+  t.eq(s.rangeUl, 40, "range");
   t.eq(s.arcDegrees, 120, "arc");
   t.eq(s.fullCircle, false, "not a full circle");
   t.eq(s.slow, null, "no slow");
@@ -2591,10 +2635,10 @@ test("one swing hits every enemy in the zone at once", function (t) {
   // The blow is a WIND-UP now: sighting starts it and damage resolves when the
   // hammer lands, `swingSeconds()` later. So the swing has to be run out.
   var dealt = runSwing(s, h);
-  t.eq(dealt, 36, "damage returned for three enemies at 12 each");
-  t.eq(a.health, 38, "first enemy hit");
-  t.eq(b.health, 38, "second enemy hit");
-  t.eq(c.health, 38, "third enemy hit");
+  t.eq(dealt, 42, "damage returned for three enemies at 14 each");
+  t.eq(a.health, 36, "first enemy hit");
+  t.eq(b.health, 36, "second enemy hit");
+  t.eq(c.health, 36, "third enemy hit");
   t.eq(out.health, 50, "the enemy out of reach was not touched");
 });
 
@@ -2644,10 +2688,10 @@ test("it holds its swing until something is in the zone", function (t) {
     "sighting starts the swing, it does not land on the same tick");
   t.ok(s.windup > 0, "the hammer is on its way");
   var dealt = runSwing(s, h);
-  t.eq(dealt, 12, "and lands when the swing finishes");
+  t.eq(dealt, 14, "and lands when the swing finishes");
   // The wind-up is taken out of the cooldown that follows, so the RATE is
   // unchanged: a full cycle is still cooldownSeconds.
-  t.near(s.cooldown, 3.5 - s.swingSeconds(), 0.001,
+  t.near(s.cooldown, 3.2 - s.swingSeconds(), 0.001,
     "the cooldown that follows is short by the swing");
 });
 
@@ -2680,16 +2724,16 @@ test("damage lands when the hammer does, not when the swing starts", function (t
     t.ok(e.health === 200, "no damage while the hammer is in the air");
     if (s.update(1 / 60, h.game.enemies, h.game.bullets)) break;
   }
-  t.eq(e.health, 188, "the first hit lands at the bottom of the swing");
+  t.eq(e.health, 186, "the first hit lands at the bottom of the swing");
 
   // And the next one waits out the cooldown, then winds up again.
   guard = 0;
   while (s.cooldown > 0 && guard++ < 1000) {
     s.update(1 / 60, h.game.enemies, h.game.bullets);
   }
-  t.eq(e.health, 188, "no damage during the cooldown");
+  t.eq(e.health, 186, "no damage during the cooldown");
   runSwing(s, h);
-  t.eq(e.health, 176, "the second blow lands after its own wind-up");
+  t.eq(e.health, 172, "the second blow lands after its own wind-up");
 });
 
 group("smasher: upgrades");
@@ -2702,9 +2746,9 @@ test("damage is additive across every owned upgrade", function (t) {
   ["A1", "A2", "A3", "A4", "A5"].forEach(function (id) {
     t.eq(h.run("buyUpgrade(towers[0], '" + id + "')"), null, "bought " + id);
   });
-  t.eq(s.damage, 61, "full path A: 12+4+5+9+13+18");
-  t.eq(s.rangeUl, 62.5, "range from the highest A owned");
-  t.eq(s.cooldownSeconds, 3.5, "path A does not change hit speed");
+  t.eq(s.damage, 65, "full path A: 14+5+6+9+13+18");
+  t.eq(s.rangeUl, 72.5, "A5's absolute 62.5, plus A1 and A2's +5 each");
+  t.eq(s.cooldownSeconds, 3.0, "A1 and A2 are the only hit speed on path A");
   t.eq(s.fullCircle, true, "full circle from A4");
   t.eq(s.slow, null, "path A has no slow");
 });
@@ -2717,13 +2761,13 @@ test("full path B with A1 and A2 totals 39", function (t) {
   ["A1", "A2", "B1", "B2", "B3", "B4", "B5"].forEach(function (id) {
     t.eq(h.run("buyUpgrade(towers[0], '" + id + "')"), null, "bought " + id);
   });
-  t.eq(s.damage, 39, "12+4+5+0+0+4+6+8");
-  t.eq(s.cooldownSeconds, 2.2, "fastest owned hit speed");
+  t.eq(s.damage, 45, "14+5+6+1+1+4+6+8");
+  t.eq(s.cooldownSeconds, 2.1, "fastest owned hit speed");
   // A2's absolute 43.75 wins the max, and path B's THREE additive bonuses
   // (B2 +15, B4 +10, B5 +15) are summed on top of it. This is the assertion
   // that would catch anyone folding rangeBonusUl back into the absolute
   // column: written as absolutes, B2's "+15" would have been worth 2.5 here.
-  t.eq(s.rangeUl, 83.75, "43.75 from A2, plus 40 of B bonuses");
+  t.eq(s.rangeUl, 103.75, "43.75 from A2, plus 60 of bonuses across both paths");
   t.eq(s.arcDegrees, 120, "still an arc");
   t.eq(s.slow.strength, 0.65, "strongest owned slow");
   t.eq(s.slow.seconds, 3.0, "its duration");
@@ -2738,11 +2782,11 @@ test("full path B with no A upgrades totals 30", function (t) {
   ["B1", "B2", "B3", "B4", "B5"].forEach(function (id) {
     h.run("buyUpgrade(towers[0], '" + id + "')");
   });
-  t.eq(s.damage, 30, "12+0+0+4+6+8");
+  t.eq(s.damage, 34, "14+1+1+4+6+8");
   // 2026-07-30: path B DOES extend range now -- B2 +15, B4 +10, B5 +15, all
   // additive on the 37.5 base. It used to grant none at all.
-  t.eq(s.rangeUl, 77.5, "37.5 + 15 (B2) + 10 (B4) + 15 (B5)");
-  t.eq(s.cooldownSeconds, 2.2, "hit speed");
+  t.eq(s.rangeUl, 90, "40 + 5 (B1) + 20 (B2) + 10 (B4) + 15 (B5)");
+  t.eq(s.cooldownSeconds, 2.1, "hit speed");
   t.eq(s.hasQuake, true, "and B5 grants the earthquake");
 });
 
@@ -2753,23 +2797,26 @@ test("path B's range bonuses land on the tiers that were asked for", function (t
   h.run("cash = 100000");
   var s = h.placeSmasher(600, 500);
 
-  t.eq(s.rangeUl, 37.5, "base");
+  t.eq(s.rangeUl, 40, "base");
   h.run("buyUpgrade(towers[0], 'B1')");
-  t.eq(s.rangeUl, 37.5, "B1 grants none");
+  t.eq(s.rangeUl, 45, "B1 grants +5 since 2026-08-27");
   h.run("buyUpgrade(towers[0], 'B2')");
-  t.eq(s.rangeUl, 52.5, "B2 grants +15");
+  t.eq(s.rangeUl, 65, "B2 grants +20, up from +15");
   h.run("buyUpgrade(towers[0], 'B3')");
-  t.eq(s.rangeUl, 52.5, "B3 grants none");
+  t.eq(s.rangeUl, 65, "B3 grants none");
   h.run("buyUpgrade(towers[0], 'B4')");
-  t.eq(s.rangeUl, 62.5, "B4 grants +10");
+  t.eq(s.rangeUl, 75, "B4 grants +10");
   t.eq(s.hasQuake, false, "and B4 does NOT grant the earthquake");
   h.run("buyUpgrade(towers[0], 'B5')");
-  t.eq(s.rangeUl, 77.5, "B5 grants +15");
+  t.eq(s.rangeUl, 90, "B5 grants +15");
 });
 
-// Path A is absolute and was NOT touched. This is the guard on the other side
-// of the two-column arrangement.
-test("path A's range is unchanged, absolute to the end", function (t) {
+// Path A's BACK HALF is absolute and was not touched. Its first two tiers
+// sell their reach through the additive column since 2026-08-27 -- an
+// absolute there could never win the max again once the base passed it, which
+// is how A1 came to sell no reach at all for a day. This is the guard on both
+// halves of the two-column arrangement.
+test("path A's reach is A5's absolute plus the two bonuses under it", function (t) {
   var h = harness.boot();
   h.run("cash = 100000");
   var s = h.placeSmasher(600, 500);
@@ -2777,7 +2824,7 @@ test("path A's range is unchanged, absolute to the end", function (t) {
   ["A1", "A2", "A3", "A4", "A5"].forEach(function (id) {
     h.run("buyUpgrade(towers[0], '" + id + "')");
   });
-  t.eq(s.rangeUl, 62.5, "A5's absolute 62.5, with nothing added to it");
+  t.eq(s.rangeUl, 72.5, "A5's absolute 62.5, plus A1 and A2's +5 each");
   t.eq(s.hasQuake, false, "and no earthquake on path A");
 });
 
@@ -2795,7 +2842,7 @@ test("stats are folded from flags, so the order they were set in cannot matter",
   t.eq(a.damage, b.damage, "same damage");
   t.eq(a.rangeUl, b.rangeUl, "same range");
   t.eq(a.cooldownSeconds, b.cooldownSeconds, "same hit speed");
-  t.eq(a.damage, 30, "12+4+5+9");
+  t.eq(a.damage, 34, "14+5+6+9");
 });
 
 test("upgrades must be bought in tier order", function (t) {
@@ -2845,34 +2892,37 @@ test("A1, A2, B1 and B2 can all be owned at once", function (t) {
     t.eq(h.run("buyUpgrade(towers[0], '" + id + "')"), null, id + " allowed");
   });
   t.eq(s.lockedBranch(), null, "none of them lock a branch");
-  t.eq(s.damage, 21, "12+4+5+0+0");
-  // A2's own 43.75 plus B2's +15 crosspath range bonus. B2 has granted range
-  // since the 2026-08-01 retune, so this is no longer "the range from A2"
-  // alone -- it is the whole point of holding both branches at once.
-  t.eq(s.rangeUl, 58.75, "43.75 from A2, plus B2's +15");
-  t.eq(s.cooldownSeconds, 2.2, "hit speed from B2");
+  t.eq(s.damage, 27, "14+5+6+1+1");
+  // A2's own 43.75 absolute, plus every bonus the four tiers carry: A1 +5,
+  // A2 +5, B1 +5 and B2 +20. Since 2026-08-27 all four grant reach, so this
+  // is no longer "A2's range plus B2's bonus" -- it is the whole crosspath,
+  // which is the point of holding both branches at once.
+  t.eq(s.rangeUl, 78.75, "43.75 from A2, plus 35 of bonuses");
+  t.eq(s.cooldownSeconds, 2.1, "hit speed from B2");
 });
 
 test("upgrades cost money and are refused when unaffordable", function (t) {
   var h = harness.boot();
-  // The purse is the smasher's price plus $250, so the tower leaves $250 behind
-  // and the A1/A2 affordability boundary is straddled: A1 at 200 is affordable,
-  // A2 at 350 is not. Was $400 while the smasher cost $200 and A1 cost $150.
+  // The purse leaves $300 behind after the tower, which straddles the A1/A2
+  // affordability boundary: A1 at 250 is affordable, A2 at 400 is not. It was
+  // $250 against a $200 A1 and a $350 A2 until the 2026-08-27 retune put $50
+  // on each of the first four tiers, and it is TAKEN OFF `Smasher.COST` rather
+  // than typed, so a reprice of the body moves it.
   //
-  // The remainder is 250 rather than exactly A1's price ON PURPOSE. Leaving
-  // exactly 200 would buy A1 down to zero, and "no cash taken for a refused
+  // The remainder is 300 rather than exactly A1's price ON PURPOSE. Leaving
+  // exactly 250 would buy A1 down to zero, and "no cash taken for a refused
   // upgrade" would then be checking that nothing moved a purse that was already
   // empty -- true whether or not the refusal is honest. A non-zero 50 is a
   // witness that can actually change.
-  h.run("cash = " + (700 + 250));
-  var s = h.placeSmasher(600, 500);      // leaves 250
-  t.eq(h.game.cash, 350, "cash after building");
+  h.run("cash = " + (h.game.Smasher.COST + 300));
+  var s = h.placeSmasher(600, 500);      // leaves 300
+  t.eq(h.game.cash, 300, "cash after building");
 
-  t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 affordable at 200");
-  t.eq(h.game.cash, 150, "cash after A1");
-  t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough cash", "A2 refused at 350");
+  t.eq(h.run("buyUpgrade(towers[0], 'A1')"), null, "A1 affordable at 250");
+  t.eq(h.game.cash, 50, "cash after A1");
+  t.eq(h.run("buyUpgrade(towers[0], 'A2')"), "not enough mana", "A2 refused at 400");
   t.eq(s.hasA2, false, "and not granted");
-  t.eq(h.game.cash, 150, "no cash taken for a refused upgrade");
+  t.eq(h.game.cash, 50, "no cash taken for a refused upgrade");
 
   t.eq(h.run("buyUpgrade(towers[0], 'A1')"), "already owned", "cannot buy twice");
   t.eq(h.run("buyUpgrade(towers[0], 'Z9')"), "no such upgrade", "unknown id");
@@ -2894,9 +2944,9 @@ test("selling refunds half of everything invested, upgrades included", function 
 
   h.run("buyUpgrade(towers[0], 'A1')");
   // A1 is $200 since the 2026-08-01 retune, so the investment is 600 + 200.
-  t.eq(s.totalSpent, 800, "600 + 200 invested");
+  t.eq(s.totalSpent, 850, "600 + 250 invested");
   t.eq(s.cost, 600, "and the build price itself never moved");
-  t.eq(h.run("sellValue(towers[0])"), 400, "half of everything invested");
+  t.eq(h.run("sellValue(towers[0])"), 425, "half of everything invested");
 });
 
 group("smasher: slow");
@@ -3007,7 +3057,7 @@ test("a smasher with no B upgrades applies no slow", function (t) {
   var e = h.spawnAt(SMASH_AT, 100);
 
   runSwing(s, h);
-  t.eq(e.health, 88, "it was hit");
+  t.eq(e.health, 86, "it was hit");
   t.eq(e.slowTimer, 0, "but not slowed");
 });
 
@@ -3033,10 +3083,10 @@ test("the blast lands on top of the swing", function (t) {
   h.run("cash = 100000");
   var s = placeSmasherBeside(h, SMASH_AT);
   ["B1", "B2", "B3", "B4"].forEach(function (id) { h.run("buyUpgrade(towers[0], '" + id + "')"); });
-  t.eq(s.damage, 22, "12+4+6");
+  t.eq(s.damage, 26, "14+1+1+4+6");
   h.run("enemies = []");
 
-  var victim = spawnOnLine(h, IN_ZONE, 22);      // dies to one swing
+  var victim = spawnOnLine(h, IN_ZONE, 26);      // dies to one swing
   var bystander = spawnOnLine(h, IN_BLAST, 50);  // in the zone AND in the blast
 
   t.ok(s.covers(bystander), "the bystander is inside a B4 wedge now");
@@ -3045,8 +3095,8 @@ test("the blast lands on top of the swing", function (t) {
   var dealt = runSwing(s, h);
 
   t.eq(victim.dead, true, "victim killed");
-  t.eq(bystander.health, 13, "50 - 22 from the swing - 15 from the blast");
-  t.eq(dealt, 59, "22 + 22 from the swing, plus 15 from the blast");
+  t.eq(bystander.health, 9, "50 - 26 from the swing - 15 from the blast");
+  t.eq(dealt, 67, "26 + 26 from the swing, plus 15 from the blast");
 });
 
 // 2026-07-30: **this used to assert the opposite**, and the owner reversed it
@@ -3074,7 +3124,7 @@ test("the blast slows what it damages", function (t) {
   // is asserted directly now: a body whose only blast-shaped hit is exactly
   // EXPLOSION_DAMAGE comes out slowed. It no longer depends on the swing
   // having missed, which was never the claim.
-  var victim = spawnOnLine(h, CHAIN_1, 22);
+  var victim = spawnOnLine(h, CHAIN_1, 26);
   var link1 = spawnOnLine(h, CHAIN_2, 30);
   var link2 = spawnOnLine(h, CHAIN_3, 30);
   var survivor = spawnOnLine(h, CHAIN_4, 500);   // deep enough to survive anything here
@@ -3112,7 +3162,7 @@ test("a kill on the very first swing still bursts", function (t) {
   ["B1", "B2", "B3", "B4"].forEach(function (id) { h.run("buyUpgrade(towers[0], '" + id + "')"); });
   h.run("enemies = []");
 
-  var victim = spawnOnLine(h, IN_ZONE, 22);      // dies to one swing
+  var victim = spawnOnLine(h, IN_ZONE, 26);      // dies to one swing
   var bystander = spawnOnLine(h, IN_BLAST, 50);
 
   t.eq(victim.slowTimer, 0, "the victim has never been slowed by anything");
@@ -3121,8 +3171,8 @@ test("a kill on the very first swing still bursts", function (t) {
 
   t.eq(victim.dead, true, "victim killed outright");
   t.eq(s.blasts.length, 1, "and it burst anyway");
-  t.eq(bystander.health, 13, "50 - 22 from the swing - 15 from the blast");
-  t.eq(dealt, 59, "22 + 22 from the swing, plus 15 from the blast");
+  t.eq(bystander.health, 9, "50 - 26 from the swing - 15 from the blast");
+  t.eq(dealt, 67, "26 + 26 from the swing, plus 15 from the blast");
 });
 
 test("without B4 a slowed kill does not burst", function (t) {
@@ -3132,13 +3182,13 @@ test("without B4 a slowed kill does not burst", function (t) {
   ["B1", "B2", "B3"].forEach(function (id) { h.run("buyUpgrade(towers[0], '" + id + "')"); });
   h.run("enemies = []");
 
-  var victim = spawnOnLine(h, IN_ZONE, 16);
+  var victim = spawnOnLine(h, IN_ZONE, 20);
   var bystander = spawnOnLine(h, IN_BLAST, 50);
   victim.applySlow(0.15, 2.0);
 
   runSwing(s, h);
   t.eq(victim.dead, true, "victim killed");
-  t.eq(bystander.health, 34, "the swing's 16 and no blast without B4");
+  t.eq(bystander.health, 30, "the swing's 20 and no blast without B4");
 });
 
 // 2026-07-30, the owner's words: "if another enemy dies to the blast, that
@@ -3164,10 +3214,10 @@ function (t) {
   // blast, that enemy also explodes" -- is asserted directly instead: a body
   // whose ONLY damage is a blast dies, and its own blast is what kills the
   // next one. That is the chain, and it does not care where the wedge points.
-  var victim = spawnOnLine(h, CHAIN_1, 22);
+  var victim = spawnOnLine(h, CHAIN_1, 26);
   var link1 = spawnOnLine(h, CHAIN_2, 30);
   var link2 = spawnOnLine(h, CHAIN_3, 30);
-  // THIRTY HIT POINTS EACH, and that number is the proof. The swing deals 22,
+  // THIRTY HIT POINTS EACH, and that number is the proof. The swing deals 26,
   // so it CANNOT kill them on its own; only a blast on top of it can. They used
   // to carry 10 and be placed outside the wedge, which proved the same thing by
   // geometry -- and geometry stopped being available (see above).
@@ -3190,7 +3240,7 @@ function (t) {
 
   // THE POINT: each of the last two took at least one blast, and the damage
   // that was NOT blast damage could not have killed it. 30 hit points against
-  // a 22-point swing leaves 8 -- so whatever finished them, it was a blast, and
+  // a 26-point swing leaves 4 -- so whatever finished them, it was a blast, and
   // link 4 can only have been reached by link 3's.
   chainOnly.forEach(function (e, i) {
     var hits = log.on(e);
@@ -3424,8 +3474,8 @@ test("an upgrade preview shows the DPS it would buy", function (t) {
   var a1 = s.previewUpgrade("A1").changes
     .filter(function (c) { return c.label === "DPS"; })[0];
   t.ok(a1, "A1 has a DPS row");
-  t.eq(a1.from + " → " + a1.to, "3.4 → 4.6", "damage up, rate flat");
-  t.eq(a1.delta, "+1.14", "the gain");
+  t.eq(a1.from + " → " + a1.to, "4.4 → 6.1", "damage and rate both up");
+  t.eq(a1.delta, "+1.75", "the gain");
 
   // B1 buys the same DPS from the other side -- same 12 damage, swung every
   // 3 s instead of 4. Two upgrades that read completely differently on the
@@ -3433,14 +3483,14 @@ test("an upgrade preview shows the DPS it would buy", function (t) {
   // place that is visible.
   var b1 = s.previewUpgrade("B1").changes
     .filter(function (c) { return c.label === "DPS"; })[0];
-  t.eq(b1.from + " → " + b1.to, "3.4 → 4.0", "rate up, damage flat");
+  t.eq(b1.from + " → " + b1.to, "4.4 → 5.2", "rate up, and a point of damage");
 
   // And it is measured, not read off the table: after A1 the same B1 is worth
   // more, because it is now speeding up a heavier hammer.
   h.run("buyUpgrade(towers[0], 'A1')");
   var after = s.previewUpgrade("B1").changes
     .filter(function (c) { return c.label === "DPS"; })[0];
-  t.eq(after.from + " → " + after.to, "4.6 → 5.3", "crosspathing included");
+  t.eq(after.from + " → " + after.to, "6.1 → 6.9", "crosspathing included");
 });
 
 test("the panel offers the next tier on each branch, with its price", function (t) {
@@ -3458,14 +3508,14 @@ test("the panel offers the next tier on each branch, with its price", function (
   // prints -- reading them back from Smasher.UPGRADES would assert only that
   // the panel echoes the table it was built from.
   t.eq(buttons[0].label, "Path A → A1", "branch A offers A1");
-  t.eq(buttons[0].detail, "$200", "with its price");
+  t.eq(buttons[0].detail, "250 mana", "with its price");
   t.eq(buttons[1].label, "Path B → B1", "branch B offers B1");
-  t.eq(buttons[1].detail, "$200", "with its price");
+  t.eq(buttons[1].detail, "250 mana", "with its price");
 
   h.run("buyUpgrade(inspected, 'A1')");
   buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[0].label, "Path A → A2", "branch A moves on to A2");
-  t.eq(buttons[0].detail, "$350", "at the next tier's price");
+  t.eq(buttons[0].detail, "400 mana", "at the next tier's price");
   t.eq(buttons[1].label, "Path B → B1", "branch B is unaffected");
 });
 
@@ -3481,8 +3531,8 @@ test("clicking a branch button buys that upgrade", function (t) {
   h.click(b.x + b.w / 2, b.y + b.h / 2);
 
   t.eq(s.hasA1, true, "A1 bought");
-  t.eq(h.game.cash, 600, "800 - 200");
-  t.eq(s.damage, 16, "stats recalculated");
+  t.eq(h.game.cash, 550, "800 - 250");
+  t.eq(s.damage, 19, "stats recalculated");
   t.eq(h.game.towers.length, 1, "the click did not place or sell anything");
 });
 
@@ -3496,7 +3546,7 @@ test("buttons walk a whole branch, then that branch reads MAXED", function (t) {
     var b = h.run("inspectionLayout(inspected).upgrades[0]");
     h.click(b.x + b.w / 2, b.y + b.h / 2);
   }
-  t.eq(s.damage, 61, "full path A bought through the panel");
+  t.eq(s.damage, 65, "full path A bought through the panel");
   t.eq(s.ownedUpgradeIds().join(""), "A1A2A3A4A5", "in tier order");
 
   // A is finished. Its button stays, greyed, reading MAXED -- it does not
@@ -3519,8 +3569,8 @@ test("buttons walk a whole branch, then that branch reads MAXED", function (t) {
   t.eq(buttons.length, 2, "still two");
   t.eq(buttons[1].id, "B3", "B3 shown, shut out by path A");
   t.eq(buttons[1].enabled, false, "greyed, not live");
-  t.eq(s.damage, 61, "B1 and B2 add no damage");
-  t.eq(s.cooldownSeconds, 2.2, "but they do speed it up");
+  t.eq(s.damage, 67, "B1 and B2 add a point each since 2026-08-27");
+  t.eq(s.cooldownSeconds, 2.1, "and they speed it up");
 });
 
 test("a fully maxed tower shows MAXED on both branches", function (t) {
@@ -3552,12 +3602,12 @@ test("the B button keeps offering B1 and B2 after committing to path A", functio
   h.run("buyUpgrade(inspected, 'A3')");
   var buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[1].label, "Path B → B1", "B1 still available");
-  t.eq(buttons[1].detail, "$200", "at its price");
+  t.eq(buttons[1].detail, "250 mana", "at its price");
 
   h.run("buyUpgrade(inspected, 'B1')");
   buttons = h.run("inspectionLayout(inspected).upgrades");
   t.eq(buttons[1].label, "Path B → B2", "then B2");
-  t.eq(buttons[1].detail, "$400", "at its price");
+  t.eq(buttons[1].detail, "450 mana", "at its price");
 });
 
 test("the locked-out branch is greyed, not removed, and says why", function (t) {
@@ -3615,15 +3665,16 @@ test("each button spells out what the upgrade does", function (t) {
   // carries an HP clause it did not used to. That is the retune showing up in
   // the panel, not the panel changing how it spells things.
   t.eq(buttons[0].label, "Path A → A1", "which tier");
-  t.eq(buttons[0].detail, "$200", "what it costs");
-  t.eq(buttons[0].effects, "+4 dmg, +30 HP",
-    "A1 effects -- no range line since 2026-08-26: the base IS its 37.5");
+  t.eq(buttons[0].detail, "250 mana", "what it costs");
+  t.eq(buttons[0].effects, "+5 dmg, +5 u.l. range, +0.01 atk/s, +30 HP",
+    "A1 sells a little of all three since 2026-08-27, and its range through "
+    + "the additive column so a base rise cannot swallow it again");
 
   // Spelled by the SAME formatter the config-driven towers use, in the same
   // unit every tower's panel now reports its rate in. It used to read "-1.0 s"
   // -- a different quantity, in a different direction, under a different name.
   // B1 still moves nothing but the swing rate, and now the hit points.
-  t.eq(buttons[1].effects, "+0.05 atk/s, +35 HP",
+  t.eq(buttons[1].effects, "+1 dmg, +5 u.l. range, +0.03 atk/s, +35 HP",
     "B1 changes attack speed and HP -- +0.05 now the base cooldown is 3.5, not 4.0");
 
   ["A1", "A2"].forEach(function (id) { h.run("buyUpgrade(inspected, '" + id + "')"); });
@@ -3637,22 +3688,22 @@ test("effects are diffed against this tower, not read off the table", function (
   var s = h.placeSmasher(600, 500);
   h.click(600, 500);
 
-  // B2 sets the swing to an absolute 2.2 s. Reached from B1's 3.0 s that is
-  // 0.33/s -> 0.45/s, not the gain from the 4.0 s base it would look like off
+  // B2 sets the swing to an absolute 2.1 s. Reached from B1's 2.9 s that is
+  // 0.34/s -> 0.48/s, not the gain from the 3.2 s base it would look like off
   // the table.
   h.run("buyUpgrade(inspected, 'B1')");
-  t.eq(s.cooldownSeconds, 3.0, "B1 applied");
+  t.eq(s.cooldownSeconds, 2.9, "B1 applied");
 
   var buttons = h.run("inspectionLayout(inspected).upgrades");
   var bButton = buttons.filter(function (b) { return b.branch === "B"; })[0];
   t.eq(bButton.id, "B2", "B2 is next");
-  // The atk/s clause is what this test is really about: +0.12 is 0.33/s -> 0.45/s
-  // measured from B1's 3.0 s, where reading the table against the 4.0 s base
-  // would have said +0.20. The range and HP clauses ride along because B2 grants
-  // both since the retune; they are listed here so the string is the whole
-  // string rather than a prefix that would pass while hiding a fourth clause.
-  t.eq(bButton.effects, "+15 u.l. range, +0.12 atk/s, +55 HP",
-    "measured from 3.0 s, not from the 4.0 s base");
+  // The atk/s clause is what this test is really about: +0.13 is 0.34/s -> 0.48/s
+  // measured from B1's 2.9 s, where reading the table against the 3.2 s base
+  // would have said +0.16. The other three clauses ride along because B2 grants
+  // all of them since the 2026-08-27 retune; they are listed here so the string
+  // is the whole string rather than a prefix that would pass while hiding one.
+  t.eq(bButton.effects, "+1 dmg, +20 u.l. range, +0.13 atk/s, +55 HP",
+    "measured from 2.9 s, not from the 3.2 s base");
 });
 
 test("every smasher tier describes itself before it is bought", function (t) {
@@ -3678,7 +3729,7 @@ test("every smasher tier describes itself before it is bought", function (t) {
       t.eq(button.id, branch + tier, branch + tier + " is on offer");
       t.ok(button.effects.length > 0,
         branch + tier + " says what it does: " + button.effects);
-      t.ok(button.detail.indexOf("$") === 0,
+      t.ok(/^\d+ mana$/.test(button.detail),
         branch + tier + " says what it costs: " + button.detail);
       seen.push(button.effects);
 
@@ -3723,24 +3774,24 @@ test("hovering a button opens a card with the whole story", function (t) {
   h.move(button.x + button.w / 2, button.y + button.h / 2);
 
   var card = h.run("hoveredCard(inspectionLayout(inspected)).model");
-  t.eq(card.subtitle, "$200", "what it costs");
+  t.eq(card.subtitle, "250 mana", "what it costs");
 
   var byLabel = {};
   card.changes.forEach(function (c) { byLabel[c.label] = c; });
 
   // The button only had room for "+4 dmg". The card says what the number
   // BECOMES, which is the question a player actually has.
-  t.eq(byLabel.Damage.from, "12", "damage before");
-  t.eq(byLabel.Damage.to, "16", "damage after");
-  t.eq(byLabel.Damage.delta, "+4", "and the delta");
+  t.eq(byLabel.Damage.from, "14", "damage before");
+  t.eq(byLabel.Damage.to, "19", "damage after");
+  t.eq(byLabel.Damage.delta, "+5", "and the delta");
 
-  // NO RANGE ROW SINCE 2026-08-26, and its absence is the assertion. A1 grants
-  // `rangeUl: 37.50` and the base range was raised to exactly that, so under
-  // the longest-value-wins rule A1 no longer moves the range at all -- and the
-  // card is right to say nothing rather than to print "37.5 -> 37.5". This
-  // used to read `byLabel.Range.to === "37.5 u.l."`, which is now a TypeError
-  // rather than a failure, so it is written as a presence check.
-  t.eq(byLabel.Range, undefined, "and no range row, because A1 no longer moves it");
+  // THE RANGE ROW IS BACK, 2026-08-27, and its return is the assertion. A1 had
+  // no range line for a day: it granted an absolute `rangeUl: 37.50` and the
+  // base was raised to exactly that, so under the longest-value-wins rule the
+  // tier moved nothing and the card was right to say nothing. Its five units
+  // are an ADDITIVE bonus now, which no base rise can swallow, so the card has
+  // something true to print again: 40 -> 45.
+  t.eq(byLabel.Range.to, "45 u.l.", "and the range row is back, additive now");
 });
 
 test("the card measures against this tower, and names the abilities it grants", function (t) {
@@ -3839,9 +3890,10 @@ test("an unaffordable button is shown dead and cannot be clicked through", funct
 
   var b = h.run("inspectionLayout(inspected).upgrades[0]");
   t.eq(b.label, "Path A → A1", "still shows what it would buy");
-  t.eq(b.detail, "$200", "and what that would cost");
-  t.eq(b.effects, "+4 dmg, +30 HP", "and what it would do");
-  t.eq(b.enabled, false, "but is not live at $60");
+  t.eq(b.detail, "250 mana", "and what that would cost");
+  t.eq(b.effects, "+5 dmg, +5 u.l. range, +0.01 atk/s, +30 HP",
+    "and what it would do");
+  t.eq(b.enabled, false, "but is not live at 60 mana");
 
   h.click(b.x + b.w / 2, b.y + b.h / 2);
   t.eq(s.hasA1, false, "clicking it bought nothing");
@@ -3884,7 +3936,7 @@ test("the sell button still works with the upgrade row present", function (t) {
   h.run("buyUpgrade(inspected, 'A1')");
 
   var refund = h.run("sellValue(inspected)");
-  t.eq(refund, 400, "half of 600 + 200");
+  t.eq(refund, 425, "half of 600 + 250");
 
   var b = h.run("inspectionLayout(inspected).sell");
   var before = h.game.cash;
@@ -3944,10 +3996,10 @@ test("a smasher counts every enemy in the swing, killed or not", function (t) {
 
   h.spawnAt(SMASH_AT - 10, 50);          // survives
   h.spawnAt(SMASH_AT, 50);               // survives
-  h.spawnAt(SMASH_AT + 10, 12);          // dies exactly
+  h.spawnAt(SMASH_AT + 10, 14);          // dies exactly
 
   runSwing(s, h);
-  t.eq(s.damageDealt, 36, "12 to each of three enemies");
+  t.eq(s.damageDealt, 42, "14 to each of three enemies");
   t.eq(s.kills, 1, "only one died");
 });
 
@@ -4073,15 +4125,15 @@ test("it still sells, inspects and draws when fully upgraded", function (t) {
   function row(name) {
     return rows.filter(function (r) { return r[0] === name; })[0][1];
   }
-  t.eq(row("Damage"), "39", "damage row");
-  // 83.75 = A2's 43.75 plus the range B2, B4 and B5 each grant (+15, +10, +15)
-  // since the 2026-08-01 retune. This build holds A1-A2 and all of B, so it
-  // collects every one of them.
-  t.eq(row("Range"), "83.75 u.l.", "range is in u.l., not the 'm' it used to print");
-  t.eq(row("Attack speed"), "0.45/s", "and the swing rate is attacks per second");
+  t.eq(row("Damage"), "45", "damage row");
+  // 103.75 = A2's 43.75 absolute plus every additive grant this build holds:
+  // A1 +5, A2 +5, B1 +5, B2 +20, B4 +10, B5 +15. It is the whole crosspath, and
+  // the widest reach the tower has.
+  t.eq(row("Range"), "103.75 u.l.", "range is in u.l., not the 'm' it used to print");
+  t.eq(row("Attack speed"), "0.48/s", "and the swing rate is attacks per second");
   t.eq(row("On kill"), "15 in 18.75 u.l., chains", "the blast radius too");
   t.eq(rows[rows.length - 1][0], "DPS", "DPS is the last row");
-  t.near(parseFloat(rows[rows.length - 1][1]), 39 / 2.2, 0.05, "DPS derived");
+  t.near(parseFloat(rows[rows.length - 1][1]), 45 / 2.1, 0.05, "DPS derived");
 
   h.step(2);
   h.draw();
@@ -4820,12 +4872,14 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   // mixed wave shows up in every list it belongs to. They no longer TILE the
   // schedule (that only held while a wave named one type).
   //
-  // **AND THEY COVER THE WHOLE ROSTER AGAIN since 2026-07-30.** For one
-  // version they did not: v0.4.9 added four types that were deliberately kept
-  // out of the schedule, plus the imported Aether Wisp, so the owner could try
-  // them in the index and the sandbox before anything was built around them.
-  // All five are now scheduled (waves 24 through 35), so the original
-  // assertion is back -- a type nobody ever meets is not content.
+  // **THEY COVER THE ROSTER EXCEPT FOR WHAT IS DELIBERATELY PARKED.** For one
+  // version they covered all of it: v0.4.9 added four types kept out of the
+  // schedule, plus the imported Aether Wisp, and all five were scheduled by
+  // 2026-07-30. On 2026-08-29 the Fractal Slime went the other way -- off the
+  // campaign at the owner's instruction, kept in the index and the sandbox --
+  // so the exemption is asserted BY NAME against the type's own `sandboxOnly`
+  // flag rather than as a hole in the list. A type that is neither scheduled
+  // nor flagged is still a failure, which is the rule that was always meant.
   var seen = {};
   var unscheduled = [];
   enemies.forEach(function (e) {
@@ -4889,9 +4943,11 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   var colossus = enemies.filter(function (e) { return e.id === "colossus"; })[0];
   t.eq(colossus.health, 550, "the new tank's HP reaches the guide");
   t.eq(colossus.bounty, 250, "with its authored bounty");
-  t.deep(colossus.waves, [25, 29, 36, 37, 38, 39],
+  t.deep(colossus.waves, [25, 29, 35, 36, 37, 38, 39],
     "and its campaign appearances, both schedules");
-  t.deep(appearanceOf(colossus, "easy"), [29], "Easy sends one, in wave 29");
+  // TWO ON EASY SINCE 2026-08-29: 35's is the body that replaced the T5
+  // Fractal Slime root, at the 1024 points the root had.
+  t.deep(appearanceOf(colossus, "easy"), [29, 35], "Easy sends two, in 29 and 35");
   t.deep(appearanceOf(colossus, "normal"), [25, 29, 36, 37, 38, 39],
     "Normal sends one in 25, two in 29, and then 2/4/6/8 across act VI");
 
@@ -4906,8 +4962,13 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   t.eq(fractal.maxTier, 5, "the guide derives the highest campaign tier");
   t.eq(fractal.maxHp, 1024, "and derives that T5's 1024 HP");
   t.eq(fractal.fractal.splitCount, 4, "the split block reaches the guide");
-  t.deep(appearanceOf(fractal, "easy"), [16, 17, 22, 25, 33, 35],
-    "with one wave per rung of Easy's ladder, in ascending order");
+  // EASY SENDS NONE SINCE 2026-08-29, at the owner's instruction, and Normal is
+  // untouched -- "from easy mode" was the whole scope of it. This pair is
+  // exactly why the guide keeps its wave lists per difficulty rather than
+  // merging them: a card printing one union would send an Easy player looking
+  // for a body that is not on their road.
+  t.deep(appearanceOf(fractal, "easy"), [],
+    "Easy sends no rung of the ladder at all");
   t.deep(appearanceOf(fractal, "normal"), [17, 27, 32, 35],
     "and Normal's four rungs, which open at T2 rather than at T0");
 
@@ -7163,7 +7224,7 @@ test("adding the Soldier moved nothing on the towers that already existed", func
   t.eq(h.game.Tower.BASE_HP, 60, "gunner hit points");
   t.eq(h.game.Tower.BASE_RANGE_UL, 100, "gunner range");
   t.eq(h.game.Smasher.COST, 600, "smasher cost");
-  t.eq(h.game.Smasher.BASE_DAMAGE, 12, "smasher damage");
+  t.eq(h.game.Smasher.BASE_DAMAGE, 14, "smasher damage");
 
   // A gunner's bullet carries no pierce, so it mitigates exactly as it always
   // did -- the new argument defaults to nothing at every existing call site.

@@ -246,7 +246,11 @@ check("every tower type is in the build bar",
   // so a tower added to the game has to be added there too or the workbench
   // stops being a truthful preview of it -- which is exactly what this line is
   // for.
-  sandbox.BUILD_SLOTS[4] === sandbox.BlubTower,
+  sandbox.BUILD_SLOTS[4] === sandbox.BlubTower &&
+  // The Farm took a SIXTH slot on 2026-08-27, and only here: the shipping bar
+  // is still five and the armoury decides which five of the owned types fill
+  // it. A workbench has no coins, so it shows every type there is.
+  sandbox.BUILD_SLOTS[5] === sandbox.FarmTower,
   "slots = " + sandbox.BUILD_SLOTS.map(function (s) { return s && s.DISPLAY_NAME; }).join(", "));
 
 // --- the extended speed ladder ---------------------------------------------
@@ -760,9 +764,17 @@ check("crosspath lock still caps B at 2 after A3+",
   upgradeTarget.core.purchased.B === 2,
   "B = " + upgradeTarget.core.purchased.B);
 
+// A row is a label and a value. Since 2026-08-29 a row MAY carry a third
+// element, `true`, marking it as a lifetime total so the armoury and the index
+// can drop a specimen's history by identity rather than by counting rows off
+// the front -- see TowerStats.total. Nothing that draws a row reads past [1],
+// which is what this still pins.
 check("statLines renders for an upgraded tower",
   upgradeTarget.statLines().length > 0 &&
-  upgradeTarget.statLines().every(function (r) { return r.length === 2; }));
+  upgradeTarget.statLines().every(function (r) {
+    return (r.length === 2 || (r.length === 3 && r[2] === true)) &&
+      typeof r[0] === "string";
+  }));
 
 // --- the on-canvas panel buttons -------------------------------------------
 
@@ -776,8 +788,8 @@ check("the panel shows two upgrade rectangles and no ability yet",
   "actions = " + layout.actions.map(function (s) { return s.action.id; }).join(", "));
 
 check("upgrade buttons quote the config's prices",
-  layout.actions[0].action.detail === "$" + panelTower.core.config.paths.A[0].cost &&
-  layout.actions[1].action.detail === "$" + panelTower.core.config.paths.B[0].cost,
+  layout.actions[0].action.detail === panelTower.core.config.paths.A[0].cost + " mana" &&
+  layout.actions[1].action.detail === panelTower.core.config.paths.B[0].cost + " mana",
   layout.actions[0].action.detail + " / " + layout.actions[1].action.detail);
 
 // --- what an upgrade DOES, before it is bought ------------------------------
@@ -853,7 +865,7 @@ check("hovering an upgrade button produces a card", !!hovered,
   hovered ? hovered.model.title : "nothing under the cursor");
 check("it names the tier and the price",
   hovered.model.title.indexOf("path A tier 1") !== -1 &&
-  hovered.model.subtitle === "$" + panelTower.core.config.paths.A[0].cost,
+  hovered.model.subtitle === panelTower.core.config.paths.A[0].cost + " mana",
   hovered.model.title + "  /  " + hovered.model.subtitle);
 check("it shows what every changed stat becomes, not just the delta",
   hovered.model.changes.length >= 3 &&
@@ -1245,13 +1257,13 @@ var fraction = charger.charge.progressFraction();
 check("the charge bar's fraction is in range", fraction >= 0 && fraction <= 1,
   "progressFraction = " + fraction.toFixed(3));
 
-// Every gold figure now reports cash the A3 ability actually generated.
-check("bonus gold and generated gold are the same paid amount",
+// Every mana figure now reports what the A3 ability actually generated.
+check("bonus mana and generated mana are the same paid amount",
   charger.bonusGold > 0 &&
     Math.abs(charger.bonusGold - charger.goldGenerated) < 0.001,
   "bonus " + charger.bonusGold.toFixed(2));
 
-var bonusRow = charger.statLines().filter(function (r) { return r[0] === "Bonus gold"; });
+var bonusRow = charger.statLines().filter(function (r) { return r[0] === "Bonus mana"; });
 check("the panel row is labelled as the bonus", bonusRow.length === 1,
   charger.statLines().map(function (r) { return r[0]; }).join(", "));
 

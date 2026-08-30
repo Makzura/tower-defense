@@ -39,7 +39,7 @@ TowerConfigs.longRangeDPS = {
   // Derived, not guessed: tools/price-upgrades.js models each tier's
   // effective DPS (sustained fire rate through reload, average crit, average
   // execute over an enemy's life, pierce with falloff at a discount) and
-  // prices the gain at the gunner's rate of $15 per DPS, plus a mild premium
+  // prices the gain at the gunner's rate of 15 mana per DPS, plus a mild premium
   // for deeper tiers. Run that script to regenerate or to argue with the
   // assumptions; the numbers below are its output.
   //
@@ -61,7 +61,7 @@ TowerConfigs.longRangeDPS = {
   // that is wanted is an open question for the owner, not a settled design.
   //
   // The pricing MODEL, though, is now off its peg: the tiers above are priced at
-  // "the gunner's rate of $15 per DPS", and the gunner costs $100 for its 1 DPS
+  // "the gunner's rate of 15 mana per DPS", and the gunner costs 100 for its 1 DPS
   // since the revamp. So upgrades are cheap relative to the towers they sit on
   // by a factor of about six. Upgrade prices were deliberately not touched on
   // 2026-07-30; re-running tools/price-upgrades.js against a $100/DPS gunner is

@@ -510,7 +510,15 @@ var BASELINE = [
     //
     // "the pause button is dead while a run is over" now reads `frozen` rather
     // than `paused` and still checks both, which is why it moves no count.
-    file: "tests/run.js", pass: 232, fail: 0,
+    // ---- 233 on 2026-08-29, merging the Farm and Fractal Slime work ------
+    // 232 -> 233: ONE added and none removed. The stat-rows test gained a
+    // second assertion group (a specimen of the same tower, showing everything
+    // except its two lifetime totals) when TowerStats grew a total MARK, which
+    // is what let the armoury and the index stop slicing rows off the front.
+    // Nothing here moved for the Fractal Slime: the composition gate, the
+    // spine, the roster rule, the wave-35 landmarks, the summary and the purse
+    // were all EDITED rather than added to, name for name.
+    file: "tests/run.js", pass: 233, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
@@ -853,7 +861,20 @@ var BASELINE = [
     // TWO ASSERTIONS MOVED, both the feature: the Volatile's `sizeScale` is
     // 0.6 where it was 0.9, and the four dive tests drive the wind-up through
     // the new `dive` helper instead of asserting that one step is enough.
-    file: "tests/content.test.js", pass: 326, fail: 0,
+    //
+    // ---- 303 on 2026-08-29, merging the Farm and Fractal Slime work ------
+    // 302 -> 303: the test that pinned Easy's six-rung fractal ladder INTO the
+    // schedule became two, since taking the ladder off left two separate
+    // claims -- that the ladder is still intact as a mechanic (and still spent
+    // by Normal, which was not touched), and that the ten bodies that replaced
+    // it stand where each root stood at the weight each root had.
+    //
+    // ---- 327 on 2026-08-30, merging the textured path into the Farm ----
+    // Both sides above branched from 302 and neither removed a test, so the
+    // union is 302 + 24 + 1. The two sets do not overlap: the 24 are the
+    // salvo, the slam, the two clocks, the discharge, the leap and the
+    // threat rings; the 1 is Easy's fractal ladder claim splitting in two.
+    file: "tests/content.test.js", pass: 327, fail: 0,
     failing: []
   },
   {
@@ -877,6 +898,57 @@ var BASELINE = [
   // disturb -- reach, gate, price and global uniqueness.
   { file: "tests/beam.test.js", pass: 47, fail: 0, failing: [] },
   { file: "tests/blub.test.js", pass: 53, fail: 0, failing: [] },
+  // 32 on 2026-08-27, the day the Farm landed. A new suite rather than rows
+  // in an existing one, for the reason blub.test.js is one: an acceptance
+  // list is a document, and one file per tower keeps it readable beside the
+  // brief it came from. The dice are SCRIPTED here -- the network takes a die
+  // through `Farms.setDie` -- so every one of the sixty-two faces across the
+  // three tables is asserted individually rather than sampled.
+  // 35 -> 44 on 2026-08-28: the nine lifetime-total tests (mana produced and
+  // base HP produced, on every door that makes either -- the wave, the tick,
+  // the stock, the clone, a kill in the field, and the C network's split
+  // payout) plus the popup that says a farm paid.
+  // 44 -> 48 on 2026-08-28: A3 adding its tick instead of replacing the
+  // per-wave figure (plus the panel row that shows both), and the Collect
+  // button that takes the stock out on demand -- refused, offered, dead on an
+  // empty stock, and paid through the real action door.
+  // 48 -> 55 on 2026-08-28: the investment became AIMED and once-only, so the
+  // two old invest tests were replaced by seven -- the target is mandatory, a
+  // tower takes one permanent boost ever, only a tier 5 non-farm qualifies, the
+  // bonus moves damage/speed/range and nothing else, a surge is re-pressable
+  // and dies with its farm, permanent and surge add rather than compound, and
+  // the button arms a mode that the next click on a tower spends.
+  // 55 -> 58: the clone announcing itself, a farm's share of a kill being its
+  // own popup rather than a bigger bounty, and the mark on a body a farm will
+  // be paid for while it is still alive.
+  // 58 -> 60: the field and the per-kill bounty stopping at a sight blocker,
+  // asked of the real Ironwood stump, and a farm standing on one seeing over it.
+  // 60 -> 63: C5's price and its refund of nothing, its 400 a wave, and the
+  // button and card that warn the price is sunk. Its ten retuned faces are
+  // re-pinned inside the tests that already walked the table face by face.
+  // 63 -> 68 on 2026-08-29: the four moments the T3 bodies act out -- a
+  // production tick, a body entering the field, a kill inside it, and the
+  // network rolling -- plus the clip names the renderer matches on.
+  // 68 -> 72 on 2026-08-29: A4's clone and withdrawal, B4's wave gain, and the
+  // name the network puts on its own throw for C4's outcome bodies.
+  // 72 -> 75 on 2026-08-29: A5's two investments told apart, B5's execution
+  // stamped on the field that took the body, and C5's prep effects named as
+  // they are recorded and spent -- the four clips that shipped unwired on C4.
+  // 75 -> 78 on 2026-08-29: the panel clearing when the boost arms (a target
+  // behind it was unclickable), the field turning to watch its nearest body,
+  // and a farm reading its own dice face by face for the board readout.
+  // 78 -> 81 on 2026-08-29: the crosspath said properly (two paths at most, one
+  // to five and the other to two, and a committed branch no longer closes the
+  // secondary at tier 1), the boost refusing at the press when no tier 5 tower
+  // is standing, and the EYE tracking instead of the whole machine.
+  // 81 -> 87 on 2026-08-29: what the interface SAYS about this tower. A
+  // specimen keeping its production rate and dropping its history (the index
+  // showed a 1200-mana economy tower as one HP line), that rule holding for
+  // every catalogue tower, a written description on all four of the Farm's
+  // abilities, those sentences quoting the tier's own numbers, the commitment
+  // note in the Farm's own three-path rule, and every catalogue tower
+  // resolving to a registered body for its icon.
+  { file: "tests/farm.test.js", pass: 87, fail: 0, failing: [] },
   {
     // sandbox.smoke.js reports "N FAILED" and no pass count of its own, so its
     // pass column is blank by design rather than unmeasured.

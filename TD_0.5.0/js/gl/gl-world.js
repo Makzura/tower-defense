@@ -292,6 +292,19 @@ var World3D = (function () {
       });
     }
 
+    // HOW HIGH AND HOW LOW THE BOARD GOES, measured once here rather than per
+    // query. `screenToWorld` walks the ray through exactly this band to find the
+    // surface under the cursor, so on a board that is all one level the band is
+    // empty and the walk is skipped entirely -- which is what keeps the six
+    // boards with no terrain on precisely the arithmetic they always had.
+    var lo = 0, hi = 0;
+    for (var m = 0; m < data.length; m++) {
+      if (data[m] > hi) hi = data[m];
+      else if (data[m] < lo) lo = data[m];
+    }
+    f.maxZ = hi;
+    f.minZ = lo;
+
     return f;
   }
 
@@ -1084,7 +1097,228 @@ var World3D = (function () {
     else if (id === "longshot") name = "sniper-" + sniperGroup(tower);
     else if (id === "smasher") name = "warbringer-" + warbringerGroup(tower);
     else if (id === "siphon") name = "siphon-" + siphonGroup(tower);
+    else if (id === "farm") name = "farm-" + farmGroup(tower);
     return (name && GLModels.has(name)) ? name : null;
+  }
+
+  // WHICH CLIP A FARM'S ONE-SHOTS ARE, by the authored name in the model.
+  //
+  // The field on the tower, and the clip that depicts it. Matched by NAME
+  // rather than by band index, because an index points at whatever happens to
+  // be second in the file -- and B3 already carries two one-shots where A3 and
+  // C3 carry one. A model without the clip simply never plays it, which is what
+  // makes this list safe to state once for every tier.
+  // A LOOP THAT REPLACES THE IDLE while the field holds a body, by model.
+  var FARM_FIELD_IDLES = ["field_pulse", "field_aura"];
+
+  var FARM_ONE_SHOTS = [
+    { at: "lastTick", clip: "produce_tick" },      // A3/A4: a production tick
+    { at: "lastClone", clip: "clone_wave" },       // A4: the stock cloned itself
+    { at: "lastWithdraw", clip: "withdraw" },      // A4: the player collected it
+    { at: "lastCapture", clip: "kill_capture" },   // B3/B4: a body died in the field
+    { at: "lastLock", clip: "target_lock" },       // B3/B4: a body entered it
+    { at: "lastGain", clip: "wave_gain" },         // B4: the base was given HP
+    { at: "lastExecute", clip: "execute" },        // B5: the field took one outright
+    { at: "lastRoll", clip: "end_wave_roll" },     // C3/C4/C5: the network rolled
+    // A PREP EFFECT, RECORDED OR SPENT, named by the simulation because the
+    // dice table is what tells a face 13 from a face 22. These are the four
+    // clips that shipped on C4 with nowhere to play: T5's body finally has the
+    // states they describe (a plaque queued, sectors purged, a double armed).
+    { at: "lastPrep", clip: null, from: "prepClip" },
+    // AND WHAT THE THROW MEANT, named the same way and played on the same stamp
+    // as the throw. It follows `end_wave_roll` in this list so that when both
+    // are live the outcome wins -- it is the later reading of the same moment,
+    // and it is what the player is waiting to see.
+    { at: "lastRoll", clip: null, from: "rollOutcome" },
+    // A5's two investments share a stamp and are told apart by a flag, because
+    // they are one press with two costs -- see `FarmTower.invest`.
+    { at: "lastEmpower", clip: "empower_permanent", unless: "empowerTemporary" },
+    { at: "lastEmpower", clip: "empower_temporary", when: "empowerTemporary" }
+  ];
+
+  // AIMING THE EYE, AND ONLY THE EYE.
+  //
+  // A scanner watches what walks into its field, and the tower does NOT turn to
+  // do it -- owner: "the whole model turns, which is not right; only the eye
+  // should turn". So this poses ONE group, about its own axis, and hands it to
+  // `drawActor` as an override: the format already speaks in per-group matrices
+  // and the recruit's rifle recoil goes through the same door.
+  //
+  // ONLY WHILE THE FIELD IDLE IS PLAYING, which is the whole reason this is
+  // safe. `field_aura` (B5) and `field_pulse` (B4) key the pylons and the range
+  // ring and deliberately leave the eye alone, so it sits at its rest and an
+  // override is the only thing moving it. `idle_panopticon` DOES sweep the eye
+  // on its own -- the authored patrol, which is what a scanner with nothing to
+  // look at should do -- and adding an aim on top of that would fight it.
+  //
+  // The pivot comes from the model (`pivots`), not from the geometry's middle:
+  // an eye turned about the centre of its own mesh would swing off its mount.
+  var farmAimMat = new Float32Array(16);
+  var farmAimOut = {};
+
+  function farmAimOverride(m, tower) {
+    if (!m || !m.pivots || !tower.fieldHeld) return null;
+    if (typeof tower.viewYaw !== "number") return null;
+    var names = m.bandNames;
+    if (!names) return null;
+    // The field idle has to be the band actually on screen; if the tower is
+    // mid-one-shot the clip owns the eye and this stands back.
+    var idle = -1;
+    for (var i = 0; i < FARM_FIELD_IDLES.length; i++) {
+      var b = names.indexOf(FARM_FIELD_IDLES[i]);
+      if (b > 0) { idle = b; break; }
+    }
+    if (idle < 0) return null;
+    var now = farmBandNow(m, tower);
+    if (now.oneShot || now.band !== idle) return null;
+
+    var group = null;
+    for (i = 0; i < FARM_AIM_GROUPS.length; i++) {
+      if (m.pivots[FARM_AIM_GROUPS[i]]) { group = FARM_AIM_GROUPS[i]; break; }
+    }
+    if (!group) return null;
+
+    // About Z, which is up in this game, so the eye yaws rather than tumbles.
+    // The tower's own draw yaw is already in the instance matrix, so the
+    // override carries only the DIFFERENCE the eye has to make up.
+    GLMath.localPose(farmAimMat, m.pivots[group], 0, 0,
+      tower.viewYaw - (tower.aim || 0));
+    farmAimOut[group] = farmAimMat;
+    return farmAimOut;
+  }
+
+  // Which group carries the eye, by model. First match wins, and a model with
+  // none simply never aims.
+  var FARM_AIM_GROUPS = ["b5_eye_pitch", "b4_core", "b3_scanner_yaw"];
+
+  // WHICH FRAME A FARM IS ON: the most recent one-shot that is still running,
+  // otherwise the idle loop.
+  //
+  // Bands are read out of the model -- `bands` says where each clip's frames
+  // are, `bandSeconds` how long it lasts, `bandNames` what it is -- and never
+  // derived by dividing `frames.length`, which is the arithmetic every
+  // off-by-one in this file's history came from.
+  //
+  // A ONE-SHOT WINS OVER THE IDLE AND OVER AN OLDER ONE-SHOT, so a kill landing
+  // during a target lock cuts to the capture rather than queueing behind it.
+  // Every action clip ends bit-exact on the idle's first pose (the importer
+  // checks it), so falling back needs no blend.
+  // The band and frame a farm is on, and whether that band is a one-shot. Two
+  // callers want different halves of the same decision -- the draw wants the
+  // frame, the eye wants to know whether a clip currently owns it -- and asking
+  // twice would be two scans that could disagree.
+  function farmBandNow(m, tower) {
+    var clock = tower.animClock || 0;
+    var bands = m.bands, seconds = m.bandSeconds, names = m.bandNames;
+
+    if (bands && bands.length > 1 && seconds && names) {
+      var bestBand = -1, bestPhase = 0, bestAt = -1;
+      for (var i = 0; i < FARM_ONE_SHOTS.length; i++) {
+        var entry = FARM_ONE_SHOTS[i];
+        var fired = tower[entry.at];
+        // STRICTLY LESS, so a later entry sharing a stamp REPLACES an earlier
+        // one rather than losing the tie. That is what lets `rollOutcome` beat
+        // the `end_wave_roll` it is the reading of.
+        if (!(fired >= 0) || fired < bestAt) continue;
+        if (entry.when && !tower[entry.when]) continue;
+        if (entry.unless && tower[entry.unless]) continue;
+        var clip = entry.from ? tower[entry.from] : entry.clip;
+        if (!clip) continue;
+        var b = names.indexOf(clip);
+        if (b < 1) continue;
+        var age = clock - fired;
+        if (age < 0 || age >= seconds[b]) continue;   // not running
+        bestBand = b; bestAt = fired;
+        bestPhase = seconds[b] > 0 ? age / seconds[b] : 0;
+      }
+      if (bestBand > 0) {
+        // A one-shot's last frame IS its end pose, so the window maps across
+        // the whole band inclusive: n frames span [0, 1] rather than [0, 1).
+        var n = bands[bestBand][1];
+        return { oneShot: true, band: bestBand, frame: bands[bestBand][0] +
+          Math.min(n - 1, Math.floor(bestPhase * (n - 1) + 0.5)) };
+      }
+    }
+
+    // THE IDLE, AND THE FIELD TOWERS HAVE TWO OF THEM. B4's `field_pulse` and
+    // B5's `field_aura` are seamless loops rather than one-shots -- the zone
+    // working while it holds something -- so whichever the model carries
+    // REPLACES band 0 for as long as the field is occupied. The tower already
+    // knows that: `fieldHeld` is kept for the lock edge. A model with neither
+    // falls through to its own band 0.
+    var idleBand = 0;
+    if (tower.fieldHeld && names) {
+      for (var w = 0; w < FARM_FIELD_IDLES.length; w++) {
+        var alt = names.indexOf(FARM_FIELD_IDLES[w]);
+        if (alt > 0) { idleBand = alt; break; }
+      }
+    }
+
+    // Band 0 when the model declares bands, the whole strip when it does not --
+    // which is the Base/T1/T2 case and the format's documented fallback.
+    var first = (bands && bands.length) ? bands[idleBand][0] : 0;
+    var count = (bands && bands.length) ? bands[idleBand][1] : m.frames.length;
+    var loop = (seconds && seconds.length) ? seconds[idleBand]
+      : (m.loopSeconds > 0 ? m.loopSeconds : 8);
+    var phase = (((clock / loop) % 1) + 1) % 1;
+    return { oneShot: false, band: idleBand,
+             frame: first + Math.min(count - 1, Math.floor(phase * count)) };
+  }
+
+  function farmFrame(m, tower) {
+    return farmBandNow(m, tower).frame;
+  }
+
+  // THE FARM'S MODELS, AND WHY A TIER 5 STILL WEARS A T3 ONE.
+  //
+  // ALL TWELVE EXIST as of 2026-08-29: a base, a T1 shared by A1/B1/C1, a T2
+  // shared by A2/B2/C2, and one per path at T3, T4 and T5 -- the well, the hand
+  // pump, the reinforced pump; the refinery, the scanner and the fate shrine;
+  // the generator, the orrery and the manipulator; the vault engine, the
+  // panopticon and the house that always wins.
+  //
+  // The "highest AUTHORED model" rule stays anyway. It is what kept a T5 farm
+  // wearing a T4 body while the set was incomplete, and it is what will absorb
+  // a future tier without a code change.
+  //
+  // It reads the `hasA1..hasC5` flags rather than a purchase list because that
+  // is how js/farm.js spells its tiers -- the same shape the Warbringer and the
+  // Rifleman use, and unlike the config towers' `core.purchased`.
+  //
+  // THE HIGHEST TIER ON ANY BRANCH WINS, which is the rule every other tower's
+  // group function follows. The Farm's crosspath makes the choice unambiguous:
+  // a T3 anywhere caps both other branches at 2, so two branches can never
+  // disagree about which is the main one.
+  function farmGroup(tower) {
+    var branches = ["A", "B", "C"];
+    var best = 0;
+    var main = "A";
+    for (var b = 0; b < branches.length; b++) {
+      for (var t = 5; t > best; t--) {
+        if (tower["has" + branches[b] + t]) { best = t; main = branches[b]; break; }
+      }
+    }
+    if (best >= 5) {
+      // T5 completes the set: twelve bodies, one per path at every tier above
+      // T2. Nothing falls back any more.
+      return "t5" + main.toLowerCase();
+    }
+    if (best >= 4) {
+      // T4 is a body per path too, and the same "highest AUTHORED" rule holds:
+      // a T5 farm wears its path's T4 until a T5 body exists.
+      return "t4" + main.toLowerCase();
+    }
+    if (best >= 3) {
+      // FROM T3 THE PATH DECIDES THE BODY, which is the brief's own rule: a
+      // farm with a main path at T3+ wears that path's model and its secondary
+      // T1/T2 add no overlay. The crosspath makes `main` unambiguous -- a T3
+      // anywhere caps both other branches at 2 -- so the branch holding `best`
+      // is the only one it can be.
+      return "t3" + main.toLowerCase();
+    }
+    if (best >= 2) return "t2";
+    if (best >= 1) return "t1";
+    return "base";
   }
 
   // Only the AUTHORED enemies have meshes. EVERY OTHER TYPE IS A SPHERE,
@@ -1278,6 +1512,12 @@ var World3D = (function () {
   // The camo ring's colour, dash and radius are lifted verbatim from the 2D
   // pack (js/enemy.js) so a player who learns the cue on one path reads it
   // unchanged on the other. Only the projection differs.
+  // The Farm's per-kill ring: its own green, its own radius, and SOLID where
+  // the camo ring is dashed, so a camo body inside a path-B circle wears both
+  // and neither is mistaken for the other.
+  var FARM_BOUNTY_RING_RGBA = "rgba(150,225,160,0.85)";
+  var FARM_BOUNTY_RING_PAD = 8;
+
   var CAMO_RING_RGBA = "rgba(190,255,205,0.75)";
   var CAMO_RING_PAD = 4;                  // px beyond radiusPx(), as in 2D
 
@@ -2412,6 +2652,36 @@ var World3D = (function () {
           var iphase = (((state.now || 0) * 0.30) % 1 + 1) % 1;
           frame = 1 + iband * SUM_CYCLE + Math.floor(iphase * SUM_CYCLE);
         }
+        // THE FARM RUNS ON THE CLOCK, NOT ON A COOLDOWN.
+        //
+        // It never fires, so it has neither gearPhase nor swingProgress, and
+        // every branch above would leave it on frame 0 -- a still well with a
+        // crank that never turns, which is exactly what the other types' notes
+        // above describe as the silent failure of this format.
+        //
+        // Its motion is an AUTHORED LOOP rather than a cycle this project
+        // solved: one glTF animation per model, imported whole by
+        // tools/glb_to_animated.py. So the frame is simply where the clock is
+        // inside that loop, and `loopSeconds` comes off the MODEL because the
+        // model is what knows how long its own animation lasts. A table here
+        // pairing an id with a duration would be the same number written twice
+        // in two files that are regenerated on different days.
+        //
+        // FRAME 0 IS PART OF THE LOOP HERE, not a rest pose held between
+        // cycles. Nothing about a farm is ever at rest: the reader of frame 0
+        // (the placement ghost, the index screen) gets t = 0 of the loop, which
+        // is a pose the tower really holds.
+        //
+        // THE CLOCK IS THE TOWER'S, NOT `state.now`. `state.now` is
+        // `performance.now()` -- wall time -- so the Summoner's idle above keeps
+        // chanting over a paused board and does not speed up at 3x. A farm's
+        // animation is a picture of its production, so it runs on the same
+        // fixed step the production does: `animClock` is accumulated in
+        // FarmTower.update and therefore freezes and accelerates with the run.
+        if (m && m.frames.length > 1 && t.constructor &&
+            t.constructor.ID === "farm") {
+          frame = farmFrame(m, t);
+        }
         // THE FORGE-SLAM. The Warbringer has no gearPhase -- it holds its
         // swing until something walks into the zone -- so its frames come from
         // `swingProgress()`, which is already the cosmetic window the 2D pack
@@ -2463,7 +2733,8 @@ var World3D = (function () {
             }
           }
         }
-        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame);
+        drawActor(model, t.x + kx, t.y + ky, drawYaw, 1, tz, frame,
+          farmAimOverride(m, t));
         // Crosspath marks, drawn OVER an unchanged body -- same yaw, same lift,
         // TRANSLATED ONTO THEIR SEAT. Because they are separate models the body
         // underneath is literally the same vertices with or without them, which
@@ -2784,7 +3055,81 @@ var World3D = (function () {
   // nothing, and then it winds up just before the shot. A linear ramp reads as
   // a lamp on a dimmer rather than as a capacitor bank filling. A channelling
   // B5 holds near full instead, because it is not cycling -- it is casting.
+  // THE FARM'S OWN LIGHT, in its path's colour.
+  //
+  // Its models carry emissive materials -- mana in glass, coil pulses, dice,
+  // the orrery's core -- and `vEmi` is per material, so a whole-tower `uGlow`
+  // brightens exactly those and never the wood or the iron. That is what makes
+  // a single number stand in for the handoff's per-material curves: the shader
+  // is already selecting the right surfaces.
+  //
+  // WHY THERE IS A STEADY PART AT ALL. Mana is lit whether or not anything is
+  // happening -- the design's idle curves all sit at 1.1 to 2.2 rather than at
+  // zero -- so a farm that only flashed on an event would be a dark jar between
+  // ticks. The breathing is slow and shallow; it is a pilot light, not a pulse.
+  //
+  // AND WHY THE EVENTS ADD TO IT. "Il est censé briller quand il y a des
+  // interactions": every one-shot this tower plays is worth a flash, and they
+  // are already stamped on the tower for the animation (see FARM_ONE_SHOTS).
+  // One decay for all of them, in simulation seconds, so it freezes and
+  // accelerates with the run exactly as the clips do.
+  var FARM_FLASH_SECONDS = 0.6;
+  var FARM_STAMPS = ["lastTick", "lastClone", "lastWithdraw", "lastCapture",
+                     "lastLock", "lastGain", "lastRoll", "lastExecute",
+                     "lastEmpower", "lastPrep"];
+
+  function farmGlow(tower) {
+    var clock = tower.animClock || 0;
+    // A slow breath. 2.4 s is deliberately not any clip's length: tying it to
+    // one would make the pilot light beat in step with the machine and read as
+    // part of the animation rather than under it.
+    var glow = 0.52 + 0.10 * Math.sin(clock * (Math.PI * 2 / 2.4));
+    var best = 0;
+    for (var i = 0; i < FARM_STAMPS.length; i++) {
+      var fired = tower[FARM_STAMPS[i]];
+      if (!(fired >= 0)) continue;
+      var age = clock - fired;
+      if (age < 0 || age >= FARM_FLASH_SECONDS) continue;
+      var k = 1 - age / FARM_FLASH_SECONDS;
+      if (k > best) best = k;
+    }
+    return glow + 1.15 * best * best;
+  }
+
+  // Path A is the purple mana, B the cyan scanner, C the gold fate -- the
+  // handoff's own design tokens (#7a4bff, #46d8ff, #ff9d2e), which are also the
+  // colours the emissive materials are painted. Tinting the glow to match is
+  // what keeps a brightening chamber PURPLE instead of routing it to white.
+  //
+  // IN LINEAR, NOT sRGB, because the shader adds this term before the one
+  // conversion at the end (`lit += uGlowTint * (vEmi * uGlow)`). The sRGB
+  // triplets look like the right numbers and are not: #7a4bff reads (0.48,
+  // 0.29, 1.0) sRGB but (0.195, 0.070, 1.0) linear, so using the first pours
+  // two and a half times too much red into every flash -- which is exactly the
+  // pastel wash it was meant to prevent.
+  var FARM_GLOW_A = [0.195, 0.070, 1.000];
+  var FARM_GLOW_B = [0.061, 0.687, 1.000];
+  var FARM_GLOW_C = [1.000, 0.337, 0.027];
+
+  // OFF THE MODEL THE TOWER IS ACTUALLY WEARING, not off its tier flags: the
+  // body decides the colour, so a T5 farm still glows in the hue of the T4 it
+  // is wearing. `farmGroup` answers "base", "t1", "t2" or "t3a".."t4c", and only
+  // the per-path ones end in a branch letter -- "base" is not path B.
+  function farmGlowTint(tower) {
+    var group = farmGroup(tower);
+    var last = group.charAt(group.length - 1);
+    if (group.charAt(0) !== "t" || group.length !== 3) return FARM_GLOW_A;
+    if (last === "b") return FARM_GLOW_B;
+    if (last === "c") return FARM_GLOW_C;
+    return FARM_GLOW_A;
+  }
+
   function towerGlow(tower) {
+    // A farm has neither a swing nor a core, so every branch below would leave
+    // it at zero -- unlit mana in a glass jar. See farmGlow.
+    if (tower.constructor && tower.constructor.ID === "farm") {
+      return farmGlow(tower);
+    }
     // THE WARBRINGER'S LEY LIGHTS ON THE BLOW, NOT ON A TIMER.
     //
     // From A3 there is ley in the hammer head, and the honest moment for it is
@@ -2816,6 +3161,9 @@ var World3D = (function () {
   }
 
   function towerGlowTint(tower) {
+    if (tower.constructor && tower.constructor.ID === "farm") {
+      return farmGlowTint(tower);
+    }
     var bought = tower.core && tower.core.purchased;
     var b = bought && bought.B ? bought.B : 0;
     var a = bought && bought.A ? bought.A : 0;
@@ -4146,6 +4494,29 @@ var World3D = (function () {
       drawGroundRing(ctx, ce.pos.x, ce.pos.y, cr, CAMO_RING_RGBA, null, 1.5);
       ctx.restore();
     }
+    // A BODY WORTH SOMETHING TO A FARM SAYS SO WHILE IT IS STILL ALIVE.
+    //
+    // Path B pays mana and base HP for anything that dies inside its circle,
+    // and until 2026-08-28 the only sign of that was the payout itself -- by
+    // which time the body is gone and the reason with it. Owner: "you should
+    // make it apparent on the enemies that they're affected by the +1 mana and
+    // HP per kill." So the bodies that carry the bounty wear a ring, in the
+    // Farm's green, solid where the camo ring is dashed so a camo body inside
+    // a field reads as both.
+    //
+    // Gated on `Farms.killBonusAt`, which costs one length test with no farm on
+    // the board -- this is the per-body overlay term measured to break first
+    // (see the camo ring above), so it does not run for a board without one.
+    if (typeof Farms !== "undefined") {
+      for (i = 0; i < state.enemies.length; i++) {
+        var fe = state.enemies[i];
+        if (!fe.pos) continue;
+        if (!Farms.killBonusAt(fe.pos.x, fe.pos.y)) continue;
+        var fr = (fe.radiusPx ? fe.radiusPx() : 11) + FARM_BOUNTY_RING_PAD;
+        drawGroundRing(ctx, fe.pos.x, fe.pos.y, fr, FARM_BOUNTY_RING_RGBA, null, 2);
+      }
+    }
+
     // Behind the bars and behind the bodies' own interface, because it is the
     // only thing in this pass that is not information.
     for (i = 0; i < state.enemies.length; i++) {
@@ -4177,6 +4548,53 @@ var World3D = (function () {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(text, tag.x, tag.y);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+    }
+
+    // THE FACES A C-PATH FARM THREW, over the dice that threw them.
+    //
+    // Permanent, like the Summoner's counter above and for the same reason: the
+    // throw is what the whole path is about, it happens once a wave, and a
+    // player between waves wants to look at it rather than have caught it.
+    // Colour is the reading -- green a gain, red a loss, gold a double, blue a
+    // reset, grey a face that only prepares something -- and it comes off the
+    // TOWER, which owns the dice table. See `FarmTower.rollFaces`.
+    for (i = 0; i < state.towers.length; i++) {
+      var fm = state.towers[i];
+      if (typeof fm.rollFaces !== "function") continue;
+      var faces = fm.rollFaces();
+      if (!faces) continue;
+      var seat = project(fm.x, fm.y, towerCrown(fm) + 16);
+      if (!seat) continue;
+
+      ctx.font = "700 12px system-ui, sans-serif";
+      var widths = [], total = 0;
+      for (var d = 0; d < faces.length; d++) {
+        widths[d] = ctx.measureText(String(faces[d].face)).width + 11;
+        total += widths[d] + (d ? 3 : 0);
+      }
+      var penX = seat.x - total / 2;
+      for (d = 0; d < faces.length; d++) {
+        var kind = faces[d].kind;
+        var ink = kind === "loss" ? "#ff9d9d"
+                : kind === "double" ? "#ffd66b"
+                : kind === "reset" ? "#9fd0ff"
+                : kind === "prep" ? "#cfd6e2"
+                : "#a8f0b0";
+        ctx.fillStyle = "rgba(16,19,26,0.88)";
+        ctx.fillRect(penX, seat.y - 9, widths[d], 17);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = ink;
+        ctx.globalAlpha = 0.55;
+        ctx.strokeRect(penX + 0.5, seat.y - 8.5, widths[d] - 1, 16);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = ink;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(faces[d].face), penX + widths[d] / 2, seat.y);
+        penX += widths[d] + 3;
+      }
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
     }
@@ -5413,9 +5831,16 @@ var World3D = (function () {
         30 + (p.lift || 0) + (1 - p.life / p.maxLife) * 22);
       if (!at) continue;
       ctx.font = "600 14px system-ui, sans-serif";
-      ctx.fillStyle = p.bad
-        ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
-        : "rgba(255,215,110," + alpha.toFixed(3) + ")";
+      // `rgb` lets a popup pick its own colour, exactly as in the 2D pass this
+      // branch replaces (Effects.drawWorld). BOTH have to honour it or the two
+      // boards disagree about the same event -- the Farm's per-kill bonus is
+      // green precisely so it is not read as part of the bounty beside it, and
+      // a 3D board that painted it gold would put the distinction back.
+      ctx.fillStyle = p.rgb
+        ? "rgba(" + p.rgb + "," + alpha.toFixed(3) + ")"
+        : (p.bad
+          ? "rgba(240,120,110," + alpha.toFixed(3) + ")"
+          : "rgba(255,215,110," + alpha.toFixed(3) + ")");
       ctx.fillText(p.text, at.x, at.y);
     }
     ctx.textAlign = "left";
@@ -6417,7 +6842,79 @@ var World3D = (function () {
     var p = camera.groundAt(c[0], c[1]);
     // Off the ground plane -- above the horizon. A point nothing can be at,
     // so hit tests miss rather than matching something at the origin.
-    return p ? { x: p[0], y: p[1] } : { x: -99999, y: -99999 };
+    if (!p) return { x: -99999, y: -99999 };
+    var s = surfaceUnder(c[0], c[1], p);
+    return s || { x: p[0], y: p[1] };
+  }
+
+  // THE SURFACE UNDER THE CURSOR, not the floor under the cursor.
+  //
+  // `groundAt` casts the ray at z = 0, which is the right answer on a board that
+  // is all one level and the wrong one the moment any of it is raised: hover a
+  // stump and the point comes back where the FLOOR is, well below the top you
+  // are pointing at. Everything downstream inherits it -- the build ghost, the
+  // red wash, `whyCannotBuild`, `blockReason` -- so a tower could not be placed
+  // where the cursor said it would go. Same defect the click target had, one
+  // layer further down, and this is the one funnel both of them come through.
+  //
+  // THE WALK IS BOUNDED BY THE TERRAIN'S OWN HEIGHT, not by the view distance,
+  // which is what makes it cheap. Two plane hits bracket the ray between the
+  // top of the board and its bottom, and the segment between them is short: on
+  // Ironwood's 25-unit stumps at the default pitch it is about 37 world units,
+  // so half a dozen samples cover it. Nothing marches out to the horizon.
+  //
+  // Returns null when there is nothing to find, and every caller then keeps the
+  // z = 0 answer it always had. That covers the six boards with no terrain by
+  // construction rather than by tolerance -- their band is empty, so not one
+  // float of this runs for them.
+  function surfaceUnder(clientX, clientY, flat) {
+    var f = heightField;
+    if (!f || !camera.planeAt) return null;
+    if (!(f.maxZ > 0) && !(f.minZ < 0)) return null;      // all one level
+
+    var top = camera.planeAt(clientX, clientY, f.maxZ);
+    if (!top) return null;                                 // parallel to it
+
+    // The ray from the top plane to the bottom one, in world space. `flat` is
+    // the z = 0 hit and is already paid for, so the direction comes off the
+    // pair rather than out of the camera a third time.
+    var dx = flat[0] - top[0], dy = flat[1] - top[1], dz = -f.maxZ;
+    var span = f.maxZ - Math.min(0, f.minZ);
+    if (span <= 1e-6) return null;
+    var scale = span / f.maxZ;                             // reach past z = 0
+    dx *= scale; dy *= scale; dz *= scale;
+
+    var len = Math.sqrt(dx * dx + dy * dy);
+    var steps = Math.max(4, Math.min(256, Math.ceil(len / HEIGHT_CELL) * 2));
+
+    // The first sample BELOW the surface is the crossing; bisect between it and
+    // the last one above. Sampling from the top means the nearest surface wins,
+    // which is what "you cannot point at ground you cannot see" means -- the
+    // dirt hidden behind a stump is not a place the cursor can reach, exactly as
+    // it is not a place the player can see.
+    var prev = 0, i, t, px, py, pz;
+    for (i = 1; i <= steps; i++) {
+      t = i / steps;
+      px = top[0] + dx * t; py = top[1] + dy * t; pz = f.maxZ + dz * t;
+      if (pz > surfaceSample(f, px, py)) { prev = t; continue; }
+      for (var k = 0; k < 12; k++) {                       // bisect to ~0.02 px
+        var mid = (prev + t) / 2;
+        var mx = top[0] + dx * mid, my = top[1] + dy * mid;
+        if (f.maxZ + dz * mid > surfaceSample(f, mx, my)) prev = mid; else t = mid;
+      }
+      return { x: top[0] + dx * t, y: top[1] + dy * t };
+    }
+    return null;
+  }
+
+  // `groundHeightAt` CLAMPS to the field's edges, which is right for standing a
+  // body on the board and wrong for a ray leaving it: the edge value would be
+  // repeated forever and the walk above would find a surface out in the apron
+  // that nothing is standing on. Off the field is the floor.
+  function surfaceSample(f, x, y) {
+    if (x < f.minX || y < f.minY ||
+        x > f.minX + f.w * HEIGHT_CELL || y > f.minY + f.h * HEIGHT_CELL) return 0;
+    return groundHeightAt(x, y);
   }
 
   return {

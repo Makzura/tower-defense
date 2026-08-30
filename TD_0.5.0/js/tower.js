@@ -85,8 +85,13 @@ function elevatedRangePx(tower, rangeUl) {
   if (rangeUl === Infinity) return Infinity;
   var px = ul(rangeUl);
   var h = (tower && tower.groundHeight) || 0;
-  if (!h) return px;
-  return px * (1 + Tower.ELEVATION_RANGE_PER_UL * (h / UNIT_LENGTH));
+  if (h) px *= (1 + Tower.ELEVATION_RANGE_PER_UL * (h / UNIT_LENGTH));
+  // A Farm's investment raises reach by 5% a tranche, and THIS IS THE ONE PLACE
+  // it is applied -- every type caches its `rangePx` out of this call, so the
+  // boost reaches the Summoner's blubs and the Siphon's beam without either
+  // file knowing what a tranche is. See FarmBoost in js/farm.js.
+  if (typeof FarmBoost !== "undefined") px *= FarmBoost.multiplier(tower);
+  return px;
 }
 
 // WHAT SHAPE A TOWER'S REACH IS -- one answer, for everything that draws it.

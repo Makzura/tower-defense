@@ -1366,7 +1366,7 @@ BlubTower.prototype.panelActions = function () {
       branch: branch,
       upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : "$" + next.cost,
+      detail: refusal ? refusal : next.cost + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
       enabled: refusal === null &&
@@ -1426,7 +1426,7 @@ BlubTower.prototype.upgradeCard = function (upgrade, refusal, preview) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  " + upgrade.id,
-    subtitle: refusal ? refusal : "$" + upgrade.cost,
+    subtitle: refusal ? refusal : upgrade.cost + " mana",
     changes: preview.changes,
     abilities: UpgradeEffects.abilities(preview.grants, null),
     note: note
@@ -1608,7 +1608,7 @@ function Blub(owner, x, y, stats, monsterTier) {
   this.name = stats.name;
 
   // A blub is free and refunds nothing. sellValue() reads totalSpent, so this
-  // is also what makes its panel's Sell button pay exactly $0 -- the brief's
+  // is also what makes its panel's Sell button pay exactly 0 mana -- the brief's
   // "option de vente a 0 gold" needs no special case anywhere.
   this.cost = 0;
   this.totalSpent = 0;
@@ -1733,14 +1733,24 @@ Blub.prototype.findTarget = function (enemies) {
 //   2. a Hungry Blub's compounding, which is a property of this ONE body and
 //      dies with it
 //   3. the swarm buff, which is a property of the fleet around it right now
+// A FARM'S INVESTMENT REACHES THE BLUBS, not just the tower that plants them:
+// "+5% damage, attack speed and range for every tower at tier 5 or above, AND
+// FOR THE UNITS THEY SUMMON". Read off the OWNER at use time rather than baked
+// in at birth, so a thirty-second surge lifts the blubs already standing on the
+// board instead of only the ones planted while it runs -- which is what a
+// thirty-second window is for.
+Blub.prototype.farmBoost = function () {
+  return (typeof FarmBoost === "undefined") ? 1 : FarmBoost.multiplier(this.owner);
+};
+
 Blub.prototype.attackDamage = function () {
   var d = this.baseDamage;
   if (this.growth > 0) d *= Math.pow(1 + this.growth, this.attacksMade);
-  return d * (1 + this.owner.swarmBonusFor(this));
+  return d * (1 + this.owner.swarmBonusFor(this)) * this.farmBoost();
 };
 
 Blub.prototype.attacksPerSecond = function () {
-  return this.baseRate * (1 + this.owner.swarmBonusFor(this));
+  return this.baseRate * (1 + this.owner.swarmBonusFor(this)) * this.farmBoost();
 };
 
 // Damage one enemy and stack the summoner's weakening debuff on it. Every point

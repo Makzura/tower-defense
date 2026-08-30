@@ -576,6 +576,12 @@ js/smasher.js       Smasher: melee AoE, two upgrade branches, Path A's
 js/soldier.js       Soldier: the $300 burst/automatic starter, two upgrade
                      branches, and SoldierRecruit -- stop-to-shoot walking
                      units B4 calls in and B5 strengthens; NOT towers
+js/farm.js          FarmTower ("Farm", id `farm`): the 1200-mana tower that
+                     produces MANA instead of damage, and the first with
+                     THREE upgrade paths. Also holds `Farms`, the board-wide
+                     half -- the C network, its dice, the field a body is
+                     standing in, and the three moments game.js calls in at
+                     -- and `FarmDice`, the three tables as DATA
 js/blub.js          BlubTower ("Summoner", id `blub`): the $450 tower that
                      never fires, its ten summon types, the swarm buff, the
                      weakening debuff and Coagulation -- plus Blub, one
@@ -616,7 +622,10 @@ js/gl/gl-renderer.js the dependency-free WebGL renderer: one flat-shaded
                      weapon's own coils and aperture light up
 js/gl/gl-camera.js  OrbitCamera: middle-drag orbit about the cursor, right-drag
                      pan, wheel zoom-to-cursor. Owns `viewport` (the game's
-                     logical 1280x720 space) and the projection cache
+                     logical 1280x720 space) and the projection cache.
+                     `planeAt(x, y, z)` casts a pixel at ANY horizontal plane
+                     and `groundAt` is it at zero; World3D.screenToWorld
+                     brackets the ray with two of them to find the surface
 js/gl/gl-math.js    perspective, look-at, one multiply, ray/plane. Column-major
 js/gl/gl-geometry.js procedural primitives: ground, road, box, boxAt, sphere,
                      cylinder, frustum, segment (a prism between two points in
@@ -1151,8 +1160,10 @@ route. Nothing about the schedule is saved to `MetaProgress`.
 **A wave may be MIXED** (2026-07-29, v0.4.7, at the owner's request — "make the
 wave a bit more chaotic, still deterministic but with more than 1 type"):
 several groups, several types, deliberately on top of each other rather than
-one after another. Six groups carry a `tier` on a fractal type (see the tier
-ladder below).
+one after another. **No group in EASY carries a `tier`** since 2026-08-29 — the
+ten that did were the Fractal Slime's, and they came off that schedule (see
+below). Normal still carries five, and the field is still the only way to send
+a rung of the ladder from a wave or from the sandbox.
 
 **Mixed is about the ROSTER, never about the group count.** Every wave carries
 `groups` now, so counting them says nothing: wave 24 is three salvos of Aether
@@ -1202,9 +1213,11 @@ it, because the table alone cannot see any of them:
 the composition gate, and it is the one a retune trips.** It holds a snapshot
 of all 35 waves taken BEFORE the rewrite — bodies, effective HP, clear bounty,
 kill bounty, and the AUTHORED SIGNATURE of every group — plus the roster rules
-(one Midboss, in 11; one Tyrant, in 35; Vanguard only in 34; Colossus only in
-29; flight introduced at 24; 14, 18 and 28 camo end to end; the six fractal
-rungs at 16/17/22/25/33/35). **Absence is part of the signature**: a group with
+(one Midboss, in 11; one Tyrant, in 35; Vanguard only in 34; Colossus in 29
+**and 35**; flight introduced at 24; 14, 18 and 28 camo end to end; and **no
+Fractal Slime in Easy**, asserted as an empty list so one creeping back into a
+retune fails here). **It walks the ACTIVE `WAVES`, which is Easy** — Normal has
+its own gate, `Normal is forty waves of exactly the authored composition`. **Absence is part of the signature**: a group with
 no `health` is a different authored thing from one that writes the type's own
 number, and materialising a default while splitting a group is the mistake the
 rewrite made easy — every aggregate in the game still balances afterwards, so
@@ -1212,10 +1225,13 @@ nothing else in any suite would notice. If you deliberately retune a wave, this
 test is what you update, in the same change, with the reason.
 
 **The kill column in that table is priced off the TYPE ROW and ignores `tier`,
-so it is not `waveKillBounty`.** Over the whole campaign the two read $22 321
-and $22 987; the gap is the six Fractal Slimes, whose tiers only
-`Enemy.bountyOf` can see. Both totals are pinned, deliberately: a group that
-loses its tier moves one of them and not the other.
+so it is not `waveKillBounty`.** They read $22 321 and $22 987 while Easy's
+fractal ladder was scheduled; the $666 gap was the six roots, whose tiers only
+`Enemy.bountyOf` can see. Since 2026-08-29 nothing in EASY carries a tier, so
+over that schedule both formulas land on **$23 132**. Both totals are still
+pinned apart, deliberately: the day a tiered body is scheduled into Easy again,
+that pair is what shows it. (Normal still carries five tiered groups, and its
+own gate prices them.)
 
 **`the whole campaign runs itself dry, with every authored arrival emitted
 once` is the only test in the repo that watches the RUN rather than the data.**
@@ -1242,86 +1258,74 @@ that moves.
 The other three are `wave 22 runs three groups at once, and wave 30 opens two
 on the same frame` (overlap and the same-frame tie-break, on the shipping
 schedule rather than on a fixture built to have one), `wave 35's Tyrant walks
-in at thirteen seconds and its T5 slime at twenty-eight` (the finale's two
+in at thirteen seconds and its Colossus at twenty-eight` (the finale's two
 authored landmarks, on the clock — neither was a readable number before `at`
 existed), and `a second road mirrors the whole timeline, and is still one wave
 and one reward` (Twin Confluence deploys all 88 bodies of wave 12 down each
 road, off ONE cursor, and pays one reward).
 
-### The Fractal Slime's tier ladder is SCHEDULED, one rung per wave
+### The Fractal Slime is OFF the EASY campaign, and what replaced it
 
-2026-08-20, at the owner's instruction: *"i want the slime tiers to spawn in
-accordance to their HP as stated in the index and behave in that manner"*. The
-mechanic was never wrong — a tier spawned by hand has always carried its stated
-health — but the campaign sent **one rung of the six**, the T3 in wave 25, while
-the index advertised all six. Five tiers existed only as somebody else's split
-children.
+2026-08-29, at the owner's instruction: *"take out the fractal slime, all of
+them, from easy mode, and replace them by, in order, colossus > hive > slow >
+normal, matching the HP total"*, and then *"don't change normal"*. All ten roots
+came off `EASY_WAVES`.
 
-Per ROOT, and the group's own total where a wave sends more than one:
+**`NORMAL_WAVES` IS UNTOUCHED** and still sends four rungs, in waves 17, 27, 32
+and 35. The type itself is untouched too — the ladder, the division, the AoE
+resistance, the half-price bounty — and it carries **no** `sandboxOnly` flag:
+that flag means "keep this out of the fixed campaign", `tests/run.js` reads it
+in **both** directions, and on a type Normal still schedules it would be a false
+claim. (It was written that way for an afternoon, on a branch that predated the
+second campaign; merging is what caught it. If Easy is ever the only schedule
+again, that flag is the right way to say this.)
 
-| wave | group | root HP | to clear | bodies in all |
-|---:|:--|---:|---:|---:|
-| 16 | T0 ×4 | 1 | 4 | 4 |
-| 17 | T1 ×2 | 4 | 16 | 10 |
-| 22 | T2 ×1 | 16 | 48 | 21 |
-| 25 | T3 ×1 | 64 | 256 | 85 |
-| 33 | T4 ×1 | 256 | 1 280 | 341 |
-| 35 | T5 ×1 | 1024 | 6 144 | 1 365 |
-| | **1 372 authored** | | **7 748** | **1 826** |
+**The substitution rule.** Each root became ONE body of the first type in that
+ladder whose own health fits inside the root's, carrying a `health` override
+equal to the root. `at`, `count` and `interval` are untouched, so the schedule's
+shape — when a body enters, and into what — is exactly what it was.
 
-(The last column counts the root and every generation under it, which is where
-the 1 826 measured figure comes from; only the roots are in `waveCount`.)
+| wave | root | HP | stands in for it |
+|---:|:--|---:|:--|
+| 16 | T0 ×4 | 1 each | Normal @ 1, ×4 |
+| 17 | T1 ×2 | 4 each | Normal @ 4, ×2 |
+| 22 | T2 | 16 | Slow @ 16 |
+| 25 | T3 | 64 | Slow @ 64 |
+| 33 | T4 | 256 | Hive @ 256 |
+| 35 | T5 | 1024 | Colossus @ 1024 |
 
-**HP is the placement rule, and "to clear" is the difficulty.** A tier T root
-takes `root × (T + 1)` points to remove — it conserves health as it divides,
-four bodies at a quarter each — and ends in `4^T` terminal T0s. The base has
-100 HP and a leak costs the leaker's remaining health, so a T5 that is not
-cleared is 1 024 separate points of base damage. That, not the root, is why T4
-waits for 33 and T5 for the last wave.
+Wave 16's four one-point Normals are the one place the ladder reached its bottom
+rung: nothing in the game weighs one point on its own, and a Normal at
+`health: 1` is what a T0 always was in play — a body that dies to one shot.
 
-**The schedule PAID for the ladder rather than growing by it**: effective HP
-25 898 → 25 939, +0.16%. Wave 33 funds its T4 exactly (two Bulwarks and a
-Brute); wave 35 covers −340 of the T5's 1024 and waves 27, 29, 30, 31, 32 and 34
-give up 641 more at 5–9% each — 1 267 trimmed against 1 308 added, and the 41
-points of difference are the whole rise. **Nothing was taken off a v0.4.4 spine
-opener or off a mechanism body** (Hive, Shieldbearer, Healer, Colossus, boss) —
-what got thinner is ordinary escort.
+**What moved, measured** — all of it Easy's, none of it Normal's. Authored
+effective HP is **unchanged**, 25 939, wave for wave: `waveEffectiveHealth`
+counts the root only and each override matches its root point for point. The
+wave-clear bonus is a tenth of health and so does not move either. Scheduled
+kill bounty rose **$22 987 → $23 132**, +$145: these four types are worth $1 a
+point where a Fractal Slime's row was written at $0.50.
 
-**Do not quote the authored total as if nothing changed.** A board that clears
-every cascade removes 7 748 points where the six roots count 1 372 (1 826
-bodies born to do it), and earns $3 874 across the generations against the $686
-of roots the purse counts. The
-authored figures are deliberately blind to death-born bodies, exactly as they
-are to a Hive's brood.
+**The REAL load fell, and the unchanged authored total must not be quoted as if
+it had not.** A cleared cascade was 7 748 points across 1 826 born bodies where
+the six roots authored 1 372, paying $3 874 against $686 of roots. All of that
+is gone. What replaces it is 1 372 points in ten bodies, plus one extra Hive
+brood on wave 33 (five shielded hatchlings, worth nothing). Waves 22, 25, 33
+and 35 are materially easier to clear and materially quieter on the road, and
+wave 35 in particular now ends on the longest single kill in the game instead
+of on a clearing problem. The measurements in the section this replaced — 20
+maxed towers peaking at 151 bodies on wave 35, 14 maxed Snipers losing the
+finale on leaks — described the cascade and no longer describe anything; they
+have not been re-run against the substitution.
 
-**Measured, not asserted** (headless, maxed board, `baseHp` is useless as a
-meter because upgrade paths heal it, so leaks were counted directly):
-
-- 20 mixed maxed towers, wave 35: 1 453 kills, **peak 151 bodies on the road**,
-  zero leaks, 55 s. Without the T5: 88 kills, peak 40, 37 s.
-- 14 maxed Arcane Snipers and nothing else, wave 35: 146 points of leak damage
-  against a 100 HP base — **it loses**. The finale now asks for coverage, not
-  only for single-target damage, and that is the intended shape.
-- The three early rungs cost a weak board nothing: 5 un-upgraded towers took
-  the same 11 / 70 / 100 points of leak damage on waves 16, 17 and 22 with the
-  ladder in and with it stripped out.
-- Simulation cost is linear and small — 1.13 ms per update at 1 024 bodies —
-  and the cascade never puts them all on the road at once anyway.
-
-**T0 is in 16 and not in 12 on purpose.** Wave 12 is the suite's mixed-wave
-fixture — "a wave resolves into one interleaved timeline of arrivals" and "a
-second road mirrors the whole timeline" both walk it, and it was "a mixed wave
-deploys its groups in order" that walked it before 2026-08-25. A fixture that
-changes shape whenever content lands stops testing the scheduler.
-
-**NEVER give a fractal group a `health` override.** `Enemy.healthOf` takes the
-tier branch and discards it, so it is a no-op on the body and a lie in
-`waveKillBounty`. `tests/content.test.js` checks the whole schedule for one.
-
-**The index derives all of this and must not be edited to match.** Tier range,
-highest campaign HP and the campaign-waves list in `js/codex.js` are read off
-the schedule and the type's own `fractal` block, so scheduling a rung moves the
-guide with no edit — which is the property the test pins.
+**The rules that outlived Easy's ladder**, and they are live rules because
+Normal still spends it. `Enemy.healthOf` takes the tier branch and discards any
+`health` beside it, so **a fractal group must never carry a `health` override**
+— it is a no-op on the body and a lie in `waveKillBounty`. And `js/codex.js`
+DERIVES the index's tier range, highest campaign HP and wave list from the
+schedules, keeping the wave list **per difficulty**: the card now reads Easy
+"none" and Normal "17, 27, 32, 35" with no edit to that file. That split is
+what stops the guide sending an Easy player to look for a body that is not on
+their road, and `tests/content.test.js` pins both halves.
 
 **THE FLAT FORM IS GONE (2026-08-25).** Until the timeline rewrite a wave could
 be a bare group object — `count`, `interval` and `type` on the wave itself, no
@@ -1454,8 +1458,9 @@ wave put this here*: sandbox spawns, codex sprites, test fixtures.
 **A wave is over when its own bodies are gone, not when the road is empty.**
 `waveStillOnTheRoad(n)` in `game.js` scans for `waveId === n`, and the clear
 branch in `update()` asks it about `lastDeployedWave()`. What this fixed: a
-survivor of an *earlier* wave — the stragglers a wave's `duration` ceiling leaves behind, a
-Fractal Slime cascade still unwinding two waves later — used to hold the
+survivor of an *earlier* wave — the stragglers a wave's `duration` ceiling leaves
+behind, a Hive brood or (until 2026-08-29) a Fractal Slime cascade still
+unwinding two waves later — used to hold the
 current wave's clear open under the old `enemies.length === 0` test. Beating
 wave 30 outright paid nothing and called nothing in while one wave-29 Brute was
 still walking, and nothing on screen told the player which body was doing it.
@@ -1687,11 +1692,12 @@ two more numbers matter:
   group — `waveEffectiveHealth` in game.js is the one implementation, and the
   clear bounty reads the same function. **This is NOT the run's purse** — a
   shield is counted here and pays nothing, so effective HP (25 939) and
-  scheduled kill bounties ($22 987) are different quantities and always will
-  be. Since 2026-08-20 a THIRD gap sits beside that one: a Fractal Slime's
-  cascade is death-born, so neither figure counts the 6 376 points the six
-  scheduled roots turn into or the $3 188 they pay on the way. See "A SHIELD PAYS NOTHING, EVER" below, which says the same thing from
-  the other end.
+  scheduled kill bounties ($23 132) are different quantities and always will
+  be. A THIRD gap sat beside that one from 2026-08-20 to 2026-08-29 — a Fractal
+  Slime's cascade is death-born, so neither figure counted the 6 376 points the
+  six scheduled roots turned into or the $3 188 they paid on the way — and it
+  closed when the ladder came off the campaign. See "A SHIELD PAYS NOTHING,
+  EVER" below, which says the same thing from the other end.
 - **Plus two amounts no table can state**, both decided by how the run goes.
   Every seven seconds a living Hive drops five hatchlings, each with a shield
   equal to its own life and each paying nothing — about 160 points of unpaid
@@ -1820,8 +1826,8 @@ The full table with per-wave HP is a comment on `WAVES` itself;
 `THE_COMPANY/tools/balance/`, so a clone of this repo cannot reproduce it.**
 
 **The schedule's length is an ECONOMY constraint, not just a difficulty one.**
-Scheduled kill bounties are the bulk of the run's lifetime purse ($22 987 of
-$35 686 all in — see the table in the economy section).
+Scheduled kill bounties are the bulk of the run's lifetime purse ($23 132 of
+$35 831 all in — see the table in the economy section).
 At the old 454 HP the $800 Siphon was unbuyable — it would have sat in
 the build bar permanently greyed out, which is not meaningfully different from
 not shipping it. A test pins `purse > dearest tower × 2`; if a tower is ever
@@ -1993,10 +1999,12 @@ one fact a banner exists for. The cut is a **timing** decision and the banner is
 a **roster**. But the key is all three fields and **not the display name**:
 `Enemy.typeOf` maps every rung of the Fractal ladder onto one row, so a name-only
 key would print a T1 salvo and a T5 salvo — 4 HP and 1024 HP — as one
-`8 × Fractal Slime`. No wave in the schedule splits a type across two `health`
-values or two tiers today (checked wave by wave, all 35), so the strict key
-prints exactly what the loose one printed; it is strict anyway because the
-banner is the only place a player can see the difference.
+`8 × Fractal Slime`. **Wave 17 splits one across two `health` values** since
+2026-08-29 — fourteen Normals at 13 beside the two at 4 that replaced its
+fractal roots — so the strict key is no longer merely defensive there: it is
+the reason that banner reads `14 × Normal + 2 × Normal` rather than folding two
+very different bodies into one line. No wave splits a type across two tiers,
+because no wave carries a tier at all any more.
 
 **Every banner is checked against `waveCount()`, per wave, across the whole
 campaign.** A summing bug here is the kind that hides: a dropped salvo or a
@@ -2168,7 +2176,7 @@ fraction is 0.1. About **$2 594** across the schedule.
 
 **The bounty is a tenth of the wave's HP, not a tenth of its cash value** — HP
 and cash are now separate quantities entirely, since a body's bounty prices its
-whole threat rather than its hit points. Against the $35 686 lifetime purse the
+whole threat rather than its hit points. Against the $35 831 lifetime purse the
 clear bonus is about **7%**. Two further rewards ride on the same payout since
 2026-07-31 — the redistributed $5000 and the rising $50 + $5-per-wave allowance
 — and `waveReward()` is where the three are summed. If it is meant to stay a tenth of
@@ -2814,12 +2822,46 @@ same one the player's eye gives: footprints cannot overlap in plan, but two
 columns certainly overlap on screen at a shallow pitch. A summon still beats a
 tower outright, which is the one genuine overlap on the board.
 
+**AND `screenToWorld` RESOLVES ONTO THE SURFACE, NOT THE FLOOR** (2026-08-27).
+The click target was only half of it. That function is THE ONE FUNNEL every
+world-space input goes through — hover, placement, inspection, aiming — and it
+cast the cursor at the ground plane, so hovering a stump to PLACE a tower
+answered with the dirt below it. Measured in a browser: pointing at the middle
+of the tallest stump answered a point **40.3 units away, on height 0 — outside a
+stump of radius 36 entirely**. The ghost, `whyCannotBuild` and `blockReason` all
+inherited it, so a tower could not be put where the cursor said it would go.
+
+**The walk is bounded by the terrain's own height, not by the view distance**,
+which is what makes it cheap. `OrbitCamera.planeAt(x, y, z)` is the old
+`groundAt` with the plane as an argument rather than a literal zero, and two of
+them bracket the ray between the top of the height field and its bottom. On
+Ironwood's 25-unit stumps at the default pitch that segment is about 37 world
+units long — half a dozen samples, then a bisection. Nothing marches to the
+horizon. A board whose band is empty skips it entirely, so the six boards with
+no terrain are byte-identical by construction, and flat ground on Ironwood
+answers the same point it always did, to the float.
+
+Sampling from the TOP means the nearest surface wins, which is what "you cannot
+point at ground you cannot see" means: the dirt hidden behind a stump is not a
+place the cursor can reach, exactly as it is not a place the player can see.
+
+**AND THE RULES PAINTED ABOUT THE CURSOR MOVED WITH IT.** `projectRing` drew
+every ground decal at z = 0 — the road band, the blockers, the ground other
+towers have taken, the rim you may not cross — which was invisible while the
+cursor was flat too and became a **28.9 px** lie the moment it was not: the
+ghost stood on the stump while every rule about it sat below the surface. It
+drapes per point now, which is clause 1b's rule for a ground decal. **Two rings
+DECLARE their height instead** (`ring.z`): a stump's rim and a tower's
+footprint, because both lie exactly ON a discontinuity and sampling a 6-unit
+grid along that edge answers two levels one point apart — measured, the tallest
+stump's 28-point rim samples 20 points at the floor and 8 on the stump, and one
+of the six stumps reads SIX levels because the ramp runs past it.
+
 **`enemyAt` and `recruitAt` still ask the world-space question**, and on the one
 board with terrain that is a smaller version of the same defect — a body on the
-depot's ramp or the bridge is picked below itself. It is left alone rather than
-swept in: those are hover readouts rather than the door to the upgrade panel,
-and the fix is the same shape whenever it is wanted. **So is the BUILD ghost**:
-hovering a stump to place a tower puts the ghost at the z = 0 point too.
+depot's ramp or the bridge is picked below itself. Left alone rather than swept
+in: those are hover readouts rather than the door to a panel, and the fix is the
+same shape whenever it is wanted.
 
 `whyCannotBuild(x, y, type)` returns `null` or a short human-readable reason,
 shown under the cursor. It is the single source of truth for placement rules —
@@ -2830,6 +2872,39 @@ rather than from the gunner specifically.
 ---
 
 ## The economy — fixed bounties per kill
+
+### THE CURRENCY IS CALLED **MANA**, and the code still calls it `cash`
+
+Renamed 2026-08-28, at the owner's instruction: *"j'ai décidé de changer
+l'argent pour du mana, donc change s'il te plaît toute instance de argent,
+gold, coins en mana"*. It is a rename of **what the player is shown**, and
+nothing else moved:
+
+* Every player-facing string says *mana*. Prices read `250 mana`, never `$250`;
+  the purse reads `12345 mana`; a refusal reads `not enough mana`; the sell
+  button reads `Sell  600 mana`; the armoury reads `600 MANA IN A RUN`; an
+  enemy's kill bounty reads `3 mana`; the Siphon's A3/A5 read *charges → mana*
+  and *mana → power*.
+* **`cash` is still the variable, `gold` is still an identifier.** `cash`,
+  `formatCash`, `goldGenerated`, `bonusGold`, `charge_to_gold`, `gold_to_power`,
+  `GoldPower`, the sandbox's `lockGold` — all of them stay. They are code and
+  save/config keys, and `gold_to_power` in particular is a CONFIG KEY that
+  appears in `js/towers/beam.config.js`; renaming those buys nothing a player
+  can see and breaks things a player cannot.
+* **THE META COINS ARE A DIFFERENT CURRENCY AND KEPT THEIR NAME.** The armoury
+  still says `META COINS`, still prices towers in `⬡`, and `needs N more coins`
+  is still that sentence. Explicitly excluded by the owner: *"change pas encore
+  les metas coins"*. Anything that spends `MetaProgress.coins()` is coins;
+  anything that spends `cash` is mana.
+* `$` notation survives in THIS document and in code comments as shorthand for
+  a mana figure. It is not shorthand anywhere a player can read.
+
+The sweep that proved it: instrument `CanvasRenderingContext2D.fillText`, walk
+the menu, the board, the armoury and the index, and grep every string the game
+asked the canvas to draw. 679 strings, zero matches for `$`, `gold`, `coins` or
+`cash` outside the meta-coin lines above. Do that again rather than grepping the
+source if you touch this — the armoury draws letter by letter through
+`drawMenuText`, so a source grep and a screen read are different questions.
 
 **Remodelled 2026-07-31.** Ordinary damage never adds cash. Every scheduled
 enemy type has an explicit base `bounty` in `Enemy.TYPES`; when the enemy dies,
@@ -2875,15 +2950,18 @@ The current authored purse is:
 | Easy starting stake | $600 |
 | progression rewards, waves 1–34 | $5 000 |
 | escalating wave allowance, waves 1–34 | $4 505 |
-| scheduled kill bounties | $22 987 |
+| scheduled kill bounties | $23 132 |
 | wave-clear bonuses | $2 594 |
-| **authored total** | **$35 686** |
+| **authored total** | **$35 831** |
 
-The total excludes Fractal descendants, conditional boss summons and the
-Siphon's A3 charge bonus. It was $23 438 / $2 590 / $36 133 until the tier
-ladder was scheduled on 2026-08-20, and the fall is the Fractal Slime's
-half-price row: **the descendants this table excludes now pay $3 188**, so a
-run that clears every cascade is better off, not worse.
+The total excludes conditional boss summons, a Hive's brood and the Siphon's A3
+charge bonus. It was $23 438 / $2 590 / $36 133 until the tier ladder was
+scheduled on 2026-08-20, which cost it $447 — the Fractal Slime's half-price
+row — against $3 188 the descendants paid outside the table. Taking the ladder
+back off on 2026-08-29 returned $145 of that: the kill money only, since the
+substitution matched every root's health and the clear bonus is a tenth of
+health. **The $3 188 the cascades used to pay is gone with them**, so what a
+board earns for clearing the campaign is now what this table says it is.
 It is the single-route schedule total. Twin Confluence mirrors every scheduled
 body onto its second route, so it also mirrors kill income. **The two figures
 that used to stand here — $47 006 in scheduled kills and $59 707 all in — are
@@ -2910,10 +2988,16 @@ Per-run cash **does not persist**: `MetaProgress` saves coins, owned tower types
 and the loadout, and nothing else. The multi-run currency is still coins.
 
 **Selling refunds half, rounded up.** `SELL_REFUND_FRACTION = 0.5` and
-`sellValue(tower)` is `Math.ceil(tower.cost * fraction)`. The rate lives in
-game.js as global economy policy; each tower supplies its actual cumulative
-`cost`. A 100% refund would make placement reversible and is not the current
-design.
+`sellValue(tower)` is `Math.ceil((totalSpent - unrefundableSpent) * fraction)`.
+The rate lives in game.js as global economy policy; each tower supplies its own
+cumulative spend. A 100% refund would make placement reversible and is not the
+current design.
+
+**`unrefundableSpent` is mana that is SUNK rather than invested**, subtracted
+before the fraction so a tier marked `noRefund` gives back nothing at all while
+every other mana on the same tower still gives back half. Exactly one tier uses
+it — the Farm's C5 (2026-08-28) — and `totalSpent` stays honest about what was
+paid, because that is what the end-of-run screen reports.
 
 When adding or changing an enemy, update its `bounty` deliberately and test both
 base and health-override resolution. When changing a tower price, re-run the
@@ -3870,8 +3954,9 @@ stats and already reads `Target: first`; a row above it saying the same word is
 the duplication the map labels were deleted for (2026-07-27).
 
 **Every tower carries `cost` AND `totalSpent`.** `cost` is the build price and
-never moves; `totalSpent` is everything sunk in, and is what `sellValue()`
-refunds half of. Before this, the smasher grew its `cost`, the beam grew a
+never moves; `totalSpent` is everything paid into the tower, and is what
+`sellValue()` refunds half of — less `unrefundableSpent`, see the economy
+section. Before this, the smasher grew its `cost`, the beam grew a
 separate `totalSpent`, and the Longshot grew neither — so a Longshot with
 $19 000 of upgrades on it sold for $38.
 
@@ -4150,27 +4235,27 @@ on an Enemy is the same idea at the instance level.
    with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
    scales bounty with a wave's `health` override, so the ratio survives an
    override but would not survive a retune of either field. Across the whole
-   schedule the ratio is 0.8862, and per type — **each type at its own BASE
+   schedule the ratio is 0.8918, and per type — **each type at its own BASE
    health, which is a property of `Enemy.TYPES` and not of the schedule** — it
    runs 0.4545 (`colossus`) to 1.5 (`fast`, `camo_fast`, `camo_heavy`).
 
    **The denominator is EFFECTIVE HP — what you must actually remove — and
-   naming it is load-bearing.** 0.8862 is `22 987 / 25 939`; against *declared*
-   health the same figure would be 0.9522, so the two readings are not
-   interchangeable. (0.9050 = `23 438 / 25 898` until 2026-08-20. It fell
-   because the Fractal Slime pays $0.50 a point where an ordinary body pays $1
-   and the ladder converted 1 308 points of schedule into new slime roots — the
-   cash comes back from the generations, which no schedule figure counts.) Every per-type number above is bounty over effective HP
+   naming it is load-bearing.** 0.8918 is `23 132 / 25 939`. (0.9050 =
+   `23 438 / 25 898` until 2026-08-20, when the fractal ladder was scheduled:
+   it fell to 0.8862 because a Fractal Slime pays $0.50 a point where an
+   ordinary body pays $1, and the cash came back from the generations, which no
+   schedule figure counts. It rose again on 2026-08-29 when the ladder came off
+   and ordinary bodies took the same points at $1.) Every per-type number above is bounty over effective HP
    too. Schedule ratios measured 2026-08-20; the per-type range measured across
    all 21 types, and a wave `health` override cannot move it because
    `Enemy.bountyOf` scales bounty in the same proportion.
 
    **AND THERE IS A SECOND RATIO IN CIRCULATION UNDER THE SAME NAME. IT IS NOT
-   THIS ONE.** The balance tooling reports a "money density" of **1.3758**
-   (1.3952 until the tier ladder),
+   THIS ONE.** The balance tooling reports a "money density" of **1.3814**
+   (1.3952 until the tier ladder, 1.3758 while it was scheduled),
    which is *authored purse over effective HP* — it carries the $10 105 of
    purse that no schedule change touches. **The figure this passage means is
-   kill bounties over effective HP, 0.8862.** Say which numerator you mean
+   kill bounties over effective HP, 0.8918.** Say which numerator you mean
    wherever either appears.
 
    The trap this closes, because it has already been reported as a defect
@@ -4182,7 +4267,7 @@ on an Enemy is the same idea at the instance level.
    the 12 cannot be removed without the 36. `revenant` splits the same way
    (1.25 declared, 0.625 effective). Every other type is identical under both,
    which is why the mismatch stayed invisible. **Do not "correct" the range to
-   1.6667** — that would contradict the 0.8862 schedule ratio at the head of
+   1.6667** — that would contradict the 0.8918 schedule ratio at the head of
    this exception.
 2. **A Hive's brood is not in the schedule at all.** Five hatchlings every
    seven seconds is unscheduled effective HP, and it PAYS NOTHING, so a run
@@ -5561,7 +5646,7 @@ being precise about what moved:
   retuned group carries a shield. **This bullet used to read "$4 092 off a
   $42 443 purse, a 10% pay cut", and that was damage-era arithmetic end to
   end**: $4 092 was `CASH_PER_DAMAGE` × a then-current shield total, and
-  $42 443 was the 2026-07-30 purse against a current authored $35 686. Nobody has asked for the
+  $42 443 was the 2026-07-30 purse against a current authored $35 831. Nobody has asked for the
   schedule or the prices to move in compensation and neither was touched.
 
 **HEALED HEALTH PAYS NOTHING EITHER**, for the same reason and by the same
@@ -6322,9 +6407,13 @@ reachable enemy to shoot. `js/systems/range-filter.js` (`RangeFilter`) answers
 They were both called `Targeting` on the two branches; the merge kept the name
 for the first and renamed the second.
 
-**The smasher (`js/smasher.js`).** Melee AoE: a 120° wedge, 37.5 u.l., 12
-damage every 3.5 s, $600 (retuned 2026-08-26 from 31.25 / 4.0 s / $700, in the
-same change that took it out of the opening hand). It **holds its swing** until something is in the zone
+**The smasher (`js/smasher.js`).** Melee AoE: a 120° wedge, **40 u.l., 14
+damage every 3.2 s, $600** — 4.38 DPS as placed. Retuned twice: 2026-08-26 from
+31.25 / 12 / 4.0 s / $700 in the change that took it out of the opening hand,
+and **2026-08-27 at the owner's instruction ("il est trop faible, il n'aide
+pas assez, il est trop cher"), which raised the body by 28% of its DPS and left
+the build price alone** — what moved instead is the first four tiers, $50 dearer
+each and carrying more (see the two path sections below). It **holds its swing** until something is in the zone
 rather than swinging on a fixed rhythm — the zone is narrow enough that a
 fixed rhythm would miss most enemies. Two five-tier branches under the same
 crosspath rule as the Longshot (tier 3 locks the other branch at 2), bought
@@ -6363,13 +6452,21 @@ can burst at all slows everything it swings at.
 
 Four things were asked for in one instruction, and all four are on branch B.
 
-**Range on B2 (+15 u.l.), B4 (+10) and B5 (+15).** Path B granted none at all
-before; a full B Warbringer now reaches **77.5 u.l.** against the 37.5 base, and
-A2+full-B crosspaths to 83.75. **These are ADDITIVE on the base**, unlike path
-A's `rangeUl` where the longest owned value wins — so the 2026-08-26 base rise
-carried the whole B column up with it (71.25 → 77.5, and 56.25 → 62.5 at B4)
-without a line of path B moving. That is also why A1 no longer sells range at
-all: it grants `rangeUl: 37.50`, which the base now equals.
+**Range on B1 (+5 u.l.), B2 (+20), B4 (+10) and B5 (+15).** Path B granted none
+at all before 2026-07-30; a full B Warbringer now reaches **90 u.l.** against
+the 40 base, and A1+A2+full-B crosspaths to 103.75. **These are ADDITIVE on the
+base**, unlike path A's `rangeUl` where the longest owned value wins — so both
+base rises carried the whole B column up with them without a line of path B
+moving.
+
+**AND THAT IS WHY A1 AND A2 SELL THEIR REACH THE SAME WAY SINCE 2026-08-27.**
+A1 granted an absolute `rangeUl: 37.50`; the 2026-08-26 base rise met it exactly
+and the tier silently stopped selling any reach at all — the max cannot be won
+by a value equal to it. Its five units are a `rangeBonusUl` now, which is summed
+after the max and so survives the next base rise as well as carrying up path A.
+A2 keeps its absolute 43.75, which still beats the 40 base, and takes its five
+on top. **Check this column against the base before moving either**: an absolute
+at or below the base is a tier claiming to sell reach it does not sell.
 
 **They live in a SECOND, ADDITIVE column** (`rangeBonusUl`) beside the existing
 absolute one, and that is the load-bearing detail. Path A's `rangeUl` figures
@@ -6922,6 +7019,511 @@ Four decisions worth knowing:
 render loop, so an enemy standing on a recruit is what the cursor is pointing at —
 the same "whatever is drawn on top wins" rule `onClick` and the inspection panel
 already follow. `drawRecruitHover` returns early when `enemyAt` finds anything.
+
+---
+
+## The Farm — a tower that produces MANA, and the first with three paths
+
+Added 2026-08-27 against a fully specified brief. `js/farm.js`, **1200 mana**,
+id `farm`, constructor `FarmTower`, display name **Farm**. It does not shoot.
+
+**THE WORD IS MANA, AND ONLY THE WORD.** Every string this tower puts on screen
+says mana — never gold, cash, coins or a dollar sign — at the owner's
+instruction. The QUANTITY is the game's ordinary `cash`: there is one run
+currency and inventing a second would be a change to the economy rather than to
+this tower. `Farms.pay` is the one door onto that global and the only place in
+the file that touches it. A test reads every panel string and every stat row and
+fails on the sight of a `$`.
+
+**IT IS THE SIXTH TYPE AND NOT A SIXTH SLOT.** The bar is five and stays five;
+the armoury already picks which five of the owned types are equipped, which is
+exactly the case a sixth type needs. The SANDBOX shows six, because a workbench
+has no coins to spend and is a preview of the towers rather than of the bar — it
+re-derives `BAR_WIDTH`/`BAR_X` after installing its roster so the extra slot is
+not drawn off the end of a bar centred for five.
+
+**TWO BRANCHES AT MOST: ONE TO FIVE, THE OTHER TO TWO.** Corrected 2026-08-29,
+and both halves had been wrong. `lockedBranch` alone refused every other branch
+outright once one reached T3, so a farm going up A could never buy B1 — the
+secondary is meant to be open to tier 2. And nothing counted branches, so before
+any T3 a farm could put two tiers on ALL THREE and only then find itself stuck.
+Owner: *"max 2 paths, one goes up to 2 and the other to 5."* Said as two rules,
+in the order a player meets them: a third branch is never started, and only one
+branch passes tier 2 — whichever got there first. `requires` is still checked
+before either, because "needs A2" is the nearer reason and the one a player can
+act on.
+
+That is the two-branch crosspath rule the other four towers share, and the brief
+settles it from the other end: a Farm with a main path at T3+ wears that path's
+model, and its secondary upgrades are T1/T2 only. THREE branches was never the
+rule — the first implementation simply never counted them.
+
+### Where its output goes, and when
+
+**`Farms` is the board-wide half** and lives at the bottom of the same file. A
+farm's own upgrades are a farm's business; who is registered, which unique tiers
+are taken, the network, the field and the wave boundary are not. `game.js` says
+only WHEN, at three moments: a wave ending, a wave starting, and a restart.
+
+**`settleWave` is LATCHED ON THE WAVE NUMBER**, exactly as `payWaveBounty` is
+and for the same reason: it is reachable from all three gates plus two safety
+nets, and paying a wave's production twice is the whole risk in a design with
+several doors. **`Farms.reset()` clears that latch**, and forgetting to was a
+real defect the suite caught: a second run would silently skip its own wave 1.
+
+**A3 ADDS a tick; it does not replace the per-wave figure** (changed
+2026-08-28). It read as “replaces” from the brief's word *remplace*, and played,
+that is a downgrade dressed as a tier: 1600 mana to trade 400 a wave for 50
+every five seconds, silently switching off the crosspathed B2 the player had
+also paid for. Owner: *“it should continue producing mana as it already did.”*
+Nothing a farm buys is ever turned off by something else it buys. The tick is
+driven from `update(dt)` rather than from a wave hook — so it advances at 3×
+speed and freezes with the run like every other cooldown.
+
+**From A4 production fills the tower's own stock instead of the purse, and
+`collect()` is the door out of it** — free, immediate, the whole stock, whenever
+the player likes. That door was missing until 2026-08-28, and its absence was
+most of what made path A read as a trap: the only other way out was A5's
+investment, 13 000 mana further on and spending in whole tranches of ten
+thousand. Owner: *“we can't take the mana stored whenever we want, which is
+supposed to be the point.”* The cost of collecting is the one the design already
+has — `cloneStock` pays 5% of what is STANDING at the end of a wave, so
+collecting every wave turns the tower back into an ordinary per-wave farm, and
+leaving it in is what makes A4 worth its price.
+
+**IT KEEPS TWO LIFETIME TOTALS, AND THEY EXIST BECAUSE THE PRODUCTION WAS
+INVISIBLE** (2026-08-28). `manaProduced` and `baseHpProduced` are on the tower,
+they never go down, and the panel prints them. A plain farm pays 200 mana into a
+purse that bounties are already moving, at a wave boundary, with no popup and no
+row — so the owner placed one, watched a run, and reported: *"the tower is
+supposed to produce mana, and it doesn't rn"*. It did, at 200 a wave, measured
+against a farmless run at the same seed. Nothing on the screen said so.
+
+Every door that makes either credits its own farm:
+
+* `produce()` is the one door for mana, so the wave figure, the tick and the
+  stock all land there. **The stocked mana counts as produced** — the stock is
+  where it went, not whether it was made — and `cloneStock` credits its clone
+  too. Spending the stock through A5 does not take it back: a lifetime total is
+  not a balance.
+* A kill in a path-B field credits both totals inside `Farms.onEnemyKilled`.
+* **The C network's payout is SPLIT across its members** by each farm's share of
+  `B`, inside `openWave`. Without that split a C-path farm would read `0 mana
+  produced` for a whole run while paying the player every wave, which is exactly
+  the illusion these totals exist to end.
+* `Effects.farmProduced` puts a `+200 mana` popup over the farm, the same one an
+  enemy's bounty gets, and says `stored` instead when A4 kept it. Presentation
+  only, guarded on `typeof Effects`, and the simulation never reads it back.
+
+`RESULT_TOTAL_LABELS` carries both labels, so they appear on the end-of-run
+screen like any other tower's totals. **`Base HP produced` is shown only on a
+farm with a tier that makes it** — no invented zeroes, the rule that screen is
+built on.
+
+### A5's investment is AIMED, and the permanent one lands once per tower
+
+**`FarmBoost` (bottom of js/farm.js) is the whole of it**, and it exists because
+until 2026-08-28 the bonus was a board-wide figure `Farms.investment()` that no
+tower read: pressing Invest spent the stock and changed nothing at all. Owner:
+*“we can't choose who to boost — we're supposed to click on the ability, then
+click on the tower, and that target boosted. Also make sure the boosts are one
+time only… boosted with 10k is boosted. It is limited to 100k, but you can't
+boost it ten times at 10k.”*
+
+**Two clicks, and the mode is a mode.** `performAction` ARMS rather than
+spends: it calls `context.beginInvesting(farm, temporary)`, which sets
+`investingFarm` in game.js — the same shape, the same rules and the same clears
+as `aimingTower` beside it. It consumes the next click ahead of building and
+inspecting, a click on open ground cancels it, Escape cancels it, and it goes
+with the farm if the farm is sold or destroyed. **A mis-press costs nothing**:
+the stock is only taken once a target has been clicked.
+
+**One permanent boost per tower, ever.** The ten-tranche ceiling is a ceiling on
+that ONE press, not on a running total: 100 000 mana at once is +50%, and 10 000
+ten times is +5% and nine refusals (`already boosted`). The SURGE has no such
+rule — thirty seconds, re-pressable, and a second one replaces the first rather
+than stacking.
+
+**Who can be boosted**: a tower at tier 5 or above on some branch
+(`FarmBoost.tierReached`, which reads `core.purchased` on the config towers and
+`hasA1..hasC5` on the hand-written ones), and never a Farm. The eligible towers
+wear a ring while the mode is up, so the once-only rule is visible BEFORE the
+click rather than explained after it.
+
+**What a boost does, and the one place each quantity is applied.** +5% damage,
++5% attack speed, +5% range per tranche. Nothing else — not hit points, not the
+footprint, not a flag:
+
+| quantity | applied in |
+|---|---|
+| range | `elevatedRangePx` (js/tower.js) — every type converts its reach through it, so the Summoner's blubs and the Siphon's beam get it for free |
+| damage, speed | the end of each type's own recompute: `recalcStats` for the Rifleman and the Warbringer, `_refreshStats` for the config towers, `Blub.attackDamage`/`attacksPerSecond` for the summoned units |
+
+Cooldowns DIVIDE by the multiplier and rates MULTIPLY by it — the same statement
+in the two units the game uses. **The blubs read the boost off their OWNER at use
+time** rather than baking it in at birth, so a thirty-second surge lifts the
+blubs already standing rather than only the ones planted while it runs.
+
+**Permanent and surge ADD as fractions**, so +50% under a +250% surge is ×4.00
+and not ×5.25 — the same additive rule `js/enemy.js` uses for damage
+amplification, and for the same reason: two bonuses that multiply are a number
+nobody can predict from the panel.
+
+### Path B raises a global, so the base's maximum is run state now
+
+`BASE_MAX_HP` is still where a run begins and still what the sandbox overrides.
+**`baseMaxHp` is what the run is currently playing with**, and `growBaseMaxHp`
+is the one door.
+
+**A GRANTED HIT POINT IS A REAL HIT POINT** (changed 2026-08-28). This read
+“raising the maximum does not heal”, on the brief's word, and the result was a
+tier nobody could feel: a B3 farm bought +150 a wave, the bar read *Base 100 /
+400* after two waves, and the player's actual health had never moved — nothing
+in the game heals the base except a Siphon's lifesteal, so the headroom was room
+to repair into with no repair in sight. Owner: *“hp gain of B doesn't work at
+all.”* `growBaseMaxHp` now raises both.
+
+**What it still does not do is undo damage already taken.** At 50/100 a grant of
+150 gives 200/250, never 250/250. That is why the two variables stay separate: a
+Farm gives what it makes and gives back nothing that was lost.
+
+### The field and the per-kill bounty need LINE OF SIGHT
+
+`FarmTower.covers` is a circle test **and** a sight test, through
+`RangeFilter.sightClear` — the same door the Warbringer's acquisition and the
+Siphon's lock check use, with the ground under the farm as the eye. Everything
+path B does reads through it: the slow, the damage amplification, B5's execution
+and the per-kill mana and base HP.
+
+The sight half arrived 2026-08-28. Until then this was the one reach on the
+board that ignored terrain — a farm behind a stump slowed, amplified and got
+paid for bodies it could not see, **while the red blind-spot overlay drawn over
+that very circle said the opposite**. Owner: *“make sure when a tower doesn't
+have vision the buff and debuff don't apply.”* Measured on Ironwood: a point 107
+px away inside a 156 px reach, with a 40 px stump 20 units tall between, is now
+refused by `covers`, by `killBonusAt`, by `slowAt` and by `damageAmpAt` — and the
+overlay paints 8 063 red pixels over exactly that side of the circle.
+
+**A farm ON a stump sees over everything at or below its own height**, like
+every other tower — the eye is `groundHeight`, so its own rock cannot blind it.
+That was the total failure the Arcane Sniper had before elevation was wired up.
+
+**The cost is small and was measured rather than assumed**: 2 µs per body for
+the whole `killBonusAt` sweep, against the ~15 µs per body the camo ground ring
+costs, in a 0.84 ms frame. The circle test runs first and throws most candidates
+away before any shape loop — the same ordering `RangeFilter.canTarget` uses.
+
+**THE FIELD IS ITS OWN CHANNEL, not a slow and not a DamageAmp stack.**
+`applySlow` takes the strongest and refreshes it, which is right for a timed
+debuff a tower applies and wrong for a standing field — a Warbringer's 65% would
+have swallowed a Farm's 5% entirely. The brief asks for these to stack
+**additively with the other kinds**, so `js/enemy.js` reads them as a third
+channel: the slow multiplies alongside `slowMultiplier`, and the damage
+amplifier is SUMMED with DamageAmp's fraction and applied once. With no farms on
+the board that sum is DamageAmp's own multiplier to the float, which is what
+keeps every existing figure in the suite where it was.
+
+**B5's execution is asked AFTER the blow, never instead of it.** "Un ennemi
+situé dans la portée est ATTAQUÉ" — a body that walks through untouched is never
+executed; being hit is what asks the question. It takes the ordinary death path,
+so a Revenant still gets up and the bounty is still paid once by the sweep.
+
+### Everything it makes is visible on the board, not only in the panel
+
+Four separate reports, all from 2026-08-28 and all the same complaint: the tower
+worked and nothing said so.
+
+* **A payment throws a popup** — `Effects.farmProduced(tower, amount, stored)`,
+  the same one an enemy's bounty gets, saying `stored` when A4 kept it. The
+  CLONE throws one too, and that one matters most: it is the only gain that
+  happens *between* waves, when nothing else on the board is moving to explain
+  the stock going up. Owner: *“we can't see whenever an A4 or A5 tower produces
+  mana between waves — the cloned mana from the storage.”*
+* **A path-B farm's share of a kill is its OWN popup**, green, above the gold
+  bounty, never added into it. Owner: *“imagine it gives four and the tower
+  gives one — it's written +4 and +1, not +5.”* Two farms over one corpse are
+  two gains and read as two.
+* **A body a farm will be paid for wears a ring while it is still alive**, in
+  the same green, solid where the camo ring is dashed so a camo body inside a
+  field reads as both. Gated on `Farms.killBonusAt`, which costs one length test
+  with no farm on the board — this is the per-body overlay term measured to
+  break first.
+
+**BOTH BOARDS DRAW ALL OF IT.** Every one of these lives in two places — the 2D
+pass and gl-world's — and each was found by the 3D board silently not doing it:
+the popup colour was honoured only in `Effects.drawWorld` and painted gold in
+gl-world; the target ring was called only inside `if (!world3D)` and so stroked
+nothing at all (measured: zero changed pixels between a frame with the mode
+armed and one without). **A popup's `y` is a world coordinate and its `lift` is a
+HEIGHT** — raising a label means raising the lift; changing `y` walks it
+northwards across the map, which is how two popups sixteen units apart ended up
+in one eighteen-pixel band.
+
+### Path C is a network, and its dice are DATA
+
+Every C3+ farm joins one network. **B** is the sum of the members' nominal
+productions; **P** is the permanent figure the dice batter and the next wave
+pays. P starts at B when the network comes into being and never tracks it again
+— a farm joining later raises the baseline a face 8 resets to, and does not undo
+the dice. **A networked farm is never paid twice**: its production is already
+inside B and therefore inside P, so `settleWave` skips it and `openWave` pays P
+once. Paying does not consume P.
+
+**NOTHING HERE USES `Math.random`.** The dice are a seeded xorshift, for the
+reason lane offsets and the Summoner's spawn points are: a run that cannot be
+replayed cannot be tested, and this tower's whole output is decided by dice.
+
+**A FACE IS A DESCRIPTOR, and the resolver never branches on a number.** `flat`,
+`percent`, `worstOf`, `bestOf`, `thenPercent`, `reset`, `double`, the three
+"next gain" charges and `prep` are the whole vocabulary; three tables differ by
+their numbers alone. That is what lets `tests/farm.test.js` walk all sixty-two
+faces individually, with a scripted die rather than a seed.
+
+**C5's TABLE HAS TWENTY-TWO FACES.** The brief calls it a D20 and then lists 21
+and 22, so the table is the harder constraint and the die has 22 sides. It is
+recorded here rather than quietly reconciled.
+
+**C5 IS PRICED AND SUNK, AND IT IS THE ONLY TIER IN THE GAME THAT IS** (retuned
+2026-08-28, to the owner's figures). 250 000 mana, up from 9 000; **the sale
+refunds none of it**; and its own production came down from +500 a wave to
++400. Every gain face on its table was cut with it: 9 +65, 10 +95, 11 +130,
+12 +175, 14 +350, 15 max(+425, +10%), 16 +225, 17 next gain max(+650, +35%),
+18 max(+525, +15%), 20 +700 then +20%. The loss faces, the reset, the reroll,
+the cull, the multiplier and the two doubles are unchanged.
+
+**The no-refund half is a tier flag, not a Farm rule**: `noRefund: true` on the
+row, `unrefundableSpent` on the tower, and `sellValue` in js/game.js subtracts
+it before the refund fraction. `totalSpent` stays honest about what was paid —
+that is the figure the end-of-run screen reports — so the two must not be
+conflated. Any future tier can be sunk the same way by adding the flag.
+
+**The deferred effects are ordered, and the order is mandated because every step
+changes what the next one sees**: a face 13's protections reroll up to three 8s;
+then the +1/+2 land on C5 dice; then a +2 that produces exactly 8 becomes 9 (a
++1 arriving on 8 is left alone, which is the brief's wording); then a previous
+face 22 removes what is still under 9; then what survives is sorted and resolved
+low to high. **Sorting is what C5 buys** — without one on the board the order is
+random, and the "next gain" faces are worth more when the gains after them are
+big.
+
+### Three of the twelve models exist, and they arrived animated
+
+**Twelve are planned**: the base, a T1 shared by A1/B1/C1, a T2 shared by
+A2/B2/C2, and one each for A3-A5, B3-B5 and C3-C5. **No crosspath ever gets a
+model of its own** — a Farm with a main path at T3+ wears that path's body and
+its secondary T1/T2 add no overlay.
+
+**All twelve are built**, imported from Claude Design. `farm-base` is a stone mana well
+with a crank, a pulley, a rope and a bucket, and a novice working it; `farm-t1`
+is a hand pump with a lever, a piston, a hose and a bottle; `farm-t2` is that
+pump reinforced with a flywheel and a pressure tank (all three 2026-08-28). Then
+the three T3 bodies, one per path (2026-08-29): `farm-t3a` a relic piston
+refinery, `farm-t3b` a targeting array on a gimbal, `farm-t3c` a d20 fate altar.
+Then the three T4s the same day: `farm-t4a` a storage-and-cloning generator,
+`farm-t4b` a control-zone orrery, `farm-t4c` a two-dice fate manipulator. And
+the T5s that finish the set: `farm-t5a` the Mana Vault Engine, `farm-t5b` the
+Azure Panopticon, `farm-t5c` The House Always Wins.
+
+`farmGroup` in gl-world answers with **the highest model that has been
+AUTHORED**, not the highest tier bought, so a T5 on path B wears `farm-t3b`
+until its own is built. From T3 the PATH picks the body, which is the brief's
+rule; the crosspath makes that unambiguous, since a T3 anywhere caps the other
+two branches at 2.
+
+**Every model carries authored clips** rather than a cycle this project solved.
+Base/T1/T2 have one loop each (8 s, 7.5 s, 7.5 s). The T3 bodies have an idle
+AND one-shots, and each one-shot depicts something the tower already does:
+
+| model | idle | one-shots | fired by |
+|---|---|---|---|
+| `farm-t3a` | `idle_work` 4 s | `produce_tick` 1.6 s | a production tick (A3+) |
+| `farm-t3b` | `idle_scan` 6 s | `target_lock` 0.35 s | a body entering the field |
+| | | `kill_capture` 0.7 s | a body dying inside it |
+| `farm-t3c` | `idle_magic` 3 s | `end_wave_roll` 2.4 s | the C network rolling |
+| `farm-t4a` | `idle_process` 4 s | `produce_tick` 1.6 s | a production tick |
+| | | `clone_wave` 2.2 s | the stock cloning at a wave |
+| | | `withdraw` 1.4 s | the player collecting it |
+| `farm-t4b` | `idle_orbit` 8 s | `field_pulse` 1.5 s | *a second IDLE — see below* |
+| | | `target_lock` 0.35 s | a body entering the field |
+| | | `kill_capture` 0.8 s | a body dying inside it |
+| | | `wave_gain` 1.1 s | the base being given its HP |
+| `farm-t4c` | `idle_fate` 4 s | `end_wave_roll` 2.4 s | the C network rolling |
+| | | `result_positive/negative` | what that throw did to P |
+| | | `result_reset` 1 s | a reset face (8) |
+| | | `critical_success/failure` | a doubling face, or P halved |
+| `farm-t5a` | `idle_vault` 6 s | `produce_tick` · `clone_wave` · `withdraw_mana` | as A4 |
+| | | `empower_permanent` 3.4 s | A5's permanent investment |
+| | | `empower_temporary` 2.2 s | A5's surge |
+| `farm-t5b` | `idle_panopticon` 10 s | `field_aura` 2 s | *a second IDLE, as B4's* |
+| | | `target_lock` · `kill_capture` · `wave_gain` | as B4 |
+| | | `execute` 1.25 s | B5 taking a body outright |
+| `farm-t5c` | `idle_casino` 6 s | `end_wave_roll` 3 s | the C network rolling |
+| | | `queue_modifier` 0.9 s | a face RECORDING a prep effect |
+| | | `reroll_eight` · `purge_under_nine` · `pre_roll_modifiers` | one being SPENT |
+| | | `result_21_double` · `result_22_purge_double` | the C5 table's own doubles |
+| | | the other `result_*` | as C4 |
+
+### Four things the first T5 pass got wrong, and what they taught
+
+**AND NOTHING TO AIM AT IS A REFUSAL, NOT A MODE.** The investment only lands on
+a tower at TIER 5 OR ABOVE — the brief's rule, and what the button says — so on a
+board with none, arming opened a mode whose every click was refused after the
+fact. That reads exactly like a broken button, and the owner reported it twice.
+`beginInvesting` asks the board first and answers false; the press then says "no
+tier 5 tower to boost" through the same channel every other refusal uses.
+
+**THE PANEL WAS STANDING ON THE TARGET.** Arming A5's boost left the inspection
+panel up — a 268 px slab down the right third of the board — and `runPanelAction`
+consumes every click that lands on it *before* `pickTower` runs, so a tower drawn
+behind it could not be picked at all. Owner: *"A5's ability is bugged, I can't
+select the tower to empower."* Measured: a Warbringer drawn at x 741 sits inside
+a panel spanning 733–977 and its click never reached the board. `beginInvesting`
+now clears `inspected`. **Aiming deliberately does not**, and the two are not the
+same case: a cone is aimed at a DIRECTION and the player can pick one that is not
+under the panel; a target is a specific tower, wherever it was built.
+
+**THE EYE WATCHES, NOT THE MACHINE.** A farm with a field tracks the nearest
+COVERED body — found by the same sweep that finds the lock edge, so the sight
+rule still holds and it will not follow something behind a rock. The bearing is
+kept as `viewYaw`, **not** as the tower's `aim`: turning `aim` swung the skid,
+the pylons and the operator with it, which is what every other tower does and
+what this one must not. Owner: *"the whole model turns, which is not right; only
+the eye should turn — notice how it already turns alone when in idle."*
+
+`farmAimOverride` in gl-world poses ONE group about its own axis and hands it to
+`drawActor` as a per-group override, the same door the recruit's rifle recoil
+uses. The pivot comes from the model's new `pivots` map, not from the geometry's
+middle — an eye turned about the centre of its own mesh swings off its mount.
+
+**ONLY WHILE THE FIELD IDLE IS PLAYING**, and that is what makes it safe:
+`field_aura` (B5) and `field_pulse` (B4) key the pylons and the range ring and
+leave the eye alone, so an override is the only thing moving it. Measured: 380 px
+change when the eye turns while watching, and **0 px** when the field is empty —
+`idle_panopticon` sweeps the eye on its own then, which is the authored patrol
+and exactly what a scanner with nothing to look at should do.
+
+**EASED, NOT SNAPPED**: `1 - exp(-6·dt)` toward the target, taken the short way
+round, so a body crossing behind does not send the eye the long way. It does not
+shoot, so it does not have to be exact.
+
+**THE PURGE WAS PERMANENT, AND THE IMPORTER'S FAULT.** `idle_poses` answered
+"what does a node keyed only by an action hold during the idle?" with "that
+clip's final pose" — generalised from one case, `b3_capture_pulse`. It is false:
+T5-C's `c5_wedge_0..7` are keyed only by the two purge clips, both of which START
+at the authored rest and deliberately END sunk, so the sectors sank once and
+never came back. Owner: *"it should only be deleted for the animation and then
+appear again."* The rule is gone: **the authored rest IS the idle pose** for any
+node the idle does not key — it is what the exporter wrote, what every one-shot
+starts from, and what `collect` bakes the geometry in.
+
+**AND THE DICE NOW SHOW THEIR FACES.** `FarmTower.rollFaces` returns one
+`{face, kind}` per die, read off the same table the resolver used, and gl-world
+draws them over the tower permanently — green a gain, red a loss, gold a double,
+blue a reset, grey a face that only prepares something. Owner: *"we have no way
+of knowing if it's bad or good."* The reading belongs to the tower, which owns
+the table; the renderer only places it. Same division as the Summoner's counter.
+
+**RECORDING A PREP EFFECT AND SPENDING IT ARE TWO MOMENTS**, and T5-C draws them
+differently — a plaque sliding into its slot, then firing. `resolve` stamps
+`queue_modifier` when a face banks one; `applyPrep` stamps `reroll_eight`,
+`purge_under_nine` or `pre_roll_modifiers` when the next series consumes it.
+These are the four clips that shipped on C4 with nowhere to play: T5's body has
+the states they describe, so they are wired now.
+
+**THE C5 TABLE HAS ITS OWN TWO DOUBLES.** Face 21 arms the next one and face 22
+purges everything under nine as well, and the T5 body has a clip for each; a C3
+or C4 double has no such face and stays the generic `critical_success`.
+`outcomeOf` checks the face numbers, and only when the farm's table IS `C5`.
+
+**`field_pulse` IS A SECOND IDLE, NOT A ONE-SHOT.** It is a seamless 1.5 s loop,
+and it replaces band 0 for as long as B4's zone holds a body — which the tower
+already knows, because `fieldHeld` is kept for the lock edge. Any model without
+the clip falls through to its own band 0.
+
+**THE SIMULATION NAMES ITS OWN OUTCOME.** C4 has a body for each way a throw can
+go, so `outcomeOf` in js/farm.js decides which — reading that farm's OWN dice
+(`lastRolls`) and the network's movement, in order: a doubling face is a
+critical success, a reset face names itself, P halved or worse is a critical
+failure, then merely up or down. The order is the decision: face 8 from a high P
+is a bigger loss than any other face can deal, so testing the halving first would
+swallow it and play a generic catastrophe where the shrine has a body for exactly
+that. The renderer never re-reads a face table.
+
+**C4's four unwired clips are wired on T5-C**, where the same effects have
+bodies that show the resulting STATE — a queued plaque, purged sectors, an armed
+double. C4 keeps its own four unplayed, because its model has no such states to
+land in and a farm wearing it has not bought C5 anyway.
+
+**THE SIMULATION RECORDS *WHEN*, THE RENDERER DECIDES *WHETHER*.** `lastTick`,
+`lastLock`, `lastCapture`, `lastRoll`, `lastClone`, `lastWithdraw`, `lastGain`,
+`lastExecute`, `lastEmpower` and `lastPrep` are animClock stamps on the tower,
+-1 for never — 0 is a real moment and a farm paid on its first step would otherwise
+play its tick at birth. `farmFrame` in gl-world picks the most recent one-shot
+still inside its own duration, else the idle. One-way, exactly like
+`swingProgress` and `gearPhase`: nothing simulated reads any of it back.
+
+**Clips are matched BY NAME, never by band index** — `bandNames` on the model —
+because an index points at whatever happens to be second in the file, and B3
+already carries two one-shots where A3 and C3 carry one. A test pins the names.
+
+### The mana has to be VISIBLE, and two separate things were hiding it
+
+Owner, on the first import: *“il n'y a pas de shine ni de couleur… le A path
+est censé avoir des couleurs violettes, le C orange un peu plus vibrant, le B
+briller quand il y a des interactions.”* Both causes were real and neither was
+the model's fault.
+
+**1. GLASS SHIPS OPAQUE, so it walled the mana in.** The design paints glass at
+35% opacity (`alphaMode: BLEND`); a palette row here is `[r, g, b, emission]`
+with no fourth channel. So every glass shell arrived as a solid pale object with
+the mana sealed inside it — A4's reservoir was a white cylinder. Each is now
+`--exclude`d at import, which is the Bulwark's argument again (see
+`Integrated_Kinetic_Field` in `glb_to_model.py`). **None of the glass nodes
+carry mana as a child**, which is what makes dropping the subtree safe, and the
+caps, necks and bands are separate nodes that stay — the silhouette survives.
+C3 and C4 have no glass at all, which is exactly why their gold read from the
+start.
+
+**2. EMISSION IS A ROUTE TO WHITE, so the colour that did show was washed.**
+`GLModels.expand` bakes `min(1, emit * 0.16)` into every LINEAR channel as a
+resting floor. At the authored 1.15–2.6 the purple goes from `#794aff` to
+`#cdb9ff` — saturation 0.71 down to 0.27. Every farm model is imported with
+`--emit-cap 0.8`, which lands it at `#9a7bff` and keeps it mana.
+
+**THE BRIGHTNESS THAT CAP GIVES UP IS REPAID BY A REAL GLOW.** A farm had none:
+`towerGlow` returns 0 for anything with no swing and no core, so the mana was
+lit only by the sun. `farmGlow` gives it a steady pilot light (0.42–0.62,
+breathing on a 2.4 s period that is deliberately no clip's length) plus a flash
+of up to 1.15 that decays over 0.6 s on **every** event the tower already
+stamps. `vEmi` is per material, so this brightens the mana, the coils, the dice
+and the orrery's core and never the wood — one number standing in for the
+handoff's per-material curves, because the shader is already picking the right
+surfaces.
+
+**THE TINT IS THE PATH'S, AND IT IS IN LINEAR.** `#7a4bff`, `#46d8ff`,
+`#ff9d2e` — the handoff's own tokens, converted: (0.195, 0.070, 1.0),
+(0.061, 0.687, 1.0), (1.0, 0.337, 0.027). The shader adds `uGlowTint * (vEmi *
+uGlow)` BEFORE its single sRGB conversion, so passing the sRGB triplets pours
+two and a half times too much red into every flash and turns a purple chamber
+pink. Measured on the board: with the linear tints a flash brightens 92 tower
+pixels, the strongest `#47616a → #82aeb2`, and the hue holds.
+
+**The per-material CURVES are still not imported and cannot be.** The handoff
+specifies them per material (`mana_chamber_t3a` at `1.15 + 0.35·sin`, and so
+on) and the format carries one static scalar per palette row. What ships is the
+right colour, lit, brightening on every event — not five independent curves.
+
+**THE ANIMATION RUNS ON THE SIMULATION CLOCK, not `state.now`.**
+`FarmTower.animClock` is accumulated in `update(dt)`, so the well turns three
+times as fast at 3× speed and stops dead when the run freezes — a picture of
+the production it is. `state.now` is `performance.now()`, which is why the
+Summoner's idle keeps chanting over a paused board; do not copy that here. The
+renderer divides `animClock` by the MODEL's own `loopSeconds` and takes the
+remainder, because the model is what knows how long its loop is.
+
+**The 2D fallback is still a placeholder**, and is meant to look it: a canvas
+glyph reduced to the four shapes that read from the top down — platform,
+cauldron, mana, hood. Only the WebGL board has the real bodies.
 
 ---
 
@@ -7968,6 +8570,62 @@ CYCLOID rather than any slip. The Herald reads 1.5 px on the same rig the
 Sapper reads 8.0 px on, and the difference is the wheel diameter, not the
 authoring. Both are still walked, measured and printed.
 
+**A SECOND IMPORTER EXISTS, AND IT IS NOT A VARIANT OF THE FIRST.**
+`tools/glb_to_animated.py` imports a `.glb` that carries **its own animation**;
+`glb_to_model.py` imports one that does not and synthesises the motion from a
+rig. The Farm's three models are the only users so far, and they are the only
+files in `glb/` with an `animations` array in them.
+
+The split is a real one rather than tidiness. `glb_to_model.py` answers "what
+should this body do" — a walk cycle that must stay in step with distance
+covered is SOLVED, not authored, and `walk_cycle` inverts the hip rotation to
+prove it. The animated importer answers "what does this file already do": it
+reads the glTF samplers and bakes them into the frame list, and there is nothing
+to solve. A model needing both would be one with an authored idle and a solved
+gait, and there is none.
+
+What it shares it IMPORTS rather than copies: the `.glb` reader, the mesh walk,
+the palette derivation, the axis convention and the emitted format. What it adds
+is grouping by **nearest animated ancestor**, geometry stored in MODEL space
+with every pivot at zero, and one field, `loopSeconds`.
+
+**GEOMETRY IN MODEL SPACE IS THE FORMAT'S RULE, NOT A CHOICE**, and it is the
+same one the walker rigs make with `origin_pivot`. A frame matrix is applied as
+`instance * pose`, so it must land its points in model space; storing them
+relative to a joint means every matrix has to carry that joint's translation
+back, and getting the direction of that wrong shifts a whole group by its pivot.
+It did, on the first version of this tool: the well's bucket and rope were
+pushed out of frame, the novice's hands ended up inside the well, and the pumps'
+levers sank into the ground. Owner: *"pour la base y a pas de seau ni de corde
+et les mains sont dans le puits, et pour les deux autres les mains et le shaft
+sont dans le sol"*.
+
+Nothing is lost by it: the delta a group is posed by already turns about that
+part's own origin, because it is built from the node's world transform rather
+than from a rotation at the model root.
+
+**HOW TO CHECK AN IMPORT WITHOUT LOADING THE GAME**, and this is the check that
+would have caught the above in one run: pose each group's rest origin by its own
+frame matrix and compare against the glTF sampled directly at the same time. The
+three Farm models agree with their sources to 8e-6 model units on the bucket,
+the rope, the pulley, the crank and both of the novice's hands.
+
+**`GLModels.register` COPIES FIELDS EXPLICITLY, so a new one has to be added
+there too.** `loopSeconds` is on that list because `bands` was not for eight
+models — the field shipped, `register` dropped it, every reader took the
+documented fallback, and the whole thing looked like it worked. A missing
+`loopSeconds` fails the same silent way: the animation plays at a default rate
+nobody chose.
+
+**THE TRAP THAT COST A REGENERATION**: `Animation.sample` must fall back to the
+node's AUTHORED value for every channel the animation does not drive. An
+animated node is normally driven on one component — `well_pulley` has a rotation
+channel and nothing else — and rebuilding its local matrix from the animation
+alone drops the translation that puts it up on the beam. The first run did
+exactly that, and the pulley's frame matrix carried a residual shift of -1.44 in
+z, which is its own height. It is checkable in one line: a group animated by a
+pure rotation about its own pivot must have a frame translation of zero.
+
 **TWO PAIRS ARE ONE BODY IMPORTED TWICE, AND THE SECOND IMPORT IS NEVER
 INDEPENDENT OF THE FIRST.** `bulwark_shield.glb` and `bulwark_no_shield.glb` are
 the same machine, and the stripped one is imported with `--span 3.0771` — the
@@ -8831,18 +9489,21 @@ no mechanic was moved to match the description.
 | Elevation | one number per tower, read once at construction: what it sees OVER and +1% reach per 1.6 u.l. **Every one of the five types carries it** — the two adapters did not until 2026-08-27 | `groundHeightUnder`, `elevatedRangePx`, `RangeFilter.sightClear` |
 | Tower reach shape | `{ radius, inner, aim, arcRad, full }` — the one reconciliation of the Warbringer's wedge, the Sniper's cone and everything else's circle. Read by the renderer AND by the blind-spot clip | `towerReach` in js/tower.js |
 | Tower click target | a **dome** at the feet at the full footprint radius, plus a **cylinder** to the top of the mesh and no higher at half of it. Nearest to the camera wins; a summon beats a tower. The world-space footprint test is the flat board's rule and the fallback | `pickTower` / `towerAt` in game.js, `Tower.HIT_SHAFT_FRACTION`, `World3D.towerTopOf` |
+| Where the cursor lands | the SURFACE under it, not the floor — the ray is walked through the height field's own band, so a stump top is what you point at. Boards with one level skip it entirely | `World3D.screenToWorld`, `OrbitCamera.planeAt` |
+| Placement feedback height | draped over the board per point; a stump rim and a tower footprint declare their own (`ring.z`) because they lie ON the edge | `projectRing`, `noBuildRings`, `drawNoBuildOverlay` |
 | Blind-spot overlay | red where a reach is held but not seen: ONE path, ONE fill (overlaps merge, never stack), the outline is the UNION's outline (no seams through the middle) and the whole layer is clipped to the reach's own shape | `drawSightShadows`, `coneRing` in game.js |
 | What stops a shot | arriving, losing its target, spending its pierce, running out of range. **Not terrain** — sight gates acquisition and nothing gates the round | `js/bullet.js` |
 | Bullet speed | 562.5 u.l./s | `Bullet.BASE_SPEED_ULPS` |
 | Pierce hit radius | 12 u.l. | `PierceBullet.HIT_RADIUS_UL` |
-| Warbringer range | 37.5 u.l. base, 62.5 at A5, **77.5 at full B** (B2 +15, B4 +10, B5 +15, additive on the base) | `Smasher.BASE_RANGE_UL`, `rangeBonusUl` in `Smasher.UPGRADES` |
+| Warbringer base | **14 damage every 3.2 s, 40 u.l., 120° = 4.38 DPS** as placed (12 / 3.5 / 37.5 until 2026-08-27) | `Smasher.BASE_*` |
+| Warbringer range | 40 u.l. base, **72.5 at A5**, **90 at full B**, 103.75 on the A1+A2+full-B crosspath. A1 +5 and A2 +5 are additive like path B's; only A2-A5 carry absolutes | `Smasher.BASE_RANGE_UL`, `rangeUl` / `rangeBonusUl` in `Smasher.UPGRADES` |
 | Warbringer blast | 18.75 u.l. radius, **15 damage, CHAINS, and applies the tower's slow**; fires on ANY kill by the swing (B4) | `Smasher.EXPLOSION_RADIUS_UL`, `Smasher.EXPLOSION_DAMAGE`, `explode()` |
 | Warbringer swing order | slow FIRST, then damage, then the burst — a one-shot kill still bursts | `Smasher.prototype.swing` |
 | Warbringer earthquake (B5) | map-wide: 3 s movement stun, then 60% slow for 5 s, **45 s cooldown**, no damage; 0.75 s world shake and 2.4 s floor fissures | `Smasher.QUAKE_*`, `triggerQuake`, `Effects.earthquake` |
 | Enemy stun | timed, movement only, longest wins — distinct from `rooted` and from a slow | `Enemy.stunTimer`, `Enemy.applyStun` |
-| Warbringer cost | 700 (was 200 before 2026-07-30) | `Smasher.COST` |
-| Warbringer full A | 4500 on top of $700 (200/350/600/1400/1950) = $5200 | `Smasher.UPGRADES` |
-| Warbringer full B | 6300 on top of $700 (200/400/900/1900/2900) = $7000 | `Smasher.UPGRADES` |
+| Warbringer cost | **600** (200 before 2026-07-30, 700 until 2026-08-26; this row said 700 until 2026-08-27 and the code said 600) | `Smasher.COST` |
+| Warbringer full A | 4600 on top of $600 (**250/400**/600/1400/1950) = $5200, for 65 damage at 3.0 s = 21.7 DPS | `Smasher.UPGRADES` |
+| Warbringer full B | 6400 on top of $600 (**250/450**/900/1900/2900) = $7000, for 34 damage at 2.1 s = 16.2 DPS | `Smasher.UPGRADES` |
 | Tower HP from upgrades | every tier on both towers carries `hp`; Warbringer 150 → 575 (A) / 700 (B), Rifleman 80 → 380 (A) / 505 (B) | `Smasher.UPGRADES`, `Soldier.UPGRADES` |
 | Health tier semantics | GRANTS its delta — it does not heal to the new maximum | `applyUpgrade` on both |
 | Warbringer swing animation | base/B 0.2 s; Path A 0.48 s with three overhead afterimages and 1.6 s AoE cracks; damage still lands only at cooldown zero | `Smasher.SWING_SECONDS`, `PATH_A_*`, `swingPose`, `pathAImpact` |
@@ -8872,13 +9533,13 @@ no mechanic was moved to match the description.
 | Charge decay | 1 charge / 3 s, continuous, out of combat | `charge_to_gold.decaySeconds` |
 | Gold scaling ceiling | 50 000 gold (5 tiers, cap x10) | `GoldPower.MAX_SCALING_GOLD` |
 | Death denial gate | 5 000 HP healed, pooled across all towers | `beam.config.js` B5 `unlockCondition` |
-| Sell refund | half of everything spent | `SELL_REFUND_FRACTION`, `sellValue()` |
+| Sell refund | half of everything spent, less anything sunk | `SELL_REFUND_FRACTION`, `sellValue()`, `unrefundableSpent` |
 | Starting cash | 600 (was 20 before 2026-07-30); buys two Riflemen. BUILD prices were deliberately not touched by the 2026-08-01 repricing, to keep that true | `STARTING_CASH` |
 | Combat income | each body's authored kill bounty, paid once on final death | `Enemy.TYPES[*].bounty`, `Enemy.bountyOf`, `Enemy.prototype.bounty` |
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | $35 686 = $22 987 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
+| Easy run purse | $35 831 = $23 132 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |
@@ -8904,7 +9565,13 @@ no mechanic was moved to match the description.
 | Blub removed by hand | selling one through its panel takes it out of the fleet, the pooled HP, the swarm buff and the next merge | `sellTower` -> `Blub.onRemoved` -> `isDestroyed` |
 | Summon clock vs cycle | a tier that shortens an interval clamps the running timer to it -- from applyUpgrade, NEVER from recalcStats | `BlubTower.clampTimersToCycle` |
 | Compact panel actions | `action.compact` — 34 px, two per row, so six action rows still fit | `inspectionLayout` in game.js |
-| Build slots | 5, ALL FIVE FILLED since 2026-08-09: Warbringer, Arcane Sniper, Siphon, Rifleman, Summoner | `BUILD_SLOTS` in game.js |
+| Build slots | 5, and **six TYPES since 2026-08-27**: the armoury picks which five of the owned types are equipped. A sixth SLOT is still an unmade decision | `BUILD_SLOTS` in game.js, `MetaProgress.SLOT_COUNT` |
+| Tower prices, all six | Rifleman $300, Summoner $450, Warbringer $600, Siphon $800, Arcane Sniper $900, **Farm 1200 mana** | each type's `COST` |
+| Farm | 1200 mana, 200 HP, 35 u.l. footprint (25 at C1), no reach until path B. 200 mana a wave | `FarmTower` in js/farm.js |
+| Farm path A | +50/+150 mana a wave, then a TICK that replaces the per-wave figure (50/75/150 every 5 s), a private stock from A4 cloning 5% a wave (cap 1000, then 3000), and A5's investment in whole 10 000 tranches | `FarmTower.UPGRADES`, `produce`, `cloneStock`, `invest` |
+| Farm path B | the base's MAXIMUM grows +15/+35/+100/+100/+200 a wave and never heals; a circle of 150/200/300 u.l. that pays for kills inside it and, from B4, slows and amplifies. B5 executes under the higher of 10 HP and 5% | `baseMaxHp`, `growBaseMaxHp`, `Farms.fieldAt`, `Farms.executes` |
+| Farm path C | every C3+ joins ONE network: B is the sum of nominal productions, P is what the dice batter and what the next wave pays. C3 rolls one d20, C4 two, C5 three d22 | `Farms.network`, `FarmDice` |
+| Farm uniqueness | one B4-or-B5 on the map (not one of each), and one C5 | `unique` on the tier, `Farms.uniqueHolder` |
 | Tower prices | Rifleman $300, **Summoner $450**, Warbringer $700, Siphon $800, Arcane Sniper $900 — BUILD prices; upgrade paths cost $5200–$7500 (Warbringer, Rifleman), $15 150–$51 650 (Summoner), $17 900–$33 800 (Siphon), $20 250–$28 575 (Sniper) | each type's `COST`, each `UPGRADES`/config |
 | Screens | menu → route chooser (`select`) → difficulty step (`difficulty`) → play; index and store off the menu | `screen` in game.js |
 | Index tabs | three: Towers, Enemies, **Difficulties** (a sub-tab per schedule previewing every wave of it — 35 for Easy, 40 for Normal — derived, and previewing never selects) | `TABS`, `tabRect`, `drawDifficultiesTab`, `Codex.scheduleRows` in js/codex.js |
