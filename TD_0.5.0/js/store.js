@@ -283,6 +283,12 @@ var Store = (function () {
     // gives at length -- the Farm keeps its totals at the bottom of its list
     // and a count ate its production rate instead.
     var specimen = new Type(-1000, -1000, path);
+    // A SPECIMEN WEARS THE PLAYER'S EQUIPPED PERKS (2026-08-30), because the
+    // card beside it already quotes the perked build price and a card that
+    // priced a perked tower and described an unperked one would be describing
+    // two different towers. `applyTo` is the same door every tower on the board
+    // goes through -- see js/systems/tower-perks.js.
+    TowerPerks.applyTo(specimen);
     var rows = TowerStats.withoutTotals(specimen.statLines());
 
     rows.forEach(function (row, i) {

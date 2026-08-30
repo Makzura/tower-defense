@@ -13,6 +13,32 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The build ghost draws the ring the tower actually gets.**
+
+Placing a Warbringer with a reach perk equipped previewed the OLD circle:
+`previewRangePx` read `Type.BASE_RANGE_UL` straight off the constructor, so the
+ghost showed 40 u.l. and the tower then stood there covering 62.5. That function
+promises in its own comment that "the ring the player is shown is the ring they
+get", and a perk that moves reach broke it.
+
+It asks `TowerPerks.previewRangeUl` now — the same question `priceOf` already
+answers for money, asked of a stat: what would a FRESH one of these have? Only
+the UNCONDITIONAL part of the equipped perks is folded in, and that is right
+rather than partial: every `when` group keys on an in-run tier and a tower being
+placed has bought none of them. The Warbringer's range rebuild previews at 62.5
+and only starts subtracting once B1 is actually on the tower, which is exactly
+what the player then sees.
+
+**Same defect, two more faces.** The armoury card and the index build a
+throwaway specimen with `new Type(-1000, -1000, path)` and read its `statLines`
+— and a specimen never goes through `addTower`, so it wore no perks while the
+same card already quoted the perked build price. A card that prices one tower
+and describes another is the same bug with a different surface; both apply
+`TowerPerks.applyTo` to their specimen now.
+
+Two tests pin it: the ghost's ring against a placed tower's, with and without
+the perk, and the conditional half correctly absent from the preview.
+
 **2026-08-30 — The Rifleman's burst node cut from three shots to one.**
 
 `[R-A]` granted two extra rounds a burst at A2 and a third at A3 — 6, 7, 8, 8

@@ -141,6 +141,10 @@ var Codex = (function () {
 
   function walkBranch(Type, branch) {
     var t = new Type(-1000, -1000, path);
+    // Perked like every other specimen in this file: a tier row that ignored
+    // the player's permanent upgrades would print prices the panel does not
+    // charge, since a perk may move what a tier costs.
+    TowerPerks.applyTo(t);
     var tiers = [];
 
     // Hard cap well above any real path length, so a tower that failed to
@@ -207,6 +211,12 @@ var Codex = (function () {
   function buildTowerModels() {
     return roster().map(function (Type) {
       var base = new Type(-1000, -1000, path);
+      // A SPECIMEN WEARS THE PLAYER'S EQUIPPED PERKS (2026-08-30), because the
+      // card beside it already quotes the perked build price and a card that
+      // priced a perked tower and described an unperked one would be describing
+      // two different towers. `applyTo` is the same door every tower on the board
+      // goes through -- see js/systems/tower-perks.js.
+      TowerPerks.applyTo(base);
 
       // Drop the lifetime-total rows: a specimen in a field guide has no
       // history. Asked of the ROWS rather than counted off the front -- the

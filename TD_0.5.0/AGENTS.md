@@ -4169,6 +4169,21 @@ one circle and shoot another. Footprint is deliberately NOT handled: it is
 placement-only on every tower, and moving it would move where a tower may stand
 after it is standing there.
 
+**And a THIRD reach: the one the build ghost draws, before any tower exists.**
+`previewRangePx` promises that "the ring the player is shown is the ring they
+get", and it read `Type.BASE_RANGE_UL` straight off the constructor — so a
+Warbringer with a reach perk was previewed at 40 u.l. and then stood there
+covering 62.5. It goes through `TowerPerks.previewRangeUl` now, which folds the
+UNCONDITIONAL part of the equipped perks onto the type's authored base. Only the
+unconditional part, and that is correct rather than a limitation: every `when`
+group keys on an in-run tier and a tower being placed has bought none of them.
+
+**A throwaway specimen wears the perks too.** The armoury card and the index
+build one with `new Type(-1000, -1000, path)` and read its `statLines`; it never
+goes through `addTower`, so it wore none — and both cards already quote the
+perked build price, which made a card that priced one tower and described
+another. Both call `TowerPerks.applyTo` on their specimen now.
+
 **`statTarget` knows three shapes, and the adapters are the one that is easy to
 miss.** The Arcane Sniper and the Siphon are ADAPTERS wrapping a
 `ConfiguredTower`: the resolved stats are on `core.stats`, and their restat

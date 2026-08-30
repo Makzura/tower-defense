@@ -6916,8 +6916,12 @@ function drawPlacementFeedback() {
 // the shadows and the built tower all use, so the ring the player is shown is
 // the ring they get.
 function previewRangePx(type, x, y) {
+  // THE PERKED BASE, NOT THE TYPE'S OWN. A permanent upgrade may move a type's
+  // reach, and this function's whole promise is that the ring on the ghost is
+  // the ring the placed tower gets -- so it has to ask the same layer the
+  // placed tower's numbers come from. See TowerPerks.previewRangeUl.
   return elevatedRangePx({ groundHeight: groundHeightUnder(x, y) },
-    type.BASE_RANGE_UL);
+    TowerPerks.previewRangeUl(type));
 }
 
 // THE PATCH OF GROUND ONE OBSTACLE HIDES, as a ring of WORLD points.

@@ -502,6 +502,51 @@ var TowerPerks = (function () {
     return Math.max(1, Math.round(base * mul + add));
   }
 
+  // --- what a tower would be, BEFORE it exists -------------------------------
+  //
+  // THE BUILD GHOST HAS NO INSTANCE TO ASK. It is drawn while the player is
+  // still choosing where to put the tower, and `previewRangePx` in js/game.js
+  // promises in as many words that "the ring the player is shown is the ring
+  // they get". A perk that moves reach broke that promise: the ghost read
+  // `Type.BASE_RANGE_UL` straight off the constructor and the placed tower then
+  // stood there with a different circle.
+  //
+  // So the same question `priceOf` answers for money is answered here for a
+  // stat: what would a FRESH one of these have?
+  //
+  // ONLY THE UNCONDITIONAL PART, and that is correct rather than a limitation.
+  // Every `when` group keys on an in-run tier and a tower being placed has
+  // bought none of them -- the Warbringer's range rebuild reads 57.5 on the
+  // ghost and only starts subtracting once B1 is on the tower, which is exactly
+  // what the player will see. `onlyIf` is skipped for the same reason.
+  //
+  // `fields` is a LIST because a tree is authored against its own tower's own
+  // names: `rangeUl` on the hand-written towers, `range` on the config-driven
+  // ones. Only one of them is ever present in a given tree.
+  function previewStat(Type, fields, base) {
+    if (!Type || typeof base !== "number") return base;
+    var mul = 1, add = 0, set = null;
+    activeNodes(Type.ID).forEach(function (node) {
+      var fx = node.effects;
+      if (!fx || fx.onlyIf) return;
+      fields.forEach(function (field) {
+        if (fx.mul && typeof fx.mul[field] === "number") mul *= fx.mul[field];
+        if (fx.add && typeof fx.add[field] === "number") add += fx.add[field];
+        if (fx.set && typeof fx.set[field] === "number") set = fx.set[field];
+      });
+    });
+    if (set !== null) return set;
+    return base * mul + add;
+  }
+
+  // The reach a freshly placed tower of this type would have, in u.l. Read by
+  // js/game.js's `previewRangePx`, which is the ONE derivation the ghost, the
+  // sight shadows and the built tower all share.
+  function previewRangeUl(Type) {
+    if (!Type || typeof Type.BASE_RANGE_UL !== "number") return 0;
+    return previewStat(Type, ["rangeUl", "range"], Type.BASE_RANGE_UL);
+  }
+
   // --- reaching a tower ------------------------------------------------------
 
   // Called once per tower, as it joins the board. Summons and any type not in
@@ -587,6 +632,8 @@ var TowerPerks = (function () {
     activeIds: activeIds,
     activeNodes: activeNodes,
     priceOf: priceOf,
+    previewStat: previewStat,
+    previewRangeUl: previewRangeUl,
     tierCostDelta: tierCostDelta,
     applyTo: applyTo,
     statTarget: statTarget

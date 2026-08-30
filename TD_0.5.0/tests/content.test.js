@@ -10960,6 +10960,65 @@ function (t) {
     "an hour later the Warbringer may be reset again");
 });
 
+test("the ghost's ring is the ring the placed tower gets", function (t) {
+  var h = bootContent();
+
+  // THE BUG THIS PINS (2026-08-30): the build ghost read `Type.BASE_RANGE_UL`
+  // straight off the constructor, so a Warbringer with a reach perk equipped
+  // was previewed at 40 u.l. and then stood there covering 62.5. The promise
+  // `previewRangePx` makes in its own comment -- "the ring the player is shown
+  // is the ring they get" -- has to survive a perk.
+  var plain = towerWith(h, "smasher", [], []);
+  var plainUl = h.run(plain + ".rangeUl");
+  var plainGhost = h.run("previewRangePx(Smasher, 300, 300)");
+  t.eq(plainUl, h.game.Smasher.BASE_RANGE_UL, "an unperked Warbringer reaches 40");
+  t.near(plainGhost, h.run(plain + ".rangePx"), 1e-9,
+    "and its ghost draws exactly that");
+
+  // Both reach perks: +5 and +17.5 on the base, and no B tier bought, so the
+  // rebuild's negative groups correctly contribute nothing yet.
+  var perked = towerWith(h, "smasher", ["war_n1", "war_s1"], []);
+  var perkedUl = h.run(perked + ".rangeUl");
+  t.eq(perkedUl, 62.5, "with both reach perks it reaches 62.5");
+  t.eq(h.run("TowerPerks.previewRangeUl(Smasher)"), 62.5,
+    "and the preview says the same number");
+  t.near(h.run("previewRangePx(Smasher, 300, 300)"),
+    h.run(perked + ".rangePx"), 1e-9,
+    "so the ghost and the placed tower draw one circle");
+
+  // THE CONDITIONAL HALF IS CORRECTLY ABSENT FROM THE PREVIEW. `war_s1` cuts
+  // what B1, B2 and B4 give, and a tower being placed has bought none of them
+  // -- so the ghost must show the full 62.5 and only start subtracting once a
+  // tier is actually on the tower.
+  var withB1 = towerWith(h, "smasher", ["war_n1", "war_s1"], ["B1"]);
+  t.eq(h.run(withB1 + ".rangeUl"), 65.5, "B1 takes it to 65.5 on the board");
+  t.eq(h.run("TowerPerks.previewRangeUl(Smasher)"), 62.5,
+    "while the ghost still previews a fresh one at 62.5");
+});
+
+test("a card's specimen wears the perks its price is quoted under", function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.addXp('smasher', 20000);" +
+        "MetaProgress.buyNode('smasher', 'war_n1', 0);" +
+        "MetaProgress.equipPerk('smasher', 'war_n1', 0); openMenu()");
+
+  // THE ARMOURY AND THE INDEX BUILD A THROWAWAY SPECIMEN and read its
+  // `statLines`. That specimen never goes through `addTower`, so it wore no
+  // perks -- and both cards already quote the PERKED build price, which made a
+  // card that priced one tower and described another.
+  var range = h.run("(function () {" +
+    "  var s = new Smasher(-1000, -1000, path);" +
+    "  TowerPerks.applyTo(s);" +
+    "  var row = null;" +
+    "  s.statLines().forEach(function (r) { if (r[0] === 'Range') row = r; });" +
+    "  return row ? row[1] : null; })()");
+  t.ok(/45/.test(String(range)), "a perked specimen reports 45 u.l., not 40 (" +
+    range + ")");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 700,
+    "which is the tower the 700-mana price belongs to");
+});
+
 test("every authored node survives a reload with its effect intact", function (t) {
   var h = bootContent();
   h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
