@@ -785,14 +785,38 @@ LongshotTower.prototype.shotSpeedUlps = function () {
 // beam or standing in a Farm's field -- all over-led -- and a hasted body or a
 // sprinting Vanguard under-led. One call fixes the set, because that function
 // is where every one of those channels already meets.
+//
+// THROUGH THE ENEMY'S OWN `positionAt`, NEVER `path.pointAt` (2026-08-30). That
+// is the rule `Enemy.prototype.refreshPos` states in as many words, and this
+// was the third place in the repository breaking it.
+//
+// It cost two different amounts of accuracy. On a walker it dropped the body's
+// LANE: the prediction landed on the centreline while the body walks up to a
+// lane's width off it, so every lead was off by that much for ever -- small,
+// permanent, and invisible because the shot still usually landed inside the
+// 12 u.l. hit radius.
+//
+// On a Skimmer it was total. That type flies the CHORD from the road's mouth to
+// the base (`offPath`, js/enemy.js) and its `progress` is a position along its
+// own route rather than along the tarmac -- so `path.pointAt(progress)` returned
+// a point on a road the body is nowhere near, and this tower fired straight-line
+// pierce shots at empty ground. The owner found it as "the towers don't know
+// what to do and shoot at random places", which is exactly what it looks like.
+//
+// `routeScale` is the same conversion `Enemy.prototype.update` makes: pixels of
+// travel into progress along whatever route this body is actually on. 1 for
+// everything on the road, so a walker's lead is unchanged but for the lane it
+// now keeps.
 LongshotTower.prototype.predictedPosition = function (enemy) {
   var dx = enemy.pos.x - this.x;
   var dy = enemy.pos.y - this.y;
   var flightSeconds = Math.sqrt(dx * dx + dy * dy) / ul(this.shotSpeedUlps());
   // A tower beside one entrance may target a body on another entrance; predict
   // along the enemy's own route, not the route nearest the tower.
-  return enemy.path.pointAt(
-    enemy.progress + ul(enemy.currentSpeedUlps()) * flightSeconds);
+  if (typeof enemy.positionAt !== "function") return enemy.pos;
+  var scale = (typeof enemy.routeScale === "function") ? enemy.routeScale() : 1;
+  return enemy.positionAt(
+    enemy.progress + ul(enemy.currentSpeedUlps()) * flightSeconds * scale);
 };
 
 // The footprint is the physical extent, the collision radius AND the click

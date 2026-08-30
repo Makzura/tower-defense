@@ -13,6 +13,31 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The sniper aims at the body, not at the road under it.**
+
+The owner, on the Skimmer: *"they can't be touched, the towers don't know what
+to do and shoots at random places when targetting them."*
+
+`LongshotTower.prototype.predictedPosition` asked `enemy.path.pointAt(progress)`
+— the third place in this repository to break the rule `refreshPos` exists to
+state, after `death-denial.js` the same day. A Skimmer's `progress` is a position
+along ITS OWN route, the chord from the road's mouth to the base, so the road
+point it answered was somewhere the body has never been. Measured on the default
+board: the aim sat **62 px** from the body against a 12 u.l. hit radius, and an
+A1 sniper standing directly on the flight line left it at full health for twenty
+seconds. Through the body's own `positionAt` it kills it in twelve.
+
+It cost the whole roster something too, quietly. Every body walks a LANE a few
+u.l. off the centreline, and the prediction has always answered the centreline —
+so every lead in the game was off by that much, for ever, and it never showed
+because the shot still usually landed inside the hit radius. It keeps the lane
+now, which let the lead test drop the workaround its own comment described: a
+lead of zero is `enemy.pos` exactly rather than "the centreline, near enough".
+
+Two towers may legally engage a Skimmer — the Arcane Sniper, and a Siphon that
+has taken A4 for flight and B1 for camo. Nothing else can see it, which is the
+type's whole question to the player.
+
 **2026-08-30 — The Skimmer: a body that does not use the road.**
 
 The owner's idea — *"one that doesn't follow the path and flies in a straight

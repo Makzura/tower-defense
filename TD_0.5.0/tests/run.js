@@ -5625,12 +5625,13 @@ test("a body that has stopped is aimed AT, not in front of", function (t) {
   // Every reason a body can be standing still, one at a time, through the same
   // function the movement loop reads (`currentSpeedUlps`). Each one used to be
   // led as though the body were at full walk.
-  // MEASURED AGAINST THE CENTRELINE, not against `enemy.pos`. A body walks a
-  // LANE -- `laneOffsetUl`, a few u.l. off the middle of the road and different
-  // per body -- and `predictedPosition` has always answered a point on the
-  // centreline. That standing offset is a couple of u.l. against a 12 u.l. hit
-  // radius and is not what this test is about; the lead is, and a lead of zero
-  // is `path.pointAt(progress)` exactly.
+  // MEASURED AGAINST `enemy.pos` SINCE 2026-08-30, and it used to be measured
+  // against the centreline instead. `predictedPosition` answered a point on the
+  // centreline for the whole of this test's life -- it asked `path.pointAt`
+  // directly -- so a standing body was aimed at a couple of u.l. off its own
+  // lane and the assertion had to tolerate that. It goes through the body's own
+  // `positionAt` now, which keeps the lane, so a lead of zero is `enemy.pos`
+  // EXACTLY and the workaround is gone rather than merely retuned.
   [["rooted by a revive", function (e) { e.tryRevive(); }],
    ["stunned", function (e) { e.applyStun(3); }]].forEach(function (row) {
     var e = new g.Enemy(g.path, undefined, "revenant");
@@ -5640,9 +5641,10 @@ test("a body that has stopped is aimed AT, not in front of", function (t) {
     t.eq(e.currentSpeedUlps(), 0, row[0] + ": it is not moving");
 
     var aim = sniper.predictedPosition(e);
-    var here = g.path.pointAt(e.progress);
-    t.eq(Math.round(Math.hypot(aim.x - here.x, aim.y - here.y)), 0,
+    t.eq(Math.round(Math.hypot(aim.x - e.pos.x, aim.y - e.pos.y)), 0,
       row[0] + ": no lead is added at all");
+    t.ok(Math.hypot(aim.x - e.pos.x, aim.y - e.pos.y) < 1e-9,
+      row[0] + ": and the aim is the body itself, lane included");
 
     // And the shot's aim point is well inside the radius a PierceBullet
     // touches, which is the property that decides whether it connects.
@@ -5650,6 +5652,67 @@ test("a body that has stopped is aimed AT, not in front of", function (t) {
       g.ul(g.PierceBullet.HIT_RADIUS_UL) * 0.5,
       row[0] + ": and the aim sits well inside the shot's hit radius");
   });
+});
+
+test("a sniper leads a body that is not on the road, and connects", function (t) {
+  var h = harness.boot();
+  var g = h.game;
+  h.clearBoard();
+
+  // THE BUG THE OWNER FOUND: "they can't be touched, the towers don't know what
+  // to do and shoot at random places when targetting them."
+  //
+  // `predictedPosition` asked `enemy.path.pointAt(progress)`, and a Skimmer's
+  // progress is a position along ITS OWN route -- the chord from the road's
+  // mouth to the base. So the aim point was a spot on a road the body is
+  // nowhere near, and a straight-line PierceBullet went there.
+  var skimmer = new g.Enemy(g.path, undefined, "skimmer");
+  skimmer.progress = g.path.length * 0.5;
+  skimmer.refreshPos();
+
+  var chord = g.Enemy.chordOf(g.path);
+  var sniper = new g.LongshotTower(
+    Math.round((chord.from.x + chord.to.x) / 2),
+    Math.round((chord.from.y + chord.to.y) / 2) - 60, g.path);
+
+  var aim = sniper.predictedPosition(skimmer);
+
+  // THE AIM IS ON THE CHORD, which is the whole claim: the body's own route,
+  // not the tarmac. Measured as the perpendicular distance from the line.
+  var dx = aim.x - chord.from.x, dy = aim.y - chord.from.y;
+  var offLine = Math.abs(dx * chord.unit.y - dy * chord.unit.x);
+  t.ok(offLine < g.ul(Math.abs(skimmer.laneOffsetUl)) + 0.001,
+    "the aim point is on the body's own line (" + offLine.toFixed(2) + " px off)");
+
+  // AND IT IS LED, not merely pointed at: the body is moving, so the aim sits
+  // ahead of it and still well inside what a PierceBullet touches.
+  var lead = Math.hypot(aim.x - skimmer.pos.x, aim.y - skimmer.pos.y);
+  t.ok(lead > 0, "a moving Skimmer is led (" + lead.toFixed(2) + " px)");
+  t.ok(lead < g.ul(g.PierceBullet.HIT_RADIUS_UL) * 0.5,
+    "and the lead is well inside the shot's hit radius");
+
+  // WHAT THE OLD ONE ANSWERED, for the record: a point on the road, tens of
+  // pixels away, against a 12 u.l. radius. Kept as a measurement rather than a
+  // memory, so nobody has to take the size of the miss on trust.
+  var onRoad = g.path.pointAt(skimmer.progress);
+  t.ok(Math.hypot(onRoad.x - skimmer.pos.x, onRoad.y - skimmer.pos.y) >
+    g.ul(g.PierceBullet.HIT_RADIUS_UL),
+    "where the road point it used to answer is outside that radius entirely");
+
+  // END TO END: the one tower that may legally engage this body -- flight by
+  // default, camo from A1 -- actually removes it.
+  h.run("towers = []; enemies = []; bullets = []; cash = 1000000;" +
+        "waveIndex = WAVES.length; waveSpawned = 0");
+  h.run("addTower(new LongshotTower(" + sniper.x + ", " + sniper.y + ", path));" +
+        "towers[0].purchase('A')");
+  t.eq(h.run("towers[0].core.stats.seesCamo"), true, "A1 gives it camo detection");
+  t.eq(h.run("towers[0].core.stats.seesFlying"), true, "and it sees flight already");
+
+  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}))");
+  var killed = h.run("(function () {" +
+    "  for (var i = 0; i < 600; i++) { update(1 / 20); if (!enemies.length) return true; }" +
+    "  return false; })()");
+  t.ok(killed, "and the Skimmer dies to it rather than flying past untouched");
 });
 
 // THE END TO END, because the arithmetic above cannot show what it cost.

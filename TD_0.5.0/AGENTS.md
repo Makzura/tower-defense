@@ -2238,10 +2238,25 @@ course and never turns.
 be addressed to something over the basin. Slows, hastes, Farm fields and its own
 sprint window all still apply; only the road's own profile is skipped.
 
-**`refreshPos`, never `path.pointAt`.** That rule already existed for lane
-offsets and `js/systems/death-denial.js` was breaking it — writing `progress`
-and asking the path directly. On a Skimmer that would teleport a knocked-back
-body onto road it has never touched. Fixed the same day.
+**`refreshPos` / `positionAt`, never `path.pointAt`.** That rule already
+existed for lane offsets and TWO places were breaking it, both found by this
+type and both fixed the same day:
+
+- `js/systems/death-denial.js` wrote `progress` and asked the path directly, so
+  a knocked-back body was snapped onto the centreline and lost its lane. On a
+  Skimmer it would have teleported one onto road it has never touched.
+- **`LongshotTower.prototype.predictedPosition` aimed through the road**, which
+  is what the owner reported as *"they can't be touched, the towers don't know
+  what to do and shoot at random places"*. On a walker it cost a lane's width of
+  lead, permanently and invisibly, because the shot still usually landed inside
+  the 12 u.l. hit radius. On a Skimmer it was total: measured on the default
+  board, the aim point sat **62 px** from the body and an A1 sniper standing on
+  the flight line left it at full health for twenty seconds. Through
+  `positionAt` it kills it in twelve.
+
+**Which towers may legally engage one**: the Arcane Sniper (flight by default,
+camo from A1) and a Siphon that has taken A4 for flight and B1 for camo. Nothing
+else can see it at all, and that is the type's whole question to the player.
 
 **PARKED, NOT SCHEDULED.** The type carries `sandboxOnly`, which is this
 repository's documented way to hold a type in the index and the sandbox while it
