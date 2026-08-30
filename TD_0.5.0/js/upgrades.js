@@ -458,8 +458,9 @@ var Upgrades = (function () {
     var out = TowerPerks.resetTree(selected, Date.now());
     if (!out.ok) { say(out.reason, "bad"); return; }
     treeNode = null;
-    say("Tree reset — " + out.removed + " refunded for " + out.refunded +
-        " ⬡, fee " + out.fee + " ⬡.", "good");
+    say("Tree reset — " + out.removed + " node" + (out.removed === 1 ? "" : "s") +
+        " refunded for " + out.refunded + " ⬡, commission " + out.fee +
+        " ⬡, net " + (out.net >= 0 ? "+" : "") + out.net + " ⬡.", "good");
   }
 
   function coolingText(readyAt) {
@@ -471,16 +472,30 @@ var Upgrades = (function () {
 
   // --- drawing: shared -------------------------------------------------------
 
-  // A NODE'S SIGIL. Procedural and deterministic, hashed off the node's own id,
-  // so a tree of any size has distinguishable marks with no art to ship and no
-  // two runs drawing the same node differently. Four families of stroke, which
-  // is enough for a player to say "the one with the cross" without pretending
-  // to be an icon set.
-  function sigil(nodeId, cx, cy, r, colour) {
+  // A NODE'S PLACEHOLDER ICON.
+  //
+  // TEN MARKS, DRAWN RATHER THAN SHIPPED. Final art has not been chosen for any
+  // node in this game, so what a node needs today is a mark that is (a) clearly
+  // not final and (b) unmistakably ITS OWN, so a node can be pointed at,
+  // discussed and tested before anyone draws anything.
+  //
+  // A node may pick one explicitly with `icon: n`, which is what the authored
+  // content does so that two nodes in the same tree never collide; a node that
+  // does not is hashed off its id, which keeps a hand-written tree usable with
+  // no bookkeeping. Deterministic either way -- the same node draws the same
+  // mark on every boot.
+  //
+  // REPLACING THESE IS A ONE-FILE CHANGE and takes no save with it: the icon is
+  // presentation, the id is the persistence format.
+  var SIGIL_KINDS = 10;
+
+  function sigil(nodeId, cx, cy, r, colour, icon) {
     var h = 0;
     for (var i = 0; i < nodeId.length; i++) h = (h * 31 + nodeId.charCodeAt(i)) % 9973;
-    var kind = h % 4;
-    var spin = (h % 12) / 12 * Math.PI;
+    var kind = (typeof icon === "number")
+      ? ((icon % SIGIL_KINDS) + SIGIL_KINDS) % SIGIL_KINDS
+      : h % SIGIL_KINDS;
+    var spin = (typeof icon === "number") ? 0 : (h % 12) / 12 * Math.PI;
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -488,17 +503,38 @@ var Upgrades = (function () {
     ctx.strokeStyle = colour;
     ctx.lineWidth = Math.max(1.2, r * 0.14);
     ctx.beginPath();
-    if (kind === 0) {
+    if (kind === 0) {                      // cross
       ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
       ctx.moveTo(0, -r); ctx.lineTo(0, r);
-    } else if (kind === 1) {
-      ctx.moveTo(-r, -r * 0.6); ctx.lineTo(0, r); ctx.lineTo(r, -r * 0.6);
-    } else if (kind === 2) {
+    } else if (kind === 1) {               // chevron up
+      ctx.moveTo(-r, r * 0.5); ctx.lineTo(0, -r * 0.7); ctx.lineTo(r, r * 0.5);
+    } else if (kind === 2) {               // hook
       ctx.arc(0, 0, r * 0.8, 0, Math.PI * 1.45);
       ctx.moveTo(0, -r); ctx.lineTo(0, 0);
-    } else {
+    } else if (kind === 3) {               // zigzag
       ctx.moveTo(-r, r * 0.5); ctx.lineTo(-r * 0.3, -r);
       ctx.lineTo(r * 0.3, r); ctx.lineTo(r, -r * 0.5);
+    } else if (kind === 4) {               // triangle
+      ctx.moveTo(0, -r); ctx.lineTo(r * 0.87, r * 0.5);
+      ctx.lineTo(-r * 0.87, r * 0.5); ctx.closePath();
+    } else if (kind === 5) {               // square on point
+      ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r);
+      ctx.lineTo(-r, 0); ctx.closePath();
+    } else if (kind === 6) {               // ring with a bar
+      ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+      ctx.moveTo(-r, r * 0.85); ctx.lineTo(r, r * 0.85);
+    } else if (kind === 7) {               // two bars
+      ctx.moveTo(-r, -r * 0.4); ctx.lineTo(r, -r * 0.4);
+      ctx.moveTo(-r * 0.6, r * 0.45); ctx.lineTo(r * 0.6, r * 0.45);
+    } else if (kind === 8) {               // arrow down
+      ctx.moveTo(0, -r); ctx.lineTo(0, r);
+      ctx.moveTo(-r * 0.6, r * 0.3); ctx.lineTo(0, r); ctx.lineTo(r * 0.6, r * 0.3);
+    } else {                               // asterisk
+      for (var a = 0; a < 3; a++) {
+        var t = a * Math.PI / 3;
+        ctx.moveTo(-Math.cos(t) * r, -Math.sin(t) * r);
+        ctx.lineTo(Math.cos(t) * r, Math.sin(t) * r);
+      }
     }
     ctx.stroke();
     ctx.restore();
@@ -713,7 +749,8 @@ var Upgrades = (function () {
       }
 
       if (node && !(drag && drag.fromSlot === i && drag.moved)) {
-        sigil(node.id, r.x + r.w / 2, r.y + 32, 15, "rgba(" + ASH_EMBER + ",0.95)");
+        sigil(node.id, r.x + r.w / 2, r.y + 32, 15,
+          "rgba(" + ASH_EMBER + ",0.95)", node.icon);
         ctx.textAlign = "center";
         ctx.font = "10px system-ui, sans-serif";
         ctx.fillStyle = "rgba(" + ASH_BONE + ",0.9)";
@@ -768,8 +805,8 @@ var Upgrades = (function () {
       });
       if (lifted) return;
 
-      sigil(node.id, r.x + 26, r.y + r.h / 2,
-        13, "rgba(" + (isEquipped ? ASH_LEY : ASH_EMBER) + ",0.9)");
+      sigil(node.id, r.x + 26, r.y + r.h / 2, 13,
+        "rgba(" + (isEquipped ? ASH_LEY : ASH_EMBER) + ",0.9)", node.icon);
 
       ctx.textAlign = "left";
       ctx.font = "600 13px system-ui, sans-serif";
@@ -812,7 +849,8 @@ var Upgrades = (function () {
     var r = { x: drag.x - 46, y: drag.y - 30, w: 92, h: 60 };
     ctx.globalAlpha = 0.92;
     drawAshPlate(r, { live: 0.9, cut: 8 });
-    sigil(node.id, r.x + r.w / 2, r.y + 20, 12, "rgba(" + ASH_EMBER + ",0.95)");
+    sigil(node.id, r.x + r.w / 2, r.y + 20, 12,
+      "rgba(" + ASH_EMBER + ",0.95)", node.icon);
     ctx.textAlign = "center";
     ctx.font = "10px system-ui, sans-serif";
     ctx.fillStyle = "#ffe6c4";
@@ -959,7 +997,7 @@ var Upgrades = (function () {
     ctx.strokeStyle = "rgba(" + accent + "," + (chosen ? 1 : alpha) + ")";
     ctx.stroke();
 
-    sigil(node.id, p.x, p.y, r * 0.44, "rgba(" + accent + "," + alpha + ")");
+    sigil(node.id, p.x, p.y, r * 0.44, "rgba(" + accent + "," + alpha + ")", node.icon);
 
     // The name under the node, and the price under that when it is not bought.
     // Hidden when zoomed far out: unreadable type over a big tree is noise.
@@ -1003,7 +1041,8 @@ var Upgrades = (function () {
 
     var info = TowerPerks.stateOf(selected, treeNode.id);
 
-    sigil(treeNode.id, d.x + 34, d.y + 38, 16, "rgba(" + ASH_EMBER + ",0.95)");
+    sigil(treeNode.id, d.x + 34, d.y + 38, 16,
+      "rgba(" + ASH_EMBER + ",0.95)", treeNode.icon);
     ctx.font = "18px " + MENU_DISPLAY_FONT;
     ctx.fillStyle = "#f6d9b4";
     drawMenuText(treeNode.name.toUpperCase(), d.x + 60, d.y + 28, 1.6);
@@ -1067,34 +1106,47 @@ var Upgrades = (function () {
     var ready = MetaProgress.resetReadyAt(selected);
     var cooling = ready > Date.now();
 
+    // EVERY FIGURE, BEFORE THE SECOND PRESS. The brief is explicit that the
+    // player must see the gross refund, the node count, the commission, the net
+    // and the delay before confirming -- and all five are derived from the same
+    // rate the model charges, so the quote cannot be a different sum from the
+    // transaction.
+    var gross = TowerPerks.refundValue(selected);
+    var fee = owned * MetaProgress.TREE_RESET_FEE_PER_NODE;
+    var net = gross - fee;
+    var hours = Math.round(MetaProgress.TREE_RESET_COOLDOWN_MS / 3600000);
+
     if (confirmReset) {
       drawAshControl(r, "CONFIRM RESET", {
         accent: "240,120,110", primary: true,
-        detail: "+" + TowerPerks.refundValue(selected) + " ⬡  −" +
-                MetaProgress.TREE_RESET_FEE + " ⬡ FEE"
+        detail: (net >= 0 ? "+" : "") + net + " ⬡ NET"
       });
     } else {
       drawAshControl(r, "RESET TREE", {
         disabled: !owned || cooling,
         detail: cooling ? ("READY IN " + coolingText(ready).toUpperCase())
-          : (owned ? (owned + " BOUGHT · FEE " + MetaProgress.TREE_RESET_FEE + " ⬡")
+          : (owned ? (owned + " BOUGHT · " + fee + " ⬡ COMMISSION")
                    : "NOTHING BOUGHT")
       });
     }
 
-    // WHAT A RESET COSTS AND WHAT IT TAKES BACK, before it is pressed. It also
-    // says what it does NOT touch, because "will I lose my level" is the first
-    // question a refund button raises.
+    // WHAT A RESET COSTS AND WHAT IT TAKES BACK. It also says what it does NOT
+    // touch, because "will I lose my level" is the first question a refund
+    // button raises.
     ctx.textAlign = "left";
     ctx.font = "10px system-ui, sans-serif";
     ctx.fillStyle = "rgba(" + ASH_DUST + ",0.7)";
-    wrapLeft(confirmReset
-      ? "Press again to refund every node and empty this tower's loadout. " +
-        "Level and XP are not touched."
-      : "Refunds every node bought here, clears the loadout, and cools down " +
-        "for " + Math.round(MetaProgress.TREE_RESET_COOLDOWN_MS / 60000) +
-        " minutes. Level and XP are never touched.",
-      r.x, r.y - 66, 232, 13, 5);
+    wrapLeft(owned
+      ? ("Refunds " + owned + " node" + (owned === 1 ? "" : "s") + " for " +
+         gross + " ⬡ gross, less a " + MetaProgress.TREE_RESET_FEE_PER_NODE +
+         " ⬡ commission a node (" + fee + " ⬡) — net " + (net >= 0 ? "+" : "") +
+         net + " ⬡. Clears this tower's loadout and cools down for " + hours +
+         " hour" + (hours === 1 ? "" : "s") + ". Level and XP are never touched.")
+      : ("Refunds every node bought here at its full price, less a " +
+         MetaProgress.TREE_RESET_FEE_PER_NODE + " ⬡ commission a node. Clears " +
+         "the loadout and cools down for " + hours + " hour" +
+         (hours === 1 ? "" : "s") + ". Level and XP are never touched."),
+      r.x, r.y - 92, 232, 13, 7);
   }
 
   // --- small text helpers ----------------------------------------------------

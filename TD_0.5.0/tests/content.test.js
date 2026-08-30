@@ -10061,43 +10061,67 @@ test("a hand-edited profile cannot run more perks than its level allows", functi
 test("a run keeps the loadout it started with, even through a level-up", function (t) {
   var h = bootProgress();
   bankCoins(h, 6);
-  var node = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
-    "  return !(n.requires && n.requires.length) && !n.minLevel && n.effects" +
-    "    && n.effects.add && typeof n.effects.add.rangeUl === 'number'; })[0]");
-  t.ok(node, "the Rifleman has a node that moves a readable stat");
 
-  h.run("TowerPerks.buy('soldier', '" + node.id + "');" +
-        "MetaProgress.addXp('soldier', 1000);" +
-        "MetaProgress.equipPerk('soldier', '" + node.id + "', 0)");
+  // ANY TREE'S ROOT THAT MOVES A READABLE STAT. Found rather than named, so
+  // replacing a tower's content does not turn this red for reasons that have
+  // nothing to do with the freeze it is testing.
+  var found = h.run("(function () { var out = null;" +
+    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
+    "    TowerPerks.nodes(towerId).forEach(function (n) {" +
+    "      if (out || (n.requires && n.requires.length) || n.minLevel) return;" +
+    "      if (!n.effects || !n.effects.add ||" +
+    "          typeof n.effects.add.rangeUl !== 'number') return;" +
+    "      out = { tower: towerId, id: n.id, delta: n.effects.add.rangeUl };" +
+    "    });" +
+    "  });" +
+    "  return out; })()");
+  t.ok(found !== null, "some tree has a root that moves reach");
+
+  var T = found.tower;
+  h.run("TowerPerks.buy('" + T + "', '" + found.id + "');" +
+        "MetaProgress.addXp('" + T + "', 1000);" +
+        "MetaProgress.equipPerk('" + T + "', '" + found.id + "', 0)");
 
   h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = []");
-  var withPerk = h.run("(function () { var s = new Soldier(200, 200, path);" +
-    "  addTower(s); return s.rangeUl; })()");
-  t.eq(withPerk, h.game.Soldier.BASE_RANGE_UL + node.effects.add.rangeUl,
-    "a tower placed in the run carries the perk");
+  var withPerk = h.run("(function () {" +
+    "  var Type = MetaProgress.constructorOf('" + T + "');" +
+    "  var s = new Type(200, 200, path); addTower(s);" +
+    "  return { ul: s.rangeUl, px: s.rangePx }; })()");
+  var baseUl = h.run("(function () {" +
+    "  var Type = MetaProgress.constructorOf('" + T + "');" +
+    "  return Type.BASE_RANGE_UL; })()");
+  t.eq(withPerk.ul, baseUl + found.delta, "a tower placed in the run carries the perk");
+
+  // REACH IS TWO NUMBERS. `rangePx` is what targeting and the ring actually
+  // read, and a perk that moved the stat and not the cache would draw one
+  // circle and shoot another.
+  t.near(withPerk.px, h.run("elevatedRangePx(towers[towers.length - 1], " +
+    withPerk.ul + ")"), 1e-9, "and the pixel reach was re-derived with it");
 
   // THE PERK SURVIVES AN IN-RUN UPGRADE. Every tower recomputes its stats from
   // base on every tier, so this is the property the whole application design
   // exists for.
   var afterTier = h.run("(function () { var s = towers[towers.length - 1];" +
     "  buyUpgrade(s, 'B1'); return s.rangeUl; })()");
-  t.ok(afterTier > withPerk, "and still carries it after buying B1 (" +
-    withPerk + " -> " + afterTier + ")");
+  t.ok(afterTier > withPerk.ul, "and still carries it after buying B1 (" +
+    withPerk.ul + " -> " + afterTier + ")");
 
   // MID-RUN THE LOADOUT IS FROZEN. Levelling up banks at once; the board keeps
   // the five it started with.
-  h.run("MetaProgress.unequipPerk('soldier', 0); MetaProgress.addXp('soldier', 5000)");
-  var later = h.run("(function () { var s = new Soldier(340, 200, path);" +
-    "  addTower(s); return s.rangeUl; })()");
-  t.eq(later, withPerk, "a tower placed later in the same run still has it");
-  t.eq(h.run("MetaProgress.progressOf('soldier').level"), 3,
+  h.run("MetaProgress.unequipPerk('" + T + "', 0); MetaProgress.addXp('" + T + "', 5000)");
+  var later = h.run("(function () {" +
+    "  var Type = MetaProgress.constructorOf('" + T + "');" +
+    "  var s = new Type(340, 200, path); addTower(s); return s.rangeUl; })()");
+  t.eq(later, withPerk.ul, "a tower placed later in the same run still has it");
+  t.eq(h.run("MetaProgress.progressOf('" + T + "').level"), 3,
     "while the level itself banked immediately");
 
   // AND THE MOMENT THE RUN IS OVER, THE LIVE LOADOUT IS THE ANSWER AGAIN.
   h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = []");
-  var nextRun = h.run("(function () { var s = new Soldier(200, 200, path);" +
-    "  addTower(s); return s.rangeUl; })()");
-  t.eq(nextRun, h.game.Soldier.BASE_RANGE_UL, "the next run plays without it");
+  var nextRun = h.run("(function () {" +
+    "  var Type = MetaProgress.constructorOf('" + T + "');" +
+    "  var s = new Type(200, 200, path); addTower(s); return s.rangeUl; })()");
+  t.eq(nextRun, baseUl, "the next run plays without it");
 });
 
 test("a perk that moves a build price moves it everywhere the price is read",
@@ -10370,6 +10394,572 @@ test("every authored tree is well formed", function (t) {
   var orphans = h.run("TowerPerks.towersWithTrees().filter(function (id) {" +
     "  return !MetaProgress.entry(id); })");
   t.deep(orphans, [], "every tree belongs to a tower in the catalogue");
+});
+
+// ---------------------------------------------------------------------------
+// THE FIRST AUTHORED TREE CONTENT (2026-08-30) — the Rifleman's four roots and
+// the Warbringer's four roots plus one child.
+//
+// NINE NODES, AND THESE ARE THE OWNER'S OWN NUMBERS, so unlike the section
+// above these tests DO name ids and DO assert exact figures: the numbers are
+// the specification. A retune is meant to turn these red.
+// ---------------------------------------------------------------------------
+
+// A profile at level 5 on every tower with coins to spend -- the state in which
+// any combination of these nodes can be bought AND equipped, so a test can ask
+// about an effect without first proving the ladder again.
+function bootContent() {
+  var h = harness.boot();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "TowerXP.setEnabled(true); openMenu()");
+  for (var i = 0; i < 40; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  return h;
+}
+
+// Buy and equip a list of node ids on one tower, then start a run and put one
+// of them on the board with the given in-run tiers bought.
+//
+// RETURNS AN EXPRESSION, NOT A SNAPSHOT -- `towers[towers.length - 1]`, read in
+// the game's own scope. That is what lets a test ask the live tower anything
+// (`.damage`, `.upgradeCost('A4')`, `.attacksPerSecond()`) without this helper
+// having to know what will be asked. The price is that a SECOND call replaces
+// what the first one pointed at: read the numbers you want before building the
+// next tower, never two expressions and then two reads.
+function towerWith(h, towerId, nodeIds, tiers) {
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  nodeIds.forEach(function (id, i) {
+    // Straight through the model rather than through TowerPerks.buy: these
+    // tests are about the EFFECTS, and the purchase rules have their own tests.
+    h.run("MetaProgress.buyNode('" + towerId + "', '" + id + "', 0);" +
+          "MetaProgress.equipPerk('" + towerId + "', '" + id + "', " + i + ")");
+  });
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  h.run("(function () { var Type = MetaProgress.constructorOf('" + towerId + "');" +
+        "  addTower(new Type(200, 200, path)); })()");
+  (tiers || []).forEach(function (tier) {
+    h.run("buyUpgrade(towers[towers.length - 1], '" + tier + "')");
+  });
+  return "towers[towers.length - 1]";
+}
+
+test("the Rifleman's four roots sit in the right directions and open at level 0",
+function (t) {
+  var h = bootContent();
+  var nodes = h.run("TowerPerks.nodes('soldier')");
+  t.eq(nodes.length, 4, "four nodes, and no fifth invented");
+
+  var byId = {};
+  nodes.forEach(function (n) { byId[n.id] = n; });
+  t.ok(byId.rif_n1 && byId.rif_s1 && byId.rif_a1 && byId.rif_b1,
+    "the four authored ids are all present");
+
+  // DIRECTIONS, because the brief names them: north is damage, south is the
+  // build price, west is path A and east is path B.
+  t.ok(byId.rif_n1.at.y < 0 && byId.rif_n1.at.x === 0, "damage is north");
+  t.ok(byId.rif_s1.at.y > 0 && byId.rif_s1.at.x === 0, "the build price is south");
+  t.ok(byId.rif_a1.at.x < 0 && byId.rif_a1.at.y === 0, "path A is west");
+  t.ok(byId.rif_b1.at.x > 0 && byId.rif_b1.at.y === 0, "path B is east");
+
+  nodes.forEach(function (n) {
+    t.eq(n.minLevel || 0, 0, n.id + " needs no level");
+    t.deep(n.requires || [], [], n.id + " is a root");
+    t.ok(/^\[R-/.test(n.name), n.id + " carries a placeholder name: " + n.name);
+    t.eq(typeof n.icon, "number", n.id + " carries a placeholder icon");
+  });
+
+  // DISTINCT PLACEHOLDERS, so a node can be pointed at and tested.
+  var icons = nodes.map(function (n) { return n.icon; });
+  t.eq(new Set(icons).size, 4, "no two share an icon");
+  t.eq(new Set(nodes.map(function (n) { return n.name; })).size, 4,
+    "and no two share a name");
+
+  t.deep([100, 60, 120, 120],
+    [byId.rif_n1.cost, byId.rif_s1.cost, byId.rif_a1.cost, byId.rif_b1.cost],
+    "the authored meta-coin prices");
+
+  // BUYABLE AT LEVEL 0, EQUIPPABLE AT NONE OF IT.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  for (var i = 0; i < 6; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  t.eq(h.run("MetaProgress.progressOf('soldier').level"), 0, "still level 0");
+  t.eq(h.run("TowerPerks.stateOf('soldier', 'rif_s1').state"), "buyable",
+    "and a root is buyable there");
+  t.eq(h.run("TowerPerks.buy('soldier', 'rif_s1').ok"), true, "the purchase goes through");
+  t.eq(h.run("MetaProgress.equipPerk('soldier', 'rif_s1', 0).ok"), false,
+    "but a level-0 tower has no slot to put it in");
+});
+
+test("[R-N] doubles the Rifleman's base damage and puts 50 mana on every tier",
+function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "soldier", [], []);
+  t.eq(h.run(plain + ".damage"), 1, "a plain Rifleman deals 1");
+
+  var s = towerWith(h, "soldier", ["rif_n1"], []);
+  t.eq(h.run(s + ".damage"), 2, "with [R-N] it deals 2");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 300, "and still costs 300 to place");
+  t.eq(h.run(s + ".cost"), 300, "on the tower itself too");
+
+  var want = { A1: 250, A2: 375, A3: 750, A4: 1950, A5: 3325,
+               B1: 250, B2: 400, B3: 800, B4: 2150, B5: 3850 };
+  Object.keys(want).forEach(function (id) {
+    t.eq(h.run(s + ".upgradeCost('" + id + "')"), want[id],
+      id + " costs " + want[id] + " mana");
+  });
+
+  // THE PANEL QUOTES WHAT THE TILL CHARGES. A button showing the authored price
+  // beside a purchase at the perked one is the divergence this pins.
+  var quoted = h.run("(function () { var tw = towers[towers.length - 1];" +
+    "  var acts = tw.panelActions(100000000);" +
+    "  var row = null;" +
+    "  acts.forEach(function (a) { if (a.upgradeId === 'A1') row = a; });" +
+    "  return row ? row.detail : null; })()");
+  t.eq(quoted, "250 mana", "and the upgrade button says so");
+});
+
+test("[R-S] makes the Rifleman cheaper to place and touches nothing else",
+function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "soldier", ["rif_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "300 becomes 250");
+  t.eq(h.run(s + ".cost"), 250, "the tower knows it");
+  t.eq(h.run(s + ".totalSpent"), 250, "and a sale refunds half of that");
+  t.eq(h.run(s + ".damage"), 1, "damage is untouched");
+  t.eq(h.run(s + ".upgradeCost('A1')"), 200, "and so is every tier price");
+  t.eq(h.run(s + ".upgradeCost('B5')"), 3800, "including the last one");
+});
+
+test("[R-A] gives path A 6, 7, 8 and 8 shots a burst, and never automatic ones",
+function (t) {
+  var h = bootContent();
+
+  // NORMAL FIRST, so the deltas are measured rather than assumed.
+  [["A1", 3], ["A2", 4], ["A3", 4], ["A4", 5], ["A5", 5]].forEach(function (row, i) {
+    var tiers = ["A1", "A2", "A3", "A4", "A5"].slice(0, i + 1);
+    var plain = towerWith(h, "soldier", [], tiers);
+    t.eq(h.run(plain + ".shotsPerBurst"), row[1],
+      "normal " + row[0] + " fires " + row[1]);
+  });
+
+  [["A1", 3], ["A2", 6], ["A3", 7], ["A4", 8], ["A5", 8]].forEach(function (row, i) {
+    var tiers = ["A1", "A2", "A3", "A4", "A5"].slice(0, i + 1);
+    var s = towerWith(h, "soldier", ["rif_a1"], tiers);
+    t.eq(h.run(s + ".shotsPerBurst"), row[1],
+      "with [R-A] " + row[0] + " fires " + row[1]);
+  });
+
+  // The two surcharges, and only those two.
+  var s = towerWith(h, "soldier", ["rif_a1"], []);
+  t.eq(h.run(s + ".upgradeCost('A1')"), 200, "A1 is unchanged");
+  t.eq(h.run(s + ".upgradeCost('A2')"), 525, "A2 costs 200 more");
+  t.eq(h.run(s + ".upgradeCost('A3')"), 800, "A3 costs 100 more");
+  t.eq(h.run(s + ".upgradeCost('A4')"), 1900, "A4 is unchanged");
+  t.eq(h.run(s + ".upgradeCost('A5')"), 3275, "A5 is unchanged");
+  t.eq(h.run(s + ".upgradeCost('B4')"), 2100, "and path B is untouched");
+
+  // AN AUTOMATIC RIFLEMAN GAINS NOTHING. B3 switches the fire mode, and an
+  // automatic Rifleman fires on `shotsPerSecond`, which is derived from the
+  // auto base and the fire-rate bonuses and never from `shotsPerBurst`.
+  var plainAuto = towerWith(h, "soldier", [], ["B1", "B2", "B3"]);
+  var rateNormal = h.run(plainAuto + ".attacksPerSecond()");
+  var perkAuto = towerWith(h, "soldier", ["rif_a1"], ["B1", "B2", "B3"]);
+  t.eq(h.run(perkAuto + ".automatic"), true, "B3 made it automatic");
+  t.eq(h.run(perkAuto + ".attacksPerSecond()"), rateNormal,
+    "and its rate of fire is exactly the normal one");
+});
+
+test("[R-B] sends three recruits at B4 and five at B5, and nothing else moves",
+function (t) {
+  var h = bootContent();
+
+  var plain4 = towerWith(h, "soldier", [], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(plain4 + ".recruitCount"), 2, "B4 normally sends 2");
+  var plain5 = towerWith(h, "soldier", [], ["B1", "B2", "B3", "B4", "B5"]);
+  t.eq(h.run(plain5 + ".recruitCount"), 4, "B5 normally sends 4");
+  var normal = h.run("(function () { var tw = towers[towers.length - 1];" +
+    "  return { hp: tw.recruitHp, dmg: tw.recruitDamage," +
+    "           rate: tw.recruitShotsPerSecond, range: tw.recruitRangeUl," +
+    "           cd: tw.recruitCooldownSeconds }; })()");
+
+  var s4 = towerWith(h, "soldier", ["rif_b1"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(s4 + ".recruitCount"), 3, "with [R-B] B4 sends 3");
+  t.eq(h.run(s4 + ".upgradeCost('B4')"), 2300, "and B4 costs 2300");
+
+  var s5 = towerWith(h, "soldier", ["rif_b1"], ["B1", "B2", "B3", "B4", "B5"]);
+  t.eq(h.run(s5 + ".recruitCount"), 5,
+    "B5 sends exactly 5 — not 4 plus two separate bonuses");
+  t.eq(h.run(s5 + ".upgradeCost('B5')"), 4150, "and B5 costs 4150");
+
+  var perked = h.run("(function () { var tw = towers[towers.length - 1];" +
+    "  return { hp: tw.recruitHp, dmg: tw.recruitDamage," +
+    "           rate: tw.recruitShotsPerSecond, range: tw.recruitRangeUl," +
+    "           cd: tw.recruitCooldownSeconds }; })()");
+  t.deep(perked, normal, "no other recruit number moved");
+
+  // A RIFLEMAN THAT NEVER BOUGHT B4 GAINS NOTHING FROM IT.
+  var bare = towerWith(h, "soldier", ["rif_b1"], []);
+  t.eq(h.run(bare + ".hasRecruitAbility"), false, "no recruit ability");
+  t.eq(h.run(bare + ".recruitCount"), 2, "and the base count is untouched");
+});
+
+test("the Rifleman's roots stack exactly as authored", function (t) {
+  var h = bootContent();
+
+  var both = towerWith(h, "soldier", ["rif_n1", "rif_s1"], []);
+  t.eq(h.run(both + ".damage"), 2, "north + south: 2 damage");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "placed for 250");
+  t.eq(h.run(both + ".upgradeCost('A1')"), 250, "and the tiers still pay +50");
+
+  var nb = towerWith(h, "soldier", ["rif_n1", "rif_b1"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(nb + ".upgradeCost('B4')"), 2350, "north + east: B4 costs 2350");
+  t.eq(h.run(nb + ".upgradeCost('B5')"), 4200, "and B5 costs 4200");
+  t.eq(h.run(nb + ".recruitCount"), 3, "with three recruits at B4");
+  var nb5 = towerWith(h, "soldier", ["rif_n1", "rif_b1"],
+    ["B1", "B2", "B3", "B4", "B5"]);
+  t.eq(h.run(nb5 + ".recruitCount"), 5, "and five at B5");
+
+  var na = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2"]);
+  t.eq(h.run(na + ".upgradeCost('A2')"), 575, "north + west: A2 costs 575");
+  t.eq(h.run(na + ".shotsPerBurst"), 6, "and fires 6");
+  var na3 = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2", "A3"]);
+  t.eq(h.run(na3 + ".upgradeCost('A3')"), 850, "A3 costs 850");
+  t.eq(h.run(na3 + ".shotsPerBurst"), 7, "and fires 7");
+  var na4 = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2", "A3", "A4"]);
+  t.eq(h.run(na4 + ".upgradeCost('A4')"), 1950, "A4 costs 1950");
+  t.eq(h.run(na4 + ".shotsPerBurst"), 8, "and fires 8");
+  var na5 = towerWith(h, "soldier", ["rif_n1", "rif_a1"],
+    ["A1", "A2", "A3", "A4", "A5"]);
+  t.eq(h.run(na5 + ".upgradeCost('A5')"), 3325, "A5 costs 3325");
+  t.eq(h.run(na5 + ".shotsPerBurst"), 8, "and still fires 8");
+
+  // ALL FOUR AT ONCE.
+  var all = towerWith(h, "soldier", ["rif_n1", "rif_s1", "rif_a1", "rif_b1"],
+    ["A1", "A2"]);
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "all four: placed for 250");
+  t.eq(h.run(all + ".damage"), 2, "2 base damage");
+  t.eq(h.run(all + ".shotsPerBurst"), 6, "path A's burst bonus is live");
+  t.eq(h.run(all + ".upgradeCost('A2')"), 575, "A2 pays both surcharges once");
+  t.eq(h.run(all + ".upgradeCost('B4')"), 2350, "and so does B4");
+});
+
+test("unequipping a Rifleman perk restores the normal numbers without un-buying it",
+function (t) {
+  var h = bootContent();
+  towerWith(h, "soldier", ["rif_n1", "rif_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "the perks are live");
+
+  h.run("openMenu(); MetaProgress.unequipPerk('soldier', 0);" +
+        "MetaProgress.unequipPerk('soldier', 1)");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', 'rif_n1')"), true,
+    "the node is still owned");
+  t.eq(h.run("TowerPerks.inventory('soldier').length"), 2,
+    "and still in the inventory");
+
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = [];" +
+        "addTower(new Soldier(200, 200, path))");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 300, "the next run pays 300 again");
+  t.eq(h.run("towers[0].damage"), 1, "and deals 1 again");
+  t.eq(h.run("towers[0].upgradeCost('A1')"), 200, "with the authored tier price");
+});
+
+test("the Warbringer's tree is four roots and one child behind the A root",
+function (t) {
+  var h = bootContent();
+  var nodes = h.run("TowerPerks.nodes('smasher')");
+  t.eq(nodes.length, 5, "five nodes, and no sixth invented");
+
+  var byId = {};
+  nodes.forEach(function (n) { byId[n.id] = n; });
+  t.ok(byId.war_n1 && byId.war_a1 && byId.war_a2 && byId.war_b1 && byId.war_s1,
+    "the five authored ids are all present");
+
+  t.ok(byId.war_n1.at.y < 0 && byId.war_n1.at.x === 0, "range is north");
+  t.ok(byId.war_a1.at.x < 0 && byId.war_a1.at.y === 0, "path A speed is west");
+  t.ok(byId.war_b1.at.x > 0 && byId.war_b1.at.y === 0, "path B damage is east");
+  t.ok(byId.war_s1.at.y > 0 && byId.war_s1.at.x === 0, "the range rebuild is south");
+
+  // THE CHILD IS NOT A FIFTH ROOT: it sits further out on the same branch and
+  // its only prerequisite is the root it grows from.
+  t.deep(byId.war_a2.requires, ["war_a1"], "the child needs the A root and only it");
+  t.ok(byId.war_a2.at.x < byId.war_a1.at.x,
+    "and is drawn further out along that branch");
+
+  [byId.war_n1, byId.war_a1, byId.war_b1, byId.war_s1].forEach(function (n) {
+    t.deep(n.requires || [], [], n.id + " is a root");
+  });
+  nodes.forEach(function (n) {
+    t.eq(n.minLevel || 0, 0, n.id + " needs no level");
+    t.ok(/^\[W-/.test(n.name), n.id + " carries a placeholder name: " + n.name);
+  });
+  t.eq(new Set(nodes.map(function (n) { return n.icon; })).size, 5,
+    "no two share an icon");
+
+  t.deep([100, 120, 150, 120, 80],
+    [byId.war_n1.cost, byId.war_a1.cost, byId.war_a2.cost,
+     byId.war_b1.cost, byId.war_s1.cost],
+    "the authored meta-coin prices");
+
+  // THE PREREQUISITE GATES THE PURCHASE AND NOTHING ELSE.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  for (var i = 0; i < 20; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  t.eq(h.run("TowerPerks.stateOf('smasher', 'war_a2').state"), "locked",
+    "the child cannot be bought before its root");
+  h.run("TowerPerks.buy('smasher', 'war_a1')");
+  t.eq(h.run("TowerPerks.buy('smasher', 'war_a2').ok"), true,
+    "and can once the root is bought");
+  h.run("MetaProgress.addXp('smasher', 20000)");
+  t.eq(h.run("MetaProgress.equipPerk('smasher', 'war_a2', 0).ok"), true,
+    "the child may be equipped WITHOUT its parent in a slot");
+  t.eq(h.run("MetaProgress.equippedPerks('smasher').indexOf('war_a1')"), -1,
+    "the parent really is not equipped");
+});
+
+test("[W-N] adds five u.l. of base reach for a hundred mana", function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "smasher", [], []);
+  t.eq(h.run(plain + ".rangeUl"), 40, "a plain Warbringer reaches 40");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 600, "and costs 600");
+
+  var s = towerWith(h, "smasher", ["war_n1"], []);
+  t.eq(h.run(s + ".rangeUl"), 45, "with [W-N] it reaches 45");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 700, "and costs 700");
+  t.eq(h.run(s + ".upgradeCost('A1')"), 250, "no tier price moves");
+  t.eq(h.run(s + ".upgradeCost('B5')"), 2900, "not one of them");
+});
+
+test("[W-A] adds 0.15 attacks a second from A4, as a RATE and not a subtraction",
+function (t) {
+  var h = bootContent();
+
+  var plain = towerWith(h, "smasher", [], ["A1", "A2", "A3", "A4"]);
+  var normalRate = h.run(plain + ".attacksPerSecond()");
+  t.near(normalRate, 1 / 3, 1e-9, "a pure path A swings about 0.333 a second");
+
+  var s = towerWith(h, "smasher", ["war_a1"], ["A1", "A2", "A3", "A4"]);
+  t.near(h.run(s + ".attacksPerSecond()"), normalRate + 0.15, 1e-9,
+    "with [W-A] it is exactly 0.15 a second faster");
+  t.near(h.run(s + ".cooldownSeconds"), 1 / (normalRate + 0.15), 1e-9,
+    "which is about one swing every 2.07 s, not 0.15 s off the period");
+  t.eq(h.run(s + ".upgradeCost('A4')"), 1650, "A4 costs 1650");
+  t.eq(h.run(s + ".upgradeCost('A5')"), 1950, "and A5 is unchanged");
+
+  // NOT BEFORE A4, AND STILL THERE AT A5.
+  ["A1", "A2", "A3"].forEach(function (top, i) {
+    var tiers = ["A1", "A2", "A3"].slice(0, i + 1);
+    var before = towerWith(h, "smasher", [], tiers);
+    var beforeRate = h.run(before + ".attacksPerSecond()");
+    var with_ = towerWith(h, "smasher", ["war_a1"], tiers);
+    t.near(h.run(with_ + ".attacksPerSecond()"), beforeRate, 1e-9,
+      "nothing at " + top);
+  });
+  var plain5 = h.run(towerWith(h, "smasher", [], ["A1", "A2", "A3", "A4", "A5"]) +
+    ".attacksPerSecond()");
+  var at5 = h.run(towerWith(h, "smasher", ["war_a1"], ["A1", "A2", "A3", "A4", "A5"]) +
+    ".attacksPerSecond()");
+  t.near(at5, plain5 + 0.15, 1e-9, "and it persists at A5");
+});
+
+test("[W-A2] takes fifty mana off A1 to A4, and stacks with its parent", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "smasher", ["war_a2"], []);
+  t.eq(h.run(s + ".upgradeCost('A1')"), 200, "A1 costs 200");
+  t.eq(h.run(s + ".upgradeCost('A2')"), 350, "A2 costs 350");
+  t.eq(h.run(s + ".upgradeCost('A3')"), 550, "A3 costs 550");
+  t.eq(h.run(s + ".upgradeCost('A4')"), 1350, "A4 costs 1350");
+  t.eq(h.run(s + ".upgradeCost('A5')"), 1950, "A5 is unchanged");
+  t.eq(h.run(s + ".upgradeCost('B1')"), 250, "and path B is untouched");
+  t.eq(h.run(s + ".rangeUl"), 40, "no stat moves");
+
+  // BOTH EQUIPPED: +250 and -50 on A4, which is 1600, and the speed as well.
+  var both = towerWith(h, "smasher", ["war_a1", "war_a2"], []);
+  t.eq(h.run(both + ".upgradeCost('A4')"), 1600, "together A4 costs 1600");
+  var plainRate = h.run(towerWith(h, "smasher", [], ["A1", "A2", "A3", "A4"]) +
+    ".attacksPerSecond()");
+  var bothRate = h.run(towerWith(h, "smasher", ["war_a1", "war_a2"],
+    ["A1", "A2", "A3", "A4"]) + ".attacksPerSecond()");
+  t.near(bothRate, plainRate + 0.15, 1e-9, "and the speed bonus is live");
+});
+
+test("[W-B] puts three more damage on a B4 Warbringer and takes its blast to 18",
+function (t) {
+  var h = bootContent();
+
+  var rows = [["B1", 0], ["B2", 1], ["B3", 2], ["B4", 3], ["B5", 3]];
+  rows.forEach(function (row, i) {
+    var tiers = ["B1", "B2", "B3", "B4", "B5"].slice(0, i + 1);
+    var plain = towerWith(h, "smasher", [], tiers);
+    var normal = h.run(plain + ".damage");
+    var s = towerWith(h, "smasher", ["war_b1"], tiers);
+    t.eq(h.run(s + ".damage"), normal + row[1],
+      "at " + row[0] + " it carries " + row[1] + " more damage");
+  });
+
+  var b4 = towerWith(h, "smasher", ["war_b1"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(b4 + ".explosionDamage"), 18, "the chain blast is 18 from B4");
+  var b5 = towerWith(h, "smasher", ["war_b1"], ["B1", "B2", "B3", "B4", "B5"]);
+  t.eq(h.run(b5 + ".explosionDamage"), 18, "and stays 18 at B5");
+  t.eq(h.run("Smasher.EXPLOSION_RADIUS_UL"), 18.75, "the radius is untouched");
+
+  var bare = towerWith(h, "smasher", ["war_b1"], []);
+  t.eq(h.run(bare + ".explosionDamage"), 15, "an unupgraded blast is still 15");
+  t.eq(h.run(bare + ".upgradeCost('B1')"), 250, "B1 is unchanged");
+  t.eq(h.run(bare + ".upgradeCost('B2')"), 500, "B2 costs 500");
+  t.eq(h.run(bare + ".upgradeCost('B3')"), 950, "B3 costs 950");
+  t.eq(h.run(bare + ".upgradeCost('B4')"), 1950, "B4 costs 1950");
+  t.eq(h.run(bare + ".upgradeCost('B5')"), 2900, "B5 is unchanged");
+});
+
+test("[W-S] rebuilds path B's reach onto the base without swallowing the tiers",
+function (t) {
+  var h = bootContent();
+
+  var base = towerWith(h, "smasher", ["war_s1"], []);
+  t.eq(h.run(base + ".rangeUl"), 57.5, "base reach is 57.5");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 650, "and it costs 650 to place");
+
+  // THE PROGRESSION THE PLAYER ACTUALLY RECEIVES, tier by tier. This is the
+  // requirement: the bigger base must not eat what B1, B2 and B4 promise.
+  var want = [["B1", 60.5], ["B2", 71.5], ["B3", 71.5], ["B4", 77.5], ["B5", 92.5]];
+  want.forEach(function (row, i) {
+    var tiers = ["B1", "B2", "B3", "B4", "B5"].slice(0, i + 1);
+    var s = towerWith(h, "smasher", ["war_s1"], tiers);
+    t.eq(h.run(s + ".rangeUl"), row[1], "after " + row[0] + " it reaches " + row[1]);
+  });
+
+  // AND THE PIXEL REACH FOLLOWS, which is what targeting and the ring read.
+  var last = towerWith(h, "smasher", ["war_s1"], ["B1", "B2"]);
+  t.near(h.run(last + ".rangePx"),
+    h.run("elevatedRangePx(towers[0], 71.5)"), 1e-9,
+    "the drawn and fired reach is the same 71.5");
+
+  var prices = towerWith(h, "smasher", ["war_s1"], []);
+  [["B1", 250], ["B2", 450], ["B3", 900], ["B4", 1900], ["B5", 2900]]
+    .forEach(function (row) {
+      t.eq(h.run(prices + ".upgradeCost('" + row[0] + "')"), row[1],
+        row[0] + " still costs " + row[1]);
+    });
+});
+
+test("the Warbringer's roots stack exactly as authored", function (t) {
+  var h = bootContent();
+
+  var ns = towerWith(h, "smasher", ["war_n1", "war_s1"], []);
+  t.eq(h.run(ns + ".rangeUl"), 62.5, "north + south: 62.5 base reach");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 750, "and 750 to place");
+
+  // East and south together: the damage and its surcharges, and the reach
+  // following the rebuilt gains rather than the authored ones.
+  var plainDamage = h.run(towerWith(h, "smasher", [], ["B1", "B2"]) + ".damage");
+  var bs = towerWith(h, "smasher", ["war_b1", "war_s1"], ["B1", "B2"]);
+  t.eq(h.run(bs + ".damage"), plainDamage + 1,
+    "east + south: B2 carries its extra damage");
+  t.eq(h.run(bs + ".rangeUl"), 71.5, "and the reach follows the rebuild");
+  t.eq(h.run(bs + ".upgradeCost('B3')"), 950, "with east's surcharge on B3");
+
+  var nsb = towerWith(h, "smasher", ["war_n1", "war_s1", "war_b1"],
+    ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(nsb + ".rangeUl"), 82.5, "all three: 77.5 plus north's five");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 750, "both price rises apply");
+  t.eq(h.run(nsb + ".explosionDamage"), 18, "and the blast is still 18");
+});
+
+test("a tree reset refunds every node, charges ten a node, and cools down for an hour",
+function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  for (var i = 0; i < 20; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  h.run("MetaProgress.addXp('smasher', 20000); MetaProgress.addXp('soldier', 20000)");
+
+  t.eq(h.game.MetaProgress.TREE_RESET_FEE_PER_NODE, 10, "ten coins a node");
+  t.eq(h.game.MetaProgress.TREE_RESET_COOLDOWN_MS, 60 * 60 * 1000, "and one hour");
+
+  // The A root and its child, so the CHILD counts as a bought node too.
+  h.run("TowerPerks.buy('smasher', 'war_a1'); TowerPerks.buy('smasher', 'war_a2');" +
+        "TowerPerks.buy('smasher', 'war_n1');" +
+        "MetaProgress.equipPerk('smasher', 'war_a1', 0);" +
+        "MetaProgress.equipPerk('smasher', 'war_a2', 1)");
+
+  var gross = h.run("TowerPerks.refundValue('smasher')");
+  t.eq(gross, 120 + 150 + 100, "the gross refund is what the three nodes cost");
+
+  var coins = h.run("MetaProgress.coins()");
+  var xp = h.run("MetaProgress.progressOf('smasher').xp");
+  var out = h.run("TowerPerks.resetTree('smasher', 5000000)");
+
+  t.eq(out.ok, true, "the reset goes through");
+  t.eq(out.removed, 3, "three nodes came out, the child included");
+  t.eq(out.refunded, gross, "the gross refund is the full purchase price");
+  t.eq(out.feePerNode, 10, "the commission rate is reported");
+  t.eq(out.fee, 30, "so the commission is thirty");
+  t.eq(out.net, gross - 30, "and the net is the gross less it");
+  t.eq(h.run("MetaProgress.coins()"), coins + gross - 30, "which is what was banked");
+
+  t.deep(h.run("MetaProgress.ownedNodes('smasher')"), [], "the tree is empty");
+  t.eq(h.run("TowerPerks.inventory('smasher').length"), 0, "so is the inventory");
+  t.deep(h.run("MetaProgress.equippedPerks('smasher')"),
+    [null, null, null, null, null], "and every slot it filled");
+  t.eq(h.run("MetaProgress.progressOf('smasher').xp"), xp, "xp is untouched");
+  t.eq(h.run("MetaProgress.progressOf('smasher').level"), 5, "and so is the level");
+  t.eq(h.run("MetaProgress.owns('smasher')"), true, "the tower is still owned");
+
+  // THE COOLDOWN IS THE TOWER'S OWN.
+  h.run("TowerPerks.buy('smasher', 'war_n1'); TowerPerks.buy('soldier', 'rif_s1')");
+  t.eq(h.run("TowerPerks.resetTree('smasher', 5000001).ok"), false,
+    "the Warbringer is cooling down");
+  t.eq(h.run("TowerPerks.resetTree('soldier', 5000001).ok"), true,
+    "and the Rifleman is not");
+  t.eq(h.run("TowerPerks.resetTree('smasher', " + (5000000 + 3600000) + ").ok"), true,
+    "an hour later the Warbringer may be reset again");
+});
+
+test("every authored node survives a reload with its effect intact", function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  for (var i = 0; i < 20; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  h.run("MetaProgress.addXp('soldier', 20000);" +
+        "TowerPerks.buy('soldier', 'rif_n1'); TowerPerks.buy('soldier', 'rif_s1');" +
+        "MetaProgress.equipPerk('soldier', 'rif_n1', 0);" +
+        "MetaProgress.equipPerk('soldier', 'rif_s1', 1)");
+
+  var before = h.run("MetaProgress.coins()");
+  var snap = h.run("MetaProgress.snapshot()");
+  h.run("MetaProgress.__loadForTest(" + JSON.stringify({
+    coins: snap.coins, owned: snap.owned, equipped: snap.equipped,
+    progress: { soldier: { xp: snap.progress.soldier.xp,
+                           nodes: snap.progress.soldier.nodes,
+                           equipped: snap.progress.soldier.equipped,
+                           resetAt: 0 } }
+  }) + ")");
+
+  t.eq(h.run("MetaProgress.coins()"), before, "the coins came out once and stayed out");
+  t.deep(h.run("MetaProgress.ownedNodes('soldier')").sort(),
+    ["rif_n1", "rif_s1"], "both nodes are still bought");
+  t.deep(h.run("MetaProgress.equippedPerks('soldier')").slice(0, 2),
+    ["rif_n1", "rif_s1"], "and both still equipped");
+
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = [];" +
+        "addTower(new Soldier(200, 200, path))");
+  t.eq(h.run("towers[0].damage"), 2, "the effect is rebuilt after the reload");
+  t.eq(h.run("towers[0].cost"), 250, "and so is the build price");
+  t.eq(h.run("towers[0].upgradeCost('A1')"), 250, "and the tier surcharge");
 });
 
 runner.run();

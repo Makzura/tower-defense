@@ -4132,12 +4132,48 @@ unique per tower by design, so a shared stat vocabulary would buy nothing and
 would forbid exactly the tower-specific effects the system exists for.
 
 **Effects, and their order:** `mul` (all factors multiply), then `add` (all
-deltas sum), then `set` (absolute; last equipped slot wins). Slot order cannot
-change a `mul` or an `add` result, which is what makes dragging a perk between
-slots free of consequence. `price: { mul, add }` moves the BUILD price and
-`TowerPerks.priceOf` is what every reader of one goes through — the build bar's
-label and its affordability check, the placement itself, the armoury card, the
-index card and `MetaProgress.loadoutProblem`.
+deltas sum), then `addRate`, then `set` (absolute; last equipped slot wins).
+Slot order cannot change a `mul` or an `add` result, which is what makes
+dragging a perk between slots free of consequence.
+
+`price: { mul, add }` moves the BUILD price and `TowerPerks.priceOf` is what
+every reader of one goes through — the build bar's label and its affordability
+check, the placement itself, the armoury card, the index card and
+`MetaProgress.loadoutProblem`.
+
+**`addRate` exists because "+0.15 attacks a second" is not "−0.15 seconds".**
+Attack speed is stored as a PERIOD on several towers (`cooldownSeconds`,
+`burstCooldown`) while a design figure is a RATE, so this inverts, adds and
+inverts back: `f = 1/(1/f + rate)`. That gives "whatever rate the tower actually
+reached, plus this" on any crosspath and at any starting value, which a
+subtraction from the period does not.
+
+**`tiers: { A4: { cost: +250 } }` moves what an IN-RUN upgrade costs, in mana.**
+It reaches the player by wrapping the tower's own `upgradeCost(id)` on the
+instance. **Every tower's panel and hover card now quote `upgradeCost(id)`
+rather than the table row's `cost`** — they read `next.cost` until 2026-08-30,
+which was a latent divergence and becomes a visible one the moment a perk moves
+a price. A tower with no `upgradeCost` ignores `tiers`.
+
+**`when: [{ has: "<field>", add/mul/set/addRate }]` is a list of conditional
+groups**, and it is what lets ONE node say "A2 gains two shots and A3 one more".
+Each group applies only while that field is truthy on the tower, and because
+`hasA2` stays true after A3 is bought, a group's effect persists upward on its
+own. `onlyIf` is the same idea for a whole node.
+
+**Reach is two numbers and only one of them is the stat.** Every tower caches
+`rangePx` through `elevatedRangePx`, and that cache is what targeting, the range
+ring and the bullets read — so `settleRange` re-derives it after a perk moves
+`rangeUl` (or `stats.range`). A perk that moved one and not the other would draw
+one circle and shoot another. Footprint is deliberately NOT handled: it is
+placement-only on every tower, and moving it would move where a tower may stand
+after it is standing there.
+
+**`statTarget` knows three shapes, and the adapters are the one that is easy to
+miss.** The Arcane Sniper and the Siphon are ADAPTERS wrapping a
+`ConfiguredTower`: the resolved stats are on `core.stats`, and their restat
+entry point on the adapter is `refreshDerived`, not `_refreshStats`. Wrapping
+the wrong one leaves those two towers silently unperked.
 
 **`onlyIf` is how a perk modifies ONE IN-RUN TIER**: the effect is skipped
 unless that field is truthy on the tower, so a perk that improves the Rifleman's
@@ -4161,12 +4197,21 @@ only reachable from the title screen.
 
 ### Resetting a tree
 
-Per tower. Refunds every bought node at its authored price, charges a fee,
-clears the inventory AND every slot those perks were in, and starts a cooldown.
+Per tower. Refunds every bought node **at its full authored price**, charges a
+commission of **`TREE_RESET_FEE_PER_NODE` = 10 coins PER NODE**, clears the
+inventory AND every slot those perks were in, and starts a **one-hour** cooldown
+that belongs to that tower alone — resetting the Rifleman does not touch the
+Warbringer's clock.
+
+**The prices are given back; the commission is the only real loss.** Net is
+`sum(prices) − 10 × nodes`. A per-node rate rather than a flat fee scales with
+how much is being undone: two roots is small change, a whole tree is a decision.
+
 **It never touches xp, level or ownership** — what a reset undoes is spending.
-The screen asks twice and shows the refund, the fee and the cooldown before the
-second press. The cooldown is asked about before "nothing bought", because after
-a reset both are true and only one is what the player is asking.
+The screen asks twice and shows the gross refund, the node count, the
+commission, the net and the delay before the second press, all off the same rate
+the model charges. The cooldown is asked about before "nothing bought", because
+after a reset both are true and only one is what the player is asking.
 
 **This file never reads a clock**: `resetTree` is handed the time and
 `resetReadyAt` hands one back, so the screens and the tests decide what "now"
@@ -4219,6 +4264,49 @@ the detail card ticks them off one by one. The five node states — owned,
 buyable, poor, level-locked, prerequisite-locked — all come from
 `TowerPerks.stateOf`, so the ring's colour, the panel's sentence and the
 purchase's refusal cannot disagree.
+
+### The authored content
+
+**The Rifleman's four roots and the Warbringer's four roots plus one child are
+the owner's own numbers** (2026-08-30) and replaced a first pass written to
+prove the format. Do not extend either tree: the rest of both is a later
+decision.
+
+Names are placeholders and say so — `[R-N] Base damage`, `[W-A2] Path A prices`
+— and icons are indices into the drawn marks in `js/upgrades.js` rather than art
+that does not exist yet. **The `id` is the persistence format**; the name and
+the icon can be replaced at any time without a player losing a node.
+
+| node | what it does | meta coins |
+|---|---|---:|
+| `rif_n1` | +1 base damage (1→2); +50 mana on all ten tiers; placement unchanged | 100 |
+| `rif_s1` | placement 300→250; nothing else | 60 |
+| `rif_a1` | burst shots 3/6/7/8/8 at A1–A5; A2 +200, A3 +100 | 120 |
+| `rif_b1` | B4 sends 3, B5 sends 5; B4 +200, B5 +350 | 120 |
+| `war_n1` | +5 u.l. base reach (40→45); placement 600→700 | 100 |
+| `war_a1` | +0.15 attacks/s from A4; A4 +250 | 120 |
+| `war_a2` | A1–A4 each −50 mana; needs `war_a1` to BUY only | 150 |
+| `war_b1` | B2/B3/B4 each +1 damage (cumulative to +3); blast 15→18; B2/B3/B4 +50 | 120 |
+| `war_s1` | +17.5 u.l. base reach; placement +50; B gains rebuilt to +3/+11/+6 | 80 |
+
+**Every one of the nine is `minLevel: 0`** — buyable the moment the tower is
+owned and the coins are there, and equippable by none of them until the tower
+reaches level 1. That is the first content where "buying is not equipping"
+really bites.
+
+Three of them are worth reading the note in the file for. `rif_a1` **cannot leak
+into automatic fire**, and not by care: B3 switches the Rifleman to
+`shotsPerSecond`, which is derived from the auto base and never from
+`shotsPerBurst`. `rif_b1` is **one +1, not two** — B5's count is an absolute
+that replaces B4's, so a single delta gives 3 then 5 and two would have given
+six. `war_s1`'s **negative groups are what keep the tiers honest**: +17.5 on top
+of the authored B bonuses would have reached 107.5 at B5 and swallowed what each
+tier promises, so the tiers are rebuilt to +3/+11/+6 and the player receives
+57.5 / 60.5 / 71.5 / 71.5 / 77.5 / 92.5.
+
+**The remaining four trees are still the first authored pass** and are content
+the owner has not specified. They are not load-bearing; deleting one leaves that
+tower with an empty tree, which is a legal state the screens draw as empty.
 
 ### Authoring a tree
 

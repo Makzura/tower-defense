@@ -351,6 +351,13 @@ Smasher.prototype.recalcStats = function () {
   this.hasQuake = false;
   this.upgradeCount = 0;
 
+  // THE CHAIN BLAST'S DAMAGE IS ON THE INSTANCE, not read off the constant at
+  // the moment it detonates (2026-08-30). It is derived here like every other
+  // number on this tower, which is what lets a permanent perk move it and what
+  // makes the panel row below quote the blast the tower will actually deal
+  // rather than the one the table was authored with. No tier moves it today.
+  this.explosionDamage = Smasher.EXPLOSION_DAMAGE;
+
   // Summed separately from the absolute column and added AFTER the max, so a
   // "+15" is +15 on top of whatever reach the tower had -- see the note on
   // rangeBonusUl in the table.
@@ -467,6 +474,7 @@ Smasher.prototype.statSnapshot = function () {
     fullCircle: this.fullCircle,
     slow: this.slow,
     explodes: this.explodesOnKill,
+    explosionDamage: this.explosionDamage,
     quake: this.hasQuake
   };
 };
@@ -934,7 +942,7 @@ Smasher.prototype.explode = function (origin, enemies) {
 
       // Blast damage and blast kills belong to the smasher whose B4 caused it,
       // however many links down the chain they happened.
-      dealt += TowerScore.apply(this, e, Smasher.EXPLOSION_DAMAGE, 0, 0, "aoe");
+      dealt += TowerScore.apply(this, e, this.explosionDamage, 0, 0, "aoe");
 
       // Died to the blast, so it is the next link.
       if (e.dead) {
@@ -1062,7 +1070,7 @@ Smasher.prototype.statLines = function () {
       this.slow.seconds.toFixed(1) + " s"]);
   }
   if (this.explodesOnKill) {
-    rows.push(["On kill", Smasher.EXPLOSION_DAMAGE + " in " +
+    rows.push(["On kill", this.explosionDamage + " in " +
       TowerStats.distance(Smasher.EXPLOSION_RADIUS_UL) + ", chains"]);
   }
   if (this.hasQuake) {
@@ -1642,10 +1650,14 @@ Smasher.prototype.panelActions = function () {
       branch: branch,
       upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : next.cost + " mana",
+      // THROUGH `upgradeCost`, NEVER OFF THE TABLE ROW (2026-08-30). A permanent
+      // perk may move what a tier costs, and a button that quoted the authored
+      // price while the till charged the perked one is the divergence this
+      // whole file already avoids everywhere else.
+      detail: refusal ? refusal : self.upgradeCost(next.id) + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
-      enabled: refusal === null && cash >= next.cost,
+      enabled: refusal === null && cash >= self.upgradeCost(next.id),
       tone: "upgrade",
       tooltip: function () { return self.upgradeCard(next, refusal, preview); }
     });
@@ -1739,7 +1751,7 @@ Smasher.prototype.upgradeCard = function (upgrade, refusal, preview) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  " + upgrade.id,
-    subtitle: refusal ? refusal : upgrade.cost + " mana",
+    subtitle: refusal ? refusal : this.upgradeCost(upgrade.id) + " mana",
     changes: preview.changes,
     abilities: UpgradeEffects.abilities(preview.grants, params),
     note: note

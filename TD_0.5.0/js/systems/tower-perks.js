@@ -267,19 +267,41 @@ var TowerPerks = (function () {
 
   // --- effects ---------------------------------------------------------------
   //
-  // FOUR KINDS, AND AN ORDER THAT IS STATED RATHER THAN EMERGENT:
+  // SIX KINDS, AND AN ORDER THAT IS STATED RATHER THAN EMERGENT:
   //
-  //   mul     every factor for a field multiplies together, first
-  //   add     every delta for a field sums, on top of that
-  //   set     an absolute value; the last equipped slot holding one wins
-  //   price   the placement cost -- { mul, add }, same order
+  //   mul      every factor for a field multiplies together, first
+  //   add      every delta for a field sums, on top of that
+  //   addRate  a PERIOD field raised by a RATE -- see below
+  //   set      an absolute value; the last equipped slot holding one wins
+  //   price    the placement cost -- { mul, add }, same order
+  //   tiers    { A1: { cost: +50 }, ... } -- what an IN-RUN tier costs
   //
-  //   final = base * (all muls) + (all adds), then any set overrides it
+  //   final = base * (all muls) + (all adds), then addRate, then any set
   //
   // Slot order does not change a result for `mul` or `add`, which is what makes
   // "drag it to a different slot" free of consequence. It does for `set`, and
   // that is why `set` is documented as last-slot-wins rather than left to be
   // discovered.
+  //
+  // `addRate` EXISTS BECAUSE "+0.15 ATTACKS A SECOND" IS NOT "-0.15 SECONDS".
+  // Attack speed is stored on several towers as a PERIOD (`cooldownSeconds`,
+  // `burstCooldown`), and subtracting a rate from a period is wrong at every
+  // value but one: 0.15 off a 3-second swing is +0.176/s, and off a 1-second
+  // one it is +0.176/s again only by coincidence of the arithmetic being wrong
+  // in the same direction. So this inverts, adds, and inverts back --
+  // `f = 1 / (1/f + rate)` -- which gives exactly "whatever rate the tower
+  // actually reached, plus this", on any crosspath and at any starting value.
+  //
+  // `tiers` MOVES THE PRICE OF ONE IN-RUN UPGRADE, in mana, during a run. It
+  // reaches the player through the tower's own `upgradeCost(id)`, which is
+  // wrapped on the instance, so the panel button, the hover card, the
+  // affordability check, the till and `totalSpent` all quote the same number.
+  // A tower with no `upgradeCost` ignores it.
+  //
+  // `when` IS A LIST OF CONDITIONAL GROUPS, and it is what lets ONE node say
+  // "A2 gains two shots and A3 one more". Each entry is
+  // `{ has: "<field>", add/mul/set/addRate }` and applies only while that field
+  // is truthy on the tower. `onlyIf` is the same idea for a whole node.
   //
   // `onlyIf` is how a perk MODIFIES ONE IN-RUN UPGRADE rather than the tower:
   // the effect is skipped unless that field is truthy on the tower. A perk that
@@ -294,12 +316,21 @@ var TowerPerks = (function () {
   // effect. A node either changes what a tower costs or it changes what one
   // tier does -- never both.
 
-  // WHERE THE NUMBERS LIVE ON THIS TOWER. A config-driven tower (the Arcane
-  // Sniper, the Siphon) keeps them in `this.stats`; every hand-written one
-  // keeps them on the instance.
+  // WHERE THE NUMBERS LIVE ON THIS TOWER, and there are three shapes of that.
+  //
+  //   an ADAPTER (the Arcane Sniper, the Siphon) wraps a ConfiguredTower and
+  //     the resolved stats are on `core.stats` -- NOT on the adapter, which
+  //     only copies a few of them out in `refreshDerived`;
+  //   a bare ConfiguredTower has them on `stats`;
+  //   every hand-written tower has them on the instance.
+  //
+  // Asked once, here, so no caller has to know which kind it is holding.
   function statTarget(tower) {
-    return (tower && tower.stats && typeof tower.stats === "object")
-      ? tower.stats : tower;
+    if (!tower) return tower;
+    if (tower.core && tower.core.stats && typeof tower.core.stats === "object") {
+      return tower.core.stats;
+    }
+    return (tower.stats && typeof tower.stats === "object") ? tower.stats : tower;
   }
 
   function applyEffects(tower) {
@@ -310,17 +341,29 @@ var TowerPerks = (function () {
     var target = statTarget(tower);
     var muls = {}, adds = {}, sets = {};
 
+    var rates = {};
+
     list.forEach(function (node) {
       var fx = node.effects;
       if (!fx) return;
       if (fx.onlyIf && !tower[fx.onlyIf]) return;
 
-      collect(fx.mul, muls, function (have, v) { return have * v; }, 1);
-      collect(fx.add, adds, function (have, v) { return have + v; }, 0);
-      collect(fx.set, sets, function (have, v) { return v; }, null);
+      gather(fx);
+      (fx.when || []).forEach(function (group) {
+        if (!group || !group.has || !tower[group.has]) return;
+        gather(group);
+      });
     });
 
+    function gather(block) {
+      collect(block.mul, muls, function (have, v) { return have * v; }, 1);
+      collect(block.add, adds, function (have, v) { return have + v; }, 0);
+      collect(block.addRate, rates, function (have, v) { return have + v; }, 0);
+      collect(block.set, sets, function (have, v) { return v; }, null);
+    }
+
     var hpBefore = readHp(tower, target);
+    var rangeBefore = readRange(tower, target);
 
     Object.keys(muls).forEach(function (field) {
       if (typeof target[field] === "number") target[field] *= muls[field];
@@ -328,11 +371,32 @@ var TowerPerks = (function () {
     Object.keys(adds).forEach(function (field) {
       if (typeof target[field] === "number") target[field] += adds[field];
     });
+    Object.keys(rates).forEach(function (field) {
+      var period = target[field];
+      if (typeof period !== "number" || !(period > 0)) return;
+      var raised = 1 / period + rates[field];
+      target[field] = raised > 0 ? 1 / raised : period;
+    });
     Object.keys(sets).forEach(function (field) {
       target[field] = sets[field];
     });
 
     settleHp(tower, target, hpBefore);
+    settleRange(tower, target, rangeBefore);
+  }
+
+  // WHAT ONE IN-RUN TIER COSTS EXTRA (or less) UNDER THE ACTIVE PERKS. Summed
+  // across the loadout, so two equipped perks that both touch A4 both count --
+  // which is the "cumuls" the brief asks for, and falls out of summing rather
+  // than needing a rule.
+  function tierCostDelta(towerId, tierId) {
+    var delta = 0;
+    activeNodes(towerId).forEach(function (node) {
+      var tiers = node.effects && node.effects.tiers;
+      var row = tiers && tiers[tierId];
+      if (row && typeof row.cost === "number") delta += row.cost;
+    });
+    return delta;
   }
 
   function collect(block, into, fold, seed) {
@@ -356,6 +420,40 @@ var TowerPerks = (function () {
       stat: (typeof target.hp === "number") ? target.hp : null,
       max: (typeof tower.maxHp === "number") ? tower.maxHp : null
     };
+  }
+
+  // REACH IS TWO NUMBERS AND ONLY ONE OF THEM IS THE STAT. Every tower caches
+  // `rangePx` -- through `elevatedRangePx`, so the ground under it counts --
+  // and `rangePx` is what targeting, the range ring and the bullets read.
+  // A perk that moved `rangeUl` and left `rangePx` alone would show the player
+  // a bigger circle in the panel and shoot the old one.
+  //
+  // The config-driven towers keep the stat in `core.stats.range` and copy it
+  // out in `refreshDerived`, which has already run by the time a perk lands --
+  // so both halves are re-derived here from whichever name the tower uses.
+  //
+  // FOOTPRINT IS DELIBERATELY NOT HANDLED. It is placement-only on every tower
+  // in this game and no tier moves it either; a perk that changed it would move
+  // where a tower may stand after it is standing there.
+  function readRange(tower, target) {
+    return {
+      stat: (typeof target.range === "number") ? target.range : null,
+      ul: (typeof tower.rangeUl === "number") ? tower.rangeUl : null
+    };
+  }
+
+  function settleRange(tower, target, before) {
+    if (before.stat !== null && typeof target.range === "number" &&
+        target.range !== before.stat) {
+      tower.rangeUl = target.range;
+    }
+    if (typeof tower.rangeUl !== "number" || typeof tower.rangePx !== "number") return;
+    if (before.ul !== null && tower.rangeUl === before.ul &&
+        (before.stat === null || target.range === before.stat)) {
+      return;                       // nothing moved, nothing to re-derive
+    }
+    if (typeof elevatedRangePx !== "function") return;
+    tower.rangePx = tower.rangeUl > 0 ? elevatedRangePx(tower, tower.rangeUl) : 0;
   }
 
   function settleHp(tower, target, before) {
@@ -428,6 +526,7 @@ var TowerPerks = (function () {
     }
 
     wrapRestat(tower);
+    wrapUpgradeCost(tower, towerId);
     applyEffects(tower);
   }
 
@@ -436,7 +535,13 @@ var TowerPerks = (function () {
   // under different profiles in a test, and a prototype wrap would also stack
   // itself once per tower built.
   function wrapRestat(tower) {
+    // THE RECOMPUTE HAS THREE NAMES, one per tower shape, and the ADAPTERS ARE
+    // THE ONE THAT IS EASY TO MISS: `refreshDerived` is what the Arcane Sniper
+    // and the Siphon call after every tier, and their `_refreshStats` lives on
+    // `core`, one object further in. Wrapping the wrong one would leave those
+    // two towers silently unperked.
     var name = (typeof tower.recalcStats === "function") ? "recalcStats"
+      : (typeof tower.refreshDerived === "function") ? "refreshDerived"
       : (typeof tower._refreshStats === "function") ? "_refreshStats" : null;
     if (!name) return;
     if (Object.prototype.hasOwnProperty.call(tower, name)) return;   // already wrapped
@@ -445,6 +550,22 @@ var TowerPerks = (function () {
     tower[name] = function () {
       inner.apply(this, arguments);
       applyEffects(this);
+    };
+  }
+
+  // THE IN-RUN PRICE OF A TIER, wrapped on the instance so every reader of one
+  // gets the perked number: `buyUpgrade` in js/game.js, the panel button, the
+  // hover card and the `totalSpent` a sale refunds half of. Floored at zero --
+  // a discount deep enough to pay the player for upgrading is not a discount.
+  function wrapUpgradeCost(tower, towerId) {
+    if (typeof tower.upgradeCost !== "function") return;
+    if (Object.prototype.hasOwnProperty.call(tower, "upgradeCost")) return;
+
+    var inner = tower.upgradeCost;
+    tower.upgradeCost = function (id) {
+      var base = inner.call(this, id);
+      if (typeof base !== "number") return base;
+      return Math.max(0, base + tierCostDelta(towerId, id));
     };
   }
 
@@ -466,6 +587,7 @@ var TowerPerks = (function () {
     activeIds: activeIds,
     activeNodes: activeNodes,
     priceOf: priceOf,
+    tierCostDelta: tierCostDelta,
     applyTo: applyTo,
     statTarget: statTarget
   };

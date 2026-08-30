@@ -1366,11 +1366,15 @@ BlubTower.prototype.panelActions = function () {
       branch: branch,
       upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : next.cost + " mana",
+      // THROUGH `upgradeCost`, NEVER OFF THE TABLE ROW (2026-08-30). A permanent
+      // perk may move what a tier costs, and a button that quoted the authored
+      // price while the till charged the perked one is the divergence this
+      // whole file already avoids everywhere else.
+      detail: refusal ? refusal : self.upgradeCost(next.id) + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
       enabled: refusal === null &&
-        (typeof cash !== "number" || cash >= next.cost),
+        (typeof cash !== "number" || cash >= self.upgradeCost(next.id)),
       tone: "upgrade",
       tooltip: function () { return self.upgradeCard(next, refusal, preview); }
     });
@@ -1426,7 +1430,7 @@ BlubTower.prototype.upgradeCard = function (upgrade, refusal, preview) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  " + upgrade.id,
-    subtitle: refusal ? refusal : upgrade.cost + " mana",
+    subtitle: refusal ? refusal : this.upgradeCost(upgrade.id) + " mana",
     changes: preview.changes,
     abilities: UpgradeEffects.abilities(preview.grants, null),
     note: note

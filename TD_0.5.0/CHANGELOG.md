@@ -13,6 +13,70 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Rifleman's four roots and the Warbringer's five.**
+
+**THE FIRST CONTENT THE OWNER ACTUALLY SPECIFIED**, replacing the first pass
+written that morning to prove the format. Nine nodes: four roots on the
+Rifleman, four roots and one child on the Warbringer, every one of them at
+`minLevel: 0`. Neither tree is to be extended — the rest of both is a later
+decision.
+
+Names are placeholders and say so (`[R-N] Base damage`, `[W-A2] Path A prices`)
+and icons are indices into ten marks drawn in `js/upgrades.js`. The ids are the
+persistence format, so the names and the marks can be replaced later without a
+player losing a node they bought.
+
+**Rifleman.** North doubles the base damage (1 → 2) and puts 50 mana on all ten
+in-run tiers, leaving the 300 placement alone. South takes 50 off the placement
+and touches nothing else. West gives path A more rounds a burst — 3, 6, 7, 8, 8
+across A1 to A5 — for 200 more on A2 and 100 more on A3. East sends one more
+recruit: three at B4 and five at B5, for 200 and 350 more mana, with no other
+recruit number moved.
+
+**Warbringer.** North is +5 u.l. of base reach for 100 more mana a body. West
+adds 0.15 attacks a second from A4, and A4 costs 250 more. The child behind it
+takes 50 off each of A1 to A4. East puts a point of damage on each of B2, B3 and
+B4 — cumulative, so a B4 or B5 Warbringer carries three more — and takes the
+chain blast from 15 to 18, for 50 more on each of those three tiers. South
+rebuilds the reach: +17.5 on the base and the B tiers cut to +3, +11 and +6, so
+the path reads 57.5, 60.5, 71.5, 71.5, 77.5, 92.5.
+
+**Three of them were arithmetic traps and are commented as such.** The burst
+bonus CANNOT leak into automatic fire, and not by care: B3 switches the Rifleman
+to `shotsPerSecond`, which is derived from the auto base and never from
+`shotsPerBurst`. The recruit bonus is ONE +1 and not two — B5's count is an
+absolute that replaces B4's, so a single delta gives 3 then 5 where two would
+have given six. And the Warbringer's range rebuild needs its negative groups:
++17.5 on top of the authored B bonuses would have reached 107.5 at B5 and
+quietly swallowed what each tier promises.
+
+**Three things the system needed and did not have.** `when` is a list of
+conditional groups, so one node can say "A2 gains two shots and A3 one more".
+`addRate` raises a PERIOD field by a RATE — `1/(1/f + r)` — because "+0.15
+attacks a second" is not "−0.15 seconds" at any value, and the naive
+subtraction would have been wrong on every crosspath. `tiers` moves what an
+in-run upgrade costs, in mana, by wrapping the tower's own `upgradeCost(id)`.
+
+**Every tower's panel now quotes `upgradeCost(id)` rather than the table row.**
+All four read `next.cost` directly, which was a latent divergence and becomes a
+visible one the moment a perk moves a price — a button showing the authored
+price beside a purchase at the perked one. The Warbringer's chain blast became
+an instance field for the same reason: it was read off the constant at
+detonation, so no perk could move it and the panel could not report it.
+
+**Reach is two numbers and only one of them is the stat.** `rangePx` is what
+targeting, the ring and the bullets read, and it is cached; a perk that moved
+`rangeUl` and left it alone would draw one circle and shoot another. It is
+re-derived after the perks land. The same pass fixed the adapters: the Arcane
+Sniper and the Siphon keep their stats on `core.stats` and restat through
+`refreshDerived`, so the first version was writing perks somewhere nothing read.
+
+**The reset's final rules.** One hour, per tower — resetting the Rifleman does
+not touch the Warbringer's clock — and a commission of ten coins PER NODE rather
+than a flat fee. Every node's price comes back in full, so the real loss is
+`10 × nodes` and scales with how much is being undone. The screen shows the
+gross, the count, the commission, the net and the delay before the second press.
+
 **2026-08-30 — Permanent tower progression: levels, trees and perks.**
 
 **A SECOND UPGRADE SYSTEM, BESIDE THE FIRST ONE RATHER THAN INSTEAD OF IT.** The

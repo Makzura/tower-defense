@@ -1247,10 +1247,14 @@ Soldier.prototype.panelActions = function () {
       branch: branch,
       upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : next.cost + " mana",
+      // THROUGH `upgradeCost`, NEVER OFF THE TABLE ROW (2026-08-30). A permanent
+      // perk may move what a tier costs, and a button that quoted the authored
+      // price while the till charged the perked one is the divergence this
+      // whole file already avoids everywhere else.
+      detail: refusal ? refusal : self.upgradeCost(next.id) + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
-      enabled: refusal === null && cash >= next.cost,
+      enabled: refusal === null && cash >= self.upgradeCost(next.id),
       tone: "upgrade",
       // A thunk, like every other tower's card -- see cardFor in js/game.js.
       tooltip: function () { return self.upgradeCard(next, refusal, preview); }
@@ -1334,7 +1338,7 @@ Soldier.prototype.upgradeCard = function (upgrade, refusal, preview) {
 
   return UpgradeEffects.card({
     title: this.name + "  ·  " + upgrade.id,
-    subtitle: refusal ? refusal : upgrade.cost + " mana",
+    subtitle: refusal ? refusal : this.upgradeCost(upgrade.id) + " mana",
     changes: preview.changes,
     abilities: UpgradeEffects.abilities(preview.grants, params),
     note: note

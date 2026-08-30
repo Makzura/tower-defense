@@ -51,19 +51,26 @@ var MetaProgress = (function () {
   // focused runs. See TowerXP.waveBudget for the other half of that arithmetic.
   var XP_THRESHOLDS = [1000, 2500, 5000, 10000, 17500];
 
-  // What resetting one tower's tree costs on top of what it hands back, and how
-  // long before that tower may be reset again. BALANCE VALUES, deliberately
-  // gentle: the point is to stop a player rebuilding a whole tree between two
-  // runs, not to charge them for a mistake. A clear pays 80 coins and a node
-  // costs 8 to 30, so five is small change; ten minutes is longer than the gap
-  // between two runs and shorter than an evening.
+  // WHAT RESETTING ONE TOWER'S TREE COSTS, and how long before that tower may
+  // be reset again. The owner's final values (2026-08-30).
+  //
+  // THE FEE IS PER NODE, NOT PER RESET. Every node's price comes back in full;
+  // the commission is ten coins for each node that was bought, so the real loss
+  // is `10 x nodes` and nothing else. That scales with how much was being undone
+  // -- undoing two roots is cheap, undoing a whole tree is a decision -- where a
+  // flat fee charged the same for both.
+  //
+  // ONE HOUR, AND IT IS THE TOWER'S OWN. Resetting the Rifleman does not touch
+  // the Warbringer's clock. An hour is longer than a run, which is the point:
+  // the loadout is free to rearrange between runs, and rebuilding the TREE
+  // between them is not meant to be part of the routine.
   //
   // The COOLDOWN IS WALL CLOCK and this file never reads a clock: `resetTree`
   // is handed the time and `resetReadyAt` hands one back, so the screens and
   // the tests decide what "now" is. A saved stamp in the future -- a profile
   // moved between machines -- is clamped by sanitise rather than trusted.
-  var TREE_RESET_FEE = 5;
-  var TREE_RESET_COOLDOWN_MS = 10 * 60 * 1000;
+  var TREE_RESET_FEE_PER_NODE = 10;
+  var TREE_RESET_COOLDOWN_MS = 60 * 60 * 1000;
 
   // How many build-bar slots a loadout has. MUST match BUILD_SLOTS.length in
   // game.js -- the bar's geometry is built from the array, and the inventory
@@ -1091,16 +1098,24 @@ var MetaProgress = (function () {
       return { ok: false, reason: "reset is still cooling down", readyAt: ready };
     }
     if (!row.nodes.length) return { ok: false, reason: "nothing bought to refund" };
-    if (s.coins < TREE_RESET_FEE) {
-      return { ok: false, reason: "the reset fee is " + TREE_RESET_FEE + " meta coins" };
-    }
-
+    var removed = row.nodes.length;
+    var fee = removed * TREE_RESET_FEE_PER_NODE;
     var back = (typeof refund === "number" && isFinite(refund) && refund > 0)
       ? Math.floor(refund) : 0;
-    var removed = row.nodes.length;
+
+    // THE REFUND IS TAKEN INTO ACCOUNT BEFORE THE FEE CAN REFUSE, because it is
+    // one transaction: a player whose purse is empty because it is all in the
+    // tree can still afford to undo the tree. Only a NET loss they cannot cover
+    // is refused, and on the authored prices that cannot happen -- every node
+    // costs more than ten.
+    if (s.coins + back < fee) {
+      return { ok: false,
+               reason: "the reset commission is " + fee + " meta coins (" +
+                       TREE_RESET_FEE_PER_NODE + " a node)" };
+    }
 
     s.coins += back;
-    s.coins -= TREE_RESET_FEE;
+    s.coins -= fee;
     row.nodes = [];
     // EVERY REVOKED PERK LEAVES THE LOADOUT WITH IT. A slot holding a node the
     // player no longer owns is the one shape equipPerk refuses to create, and a
@@ -1108,8 +1123,17 @@ var MetaProgress = (function () {
     row.equipped = emptyPerkSlots();
     row.resetAt = now;
     save();
+    // EVERY FIGURE THE SCREEN HAS TO SHOW, returned rather than re-derived:
+    // the gross refund, how many nodes it covered, the commission, and what the
+    // player actually nets. A screen that recomputed any of them could disagree
+    // with what was just banked.
     return {
-      ok: true, refunded: back, fee: TREE_RESET_FEE, removed: removed,
+      ok: true,
+      refunded: back,
+      removed: removed,
+      feePerNode: TREE_RESET_FEE_PER_NODE,
+      fee: fee,
+      net: back - fee,
       readyAt: now + TREE_RESET_COOLDOWN_MS
     };
   }
@@ -1199,7 +1223,7 @@ var MetaProgress = (function () {
     // --- permanent tower progression (2026-08-30) ---------------------------
     PERK_SLOTS: PERK_SLOTS,
     XP_THRESHOLDS: XP_THRESHOLDS.slice(),
-    TREE_RESET_FEE: TREE_RESET_FEE,
+    TREE_RESET_FEE_PER_NODE: TREE_RESET_FEE_PER_NODE,
     TREE_RESET_COOLDOWN_MS: TREE_RESET_COOLDOWN_MS,
     levelForXp: levelForXp,
     xpForLevel: xpForLevel,

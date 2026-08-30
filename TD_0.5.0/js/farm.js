@@ -1123,15 +1123,20 @@ FarmTower.prototype.panelActions = function () {
     actions.push({
       id: "upgrade" + branch, branch: branch, upgradeId: next.id,
       label: "Path " + branch + " → " + next.id,
-      detail: refusal ? refusal : next.cost + " mana",
+      // THROUGH `upgradeCost`, NEVER OFF THE TABLE ROW (2026-08-30). A permanent
+      // perk may move what a tier costs, and a button that quoted the authored
+      // price while the till charged the perked one is the divergence this
+      // whole file already avoids everywhere else.
+      detail: refusal ? refusal : self.upgradeCost(next.id) + " mana",
       effects: refusal ? refusal : preview.effects.join(", "),
       reason: refusal,
-      enabled: refusal === null && (typeof cash !== "number" || cash >= next.cost),
+      enabled: refusal === null &&
+        (typeof cash !== "number" || cash >= self.upgradeCost(next.id)),
       tone: "upgrade",
       tooltip: function () {
         return UpgradeEffects.card({
           title: self.name + "  ·  " + next.id,
-          subtitle: refusal ? refusal : next.cost + " mana",
+          subtitle: refusal ? refusal : self.upgradeCost(next.id) + " mana",
           changes: preview.changes,
           // THE NUMBERS FOR THE SENTENCES, off this tower's own constants and
           // the tier's own row rather than repeated in the description table --
@@ -1143,7 +1148,8 @@ FarmTower.prototype.panelActions = function () {
           note: refusal ? "Unavailable: " + refusal + "."
             : (next.noRefund
               ? "This tier is SUNK: selling the tower refunds half of everything "
-                + "else on it and nothing of this " + next.cost + " mana."
+                + "else on it and nothing of this "
+                + self.upgradeCost(next.id) + " mana."
               : self.crosspathNote(next))
         });
       }
