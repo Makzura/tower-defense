@@ -302,6 +302,13 @@
 <script src="js/systems/damage-pipeline.js"></script>
 <script src="js/systems/buff-stacks.js"></script>
 <script src="js/systems/reload.js"></script>
+<!-- Permanent tower progression (2026-08-30). tower-perks.js holds the rules
+     and the registry the js/perks/*.js trees register into; tower-xp.js holds
+     the fixed per-wave xp budget and the investment integral that splits it.
+     Both read MetaProgress, Difficulty and the tower constructors at CALL time,
+     so neither cares that it loads before them. -->
+<script src="js/systems/tower-perks.js"></script>
+<script src="js/systems/tower-xp.js"></script>
 <script src="js/systems/active-ability.js"></script>
 <script src="js/systems/upgrade-effects.js"></script>
 <!-- The auto ON/OFF switch on ability buttons. After upgrade-effects.js, whose
@@ -343,6 +350,21 @@
      roster. -->
 <script src="js/meta.js"></script>
 <script src="js/store.js"></script>
+
+<!-- ONE TREE PER TOWER, and no two the same shape -- that is the design, not a
+     filing convention. Each of these calls TowerPerks.register at load, so they
+     must come after js/systems/tower-perks.js; they read nothing else. A tower
+     with no file here has an empty tree, which is a legal state the screens
+     draw as empty rather than as broken. -->
+<script src="js/perks/soldier-perks.js"></script>
+<script src="js/perks/smasher-perks.js"></script>
+<script src="js/perks/longshot-perks.js"></script>
+<script src="js/perks/siphon-perks.js"></script>
+<script src="js/perks/blub-perks.js"></script>
+<script src="js/perks/farm-perks.js"></script>
+<!-- The Upgrades screen and the Tree screen. Same shape as store.js: it draws
+     what meta.js and TowerPerks answer and mutates nothing itself. -->
+<script src="js/upgrades.js"></script>
 
 <!-- The 3D board. Loaded BEFORE game.js so the hooks in draw() and
      screenToWorld() find World3D already defined. If WebGL is unavailable the

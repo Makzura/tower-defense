@@ -247,7 +247,8 @@ var Store = (function () {
       if (Type) {
         ctx.font = "10px " + MENU_TECH_FONT;
         ctx.fillStyle = "rgba(186,158,140,0.45)";
-        ctx.fillText(Type.COST + " MANA IN A RUN", r.x + r.w - 14, r.y + 50);
+        ctx.fillText(TowerPerks.priceOf(Type) + " MANA IN A RUN",
+          r.x + r.w - 14, r.y + 50);
       }
       ctx.textAlign = "left";
     });

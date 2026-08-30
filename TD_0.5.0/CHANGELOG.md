@@ -13,6 +13,98 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — Permanent tower progression: levels, trees and perks.**
+
+**A SECOND UPGRADE SYSTEM, BESIDE THE FIRST ONE RATHER THAN INSTEAD OF IT.** The
+A/B/C tiers a tower buys with mana during a run are untouched. This is the other
+kind: a PERK is bought once with meta coins out of a tower TYPE's own tree, and
+it outlives every run. Buying it does not switch it on — a type has up to five
+perk slots, opened one at a time by its LEVEL, and only a perk sitting in a slot
+does anything.
+
+**A wave carries a FIXED budget of experience.** Not damage, not kills, not time
+survived, not a contribution formula per role. The wave's number is decided
+before the wave starts, which closes every farm at once: overkill, enemy
+healing, stun loops, summon walls and holding a wave open all earn exactly what
+killing it instantly earns. `weight(n) = 1 + 3(n/N)²`, normalised so a whole
+reference campaign pays 500 — times `Difficulty.scaleFor`, the same rating the
+coins are already priced through, so there is one difficulty number in this game
+and not two. Easy pays 500 over 35 waves, Normal 750 over 40, and the last wave
+of either is worth four times its first.
+
+**The budget splits by investment INTEGRATED over the wave.** Each tower adds
+`totalSpent × dt` to its type's weight every frame; a type's share is its weight
+over the total. One line of arithmetic, and it answers every edge case in the
+brief: a tower bought in the last second integrates almost nothing, selling
+everything else at the end does not move what the wave already earned, a sold
+tower keeps the share it stood for, a refund cannot go negative, churn only
+accumulates while a tower is up, and upgrades count because `totalSpent`
+includes them. **The integral decides shares only** — the total is the wave's
+own number, so a longer wave pays exactly the same.
+
+**Credited from `endWave`, the one exit a wave has**, beside the clear bounty
+and the farms' settlement and for the same reason. No ending takes it back: a
+loss, an abandon and a walk to the menu all keep every point the finished waves
+paid, and the result screen says so in as many words on both endings.
+
+**No tower file changed, and that was the design constraint.** Every tower
+recomputes from scratch, so a perk written onto one would be erased by its next
+tier. `TowerPerks.applyTo` wraps that instance's own recompute and runs the
+perks as a post-pass after every one — base, then the in-run tiers, then the
+equipped perks, stated rather than emergent. It is the seam `farmBoostMult`
+already uses. `statTarget` routes a perk to `this.stats` on a config-driven
+tower and to the instance on a hand-written one, so each tree is authored
+against its own tower's own field names.
+
+**`onlyIf` is how a perk modifies ONE in-run tier** — inert unless that field is
+truthy on the tower, so a perk on the Rifleman's B4 recruits does nothing on a
+Rifleman that never bought B4. It deliberately does not reach `price`: a build
+price is quoted before any tower exists, and charging for a tier the player may
+never buy is the dishonest half of a conditional effect.
+
+**Every reader of a build price now goes through `TowerPerks.priceOf`** — the
+bar's label and its affordability check, the placement, the armoury card, the
+index card and `loadoutProblem` — so a perk that makes a tower dearer cannot be
+shown at one price and charged at another.
+
+**The loadout is frozen for the length of a run**, from `restartGame`, which
+every entry onto a board goes through. A type that levels up mid-run banks the
+level at once and gets its new slot on the preparation screen; nothing under the
+player's towers moves while they are playing.
+
+**Two new screens off the title rail, which is four wide now.** Upgrades lists
+the towers the profile owns with their level, xp bar, five slots and inventory;
+the Tree screen draws a whole tree with no fog and no hidden nodes — what a
+level or a prerequisite locks is the PURCHASE, never the view. Right-drag pans,
+the wheel zooms to the cursor, and recentre FRAMES the tree rather than
+returning to a typed-in origin, because a tree may be any size. `requires` is
+AND: a convergence needs every parent, and the card ticks them off.
+
+**A perk is dragged, and a plain click also works** — an inventory card goes to
+the first open slot, a slot's perk comes out. A screen that can only be operated
+by dragging cannot be operated at all on a bad trackpad. A drop that lands
+nowhere legal puts the perk back and names the reason.
+
+**A seventh saved field, and an old save loses nothing.** `progress` is keyed by
+catalogue id and holds xp, bought nodes, the five slots and the reset stamp.
+Level is DERIVED from xp and never stored, which makes "xp never lowers a level"
+structural. A profile written before today gets an empty map and starts this
+system at the beginning with its coins, towers and build bar exactly as they
+were. `sanitise` enforces the three invariants that are about storage — xp is
+non-negative, an equipped node must be owned, and no slot past the level may
+hold anything — so a hand-edited file cannot run five perks on a level-1 tower.
+
+**The sandbox banks nothing.** `TowerXP.setEnabled(false)` at boot. The equipped
+perks still apply there, deliberately: what you learn about a tower on the
+workbench has to be true in the shipping game.
+
+**Six trees, one file each, as a first authored pass.** They are content and the
+owner will replace them; what they are here for is to prove the format carries
+what the brief asks of it — four roots out of the centre, AND-convergences,
+level gates, trade-offs, a price change, a flag that changes a tower's role
+(the Siphon's beam gaining the sky), a perk that modifies one in-run tier, and
+an economy tower whose whole tree touches no damage stat at all.
+
 **2026-08-30 — The Rifleman can be taken out of the build bar.**
 
 **It could not be, and there were two separate reasons for that.** Either one

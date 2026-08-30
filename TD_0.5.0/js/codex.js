@@ -218,7 +218,7 @@ var Codex = (function () {
       return {
         type: Type,
         name: Type.DISPLAY_NAME,
-        cost: Type.COST,
+        cost: TowerPerks.priceOf(Type),
         stats: TowerStats.withoutTotals(base.statLines()),
         // The unbought body, from the same resolver every tier uses.
         model: bodyOf(base),

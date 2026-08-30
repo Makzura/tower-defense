@@ -2975,6 +2975,21 @@ function applyMapOcclusion() {
 // with them rather than staying as a function with no caller.
 var mapSightBlockers = null;
 
+// WHAT THIS CAMPAIGN MULTIPLIES ITS XP BY. The SAME `Difficulty.scaleFor` the
+// coin rewards are priced through, read at call time -- so a longer or harder
+// schedule pays more experience for the same reason it pays more salvage, and
+// there is one rating in this game rather than two that can drift.
+//
+// Degrades to 1 rather than throwing when the rating cannot be computed, which
+// is what a fixture with no schedule and the Node harness both look like.
+function xpDifficultyScale() {
+  if (typeof Difficulty === "undefined" || !Difficulty.scaleFor) return 1;
+  var mapId = (typeof Maps !== "undefined" && Maps.currentId)
+    ? Maps.currentId() : (currentMap && currentMap.id);
+  var scale = Difficulty.scaleFor(selectedDifficultyId, mapId);
+  return (typeof scale === "number" && isFinite(scale) && scale > 0) ? scale : 1;
+}
+
 function startRun(map) {
   loadMap(map);
   restartGame();
@@ -3036,6 +3051,10 @@ function openMenu() {
   screen = "menu";
   paused = false;
   frozen = false;
+  // THE RUN IS OVER, SO THE FROZEN LOADOUT IS TOO. Back on the live profile the
+  // preparation screens edit -- which is what makes a perk equipped in the
+  // armoury take effect on the next run rather than the one after it.
+  if (typeof TowerPerks !== "undefined") TowerPerks.releaseRun();
   // The run is over as far as the world is concerned: no clock on the title
   // screen. Victory and game over do NOT call this -- they freeze the board
   // they finished on, and the sky is part of that board.
@@ -3092,6 +3111,16 @@ function restartGame() {
   // and starting another run does not leak phase" true by construction rather
   // than by remembering to reset in four places.
   if (typeof EnvironmentCycle !== "undefined") EnvironmentCycle.begin();
+
+  // AND FOR THE SAME REASON, THE PERMANENT LOADOUT IS FROZEN HERE. Every entry
+  // onto a board comes through this function, so this one line is what makes
+  // "a run plays the perks it started with" true: a type that levels up during
+  // the run banks the level at once and gets its new slot back on the
+  // preparation screen, and nothing under the player's towers moves mid-run.
+  if (typeof TowerPerks !== "undefined") TowerPerks.lockForRun();
+  // The xp ledger is run state like every other line here: what the LAST run
+  // paid must not be shown at the end of this one.
+  if (typeof TowerXP !== "undefined") TowerXP.beginRun();
 
   cash = STARTING_CASH;
   baseHp = BASE_MAX_HP;
@@ -3314,6 +3343,15 @@ function onMouseMove(event) {
     clampCamera();
   }
 
+  // THE TWO PROGRESSION SCREENS ARE THE ONLY ONES IN THIS GAME THAT DRAG.
+  // A perk is carried from the inventory to a slot on the Upgrades screen, and
+  // a tree bigger than its window is pushed around on the Tree screen. Both
+  // return here rather than falling through: there is no world under either of
+  // them, so refreshWorldPointer would be asking the board a question about a
+  // screen the board is not on.
+  if (screen === "upgrades") { Upgrades.onMouseMove(mouse.x, mouse.y); return; }
+  if (screen === "tree") { Upgrades.movePan(mouse.x, mouse.y); return; }
+
   refreshWorldPointer();
 }
 
@@ -3334,6 +3372,30 @@ function refreshWorldPointer() {
 }
 
 function onMouseDown(event) {
+  // THE PROGRESSION SCREENS FIRST, and above the 3D early-return below for the
+  // same reason the mixer is: that return exists to stop the 2D map-grab
+  // fighting the orbit camera, and neither of these screens has a board at all.
+  //
+  // LEFT PICKS A PERK UP, RIGHT AND MIDDLE PUSH THE TREE. Right-drag is the
+  // pan gesture the owner asked for and is also the macOS trackpad's two-finger
+  // drag, which is the same button; middle is accepted too because every map
+  // tool in the world takes it and it costs one clause.
+  if (screen === "upgrades" || screen === "tree") {
+    var at = toGameCoords(event);
+    if (screen === "upgrades" && event.button === 0) {
+      if (Upgrades.onMouseDown(at.x, at.y) && event.preventDefault) event.preventDefault();
+      return;
+    }
+    // LEFT IS NOT A PAN ON THE TREE. It picks a node, and a button that both
+    // moved the view and selected whatever ended up under the cursor is the
+    // gesture every map tool gets wrong exactly once.
+    if (screen === "tree" && (event.button === 1 || event.button === 2)) {
+      if (Upgrades.beginPan(at.x, at.y) && event.preventDefault) event.preventDefault();
+      return;
+    }
+    return;
+  }
+
   // ABOVE the 3D early-return below, and it has to be: that return exists to
   // keep the 2D map-grab from fighting the orbit camera, and the mixer is
   // neither. Left button only -- the orbit camera claims middle and right
@@ -3359,6 +3421,16 @@ function onMouseDown(event) {
 }
 
 function onMouseUp(event) {
+  // On window rather than on the canvas, which is what lets a perk dragged off
+  // the edge of the screen still be let go of -- and let go of somewhere
+  // illegal, which puts it back where it came from rather than losing it.
+  if (screen === "upgrades" && event.button === 0) {
+    var drop = toGameCoords(event);
+    Upgrades.onMouseUp(drop.x, drop.y);
+    return;
+  }
+  if (screen === "tree") { Upgrades.endPan(); return; }
+
   if (event.button === 1) cameraDrag = null;
   // On window rather than on the canvas (see init), which is what lets a
   // slider dragged off the edge of the panel still be let go of.
@@ -3416,6 +3488,14 @@ function onWheel(event) {
     return;
   }
 
+  // The inventory scrolls on the Upgrades screen and the whole tree zooms on
+  // the Tree screen -- an arbitrarily large tree is the one thing in this game
+  // that cannot be laid out to fit, so it has to be navigable instead.
+  if (screen === "upgrades" || screen === "tree") {
+    Upgrades.onWheel(p.x, p.y, event.deltaY);
+    return;
+  }
+
   // On the board the wheel zooms. Not while a modal is up: a pause or
   // game-over screen is a place you are, and moving the map underneath it
   // would be motion with nothing to act on.
@@ -3442,6 +3522,7 @@ function onClick(event) {
   if (screen === "menu") {
     if (pointInRect(p.x, p.y, playButtonRect())) { Sound.playUIClick(); openMapSelect(); }
     else if (pointInRect(p.x, p.y, storeButtonRect())) { Sound.playUIClick(); Store.open(); }
+    else if (pointInRect(p.x, p.y, upgradesButtonRect())) { Sound.playUIClick(); Upgrades.open(); }
     else if (pointInRect(p.x, p.y, indexButtonRect())) { Sound.playUIClick(); Codex.open(); }
     else if (pointInRect(p.x, p.y, sandboxButtonRect())) { Sound.playUIClick(); openSandbox(); }
     return;
@@ -3462,6 +3543,23 @@ function onClick(event) {
     Sound.playUIClick();
     if (pointInRect(p.x, p.y, backButtonRect())) openMenu();
     else Store.onClick(p.x, p.y);
+    return;
+  }
+
+  // The two progression screens own every click while they are up, on the same
+  // terms as the armoury: the tree's own Back control belongs to it (it goes
+  // back to Upgrades, not to the menu, which is what keeps the selected tower
+  // under the player), and the menu Back is handled here so no two screens in
+  // this game can disagree about how leaving works.
+  if (screen === "upgrades") {
+    Sound.playUIClick();
+    if (pointInRect(p.x, p.y, backButtonRect())) openMenu();
+    else Upgrades.onClick(p.x, p.y);
+    return;
+  }
+  if (screen === "tree") {
+    Sound.playUIClick();
+    Upgrades.onClick(p.x, p.y);
     return;
   }
 
@@ -3707,7 +3805,11 @@ function onClick(event) {
     // primary route used by the target-claiming update order.
     built.pathProgress = route.progress / route.path.length * path.length;
     addTower(built);
-    cash -= type.COST;
+    // THE PERKED PRICE, NOT THE TYPE'S OWN. `addTower` has just handed the
+    // tower to TowerPerks, which set `built.cost` to the same number this
+    // charges -- one source, so the bar's label, the affordability check and
+    // the till cannot quote three different prices.
+    cash -= TowerPerks.priceOf(type);
 
     // The placement clink. Here and not in addTower(), deliberately: a
     // Summoner's blubs go through addTower too (js/blub.js), and a tower being
@@ -3732,6 +3834,12 @@ function onClick(event) {
 // leaving the earlier one's circle, so that tower's chance to shoot is the one
 // about to expire. Give it the shot; the later tower will get another look.
 function addTower(tower) {
+  // THE ONE DOOR EVERY TOWER COMES THROUGH, which is why the permanent perks
+  // are applied here rather than in six constructors: the player's placements,
+  // the sandbox's roster and a test's fixture all arrive by this line. Summons
+  // pass through it too and are skipped inside -- a blub is not a tower TYPE
+  // and has no tree, no level and no xp of its own.
+  if (typeof TowerPerks !== "undefined") TowerPerks.applyTo(tower);
   towers.push(tower);
   towers.sort(function (a, b) { return a.pathProgress - b.pathProgress; });
 }
@@ -3971,8 +4079,9 @@ function onKeyDown(event) {
   if (screen === "menu") {
     if (event.key === "Enter" || event.key === "1") openMapSelect();
     else if (event.key === "2") Store.open();
-    else if (event.key === "3" || event.key === "i" || event.key === "I") Codex.open();
-    else if (event.key === "4" || event.key === "s" || event.key === "S") openSandbox();
+    else if (event.key === "3" || event.key === "u" || event.key === "U") Upgrades.open();
+    else if (event.key === "4" || event.key === "i" || event.key === "I") Codex.open();
+    else if (event.key === "5" || event.key === "s" || event.key === "S") openSandbox();
     return;
   }
 
@@ -3985,7 +4094,12 @@ function onKeyDown(event) {
   // menu follows against the board underneath it.
   if (screen === "index" && Codex.onKey(event.key)) return;
 
-  if (screen === "index" || screen === "store") {
+  // The tree eats Escape itself -- it goes back to Upgrades rather than to the
+  // menu, which is the whole reason it is a screen and not a modal -- so it is
+  // asked before the shared "Escape leaves an interior" rule below.
+  if ((screen === "upgrades" || screen === "tree") && Upgrades.onKey(event.key)) return;
+
+  if (screen === "index" || screen === "store" || screen === "upgrades") {
     if (event.key === "Escape") openMenu();
     return;
   }
@@ -4423,7 +4537,7 @@ function whyCannotBuild(x, y, type) {
     }
   }
 
-  if (cash < type.COST) {
+  if (cash < TowerPerks.priceOf(type)) {
     return "not enough mana";
   }
 
@@ -5036,6 +5150,13 @@ function update(dt) {
     });
   }
 
+  // ONE STEP OF THE XP INTEGRAL. Simulation rather than presentation -- it
+  // decides how a finished wave's fixed budget is SPLIT between the tower types
+  // that were actually standing -- so it is stepped from here on the same dt
+  // the board moves on, and inherits the pause and the speed toggle with it.
+  // It can never change how much a wave pays; see js/systems/tower-xp.js.
+  if (typeof TowerXP !== "undefined") TowerXP.track(dt, towers);
+
   // Cosmetic timers advance on the same fixed step as the world they
   // decorate, and freeze when it freezes.
   if (typeof Effects !== "undefined") Effects.update(dt);
@@ -5602,6 +5723,15 @@ function endWave(delaySeconds, overshoot) {
   // 1-based number the player was shown is waveIndex + 1.
   if (typeof Farms !== "undefined") Farms.settleWave(waveIndex + 1);
 
+  // AND THE EXPERIENCE, on exactly the same terms and through the same door.
+  // `waveIndex` is still the wave that just ended here -- it is incremented
+  // below -- so the 1-based number is waveIndex + 1, the same arithmetic the
+  // farms above use. One call site, so a wave cannot pay its xp twice however
+  // many gates fired on the step.
+  if (typeof TowerXP !== "undefined") {
+    TowerXP.settleWave(waveIndex + 1, WAVES.length, xpDifficultyScale());
+  }
+
   var spent = overshoot > 0 ? overshoot : 0;
   waveIndex++;
   waveSpawned = 0;
@@ -6075,6 +6205,11 @@ function draw() {
 
   if (screen === "index") {
     Codex.draw(ctx);
+    return;
+  }
+
+  if (screen === "upgrades" || screen === "tree") {
+    Upgrades.draw(ctx);
     return;
   }
 
@@ -7708,6 +7843,8 @@ function drawRunOverlay(spec) {
     MetaProgress.coins() + " meta coins banked",
     VIEW_WIDTH / 2, VIEW_HEIGHT / 2 + 24);
 
+  drawRunXpSummary();
+
   drawOverlayButton(restartButtonRect(),
     "Restart " + (currentMap ? currentMap.name : ""));
   drawOverlayButton(changeMapButtonRect(), "Choose another route");
@@ -7717,6 +7854,73 @@ function drawRunOverlay(spec) {
   ctx.fillStyle = "rgba(" + ASH_DUST + ",0.6)";
   drawMenuText("R / ENTER RESTART   \u00b7   M ANOTHER ROUTE   \u00b7   ESC MENU",
     VIEW_WIDTH / 2, mainMenuButtonRect().y + 64, 1.3);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+}
+
+// WHAT THE RUN TAUGHT EACH TOWER TYPE, under the buttons on both endings.
+//
+// IT IS ON THE LOSS SCREEN TOO, AND THAT IS THE POINT. Experience is credited
+// wave by wave and is never taken back -- losing on wave 12 keeps everything
+// the first eleven waves paid -- so a result screen that showed the payout only
+// on a win would be teaching the player something false about their own save.
+// The line says "kept" in as many words for the same reason.
+//
+// It reads TowerXP's ledger and never re-derives it, which is the rule the coin
+// payout above already follows: the screen prints what was banked, and the
+// banking is not a thing a screen does.
+function drawRunXpSummary() {
+  if (typeof TowerXP === "undefined") return;
+  var run = TowerXP.ledger();
+  var ids = Object.keys(run.perType).filter(function (id) {
+    return run.perType[id] >= 0.5;
+  });
+  ids.sort(function (a, b) { return run.perType[b] - run.perType[a]; });
+
+  var top = mainMenuButtonRect().y + 92;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "10px " + MENU_TECH_FONT;
+
+  if (!ids.length) {
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
+    drawMenuText(run.waves > 0
+      ? "NO TOWER STOOD THROUGH A FINISHED WAVE — NO EXPERIENCE EARNED"
+      : "NO WAVE FINISHED — NO EXPERIENCE EARNED", VIEW_WIDTH / 2, top, 1.3);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    return;
+  }
+
+  ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.8)";
+  drawMenuText("EXPERIENCE BANKED — KEPT WHATEVER THE ENDING", VIEW_WIDTH / 2, top, 1.6);
+
+  // FOUR ROWS AT MOST, and the rest folded into one line rather than run off
+  // the bottom of the screen. Sorted by what was earned, so the four shown are
+  // always the four the run was actually about.
+  var shown = ids.slice(0, 4);
+  ctx.font = "600 12px system-ui, sans-serif";
+  shown.forEach(function (id, i) {
+    var Type = MetaProgress.constructorOf(id);
+    var name = Type ? Type.DISPLAY_NAME : id;
+    var gained = Math.round(run.perType[id]);
+    var levelled = run.levels[id];
+    var y = top + 20 + i * 17;
+
+    ctx.fillStyle = levelled ? "rgba(" + ASH_LEY + ",0.95)" : "rgba(" + ASH_BONE + ",0.82)";
+    ctx.fillText(name + "   +" + gained + " XP" +
+      (levelled ? ("   ·   LEVEL " + levelled.to + " REACHED") : ""),
+      VIEW_WIDTH / 2, y);
+  });
+
+  if (ids.length > shown.length) {
+    ctx.font = "10px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.6)";
+    drawMenuText("AND " + (ids.length - shown.length) + " MORE",
+      VIEW_WIDTH / 2, top + 20 + shown.length * 17, 1.2);
+  }
 
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -7892,7 +8096,7 @@ function drawBuildBar() {
     var type = BUILD_SLOTS[i];
     var r = slotRect(i);
     var armed = (i === selectedSlot);
-    var affordable = type !== null && cash >= type.COST;
+    var affordable = type !== null && cash >= TowerPerks.priceOf(type);
 
     // Panel
     ctx.fillStyle = armed ? "rgba(108,230,133,0.14)" : "rgba(28,30,38,0.85)";
@@ -7947,7 +8151,7 @@ function drawBuildBar() {
 
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillStyle = affordable ? "#ffd76e" : "#e0736e";
-    ctx.fillText(type.COST + " mana", r.x + r.w / 2, r.y + 68);
+    ctx.fillText(TowerPerks.priceOf(type) + " mana", r.x + r.w / 2, r.y + 68);
   }
 
   ctx.textAlign = "left";
@@ -8916,19 +9120,30 @@ function playButtonRect() {
   return { x: VIEW_WIDTH / 2 - 240, y: 334, w: 480, h: 88 };
 }
 
-// PLAY owns the centre. The three smaller destinations form one command rail
-// below it instead of a second stack competing with the primary action.
-function storeButtonRect() {
-  return { x: VIEW_WIDTH / 2 - 270, y: 456, w: 170, h: 58 };
+// PLAY owns the centre. The smaller destinations form one command rail below
+// it instead of a second stack competing with the primary action.
+//
+// FOUR OF THEM SINCE 2026-08-30, when Upgrades arrived. The rail is laid out
+// from one pitch rather than from four typed-in x values, so the next
+// destination moves the row instead of being wedged into it -- which is what
+// the three hand-placed numbers this replaced could not do.
+var RAIL_SLOTS = 4;
+var RAIL_W = 168;
+var RAIL_GAP = 12;
+
+function railRect(i) {
+  var total = RAIL_SLOTS * RAIL_W + (RAIL_SLOTS - 1) * RAIL_GAP;
+  return { x: (VIEW_WIDTH - total) / 2 + i * (RAIL_W + RAIL_GAP), y: 456,
+           w: RAIL_W, h: 58 };
 }
 
-function indexButtonRect() {
-  return { x: VIEW_WIDTH / 2 - 85, y: 456, w: 170, h: 58 };
-}
+function storeButtonRect() { return railRect(0); }
 
-function sandboxButtonRect() {
-  return { x: VIEW_WIDTH / 2 + 100, y: 456, w: 170, h: 58 };
-}
+function upgradesButtonRect() { return railRect(1); }
+
+function indexButtonRect() { return railRect(2); }
+
+function sandboxButtonRect() { return railRect(3); }
 
 // Back to the menu from the chooser. Top-left, out of the cards' way.
 function backButtonRect() {
@@ -9980,7 +10195,8 @@ function drawMenuButton(r, label, key, rgb, primary, dead) {
   var t = menuClock();
   var detail = label === "PLAY" ? "HOLD THE LAST GATE"
     : (label === "ARMOURY" ? "SALVAGE & LOADOUT"
-    : (label === "INDEX" ? "FIELD RECORDS" : "TEST RANGE"));
+    : (label === "UPGRADES" ? "TOWER TREES & XP"
+    : (label === "INDEX" ? "FIELD RECORDS" : "TEST RANGE")));
   var cut = primary ? 22 : 14;
   // The primary breathes; the rail lights only under the cursor. One ambient
   // pulse on the screen's controls, as before -- the scene carries the rest.
@@ -10224,8 +10440,9 @@ function drawMenu() {
   drawMenuButton(playButtonRect(), "PLAY", "1",
     barProblem ? "134,116,108" : "255,146,60", true, !!barProblem);
   drawMenuButton(storeButtonRect(), "ARMOURY", "2", "230,168,84", false);
-  drawMenuButton(indexButtonRect(), "INDEX", "3", "116,240,214", false);
-  drawMenuButton(sandboxButtonRect(), "SANDBOX", "4", "168,132,255", false);
+  drawMenuButton(upgradesButtonRect(), "UPGRADES", "3", "240,150,78", false);
+  drawMenuButton(indexButtonRect(), "INDEX", "4", "116,240,214", false);
+  drawMenuButton(sandboxButtonRect(), "SANDBOX", "5", "168,132,255", false);
 
   // The sentence itself, in the gap between the primary and the rail that is
   // empty on every other profile.
@@ -10260,11 +10477,11 @@ function drawMenu() {
 
   ctx.font = "11px " + MENU_TECH_FONT;
   ctx.fillStyle = "rgba(0,0,0,0.6)";
-  drawMenuText("ENTER / 1 PLAY   ·   2 ARMOURY   ·   3 INDEX   ·   4 SANDBOX",
-    VIEW_WIDTH / 2 + 1, 649, 1.8);
+  drawMenuText("ENTER / 1 PLAY   ·   2 ARMOURY   ·   3 UPGRADES   ·   " +
+    "4 INDEX   ·   5 SANDBOX", VIEW_WIDTH / 2 + 1, 649, 1.8);
   ctx.fillStyle = "rgba(236,208,180,0.92)";
-  drawMenuText("ENTER / 1 PLAY   ·   2 ARMOURY   ·   3 INDEX   ·   4 SANDBOX",
-    VIEW_WIDTH / 2, 648, 1.8);
+  drawMenuText("ENTER / 1 PLAY   ·   2 ARMOURY   ·   3 UPGRADES   ·   " +
+    "4 INDEX   ·   5 SANDBOX", VIEW_WIDTH / 2, 648, 1.8);
   ctx.font = "9px " + MENU_TECH_FONT;
   ctx.fillStyle = "rgba(196,150,116,0.72)";
   drawMenuText("LEYLINE DEFENSE NETWORK   //   RELAY 04.11   //   SIGNAL DEGRADED",

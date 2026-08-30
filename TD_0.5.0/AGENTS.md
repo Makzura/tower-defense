@@ -4027,6 +4027,213 @@ prints it under the build-bar row, both off that same function. `sanitise()` no
 longer repairs an unplayable saved bar either: an emptied bar is a deliberate
 edit and must survive a reload, or the armoury reads as broken.
 
+---
+
+## Permanent tower progression — levels, trees and perks (2026-08-30)
+
+**A SECOND UPGRADE SYSTEM, AND IT IS NOT THE FIRST ONE.** The A/B/C tiers a
+tower buys with MANA during a run are untouched and stay exactly what they
+were. This is the other kind: a **perk** is bought once, with META COINS, out
+of a tower TYPE's own tree, and it outlives every run.
+
+**Buying is not equipping.** A type has a LOADOUT of up to five perk slots,
+opened one at a time by the type's LEVEL, and only a perk sitting in a slot
+does anything. A bought perk that is not equipped is in the inventory, owned
+forever, and inert.
+
+**THERE ARE NOW THREE FIVES IN THIS GAME AND THEY ARE ALL DIFFERENT.**
+`MetaProgress.SLOT_COUNT` is how many TYPES fit in the build bar;
+`MetaProgress.PERK_SLOTS` is how many PERKS fit in one type's loadout; a
+tower's in-run tiers also go to five. Nothing may read one for another, and the
+Upgrades screen is deliberately NOT a third armoury tab for the same reason.
+
+| file | what it owns |
+|---|---|
+| `js/meta.js` | the SAVE: xp, bought nodes, the five slots, the reset stamp — plus every invariant that is about storage |
+| `js/systems/tower-perks.js` | the RULES and the registry: node state, purchase, refund, the run freeze, and how a perk reaches a tower |
+| `js/systems/tower-xp.js` | the fixed per-wave budget and the investment integral that splits it |
+| `js/perks/*-perks.js` | the CONTENT: one file per tower, one tree each |
+| `js/upgrades.js` | the Upgrades screen and the Tree screen |
+
+### Level is DERIVED from xp and is never stored
+
+`XP_THRESHOLDS` is `[1000, 2500, 5000, 10000, 17500]` — cumulative xp to reach
+levels 1 through 5, and **the number of usable slots IS the level**. Deriving
+rather than storing is what makes "xp never lowers a level" and "level and xp
+cannot drift" structural instead of something to remember.
+
+### A wave carries a FIXED budget of xp
+
+`TowerXP.waveBudget(waveNumber, waveCount, scale)`. It is **not** damage, kills,
+DPS, time survived or a per-role contribution formula — the wave's number is
+decided before the wave starts. That closes every farm at once: overkill,
+enemy healing, stun loops, summon walls and stalling a wave open all earn
+exactly what killing it instantly earns.
+
+```
+weight(n) = 1 + LATE_WEIGHT * (n/N)^2          LATE_WEIGHT = 3
+budget(n) = RUN_XP_TARGET * scale * weight(n) / sum(weight(1..N))
+```
+
+**A whole reference campaign pays `RUN_XP_TARGET` = 500, exactly**, and every
+other campaign pays that times `Difficulty.scaleFor` — the SAME rating the coin
+rewards are priced through, so there is one difficulty number in this game and
+not two that can drift. Easy on the default board rates 1.00, so it pays 500
+over 35 waves; Normal rates 1.50 and pays 750 over 40. Against the thresholds
+above that is about 2, 5, 10, 20 and 35 *focused* runs to reach levels 1–5.
+The last wave is worth four times the first, and no wave is worth nothing.
+
+**Nothing assumes a campaign's wave count.** A 12-wave schedule and a 60-wave
+one both normalise onto the same total. A freeplay mode, if one is ever added,
+already has its sharply diminishing rates (30% then 10%) in `weightOf`.
+
+### The budget splits by INVESTMENT INTEGRATED OVER THE WAVE
+
+Every frame, `TowerXP.track` adds each tower's `totalSpent × dt` to its TYPE's
+weight; a type's share of the wave is its weight over the total. One line of
+arithmetic, and it answers all six edge cases at once: a tower bought in the
+last second integrates almost nothing, selling everything else at the end does
+not move what the wave already earned, a sold or destroyed tower keeps the
+share it stood for, a refund cannot go negative because the integrated quantity
+is money already spent, churn only accumulates while a tower is actually up,
+and upgrades count because `totalSpent` includes them.
+
+**The integral decides SHARES ONLY.** The total is the wave's own number, so a
+longer wave has a bigger integral and exactly the same payout.
+
+Summons belong to their summoner: a blub is in `towers` with `totalSpent` of
+zero, so it weighs nothing of its own, and the mana that produced it was spent
+on the Summoner where the weight already is. Recruits are not in `towers`.
+
+**Credited from `endWave` — the ONE exit a wave has**, beside `payWaveBounty`
+and `Farms.settleWave` and for the same reason: paid exactly once is a property
+of a single call site rather than of three gates agreeing.
+
+**No ending can take it back.** A loss, an abandon and a walk to the menu all
+keep every point the finished waves paid. `restartGame` clears the run LEDGER
+(what the result screen prints), never the xp.
+
+### How a perk reaches a tower, and why no tower file changed
+
+Every tower recomputes its numbers from scratch — `recalcStats` on the
+hand-written ones, `_refreshStats` through `StatResolver` on the config-driven
+ones — so anything written on from outside is erased by the next tier.
+`TowerPerks.applyTo` therefore **wraps that instance's own recompute** and runs
+the perks as a post-pass after every one of them.
+
+**The order is stated, not emergent: base, then the in-run tiers, then the
+equipped perks.** That is the same seam `farmBoostMult` already uses inside
+`_refreshStats`.
+
+`statTarget` decides WHERE a perk writes: `this.stats` on a config-driven tower,
+the instance itself on a hand-written one. Every tree is authored against its
+own tower's own field names, which is correct rather than lazy — the trees are
+unique per tower by design, so a shared stat vocabulary would buy nothing and
+would forbid exactly the tower-specific effects the system exists for.
+
+**Effects, and their order:** `mul` (all factors multiply), then `add` (all
+deltas sum), then `set` (absolute; last equipped slot wins). Slot order cannot
+change a `mul` or an `add` result, which is what makes dragging a perk between
+slots free of consequence. `price: { mul, add }` moves the BUILD price and
+`TowerPerks.priceOf` is what every reader of one goes through — the build bar's
+label and its affordability check, the placement itself, the armoury card, the
+index card and `MetaProgress.loadoutProblem`.
+
+**`onlyIf` is how a perk modifies ONE IN-RUN TIER**: the effect is skipped
+unless that field is truthy on the tower, so a perk that improves the Rifleman's
+B4 recruits carries `onlyIf: "hasRecruitAbility"` and is inert on a Rifleman
+that never bought B4. **`onlyIf` does not reach `price` and must never be
+authored beside one** — a build price is quoted before any tower exists, so
+there is nothing to test the condition against, and charging for a tier the
+player may never buy is the dishonest half of a conditional effect.
+
+### The loadout is FROZEN for the length of a run
+
+`TowerPerks.lockForRun()` is called from `restartGame` — the one function every
+entry onto a board goes through — and `activeIds` reads that copy while a run is
+up. A type that levels up mid-run banks the level **immediately** and gets its
+new slot back on the preparation screen; the board it is standing on keeps the
+five it started with. `openMenu` releases the freeze.
+
+There is no way to change an equipped perk from the HUD, the pause menu, a
+frozen board or any other surface reachable during a run: the Upgrades screen is
+only reachable from the title screen.
+
+### Resetting a tree
+
+Per tower. Refunds every bought node at its authored price, charges a fee,
+clears the inventory AND every slot those perks were in, and starts a cooldown.
+**It never touches xp, level or ownership** — what a reset undoes is spending.
+The screen asks twice and shows the refund, the fee and the cooldown before the
+second press. The cooldown is asked about before "nothing bought", because after
+a reset both are true and only one is what the player is asking.
+
+**This file never reads a clock**: `resetTree` is handed the time and
+`resetReadyAt` hands one back, so the screens and the tests decide what "now"
+is, and a saved stamp in the future is clamped by `sanitise` rather than trusted.
+
+### The save
+
+A seventh field, `progress`, keyed by catalogue id: `{ xp, nodes, equipped,
+resetAt }`, and a row exists only for a tower that has actually done something.
+**An old save has none of it and that is not corruption** — it gets an empty
+map, keeps its coins, its towers and its build bar exactly, and starts this
+system at the beginning.
+
+Node ids are OPEN, like route ids and for the same reason: this file cannot
+enumerate the trees without depending on them, so an id this build does not know
+is kept in the save and never reported. The three invariants `sanitise` DOES
+enforce are the ones about storage: xp is a non-negative number, an equipped
+node must be owned, and no slot past the level the xp buys may hold anything.
+
+### The sandbox banks nothing
+
+`sandbox.js` calls `TowerXP.setEnabled(false)` at boot. The EQUIPPED perks still
+apply there, deliberately — what you learn about a tower on the workbench has to
+be true in the shipping game, which is that file's whole premise — but no xp,
+no level and no coin is ever banked.
+
+### The screens
+
+**Upgrades** (`screen === "upgrades"`) lists every tower the profile OWNS —
+types not bought yet belong to the armoury — and shows the selected one's icon,
+level, xp bar, five slots and inventory. **All five slots are always drawn**, so
+the whole ladder is visible from level 0, and a locked one says which level
+opens it.
+
+A perk is moved by dragging it, and **a plain click does the obvious thing
+instead** (an inventory card goes to the first open slot; a slot's perk comes
+out), because a screen that can only be operated by dragging cannot be operated
+at all on a bad trackpad. A drop that lands nowhere legal puts the perk back and
+says why.
+
+**Tree** (`screen === "tree"`) draws the whole tree — there is no fog and no
+hidden node; **what a level or a prerequisite locks is the PURCHASE, never the
+view**. Right-drag or two-finger-drag pans, the wheel zooms towards the cursor,
+and ◉ **recentres by FRAMING every node**, derived from the tree rather than
+typed in, because a tree may be any size. Escape goes back to Upgrades with the
+same tower selected.
+
+**`requires` is AND, never OR.** A convergence with two parents needs both, and
+the detail card ticks them off one by one. The five node states — owned,
+buyable, poor, level-locked, prerequisite-locked — all come from
+`TowerPerks.stateOf`, so the ring's colour, the panel's sentence and the
+purchase's refusal cannot disagree.
+
+### Authoring a tree
+
+`TowerPerks.register({ towerId, nodes: [...] })` from a file in `js/perks/`.
+A node is `{ id, name, blurb, cost, requires, minLevel, at: {x, y}, effects }`
+and everything but `id` and `name` is optional. `at` is in node units with the
+tower at the origin. **`id` is a PERSISTENCE FORMAT** — renaming one un-buys it
+for every existing player.
+
+A tower with no tree is a legal state the screens draw as empty. A test asserts
+every tree is well formed: no duplicate id, no dangling parent, no free node, no
+self-reference, no conditional price, and at least one root.
+
+---
+
 **The test harness calls `MetaProgress.unlockAll()`** before `init()`. That is
 a real entry point, not a back door in the gate: the suite is about what towers
 *do*, not how they are unlocked, and a locked roster would silently reduce most

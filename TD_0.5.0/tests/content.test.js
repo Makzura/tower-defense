@@ -9501,7 +9501,7 @@ test("the map grid fits its canvas and no two cards overlap", function (t) {
     "the grid leaves room for the line under it");
 });
 
-test("the title screen renders its command deck and four dedicated controls", function (t) {
+test("the title screen renders its command deck and five dedicated controls", function (t) {
   var h = harness.boot(null);
   h.run(
     "openMenu();" +
@@ -9512,16 +9512,21 @@ test("the title screen renders its command deck and four dedicated controls", fu
     "drawMenuBackdrop = function () {" +
       "menuBackdropDraws++; realMenuBackdrop();" +
     "};" +
-    "drawMenuButton = function (r, label, key, rgb, primary) {" +
-      "menuControlDraws++; realMenuButton(r, label, key, rgb, primary);" +
+    // EVERY ARGUMENT PASSED THROUGH, `dead` included: the wrapper that dropped
+    // the last one would silently light the PLAY plate back up on a profile
+    // whose build bar cannot start a run, and the test would be measuring a
+    // screen the player never sees.
+    "drawMenuButton = function (r, label, key, rgb, primary, dead) {" +
+      "menuControlDraws++; realMenuButton(r, label, key, rgb, primary, dead);" +
     "};"
   );
 
   h.draw();
   t.eq(h.game.menuBackdropDraws, 1,
     "one full sci-fi command deck sits behind the title");
-  t.eq(h.game.menuControlDraws, 4,
-    "each existing action uses the dedicated terminal control style");
+  t.eq(h.game.menuControlDraws, 5,
+    "each existing action uses the dedicated terminal control style — PLAY " +
+    "plus the four-wide rail Upgrades joined on 2026-08-30");
   t.eq(h.game.screen, "menu", "decoration does not navigate or start a run");
 });
 
@@ -9692,5 +9697,679 @@ test("the ten seconds run out on their own and wave 1 walks in", function (t) {
   t.notOk(h.game.betweenWaves(), "the break is over, so the button is gone");
 });
 
+
+// ---------------------------------------------------------------------------
+// PERMANENT TOWER PROGRESSION (2026-08-30)
+//
+// Three layers, tested through their real entry points:
+//
+//   js/systems/tower-xp.js     the fixed per-wave budget and the split
+//   js/systems/tower-perks.js  the trees, the purchase rules, the application
+//   js/meta.js                 the save and every invariant about it
+//
+// THE TREE CONTENT IS DELIBERATELY NOT HARD-CODED HERE except where a shape
+// is the thing under test. These read whatever tree a tower has, so retuning a
+// node -- or replacing a whole tree, which the owner will -- does not turn
+// this section red for reasons that have nothing to do with the system.
+// ---------------------------------------------------------------------------
+
+function bootProgress() {
+  var h = harness.boot();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar(); " +
+        "TowerXP.setEnabled(true); openMenu()");
+  return h;
+}
+
+// Coins the honest way -- through the real award path, so the test spends what
+// a run actually pays rather than writing a number into the profile.
+function bankCoins(h, runs) {
+  for (var i = 0; i < (runs || 1); i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  return h.run("MetaProgress.coins()");
+}
+
+test("a fresh profile starts every tower it owns at level 0 with five locked slots",
+function (t) {
+  var h = harness.boot();
+  h.run("MetaProgress.reset()");
+  var snap = h.run("MetaProgress.snapshot()");
+
+  Object.keys(snap.progress).forEach(function (id) {
+    var p = snap.progress[id];
+    t.eq(p.level, 0, id + " opens at level 0");
+    t.eq(p.xp, 0, id + " opens at 0 xp");
+    t.eq(p.slots, 0, id + " has no usable slot yet");
+    t.eq(p.equipped.length, 5, id + " still shows all five slots");
+    t.deep(p.nodes, [], id + " owns no node");
+  });
+
+  // THE TWO FIVES ARE NOT THE SAME FIVE. The build bar holds tower TYPES; a
+  // perk loadout holds upgrades of ONE type. They are equal today and mean
+  // different things, which is exactly why this is pinned.
+  t.eq(h.game.MetaProgress.PERK_SLOTS, 5, "five perk slots");
+  t.eq(h.game.MetaProgress.SLOT_COUNT, 5, "and five build-bar slots, separately");
+});
+
+test("a wave's xp budget is fixed, rises with the campaign, and sums to the target",
+function (t) {
+  var h = harness.boot();
+  var X = h.game.TowerXP;
+
+  // THE WHOLE REFERENCE CAMPAIGN IS WORTH THE TARGET, EXACTLY. That is what
+  // makes the level thresholds in js/meta.js mean "about 2, 5, 10, 20 and 35
+  // focused runs" rather than approximately something.
+  t.near(X.runBudget(35, 1), X.RUN_XP_TARGET, 1e-9,
+    "a 35-wave reference campaign pays exactly the target");
+  t.near(X.runBudget(40, 1.5), X.RUN_XP_TARGET * 1.5, 1e-9,
+    "and a longer, harder one pays its own rating times it");
+
+  // A RISING CURVE, with a floor. The late waves are worth more, and no wave
+  // is worth nothing -- a wave that paid hundredths of a point would read as
+  // a bug however defensible the maths.
+  var first = X.waveBudget(1, 35, 1);
+  var mid = X.waveBudget(18, 35, 1);
+  var last = X.waveBudget(35, 35, 1);
+  t.ok(first < mid && mid < last, "wave 1 < wave 18 < wave 35 (" +
+    first.toFixed(2) + " / " + mid.toFixed(2) + " / " + last.toFixed(2) + ")");
+  t.near(last / first, 1 + X.LATE_WEIGHT, 0.02,
+    "the last wave is worth the authored multiple of the first");
+  t.ok(first > 1, "and the first wave is still worth something");
+
+  // NOTHING ABOUT A CAMPAIGN'S LENGTH IS ASSUMED. A 12-wave schedule and a
+  // 60-wave one both normalise onto the same total.
+  [12, 35, 40, 60].forEach(function (n) {
+    t.near(X.runBudget(n, 1), X.RUN_XP_TARGET, 1e-9,
+      "a " + n + "-wave campaign still totals the target");
+  });
+});
+
+test("damage, kills and duration cannot change what a wave pays", function (t) {
+  var h = bootProgress();
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000");
+  h.run("towers = []; addTower(new Soldier(200, 200, path))");
+
+  // Two waves fought with the same board, one of them for fifty times as long.
+  var quick = h.run("(function () {" +
+    "  for (var i = 0; i < 20; i++) TowerXP.track(0.1, towers);" +
+    "  return TowerXP.settleWave(3, WAVES.length, 1); })()");
+  var slow = h.run("(function () {" +
+    "  for (var i = 0; i < 1000; i++) TowerXP.track(0.1, towers);" +
+    "  return TowerXP.settleWave(3, WAVES.length, 1); })()");
+
+  t.near(slow.budget, quick.budget, 1e-9,
+    "the same wave pays the same however long it is held open");
+  t.near(slow.awarded.soldier, quick.awarded.soldier, 1e-9,
+    "and the tower that held it open earns the same");
+
+  // The integral decides SHARES, never the total: whatever the weights, the
+  // parts sum to the wave's own number and no more.
+  var total = 0;
+  Object.keys(slow.awarded).forEach(function (id) { total += slow.awarded[id]; });
+  t.near(total, slow.budget, 1e-9, "the parts sum to exactly the budget");
+});
+
+test("a wave's budget splits by the money actually invested, over the whole wave",
+function (t) {
+  var h = bootProgress();
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 1000000; towers = []");
+
+  // 900 of Rifleman against 300 of Warbringer... the Warbringer is 600, so
+  // three Riflemen (900) against one Warbringer (600) is 60/40, and the split
+  // is asserted against the money rather than against a number typed here.
+  h.run("addTower(new Soldier(200, 200, path));" +
+        "addTower(new Soldier(260, 200, path));" +
+        "addTower(new Soldier(320, 200, path));" +
+        "addTower(new Smasher(420, 260, path))");
+  var spent = h.run("(function () { var out = {};" +
+    "  towers.forEach(function (tw) { var id = tw.constructor.ID;" +
+    "    out[id] = (out[id] || 0) + tw.totalSpent; });" +
+    "  return out; })()");
+
+  var shares = h.run("(function () {" +
+    "  for (var i = 0; i < 200; i++) TowerXP.track(0.1, towers);" +
+    "  return TowerXP.currentShares(); })()");
+
+  var money = spent.soldier + spent.smasher;
+  t.near(shares.soldier, spent.soldier / money, 1e-9,
+    "the Rifleman's share is its share of the money");
+  t.near(shares.smasher, spent.smasher / money, 1e-9, "and the Warbringer's is its");
+});
+
+test("buying at the last second earns almost nothing, and a sold tower keeps what it earned",
+function (t) {
+  var h = bootProgress();
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 1000000; towers = []");
+
+  // A Rifleman stands the whole wave; a Warbringer is bought for its last
+  // step. Investment INTEGRATED over the wave is what makes the late arrival
+  // unable to buy a share retroactively.
+  h.run("addTower(new Soldier(200, 200, path));" +
+        "for (var i = 0; i < 300; i++) TowerXP.track(0.1, towers);" +
+        "addTower(new Smasher(420, 260, path)); TowerXP.track(0.1, towers)");
+  var late = h.run("TowerXP.currentShares()");
+  t.ok(late.smasher < 0.05, "a tower bought in the last step took under 5% (" +
+    (late.smasher * 100).toFixed(2) + "%)");
+
+  // And the other way: sell everything else at the last moment. The shares the
+  // wave already earned do not move, because they were earned second by second.
+  h.run("TowerXP.settleWave(1, WAVES.length, 1); towers = [];" +
+        "addTower(new Soldier(200, 200, path));" +
+        "addTower(new Smasher(420, 260, path));" +
+        "for (var i = 0; i < 300; i++) TowerXP.track(0.1, towers);" +
+        "sellTower(towers[0])");
+  var afterSale = h.run("(function () { TowerXP.track(0.1, towers);" +
+    "  return TowerXP.currentShares(); })()");
+  t.ok(afterSale.soldier > 0.3,
+    "the sold Rifleman keeps the share it stood for (" +
+    (afterSale.soldier * 100).toFixed(1) + "%)");
+
+  // A refund cannot make a contribution negative: the quantity integrated is
+  // money already spent and never goes below zero.
+  t.ok(afterSale.soldier > 0 && afterSale.smasher > 0, "and no share is negative");
+});
+
+test("xp is credited when a wave finishes and survives losing the run", function (t) {
+  var h = bootProgress();
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 1000000; towers = [];" +
+        "addTower(new Soldier(200, 200, path))");
+  h.run("for (var i = 0; i < 200; i++) TowerXP.track(0.1, towers);" +
+        "TowerXP.settleWave(1, WAVES.length, 1)");
+  var banked = h.run("MetaProgress.progressOf('soldier').xp");
+  t.ok(banked > 0, "a finished wave banked something (" + banked.toFixed(2) + ")");
+
+  // LOSE THE RUN, HARD. Nothing about an ending may reach back into a wave
+  // that was already finished and paid.
+  h.run("baseHp = 0; gameOver = true; update(1 / 60)");
+  t.eq(h.run("MetaProgress.progressOf('soldier').xp"), banked,
+    "a loss keeps every point the finished waves paid");
+
+  h.run("openMenu()");
+  t.eq(h.run("MetaProgress.progressOf('soldier').xp"), banked,
+    "and so does walking away to the menu");
+
+  // A wave nobody built for pays nobody -- not a payout held over, not a
+  // payout split evenly.
+  h.run("towers = []");
+  var empty = h.run("TowerXP.settleWave(2, WAVES.length, 1)");
+  t.deep(Object.keys(empty.awarded), [], "an empty board earns nothing at all");
+});
+
+test("the xp thresholds open the five slots one at a time", function (t) {
+  var h = bootProgress();
+  var thresholds = h.game.MetaProgress.XP_THRESHOLDS;
+  t.eq(thresholds.length, 5, "five thresholds for five levels");
+
+  thresholds.forEach(function (need, i) {
+    h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+    h.run("MetaProgress.addXp('soldier', " + (need - 1) + ")");
+    t.eq(h.run("MetaProgress.progressOf('soldier').level"), i,
+      "one point short of " + need + " is still level " + i);
+    h.run("MetaProgress.addXp('soldier', 1)");
+    var p = h.run("MetaProgress.progressOf('soldier')");
+    t.eq(p.level, i + 1, need + " xp is level " + (i + 1));
+    t.eq(p.slots, i + 1, "and opens exactly " + (i + 1) + " slot(s)");
+  });
+
+  // AT THE TOP THERE IS NO SIXTH BAR TO FILL.
+  h.run("MetaProgress.addXp('soldier', 100000)");
+  var top = h.run("MetaProgress.progressOf('soldier')");
+  t.eq(top.level, 5, "level is capped at five");
+  t.eq(top.atMax, true, "and says so");
+  t.eq(top.nextLevelXp, null, "with no next threshold invented");
+});
+
+test("buying a node does not equip it, and the slots refuse what the level has not opened",
+function (t) {
+  var h = bootProgress();
+  bankCoins(h, 6);
+  var node = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return !(n.requires && n.requires.length) && !n.minLevel; })[0].id");
+
+  t.eq(h.run("TowerPerks.buy('soldier', '" + node + "').ok"), true, "the node buys");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', '" + node + "')"), true, "and is owned");
+  t.deep(h.run("MetaProgress.equippedPerks('soldier')"), [null, null, null, null, null],
+    "BUYING IS NOT EQUIPPING — the loadout is untouched");
+  t.eq(h.run("TowerPerks.inventory('soldier').length"), 1, "it is in the inventory");
+
+  // LEVEL 0 HAS NO SLOTS, and that is the first thing a player will try.
+  var atZero = h.run("MetaProgress.equipPerk('soldier', '" + node + "', 0)");
+  t.eq(atZero.ok, false, "level 0 equips nothing");
+  t.ok(/level 0/.test(atZero.reason), "and says why: " + atZero.reason);
+
+  h.run("MetaProgress.addXp('soldier', 1000)");
+  t.eq(h.run("MetaProgress.equipPerk('soldier', '" + node + "', 0).ok"), true,
+    "level 1 opens the first slot");
+  t.eq(h.run("MetaProgress.equipPerk('soldier', '" + node + "', 1).ok"), false,
+    "and not the second");
+
+  // NO DUPLICATES, IN THE TREE OR IN THE BAR.
+  t.eq(h.run("TowerPerks.buy('soldier', '" + node + "').ok"), false,
+    "a node cannot be bought twice");
+  h.run("MetaProgress.addXp('soldier', 2000)");
+  h.run("MetaProgress.equipPerk('soldier', '" + node + "', 1)");
+  var bar = h.run("MetaProgress.equippedPerks('soldier')");
+  t.eq(bar.filter(function (x) { return x === node; }).length, 1,
+    "dropping an equipped perk on a second slot MOVES it rather than copying it");
+});
+
+test("a convergence needs every parent, and a level gate holds on its own",
+function (t) {
+  var h = bootProgress();
+  bankCoins(h, 20);
+
+  // FIND THE SHAPES RATHER THAN NAMING THEM: whichever tree holds an AND-node
+  // and a level-gated node, these are the rules they follow.
+  var found = h.run("(function () {" +
+    "  var out = { conv: null, gated: null };" +
+    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
+    "    TowerPerks.nodes(towerId).forEach(function (n) {" +
+    "      if (!out.conv && n.requires && n.requires.length >= 2)" +
+    "        out.conv = { tower: towerId, id: n.id, parents: n.requires };" +
+    "      if (!out.gated && n.minLevel > 0)" +
+    "        out.gated = { tower: towerId, id: n.id, level: n.minLevel," +
+    "                      parents: n.requires || [] };" +
+    "    });" +
+    "  });" +
+    "  return out; })()");
+
+  t.ok(found.conv !== null, "some tree has a node with two or more parents");
+  t.ok(found.gated !== null, "and some tree has a node behind a level");
+
+  // ONE PARENT IS NEVER ENOUGH.
+  h.run("MetaProgress.addXp('" + found.conv.tower + "', 100000)");
+  h.run("MetaProgress.buyNode('" + found.conv.tower + "', '" +
+        found.conv.parents[0] + "', 0)");
+  var half = h.run("TowerPerks.stateOf('" + found.conv.tower + "', '" +
+        found.conv.id + "')");
+  t.eq(half.state, "locked", "half the parents leaves it locked");
+  t.ok(half.missing.length >= 1, "and it names what is missing");
+  t.eq(h.run("TowerPerks.buy('" + found.conv.tower + "', '" + found.conv.id +
+        "').ok"), false, "the purchase is refused too");
+
+  found.conv.parents.forEach(function (p) {
+    h.run("MetaProgress.buyNode('" + found.conv.tower + "', '" + p + "', 0)");
+  });
+  t.eq(h.run("TowerPerks.stateOf('" + found.conv.tower + "', '" +
+        found.conv.id + "').state"), "buyable", "every parent opens it");
+
+  // A LEVEL GATE IS ITS OWN GATE: prerequisites and coins are not enough.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  bankCoins(h, 20);
+  (found.gated.parents || []).forEach(function (p) {
+    h.run("MetaProgress.buyNode('" + found.gated.tower + "', '" + p + "', 0)");
+  });
+  var gated = h.run("TowerPerks.stateOf('" + found.gated.tower + "', '" +
+        found.gated.id + "')");
+  t.eq(gated.state, "level", "prerequisites and coins are not enough at level 0");
+  t.ok(/level/.test(gated.reason), "and it says which level: " + gated.reason);
+});
+
+test("a purchase spends once, and every part of it survives a reload", function (t) {
+  var h = bootProgress();
+  var coins = bankCoins(h, 6);
+  var node = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return !(n.requires && n.requires.length) && !n.minLevel; })[0]");
+
+  h.run("TowerPerks.buy('soldier', '" + node.id + "')");
+  t.eq(h.run("MetaProgress.coins()"), coins - node.cost, "the price came out once");
+  h.run("TowerPerks.buy('soldier', '" + node.id + "')");
+  h.run("TowerPerks.buy('soldier', '" + node.id + "')");
+  t.eq(h.run("MetaProgress.coins()"), coins - node.cost,
+    "and a double click does not pay twice");
+
+  h.run("MetaProgress.addXp('soldier', 1200)");
+  h.run("MetaProgress.equipPerk('soldier', '" + node.id + "', 0)");
+
+  // RELOAD, through the same sanitise a file goes through.
+  var raw = h.run("MetaProgress.snapshot()");
+  var reloaded = h.run("MetaProgress.__loadForTest(" + JSON.stringify({
+    coins: raw.coins, owned: raw.owned, equipped: raw.equipped,
+    progress: { soldier: { xp: raw.progress.soldier.xp,
+                           nodes: raw.progress.soldier.nodes,
+                           equipped: raw.progress.soldier.equipped, resetAt: 0 } }
+  }) + ")");
+  t.eq(reloaded.coins, coins - node.cost, "coins survive");
+  t.deep(reloaded.progress.soldier.nodes, [node.id], "the bought node survives");
+  t.eq(reloaded.progress.soldier.equipped[0], node.id, "so does the loadout");
+  t.eq(reloaded.progress.soldier.level, 1, "and the level the xp bought");
+});
+
+test("a hand-edited profile cannot run more perks than its level allows", function (t) {
+  var h = bootProgress();
+
+  // Five perks equipped on a level-1 tower, and a perk that was never bought.
+  var repaired = h.run("MetaProgress.__loadForTest(" + JSON.stringify({
+    coins: 40, owned: ["soldier"], equipped: ["soldier", null, null, null, null],
+    progress: { soldier: {
+      xp: 1000,
+      nodes: ["a", "b", "c"],
+      equipped: ["a", "b", "c", "never_bought", "a"],
+      resetAt: 4102444800000          // and a stamp far in the future
+    } }
+  }) + ")");
+
+  var row = repaired.progress.soldier;
+  t.eq(row.level, 1, "1000 xp is level 1");
+  t.eq(row.equipped[0], "a", "the one slot the level opened is honoured");
+  t.deep(row.equipped.slice(1), [null, null, null, null],
+    "and every slot past it is emptied");
+  t.eq(row.xp, 1000, "the xp itself is kept");
+});
+
+test("a run keeps the loadout it started with, even through a level-up", function (t) {
+  var h = bootProgress();
+  bankCoins(h, 6);
+  var node = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return !(n.requires && n.requires.length) && !n.minLevel && n.effects" +
+    "    && n.effects.add && typeof n.effects.add.rangeUl === 'number'; })[0]");
+  t.ok(node, "the Rifleman has a node that moves a readable stat");
+
+  h.run("TowerPerks.buy('soldier', '" + node.id + "');" +
+        "MetaProgress.addXp('soldier', 1000);" +
+        "MetaProgress.equipPerk('soldier', '" + node.id + "', 0)");
+
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = []");
+  var withPerk = h.run("(function () { var s = new Soldier(200, 200, path);" +
+    "  addTower(s); return s.rangeUl; })()");
+  t.eq(withPerk, h.game.Soldier.BASE_RANGE_UL + node.effects.add.rangeUl,
+    "a tower placed in the run carries the perk");
+
+  // THE PERK SURVIVES AN IN-RUN UPGRADE. Every tower recomputes its stats from
+  // base on every tier, so this is the property the whole application design
+  // exists for.
+  var afterTier = h.run("(function () { var s = towers[towers.length - 1];" +
+    "  buyUpgrade(s, 'B1'); return s.rangeUl; })()");
+  t.ok(afterTier > withPerk, "and still carries it after buying B1 (" +
+    withPerk + " -> " + afterTier + ")");
+
+  // MID-RUN THE LOADOUT IS FROZEN. Levelling up banks at once; the board keeps
+  // the five it started with.
+  h.run("MetaProgress.unequipPerk('soldier', 0); MetaProgress.addXp('soldier', 5000)");
+  var later = h.run("(function () { var s = new Soldier(340, 200, path);" +
+    "  addTower(s); return s.rangeUl; })()");
+  t.eq(later, withPerk, "a tower placed later in the same run still has it");
+  t.eq(h.run("MetaProgress.progressOf('soldier').level"), 3,
+    "while the level itself banked immediately");
+
+  // AND THE MOMENT THE RUN IS OVER, THE LIVE LOADOUT IS THE ANSWER AGAIN.
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = []");
+  var nextRun = h.run("(function () { var s = new Soldier(200, 200, path);" +
+    "  addTower(s); return s.rangeUl; })()");
+  t.eq(nextRun, h.game.Soldier.BASE_RANGE_UL, "the next run plays without it");
+});
+
+test("a perk that moves a build price moves it everywhere the price is read",
+function (t) {
+  var h = bootProgress();
+  bankCoins(h, 12);
+  var found = h.run("(function () {" +
+    "  var out = null;" +
+    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
+    "    TowerPerks.nodes(towerId).forEach(function (n) {" +
+    "      if (out || !n.effects || !n.effects.price) return;" +
+    "      if (n.requires && n.requires.length) return;" +
+    "      if (n.minLevel) return;" +
+    "      out = { tower: towerId, id: n.id };" +
+    "    });" +
+    "  });" +
+    "  return out; })()");
+  t.ok(found !== null, "some tree changes what its tower costs to build");
+
+  var Type = found.tower;
+  var before = h.run("TowerPerks.priceOf(MetaProgress.constructorOf('" + Type + "'))");
+  h.run("TowerPerks.buy('" + Type + "', '" + found.id + "');" +
+        "MetaProgress.addXp('" + Type + "', 1000);" +
+        "MetaProgress.equipPerk('" + Type + "', '" + found.id + "', 0)");
+  var after = h.run("TowerPerks.priceOf(MetaProgress.constructorOf('" + Type + "'))");
+  t.ok(after !== before, "the quoted price moved (" + before + " -> " + after + ")");
+
+  // THE TILL AND THE TOWER AGREE. `cost` is what the panel shows and
+  // `totalSpent` is what a sale refunds half of; both must be the perked price
+  // or a sale would hand back half of a number nobody paid.
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = []");
+  var built = h.run("(function () {" +
+    "  var T = MetaProgress.constructorOf('" + Type + "');" +
+    "  var s = new T(200, 200, path); addTower(s);" +
+    "  return { cost: s.cost, spent: s.totalSpent }; })()");
+  t.eq(built.cost, after, "the tower's own cost is the perked price");
+  t.eq(built.spent, after, "and so is what it has had sunk into it");
+});
+
+test("resetting a tree refunds the nodes, keeps the level, and cools down",
+function (t) {
+  var h = bootProgress();
+  var coins = bankCoins(h, 12);
+
+  var roots = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return !(n.requires && n.requires.length) && !n.minLevel; })" +
+    "  .map(function (n) { return { id: n.id, cost: n.cost }; })");
+  t.ok(roots.length >= 2, "the Rifleman has root nodes to buy");
+
+  var spent = 0;
+  roots.forEach(function (n) {
+    h.run("TowerPerks.buy('soldier', '" + n.id + "')");
+    spent += n.cost;
+  });
+  h.run("MetaProgress.addXp('soldier', 3000)");
+  h.run("MetaProgress.equipPerk('soldier', '" + roots[0].id + "', 0)");
+
+  var beforeXp = h.run("MetaProgress.progressOf('soldier').xp");
+  var refund = h.run("TowerPerks.refundValue('soldier')");
+  t.eq(refund, spent, "the refund is what the nodes cost");
+
+  var out = h.run("TowerPerks.resetTree('soldier', 1000000)");
+  t.eq(out.ok, true, "the reset goes through");
+  t.eq(h.run("MetaProgress.coins()"), coins - spent + refund - out.fee,
+    "the prices come back and only the fee is lost");
+  t.deep(h.run("MetaProgress.ownedNodes('soldier')"), [], "every node is revoked");
+  t.eq(h.run("TowerPerks.inventory('soldier').length"), 0, "the inventory is empty");
+  t.deep(h.run("MetaProgress.equippedPerks('soldier')"), [null, null, null, null, null],
+    "AND THE LOADOUT WITH IT — a slot holding a node you no longer own is the " +
+    "one shape equipPerk refuses to create, so a reset must not create it either");
+  t.eq(h.run("MetaProgress.progressOf('soldier').xp"), beforeXp, "the xp is untouched");
+  t.eq(h.run("MetaProgress.progressOf('soldier').level"), 2, "and so is the level");
+
+  // THE COOLDOWN IS PER TOWER AND IS REPORTED, NOT MERELY ENFORCED.
+  h.run("TowerPerks.buy('soldier', '" + roots[0].id + "')");
+  var again = h.run("TowerPerks.resetTree('soldier', 1000000)");
+  t.eq(again.ok, false, "an immediate second reset is refused");
+  t.ok(again.readyAt > 1000000, "and says when it may be done: " + again.readyAt);
+  t.eq(h.run("TowerPerks.resetTree('soldier', " +
+    (1000000 + h.game.MetaProgress.TREE_RESET_COOLDOWN_MS) + ").ok"), true,
+    "once the cooldown is out it works again");
+});
+
+test("the sandbox banks no experience at all", function (t) {
+  var h = bootProgress();
+  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = [];" +
+        "addTower(new Soldier(200, 200, path))");
+  h.run("TowerXP.setEnabled(false)");
+
+  var before = h.run("MetaProgress.progressOf('soldier').xp");
+  var out = h.run("(function () {" +
+    "  for (var i = 0; i < 400; i++) TowerXP.track(0.1, towers);" +
+    "  return TowerXP.settleWave(30, WAVES.length, 1); })()");
+  t.eq(h.run("MetaProgress.progressOf('soldier').xp"), before,
+    "a testing surface cannot level a real profile");
+  t.deep(Object.keys(out.awarded), [], "and nothing is awarded");
+
+  // The EQUIPPED perks still apply there, deliberately: what you learn about a
+  // tower on the workbench has to be true in the shipping game.
+  t.eq(h.run("typeof TowerPerks.applyTo"), "function",
+    "perks are still applied — only the banking is off");
+  h.run("TowerXP.setEnabled(true)");
+});
+
+test("a save written before this system existed loads and loses nothing", function (t) {
+  var h = harness.boot();
+  var old = { coins: 42, owned: ["soldier", "smasher"],
+              equipped: ["smasher", "soldier", null, null, null],
+              runs: 9, bestWave: 22, milestones: ["reach_11"], routesWon: [] };
+  var loaded = h.run("MetaProgress.__loadForTest(" + JSON.stringify(old) + ")");
+
+  t.eq(loaded.coins, 42, "its coins are its own");
+  t.deep(loaded.owned, ["soldier", "smasher"], "its towers are still owned");
+  t.deep(loaded.equipped, ["smasher", "soldier", null, null, null],
+    "and its build bar is untouched");
+
+  // EVERY OWNED TOWER GETS A CLEAN STARTING ROW rather than an undefined one.
+  ["soldier", "smasher"].forEach(function (id) {
+    var p = loaded.progress[id];
+    t.eq(p.level, 0, id + " starts this system at level 0");
+    t.eq(p.xp, 0, "with no xp");
+    t.deep(p.nodes, [], "no node bought");
+    t.deep(p.equipped, [null, null, null, null, null], "and five empty slots");
+  });
+});
+
+test("the Upgrades screen lists what is owned and drives the loadout by click and by drag",
+function (t) {
+  var h = bootProgress();
+  bankCoins(h, 8);
+  h.run("MetaProgress.addXp('soldier', 2600)");     // level 2, two slots
+  var roots = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return !(n.requires && n.requires.length) && !n.minLevel; })" +
+    "  .map(function (n) { return n.id; })");
+  h.run("TowerPerks.buy('soldier', '" + roots[0] + "');" +
+        "TowerPerks.buy('soldier', '" + roots[1] + "')");
+
+  h.run("openMenu(); Upgrades.open()");
+  t.eq(h.game.screen, "upgrades", "the screen opens");
+  t.eq(h.run("Upgrades.state().selected"), "soldier",
+    "on the first tower the profile owns");
+
+  // ONLY OWNED TOWERS. A type you have not bought belongs to the armoury.
+  h.run("MetaProgress.__loadForTest(" + JSON.stringify({
+    coins: 300, owned: ["soldier"], equipped: ["soldier", null, null, null, null]
+  }) + "); Upgrades.open()");
+  var rows = h.run("(function () { var n = 0;" +
+    "  while (Upgrades.towerRowRect(n).y < VIEW_HEIGHT) n++;" +
+    "  return MetaProgress.snapshot().owned.length; })()");
+  t.eq(rows, 1, "a profile owning one tower lists one tower");
+
+  // Back to the full profile for the loadout gestures.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  bankCoins(h, 8);
+  h.run("MetaProgress.addXp('soldier', 2600);" +
+        "TowerPerks.buy('soldier', '" + roots[0] + "');" +
+        "TowerPerks.buy('soldier', '" + roots[1] + "');" +
+        "Upgrades.open()");
+
+  // A CLICK -- press and release on the same card, without moving -- puts a
+  // perk in the first open slot. The screen has to work without dragging.
+  var card = h.run("Upgrades.inventoryCardRect(0)");
+  h.run("Upgrades.onMouseDown(" + (card.x + 20) + ", " + (card.y + 20) + ");" +
+        "Upgrades.onMouseUp(" + (card.x + 20) + ", " + (card.y + 20) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), roots[0],
+    "clicking an inventory card equips it");
+
+  // A DRAG onto a legal slot moves it there.
+  var card2 = h.run("Upgrades.inventoryCardRect(1)");
+  var slot2 = h.run("Upgrades.slotRect(1)");
+  h.run("Upgrades.onMouseDown(" + (card2.x + 20) + ", " + (card2.y + 20) + ");" +
+        "Upgrades.onMouseMove(" + (card2.x + 60) + ", " + (card2.y + 20) + ");" +
+        "Upgrades.onMouseUp(" + (slot2.x + 40) + ", " + (slot2.y + 40) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[1]"), roots[1],
+    "dragging one onto slot 2 equips it there");
+
+  // A DROP ON A LOCKED SLOT REFUSES AND SAYS WHY, and nothing moves.
+  var card3 = h.run("Upgrades.inventoryCardRect(0)");
+  var slot5 = h.run("Upgrades.slotRect(4)");
+  h.run("Upgrades.onMouseDown(" + (card3.x + 20) + ", " + (card3.y + 20) + ");" +
+        "Upgrades.onMouseMove(" + (card3.x + 80) + ", " + (card3.y + 20) + ");" +
+        "Upgrades.onMouseUp(" + (slot5.x + 40) + ", " + (slot5.y + 40) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[4]"), null, "slot 5 stays empty");
+  t.ok(/level 5/.test(h.run("Upgrades.state().flash.text")),
+    "and the screen says which level opens it");
+
+  // A DROP ON NOTHING PUTS IT BACK. A perk is never lost off the edge.
+  var bar = h.run("MetaProgress.equippedPerks('soldier')");
+  h.run("Upgrades.onMouseDown(" + (card3.x + 20) + ", " + (card3.y + 20) + ");" +
+        "Upgrades.onMouseMove(10, 10); Upgrades.onMouseUp(4, 4)");
+  t.deep(h.run("MetaProgress.equippedPerks('soldier')"), bar,
+    "a drop that lands nowhere changes nothing");
+
+  // AND A CLICK ON AN EQUIPPED SLOT TAKES IT OUT AGAIN, free and immediate.
+  var slot1 = h.run("Upgrades.slotRect(0)");
+  h.run("Upgrades.onMouseDown(" + (slot1.x + 40) + ", " + (slot1.y + 40) + ");" +
+        "Upgrades.onMouseUp(" + (slot1.x + 40) + ", " + (slot1.y + 40) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null, "the slot empties");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', '" + roots[0] + "')"), true,
+    "and the node is still owned — unequipping is not un-buying");
+});
+
+test("the tree screen shows the whole tree, navigates it, and comes back to its tower",
+function (t) {
+  var h = bootProgress();
+  h.run("openMenu(); Upgrades.open(); Upgrades.selectTower('farm'); Upgrades.openTree()");
+  t.eq(h.game.screen, "tree", "the tree opens");
+
+  // THE WHOLE TREE IS FRAMED BY RECENTRING, whatever size it is -- that is what
+  // "come back to a usable view" has to mean when a tree may be any shape.
+  var framed = h.run("(function () {" +
+    "  var board = Upgrades.boardRect();" +
+    "  return TowerPerks.nodes('farm').every(function (n) {" +
+    "    var p = Upgrades.nodeScreenPoint(n);" +
+    "    return p.x > board.x && p.x < board.x + board.w &&" +
+    "           p.y > board.y && p.y < board.y + board.h; }); })()");
+  t.eq(framed, true, "every node is on the board after a recentre");
+
+  // PAN AND ZOOM, then recentre puts it back.
+  var home = h.run("Upgrades.state().view");
+  h.run("Upgrades.beginPan(400, 300); Upgrades.movePan(700, 500); Upgrades.endPan()");
+  var moved = h.run("Upgrades.state().view");
+  t.ok(moved.x !== home.x || moved.y !== home.y, "a right-drag moves the view");
+  h.run("Upgrades.onWheel(400, 300, -100)");
+  t.ok(h.run("Upgrades.state().view.zoom") > moved.zoom, "the wheel zooms in");
+
+  var re = h.run("Upgrades.recentreRect()");
+  h.run("Upgrades.onClick(" + (re.x + 10) + ", " + (re.y + 10) + ")");
+  t.deep(h.run("Upgrades.state().view"), home, "and the recentre button restores it");
+
+  // LEAVING KEEPS THE TOWER. That is the whole reason this is a screen.
+  h.run("Upgrades.onKey('Escape')");
+  t.eq(h.game.screen, "upgrades", "Escape goes back to Upgrades");
+  t.eq(h.run("Upgrades.state().selected"), "farm", "with the same tower selected");
+});
+
+test("every authored tree is well formed", function (t) {
+  var h = harness.boot();
+
+  // A CHECK ON THE CONTENT, not on the engine, and it is here because the owner
+  // will be writing these by hand: a typo in a `requires` is invisible until a
+  // player cannot buy a node, and a duplicate id silently shadows a purchase.
+  var report = h.run("(function () {" +
+    "  var problems = [];" +
+    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
+    "    var seen = {}, roots = 0;" +
+    "    TowerPerks.nodes(towerId).forEach(function (n) {" +
+    "      if (seen[n.id]) problems.push(towerId + ': duplicate id ' + n.id);" +
+    "      seen[n.id] = true;" +
+    "      if (!n.name) problems.push(towerId + ': ' + n.id + ' has no name');" +
+    "      if (!(n.cost > 0)) problems.push(towerId + ': ' + n.id + ' is free');" +
+    "      if (!n.requires || !n.requires.length) roots++;" +
+    "      (n.requires || []).forEach(function (r) {" +
+    "        if (!TowerPerks.nodeOf(towerId, r))" +
+    "          problems.push(towerId + ': ' + n.id + ' requires unknown ' + r);" +
+    "        if (r === n.id) problems.push(towerId + ': ' + n.id + ' requires itself');" +
+    "      });" +
+    "      if (n.effects && n.effects.onlyIf && n.effects.price)" +
+    "        problems.push(towerId + ': ' + n.id + ' has a conditional price');" +
+    "    });" +
+    "    if (!roots) problems.push(towerId + ': no root node');" +
+    "  });" +
+    "  return problems; })()");
+
+  t.deep(report, [], "no tree has a duplicate id, a dangling parent, a free " +
+    "node, a self-reference, a conditional price or no root");
+
+  // A tree registered for a tower nobody can own would be content nobody can
+  // reach. Every tree belongs to a catalogue type.
+  var orphans = h.run("TowerPerks.towersWithTrees().filter(function (id) {" +
+    "  return !MetaProgress.entry(id); })");
+  t.deep(orphans, [], "every tree belongs to a tower in the catalogue");
+});
 
 runner.run();

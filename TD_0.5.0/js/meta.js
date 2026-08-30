@@ -33,6 +33,38 @@ var MetaProgress = (function () {
 
   var STORAGE_KEY = "towerDefense.meta.v1";
 
+  // --- PERMANENT TOWER PROGRESSION (2026-08-30) ------------------------------
+  //
+  // A SECOND FIVE, AND IT IS NOT THE BUILD BAR'S FIVE. `SLOT_COUNT` below is
+  // how many TOWER TYPES fit in the build bar. `PERK_SLOTS` is how many
+  // permanent upgrades fit in ONE TYPE's loadout. They are both five today and
+  // they answer different questions; nothing may read one for the other. See
+  // the header of js/systems/tower-perks.js.
+  var PERK_SLOTS = 5;
+
+  // CUMULATIVE XP to REACH each level, 1 through 5. Level is DERIVED from xp
+  // and never stored, which is what makes "xp never lowers a level" and "level
+  // and xp cannot drift apart" structural rather than something to remember.
+  //
+  // The owner's targets, against a full campaign paying about 500 XP split
+  // between the types that were actually built: roughly 2, 5, 10, 20 and 35
+  // focused runs. See TowerXP.waveBudget for the other half of that arithmetic.
+  var XP_THRESHOLDS = [1000, 2500, 5000, 10000, 17500];
+
+  // What resetting one tower's tree costs on top of what it hands back, and how
+  // long before that tower may be reset again. BALANCE VALUES, deliberately
+  // gentle: the point is to stop a player rebuilding a whole tree between two
+  // runs, not to charge them for a mistake. A clear pays 80 coins and a node
+  // costs 8 to 30, so five is small change; ten minutes is longer than the gap
+  // between two runs and shorter than an evening.
+  //
+  // The COOLDOWN IS WALL CLOCK and this file never reads a clock: `resetTree`
+  // is handed the time and `resetReadyAt` hands one back, so the screens and
+  // the tests decide what "now" is. A saved stamp in the future -- a profile
+  // moved between machines -- is clamped by sanitise rather than trusted.
+  var TREE_RESET_FEE = 5;
+  var TREE_RESET_COOLDOWN_MS = 10 * 60 * 1000;
+
   // How many build-bar slots a loadout has. MUST match BUILD_SLOTS.length in
   // game.js -- the bar's geometry is built from the array, and the inventory
   // screen edits the same shape. A test pins the two together.
@@ -178,7 +210,12 @@ var MetaProgress = (function () {
       // the list itself. A count would re-pay the moment the ladder changed.
       bestWave: 0,
       milestones: [],
-      routesWon: []
+      routesWon: [],
+      // THE SEVENTH FIELD (2026-08-30): per-tower permanent progression, keyed
+      // by catalogue id. Absent for a tower that has never been played, which
+      // is the same thing as level 0 with nothing bought -- see progressOf,
+      // which materialises that default rather than storing a row per tower.
+      progress: {}
     };
   }
 
@@ -259,8 +296,63 @@ var MetaProgress = (function () {
       // Route ids are OPEN: a map can be added, and a save naming one this
       // build does not have must load rather than throw. Unknown ids are kept
       // out of the ledger but never crash it -- see the note on Maps ids.
-      routesWon: cleanStringList(raw.routesWon)
+      routesWon: cleanStringList(raw.routesWon),
+      // AN OLD SAVE HAS NO `progress` AND THAT IS NOT CORRUPTION. It gets an
+      // empty map, which progressOf reads as "level 0, nothing bought, nothing
+      // equipped" for every tower it owns -- so a profile written before
+      // 2026-08-30 keeps its coins, its towers and its build bar exactly, and
+      // starts this system at the beginning like a fresh one.
+      progress: cleanProgress(raw.progress, owned)
     };
+  }
+
+  // One tower's saved progression, rebuilt from what is recognisable.
+  //
+  // NODE IDS ARE OPEN, like route ids and for the same reason: this file
+  // cannot enumerate the trees without depending on them, and a build that has
+  // dropped a node must load rather than throw. An id this build does not know
+  // is kept in the save and never reported -- js/systems/tower-perks.js only
+  // ever answers with nodes it can find, so an unknown id is inert here and
+  // still there if the node comes back.
+  //
+  // The three invariants that ARE enforced, because they are about storage
+  // rather than about content: xp is a non-negative number, an equipped node
+  // must be owned, and no slot past the level the xp buys may hold anything.
+  // That last one is what makes a hand-edited file unable to run five perks on
+  // a level-1 tower.
+  function cleanProgress(raw, owned) {
+    var out = {};
+    if (!raw || typeof raw !== "object") return out;
+
+    owned.forEach(function (towerId) {
+      var row = raw[towerId];
+      if (!row || typeof row !== "object") return;
+
+      var xp = (typeof row.xp === "number" && isFinite(row.xp) && row.xp > 0) ? row.xp : 0;
+      var nodes = cleanStringList(row.nodes);
+      var level = levelForXp(xp);
+
+      var equipped = [];
+      for (var i = 0; i < PERK_SLOTS; i++) {
+        var nodeId = row.equipped && row.equipped[i];
+        var legal = i < level &&
+          typeof nodeId === "string" &&
+          nodes.indexOf(nodeId) !== -1 &&
+          equipped.indexOf(nodeId) === -1;
+        equipped.push(legal ? nodeId : null);
+      }
+
+      // A STAMP IN THE FUTURE IS NOT TRUSTED. A profile carried between two
+      // machines whose clocks disagree would otherwise lock its own reset for
+      // as long as the two are apart. Zero means "never reset", which is what
+      // a fresh row says too.
+      var resetAt = (typeof row.resetAt === "number" && isFinite(row.resetAt) &&
+                     row.resetAt > 0) ? Math.floor(row.resetAt) : 0;
+
+      out[towerId] = { xp: xp, nodes: nodes, equipped: equipped, resetAt: resetAt };
+    });
+
+    return out;
   }
 
   // Every number off disk goes through here: negatives, NaN, Infinity, strings
@@ -749,7 +841,14 @@ var MetaProgress = (function () {
     s.equipped.forEach(function (id) {
       if (id === null) return;
       var ctor = constructorOf(id);
-      if (ctor && typeof ctor.COST === "number") cheapest = Math.min(cheapest, ctor.COST);
+      if (!ctor || typeof ctor.COST !== "number") return;
+      // THE PERKED PRICE, not the type's own. A permanent upgrade may make a
+      // tower dearer or cheaper to place, so the question "could this bar
+      // afford a first tower" has to be asked at the price the till will
+      // actually charge -- see TowerPerks.priceOf, which every other reader of
+      // a build price goes through too.
+      cheapest = Math.min(cheapest, (typeof TowerPerks !== "undefined")
+        ? TowerPerks.priceOf(ctor) : ctor.COST);
     });
     if (cheapest === Infinity) return "your build bar is empty";
     if (cheapest > startingCash()) {
@@ -778,6 +877,241 @@ var MetaProgress = (function () {
     return ensure().equipped.map(function (id) {
       return id === null ? null : constructorOf(id);
     });
+  }
+
+  // --- permanent tower progression -----------------------------------------
+  //
+  // THE STORAGE HALF. What a node COSTS, what it REQUIRES and what it DOES are
+  // tree content and live in js/systems/tower-perks.js with the trees; this
+  // file owns the save format and the invariants that are about the save
+  // rather than about the content:
+  //
+  //   * level is derived from xp, so the two cannot drift;
+  //   * xp only ever goes up;
+  //   * a node cannot be owned twice;
+  //   * a node must be owned before it can be equipped;
+  //   * a node cannot sit in two slots at once;
+  //   * no slot past the level may hold anything;
+  //   * a node belongs to ONE tower's row and is never visible from another's.
+  //
+  // `buyNode` is handed a price rather than looking one up, because looking one
+  // up would mean this file knowing the trees. TowerPerks.buy is its only
+  // caller and checks the tree rules first -- the same division store.js has
+  // with the build bar, written down here so nobody adds a second caller.
+
+  function levelForXp(xp) {
+    var level = 0;
+    for (var i = 0; i < XP_THRESHOLDS.length; i++) {
+      if (xp >= XP_THRESHOLDS[i]) level = i + 1;
+    }
+    return level;
+  }
+
+  // Cumulative xp to REACH `level`. Level 0 is free; a level past the top has
+  // no threshold and answers null, which is what the screens print as MAX
+  // rather than inventing a sixth bar to fill.
+  function xpForLevel(level) {
+    if (level <= 0) return 0;
+    if (level > XP_THRESHOLDS.length) return null;
+    return XP_THRESHOLDS[level - 1];
+  }
+
+  // The live row, created on first use. A tower with no row has never earned a
+  // point and owns nothing, which is exactly what an empty row says -- so the
+  // save carries a row only for towers that have actually done something.
+  function progressRow(towerId) {
+    var s = ensure();
+    if (!s.progress) s.progress = {};
+    if (!s.progress[towerId]) {
+      s.progress[towerId] = { xp: 0, nodes: [], equipped: emptyPerkSlots(), resetAt: 0 };
+    }
+    var row = s.progress[towerId];
+    // A row read back from a save is already the right shape; one written by an
+    // older build of THIS system might not be, and repairing here costs
+    // nothing and removes a class of undefined.
+    if (!row.nodes) row.nodes = [];
+    if (!row.equipped || row.equipped.length !== PERK_SLOTS) {
+      row.equipped = emptyPerkSlots();
+    }
+    return row;
+  }
+
+  function emptyPerkSlots() {
+    var out = [];
+    for (var i = 0; i < PERK_SLOTS; i++) out.push(null);
+    return out;
+  }
+
+  // EVERYTHING A SCREEN NEEDS ABOUT ONE TOWER, in one read-only object, with
+  // the arithmetic done here rather than in each of the three places that show
+  // it. `xpInto` / `xpSpan` are the progress bar; at the top both are null and
+  // `atMax` is what the screen prints instead of a bar that can never fill.
+  function progressOf(towerId) {
+    var row = progressRow(towerId);
+    var level = levelForXp(row.xp);
+    var floor = xpForLevel(level) || 0;
+    var next = xpForLevel(level + 1);
+    return {
+      id: towerId,
+      xp: row.xp,
+      level: level,
+      slots: level,
+      atMax: next === null,
+      nextLevelXp: next,
+      xpInto: next === null ? null : row.xp - floor,
+      xpSpan: next === null ? null : next - floor,
+      nodes: row.nodes.slice(),
+      equipped: row.equipped.slice(),
+      resetAt: row.resetAt
+    };
+  }
+
+  // XP IS ONLY EVER ADDED, and a negative or nonsense amount is a no-op rather
+  // than an error: the caller is a wave settling, and a wave that computed
+  // nothing must not be able to take a level away.
+  //
+  // Returns what changed, so the end-of-run screen can say "the Rifleman
+  // reached level 2" without asking twice and subtracting.
+  function addXp(towerId, amount) {
+    if (!owns(towerId)) return { ok: false, reason: "not owned" };
+    if (typeof amount !== "number" || !isFinite(amount) || amount <= 0) {
+      var flat = progressOf(towerId);
+      return { ok: true, gained: 0, xp: flat.xp, level: flat.level, levelsGained: 0 };
+    }
+    var row = progressRow(towerId);
+    var before = levelForXp(row.xp);
+    row.xp += amount;
+    var after = levelForXp(row.xp);
+    save();
+    return {
+      ok: true, gained: amount, xp: row.xp,
+      level: after, levelsGained: after - before
+    };
+  }
+
+  function ownsNode(towerId, nodeId) {
+    return progressRow(towerId).nodes.indexOf(nodeId) !== -1;
+  }
+
+  function ownedNodes(towerId) {
+    return progressRow(towerId).nodes.slice();
+  }
+
+  // Spend `price` coins and mark the node bought. The price is the caller's --
+  // see the note above -- but the SPEND is not: coins are checked and deducted
+  // exactly once here, so a double click cannot pay twice (the second call
+  // finds the node already owned and refuses before touching the purse).
+  function buyNode(towerId, nodeId, price) {
+    var s = ensure();
+    if (!owns(towerId)) return { ok: false, reason: "you do not own that tower" };
+    if (ownsNode(towerId, nodeId)) return { ok: false, reason: "already bought" };
+    var cost = (typeof price === "number" && isFinite(price) && price > 0)
+      ? Math.floor(price) : 0;
+    if (s.coins < cost) return { ok: false, reason: "not enough meta coins" };
+
+    s.coins -= cost;
+    progressRow(towerId).nodes.push(nodeId);
+    save();
+    return { ok: true, spent: cost };
+  }
+
+  // Put an owned node in a slot. Refuses, in this order and with the reason the
+  // screen prints: a slot outside the bar, a slot the level has not opened, a
+  // node this tower does not own, and a node already in another slot.
+  function equipPerk(towerId, nodeId, slot) {
+    if (typeof slot !== "number" || slot < 0 || slot >= PERK_SLOTS) {
+      return { ok: false, reason: "no such slot" };
+    }
+    var row = progressRow(towerId);
+    var level = levelForXp(row.xp);
+    if (slot >= level) {
+      return { ok: false, reason: level === 0
+        ? "this tower is level 0 — it has no slots yet"
+        : "slot " + (slot + 1) + " opens at level " + (slot + 1) };
+    }
+    if (row.nodes.indexOf(nodeId) === -1) {
+      return { ok: false, reason: "you have not bought that upgrade" };
+    }
+    var already = row.equipped.indexOf(nodeId);
+    if (already !== -1 && already !== slot) {
+      // MOVED, NOT DUPLICATED. Dragging an equipped perk onto a second slot is
+      // an obvious gesture and the only sane reading of it is "move it there";
+      // refusing would leave a copy behind in the eye of the player who just
+      // dragged it away.
+      row.equipped[already] = null;
+    }
+    row.equipped[slot] = nodeId;
+    save();
+    return { ok: true, slot: slot, replaced: already === -1 ? null : already };
+  }
+
+  function unequipPerk(towerId, slot) {
+    if (typeof slot !== "number" || slot < 0 || slot >= PERK_SLOTS) {
+      return { ok: false, reason: "no such slot" };
+    }
+    var row = progressRow(towerId);
+    if (row.equipped[slot] === null) return { ok: false, reason: "that slot is empty" };
+    row.equipped[slot] = null;
+    save();
+    return { ok: true, slot: slot };
+  }
+
+  // The loadout as ids, holes included. Reading it never changes it, which is
+  // why the perks layer can call it every frame without thinking about it.
+  function equippedPerks(towerId) {
+    return progressRow(towerId).equipped.slice();
+  }
+
+  // WHEN THIS TOWER MAY BE RESET AGAIN, as a wall-clock stamp. Zero means now.
+  // The comparison is the caller's -- see the note on TREE_RESET_COOLDOWN_MS.
+  function resetReadyAt(towerId) {
+    var row = progressRow(towerId);
+    return row.resetAt ? row.resetAt + TREE_RESET_COOLDOWN_MS : 0;
+  }
+
+  // Hand back every node this tower has bought, take the fee, and start the
+  // cooldown. `refund` is what the caller worked out the nodes were worth --
+  // the prices live with the trees, not here.
+  //
+  // XP AND LEVEL ARE NOT TOUCHED, and neither is ownership of the tower. What a
+  // reset undoes is spending, and only spending: a player who has played thirty
+  // runs still has the level those runs bought.
+  function resetTree(towerId, refund, nowMs) {
+    var s = ensure();
+    if (!owns(towerId)) return { ok: false, reason: "you do not own that tower" };
+    var row = progressRow(towerId);
+
+    // THE COOLDOWN IS ASKED FIRST, and deliberately, even though "nothing
+    // bought" is also true right after a reset. A player pressing this again
+    // needs to know WHEN they may, and "nothing to refund" answers a question
+    // they did not ask -- they can see the tree is empty.
+    var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : 0;
+    var ready = resetReadyAt(towerId);
+    if (ready > now) {
+      return { ok: false, reason: "reset is still cooling down", readyAt: ready };
+    }
+    if (!row.nodes.length) return { ok: false, reason: "nothing bought to refund" };
+    if (s.coins < TREE_RESET_FEE) {
+      return { ok: false, reason: "the reset fee is " + TREE_RESET_FEE + " meta coins" };
+    }
+
+    var back = (typeof refund === "number" && isFinite(refund) && refund > 0)
+      ? Math.floor(refund) : 0;
+    var removed = row.nodes.length;
+
+    s.coins += back;
+    s.coins -= TREE_RESET_FEE;
+    row.nodes = [];
+    // EVERY REVOKED PERK LEAVES THE LOADOUT WITH IT. A slot holding a node the
+    // player no longer owns is the one shape equipPerk refuses to create, and a
+    // reset must not create it by the back door.
+    row.equipped = emptyPerkSlots();
+    row.resetAt = now;
+    save();
+    return {
+      ok: true, refunded: back, fee: TREE_RESET_FEE, removed: removed,
+      readyAt: now + TREE_RESET_COOLDOWN_MS
+    };
   }
 
   // --- test / sandbox hooks ------------------------------------------------
@@ -809,6 +1143,13 @@ var MetaProgress = (function () {
     var s = ensure();
     return {
       coins: s.coins, owned: s.owned.slice(), equipped: s.equipped.slice(),
+      // One progression row per OWNED tower, materialised rather than copied,
+      // so a tower that has never earned a point still reads as level 0 with
+      // five locked slots instead of as `undefined`.
+      progress: s.owned.reduce(function (acc, id) {
+        acc[id] = progressOf(id);
+        return acc;
+      }, {}),
       runs: s.runs, bestWave: s.bestWave,
       milestones: s.milestones.slice(), routesWon: s.routesWon.slice()
     };
@@ -855,6 +1196,23 @@ var MetaProgress = (function () {
     equip: equip,
     unequip: unequip,
     loadoutProblem: loadoutProblem,
+    // --- permanent tower progression (2026-08-30) ---------------------------
+    PERK_SLOTS: PERK_SLOTS,
+    XP_THRESHOLDS: XP_THRESHOLDS.slice(),
+    TREE_RESET_FEE: TREE_RESET_FEE,
+    TREE_RESET_COOLDOWN_MS: TREE_RESET_COOLDOWN_MS,
+    levelForXp: levelForXp,
+    xpForLevel: xpForLevel,
+    progressOf: progressOf,
+    addXp: addXp,
+    ownsNode: ownsNode,
+    ownedNodes: ownedNodes,
+    buyNode: buyNode,
+    equipPerk: equipPerk,
+    unequipPerk: unequipPerk,
+    equippedPerks: equippedPerks,
+    resetReadyAt: resetReadyAt,
+    resetTree: resetTree,
     slotConstructors: slotConstructors,
     unlockAll: unlockAll,
     reset: reset,

@@ -972,6 +972,14 @@
     // map buttons switch routes afterwards.
     startRun(Maps.byId(Maps.DEFAULT_ID));
 
+    // NO PERMANENT PROGRESSION FROM A TESTING SURFACE (2026-08-30). The
+    // workbench already hands out infinite money and un-loses runs; a profile
+    // that could be levelled here is a profile whose numbers mean nothing. The
+    // EQUIPPED perks still apply, and deliberately so -- what you learn about a
+    // tower here has to be true in the shipping game, which is this file's
+    // whole premise -- but no xp, no level and no coin is ever banked.
+    if (typeof TowerXP !== "undefined") TowerXP.setEnabled(false);
+
     installRoster();
     installSpeeds();
     installBase();
