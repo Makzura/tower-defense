@@ -19,7 +19,8 @@ doubles its speed when the shield breaks, one that gets back up once, a spawner
 whose brood is shielded and pays nothing, one that hastens everything around it,
 one that switches your towers off without damaging them, one that leaves a live
 charge where it dies, the Tyrant, and the **Dinomech** — 45 000 hit points, no
-shield, no phase and no summons, which ends Normal at wave 40). **All
+shield, no phase and no summons, which shells six of your towers at once and
+silences a corner with its tail, and ends Normal at wave 40). **All
 twenty-five are scheduled** — Easy carries twenty-one and Normal carries all
 twenty-five,
 including the four v0.4.9 additions, the flying Aether Wisp imported from
@@ -447,9 +448,33 @@ art, both proven in the shipping build:
 - **Geometry**, either exported from Blender into `js/gl/models/*.js` or built
   at runtime from `GLGeometry`'s primitives. Costs nothing to load.
 - **Sprite sheets** through `Image()`, as the 2D fallback pack does.
+- **Textured, PBR glTF through Three.js**, for HERO UNITS ONLY (towers and
+  bosses) — added 2026-08-29. See "Two renderers" below. It fetches nothing:
+  `tools/glb_to_three.py` base64s the `.glb` into a `.js` file, a `<script>`
+  element injected at runtime pulls it in, and `GLTFLoader.parse()` reads it
+  out of memory. **Measured from a real `file://` origin in headless Chrome:
+  42 ms end to end, all three 2048x2048 maps decoded.**
 
 What is still forbidden is `fetch`, `XMLHttpRequest` and anything requiring a
-build step or a server.
+build step **to RUN the game** or a server. Changing the ART of a hero unit
+does need `glb_to_three.py` re-run, exactly as changing a baked enemy needs
+`glb_to_model.py` re-run.
+
+**AND THE ONE TRAP INSIDE THAT, WHICH FAILS SILENTLY AND FOREVER.** A `.glb`
+carries its textures inside itself, so GLTFLoader mints a `blob:` URL for each
+one. Which loader it then uses is decided by whether `createImageBitmap`
+exists: if it does, it picks `THREE.ImageBitmapLoader`, which reaches the blob
+through `fetch` — and a blob minted by a `file://` document has a null origin,
+which is the case `fetch` refuses.
+
+**The failure is not an error. It is a HANG.** Measured 2026-08-29 with the
+mitigation removed: the load stops after the base64 decode and NEITHER the
+success nor the error callback ever fires. Nothing throws, nothing is logged,
+and the model sits in "loading" for the life of the page. `three-loader.js`
+hides `window.createImageBitmap` across the `parse()` call to force the plain
+`Image()` path — the one `assets/*.png` already proves from `file://`. That
+shadow is load-bearing. Do not remove it as dead defensive code; there is no
+symptom to find it by if you do.
 
 **Keep `update()` free of DOM access.** Simulation and rendering stay separate.
 Any future replay, fast-forward, or headless balancing work depends on it.
@@ -525,6 +550,15 @@ js/systems/hazards.js  what a DEATH leaves on a fuse, read off a type's
                      NOT an enemy: never in `enemies`, so it cannot hold a wave
                      or the victory screen open, and it pays nothing. Knows no
                      type ids
+js/systems/missiles.js  what an ATTACK put in the air, read off a spec's
+                     `salvo` block. Simulation for the hazards reason -- a
+                     tower loses real hit points when a warhead ARRIVES, so
+                     the flight is stepped from update() and inherits the
+                     pause, the speed toggle and the beam's rewind. A missile
+                     commits to a POINT and to a tower: it lands where it was
+                     aimed whatever happened on the ground, and damages that
+                     tower only if it is still in `towers`. No splash and no
+                     chaining. Knows no type ids
 js/meta.js          MetaProgress: coins, owned towers, the equipped loadout,
                      and the only thing in the game that is SAVED
 js/store.js         the armoury screen (screen === "store"): a Store tab that
@@ -604,6 +638,21 @@ js/gl/ironwood-path.js GENERATED from the authored forest-road GLBs: their packe
                      along Ironwood's live GamePath and width profile
 js/gl/gl-models.js  the model registry the generated js/gl/models/*.js register
                      into; expands per-triangle data to per-vertex once, lazily
+vendor/three/*      Three.js r147, VERBATIM: the UMD three.min.js and the
+                     plain-script GLTFLoader.js. r147 is the last release line
+                     that ships either -- r148+ is ES modules only, which
+                     file:// blocks. Third-party, so it lives OUTSIDE js/ and
+                     is not held to the ES5 house style; the gates scan js/
+                     only. Removing it costs nothing but the hero bodies
+js/gl/three-loader.js THE SECOND RENDERER, for HERO UNITS (towers, bosses) only.
+                     Owns a THREE.Scene, three lights synchronised to the
+                     board's own rig every frame, and the async load path.
+                     Draws into the GAME'S OWN GL CONTEXT -- one framebuffer,
+                     one depth buffer -- and hands it back, exactly as
+                     gl-sky.js already does. Touches no baked enemy
+assets/gltf/*.js    GENERATED by tools/glb_to_three.py: a .glb, base64, in a
+                     .js file. Loaded by a <script> element injected at
+                     runtime and parsed from memory, so nothing is fetched
 js/gl/gl-parts.js   which parts of a model are bolted to the MAP rather than to
                      the tower, recovered from the geometry for models exported
                      before export_mesh.py learned to emit a `world_fixed`
@@ -5246,7 +5295,7 @@ where the type is in Easy and Normal's where it is not.
 | `herald` | 100 | ×0.55 | — | — | — | 1.15 | **N6** | TIME — every 8 s it gives the 8 nearest eligible ground allies within 160 u.l. +30% speed for 4 s, so a board tuned to kill a column in the seconds it spends in one circle stops killing it |
 | `sapper` | 45 | ×0.8 | — | — | — | 1.0 | **N13** | REDUNDANCY — no damage at all: it telegraphs 1.1 s and switches one tower off for 2 s, then that tower is immune to every Sapper for 4 s |
 | `volatile` | **8** | ×1.5 | — | — | — | 0.9 | **N20** | POSITION — dives into the nearest tower within 75 u.l. for 13 and dies of the impact; the charge that death leaves takes 13 more off every tower within **60** u.l. one second later; leaking leaves nothing. Almost any shot kills one, so it is answered by rate of fire and placement, never by damage |
-| `dinomech` | **45 000** | ×0.25 | — | — | — | 2.6 | **N40** | THROUGHPUT — the whole of it. No shield, no second life, no phase, no summons: 45 000 is what the schedule says and what has to come off. It rails the board's best tower for 60 + a 2.5 s stun every 14 s and stomps for 90 across 140 u.l. with no stun at all, so what it takes off the board it takes permanently. Measured: ~30 maxed towers kill it before it lands, ~25 do not |
+| `dinomech` | **45 000** | ×0.25 | — | — | — | 2.6 | **N40** | THROUGHPUT — the whole of it. No shield, no second life, no phase, no summons: 45 000 is what the schedule says and what has to come off. **Retuned 2026-08-28**: every 12 s its silos put **six missiles** in the air at six towers picked at random anywhere on the map, **45 damage each on arrival**; every 10 s its tail comes down **behind** it and stuns everything within 80 u.l. for 3 s, for no damage at all. The two cooldowns are INDEPENDENT (`independentCooldown`, the only specs in the roster that carry it). 270 a volley, spread across six guns rather than concentrated on one |
 
 The four v0.4.9 additions and the Aether Wisp are all scheduled in Easy, and all
 arrive late — Aether Wisp 24/31/35, Shieldbearer 27/29/30/34, Camo Heavy 28,
@@ -5262,12 +5311,14 @@ follows without an edit: the Colossus is now 25/29/**36/37/38/39** on Normal
 (2 / 4 / 6 / 8 across the act), the Tyrant is 35 **and 39** (three of them), and
 a stock Normal's highest campaign health is **48** rather than 36, from wave 38.
 
-**THE DINOMECH HAS NO MESH**, so the 3D board draws it as an untextured sphere
-at `sizeScale` 2.6 — the documented fallback for every type with no
-`js/gl/models/enemy-<typeId>.js`. It is the only body in either campaign's
-finale in that state, and it is a known visual gap rather than an oversight:
-building one is a modelling job with its own gates (clause 3b, the tag check,
-the gait gate), not a side effect of a schedule change.
+**THE DINOMECH HAS A MESH SINCE 2026-08-28**, and so do the Herald and the
+Sapper — the last three unmeshed bodies in either campaign. All three are
+`.glb` imports through `tools/glb_to_model.py`; see the model section below for
+the two new rigs they needed and for the commands. The Dinomech stands 1.05
+model units, which at `sizeScale` 2.6 is **87 board px — the tallest body in
+the game**, 2 px over the Tyrant — and is 1.79 units long, 148 board px, which
+is by a wide margin the longest. Nothing on either campaign's roster draws the
+fallback sphere any more.
 
 Speeds are stored as **multipliers** of `BASE_SPEED_ULPS` so retuning the
 walking speed moves the whole roster in proportion; health is stored as plain
@@ -7502,6 +7553,164 @@ combination. It intentionally lives beside the gunner rather than inside it:
 
 ---
 
+## Two renderers, and which one draws what
+
+**Added 2026-08-29.** There are now two renderers on the board and they share
+one canvas. Which one draws a body is decided by what KIND of body it is, and
+nothing else.
+
+| | drawn by | art | loaded |
+|---|---|---|---|
+| 24 of the 25 enemy types, every tower, recruit and blub | `GLRenderer` + `GLModels` | flat-shaded, untextured, one palette per model | baked into `js/gl/models/*.js`, in the page |
+| **the Dinomech**, and hero units added later | `ThreeGL` (Three.js r147) | textured, PBR, skeletal animation when the export has a rig | `assets/gltf/*.js`, async, at runtime |
+
+**EVERY PAGE THAT LOADS `gl-world.js` MUST ALSO LOAD THE THREE BLOCK, and the
+failure mode if it does not is silent.** `index.html` and `sandbox.html` both
+carry the three tags (`vendor/three/three.min.js`,
+`vendor/three/GLTFLoader.js`, `js/gl/three-loader.js`) and the two lists must
+stay identical, for the same reason the tower/systems block above must:
+the sandbox's whole promise is that what you learn there is true in the game.
+
+**This was got wrong on the day it shipped.** Only `index.html` was wired, so a
+Dinomech spawned in the sandbox drew the chunky untextured mesh while the same
+body in a real run was textured. There is no error for this and no 404:
+`ThreeGL` is simply undefined, `heroBody` returns false exactly as it does for
+a model that is still loading, and the baked body draws. **A correct fallback
+concealed an unwired page** — which is the same shape as the defect
+`tools/check-script-manifest.js` exists to catch, one level up, and neither it
+nor `check-constraints` can see this one: both files WERE loaded by a page, so
+every gate stayed green.
+
+`3d.html` deliberately does NOT carry the block: it does not load `gl-world.js`
+at all and draws through its own viewer path, so there is nothing there for
+`heroBody` to hook.
+
+**The whole roster of who goes through Three is one table**, `THREE_BY_MODEL`
+in `js/gl/gl-world.js`. It is keyed by the BAKED MODEL NAME, not by type id, so
+the swap happens after `enemyModel` has already applied every variant rule
+(revived, shieldBroken, shieldOut, camo shadowing) and this table never
+restates a rule that exists above it.
+
+**THE LOADING STATE IS THE BAKED BODY, and that is better than a placeholder.**
+`heroBody` returns false while the payload is still loading and false forever if
+it failed, and the caller then draws the flat body exactly as it always did --
+right size, right place, right silhouette, animated as before -- which upgrades
+to the textured mesh the moment it is ready. Nothing pops and there is no
+spinner to explain. An early version drew a grey box with a "loading" label
+beside it; the baked body is strictly more informative and was already there.
+
+**SIZE IS LOCKED TO THE BAKED BODY BY MEASUREMENT, NOT BY A CONSTANT.**
+`bakedSpanOf` measures the flat mesh's own span along its forward axis and
+multiplies by the same `unitsToPx` and the same `sizeScale` the flat draw uses,
+so the textured body arrives at the size the flat one would have and follows it
+through any retune. Measured on the live board 2026-08-29: baked silhouette
+**147 x 65 px**, textured **146 x 67 px**, origins 1-2 px apart. The couple of
+pixels are real and expected -- the textured mesh is the full 100 568-triangle
+source where the baked one is decimated to 16 894, so spines and the tail tip
+reach a little further.
+
+**WHY TWO, WHEN gl-renderer.js OPENS BY ARGUING AGAINST EXACTLY THIS.** That
+argument is still correct and is left standing: for flat-shaded untextured
+low-poly under one sun, a general engine is 600 kB to use 20 of them, and the
+models carry no textures to load. **Every word of it is true OF THE ENEMIES.**
+
+It stops being true of a hero unit. `glb/dragon.glb` ships a base colour map, a
+metal/roughness map and a normal map at 2048x2048, and the baked import of that
+exact file -- `js/gl/models/enemy-dinomech.js` -- is **eight flat colours and
+16 894 triangles against the source's 100 568**. The pipeline is not failing
+there; it is doing what it was built to do, to a file it was not built for.
+Towers and bosses are the units a player looks AT rather than past, and there
+are eight of them rather than twenty-five.
+
+**ONE CANVAS AND ONE DEPTH BUFFER, NOT A SECOND LAYER.** `ThreeGL` is handed
+the game's own WebGL context (`new THREE.WebGLRenderer({ canvas, context })`)
+and draws into the same framebuffer, so a hero unit is clipped by the terrain
+in front of it and occludes what is behind it, for free. A stacked transparent
+canvas is simpler and always wrong: a layer on top cannot be got in front of.
+
+**MEASURED, because a picture cannot settle it** (2026-08-29, Ironwood, frozen
+board, `readPixels` A/B with the Three pass live vs stubbed):
+
+- Two consecutive frames with nothing changed differ by **0 pixels**. That is
+  the noise floor, and it is what makes the rest of these numbers mean anything.
+- The Three pass changes **25 675 pixels, all of them inside the dragon's
+  silhouette, and 0 anywhere else on the board.** That is the state-bleed
+  result: borrowing the context and handing it back leaves the board bit for
+  bit identical.
+- Sunk 400 units below the terrain, the dragon paints **exactly 0 pixels**,
+  against 12 706 standing on the ground. **This is the proof the depth buffer
+  is genuinely shared** -- a stacked canvas cannot be buried, so no other
+  arrangement can produce that zero.
+
+**HANDING THE CONTEXT BACK IS THE WHOLE RISK, and it is wider than the sky
+pass.** `gl-sky.js` restores three pieces of state. Three touches most of them,
+and the one a WebGL1 codebase would never think of is the **vertex array
+object**: a VAO left bound overrides every attribute pointer set after it. See
+`handBack` in `three-loader.js` for the full list. `depthFunc` goes back to
+**LEQUAL**, which is the game's setting and is not interchangeable with LESS.
+
+**THE DINOMECH IS THE FIRST ONE THROUGH, AND IT COST NOTHING TO MOVE**
+(2026-08-29, at the owner's instruction). `js/gl/models/enemy-dinomech.js` is
+`glb/dragon.glb` put through `glb_to_model.py`, so the body on the board was
+already this mesh -- 16 894 triangles and eight flat colours out of a source
+carrying 100 568 triangles and three 2048x2048 maps. Same mesh, same
+silhouette, same size; the only thing that changed on screen is that the
+textures are there.
+
+**AND THERE WAS NO WALK TO LOSE.** `node tools/check-gait-slip.js` reports this
+body as `! no weight-bearing group found`, sawtooth 18.59 px at 227% -- four
+identity frames, and it slides. That is the state the bake left it in. The gait
+check reads byte-identically before and after the swap, because the generated
+file is untouched.
+
+**`glb/dinomech.glb` CANNOT BE PUT THROUGH THIS PATH, and it is worth knowing
+why before anyone tries.** It has **no textures, no images and no UVs** -- six
+named materials and 4 584 triangles, flat colour only. There is nothing for a
+textured renderer to show. Moving it over would cost the flat pipeline's exact
+style match and buy nothing.
+
+**WHAT IS NOT DONE YET.** `glb/dragon.glb` is a static Tripo scan: **no
+armature, no animation clips**. The `AnimationMixer` wiring in `three-loader.js`
+is real and does nothing until a rigged export arrives. `ThreeGL.clipsOf()`
+reports what an export actually carries, and the loader warns once when it is
+empty -- because "this boss will not move" and "this boss has no clips" look
+identical on screen and have completely different fixes.
+
+Also standing: the game's fog has a height falloff (`uFogFall`) that
+`THREE.FogExp2` has no equivalent for, so a hero unit sits slightly differently
+in heavy mist than the board around it. Not solved.
+
+### An open discrepancy about the Dinomech's body, found 2026-08-29
+
+**Two documents and the shipped file disagree, and the file is the one that is
+running.** Recorded rather than resolved, because which one is INTENDED is the
+owner's call and not a thing to guess.
+
+- `js/enemy.js` says the body is `glb/dinomech.glb` through the `saurian` rig,
+  **1.041 units tall**, with the **TAIL as a group of its own** that
+  `gl-world.js` swings for the slam. The 2026-08-29 change log entry describes
+  the same biped: 6 030 triangles, two legs, a working walk.
+- **The shipped `js/gl/models/enemy-dinomech.js` is none of that.** Its own
+  header says `Source of truth is dragon.glb`. Measured live through
+  `World3D.strikeSeam` and `GLModels`: **one group, `dinomech_body`** -- there
+  is no `tail` -- **0.671 units tall**, 16 894 triangles, `bands: null`, four
+  identity frames.
+
+**The consequence is that the tail slam cannot animate.** `STRIKE_BY_MODEL`
+still points at group `"tail"`, and the model has no such group, so the lookup
+misses and the body draws its plain pose. A body that drew nothing different is
+pixel-for-pixel a body that did not attack, which is precisely the failure
+`strikeSeam`'s `missingGroupOn` exists to make visible -- ask it rather than
+looking.
+
+**This predates the Three.js work and is unchanged by it**: the strike override
+is not applied on either path, so the swap neither caused it nor hides it.
+Fixing it means deciding which mesh the Dinomech is supposed to be and
+re-running the importer; until then, do not trust the two paragraphs above it
+in `js/enemy.js`.
+
+---
+
 ## Building a model that looks like the ones that already work
 
 The Arcane Sniper, the Rifleman and the meshed enemies set the bar. The Warbringer
@@ -7590,7 +7799,7 @@ on 2026-08-13 and any figure written down is wrong by the next commit;
 falling back to the sphere — so `ls js/gl/models/enemy-*.js` against
 `Enemy.TYPES` is the answer, and it is always current.
 
-**THIRTEEN BODIES NOW COME FROM A `.glb` AND NOT FROM `tools/blender`**, and which
+**SIXTEEN BODIES NOW COME FROM A `.glb` AND NOT FROM `tools/blender`**, and which
 ones cannot be worked out from the directory listings. `enemy-flying` (the
 Aether Wisp) was the first, brought in on 2026-08-12; both Revenant meshes
 followed on 2026-08-16; **`enemy-fast` joined them on 2026-08-17**;
@@ -7601,14 +7810,163 @@ Auroris beacon) the same day**; **`enemy-slow` (the plodder) and
 **`enemy-shielded` and `enemy-shielded-broken` (the Bulwark, before and after
 its shield goes) on 2026-08-20**; and **`enemy-boss_fast` and
 `enemy-boss_fast-shattered` (the Vanguard, before and after its own shield
-goes) on 2026-08-26**. All thirteen are
+goes) on 2026-08-26**; and **`enemy-herald`, `enemy-sapper` and
+`enemy-dinomech` on 2026-08-28**, which were the last three bodies in either
+campaign still drawing the fallback sphere. All sixteen are
 regenerated by
 `tools/glb_to_model.py` from `glb/`, and none of them can be rebuilt from
-`tools/blender`. **Six of the thirteen REPLACED a body this repo had already
+`tools/blender`. **Six of the sixteen REPLACED a body this repo had already
 built** — `enemy-fast`, `enemy-shieldbearer`, `enemy-slow`, `enemy-boss`,
 `enemy-shielded` and `enemy-boss_fast` —
 and each cost a row in `export_mesh.py::TARGETS`; see the trap below, which has
-now been sprung six times.
+now been sprung six times. The three newest replaced NOTHING: those types had
+never had a body at all, so none of them cost an `export_mesh.py` row.
+
+**TWO NEW RIGS ARRIVED WITH THEM, AND EACH IS A KIND OF BODY THIS FILE HAD NOT
+SEEN.**
+
+`--rig cart` is the Herald and the Sapper: a chassis on WHEELS, which is a
+fourth kind of ground contact beside a walker's plant, a hoverer's absence of
+one and the Vanguard's skate. A rolling wheel's contact patch is momentarily at
+REST, so `roll_cycle` solves each wheel's rate off its own measured radius —
+`CYCLE_UNITS / (2·π·r)` turns per stride, per wheel, because a hand-cart's
+caster is a third the diameter of its drive wheels. The rate is then rounded to
+a whole number of SPOKE PITCHES (`--wheel-facets`) so the frame list's wrap is
+invisible, and **both carts' fitted heights are chosen so there is almost
+nothing to round**: 1.237 u puts the Herald's drive wheel at 4.000 sixths of a
+turn and 0.930 u puts the Sapper's at 5.003 quarters. A cart's SIZE is set by
+its wheel, which no other import here does.
+
+`--rig saurian` is the Dinomech, and it is the only rig whose grouping is not
+read off a name: its source arrives as ONE node carrying ONE mesh, so the names
+every other rig is built on do not exist. A `split` hook on the rig cuts the
+single part into pseudo-parts by the position of each triangle's own centroid —
+body, tail and the two legs — and `group_of` then does what it always does. The
+thresholds are FRACTIONS of the body's own extent and were measured off the
+mesh rather than chosen; the scan is in that rig's header. The legs are solved
+by `walk_cycle`'s own `leg_series`/`plant_leg`, half the cycle planted each and
+offset by half, so the finale grades **A = 0.001 board px** on
+`check-gait-slip.js`.
+
+**IT DECLARES `source_forward: "+x"`, AND THAT LINE HAS ALREADY SHIPPED WRONG
+ONCE.** `glb/dinomech.glb`'s head is at its +x end; the withdrawn
+`glb/biomech.glb` faced −x, and for one day this rig carried −x. Run against
+this file that turns the finale through 180° and walks it down the road
+**tail-first** — and *every instrument in the toolchain reports green on it*,
+because a heel plants exactly as well as a toe: the backwards body graded 0.001
+board px on `check-gait-slip.js`. **Nothing in this repo measures facing.**
+What catches it is asking where the EYES are — `Red Optics` is 336 triangles at
+source x +1.70, y 5.23..5.49, the only material on the body that says which end
+is the head. Check that, never the gait, whenever a Dinomech mesh changes.
+
+`--rig volatile` is the diver, and it is the only rig whose LEGS ARE NAMED BY
+MEASUREMENT. Its source has a real hierarchy — `limbs/limb_1..limb_4` — but the
+four are NUMBERED, not named, and a number says nothing about which corner of
+the animal a limb stands in. The gait is keyed on the corner (`GALLOP_PHASE`
+puts the hind pair down first), so bucketing them in file order would have been
+a coin flip per corner, and a gallop whose "hinds" are the front pair is a body
+running backwards on the spot with every instrument reading green. A `split`
+hook therefore measures each limb's own centroid in the model's FINAL space and
+names it from the signs — forward is +x, left is +y. It rides `run_cycle`, the
+hound's gallop, and not `saurian_cycle`'s trot: this type's whole character is
+that it arrives faster than a slow gun can re-aim, so it has to READ as a run,
+and the quarter-cycle duty's two suspensions per stride are the only thing that
+separates the two gaits to the eye at 20 board px. It grades **A = 0.000 board
+px** on all four legs.
+
+`--rig missile` is the Dinomech's warhead, and it is the first import that is
+not a body at all. Two things about it generalise. It is authored **standing on
+its tail** — nose at source +y, plume below the nozzle — which is how a missile
+is modelled and ninety degrees from how one flies; `source_forward` is a yaw
+about the up axis and cannot lay a standing body down, so `source_up: "z"` does
+that half (the file's z is a radius through the fins, and a missile has no up of
+its own) and `source_forward: "+y"` yaws the long axis onto the game's forward.
+**The pair reads like a mistake and is not.** And its plume materials are
+`KHR_materials_unlit`, which `material_entry` now reads as a unit emissive
+strength: an unlit material is a self-lit one, and read as ordinary PBR a rocket
+flame ships as flat plastic that goes DARK on the side facing away from the
+lamp. `missile.glb` is the only file in `glb/` that declares the extension, so
+that branch reproduces every existing import byte-for-byte. Its cycle is a
+throttle flicker — the only **scale** any cycle in this tool emits, because a
+flame is the one part of any model here whose length IS its state.
+
+**THE DINOMECH'S BODY WAS SWAPPED ON 2026-08-28 AND SWAPPED BACK ON
+2026-08-29.** For one day the type wore `glb/biomech.glb`, a generated
+502 250-triangle QUADRUPED under one material and a 4096×4096 atlas, authored
+inside a unit cube, facing −x, carrying a scythe of a tail curled up over its
+own back. That file has been withdrawn and the body is the skeletal biped
+again, now named **`glb/dinomech.glb`** — 34 348 triangles, six named
+materials, 6.22 source units tall, facing **+x**, dragging a straight tail.
+The rig has been re-authored for it: two legs, a walk instead of a diagonal
+trot, no "the tail curls forward over the spine" clause, and `source_forward`
+back to +x.
+
+**WHAT THE ROUND TRIP IS WORTH REMEMBERING FOR** is not the quadruped, which is
+gone. It is that the two meshes faced OPPOSITE ways, so a rig left carrying the
+other one's facing is the whole of the bug — and it is invisible to everything
+that measures this project. See the `source_forward` note above.
+
+The current thresholds, all measured on `glb/dinomech.glb` and all fractions of
+its own extent:
+
+- **BEHIND x = 0.50 L FROM THE NOSE THERE IS NOTHING BUT TAIL.** Scanned in
+  half-unit columns from the hips to the tip, the mesh behind the mid-point
+  holds 7 556 triangles at z 1.60..3.47 and |y| ≤ 0.72 and not one triangle of
+  anything else — no pelvis, no spine, no back plating. So the tail cut is
+  simply "behind the middle".
+- **BELOW z = 0.30 H AND OUTBOARD OF |y| = 0.33 W IS A LEG.** Under 0.30 H the
+  body has no mass within 0.33 W of its own centre line: two columns at
+  |y| = 0.63..0.99 W with nothing between them. The cut takes 5 075 triangles,
+  **2 537 left and 2 538 right** — a symmetry that is itself the check, since a
+  threshold slicing through a hip would not come out even.
+- **AND THE TWO DO NOT OVERLAP, measured rather than assumed.** The tail dips
+  to 0.26 H and swells to 0.53 W near its root, so on paper it can pass both
+  halves of the leg test — but not at once: the leg cut takes **zero** from
+  behind x = 0. At 0.34 H it takes 104, which is where a foot starts swinging
+  with the tail.
+- **THE TAIL'S ROOT IS ITS SLICE NEAREST THE HIPS, NOT ITS FRONTMOST SLICE.**
+  On this straight tail the two agree; they come apart on a tail that curls
+  forward over its own spine, where the frontmost point is the TIP. Distance
+  from the hip line is the rule that is right on both, so it is the rule that
+  is written. `js/gl/gl-world.js`'s slam record carries the measured joint,
+  **`[-0.020, -0.010, 0.359]`**, and a pitch of **−0.30 rad**: this tail is
+  level and already points backward, so a negative rotation drives its far end
+  at the road. Swept on the shipped mesh at `sizeScale` 2.6, −0.30 leaves the
+  lowest point of the tail **5.6 board px** clear of the tarmac and −0.42 puts
+  it through. The legs are never at risk — the tail never swings forward of
+  x 0.026 and they start at x 0.010, and the 16 vertices the two share are the
+  tail's own root inside the pelvis, identical at every angle including rest.
+
+**A GENERATED BODY KEEPS ITS COLOUR IN A TEXTURE, AND THE IMPORTER NOW READS
+ONE.** `texture_bands` in `tools/glb_to_model.py` samples the base colour map
+at each triangle's own UV, fits a handful of bands to what it finds, and
+appends each band to the file's material list as a SYNTHETIC material — so
+`material_entry`, the tint table, the emissive rules and the palette de-dup all
+run afterwards exactly as they do for a hand-authored body. Three things about
+it are worth knowing before touching it:
+
+- **THE IMAGE IS DECODED AT ONE COLOUR PER 8×8 BLOCK**, off the DC coefficient
+  a baseline JPEG already stores, which is a 512×512 read of a 4096×4096 atlas
+  in about a second of pure Python. That is not a compromise: a 99% decimation
+  leaves each surviving triangle covering hundreds of source texels.
+- **THE FIT WEIGHTS CHROMA AT TWICE LUMINANCE** (`BAND_CHROMA`). In plain RGB
+  every centre lands on one luminance diagonal and the Dinomech ships as six
+  shades of a single brown — its gunmetal and its bone sit at nearly the same
+  brightness and differ only in colour.
+- **NOTHING IN IT CONSULTS A RANDOM NUMBER GENERATOR.** The k-means opens on a
+  luminance ladder read off the samples' own weight quantiles and runs a fixed
+  number of rounds, because a `.js` file that changed under a re-run that
+  changed nothing else could not be committed.
+
+**AND THE CARTS ARE GRADED AS A ROLLING CONTACT, WHICH IS A NEW CATEGORY IN
+`check-gait-slip.js` AND NOT THE VANGUARD'S `GLIDES`.** A glide is a contact
+that is MEANT to slide; a roll is a contact that is at rest and is being
+measured wrong. The instrument picks a foot's sole as every vertex within
+0.02 u of the group's lowest, which on a boot is an underside and on a wheel is
+a 60° arc of tyre — so on a small wheel turning 28° a frame it tracks the
+CYCLOID rather than any slip. The Herald reads 1.5 px on the same rig the
+Sapper reads 8.0 px on, and the difference is the wheel diameter, not the
+authoring. Both are still walked, measured and printed.
 
 **TWO PAIRS ARE ONE BODY IMPORTED TWICE, AND THE SECOND IMPORT IS NEVER
 INDEPENDENT OF THE FIRST.** `bulwark_shield.glb` and `bulwark_no_shield.glb` are
@@ -8427,11 +8785,17 @@ no mechanic was moved to match the description.
 | Sapper | 45 HP, 60 bounty, ×0.8. No damage. Nearest valid tower within 90 u.l., 1.1 s telegraph, 2 s disable, then 4 s of immunity to every Sapper. **Normal only** | `Enemy.TYPES.sapper`, `attack.disable`, `attack.commitsTarget` |
 | Sapper collisions | resolved in enemy order: the first disable lands, later ones see a dark target, fizzle, and consume their cycles without extending the stun | `windUpTarget`, `committedTargetValid`, `Enemy.towerAcceptsDisable` |
 | Tower suppression | named timed immunities on the tower, keyed by the spec's own string; longest wins; ticked BEFORE the stun check because that check `continue`s | `TowerHealth.suppress / isSuppressed / suppressionRemaining / tickSuppression` |
-| Volatile | **8 HP**, 25 bounty, **×1.5**, size 0.9. Dives onto the nearest tower within **75 u.l.** for **13** and dies of it (`lunge` + `selfDestructs`); any combat death — dive or gunfire — leaves a charge, and 1 s later that is exactly **13** damage once to every living tower within **60 u.l.**, no stun. **The dive reaches further than the blast, and that gap is the point**: a tower can be close enough to be dived at and far enough back to sit outside the explosion, so spacing buys something. A dive pays its bounty like any death; a leak leaves nothing. **Normal only** | `Enemy.TYPES.volatile`, `attack.lunge`, `attack.selfDestructs`, `deathEffect.hazard` |
-| Dinomech | **45 000 HP**, 6000 bounty, ×0.25, size 2.6, banner. NO shield, NO revive, NO phases, NO support, NO spawns — its effective HP is exactly its health. Two attacks it cycles: a board-wide rail (60 + a 2.5 s stun, 14 s, 1.4 s wind-up) at the highest-DPS tower, and a stomp (90, 14 s, 2 s wind-up, 70 u.l. jump into a 140 u.l. landing) with **no stun at all** — it breaks towers where the Tyrant silences them. **Normal only, wave 40.** No mesh: draws as the fallback sphere | `Enemy.TYPES.dinomech` |
+| Volatile | **8 HP**, 25 bounty, **×1.5**, **size 0.6** (0.9 until 2026-08-28 — `sizeScale` moves the hit box, the health bar, the shadow and the rings with the mesh, so a smaller body really is a smaller thing for a round to find). Dives onto the nearest tower within **75 u.l.** for **13** and dies of it (`lunge` + `selfDestructs`) after a **0.28 s wind-up it spends IN THE AIR** — `commitsTarget` freezes the gun so the arc both boards draw ends on the tower it was aimed at, and a dive whose gun is sold mid-flight takes another rather than fizzling, because this body has one swing and no cooldown; any combat death — dive or gunfire — leaves a charge, and 1 s later that is exactly **13** damage once to every living tower within **60 u.l.**, no stun. **The dive reaches further than the blast, and that gap is the point**: a tower can be close enough to be dived at and far enough back to sit outside the explosion, so spacing buys something. A dive pays its bounty like any death; a leak leaves nothing. **Normal only** | `Enemy.TYPES.volatile`, `attack.lunge`, `attack.selfDestructs`, `deathEffect.hazard` |
+| Dinomech | **45 000 HP**, 6000 bounty, ×0.25, size 2.6, banner. NO shield, NO revive, NO phases, NO support, NO spawns — its effective HP is exactly its health. Two attacks on SEPARATE clocks: a **silo salvo** (6 missiles at 6 towers chosen at random anywhere on the map, 45 each, 12 s, 1.4 s wind-up) and a **tail slam** (3 s stun inside 80 u.l. of where the tail lands BEHIND the body, 10 s, 0.7 s wind-up, no damage). The salvo's damage lands when a warhead ARRIVES — `js/systems/missiles.js` flies them on the fixed step — so a tower sold in flight costs it. **Normal only, wave 40.** Meshed 2026-08-28 (`--rig saurian`) off `glb/dinomech.glb`, a skeletal biped that walks — a quadruped wore the type for one day and was withdrawn on 2026-08-29. **Its warheads have a body too** (`--rig missile`), drawn in the geometry pass so they are occluded by the towers they are flying at | `Enemy.TYPES.dinomech`, `js/gl/models/missile.js` |
 | `lunge` / `selfDestructs` | two generic ATTACK-SPEC flags, read off the spec and never off a type id. `lunge` writes the body's `pos` to the tower it is about to hit — the one move in the game that leaves the path, allowed only because `selfDestructs` removes the body in the same step. `selfDestructs` sets `dead` (not `takeDamage`: a self-destruct is not damage, so no shield soaks it, no defense mitigates it, no revive denies it and no tower is credited) and ONLY if the swing connected, so nothing blows up over empty road | `Enemy.prototype.resolveAttack` |
 | Volatiles come LAST | every Volatile group in the campaign starts after every other group in its wave has FINISHED arriving — waves 20 and 26 at 14 s and 20 s, wave 31 at 18 s and 24 s. A campaign-wide rule, not three authored coincidences: a test walks every schedule in `DIFFICULTIES` and fails if any wave's first Volatile leaves before another group's last body does | `NORMAL_WAVES` waves 20/26/31, `tests/content.test.js` *"every Volatile in the campaign is the last thing its wave spawns"* |
 | Hazards | not enemies: their own list, never in `enemies`, cannot hold a wave or the win open, pay nothing, touch towers only (so no charge can chain), cleared by `restartGame()` | `Hazards` in js/systems/hazards.js |
+| Missiles | the same shape one step later: their own list, never in `enemies`, simulated on the fixed step, cleared by `restartGame()`. A missile commits to a POINT at launch and cannot be re-aimed; it damages its target only if that tower is still IN `towers`, so selling one out from under a warhead costs nothing. No splash — six warheads cost exactly six times one wherever the towers stand | `Missiles` in js/systems/missiles.js, `salvo` on an attack spec |
+| `salvo` / `slam` | two generic ATTACK-SPEC shape blocks beside `leap` and `lunge`, read off the spec and never off a type id. `salvo` chooses N towers from a bag that REFILLS — distinct while the board allows, duplicated when it does not, nothing at all on an empty board — and records one launch per warhead for `update()` to hand to `Missiles`. `slam` moves the attack's ORIGIN to a point behind the body (`behindRadii`, in radii so it survives `sizeScale`) and takes its radius from its own block, through the same `attackOriginOf`/`attackRadiusOf` pair the eligibility test uses — which is what makes a telegraphed slam a slam that connects | `Enemy.prototype.fireSalvo`, `Enemy.prototype.slamPoint`, `Enemy.prototype.resolveAttack` |
+| A targeted tower wears a RED RING | 2026-08-28, at the owner's instruction. "Targeted" means COMMITTED, never considered: a wind-up that froze its target (`commitsTarget` — the Sapper's disable, the Volatile's dive) and a warhead already in the air, and nothing else. Every enemy is forever evaluating candidates, and a ring lit for that would be lit on every tower in range of anything, permanently. **ONE ring per tower, not one per threat** — the list is deduped at source, because the cue answers "is this about to be hit", which is a yes or a no. A sold or destroyed tower and a landed warhead mark nothing, and a body shot out of the air takes its threat with it. **Both boards read the same function and neither decides the rule** | `Enemy.targetedTowers`, `drawThreatRings` in js/gl/gl-world.js, `drawThreatMarks` in js/game.js |
+| A dive is a LEAP, not a teleport | 2026-08-28, at the owner's instruction ("a jumping animation where we see them jump into the towers"). The Volatile's `lunge` now carries a **0.28 s `windUpSeconds`**, and both boards spend it flying: a gather (the body sinks, does not travel), then a straight line on the ground and a parabola in the air, ending on the tower on the exact frame it loses its hit points. `Enemy.prototype.leapPose` is the ONE place either board turns that wind-up into a position, and it is **presentation only** — `pos` stays the patch of road it took off from until `resolveAttack` moves it, so every range check, the targeting and the slow field answer exactly what they answered before there was an animation. Read off `spec.lunge`, never a type id: a Sapper's much longer telegraph draws no arc | `Enemy.prototype.leapPose`, `Enemy.LEAP_*`, `js/gl/gl-world.js`, `Enemy.prototype.draw` |
+| `independentCooldown` | an attack spec may keep its OWN clock (`attackTimers[i]`) instead of the pool-wide `attackTimer` every type before 2026-08-28 shares. Opt-in on the spec: the Dinomech's 12 s salvo and 10 s slam are the only two in the roster that carry it, and the Tyrant's pool is untouched, so its 14 s alternation is exactly what it was. Without it, 12 and 10 under one timer produce each attack once every 22 s | `Enemy.prototype.attackTowers`, `this.attackTimers` |
+| `arcBeam` | presentation data on an attack spec, the way `eyeBeam` already is: it turns `attackBeam`'s one straight bolt into N writhing filaments in a declared tint for a declared number of seconds. Both boards draw it off the same field with a DETERMINISTIC wobble (a hash of the filament, the segment and a bucket of the beam's own life) — Math.random still lives in js/effects.js and nowhere else in the frame. The Sapper is the only spec that carries one | `Enemy.prototype.makeAttackBeam`, `drawDischarge` in js/enemy.js and js/gl/gl-world.js |
 | What a shield pays | **nothing, ever** (2026-07-30). Healed HP too. Only health pays | `Enemy.takeDamage`, `Enemy.bounty` |
 | Bulwark | 12 HP + 24 shield (ratio 2), ×2 speed when the shield breaks, **and a second mesh from that moment on** | `Enemy.TYPES.shielded`, `shieldBroken`, `ENEMY_VARIANT` |
 | Vanguard's shield | 100 every 7 s, non-stacking, granted to ITSELF. A break swaps in the shattered mesh, throws the fragments onto the road and pulls them home again, and the mesh swaps BACK when the pool refills | `Enemy.TYPES.boss_fast.support`, `shieldOut`, `shieldReformProgress`, `ENEMY_VARIANT`, `shardPose` |

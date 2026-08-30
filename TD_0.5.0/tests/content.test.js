@@ -4211,11 +4211,21 @@ test("a type's traits are read off its BLOCKS, in defining order", function (t) 
   // whose whole pool is authored on the TYPE rather than half-added by a phase
   // -- so it is the first body the sidebar shows two attack rows for.
   var dino = Enemy.traitsOf("dinomech").map(function (trait) { return trait.id; });
-  t.deep(dino, ["attack-best", "attack"],
-    "the rail that hunts your best tower, then the stomp that takes a corner");
-  t.eq(Enemy.traitsOf("dinomech")[1].detail.indexOf("leaps 70 u.l.") !== -1, true,
-    "and the stomp row states the leap it is (" +
-    Enemy.traitsOf("dinomech")[1].detail + ")");
+  t.deep(dino, ["attack-salvo", "attack-slam"],
+    "the salvo that shells the board, then the tail slam that silences a corner");
+  var slam = Enemy.traitsOf("dinomech")[1].detail;
+  // THE ROW HAS TO SAY *BEHIND*. A slam is the only attack in the game whose
+  // blow does not land where the body is, and on a mesh 148 board px long the
+  // difference is most of a body -- so a row that quoted only the radius would
+  // be describing the right size in the wrong place.
+  t.eq(slam.indexOf("BEHIND") !== -1, true,
+    "and the slam row says the blow lands behind the body (" + slam + ")");
+  t.eq(slam.indexOf("80 u.l.") !== -1, true, "and states its radius");
+  // The slam carries `stunSeconds` at the spec level, so the generic stun
+  // branch in traitsOf would claim it if the shape branches were not checked
+  // first. This is that ordering, asserted rather than assumed.
+  t.eq(dino.indexOf("attack-stun"), -1,
+    "and the shape branch beat the generic stun branch to it");
 
   t.deep(Enemy.traitsOf("normal"), [],
     "and a plain Normal carries nothing at all");
@@ -4254,10 +4264,10 @@ test("every badge the index prints comes off the trait list", function (t) {
     boss_fast: "RESHIELDS ITSELF — $0",
     shielded: "SHIELD → DOUBLE SPEED",
     revenant: "GETS BACK UP ONCE",
-    // The Dinomech's pool leads with the rail, which picks the board's single
-    // best gun -- the same first-spec-only rule the Tyrant's badge follows. Its
-    // stomp is a second ROW in the sidebar and does not get the headline.
-    dinomech: "HUNTS YOUR BEST TOWER"
+    // The Dinomech's pool leads with the silo salvo -- the same first-spec-only
+    // rule the Tyrant's badge follows. Its tail slam is a second ROW in the
+    // sidebar and does not get the headline.
+    dinomech: "SHELLS THE WHOLE BOARD"
   };
 
   Object.keys(expected).forEach(function (id) {
@@ -5057,10 +5067,12 @@ function (t) {
 
   var text = h.run("Codex.describe('dinomech')").join(" ");
   t.ok(text.indexOf("45 000") !== -1, "the card states the 45 000");
-  t.ok(text.indexOf("60 damage") !== -1, "the rail's damage");
-  t.ok(text.indexOf("2.5 s") !== -1, "and its stun");
-  t.ok(text.indexOf("90 damage") !== -1, "the stomp's damage");
-  t.ok(text.indexOf("140 u.l.") !== -1, "and the area it lands across");
+  t.ok(text.indexOf("6 missiles") !== -1, "the salvo's six warheads");
+  t.ok(text.indexOf("45 damage") !== -1, "and what one of them costs");
+  t.ok(text.indexOf("Every 12 s") !== -1, "and how often the silos open");
+  t.ok(text.indexOf("80 u.l.") !== -1, "the tail slam's radius");
+  t.ok(text.indexOf("every 10 s") !== -1, "and its own, separate cooldown");
+  t.ok(text.indexOf("BEHIND") !== -1, "and that the slam lands behind the body");
   t.eq(text.indexOf("every 0 s"), -1, "and no zero-second cooldown anywhere");
 });
 
@@ -7685,7 +7697,12 @@ test("the Volatile's numbers are the ones that were asked for", function (t) {
   t.eq(T.health, 8, "8 base health -- under a single Warbringer round");
   t.eq(T.bounty, 25, "25 bounty, deliberately unchanged by the retune");
   t.eq(T.speedMultiplier, 1.5, "1.5x baseline movement speed");
-  t.ok(Math.abs(T.sizeScale - 0.9) < 0.001, "about 0.9x a Normal's size");
+  t.ok(Math.abs(T.sizeScale - 0.6) < 0.001,
+    "about 0.6x a Normal's size -- 0.9 until 2026-08-28, when the owner asked " +
+    "for them smaller. It is the knob that moves the hit box and the health " +
+    "bar with the mesh, which is why the model's own height did not change");
+  t.ok(T.sizeScale > h.game.Enemy.TYPES.swarm.sizeScale,
+    "and still not the smallest body on the roster -- a Swarm is");
   t.eq(T.deathEffect.hazard.fuseSeconds, 1, "a one-second fuse");
   t.eq(T.deathEffect.hazard.radiusUl, 60, "a 60 u.l. blast");
   t.eq(T.deathEffect.hazard.towerDamage, 13, "for 13 damage");
@@ -7804,6 +7821,26 @@ function volatileAt(h, tower, distanceUl) {
   return e;
 }
 
+// RUN A DIVE TO GROUND. Since 2026-08-28 the attack carries a 0.28 s wind-up
+// -- the leap the owner asked to be able to SEE (js/enemy.js, and `leapPose`
+// for what the two boards draw across it) -- so the first step commits and a
+// later one lands. Both are returned through the same value attackTowers has
+// always returned: the tower that was hit, or null.
+//
+// STEPPED AT THE REAL 1/60 RATHER THAN IN ONE FAT dt, because the wind-up is
+// what these tests are now standing on and a single step long enough to cover
+// it would prove nothing about it. `attackTowers` is called directly rather
+// than through h.step for the reason `volatileAt` gives: a placed body's `pos`
+// does not survive the top of a real update.
+function dive(h, body) {
+  for (var i = 0; i < 60; i++) {
+    var hit = body.attackTowers(1 / 60, h.game.towers);
+    if (hit) return hit;
+    if (body.dead || !(body.windUpTimer > 0)) return null;
+  }
+  return null;
+}
+
 // The same body, but ON THE ROAD and on the board, at the point of the path
 // that runs closest to `tower`. For the tests that drive the real update()
 // loop, where a hand-written `pos` does not survive the top of the next step.
@@ -7825,10 +7862,18 @@ function (t) {
   var hp = tower.currentHp;
   var body = volatileAt(h, tower, 60);
 
-  // ONE STEP IS ENOUGH. intervalSeconds is 0, so attackTimer starts expired
-  // and the dive lands on the first step a tower is in reach -- which is the
-  // whole point of authoring it as 0 rather than as a small number.
-  var hit = body.attackTowers(1 / 60, h.game.towers);
+  // IT COMMITS ON THE FIRST STEP AND LANDS 0.28 s LATER. `intervalSeconds` is
+  // still 0, so attackTimer starts expired and the dive is CHOSEN on the first
+  // step a tower is in reach -- what changed on 2026-08-28 is that choosing it
+  // starts a wind-up instead of resolving it, so there is a flight for the
+  // boards to draw. See `dive`.
+  t.eq(body.attackTowers(1 / 60, h.game.towers), null,
+    "the first step commits rather than landing");
+  t.ok(body.windUpTimer > 0, "it is winding up");
+  t.eq(body.windUpTarget, tower, "at the tower it will land on");
+  t.eq(body.currentSpeedUlps(), 0, "and standing still while it does");
+
+  var hit = dive(h, body);
 
   t.eq(hit, tower, "it went for the tower");
   t.eq(tower.currentHp, hp - 13, "which lost exactly 13");
@@ -7850,13 +7895,14 @@ test("the dive reaches 75 u.l. and no further", function (t) {
   var far = volatileAt(h, tower, 76);
   var hp = tower.currentHp;
   t.eq(far.attackTowers(1 / 60, h.game.towers), null, "76 u.l. is out of reach");
+  t.eq(far.windUpTimer, 0, "so nothing was even committed to");
   t.eq(tower.currentHp, hp, "the tower is untouched");
   t.eq(far.dead, false,
     "and nothing blew itself up over an empty stretch of road -- a dive that " +
     "found no tower never committed, so the body walks on");
 
   var near = volatileAt(h, tower, 74);
-  t.ok(!!near.attackTowers(1 / 60, h.game.towers), "74 u.l. is inside it");
+  t.ok(!!dive(h, near), "74 u.l. is inside it");
   t.eq(tower.currentHp, hp - 13, "and that one lands");
 });
 
@@ -7870,7 +7916,7 @@ test("a tower can be inside the dive and outside the blast", function (t) {
   var hp = tower.currentHp;
 
   var body = volatileAt(h, tower, 70);
-  t.eq(body.attackTowers(1 / 60, h.game.towers), tower, "70 u.l. is divable");
+  t.eq(dive(h, body), tower, "70 u.l. is divable");
 
   // The charge is armed ON the tower, so THAT tower is always inside its own
   // blast. What the shorter radius protects is everything behind it -- proved
@@ -7899,7 +7945,11 @@ test("the dive is a death: it pays, it counts, and it arms the charge ON the " +
   // that passes closest to the tower, which is where a Volatile that got this
   // far would be standing anyway.
   var body = volatileOnRoadNear(h, tower);
-  h.step(1 / 60);
+  // LONG ENOUGH FOR THE LEAP. The dive commits on the first step and lands
+  // 0.28 s later (see `dive`), and the body is only swept once it has landed.
+  // It survives its own wind-up standing next to a live gun -- measured, not
+  // assumed, and asserted below by the fact that it got there at all.
+  h.step(0.35);
 
   t.eq(h.game.enemies.indexOf(body), -1, "the body was swept off the board");
   t.eq(tower.currentHp, hp - 13, "the tower took the impact");
@@ -8147,9 +8197,666 @@ test("pending charges are cleared by a restart", function (t) {
 });
 
 
-group("the three new types are DATA, not branches");
+// --- THE LEAP, which is the 2026-08-28 half of the dive ---------------------
+//
+// "add a jumping animation where we see them jump into the towers." A dive
+// that resolved on the step it was chosen had no interval for anything to be
+// drawn across, so the attack now carries a wind-up and BOTH boards spend it
+// flying. What follows is the seam between the two halves: the simulation is
+// tested here for what it commits to and when it lands, and `leapPose` is
+// tested for the picture -- including the one property that makes it safe,
+// which is that it changes nothing the simulation reads.
 
-test("no shared code branches on herald, sapper or volatile", function (t) {
+test("a dive commits to one tower, holds still, and lands on that tower",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var body = volatileAt(h, tower, 60);
+
+  t.eq(body.attackTowers(1 / 60, h.game.towers), null, "step one commits");
+  t.eq(body.windUpTarget, tower, "and freezes the gun it chose");
+  var spec = body.windUpAttack;
+  t.eq(spec.lunge, true, "the committed attack is the dive");
+  t.ok(Math.abs(spec.windUpSeconds - 0.28) < 1e-9, "0.28 s of it");
+
+  // IT IS OFF THE ROAD FOR NONE OF IT. The wind-up holds the body still
+  // (currentSpeedUlps), so the take-off point is fixed for the whole flight --
+  // which is what lets `leapPose` draw an arc that cannot drift.
+  var from = { x: body.pos.x, y: body.pos.y };
+  var steps = 0;
+  while (body.windUpTimer > 0 && steps < 60) {
+    t.eq(body.currentSpeedUlps(), 0, "held still through the leap");
+    t.eq(body.pos.x, from.x, "and not advancing while it is in the air");
+    steps++;
+    if (body.attackTowers(1 / 60, h.game.towers)) break;
+  }
+  t.ok(steps >= 16 && steps <= 18,
+    "0.28 s at 1/60 is seventeen steps, not one -- got " + steps);
+  t.eq(body.pos.x, tower.x, "and it finished standing on the tower");
+  t.eq(body.dead, true, "having died of the impact");
+});
+
+test("a dive whose tower is sold mid-air takes another rather than fizzling",
+function (t) {
+  var h = harness.boot();
+  var first = sapperTower(h);
+  // A SECOND GUN, close enough to be inside the same 75 u.l. reach.
+  var second = h.placeGunner(first.x + h.game.ul(30), first.y);
+  t.ok(!!second && second !== first, "two towers on the board");
+
+  var body = volatileAt(h, first, 20);
+  body.attackTowers(1 / 60, h.game.towers);
+  var chosen = body.windUpTarget;
+  t.ok(!!chosen, "it committed to one of them");
+
+  // SOLD MID-FLIGHT. Selling splices `towers` and leaves the object intact,
+  // which is the case `committedTargetValid` exists to catch and the same one
+  // Missiles.stillThere catches for a warhead already in the air.
+  h.game.towers.splice(h.game.towers.indexOf(chosen), 1);
+  var other = chosen === first ? second : first;
+  var hp = other.currentHp;
+
+  var hit = dive(h, body);
+  t.eq(hit, other, "the dive lands on the gun that is still standing");
+  t.eq(other.currentHp, hp - 13, "which pays the full 13");
+  t.eq(body.dead, true,
+    "and the body still dies of it -- a Volatile has one swing and no " +
+    "cooldown, so a dive that declined to land would leave a live diver " +
+    "standing in the middle of the guns with its telegraph already spent");
+});
+
+test("a dive with nowhere left to land does not blow itself up", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var body = volatileAt(h, tower, 60);
+  body.attackTowers(1 / 60, h.game.towers);
+  t.eq(body.windUpTarget, tower, "committed");
+
+  h.game.towers.length = 0;             // every gun sold while it was in the air
+  var hit = dive(h, body);
+  t.eq(hit, null, "it lands on nothing");
+  t.eq(body.dead, false, "and does not die of a blow it never struck");
+});
+
+test("leapPose draws the flight and the simulation never moves", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var body = volatileAt(h, tower, 60);
+
+  t.eq(body.leapPose(), null, "a body that is not diving has no pose");
+
+  body.attackTowers(1 / 60, h.game.towers);
+  var from = { x: body.pos.x, y: body.pos.y };
+
+  var sawCrouch = false;
+  var sawAir = false;
+  var peak = 0;
+  var last = null;
+  for (var i = 0; i < 60 && body.windUpTimer > 0; i++) {
+    var pose = body.leapPose();
+    t.ok(!!pose, "there is a pose for every frame of the wind-up");
+    t.eq(pose.target, tower, "aimed at the gun it committed to");
+    // THE SIMULATION IS UNTOUCHED. This is the property the whole arrangement
+    // rests on: range checks, targeting and the slow field all read `pos`, and
+    // an animation that moved it would be a body that had really left the road.
+    t.eq(body.pos.x, from.x, "pos is still the road it took off from");
+    t.eq(body.pos.y, from.y, "on both axes");
+
+    if (!pose.airborne) {
+      sawCrouch = true;
+      t.ok(pose.lift <= 0, "the gather sinks rather than rises");
+      t.eq(pose.x, from.x, "and does not travel");
+    } else {
+      sawAir = true;
+      t.ok(pose.lift >= 0, "and the flight is above the road");
+      peak = Math.max(peak, pose.lift);
+    }
+    last = pose;
+    if (body.attackTowers(1 / 60, h.game.towers)) break;
+  }
+
+  t.eq(sawCrouch, true, "it gathers before it goes");
+  t.eq(sawAir, true, "and then it is in the air");
+  t.ok(peak > 0, "with a real arc over the middle of it -- peaked at " +
+    peak.toFixed(2) + " px");
+  // THE ARC ENDS WHERE THE DAMAGE DOES. The last drawn frame is within one
+  // step of the tower, so the body touches down on the frame the tower loses
+  // its hit points rather than arriving early or being snapped there.
+  t.ok(Math.hypot(last.x - tower.x, last.y - tower.y) <
+    Math.hypot(from.x - tower.x, from.y - tower.y) * 0.2,
+    "and the last frame of it is on the tower");
+});
+
+test("nothing but a committed lunge gets a leap", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+
+  // A SAPPER COMMITS AND WINDS UP FOR FOUR TIMES AS LONG, and draws no arc:
+  // `leapPose` reads `spec.lunge` off the SPEC, never a type id, so the two
+  // telegraphed attacks in the game stay two different pictures.
+  var sapper = sapperAt(h, tower, 40);
+  // Its own 8 s cooldown has to run out first -- a Sapper is not the Volatile,
+  // which starts with an expired timer because it only ever swings once.
+  sapper.attackTowers(sapper.attacks[0].intervalSeconds + 0.05, h.game.towers);
+  t.ok(sapper.windUpTimer > 0, "the Sapper is telegraphing");
+  t.eq(sapper.leapPose(), null, "and is not drawn leaping");
+});
+
+
+// --- THE RED CIRCLE ON A TARGETED TOWER -------------------------------------
+//
+// "on all targeted towers, include a red circle around them on the ground."
+// Both boards draw it and NEITHER decides who is on the list, so the rule is
+// tested once, here, where it lives.
+
+group("towers under a declared threat");
+
+test("a committed wind-up puts its target on the list", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var Enemy = h.game.Enemy;
+
+  t.deep(Enemy.targetedTowers(h.game.enemies, null, h.game.towers), [],
+    "an empty board threatens nothing");
+
+  var sapper = sapperAt(h, tower, 40);
+  sapper.attackTowers(sapper.attacks[0].intervalSeconds + 0.05, h.game.towers);
+  t.ok(sapper.windUpTimer > 0, "the Sapper is telegraphing");
+  t.deep(Enemy.targetedTowers([sapper], null, h.game.towers), [tower],
+    "a Sapper mid-telegraph marks the gun it is about to switch off");
+
+  // A DIVER MARKS ITS TOWER FOR THE SAME REASON AND THROUGH THE SAME FIELD.
+  var diver = volatileAt(h, tower, 60);
+  diver.attackTowers(1 / 60, h.game.towers);
+  t.deep(Enemy.targetedTowers([diver], null, h.game.towers), [tower],
+    "and so does a Volatile in mid-dive");
+
+  // ONE RING PER TOWER, NOT ONE PER THREAT.
+  t.deep(Enemy.targetedTowers([sapper, diver], null, h.game.towers), [tower],
+    "two threats on one gun are still one ring");
+});
+
+test("a warhead in the air marks the gun it was aimed at", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var Enemy = h.game.Enemy;
+  var Missiles = h.game.Missiles;
+
+  var m = Missiles.launch({ x: tower.x + h.game.ul(400), y: tower.y, lift: 40 },
+    tower, { damage: 45, speedUlps: 340, apexUl: 90 });
+  t.ok(!!m, "a missile is in the air");
+  t.deep(Enemy.targetedTowers([], Missiles.active(), h.game.towers), [tower],
+    "and the tower it is committed to wears the ring");
+
+  // A SPENT ONE IS NOT A THREAT. It has already landed; the explosion is what
+  // says so, and a warning about a thing that has happened is noise.
+  m.landed = true;
+  t.deep(Enemy.targetedTowers([], Missiles.active(), h.game.towers), [],
+    "a landed warhead marks nothing");
+});
+
+test("a tower that is gone gets no ring", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var Enemy = h.game.Enemy;
+
+  var diver = volatileAt(h, tower, 60);
+  diver.attackTowers(1 / 60, h.game.towers);
+  t.deep(Enemy.targetedTowers([diver], null, h.game.towers), [tower],
+    "marked while it stands");
+
+  // SOLD. Membership in the live array is the test, which is the same question
+  // `committedTargetValid` and `Missiles.stillThere` both ask, for the same
+  // reason: ordnance in the air does not know the gun was sold, and the player
+  // does not need a circle on the empty ground it is about to hit.
+  h.game.towers.splice(h.game.towers.indexOf(tower), 1);
+  t.deep(Enemy.targetedTowers([diver], null, h.game.towers), [],
+    "and unmarked the instant it is sold");
+});
+
+test("a dead body's telegraph marks nothing", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var Enemy = h.game.Enemy;
+
+  var diver = volatileAt(h, tower, 60);
+  diver.attackTowers(1 / 60, h.game.towers);
+  diver.dead = true;
+  t.deep(Enemy.targetedTowers([diver], null, h.game.towers), [],
+    "a body shot out of the air takes its threat with it -- the same rule " +
+    "attackTowers already applies to the telegraph line itself");
+});
+
+
+group("the Dinomech's silo salvo");
+
+// A Dinomech standing at a known point on the road, with a known heading --
+// `progress` rather than a hand-written `pos`, because the tail slam is
+// measured along `headingVec()` and that reads the path's tangent.
+function dinomechAt(h, progressPx) {
+  var e = new h.game.Enemy(h.game.path, undefined, "dinomech");
+  e.progress = progressPx === undefined ? 200 : progressPx;
+  e.refreshPos();
+  return e;
+}
+
+// N gunners on the board's own buildable spots, so nothing here depends on a
+// coordinate that a map retune would move.
+function towerRow(h, count) {
+  h.run("cash = 1000000");
+  var spots = h.game.Maps.bestSpots(h.game.currentMap, count * 3);
+  var built = [];
+  for (var i = 0; i < spots.length && built.length < count; i++) {
+    var tower = h.placeGunner(spots[i].x, spots[i].y);
+    if (tower) built.push(tower);
+  }
+  return built;
+}
+
+// A stand-in tower with enough hit points to absorb a whole salvo, so a test
+// about WHEN damage lands is not also a test about a gunner's 60 HP. It answers
+// the same small vocabulary Enemy.attackCandidates and TowerHealth ask of every
+// tower type, which is the whole of what a target has to be.
+function stubTower(h, x, y, hp) {
+  var stub = { x: x, y: y, footprintPx: 12, hurt: 0,
+    attackDamage: function () { return 1; },
+    attacksPerSecond: function () { return 1; },
+    isDestroyed: function () { return false; },
+    takeDamage: function (n) { this.hurt += n; } };
+  h.game.TowerHealth.init(stub, hp === undefined ? 100000 : hp);
+  return stub;
+}
+
+// Run one full salvo cycle and hand back the launches it committed to.
+function salvoOf(h, dino, towers) {
+  var spec = dino.attacks[0];
+  dino.attackTowers(spec.intervalSeconds + 0.05, towers);
+  dino.attackTowers(spec.windUpSeconds + 0.05, towers);
+  return dino.takeSalvo();
+}
+
+test("the Dinomech's two attacks are the ones that were asked for",
+function (t) {
+  var h = readOnlyBoot();
+  var pool = h.game.Enemy.attacksOf(h.game.Enemy.TYPES.dinomech);
+  t.eq(pool.length, 2, "two attacks, both on the type");
+
+  var salvo = pool[0];
+  t.eq(salvo.intervalSeconds, 12, "the salvo's cooldown is twelve seconds");
+  t.eq(salvo.salvo.shots, 6, "six missiles");
+  t.eq(salvo.salvo.damage, 45, "45 damage each");
+  t.eq(salvo.damage, undefined,
+    "and NO damage on the spec -- a salvo cannot also hit on the spot");
+  t.eq(salvo.reachUl, undefined, "no reach: the whole map, as the brief says");
+
+  var slam = pool[1];
+  t.eq(slam.intervalSeconds, 10, "the slam's cooldown is ten seconds");
+  t.eq(slam.slam.radiusUl, 80, "an 80 u.l. radius");
+  t.eq(slam.stunSeconds, 3, "a three-second stun");
+  t.eq(slam.damage, undefined, "and no damage at all");
+
+  // THE TWO NUMBERS ONLY MEAN WHAT THEY SAY IF THE CLOCKS ARE SEPARATE. Under
+  // the pool-wide `attackTimer` every other type uses, 12 and 10 would produce
+  // each attack once every twenty-two seconds.
+  t.eq(salvo.independentCooldown, true, "the salvo keeps its own clock");
+  t.eq(slam.independentCooldown, true, "and so does the slam");
+});
+
+test("a salvo of six on a board of six hits six DIFFERENT towers",
+function (t) {
+  var h = harness.boot();
+  var towers = towerRow(h, 6);
+  t.eq(towers.length, 6, "six towers standing");
+
+  var dino = dinomechAt(h);
+  var launches = salvoOf(h, dino, towers);
+  t.eq(launches.length, 6, "six missiles left the silos");
+
+  var seen = [];
+  for (var i = 0; i < launches.length; i++) {
+    t.eq(seen.indexOf(launches[i].tower), -1,
+      "missile " + i + " went to a tower nothing else was aimed at");
+    seen.push(launches[i].tower);
+  }
+  t.eq(seen.length, 6, "so all six guns are covered");
+});
+
+test("with fewer towers than missiles, one tower takes several", function (t) {
+  var h = harness.boot();
+  var towers = towerRow(h, 2);
+  t.eq(towers.length, 2, "two towers standing");
+
+  var dino = dinomechAt(h);
+  var launches = salvoOf(h, dino, towers);
+  t.eq(launches.length, 6, "still six missiles -- the salvo is not shortened");
+
+  // DRAWN FROM A BAG THAT REFILLS, so the six are spread evenly rather than
+  // piled on whichever tower the stream happened to like: three refills of a
+  // two-tower bag is three each, by construction and not by luck.
+  var counts = [0, 0];
+  for (var i = 0; i < launches.length; i++) {
+    counts[towers.indexOf(launches[i].tower)]++;
+  }
+  t.eq(counts[0], 3, "three on the first tower");
+  t.eq(counts[1], 3, "and three on the second");
+});
+
+test("with no towers there are no missiles", function (t) {
+  var h = harness.boot();
+  var dino = dinomechAt(h);
+  var launches = salvoOf(h, dino, []);
+  t.eq(launches.length, 0, "an empty board is fired at with nothing");
+  // AND THE CYCLE IS NOT SPENT. attackCandidates returns nothing, so
+  // attackTowers never commits and the timer is left expired -- the salvo goes
+  // off the instant a tower is built, not twelve seconds later.
+  t.ok(dino.attackTimers[0] <= 0, "and the cycle was not consumed looking");
+});
+
+test("a salvo is the same salvo every time the run is played", function (t) {
+  var h = harness.boot();
+  var towers = towerRow(h, 6);
+
+  // TWO BODIES WITH THE SAME SPAWN NUMBER FIRE THE SAME SALVO, which is what
+  // "deterministic" has to mean here: the stream is seeded off `laneIndex`, so
+  // replaying a run reproduces it exactly. Math.random would make every pinned
+  // figure in this suite a coin toss.
+  var a = dinomechAt(h);
+  var b = dinomechAt(h);
+  b.salvoRng = h.game.Enemy.seedFrom(a.laneIndex);
+
+  var first = salvoOf(h, a, towers).map(function (s) { return towers.indexOf(s.tower); });
+  var again = salvoOf(h, b, towers).map(function (s) { return towers.indexOf(s.tower); });
+  t.deep(again, first, "the same seed fires at the same six, in the same order");
+
+  // AND TWO BODIES ON ONE BOARD DO NOT. `laneIndex` is unique per spawn, so a
+  // pair of Dinomechs does not concentrate twelve warheads on the same guns.
+  var c = dinomechAt(h);
+  var other = salvoOf(h, c, towers).map(function (s) { return towers.indexOf(s.tower); });
+  t.ok(other.join(",") !== first.join(","),
+    "a different body fires a different salvo (" + other.join(",") + ")");
+});
+
+test("a missile deals its 45 when it ARRIVES, not when it is fired",
+function (t) {
+  var h = harness.boot();
+  var dino = dinomechAt(h);
+  // A stand-in rather than a gunner, so the arithmetic below is about the
+  // warheads and not about a 60-point tower dying to the second one.
+  var tower = stubTower(h, dino.pos.x + h.game.ul(300), dino.pos.y);
+  var towers = [tower];
+
+  var launches = salvoOf(h, dino, towers);
+  t.eq(launches.length, 6, "six warheads at the only gun on the board");
+  h.game.Missiles.reset();
+  for (var i = 0; i < launches.length; i++) {
+    h.game.Missiles.launch(launches[i].from, launches[i].tower, launches[i].spec);
+  }
+  t.eq(h.game.Missiles.count(), 6, "six in the air");
+  t.eq(tower.hurt, 0, "and the tower has lost nothing yet");
+
+  // Step until they land. The flight is simulated TIME, so this is seconds and
+  // not frames -- the same number of seconds at any step size.
+  var guard = 0;
+  while (h.game.Missiles.count() && guard++ < 4000) {
+    h.game.Missiles.update(1 / 60, towers);
+  }
+  t.eq(tower.hurt, 6 * 45, "and then six times 45 arrives");
+});
+
+test("a tower sold while a missile is in the air costs nothing", function (t) {
+  var h = harness.boot();
+  var towers = towerRow(h, 2);
+  var doomed = towers[0];
+  var spared = towers[1];
+  var hp = spared.currentHp;
+
+  h.game.Missiles.reset();
+  h.game.Missiles.launch({ x: doomed.x - 400, y: doomed.y, lift: 30 }, doomed,
+    { shots: 1, damage: 45, speedUlps: 340 });
+  t.eq(h.game.Missiles.count(), 1, "one in the air");
+
+  // Sell it out from under the warhead. `towers` is spliced, the object stays
+  // perfectly intact -- which is exactly why membership is the test.
+  var live = [spared];
+  var guard = 0;
+  while (h.game.Missiles.count() && guard++ < 2000) {
+    h.game.Missiles.update(1 / 60, live);
+  }
+  t.eq(doomed.currentHp, doomed.maxHp,
+    "the tower that is no longer on the board takes nothing");
+  t.eq(spared.currentHp, hp,
+    "and the missile does NOT pick a new victim in mid-air");
+});
+
+test("missiles in the air are cleared by a restart", function (t) {
+  var h = harness.boot();
+  var towers = towerRow(h, 1);
+  h.game.Missiles.reset();
+  h.game.Missiles.launch({ x: towers[0].x - 500, y: towers[0].y, lift: 30 },
+    towers[0], { damage: 45, speedUlps: 340 });
+  t.eq(h.game.Missiles.count(), 1, "one in the air");
+
+  h.run("restartGame()");
+  t.eq(h.game.Missiles.count(), 0, "and a restart empties the sky");
+
+  // A warhead that survived would land 45 on a tower built by the run that
+  // began, which is the class of bug the reset exists for.
+  var fresh = towerRow(h, 1)[0];
+  var hp = fresh.currentHp;
+  h.step(4);
+  t.eq(fresh.currentHp, hp, "a tower placed afterwards is never touched by it");
+});
+
+
+group("the Dinomech's tail slam");
+
+test("the slam lands BEHIND the body, not around it", function (t) {
+  var h = harness.boot();
+  var dino = dinomechAt(h);
+  var slam = dino.attacks[1];
+  var behind = dino.slamPoint(slam);
+
+  var heading = dino.headingVec();
+  var back = dino.radiusPx() * slam.slam.behindRadii;
+  t.ok(Math.abs(behind.x - (dino.pos.x - heading.x * back)) < 1e-6 &&
+       Math.abs(behind.y - (dino.pos.y - heading.y * back)) < 1e-6,
+    "the tail point is one tail-length back along its own heading");
+  t.ok(Math.hypot(behind.x - dino.pos.x, behind.y - dino.pos.y) > 1,
+    "and it is not the body's own position");
+
+  // THE ORIGIN AND THE REACH ARE READ THROUGH ONE PAIR OF HELPERS, used by the
+  // eligibility test AND by the resolution -- which is what makes "a slam that
+  // was chosen is a slam that connects" true by construction. Asserted here
+  // rather than left to the two agreeing by accident.
+  var origin = dino.attackOriginOf(slam);
+  t.eq(origin.x, behind.x, "the candidate search starts at the tail");
+  t.eq(dino.attackRadiusOf(slam), 80, "and reaches the slam's own 80 u.l.");
+  t.eq(dino.attackRadiusOf(dino.attacks[0]), undefined,
+    "while a salvo still reads its own (absent) reach -- the whole map");
+});
+
+test("a tower behind the Dinomech is silenced and one in front is not",
+function (t) {
+  var h = harness.boot();
+  var dino = dinomechAt(h);
+  var slam = dino.attacks[1];
+  var heading = dino.headingVec();
+  var at = dino.slamPoint(slam);
+
+  // Two stand-in towers, placed by hand at mirrored distances: one 20 u.l.
+  // from where the tail comes down, one the same 20 u.l. past the nose. The
+  // second is far outside the 80 u.l. radius precisely because the radius is
+  // measured from the tail.
+  function stub(x, y) {
+    return { x: x, y: y, footprintPx: 12, stunned: 0,
+             attackDamage: function () { return 1; },
+             attacksPerSecond: function () { return 1; },
+             isDestroyed: function () { return false; },
+             takeDamage: function (n) { this.hurt = (this.hurt || 0) + n; } };
+  }
+  var lead = dino.radiusPx() * slam.slam.behindRadii;
+  var back = stub(at.x + h.game.ul(20), at.y);
+  var front = stub(dino.pos.x + heading.x * lead + h.game.ul(20),
+    dino.pos.y + heading.y * lead);
+  var towers = [back, front];
+
+  h.game.TowerHealth.init(back, 100);
+  h.game.TowerHealth.init(front, 100);
+
+  dino.attackTowers(slam.intervalSeconds + 0.05, towers);
+  t.ok(dino.windUpTimer > 0, "it winds the tail up");
+  dino.attackTowers(slam.windUpSeconds + 0.05, towers);
+
+  t.eq(h.game.TowerHealth.isStunned(back), true, "the tower behind goes dark");
+  t.eq(back.stunTimer, 3, "for three seconds");
+  t.eq(h.game.TowerHealth.isStunned(front), false,
+    "and the one the same distance past its nose is untouched");
+  t.eq(back.hurt, undefined, "the slam deals no damage");
+  t.ok(dino.slamFlash > 0 && !!dino.slamAt,
+    "and it leaves the renderers a landing point to draw");
+  t.eq(dino.slamAt.x, at.x, "which is the point the stun was measured from");
+});
+
+
+group("two cooldowns on one body");
+
+test("the salvo's twelve and the slam's ten run on separate clocks",
+function (t) {
+  var h = harness.boot();
+  var dino = dinomechAt(h);
+  // ONE TOWER AT THE TAIL, because both attacks have to have something to hit
+  // for the question to be about the clocks: a salvo reaches the whole map and
+  // a slam reaches only its own 80 u.l. behind the body.
+  var at = dino.slamPoint(dino.attacks[1]);
+  var towers = [stubTower(h, at.x, at.y)];
+
+  // Both clocks start FULL, so nothing happens for the first ten seconds.
+  dino.attackTowers(9.9, towers);
+  t.eq(dino.windUpTimer, 0, "nothing at 9.9 s");
+
+  // THE SLAM COMES FIRST, at ten, because it is the shorter clock -- and the
+  // salvo's twelve is untouched by it.
+  dino.attackTowers(0.2, towers);
+  t.eq(dino.windUpAttack && dino.windUpAttack.id, "tail-slam",
+    "the slam's clock is the one that came up at 10.1 s");
+  t.ok(dino.attackTimers[0] > 0 && dino.attackTimers[0] < 2,
+    "and the salvo still has under two seconds left on its own");
+
+  // Land it, then run on to the salvo's own twelve. Under the pool-wide timer
+  // every other type uses, the slam firing at 10 s would have pushed the salvo
+  // out to 20 -- which is the coupling `independentCooldown` removes.
+  dino.attackTowers(0.75, towers);
+  t.eq(dino.attackTimers[1], 10, "the slam's clock is the one that was spent");
+  // NO CLOCK RUNS DURING A WIND-UP -- attackTowers returns out of the wind-up
+  // branch before it reaches the timers, which has been true of `attackTimer`
+  // since wind-ups were written and is now true of both kinds. So the salvo
+  // still has the 1.9 s it had when the slam committed, not 1.9 minus the
+  // telegraph.
+  t.ok(dino.attackTimers[0] > 1.8 && dino.attackTimers[0] < 2,
+    "and the salvo's clock did not run while the tail was in the air");
+  dino.attackTowers(2, towers);
+  t.eq(dino.windUpAttack && dino.windUpAttack.id, "silo-salvo",
+    "and the salvo goes off on ITS twelve, not on the slam's rhythm");
+});
+
+test("the Tyrant's shared rhythm is untouched by independent cooldowns",
+function (t) {
+  var h = readOnlyBoot();
+  var pool = h.game.Enemy.attacksOf(h.game.Enemy.TYPES.boss);
+
+  // THE REGRESSION THIS EXISTS FOR. `independentCooldown` is opt-in on the
+  // SPEC, so a pool with no such spec must be gated by `attackTimer` exactly
+  // as it was before the flag existed -- one attack per interval, alternating.
+  // A pool where every spec got its own clock would let the Tyrant's aimed shot
+  // and its leap both fire in the same fourteen seconds.
+  for (var i = 0; i < pool.length; i++) {
+    t.eq(pool[i].independentCooldown, undefined,
+      "the Tyrant's " + (pool[i].id || i) + " keeps the pool-wide rhythm");
+  }
+
+  var any = false;
+  Object.keys(h.game.Enemy.TYPES).forEach(function (id) {
+    if (id === "dinomech") return;
+    h.game.Enemy.attacksOf(h.game.Enemy.TYPES[id]).forEach(function (a) {
+      if (a.independentCooldown) any = true;
+    });
+  });
+  t.eq(any, false, "and no other type on the roster has opted in either");
+});
+
+
+group("the Sapper's discharge");
+
+test("the disable draws electric beams at the moment it lands", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var sapper = sapperAt(h, tower, 40);
+
+  // NOTHING WHILE IT TELEGRAPHS. The cord that says WHICH tower is drawn from
+  // `windUpTarget` and is a different mark; this one is the contact.
+  sapper.attackTowers(8.1, [tower]);
+  t.ok(sapper.windUpTimer > 0, "it is telegraphing");
+  t.eq(sapper.attackBeam, null, "and no discharge yet");
+
+  sapper.attackTowers(1.2, [tower]);
+  t.eq(h.game.TowerHealth.isStunned(tower), true, "the tower goes dark");
+  t.ok(!!sapper.attackBeam, "and the discharge appears with it");
+  t.eq(sapper.attackBeam.x, tower.x, "aimed at the tower that was hit");
+  t.eq(sapper.attackBeam.y, tower.y, "on both axes");
+  t.ok(!!sapper.attackBeam.arc, "carrying the spec's own arc block");
+  t.eq(sapper.attackBeam.arc.bolts, 3, "three filaments -- a discharge, not a wire");
+
+  // ITS LIFE IS THE SPEC'S, IN SECONDS. `rate` is the only place the
+  // reciprocal is taken, so an author writes the number they mean.
+  var arc = h.game.Enemy.TYPES.sapper.attack.arcBeam;
+  t.ok(Math.abs(sapper.attackBeam.rate - 1 / arc.seconds) < 1e-9,
+    "and it lives for the " + arc.seconds + " s the spec declares");
+
+  sapper.update(arc.seconds * 0.5);
+  t.ok(!!sapper.attackBeam, "still there half way through");
+  sapper.update(arc.seconds * 0.6);
+  t.eq(sapper.attackBeam, null, "and gone at the end of it");
+});
+
+test("a fizzled disable draws nothing at all", function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var sapper = sapperAt(h, tower, 40);
+
+  sapper.attackTowers(8.1, [tower]);
+  t.eq(sapper.windUpTarget, tower, "committed to the tower");
+
+  // Sold out from under the telegraph. A committed attack whose target is gone
+  // FIZZLES -- and a discharge for a disable that never landed would be the
+  // cue lying about what happened.
+  sapper.attackTowers(1.2, []);
+  t.eq(h.game.TowerHealth.isStunned(tower), false, "nothing went dark");
+  t.eq(sapper.attackBeam, null, "and nothing was drawn");
+});
+
+test("an ordinary attack still draws the plain bolt it always did",
+function (t) {
+  var h = harness.boot();
+  var tower = sapperTower(h);
+  var angry = new h.game.Enemy(h.game.path, undefined, "angry");
+  angry.pos = { x: tower.x + h.game.ul(10), y: tower.y };
+
+  var spec = angry.attacks[0];
+  angry.attackTowers(spec.intervalSeconds + 0.05, [tower]);
+  if (angry.windUpTimer > 0 || angry.attackPosture) {
+    angry.attackTowers(2.5, [tower]);
+  }
+  t.ok(!!angry.attackBeam, "the Hedger's bolt is still drawn");
+  t.eq(angry.attackBeam.arc, null, "with no arc block on it");
+  t.eq(angry.attackBeam.rate, 4,
+    "and the quarter-second life every attack has had since it was written");
+});
+
+
+group("the v0.5.1 types are DATA, not branches");
+
+test("no shared code branches on herald, sapper, volatile or dinomech",
+function (t) {
   var fs = require("fs");
   var nodePath = require("path");
   var root = nodePath.join(__dirname, "..", "js");
@@ -8165,7 +8872,19 @@ test("no shared code branches on herald, sapper or volatile", function (t) {
   // files that legitimately hold the literal are exempted by name with the
   // reason beside them.
   var offenders = [];
-  var IDS = ["herald", "sapper", "volatile"];
+  // THE DINOMECH JOINED THE LIST ON 2026-08-28, with its silo salvo and its
+  // tail slam -- the change most likely to have broken this rule, because both
+  // are one-off mechanics on a boss and a boss is where a special case is
+  // easiest to justify to yourself. Neither is: a salvo is dispatched from
+  // `spec.salvo`, a slam from `spec.slam`, an independent clock from
+  // `spec.independentCooldown` and the Sapper's discharge from `spec.arcBeam`,
+  // so a second body wanting any of the four writes a block and no code.
+  //
+  // NOTE js/gl/gl-world.js HOLDS THE LITERAL "enemy-dinomech" and is not
+  // exempted, because that is a MODEL name used as an object key, not a type
+  // id used in a comparison -- which is exactly the distinction the forms
+  // below draw, and the reason they are forms rather than a substring search.
+  var IDS = ["herald", "sapper", "volatile", "dinomech"];
 
   function walk(dir) {
     fs.readdirSync(dir).forEach(function (name) {
@@ -8200,12 +8919,27 @@ test("no shared code branches on herald, sapper or volatile", function (t) {
     "haste is applied from `spec.haste`");
   t.ok(enemySrc.indexOf("if (spec.disable") !== -1,
     "a disable is applied from `spec.disable`");
+  t.ok(enemySrc.indexOf("if (spec.salvo)") !== -1,
+    "a salvo is fired from `spec.salvo`");
+  t.ok(enemySrc.indexOf("if (spec.slam)") !== -1,
+    "a slam is landed from `spec.slam`");
+  t.ok(enemySrc.indexOf("spec.arcBeam") !== -1,
+    "and a discharge is drawn from `spec.arcBeam`");
   var hazardSrc = fs.readFileSync(
     nodePath.join(root, "systems", "hazards.js"), "utf8");
   t.ok(hazardSrc.indexOf("deathEffect") !== -1,
     "and a hazard is built from `deathEffect`");
+  var missileSrc = fs.readFileSync(
+    nodePath.join(root, "systems", "missiles.js"), "utf8");
+  t.ok(missileSrc.indexOf("salvo") !== -1,
+    "and a missile is built from a `salvo` block");
   IDS.forEach(function (id) {
     t.eq(hazardSrc.indexOf(id), -1, "js/systems/hazards.js never says '" + id + "'");
+    // THE SAME PROMISE FOR THE NEWER SYSTEM, and it is the one most at risk:
+    // missiles.js was written for exactly one body, so "the Dinomech's missile
+    // system" is what it would have become if nobody had said otherwise.
+    t.eq(missileSrc.indexOf(id), -1,
+      "js/systems/missiles.js never says '" + id + "'");
   });
 });
 

@@ -140,6 +140,160 @@
 # actually blend it, and the mesh keeps the twenty ring segments that say
 # WHICH shield it is.
 #
+# THE THREE v0.5.1 BODIES, IMPORTED 2026-08-28, AND TWO OF THEM RIDE ON WHEELS:
+#
+#   python3 tools/glb_to_model.py ../glb/speaker-herald.glb \
+#       --rig cart --name enemy-herald --glow sum --emit-cap 1.6 \
+#       --frames 16 --wheel-facets 6 --cell 0.07 --floor 120 \
+#       --exclude wave_rings
+#
+#   python3 tools/glb_to_model.py ../glb/sapper.glb \
+#       --rig cart --name enemy-sapper --glow sum --emit-cap 1.6 \
+#       --frames 16 --wheel-facets 4 --height 0.930 --cell 0.055 --floor 120
+#
+#   python3 tools/glb_to_model.py ../glb/dinomech.glb \
+#       --rig saurian --name enemy-dinomech --glow sum --emit-cap 1.6 \
+#       --frames 16 --cell 0.24 --floor 120
+#
+# AND THE TWO 2026-08-28 IMPORTS -- one body and one thing that is not a body:
+#
+#   python3 tools/glb_to_model.py ../glb/volatile.glb \
+#       --rig volatile --name enemy-volatile --glow sum --emit-cap 1.6 \
+#       --frames 16 --cell 0.02 --floor 120
+#
+#   python3 tools/glb_to_model.py ../glb/missile.glb \
+#       --rig missile --name missile --glow sum --emit-cap 1.6 \
+#       --frames 8 --cell 0.03 --floor 40 --exclude sparks
+#
+# `--exclude sparks` IS NOT OPTIONAL ON THE MISSILE. That node is a POINT
+# primitive (glTF draw mode 0) and `collect` raises on any mode but triangles
+# rather than dropping it quietly -- correctly, because a mesh this tool cannot
+# read is a mesh the board would be missing without anybody being told. Nothing
+# is lost: a spark shower is what js/effects.js already throws at the impact.
+#
+# `--exclude wave_rings` DROPS THE HERALD'S SOUND HALO, and the argument is the
+# Vanguard's `Integrated_Kinetic_Field` argument with different numbers. Those
+# three nodes are flat concentric discs at y 0.13..0.29 -- floating, never
+# touching the road -- spanning 3.54 source units against a cart 1.2 wide.
+# Imported they would TREBLE the model's plan extent, which is what the frost
+# ring, the camo ring and tools/check-gait-slip.js's ring budget are drawn
+# against, and this format has no translucency to draw them with (see
+# `material_entry`), so they would ship as an opaque grey dinner plate under
+# the cart. Nothing is lost: the Herald's broadcast is already drawn, by the
+# cords its own `support.tether` block puts on every body it hastens.
+#
+# THE TWO CARTS' SIZES ARE SET BY THEIR WHEELS AND NOT BY THEIR BODIES, which
+# is a rule no other import here follows and is explained in full in
+# `roll_cycle`. In short: the cycle is a LOOP, so a wheel must come back to
+# itself at the wrap, and a size at which the measured roll lands on a whole
+# number of spoke pitches is a size at which nothing has to be rounded away.
+# 1.237 u puts the Herald's drive wheel at 4.000 sixths of a turn per stride and
+# 0.930 u puts the Sapper's at 5.003 quarters. Change either number and the
+# wheel starts rolling a few percent off true -- which is survivable, and is
+# what `--wheel-facets` exists to bound, but it is not free.
+#
+# `--wheel-facets` IS THE SPOKE COUNT OF THE FILE'S WHEELS, counted off the
+# hierarchy rather than guessed: the Herald ships `drive_wheel_l_spoke_0..5`
+# and the Sapper `wheel_spoke_rear_l_1..4`.
+#
+# THE DINOMECH IS THE ONLY IMPORT WITH NO HIERARCHY AT ALL -- one node, one
+# mesh, 34 348 triangles -- so `--rig saurian` is the only rig here that reads
+# its grouping off the GEOMETRY. See the header above `saurian_split`.
+#
+# THE DINOMECH'S BODY WAS REPLACED ON 2026-08-28 AND PUT BACK ON 2026-08-29.
+# For one day the type wore `biomech.glb`, a generated 502 250-triangle
+# QUADRUPED under one material and a 4096x4096 atlas, authored inside a unit
+# cube, facing -x, carrying a scythe of a tail curled over its own back. That
+# file has been withdrawn; the body is the skeletal biped again, renamed
+# `dinomech.glb` -- 34 348 triangles, six named materials, 6.22 source units
+# tall, facing +x, dragging a straight tail -- and the command above is the one
+# that was in use before the swap.
+#
+# WHAT THE ROUND TRIP IS WORTH REMEMBERING FOR is not the quadruped, which is
+# gone, but the fact that the two meshes FACED OPPOSITE WAYS. A rig left
+# carrying the other one's `source_forward` walks the finale down the road
+# tail-first, and nothing in this toolchain measures facing -- see the note in
+# `build` and the header above `saurian_split`, which names the one thing that
+# does catch it.
+#
+# `--texture-bands` WAS ADDED FOR THAT QUADRUPED AND NOW RUNS ON NOTHING. It is
+# not dead code and it is not tested by any shipped import either: every file
+# in `glb/` today carries its colour in named materials, so the stage is a
+# no-op on all of them. Read `texture_bands`'s own header before trusting it
+# again.
+
+# AND THE TWO 2026-08-28 IMPORTS -- one body and one thing that is not a body:
+#
+#   python3 tools/glb_to_model.py ../glb/volatile.glb \
+#       --rig volatile --name enemy-volatile --glow sum --emit-cap 1.6 \
+#       --frames 16 --cell 0.02 --floor 120
+#
+#   python3 tools/glb_to_model.py ../glb/missile.glb \
+#       --rig missile --name missile --glow sum --emit-cap 1.6 \
+#       --frames 8 --cell 0.03 --floor 40 --exclude sparks
+#
+# `--exclude sparks` IS NOT OPTIONAL ON THE MISSILE. That node is a POINT
+# primitive (glTF draw mode 0) and `collect` raises on any mode but triangles
+# rather than dropping it quietly -- correctly, because a mesh this tool cannot
+# read is a mesh the board would be missing without anybody being told. Nothing
+# is lost: a spark shower is what js/effects.js already throws at the impact.
+#
+# `--exclude wave_rings` DROPS THE HERALD'S SOUND HALO, and the argument is the
+# Vanguard's `Integrated_Kinetic_Field` argument with different numbers. Those
+# three nodes are flat concentric discs at y 0.13..0.29 -- floating, never
+# touching the road -- spanning 3.54 source units against a cart 1.2 wide.
+# Imported they would TREBLE the model's plan extent, which is what the frost
+# ring, the camo ring and tools/check-gait-slip.js's ring budget are drawn
+# against, and this format has no translucency to draw them with (see
+# `material_entry`), so they would ship as an opaque grey dinner plate under
+# the cart. Nothing is lost: the Herald's broadcast is already drawn, by the
+# cords its own `support.tether` block puts on every body it hastens.
+#
+# THE TWO CARTS' SIZES ARE SET BY THEIR WHEELS AND NOT BY THEIR BODIES, which
+# is a rule no other import here follows and is explained in full in
+# `roll_cycle`. In short: the cycle is a LOOP, so a wheel must come back to
+# itself at the wrap, and a size at which the measured roll lands on a whole
+# number of spoke pitches is a size at which nothing has to be rounded away.
+# 1.237 u puts the Herald's drive wheel at 4.000 sixths of a turn per stride and
+# 0.930 u puts the Sapper's at 5.003 quarters. Change either number and the
+# wheel starts rolling a few percent off true -- which is survivable, and is
+# what `--wheel-facets` exists to bound, but it is not free.
+#
+# `--wheel-facets` IS THE SPOKE COUNT OF THE FILE'S WHEELS, counted off the
+# hierarchy rather than guessed: the Herald ships `drive_wheel_l_spoke_0..5`
+# and the Sapper `wheel_spoke_rear_l_1..4`.
+#
+# THE DINOMECH IS THE ONLY IMPORT WITH NO HIERARCHY AT ALL -- one node, one
+# mesh, 34 348 triangles -- so `--rig saurian` is the only rig here that reads
+# its grouping off the GEOMETRY. See the header above `saurian_split`.
+#
+# THE DINOMECH'S BODY WAS REPLACED ON 2026-08-28, at the owner's instruction
+# ("swap out the biomech model with the biomech.glb model instead of the
+# biomech_skeletal_dinosaur.glb"), and the swap moved three numbers on the
+# command above and two rules inside the rig. `biomech_skeletal_dinosaur.glb`
+# was a 34 348-triangle BIPED, six named materials, 4.35 source units tall,
+# facing +x, dragging a straight tail. `biomech.glb` is a generated
+# 502 250-triangle QUADRUPED, one material and a 4096x4096 atlas, ONE source
+# unit long, facing -x, carrying a scythe of a tail curled over its own back.
+# What each change is for:
+#
+#   `--cell 0.038` AND NOT 0.24, and the two are the same decimation. The cell
+#   is in SOURCE units and this file is authored inside a unit cube where the
+#   old one stood 4.35 units tall, so the old number is 26% of the new body's
+#   whole height -- it would grind the legs off. 0.038 lands at 6 202
+#   triangles against the old import's 6 030: the same budget, which is what a
+#   boss is worth and what `cluster` exists to hold.
+#
+#   `--texture-bands 8` AND NOT THE DEFAULT 6. See `texture_bands` for the
+#   stage; the count is 8 because this atlas paints TWO families -- warm bone
+#   and neutral gunmetal -- and six bands spend five of themselves on the warm
+#   one. The eighth band is what buys the grey a ladder of its own.
+#
+#   NO `--exclude` AND NO `--height`. There is one node, so there is nothing to
+#   name in an exclude, and the rig's own 1.05 u default is still the right
+#   height: it is set against the ROSTER (see the rig entry) and not against
+#   either mesh.
+#
 # A WALKER'S CYCLE IS SOLVED, NOT TUNED. gl-world.js advances an enemy's frame
 # by DISTANCE covered, so one cycle is 28.6 / 31.8032 = 0.899281 model units of
 # travel for every body at every size, and a planted foot must go backward by
@@ -364,6 +518,29 @@ def material_entry(material, tint, glow="emissive", cap=None):
             "emissiveStrength", 1.0)
     elif any(v > 0 for v in emissive):
         strength = 1.0
+    elif "KHR_materials_unlit" in ext:
+        # AN UNLIT MATERIAL IS A SELF-LIT ONE, whatever it says about emission.
+        # `KHR_materials_unlit` means "draw this at its base colour and do not
+        # light it", which is how a flame, a hologram or a sky dome is authored
+        # for a renderer that has an unlit path -- and this renderer does not.
+        # Read as an ordinary PBR material it comes out as flat plastic in
+        # exactly the right colour, lit and shaded by the board's own lamp,
+        # which is the opposite of what the extension asks for: the part goes
+        # DARK on the side facing away from the light.
+        #
+        # So an unlit material is given a unit strength, which is the nearest
+        # thing this format has to "does not take the lighting" -- see
+        # `GLModels.expand` for how emission becomes a resting floor -- and, as
+        # importantly, that is what makes it a material a TINT may then retune.
+        # The rule below is that a tint cannot turn plating into a lamp; the
+        # file has already said this is not plating.
+        #
+        # 1.0 AND NOT MORE. It is a floor of 0.16 of white, which reads as "lit"
+        # without blowing the colour out, and it leaves the ladder between four
+        # plume shells to the tint that knows what they are. `missile.glb` is
+        # the only file in `glb/` that declares the extension at all, so this
+        # branch reproduces every existing import byte-for-byte.
+        strength = 1.0
 
     # Capped AFTER the emissive/base decision is made from it, so a capped
     # material still counts as emissive and still takes its glow colour.
@@ -393,6 +570,481 @@ def material_entry(material, tint, glow="emissive", cap=None):
         rgb = emissive
     return [round(to_srgb(rgb[0]), PRECISION), round(to_srgb(rgb[1]), PRECISION),
             round(to_srgb(rgb[2]), PRECISION), round(strength, 2)]
+
+
+# --- a painted body: the palette read off a base colour map -----------------
+#
+# WHY THIS EXISTS AT ALL. Every import here carries its colour in its
+# MATERIALS -- six named PBR entries on the skeletal dinosaur, a
+# `baseColorFactor` each, and `material_entry` turns one of those into one
+# palette row. A generated body does not work that way. `biomech.glb` was a
+# SINGLE mesh of 502 250 triangles under a SINGLE material whose base colour is
+# a 4096x4096 atlas and whose `baseColorFactor` is absent, which glTF says
+# means white. Imported through materials alone that body shipped as one flat
+# white silhouette: every plate, bone, rust streak and red lens the artist
+# painted was in the image, and none of it in the file the game loads.
+#
+# **THAT FILE WAS WITHDRAWN ON 2026-08-29 AND NO SHIPPED IMPORT USES THIS STAGE
+# TODAY.** Every `.glb` in `glb/` carries named materials, so `texture_bands`
+# is a no-op on all of them and nothing exercises the code below. It is kept
+# because the next generated body will need it and because deleting a working
+# stage to re-derive it later is worse -- but it is UNTESTED by the suites in
+# its current form, and that is a fact about it rather than an oversight.
+#
+# SO THE COLOUR IS READ OFF THE IMAGE AND QUANTISED BACK INTO MATERIALS. Each
+# triangle is sampled at its own UV centroid, the samples are clustered into a
+# handful of bands, and each band is appended to the file's material list as a
+# synthetic material carrying that band's colour. Everything downstream --
+# `material_entry`, the tint table, the emissive rules, the palette de-dup in
+# `build` -- then runs exactly as it does for a hand-authored body, because
+# what it is handed IS a hand-authored body's worth of materials. Nothing in
+# this file changes shape for a textured import except `collect`, which now
+# carries a UV alongside each triangle, and this block, which spends it.
+#
+# WHY A HANDFUL OF BANDS AND NOT A COLOUR PER TRIANGLE. The .js format stores a
+# palette and one INDEX per triangle (see `write_js`), and a 6 000-entry
+# palette would be the largest thing in the file by an order of magnitude. Six
+# bands is also what the mesh this one replaces shipped -- gunmetal, dark
+# steel, beige bone, crimson, blackened mechanism, red optic -- so the ceiling
+# is the one the board already reads a boss at, arrived at from the other side.
+#
+# AT WHAT RESOLUTION THE IMAGE IS READ, AND WHY THAT IS NOT A COMPROMISE. A
+# baseline JPEG already stores each 8x8 block's average, in that block's DC
+# coefficient, so `jpeg_dc` walks the entropy stream and keeps nothing else:
+# no dequantisation past the DC term, no inverse DCT, no chroma upsampling.
+# What comes back is the atlas at 1/8 scale -- 512x512 for this file -- in
+# about a second of pure Python where a full decode is minutes. This pipeline
+# then decimates 502 250 triangles to about 6 000, so a triangle that survives
+# covers hundreds of source texels; the mean of an 8x8 block is a FINER
+# measurement than the model that quotes it can hold.
+#
+# BASELINE JPEG ONLY, AND IT SAYS SO. Progressive JPEG and PNG are refused by
+# name rather than mis-decoded, because a texture read wrong is a body painted
+# wrong and nothing downstream can tell. The three maps this file ships are
+# baseline; a source that is not can be re-saved, and the error says so.
+
+# The zig-zag order's first entry is the DC term, which is the only one read.
+JPEG_DC_SCALE = 8.0
+# What a JPEG's 8-bit samples are centred on before the level shift is undone.
+JPEG_LEVEL = 128.0
+
+
+def jpeg_dc(data):
+    """A baseline JPEG as one average colour per 8x8 block, per component.
+
+    Returns (width, height, [(blocks across, blocks down, values), ...]) with
+    one entry per component in the frame's own order -- Y, Cb, Cr for the
+    3-component files this reads. A chroma plane is smaller than the luma one
+    exactly as its sampling factors say, and `texture_sampler` does the only
+    upsampling anyone here needs, which is nearest.
+
+    THE ENTROPY STREAM MUST STILL BE WALKED IN FULL. There is no seeking in a
+    Huffman stream: every AC coefficient of every block has to be decoded to
+    find where the next block starts, even when -- as here -- the value is
+    thrown away the instant it is read. What makes that cheap is the 16-bit
+    lookup built for each code table: one peek and one list index per symbol,
+    against a bit-at-a-time walk down a code tree.
+    """
+    tables, frame, scan, start = {}, None, None, None
+    i = 2
+    while i < len(data) - 1:
+        if data[i] != 0xFF:
+            raise ValueError("not a JPEG: expected a marker at byte %d" % i)
+        marker = data[i + 1]
+        length = (data[i + 2] << 8) | data[i + 3]
+        seg = data[i + 4:i + 2 + length]
+        if marker == 0xDB:                       # quantisation tables
+            p = 0
+            while p < len(seg):
+                wide, slot = seg[p] >> 4, seg[p] & 15
+                p += 1
+                if wide:
+                    tables[("q", slot)] = struct.unpack_from(">64H", seg, p)
+                    p += 128
+                else:
+                    tables[("q", slot)] = tuple(seg[p:p + 64])
+                    p += 64
+        elif marker == 0xC4:                     # Huffman tables
+            p = 0
+            while p < len(seg):
+                kind, slot = seg[p] >> 4, seg[p] & 15
+                counts = seg[p + 1:p + 17]
+                p += 17
+                code = 0
+                lut = [None] * 65536
+                for bits in range(1, 17):
+                    for _ in range(counts[bits - 1]):
+                        head = code << (16 - bits)
+                        for tail in range(1 << (16 - bits)):
+                            lut[head + tail] = (seg[p], bits)
+                        p += 1
+                        code += 1
+                    code <<= 1
+                tables[("h", kind, slot)] = lut
+        elif marker in (0xC0, 0xC1):             # baseline frame header
+            height = (seg[1] << 8) | seg[2]
+            width = (seg[3] << 8) | seg[4]
+            frame = (width, height, [
+                {"id": seg[6 + c * 3], "h": seg[7 + c * 3] >> 4,
+                 "v": seg[7 + c * 3] & 15, "q": seg[8 + c * 3]}
+                for c in range(seg[5])])
+        elif marker == 0xC2:
+            raise ValueError("this JPEG is PROGRESSIVE; re-save it as baseline")
+        elif marker == 0xDD:
+            raise ValueError("this JPEG carries restart intervals, which this "
+                             "reader does not walk")
+        elif marker == 0xDA:                     # start of scan
+            scan = dict((seg[1 + c * 2], (seg[2 + c * 2] >> 4,
+                                          seg[2 + c * 2] & 15))
+                        for c in range(seg[0]))
+            start = i + 2 + length
+            break
+        i += 2 + length
+    if frame is None or scan is None:
+        raise ValueError("this JPEG has no baseline scan")
+    return _jpeg_scan(data, start, frame, scan, tables)
+
+
+def _jpeg_scan(data, start, frame, scan, tables):
+    """The one interleaved scan of a baseline JPEG, DC coefficients kept."""
+    width, height, comps = frame
+    across = max(c["h"] for c in comps)
+    down = max(c["v"] for c in comps)
+    mcus_x = (width + 8 * across - 1) // (8 * across)
+    mcus_y = (height + 8 * down - 1) // (8 * down)
+
+    # WHERE THE SCAN ENDS IS FOUND BEFORE THE STUFFING IS REMOVED, and the
+    # order matters: a stuffed 0xFF 0x00 sitting in front of a 0xD9 becomes
+    # 0xFF 0xD9 the moment the 0x00 is dropped, and a search afterwards would
+    # cut the picture off at the first one of those. This file's scan ends 1.0
+    # MB past the first such pair.
+    end = start
+    while True:
+        end = data.find(b"\xff", end)
+        if end < 0:
+            end = len(data)
+            break
+        if data[end + 1] == 0x00 or 0xD0 <= data[end + 1] <= 0xD7:
+            end += 2
+            continue
+        break
+    raw = data[start:end].replace(b"\xff\x00", b"\xff")
+
+    planes = [[0] * (mcus_x * c["h"] * mcus_y * c["v"]) for c in comps]
+    plan = []
+    for index, c in enumerate(comps):
+        dc, ac = scan[c["id"]]
+        plan.append((index, c["h"], c["v"], tables[("h", 0, dc)],
+                     tables[("h", 1, ac)], mcus_x * c["h"], planes[index]))
+
+    predicted = [0] * len(comps)
+    acc = held = 0
+    at = 0
+    total = len(raw)
+    for my in range(mcus_y):
+        for mx in range(mcus_x):
+            for index, ch, cv, dc_lut, ac_lut, stride, plane in plan:
+                for by in range(cv):
+                    row = (my * cv + by) * stride + mx * ch
+                    for bx in range(ch):
+                        while held < 32 and at < total:
+                            acc = (acc << 8) | raw[at]
+                            at += 1
+                            held += 8
+                        peek = (acc >> (held - 16)) & 0xFFFF if held >= 16 \
+                            else (acc << (16 - held)) & 0xFFFF
+                        size, bits = dc_lut[peek]
+                        held -= bits
+                        acc &= (1 << held) - 1
+                        if size:
+                            held -= size
+                            value = acc >> held
+                            acc &= (1 << held) - 1
+                            if value < (1 << (size - 1)):
+                                value -= (1 << size) - 1
+                            predicted[index] += value
+                        plane[row + bx] = predicted[index]
+                        k = 1
+                        while k < 64:
+                            while held < 32 and at < total:
+                                acc = (acc << 8) | raw[at]
+                                at += 1
+                                held += 8
+                            peek = (acc >> (held - 16)) & 0xFFFF if held >= 16 \
+                                else (acc << (16 - held)) & 0xFFFF
+                            symbol, bits = ac_lut[peek]
+                            held -= bits
+                            acc &= (1 << held) - 1
+                            run, size = symbol >> 4, symbol & 15
+                            if size == 0:
+                                if run == 15:      # sixteen zeroes, no value
+                                    k += 16
+                                    continue
+                                break              # end of block
+                            k += run + 1
+                            held -= size
+                            acc &= (1 << held) - 1
+
+    out = []
+    for index, c in enumerate(comps):
+        step = tables[("q", c["q"])][0]
+        out.append((mcus_x * c["h"], mcus_y * c["v"],
+                    [max(0, min(255, int(v * step / JPEG_DC_SCALE
+                                         + JPEG_LEVEL + 0.5)))
+                     for v in planes[index]]))
+    return width, height, out
+
+
+def texture_sampler(gltf, index):
+    """One glTF texture as (u, v) -> (r, g, b) in sRGB 0..1.
+
+    UV WRAPS RATHER THAN CLAMPS, which is glTF's own default and the only
+    behaviour that can be right for an atlas: a coordinate a hair outside 0..1
+    belongs to the island it came from, not to the edge of the sheet.
+    """
+    image = gltf.json["images"][gltf.json["textures"][index]["source"]]
+    if "bufferView" not in image:
+        raise ValueError("texture %d is stored as a URI; this reads .glb "
+                         "images from the binary chunk" % index)
+    mime = image.get("mimeType", "")
+    if mime not in ("image/jpeg", "image/jpg"):
+        raise ValueError("texture %d is %s; only baseline JPEG is read"
+                         % (index, mime or "of no declared type"))
+    view = gltf.json["bufferViews"][image["bufferView"]]
+    at = view.get("byteOffset", 0)
+    width, height, planes = jpeg_dc(gltf.bin[at:at + view["byteLength"]])
+    if len(planes) == 1:
+        (bw, bh, luma) = planes[0]
+
+        def grey(u, v):
+            x = int(u * bw) % bw
+            y = int(v * bh) % bh
+            value = luma[y * bw + x] / 255.0
+            return (value, value, value)
+        return grey
+
+    (bw, bh, luma), (cw, ch, blue), (_, _, red) = planes[:3]
+
+    def sample(u, v):
+        x = int(u * bw) % bw
+        y = int(v * bh) % bh
+        y_ = luma[y * bw + x]
+        # Nearest-neighbour chroma. The planes differ by the sampling factors
+        # and nothing finer than a block is being asked for.
+        cx = x * cw // bw
+        cy = y * ch // bh
+        cb = blue[cy * cw + cx] - 128.0
+        cr = red[cy * cw + cx] - 128.0
+        return (min(1.0, max(0.0, (y_ + 1.402 * cr) / 255.0)),
+                min(1.0, max(0.0, (y_ - 0.344136 * cb - 0.714136 * cr) / 255.0)),
+                min(1.0, max(0.0, (y_ + 1.772 * cb) / 255.0)))
+    return sample
+
+
+def to_linear(v):
+    """sRGB -> linear. `to_srgb` the other way round.
+
+    A texel is sRGB-encoded and a `baseColorFactor` is linear, so a band's
+    colour has to be handed back in linear light or `material_entry` -- which
+    converts on the way out -- would gamma-correct it twice and ship a washed
+    out body.
+    """
+    v = max(0.0, min(1.0, v))
+    return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+
+# How many rounds the band solve runs. It is a k-means over at most a few tens
+# of thousands of samples in three dimensions and it stops moving long before
+# this; the fixed count is here so two runs of this tool cannot disagree.
+BAND_ROUNDS = 24
+# How many samples the bands are FITTED on. Every triangle is then assigned to
+# the nearest one, so this bounds the solve and not the result: a stride over
+# an atlas's worth of samples is a fair sample of it, and 20 000 of them fit
+# six centres to well inside the rounding this format ships at.
+BAND_SAMPLES = 20000
+
+
+def texture_bands(gltf, parts, count):
+    """Repaint textured triangles with a small palette read off the atlas.
+
+    Triangles arrive as (points, material, uv) and leave as (points, material)
+    -- the pair the rest of this file has always handled. A triangle whose
+    material has no base colour texture keeps the material it came with, so a
+    file that mixes an authored material with a painted one imports both.
+
+    THE BANDS ARE FITTED IN sRGB AND STORED IN LINEAR. Clustering is a
+    perceptual question -- which colours a reader would call the same colour --
+    and sRGB is the space where distance means roughly that; a linear-space fit
+    puts four of six bands inside the darkest quarter of this atlas and paints
+    the whole animal in shades of black. What is written into the synthetic
+    material is linear, because that is what glTF says a `baseColorFactor` is.
+
+    EACH BAND IS WEIGHTED BY AREA, NOT BY TRIANGLE COUNT. This mesh's triangles
+    vary by three orders of magnitude in size -- generated geometry is dense
+    where the surface is busy -- so counting them would let the fine detail
+    around a lens outvote the entire flank it sits on.
+    """
+    painted = {}
+    for part in parts:
+        for tri in part["triangles"]:
+            if tri[2] is None or tri[1] in painted:
+                continue
+            texture = gltf.json["materials"][tri[1]] \
+                .get("pbrMetallicRoughness", {}).get("baseColorTexture")
+            if texture is not None:
+                painted[tri[1]] = texture["index"]
+
+    if not painted or count < 1:
+        for part in parts:
+            part["triangles"] = [(tri[0], tri[1]) for tri in part["triangles"]]
+        return {}
+
+    # SAMPLED ONCE, PER TRIANGLE, AND HELD -- the atlas is read on the way past
+    # and never again, so the band fit and the band assignment below are
+    # arithmetic on a list rather than half a million more texture lookups.
+    samplers = dict((m, texture_sampler(gltf, t)) for m, t in painted.items())
+    sampled = []
+    gathered = {}
+    for part in parts:
+        here = []
+        for tri in part["triangles"]:
+            sampler = samplers.get(tri[1]) if tri[2] is not None else None
+            if sampler is None:
+                here.append(None)
+                continue
+            rgb = sampler(tri[2][0], tri[2][1])
+            here.append(rgb)
+            gathered.setdefault(tri[1], []).append((rgb, triangle_area(tri[0])))
+        sampled.append(here)
+
+    bands = {}
+    report = {}
+    for material, samples in gathered.items():
+        centres = fit_bands(samples, count)
+        keys = [band_key(c) for c in centres]
+        name = gltf.json["materials"][material].get("name",
+                                                    "material %d" % material)
+        bands[material] = (len(gltf.json["materials"]), keys)
+        for band, rgb in enumerate(centres):
+            gltf.json["materials"].append({
+                "name": "%s band %d" % (name, band),
+                "pbrMetallicRoughness": {
+                    "baseColorFactor": [to_linear(rgb[0]), to_linear(rgb[1]),
+                                        to_linear(rgb[2]), 1.0]}})
+        report[name] = [tuple(round(v, PRECISION) for v in rgb)
+                        for rgb in centres]
+
+    for part, here in zip(parts, sampled):
+        out = []
+        for tri, rgb in zip(part["triangles"], here):
+            if rgb is None:
+                out.append((tri[0], tri[1]))
+                continue
+            first, keys = bands[tri[1]]
+            out.append((tri[0], first + nearest_band(band_key(rgb), keys)))
+        part["triangles"] = out
+    return report
+
+
+def triangle_area(points):
+    """Half the cross product's length, in whatever units the points are in."""
+    a, b, c = points
+    u = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    v = (c[0] - a[0], c[1] - a[1], c[2] - a[2])
+    n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+         u[0] * v[1] - u[1] * v[0])
+    return 0.5 * math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2)
+
+
+# HOW MUCH A DIFFERENCE IN COLOUR OUTWEIGHS A DIFFERENCE IN BRIGHTNESS when
+# the bands are fitted. NOT 1, AND THE PICTURE IS THE ARGUMENT: at 1 -- plain
+# RGB distance -- every centre this atlas produces lands on one luminance
+# diagonal, because that is the axis the samples are spread along, and the
+# Dinomech ships as six shades of a single brown. Its gunmetal plating and the
+# bone bolted to it sit at nearly the SAME brightness and differ almost
+# entirely in chroma, so the one axis that separates the two families is the
+# one a plain fit spends last. At 2 the fit returns four warm bands and four
+# neutral ones, which is the animal the atlas actually paints.
+BAND_CHROMA = 2.0
+
+
+def band_key(rgb):
+    """A colour in the space the bands are fitted in: luma, then two chromas.
+
+    An opponent encoding rather than RGB, so `BAND_CHROMA` has one place to
+    apply. It is a LINEAR map, which is what lets `fit_bands` keep its centres
+    in RGB and still run a true k-means in this space: a weighted mean commutes
+    with a linear transform, so averaging the members in RGB and encoding the
+    result is the same centre as averaging their encodings.
+    """
+    y = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+    return (y, BAND_CHROMA * (rgb[2] - y), BAND_CHROMA * (rgb[0] - y))
+
+
+def nearest_band(key, keys):
+    """Which band a colour belongs to. Squared distance in `band_key` space."""
+    best = 0
+    far = None
+    for i, c in enumerate(keys):
+        d = (key[0] - c[0]) ** 2 + (key[1] - c[1]) ** 2 + (key[2] - c[2]) ** 2
+        if far is None or d < far:
+            far = d
+            best = i
+    return best
+
+
+def fit_bands(samples, count):
+    """`count` colours that stand for this list of (colour, weight) samples.
+
+    THE START IS THE LUMINANCE LADDER AND NOT A RANDOM DRAW, which is what
+    makes two runs of this tool agree: the samples are ordered by brightness
+    and the initial centres are read off that order at even weight intervals,
+    so a body's darkest quarter opens on a dark centre and its highlights on a
+    bright one. Nothing here consults a random number generator, and a k-means
+    that did could not be committed to a repository -- the .js file would
+    change under a re-run that changed nothing else.
+
+    AN EMPTY BAND KEEPS ITS PREVIOUS COLOUR rather than being re-seeded. A band
+    nothing lands in contributes no triangle, so `build`'s palette de-dup drops
+    it and the cost of leaving it is a row that never appears; the cost of
+    re-seeding it is a solve that can oscillate and a file that does not
+    reproduce.
+    """
+    ordered = sorted(samples, key=lambda s: band_key(s[0])[0])
+    stride = max(1, len(ordered) // BAND_SAMPLES)
+    fitting = [(list(rgb), band_key(rgb), weight)
+               for rgb, weight in ordered[::stride]]
+    total = sum(s[2] for s in fitting)
+    centres = []
+    carried = 0.0
+    for rgb, _key, weight in fitting:
+        carried += weight
+        if len(centres) < count and \
+                carried >= total * (len(centres) + 1.0) / (count + 1.0):
+            centres.append(list(rgb))
+    while len(centres) < count:
+        centres.append(list(fitting[len(centres) * len(fitting) // count][0]))
+
+    for _ in range(BAND_ROUNDS):
+        keys = [band_key(c) for c in centres]
+        sums = [[0.0, 0.0, 0.0, 0.0] for _ in centres]
+        for rgb, key, weight in fitting:
+            acc = sums[nearest_band(key, keys)]
+            acc[0] += rgb[0] * weight
+            acc[1] += rgb[1] * weight
+            acc[2] += rgb[2] * weight
+            acc[3] += weight
+        moved = 0.0
+        for i, acc in enumerate(sums):
+            if acc[3] <= 0.0:
+                continue
+            for k in range(3):
+                fresh = acc[k] / acc[3]
+                moved = max(moved, abs(fresh - centres[i][k]))
+                centres[i][k] = fresh
+        if moved < 1e-4:
+            break
+    return [tuple(c) for c in sorted(centres, key=lambda c: band_key(c)[0])]
 
 
 # --- triangle budget --------------------------------------------------------
@@ -480,7 +1132,7 @@ def triangle_normal(tri):
 # --- reading the scene ------------------------------------------------------
 
 def collect(gltf, exclude=()):
-    """Every mesh node as (node name, ancestor names, [(3 points, material)]).
+    """Every mesh node as (node name, ancestors, [(3 points, material, uv)]).
 
     Points come out in the file's own space and units; the caller decides what
     that means. Positions are indexed here so the rest of the tool never has to
@@ -522,9 +1174,22 @@ def collect(gltf, exclude=()):
                 else:
                     idx = list(range(len(pos)))
                 material = prim.get("material", 0)
+                # THE UV IS CARRIED BUT NOT SPENT HERE. A triangle leaves this
+                # function as (points, material, uv) and `texture_bands` is the
+                # only thing that reads the third: it turns an atlas into
+                # materials and hands back the (points, material) pairs the
+                # rest of this file has always taken. A file with no texture
+                # coordinates carries None, and nothing downstream can tell.
+                slot = prim["attributes"].get("TEXCOORD_0")
+                uv = gltf.accessor(slot) if slot is not None else None
                 for i in range(0, len(idx) - 2, 3):
+                    at = None
+                    if uv is not None:
+                        a, b, c = uv[idx[i]], uv[idx[i + 1]], uv[idx[i + 2]]
+                        at = ((a[0] + b[0] + c[0]) / 3.0,
+                              (a[1] + b[1] + c[1]) / 3.0)
                     tris.append(([pos[idx[i]], pos[idx[i + 1]],
-                                  pos[idx[i + 2]]], material))
+                                  pos[idx[i + 2]]], material, at))
             parts.append({"name": name, "chain": chain, "triangles": tris})
         for child in node.get("children", []):
             walk(child, here, chain + [name])
@@ -597,7 +1262,7 @@ def firefly_pivot_of(name, points, refs):
     return [0.0, 0.0, 0.0]
 
 
-def hover_cycle(groups, frames, geometry, joints):
+def hover_cycle(groups, frames, geometry, joints, options=None):
     """The pose of every group on every frame of one hover cycle.
 
     A WINGBEAT IS NOT A WALK, and this is the one place that matters. Every
@@ -1074,7 +1739,7 @@ def set_down(points, joint, local, raise_by=0.0):
     return mat_multiply(mat_translate([0.0, 0.0, -low + raise_by]), placed)
 
 
-def walk_cycle(groups, frames, geometry, joints):
+def walk_cycle(groups, frames, geometry, joints, options=None):
     """The pose of every group on every frame of one walk cycle.
 
     THE LEGS ARE SOLVED AND THE REST IS AUTHORED, which is the whole shape of
@@ -1344,7 +2009,7 @@ def fore_centre(frames, windows):
     return (sum(mids) / len(mids)) / float(frames)
 
 
-def run_cycle(groups, frames, geometry, joints):
+def run_cycle(groups, frames, geometry, joints, options=None):
     """The pose of every group on every frame of one gallop.
 
     FOUR LEGS, FOUR PHASES, ONE SOLVER. Each paw's plant window is `RUN_DUTY` of
@@ -1844,7 +2509,7 @@ def twitch_series(frames, at, snap, hold):
     return out
 
 
-def march_cycle(groups, frames, geometry, joints):
+def march_cycle(groups, frames, geometry, joints, options=None):
     """The pose of every group on every frame of one march.
 
     THE LEGS ARE SOLVED AND EVERYTHING ELSE IS DERIVED FROM THEM, which is a
@@ -2057,7 +2722,7 @@ DRIFT_CORE_PULSE = 0.045          # the lantern breathes by this much of itself
 DRIFT_TWIST = 0.05                # a little yaw on anything that sways
 
 
-def drift_cycle(groups, frames, geometry, joints):
+def drift_cycle(groups, frames, geometry, joints, options=None):
     """The pose of every group on every frame of one drift.
 
     EVERY TERM IS EITHER A WHOLE NUMBER OF TURNS OR A SINE OF THE CYCLE, which
@@ -2217,7 +2882,7 @@ BEACON_CORE_TURNS = 0.5           # the crystal is symmetric; half a turn lands
 BEACON_CORE_PULSE = 0.05          # the lantern breathes by this much of itself
 
 
-def broadcast_cycle(groups, frames, geometry, joints):
+def broadcast_cycle(groups, frames, geometry, joints, options=None):
     """The pose of every group on every frame of one broadcast."""
     zs = [p[2] for pts in geometry.values() for p in pts]
     height = (max(zs) - min(zs)) if zs else 1.0
@@ -2719,12 +3384,12 @@ BOUND_GAIT = {
 }
 
 
-def sprint_cycle(groups, frames, geometry, joints):
+def sprint_cycle(groups, frames, geometry, joints, options=None):
     """The shielded Bulwark: quick, upright, light on its feet."""
     return biped_cycle(groups, frames, geometry, joints, SPRINT_GAIT)
 
 
-def bound_cycle(groups, frames, geometry, joints):
+def bound_cycle(groups, frames, geometry, joints, options=None):
     """The stripped Bulwark: a spring, one leg at a time."""
     return biped_cycle(groups, frames, geometry, joints, BOUND_GAIT)
 
@@ -2950,7 +3615,7 @@ VANGUARD_SKATE_TWIST = 0.18
 VANGUARD_SKATE_HEAD_LEAD = 0.10
 
 
-def vanguard_skate_cycle(groups, frames, geometry, joints):
+def vanguard_skate_cycle(groups, frames, geometry, joints, options=None):
     """BAND 0: a long, low glide -- wheels down, weight rolling side to side.
 
     Authored throughout. See the block above for why a solve would be the wrong
@@ -3074,9 +3739,705 @@ VANGUARD_DASH_GAIT = {
     "head_lead": VANGUARD_DASH_HEAD_LEAD, "head_nod": VANGUARD_DASH_HEAD_NOD,
 }
 
-def vanguard_dash_cycle(groups, frames, geometry, joints):
+def vanguard_dash_cycle(groups, frames, geometry, joints, options=None):
     """BAND 1: the opening burst -- swept back, leant over, barely down."""
     return biped_cycle(groups, frames, geometry, joints, VANGUARD_DASH_GAIT)
+
+
+# --- a cart's rig: a body that rides on wheels -------------------------------
+#
+# TWO IMPORTS ARRIVED ON WHEELS ON 2026-08-28 -- `speaker-herald.glb` and
+# `sapper.glb` -- and neither is a walker, a hoverer or a skater. A cart is a
+# fourth thing, and the difference is worth stating because the toolchain
+# grades on it: its contact with the road is REAL (the tyres are on the tarmac,
+# not floating like the beacon's plinth) and it does not PLANT. It ROLLS, which
+# is the one moving contact that is honest, because a rolling wheel's contact
+# patch is momentarily at rest however fast the wheel is turning above it.
+#
+# THE RIG IS TWO RULES AND NOTHING ELSE:
+#
+#   WHICH PARTS ARE A WHEEL, and which wheel each belongs to. Read off the
+#   names, like every other rig here -- but off BOTH the part's own name and
+#   its ancestry, and the two answer different halves. The ANCESTRY says WHICH
+#   wheel (`drive_wheel_l`, `wheel_assembly_front_r`, `caster`); the PART'S OWN
+#   NAME says whether it turns at all. The second test is not decoration:
+#   `caster_fork` is the strut the caster swings under, it is a child of the
+#   node named `caster`, and a rig that read the ancestor alone would spin the
+#   fork with the wheel and drill it through the deck once per stride.
+#
+#   HOW FAST EACH ONE TURNS, which is measured off the wheel. See `roll_cycle`.
+#
+# EVERYTHING ELSE IS ONE STATIC GROUP, exactly as the beacon's structure is and
+# for the same reason: a group is a draw call per body, these two walk in ones
+# and twos, and a deck plank has no more reason to move than a tower's plinth
+# does. What sells a cart is its wheels going round; nothing else on it needs a
+# matrix, and the Herald's broadcast is already drawn by the tethers its
+# `support.tether` block puts on everything it hastens.
+
+# A part that turns with a wheel names itself as one of these. Anything else
+# under a wheel node is bodywork bolted beside it and stays with the chassis.
+WHEEL_PARTS = ("wheel", "tire", "tyre", "tread", "rim", "hub", "spoke", "ring")
+
+# The node names that OWN a wheel. Both files nest one wheel's pieces under a
+# node named for it, which is the whole of what tells the wheels apart -- there
+# is no other information in either file about which tyre is the left one.
+WHEEL_NODES = ("wheel", "caster")
+
+
+def cart_is_wheel_group(name):
+    """Is this group name a wheel, rather than the chassis?
+
+    Asked by the pivot rule and by the cycle, and asked of the GROUP NAME
+    rather than of a list built somewhere else, so the three cannot disagree
+    about what a wheel is.
+    """
+    return bool(name) and any(word in name for word in WHEEL_NODES)
+
+
+def cart_group_of(part, options):
+    """Which wheel a mesh turns with, or the chassis.
+
+    BOTH TESTS MUST PASS. A part with an owning wheel node and no turning name
+    (the caster's fork, an axle brace) is chassis; so is a part with a turning
+    name and no owner (a bare axle, a rim-shaped trim strip on a cabinet).
+    """
+    own = part["name"].lower()
+    if not any(word in own for word in WHEEL_PARTS):
+        return options.body_group
+    for name in list(part["chain"][1:]) + [part["name"]]:
+        low = name.lower()
+        if any(word in low for word in WHEEL_NODES):
+            return low
+    return options.body_group
+
+
+def cart_pivot_of(name, points, refs):
+    """Where a group turns: a wheel about its own axle, the chassis about zero.
+
+    THE AXLE IS THE CENTROID OF THE WHEEL, and on a wheel that is not an
+    approximation -- a tyre, a rim, a hub and a ring of spokes are each centred
+    on the axle by construction, so their combined centroid IS it. Nothing here
+    is eyeballed and nothing is typed, which is the promise `firefly_pivot_of`
+    and `walker_pivot_of` already make.
+    """
+    if cart_is_wheel_group(name):
+        return [sum(p[k] for p in points) / len(points) for k in range(3)]
+    return [0.0, 0.0, 0.0]
+
+
+def wheel_radius(points, joint):
+    """A wheel's radius, measured off the wheel.
+
+    The largest distance from the axle in the plane the wheel turns in -- x
+    (along the road) and z (up) -- and never in y, which is the wheel's own
+    thickness and has nothing to do with how far it rolls per turn.
+    """
+    return max(math.hypot(p[0] - joint[0], p[2] - joint[2]) for p in points)
+
+
+def roll_cycle(groups, frames, geometry, joints, options=None):
+    """The pose of every group on every frame of one roll.
+
+    A WHEEL'S RATE IS MEASURED, NOT CHOSEN, and this is the cart's answer to
+    the thing `walk_cycle` solves for a leg. gl-world.js advances the frame by
+    DISTANCE covered -- one cycle is CYCLE_UNITS of travel at every size and
+    every speed -- so a wheel of radius r must turn CYCLE_UNITS / (2 pi r)
+    times in that cycle or its tyre is sliding down the road. Each wheel is
+    measured separately, because a hand-cart's caster is a third the diameter
+    of its drive wheels and has to spin three times as fast to keep up.
+
+    AND THEN QUANTIZED TO THE WHEEL'S OWN SYMMETRY, which is the one place this
+    departs from the measurement, because the frame list is a LOOP. A wheel
+    that has turned 1.368 times when the cycle wraps snaps back a third of a
+    turn on the seam, and on a four-spoke wheel that is a visible 42-degree
+    jolt once per stride. Rounding the turn count to a whole number of SPOKE
+    PITCHES (`--wheel-facets`) makes the wrap invisible instead: the wheel
+    comes back to a pose its own symmetry makes indistinguishable from the one
+    it left. What is left over is a wheel rolling a fraction of a percent off
+    true, which nobody can see, against a jolt everybody can.
+
+    BOTH SHIPPED CARTS CHOOSE THEIR FITTED SIZE SO THERE IS ALMOST NOTHING TO
+    ROUND -- the Herald's drive wheel wants 4.000 sixths of a turn at 1.237 u
+    and the Sapper's wheels 5.003 quarters at 0.930 u -- so this is a safety
+    net on those two rather than a cost being paid. The commands are in this
+    file's header and the residual is printed by `--stats`.
+    """
+    facets = max(1, int(getattr(options, "wheel_facets", 1) or 1))
+    turns = {}
+    for name, _offset in groups:
+        if not name or name not in geometry or name not in joints:
+            continue
+        if not cart_is_wheel_group(name):
+            continue
+        joint = joints[name]
+        radius = wheel_radius(geometry[name], joint)
+        if radius <= 1e-6:
+            continue
+        exact = CYCLE_UNITS / (2 * math.pi * radius)
+        turns[name] = max(1, int(round(exact * facets))) / float(facets)
+
+    poses = []
+    for f in range(frames):
+        t = f / float(frames)
+        pose = []
+        for name, _offset in groups:
+            if not name:
+                pose.append(None)
+                continue
+            if name in turns:
+                # A POSITIVE ROTATION ABOUT y TAKES LOCAL +x TOWARD LOCAL -z,
+                # so the front of the wheel goes down and the tyre rolls
+                # FORWARD -- the same convention the Hedger's strike is written
+                # against in js/gl/gl-world.js.
+                pose.append(turn_about(joints[name],
+                                       mat_rotate("y", turns[name] * t * 2 * math.pi)))
+            else:
+                pose.append(IDENTITY)
+        poses.append(pose)
+    return poses
+
+
+# --- the Dinomech: ONE MESH, NO HIERARCHY, AND A RIG READ OFF THE GEOMETRY ---
+#
+# `dinomech.glb` is the wave-40 finale and it arrives as a SINGLE node carrying
+# a SINGLE mesh under six named materials. There are no child nodes, so there
+# are no names, so the whole apparatus every other rig in this file is built on
+# -- "the names are the entire rig" -- has nothing to read. The only rig
+# information this file carries is WHERE its geometry is, and this is the rig
+# that reads that.
+#
+# THAT IS A DIFFERENT KIND OF RIG AND IT SAYS SO. `group_of` maps a PART to a
+# group, and one part cannot become four, so the split happens one stage
+# earlier: `rig["split"]` cuts the single part into named pseudo-parts by the
+# position of each triangle's own centroid, and `group_of` then does what it
+# always does. `build` runs it after the body has been oriented, scaled,
+# grounded, faced and centred, so every threshold below is in the model's final
+# space and none of them depends on how the file happened to be authored.
+#
+# ---- IT IS A BIPED, AND THIS RIG WAS BRIEFLY WRITTEN FOR SOMETHING ELSE -----
+#
+# On 2026-08-28 this rig was re-authored for `glb/biomech.glb`, a generated
+# 502 250-triangle QUADRUPED inside a unit cube that faced -x and carried a
+# scythe of a tail curled up over its own back. **That file was withdrawn on
+# 2026-08-29 and the body is the skeletal biped again**, now named
+# `glb/dinomech.glb`. Everything the quadruped cost has been given back: four
+# legs are two, the diagonal trot is a walk, the "tail curls forward over the
+# spine" clause is gone, and `source_forward` is **+x** and not -x.
+#
+# THAT LAST ONE IS THE WHOLE REASON THIS PARAGRAPH EXISTS. The two meshes face
+# OPPOSITE WAYS, so a rig carrying the other one's facing turns this body
+# through 180 degrees and walks the finale down the road tail-first -- and
+# **every instrument in this toolchain reports green on it and always will**,
+# because a heel plants exactly as well as a toe. `check-gait-slip.js` graded
+# the backwards body 0.001 board px. What actually catches it is asking where
+# the EYES are: `Red Optics` is 336 triangles at source x +1.70..+1.96 and
+# y 5.23..5.49 -- the head is at +x, near the top, and it is the only material
+# on the body that says so. Check that, not the gait, whenever this changes.
+#
+# ---- THE THRESHOLDS, AND THE SCAN THEY CAME OUT OF --------------------------
+#
+# All of them are FRACTIONS of the body's own extent, never source units, so
+# re-importing at another size cuts the same animal. Every one was measured off
+# the mesh rather than chosen:
+#
+#   BEHIND x = 0.50 L FROM THE NOSE, THERE IS NOTHING BUT TAIL. That is the
+#   strongest statement in this header and it is what makes the cut trivial:
+#   scanned in half-unit columns from the hips back to the tip, the mesh behind
+#   the mid-point holds 7 556 triangles spanning z 1.60..3.47 and |y| <= 0.72,
+#   and NOT ONE TRIANGLE of anything else -- no pelvis, no spine, no back
+#   plating. So the tail is "behind the middle", full stop.
+#
+#   BELOW z = 0.30 H AND OUTBOARD OF |y| = 0.33 W IS A LEG. Under 0.30 H this
+#   body has no mass within 0.33 W of its own centre line at all: the bottom
+#   fifth is two columns at |y| = 0.63..0.99 W with nothing between them, and
+#   the centre line fills in at 0.20 H where the crotch starts and is solid by
+#   0.30 H. The cut takes 5 075 triangles, 2 537 left and 2 538 right -- a
+#   symmetry that is itself the check, since a threshold slicing through a hip
+#   would not come out even.
+#
+#   AND THE TWO TESTS DO NOT OVERLAP, which is measured and not assumed. The
+#   tail dips to z 1.60 (0.26 H) and swells to |y| 0.72 (0.53 W) near its root,
+#   so on paper it can pass both halves of the leg test -- but not at the same
+#   time: the leg cut at 0.30 H / 0.33 W takes **zero** triangles from behind
+#   x = 0. At 0.34 H it starts taking 104 of them, which is where a foot would
+#   begin swinging with the tail. 0.30 is the value with margin under that.
+#
+# THE TAIL FLOOR IS A GUARD THAT CHANGES NOTHING ON THIS MESH, and it is kept
+# for exactly that reason. Nothing behind the hips sits below 0.26 H today, so
+# 0.18 H drops not one triangle; it is here so that a re-export which lets the
+# tail tip touch the road does not silently hand a foot to a group that is
+# about to be swung through the tarmac.
+#
+# WHY THE TAIL IS A GROUP AT ALL, and it is not for the walk: the Dinomech's
+# second attack is a TAIL SLAM (js/enemy.js), and js/gl/gl-world.js swings this
+# group for it off `slamFlash` exactly as it swings the Hedger's `mast` off
+# `attackFlash`. A body cannot be given a strike gesture it has no group for --
+# `strikeOf` warns and draws the plain walk -- so the attack and the group are
+# one decision, made here.
+#
+# THERE IS NO HEAD GROUP, and that is a decision rather than an omission. The
+# skull is at the end of a neck that is already the tallest geometry on the
+# body; giving it a matrix would buy a nod nobody can read at 87 board px and
+# would put `model.top` at risk for the health bar. The Harvester's rig
+# declined the same part for the same reason.
+
+# Where the legs stop and the hips start, as a fraction of the body's height.
+SAURIAN_LEG_TOP = 0.30
+# How far outboard a triangle must sit to be a leg rather than a belly, as a
+# fraction of the body's half-width.
+SAURIAN_LEG_INNER = 0.33
+# Where the tail leaves the hips, as a fraction of the body's length from the
+# NOSE, and how high above the road it has to be to count. See the header: the
+# first is the mid-point of the body and the second is a guard.
+SAURIAN_TAIL_FROM = 0.50
+SAURIAN_TAIL_FLOOR = 0.18
+
+
+def saurian_split(parts, options):
+    """One mesh -> four pseudo-parts, cut by where each triangle sits.
+
+    Returns parts in a stable order (body, tail, then the legs left to right)
+    so a re-run cannot reorder the vertex buffer; `build` sorts the group names
+    afterwards anyway, but the triangles inside a group are emitted in the
+    order they arrive here.
+
+    THE TAIL TEST RUNS FIRST AND THE LEG TEST SECOND. On this body the two are
+    disjoint by measurement (see the header), so the order changes nothing
+    today -- but the tail is the part that reaches furthest back and lowest,
+    and asking about it first is what keeps a re-export that lets it sag from
+    quietly welding its tip to a foot.
+    """
+    every = [p for part in parts for tri in part["triangles"] for p in tri[0]]
+    lo_x, hi_x = min(p[0] for p in every), max(p[0] for p in every)
+    hi_z = max(p[2] for p in every)
+    half_w = max(abs(p[1]) for p in every)
+    length = hi_x - lo_x
+    leg_top = hi_z * SAURIAN_LEG_TOP
+    leg_inner = half_w * SAURIAN_LEG_INNER
+    tail_back = hi_x - length * SAURIAN_TAIL_FROM
+    tail_floor = hi_z * SAURIAN_TAIL_FLOOR
+
+    legs = ("leg_l", "leg_r")
+    buckets = dict((name, []) for name in legs)
+    buckets["tail"] = []
+    buckets[options.body_group] = []
+    for part in parts:
+        for tri in part["triangles"]:
+            cx = sum(p[0] for p in tri[0]) / 3.0
+            cy = sum(p[1] for p in tri[0]) / 3.0
+            cz = sum(p[2] for p in tri[0]) / 3.0
+            if cx < tail_back and cz > tail_floor:
+                where = "tail"
+            elif cz < leg_top and abs(cy) > leg_inner:
+                # +y is the machine's LEFT, which is what `walker_group_of`
+                # already reads a sign for: the game's forward is +x and its up
+                # is +z, so a right-handed frame puts left on +y.
+                where = "leg_l" if cy > 0 else "leg_r"
+            else:
+                where = options.body_group
+            buckets[where].append(tri)
+
+    order = [options.body_group, "tail"] + list(legs)
+    return [{"name": name, "chain": [], "triangles": buckets[name]}
+            for name in order if buckets[name]]
+
+
+def saurian_group_of(part, options):
+    """The split already named it. This rig's grouping is its split."""
+    return part["name"]
+
+
+def saurian_pivot_of(name, points, refs):
+    """Where each group turns.
+
+    THE LEGS AND THE BODY BORROW THE HUMANOID'S ANSWER, by reference rather
+    than by copy: a leg hinges at its top and a body leans about the hip line
+    whatever animal it belongs to, and `walk_cycle`'s solve is written against
+    exactly those two.
+
+    THE TAIL IS THE ONE NEW JOINT AND IT IS THE TAIL'S ROOT, not its centroid.
+    A centroid pivot would have the tail rotating about a point halfway along
+    itself, which lifts the tip and drives the base through the hips at the
+    same time.
+
+    THE ROOT IS THE SLICE NEAREST THE HIPS, measured by distance from the hip
+    line rather than taken as the frontmost slice. On a STRAIGHT tail like this
+    one the two rules agree -- its root really is its frontmost point -- and
+    they come apart on a tail that curls forward over its own spine, where the
+    frontmost point is the TIP. Distance is the rule that is right on both, so
+    it is the rule that is written, and it costs nothing here.
+
+    The height and side offset are the mean over the slice, so a tail that
+    leaves the body off centre keeps its own line.
+    """
+    if name.startswith("leg_"):
+        return humanoid_pivot_of("leg_l", points, refs)
+    if name == "tail":
+        hip = refs.get("hip", [0.0, 0.0, 0.0])
+
+        def reach(p):
+            return math.hypot(p[0] - hip[0], p[2] - hip[2])
+
+        near = min(reach(p) for p in points)
+        band = [p for p in points if reach(p) <= near + TAIL_ROOT_BAND]
+        return [sum(p[0] for p in band) / len(band),
+                sum(p[1] for p in band) / len(band),
+                sum(p[2] for p in band) / len(band)]
+    return refs.get("hip", [0.0, 0.0, 0.0])
+
+
+# How thick the slice at the root of the tail is, in model units, when the
+# root joint is measured. Wide enough to average over a real cross-section of
+# the spar rather than over whichever three vertices happen to be nearest.
+TAIL_ROOT_BAND = 0.06
+# The tail's sway, in radians, about the machine's up axis. SMALL on purpose:
+# the tail is the longest lever on the board and every radian here is paid for
+# in plan extent -- which the ring budget in tools/check-gait-slip.js measures
+# and the frost and camo rings are drawn to.
+SAURIAN_TAIL_SWAY = 0.055
+# And how much it rises and falls with the stride, as a rotation about the side
+# axis. Half the sway, because a counterweight bobs less than it swings.
+SAURIAN_TAIL_LIFT = 0.028
+# A two-legged machine this heavy does not lean into its walk the way a zombie
+# does -- what it does is rock, once per footfall, and that is all this is.
+SAURIAN_BODY_ROCK = 0.022
+
+
+def saurian_cycle(groups, frames, geometry, joints, options=None):
+    """The pose of every group on every frame of one stride.
+
+    THE LEGS ARE SOLVED BY THE SAME CODE THE ZOMBIE'S ARE -- `leg_series` and
+    `plant_leg`, half the cycle planted each, offset by half -- because a foot
+    that does not travel backward by exactly the distance the road moves under
+    it is skating, and that has one right answer regardless of what is standing
+    on the foot. The windows are `walk_cycle`'s own, phased the same way and
+    for the reason stated there: `leg_l` starts its plant three quarters of the
+    way round so frame 0, the pose a stopped body holds and the one every still
+    capture shows, falls in the MIDDLE of a stride rather than at its extreme.
+
+    `about_rest` IS SET, and on this body that matters more than on most: its
+    feet are authored well outboard of its hips, and solving for "sole directly
+    under the hip" would tuck both underneath it and jack the whole machine up
+    to put them back on the road. That is the Harvester's argument.
+
+    THE TAIL IS A COUNTERWEIGHT AND IS ANIMATED AS ONE: it swings AGAINST the
+    stride, once per cycle, and lifts at twice that -- the footfall rate, which
+    on two legs is once per step -- so it reads as balancing the animal rather
+    than as wagging.
+    """
+    half = frames // 2
+    start = frames - frames // 4
+    windows = {
+        "leg_l": [(start + i) % frames for i in range(half)],
+        "leg_r": [(start + half + i) % frames for i in range(half)],
+    }
+
+    angles = {}
+    for name in windows:
+        if name not in geometry:
+            continue
+        angles[name] = leg_series(geometry[name], joints[name], frames,
+                                  windows[name], about_rest=True)
+
+    hip = joints.get("hip")
+    poses = []
+    for f in range(frames):
+        t = f / float(frames)
+        slow = t * 2 * math.pi              # once per stride
+        fast = slow * 2                     # once per footfall
+        carry = (turn_about(hip, mat_rotate("y", SAURIAN_BODY_ROCK *
+                                            math.sin(fast)))
+                 if hip else IDENTITY)
+        pose = []
+        for name, _offset in groups:
+            if not name:
+                pose.append(None)
+                continue
+            joint = joints[name]
+            if name in angles:
+                series, lift = angles[name]
+                pose.append(plant_leg(geometry[name], joint, series, lift, f))
+            elif name == "tail":
+                swung = mat_multiply(
+                    mat_rotate("z", SAURIAN_TAIL_SWAY * math.sin(slow)),
+                    mat_rotate("y", SAURIAN_TAIL_LIFT * math.sin(fast)))
+                pose.append(mat_multiply(carry, turn_about(joint, swung)))
+            else:
+                pose.append(carry)
+        poses.append(pose)
+    return poses
+
+
+
+# --- the Volatile: FOUR NAMED LIMBS, NAMED BY WHERE THEY STAND ---------------
+#
+# `volatile.glb` is the v0.5.1 diver and it arrives with a real hierarchy --
+# `limbs/limb_1..limb_4`, each carrying a shell, its seams and a foot -- so
+# unlike the Dinomech there IS something to read. What there is NOT is any
+# statement of which limb is which corner of the animal: the four are numbered,
+# not named, and a number says nothing about front, back, left or right.
+#
+# THAT MATTERS BECAUSE THE GAIT IS KEYED ON THE CORNER AND NOT ON THE LIMB.
+# `GALLOP_PHASE` puts the hind pair down first and splits each pair by a beat,
+# so `leg_bl` and `leg_fl` are two different roles in one rhythm. Bucketing the
+# numbers in file order would have been a coin flip per corner -- and a gallop
+# whose "hinds" are actually the front pair is a body running backwards on the
+# spot, which every instrument in this toolchain reports green (a paw plants
+# just as well whichever end of the animal it is on -- see `source_forward`).
+#
+# SO THE CORNER IS MEASURED, in the model's FINAL space, after `build` has
+# oriented, scaled, grounded, faced and centred the body: the game's forward is
+# +x and its left is +y, so the sign of each limb's own centroid IS its corner.
+# Nothing here depends on how the file happened to be numbered, and a re-export
+# that renumbers the limbs imports identically.
+#
+# WHY THIS IS A `split` AND NOT A `group_of`, which is what a named hierarchy
+# would normally use. `group_of` is handed one part at a time and has to answer
+# from that part alone; the corner of a limb is only knowable against the OTHER
+# three, because "front" means "ahead of the middle of this animal". The split
+# stage sees all of them at once, which is the whole reason the saurian rig
+# reaches for it too.
+#
+# THE FOUR CORNERS MUST COME OUT DISTINCT, and a clash is raised rather than
+# resolved. Two limbs in one corner means this is not the animal the rig is a
+# gait for, and picking a winner would ship a body galloping on three legs with
+# a fourth welded into the shell -- the same silent defect `build` raises on an
+# absent leg for, one stage earlier.
+
+
+def volatile_split(parts, options):
+    """The limb subtrees -> four legs, each named by the corner it stands in.
+
+    Everything that is not under a `limb_*` node -- the shell, the molten core,
+    the crystals and the eyes -- goes into the body group, which is what a
+    `group_of` would have done with it anyway.
+
+    Returns parts in a stable order (body, then the legs front to back and left
+    to right) so a re-run cannot reorder the vertex buffer.
+    """
+    limbs = {}
+    body = []
+    for part in parts:
+        stem = None
+        for name in list(part["chain"][1:]) + [part["name"]]:
+            if name and name.lower().startswith("limb_"):
+                # The LIMB, never the shell or the foot under it: everything
+                # bolted to a limb travels with it, which is the same rule
+                # `quadruped_group_of` states for a named hierarchy.
+                stem = name.lower()
+                break
+        if stem is None:
+            body.extend(part["triangles"])
+        else:
+            limbs.setdefault(stem, []).extend(part["triangles"])
+
+    if len(limbs) != 4:
+        raise ValueError("rig volatile wants four limb_* subtrees; this file "
+                         "has %d (%s)" % (len(limbs),
+                                          ", ".join(sorted(limbs)) or "none"))
+
+    corners = {}
+    for stem in sorted(limbs):
+        pts = [p for tri in limbs[stem] for p in tri[0]]
+        cx = sum(p[0] for p in pts) / len(pts)
+        cy = sum(p[1] for p in pts) / len(pts)
+        # +x is forward and +y is the animal's left -- the game's own frame,
+        # which `build` has already put these points into.
+        corner = "leg_%s%s" % ("f" if cx > 0 else "b", "l" if cy > 0 else "r")
+        if corner in corners:
+            raise ValueError("rig volatile put %s and %s both at %s; this "
+                             "file's limbs do not stand one per corner"
+                             % (corners[corner], stem, corner))
+        corners[corner] = stem
+
+    order = [options.body_group] + list(VOLATILE_LEGS)
+    buckets = {options.body_group: body}
+    for corner, stem in corners.items():
+        buckets[corner] = limbs[stem]
+    return [{"name": name, "chain": [], "triangles": buckets[name]}
+            for name in order if buckets.get(name)]
+
+
+def volatile_group_of(part, options):
+    """The split already named it. This rig's grouping is its split."""
+    return part["name"]
+
+
+VOLATILE_LEGS = ("leg_fl", "leg_fr", "leg_bl", "leg_br")
+
+
+# --- a MISSILE: the first import that is not a body at all -------------------
+#
+# `missile.glb` is the warhead the Dinomech's silos put in the air
+# (js/systems/missiles.js), and it is the first thing this tool imports that
+# does not stand on the road. Everything else here is an animal or a machine
+# that walks; this is ordnance, and three of the assumptions the rest of the
+# file is built on come apart on it.
+#
+# IT IS AUTHORED STANDING ON ITS TAIL. The nose is at source y = +3.02 and the
+# exhaust plume hangs below the nozzle at y = -1.58: a rocket on a pad, which
+# is how a missile is modelled and is ninety degrees away from how one FLIES.
+# `source_forward` cannot fix that -- it is a yaw about the up axis, so it can
+# turn a body that is already lying down and can do nothing to one that is
+# standing up. What lays it down is `source_up: "z"`, which says the axis this
+# file should be stood up along is its OWN z -- a radial direction through the
+# fins, because a missile has no up of its own -- leaving the long axis
+# horizontal for `source_forward: "+y"` to yaw onto the game's forward.
+#
+# So the two declarations are doing different halves of one rotation here,
+# rather than the "which way is up" and "which way is the head" they do for
+# every walking body. That is worth stating because the pair reads like a
+# mistake otherwise: a y-up file declaring z-up is exactly what a careless
+# import looks like.
+#
+# `--exclude sparks` IS NOT OPTIONAL ON THIS FILE. The `sparks` node is a POINT
+# primitive (glTF draw mode 0), and `collect` raises on any mode but triangles
+# rather than silently dropping it -- correctly, because a mesh this tool
+# cannot read is a mesh the board would be missing without anyone being told.
+# There is nothing to lose: a spark shower is what js/effects.js already throws
+# at the impact, in the one place this game draws debris.
+#
+# THE PLUME IS A GROUP SO THAT IT CAN BURN. It is the only part of a missile
+# that moves at all -- the airframe is rigid, and rigid is the whole of what a
+# warhead does between the silo and the tower -- so this rig's "cycle" is a
+# throttle flicker and nothing else. See `missile_cycle`.
+
+
+def missile_group_of(part, options):
+    """The exhaust, or the airframe.
+
+    Matched on the `thrust` parent rather than on each plume's own name so the
+    shock diamonds inside the flame travel with it, which is the rule
+    `quadruped_group_of` states for a named hierarchy and the reason the
+    exporter put them under one node.
+    """
+    for name in list(part["chain"][1:]) + [part["name"]]:
+        if name and name.lower() == "thrust":
+            return "plume"
+    return options.body_group
+
+
+def missile_pivot_of(name, points, refs):
+    """Where the flame is anchored: the nozzle, which is its FRONT.
+
+    The plume streams backward from the nozzle along -x once the body has been
+    laid down and faced, so the end that must not move when the throttle
+    flickers is its maximum x. Scaling about the centroid instead would push
+    the flame forward into the boat tail on every bright frame.
+    """
+    if name == "plume":
+        return [max(p[0] for p in points),
+                sum(p[1] for p in points) / len(points),
+                sum(p[2] for p in points) / len(points)]
+    return [0.0, 0.0, 0.0]
+
+
+# How far the exhaust stretches and shrinks over one cycle, as a fraction of
+# its own length, and how much of that reaches the flame's width. A rocket
+# motor's plume pulses far more along its axis than across it -- the width is
+# set by the nozzle and the length by what is coming out of it -- so the two
+# numbers are deliberately not the same.
+MISSILE_THROTTLE = 0.22
+MISSILE_FLARE = 0.07
+
+
+def missile_cycle(groups, frames, geometry, joints, options=None):
+    """The airframe is rigid; the flame flickers. That is the whole animation.
+
+    TWO BEATS PER CYCLE, NOT ONE. gl-world.js advances an unbanded model's
+    frames off a clock for anything that does not touch the road, and a single
+    slow swell reads as a balloon inflating; a motor roars. The second harmonic
+    is a third of the first so the flicker is uneven, which is what keeps it
+    from reading as a sine.
+
+    A SCALE, WHICH NO OTHER CYCLE IN THIS FILE EMITS. Every walking rig poses
+    its groups with rotations, because a limb that changed size would be a limb
+    that changed shape. A flame is not geometry in that sense -- it is the one
+    part of any model here whose length IS its state -- so the pose is a
+    non-uniform scale about the nozzle, built directly rather than through
+    `mat_rotate`.
+    """
+    poses = []
+    for f in range(frames):
+        t = f / float(frames)
+        beat = (math.sin(t * 2 * math.pi) +
+                0.33 * math.sin(t * 4 * math.pi + 1.1))
+        along = 1.0 + MISSILE_THROTTLE * beat
+        across = 1.0 + MISSILE_FLARE * beat
+        pose = []
+        for name, _offset in groups:
+            if not name:
+                pose.append(None)
+                continue
+            if name != "plume":
+                pose.append(IDENTITY)
+                continue
+            joint = joints[name]
+            # Scale about the nozzle: translate the joint to the origin, scale,
+            # and put it back. Written out rather than reached for through
+            # `turn_about`, which composes a ROTATION and would silently drop
+            # the scale's off-diagonal-free diagonal.
+            scaled = [[along, 0.0, 0.0, 0.0],
+                      [0.0, across, 0.0, 0.0],
+                      [0.0, 0.0, across, 0.0],
+                      [0.0, 0.0, 0.0, 1.0]]
+            pose.append(mat_multiply(
+                mat_translate([joint[0], joint[1], joint[2]]),
+                mat_multiply(scaled,
+                             mat_translate([-joint[0], -joint[1], -joint[2]]))))
+        poses.append(pose)
+    return poses
+
+
+# --- the mechanical dragon: A FIRST-LOOK RIG, AND IT SAYS SO -----------------
+#
+# `dragon.glb` is a Tripo export: ONE node, ONE mesh, ONE material with a
+# 2048x2048 base colour atlas, 100 568 triangles, authored inside a unit cube
+# and already grounded at y = 0. Structurally it is `biomech.glb` again, so it
+# needs a rig that reads its grouping off the GEOMETRY.
+#
+# THIS ENTRY IS DELIBERATELY NOT THAT RIG YET. It ships the body as ONE static
+# group with no cycle, for one reason: **which end is the head cannot be read
+# off this file.** Both ends taper to |z| ~ 0.02, there is no emissive material
+# to give the skull away (the Dinomech's `Red Optics` is what that check rests
+# on), and NOTHING IN THIS TOOLCHAIN MEASURES FACING -- a backwards body grades
+# 0.001 board px on check-gait-slip.js and passes every suite. A split that
+# names legs "front" and "back" is a split that has already assumed the answer,
+# so the answer gets established by LOOKING first, on the board, at a body that
+# is merely oriented and painted.
+#
+# What this pass is for, in order: does the silhouette survive the decimation,
+# does `texture_bands` give the paint back, and which way is it pointing.
+# Grouping and gait come after, once those three are facts.
+#
+# `source_forward` WAS A GUESS AND THE GUESS WAS WRONG. The long axis is source
+# x, so it has to be declared (a y-up remap defaults to "+z", which would walk
+# the body sideways down the road). "+x" was the starting assumption, on the
+# strength of where the mass and the wider pair of ground contacts sat. Drawn
+# beside the Dinomech at the same yaw the two pointed OPPOSITE ways, so it is
+# "-x": this dragon's skull is at its -x end. Neither the geometry scan nor the
+# palette settled it -- both ends taper to |z| ~ 0.02 and the one saturated
+# band splits across the body -- and only the side-by-side did.
+
+
+def dragon_group_of(part, options):
+    """Everything is the body, for now. See the header."""
+    return options.body_group
+
+
+def dragon_pivot_of(name, points, refs):
+    """Nothing turns yet, so nothing needs a joint."""
+    return [0.0, 0.0, 0.0]
+
+
+def dragon_cycle(groups, frames, geometry, joints, options=None):
+    """One rest pose repeated: a body that is drawn, not animated.
+
+    Emitted as real frames rather than an empty list so the model carries the
+    same shape every other import here does and gl-world's band reader has
+    something to index. A static body costs one matrix per frame and no solve.
+    """
+    return [[IDENTITY for _name, _offset in groups] for _f in range(frames)]
 
 
 # --- the rigs, and what each one is a set of --------------------------------
@@ -3320,6 +4681,157 @@ RIGS = {
         "legs": ("leg_l", "leg_r"),
         "origin_pivot": True,
     },
+    # A CART, WHICH IS THE FOURTH KIND OF CONTACT IN THIS FILE. See the header
+    # above `cart_group_of`: it is not a walker, not a hoverer and not a
+    # skater, and the difference is that its wheels are ON the road and are
+    # MEANT to turn under it.
+    #
+    # Y-UP AND FACING +Z, which is the glTF convention and the default here, so
+    # neither `source_up` nor `source_forward` appears. Measured rather than
+    # assumed on both files: the Herald's caster (its steering wheel) sits at
+    # z +0.52 against its drive axle at z -0.14 and its push handle at z -0.50,
+    # and its speaker baffle faces +z; the Sapper's front axle is at z +0.21
+    # and its rear at z -0.21, its eyes and emitter at +z and its coil pack at
+    # -z. Both roll toward +z, which the y-up remap sends to the game's +X.
+    #
+    # NO `legs`. There is nothing here to solve a plant for, which is what this
+    # rig shares with the spectre's and the beacon's -- and unlike those two,
+    # this body does not hover: it touches the road with a rolling contact, so
+    # tools/check-gait-slip.js grades it as a GLIDE band rather than exempting
+    # it as clock-driven. See the note beside `GLIDES` in that file.
+    #
+    # THE DEFAULT SIZE IS THE HERALD'S, and both shipped sizes are chosen off
+    # the WHEEL rather than off the body -- see `roll_cycle`. 1.237 u at the
+    # Herald's own sizeScale of 1.15 is 45.2 board px, deliberately taller than
+    # a Trudge's 37.8: a standard-bearer the player is being taught to shoot
+    # first has to be findable in the crowd it is hastening.
+    "cart": {
+        "group_of": cart_group_of,
+        "pivot_of": cart_pivot_of,
+        "cycle": roll_cycle,
+        "fit_axis": 1,                  # glTF Y: road to the top of the load
+        "fit_name": "height",
+        "default_size": 1.237,
+        "origin_pivot": True,
+    },
+    # THE DINOMECH, AND THE ONLY RIG HERE WHOSE GROUPING IS NOT READ OFF A
+    # NAME. See the header above `saurian_split` for why, and for the scan the
+    # four thresholds came out of.
+    #
+    # Y-UP AND FACING +X. Its `Red Optics` -- 336 triangles, the only material
+    # on the body that says which end is the head -- sit at source x +1.70,
+    # y 5.23..5.49, so the skull is at the +x end and near the crown. Under a
+    # y-up remap the default facing is "+z", which would put the head on the
+    # game's LEFT, so this has to be declared; and it is declared as **+x**
+    # rather than the -x this rig briefly carried for the withdrawn
+    # `biomech.glb`. Left on -x the finale walks the road backwards with every
+    # instrument reading green -- a heel plants exactly as well as a toe --
+    # which is the failure the Trudge's own entry warns about and which this
+    # body has actually shipped once.
+    #
+    # 1.05 u AT ITS OWN sizeScale OF 2.6 IS 86.8 BOARD px, which makes it the
+    # tallest body in the game by 1.9 px over the Tyrant's 84.9 -- and unlike
+    # every other import here, that number is NOT inherited from a body this
+    # one replaces. There is no such body: wave 40 drew an untextured sphere
+    # until this type was meshed. So the figure is set against the roster
+    # instead, and it is set deliberately close: the finale should be the
+    # tallest thing that walks, and it should not be so by a margin that makes
+    # the Tyrant look small in the wave before it.
+    "saurian": {
+        "split": saurian_split,
+        "group_of": saurian_group_of,
+        "pivot_of": saurian_pivot_of,
+        "cycle": saurian_cycle,
+        "source_forward": "+x",
+        "fit_axis": 1,                  # glTF Y: road to crest
+        "fit_name": "height",
+        "default_size": 1.05,
+        "legs": ("leg_l", "leg_r"),
+        "origin_pivot": True,
+    },
+    # THE VOLATILE, 2026-08-28. Four limbs off a molten shell, and the only
+    # rig here whose legs are named by MEASUREMENT rather than by the file --
+    # see the header above `volatile_split`.
+    #
+    # `run_cycle` AND NOT `saurian_cycle`, which is the other four-legged gait
+    # in this file and the wrong one for this body. A saurian trots: diagonals
+    # in lockstep, half the cycle planted each, no frame with nothing on the
+    # road. This type's whole character is that it arrives faster than a slow
+    # gun can re-aim (js/enemy.js), so what it has to read as is a RUN -- the
+    # gallop's quarter-cycle duty leaves two suspensions per stride, and a
+    # moment of flight is the only thing that separates the two gaits to the
+    # eye at 20 board px.
+    #
+    # MEASURED FLOOR TO CROWN, like the bipeds and unlike the hound, because
+    # this animal is a SPHERE on stubs: its length and its height are the same
+    # number to within a few percent, so a nose-to-tail fit would scale it by
+    # the reach of its own crystals. 1.013 u is the height the body shipped at
+    # before it had a gait, and it is held deliberately -- the change the owner
+    # asked for on 2026-08-28 was "make them smaller", and that is `sizeScale`
+    # on the type, which moves the hit radius and the health bar with the mesh.
+    # Shrinking the model here instead would have drawn a smaller body inside
+    # the same hit box, rings and shadow.
+    "volatile": {
+        "split": volatile_split,
+        "group_of": volatile_group_of,
+        # A leg hinges at its top and a body rides its own hip line, whatever
+        # animal they belong to -- referenced, not copied, so a fix to either
+        # reaches both bodies.
+        "pivot_of": quadruped_pivot_of,
+        "cycle": run_cycle,
+        "fit_axis": 1,                  # glTF Y: sole to crystal tip
+        "fit_name": "height",
+        "default_size": 1.013,
+        "legs": VOLATILE_LEGS,
+        "origin_pivot": True,
+    },
+    # THE WARHEAD, 2026-08-28. Not a body -- see the header above
+    # `missile_group_of` for why `source_up` and `source_forward` are doing
+    # something different here than they do for anything that walks.
+    #
+    # 0.75 u IS 23.9 BOARD px NOSE TO PLUME TIP, of which the airframe itself
+    # is 15.9. Set against what it is drawn NEXT TO rather than against the
+    # file: six of these leave a machine 94 px long and cross a board where the
+    # smallest body on the roster is 12 px across, so a missile has to be a
+    # thing you can count at a glance and must not be a thing you mistake for
+    # an enemy. There is no body this one replaces and no silhouette to
+    # inherit; js/gl/gl-world.js scales it from here and nothing else.
+    "missile": {
+        "group_of": missile_group_of,
+        "pivot_of": missile_pivot_of,
+        "cycle": missile_cycle,
+        "source_up": "z",
+        "source_forward": "+y",
+        # SOURCE Y, WHICH IS THE ONE PLACE THIS RIG DEPARTS FROM THE RULE
+        # `build` states two paragraphs above `source_up`: a z-up source is
+        # measured along axis 2. That rule is about bodies STOOD UP along the
+        # axis they were authored along, and this file is not stood up along
+        # its z -- its z is a radius through the fins, 0.44 u wide. Fitting on
+        # it would scale the missile by its own calibre.
+        "fit_axis": 1,                  # glTF Y: nozzle plume to nose cone
+        "fit_name": "length",
+        "default_size": 0.75,
+        "origin_pivot": True,
+    },
+    # THE MECHANICAL DRAGON -- a FIRST-LOOK rig. See the header above
+    # `dragon_group_of` for why it has no split and no gait yet.
+    "dragon": {
+        "group_of": dragon_group_of,
+        "pivot_of": dragon_pivot_of,
+        "cycle": dragon_cycle,
+        # MEASURED BY EYE, NOT GUESSED. The first import declared "+x" on the
+        # strength of where the mass sat; drawn beside the Dinomech at the same
+        # yaw -- whose head is at model +x and is VERIFIED off its `Red Optics`
+        # -- the two pointed opposite ways. This body's skull is at its -x end.
+        # That comparison is the check to repeat, because nothing in this
+        # toolchain measures facing and a backwards body passes every suite.
+        "source_forward": "-x",
+        "fit_axis": 0,                  # glTF X: this body's long axis
+        "fit_name": "length",
+        "default_size": 1.787,          # the Dinomech's length, to compare like
+                                        # with like on the board
+        "origin_pivot": True,
+    },
     "walker": {
         "group_of": walker_group_of,
         "pivot_of": walker_pivot_of,
@@ -3347,6 +4859,15 @@ RIGS = {
 def build(gltf, options):
     rig = RIGS[options.rig]
     parts = collect(gltf, options.exclude)
+
+    # PAINT FIRST, BEFORE ANY OTHER STAGE HAS AN OPINION. `texture_bands` reads
+    # the base colour atlas at each triangle's own UV, quantises what it finds
+    # into synthetic materials, and hands back the (points, material) pairs
+    # every stage below already takes -- so orientation, splitting, decimation
+    # and the palette de-dup are the same code for a painted body as for a
+    # hand-authored one. It is a no-op, tuple shape included, on a file whose
+    # materials carry their own colours.
+    paint = texture_bands(gltf, parts, options.texture_bands)
 
     # ORIENT, SCALE, GROUND. glTF is Y-up; this game is Z-up with forward on
     # +X. The remap below is (x, y, z) <- (gz, gx, gy), whose determinant is
@@ -3474,6 +4995,18 @@ def build(gltf, options):
     # than by what it is called: `walker_group_of` reads the sign of a limb's
     # own centroid, and a sign is only meaningful once the machine's centre line
     # is at zero rather than at whatever origin the file was authored around.
+    # A RIG MAY HAVE TO CUT THE PARTS UP BEFORE IT CAN GROUP THEM, and exactly
+    # one does. `group_of` maps a PART to a group and a part cannot become
+    # four, so a source that arrives as a single undivided mesh -- which
+    # `dinomech.glb` does -- has no way to reach four groups
+    # through it. `split` runs here, one stage earlier, with the body already
+    # oriented, scaled, grounded, faced and CENTRED, so a rig that cuts by
+    # position is cutting in the model's final space rather than around
+    # whatever origin the file was authored about. Absent on every other rig,
+    # which is what keeps their output byte-identical.
+    if rig.get("split"):
+        parts = rig["split"](parts, options)
+
     for part in parts:
         part["group"] = rig["group_of"](part, options)
 
@@ -3600,7 +5133,15 @@ def build(gltf, options):
     frames = []
     bands = []
     for cycle in cycles:
-        block = cycle(groups, options.frames, emitted, joints)
+        # `options` IS HANDED TO THE CYCLE, and every cycle that predates the
+        # cart rig ignores it (they take it as a defaulted fifth parameter and
+        # never read it, so their output is byte-identical across this change).
+        # It is here for the one thing a cycle can need that is a fact about
+        # the FILE rather than about the rig: `--wheel-facets` is a property of
+        # the wheels in a particular .glb, exactly as `--exclude`, `--cell` and
+        # `--height` are properties of a particular .glb, and the alternative
+        # was a second rig entry per spoke count.
+        block = cycle(groups, options.frames, emitted, joints, options)
         bands.append([len(frames), len(block)])
         frames.extend(block)
     frames = [[None if m is None else
@@ -3611,7 +5152,7 @@ def build(gltf, options):
             "palette": palette, "positions": positions, "normals": normals,
             "colourIndex": colour_index, "groups": out_groups,
             "frames": frames, "bands": bands if len(cycles) > 1 else None,
-            "before": before, "after": after,
+            "before": before, "after": after, "paint": paint,
             "scale": scale, "span": span}
 
 
@@ -4004,7 +5545,72 @@ BULWARK_TINT = {
     "Bulwark_Energy_Gold": [1.0, 0.46, 0.02, 0.55],
 }
 
+# THE MISSILE'S EXHAUST, AND IT IS HERE BECAUSE THE FILE DECLARES NO EMISSION
+# AT ALL. Its four plume materials are `KHR_materials_unlit` -- the glTF way of
+# saying "draw this at its base colour and do not light it", which is exactly
+# right in a renderer that has an unlit path and means nothing whatever in this
+# one. `material_entry` reads emission, finds none, and ships a rocket flame as
+# four shades of flat orange plastic: the correct colour, with no heat in it,
+# on the one part of the model whose whole job is to be the brightest thing in
+# the frame.
+#
+# THE RGB IS EACH MATERIAL'S OWN BASE COLOUR, unchanged and only converted to
+# the linear space a tint's first three numbers live in, so the flame keeps the
+# ladder the artist painted -- deep orange outside, pale gold inside, white at
+# the core. The fourth number is the entire edit, and it is a LADDER for the
+# reason BEACON_TINT gives: the resting floor is white, so the smallest,
+# innermost part carries the most heat and the big outer envelope carries the
+# least, or the flame blows out into one white blob at 24 board px.
+#
+# THE SHOCK DIAMONDS ARE THE HOTTEST THING ON THE MODEL and are 24 triangles.
+# That is the whole argument for giving them 1.30 where the outer envelope gets
+# 0.30: they are what says this is a rocket motor rather than a flare.
+MISSILE_TINT = {
+    "plume_outer": [0.75, 0.08, 0.005, 0.30],
+    "plume_mid": [1.0, 0.25, 0.012, 0.55],
+    "plume_core": [1.0, 0.89, 0.56, 0.85],
+    "shock_diamond": [1.0, 1.0, 1.0, 1.30],
+}
+
+# THE VOLATILE IS A ROCK WITH A FIRE INSIDE IT, AND `--emit-cap` ALONE SHIPS
+# THE FIRE AS WHITE. This is the hound's case and the beacon's case again, in
+# the same terms both of those are settled in.
+#
+# The file emits at 2.8 (`magma_core`), 3.4 (`magma_whitehot`) and 2.4
+# (`eye_arc`). `GLModels.expand` spends a strength as a resting floor of
+# min(1, e * 0.16) added to every LINEAR channel, and that floor is WHITE --
+# so even capped at 1.6 all three arrive with 0.26 of white under them, which
+# turns a saturated orange into salmon and the white-hot core into the colour
+# white. Seen on the real page, in the index's own viewer, before this was
+# written; it is not a thing a palette dump shows.
+#
+# COLOURS UNCHANGED, HEAT RETUNED, and the heats are a LADDER by AREA rather
+# than by temperature -- which is the counter-intuitive half and the one
+# BEACON_TINT spells out. The seams of magma are the largest lit area on the
+# body by a wide margin, so they take the LOWEST heat or they stop being a
+# detail and become the body's colour; the white-hot vents are a tenth of that
+# area and can carry more; the two eyes are 22 triangles and carry the most,
+# because they are what makes this thing read as alive rather than as a rock.
+#
+# THE RGBs ARE EACH MATERIAL'S OWN EMISSIVE, pushed to full saturation for the
+# reason HOUND_TINT gives at length: a vivid lit part is bought with a SMALL
+# number, not a big one, so the hue has to start where it means to end up.
+#
+# THE BASALT AND THE OBSIDIAN ARE UNTOUCHED AND ARE MEANT TO BE. They are not
+# emissive at all, so a tint cannot reach them -- `material_entry` will not let
+# a palette decision turn plating into a lamp -- and they should not be
+# reached: a near-black shell with hot seams through it is what makes a
+# 12 px body on a green board read as an ember rolling down the road, which is
+# the whole silhouette this type is asking for.
+VOLATILE_TINT = {
+    "magma_core": [1.0, 0.18, 0.02, 0.5],
+    "magma_whitehot": [1.0, 0.62, 0.12, 0.85],
+    "eye_arc": [0.06, 0.45, 1.0, 1.15],
+}
+
 TINTS = {
+    "missile": MISSILE_TINT,
+    "enemy-volatile": VOLATILE_TINT,
     "enemy-shieldbearer": BEACON_TINT,
     "enemy-flying": WISP_TINT,
     "enemy-fast": HOUND_TINT,
@@ -4060,11 +5666,26 @@ def main():
                              "imported 5 ships a WHITE part, not a bright one. "
                              "See material_entry. A tint entry's own fourth "
                              "number overrides this for that material.")
+    parser.add_argument("--texture-bands", type=int, default=6,
+                        dest="texture_bands", metavar="N",
+                        help="how many colours a BASE COLOUR TEXTURE is "
+                             "quantised into, one synthetic material each. "
+                             "Ignored by a file whose materials carry their "
+                             "own colours; 0 turns the stage off and ships a "
+                             "textured body in its material's flat colour. "
+                             "See texture_bands.")
     parser.add_argument("--cell", type=float, default=0.018,
                         help="decimation grid, in SOURCE units")
     parser.add_argument("--floor", type=int, default=300,
                         help="parts at or below this many triangles are left "
                              "alone")
+    parser.add_argument("--wheel-facets", type=int, default=1,
+                        dest="wheel_facets", metavar="N",
+                        help="how many poses one of this file's wheels has "
+                             "per turn -- its spoke count (--rig cart). A "
+                             "wheel's roll is rounded to a whole number of "
+                             "these so the cycle's wrap is invisible. See "
+                             "roll_cycle. Default 1: whole turns only.")
     parser.add_argument("--frames", type=int, default=12,
                         help="frames in one cycle")
     parser.add_argument("--stats", action="store_true",
@@ -4106,6 +5727,10 @@ def main():
           % (args.rig, fit, args.size, model["span"], model["scale"]))
     if args.exclude:
         print("   dropped: %s" % ", ".join(args.exclude))
+    for material, centres in sorted(model.get("paint", {}).items()):
+        print("   painted from %s: %s" % (material, " ".join(
+            "#%02x%02x%02x" % tuple(int(round(v * 255)) for v in rgb)
+            for rgb in centres)))
     if model.get("bands"):
         print("   bands: %s" % ", ".join(
             "[%d, %d]" % (b[0], b[1]) for b in model["bands"]))

@@ -1364,6 +1364,28 @@ var World3D = (function () {
   // Reused, so a board full of wrecks allocates nothing per frame.
   var wreckTilt = { rx: 0, ry: 0, pivotZ: 0 };
 
+  // AND ONE FOR A BODY IN MID-JUMP, kept separate from the wrecks' rather than
+  // shared: the wrecks are drawn in a pass of their own AFTER every living
+  // body, so one object would be safe today and would become a silent aliasing
+  // bug the first time either pass moved. Consumed synchronously by the
+  // drawActor call on the line after it is written, which is the contract every
+  // other scratch object in this file runs on.
+  var leapTilt = { rx: 0, ry: 0, pivotZ: 0 };
+
+  // HOW FAR A DIVER PITCHES OVER ITS OWN ARC, in radians. A positive rotation
+  // about the side axis takes local +x toward local -z -- nose DOWN (see the
+  // Hedger's strike record for the derivation) -- so the sign below is
+  // negative while the body is climbing and positive as it falls. The pitch is
+  // read off the ARC's own vertical velocity, not off a second curve: the
+  // parabola's slope is proportional to (1 - 2t), so nose-up at take-off and
+  // nose-down at touchdown come out of the trajectory rather than being phased
+  // against it by hand.
+  var LEAP_PITCH = 0.5;
+  // Where it pitches ABOUT, in model units up from the road. Roughly the
+  // middle of a body: pitching about the origin would swing the whole animal
+  // around its own feet and drive its head through the ground on the way down.
+  var LEAP_PITCH_PIVOT_Z = 0.5;
+
   function lanternTint(enemy) {
     var id = enemy.typeId || "unknown";
     var hit = typePrims["glow:" + id];
@@ -1580,6 +1602,87 @@ var World3D = (function () {
 
   // Scratch, so a board full of shielded bodies allocates nothing per frame.
   var bubbleList = [];
+
+  // --- THE MISSILE AS A REAL BODY --------------------------------------------
+  //
+  // 2026-08-28, at the owner's instruction: "implement the missile design for
+  // the missiles shooting out the silos from the dinomech's back". Until this
+  // a warhead was a bright dot and a streak drawn in the OVERLAY pass -- a
+  // reading of "a missile" that says nothing about which way it is pointing,
+  // and one the flat board can make just as well. `glb/missile.glb` is a
+  // finned airframe with a lit motor, imported through the `missile` rig in
+  // tools/glb_to_model.py, and this is what puts it in the world.
+  //
+  // IT IS GEOMETRY, SO IT IS DRAWN WITH THE GEOMETRY. The overlay pass runs
+  // over a finished frame with no depth buffer to consult, so a warhead drawn
+  // there passes IN FRONT of the tower it is about to hit and in front of the
+  // machine that fired it. Drawn here it is occluded by both, which is what
+  // makes the flight read as crossing the board rather than as a mark on the
+  // glass. Opaque, so it goes with the opaque bodies and ahead of the wrecks
+  // and the shield bubbles, exactly like every enemy above it.
+  //
+  // THE STREAK STAYS. `drawMissiles` in the overlay pass keeps the exhaust
+  // trail, the impact ring on the destination and the target circle, because
+  // those are marks and not objects -- and because a 24 px body crossing a
+  // 1230 u.l. board needs something the eye can catch it by. What the overlay
+  // no longer draws is the head: the model IS the head now.
+  //
+  // THE POSE IS THE TRAJECTORY, NOT A GUESS AT IT. Yaw comes off the straight
+  // line the flight was launched along and PITCH comes off the derivative of
+  // the very parabola js/systems/missiles.js is flying -- so the nose is up on
+  // the way out and down on the way in, by construction, and a change to the
+  // arc's apex or its cap moves the attitude with it. A warhead that came in
+  // flat would read as a tracer going past the tower instead of into it, which
+  // is the same sentence that file's own `place` is written around.
+  var MISSILE_MODEL = "missile";
+  // The model lies along +x with its tube's axis this far above z = 0 -- it is
+  // grounded like every other import, so the origin is under the airframe and
+  // not through it. Both the draw height and the pitch pivot read it, so the
+  // missile turns about its own centre line rather than about the air below it.
+  var MISSILE_AXIS_Z = 0.0685;
+  // How fast the motor's flicker runs, in cycles per second. Fast: it is a
+  // throttle, not a breath, and the model's own cycle already carries a second
+  // harmonic (see `missile_cycle`).
+  var MISSILE_BURN_HZ = 9;
+
+  function drawMissileBodies(state) {
+    var list = state.missiles;
+    if (!list || !list.length) return;
+    var m = GLModels.get(renderer, MISSILE_MODEL);
+    if (!m) return;                       // no model on this page: the streak
+                                          // in the overlay pass still draws
+    var axis = MISSILE_AXIS_Z * m.unitsToPx;
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      // A SPENT ONE IS GONE. The explosion belongs to Effects from the frame
+      // it lands, and an airframe left lying in the blast would be a warhead
+      // that survived its own detonation.
+      if (s.landed) continue;
+      var dx = s.x1 - s.x0;
+      var dy = s.y1 - s.y0;
+      var yaw = Math.atan2(dy, dx);
+      // The slope of the arc at this instant, as rise over ground run. The
+      // parabola is `lift0 * (1 - t) + apex * 4t(1 - t)`, so its derivative in
+      // t is `4 * apex * (1 - 2t) - lift0`, and dividing by the span converts
+      // that into a gradient against the ground the missile is covering.
+      var span = Math.max(1e-3, s.span || Math.hypot(dx, dy));
+      var slope = (4 * (s.apex || 0) * (1 - 2 * s.t) - (s.lift0 || 0)) / span;
+      // Positive `ry` takes local +x toward local -z, which is nose DOWN, so a
+      // climbing missile takes the negative. Same convention, and the same
+      // derivation, as the Hedger's strike record above.
+      missileTilt.rx = 0;
+      missileTilt.ry = -Math.atan(slope);
+      missileTilt.pivotZ = MISSILE_AXIS_Z;
+      var frame = Math.floor(boardClock * MISSILE_BURN_HZ * m.frames.length) %
+        m.frames.length;
+      drawActor(MISSILE_MODEL, s.x, s.y, yaw, 1, s.lift - axis,
+        m.frames.length ? frame : 0, null, missileTilt);
+    }
+  }
+
+  // One scratch object for the pitch, on the same synchronous-consumption
+  // contract every other one in this file runs on.
+  var missileTilt = { rx: 0, ry: 0, pivotZ: 0 };
 
   function drawShieldBubbles(state) {
     bubbleList.length = 0;
@@ -1831,6 +1934,24 @@ var World3D = (function () {
     };
     enabled = true;
 
+    // THE SECOND RENDERER, and the loads it needs, started here rather than on
+    // the first frame that wants one. Five megabytes over an asynchronous load
+    // wants every second of head start it can get, and install() is the first
+    // moment `renderer` and `glCanvas` both exist.
+    //
+    // Guarded with typeof on the same terms as the Summoner's modules below: a
+    // build shipped without js/gl/three-loader.js or without vendor/three
+    // installs exactly as it did before, and every hero unit keeps drawing the
+    // baked body it drew already -- see `heroBody` for why that is the whole
+    // loading state.
+    if (typeof ThreeGL !== "undefined") {
+      if (ThreeGL.install({ renderer: renderer, glCanvas: glCanvas })) {
+        for (var hm = 0; hm < HERO_MODELS.length; hm++) {
+          ThreeGL.request(HERO_MODELS[hm].name, HERO_MODELS[hm].src);
+        }
+      }
+    }
+
     // THE SUMMONER'S EFFECT MODULES, handed the helpers they cannot reach.
     //
     // Done here rather than at their own load time because `renderer` and
@@ -1906,6 +2027,147 @@ var World3D = (function () {
 
   // --- the world pass ------------------------------------------------------
 
+  // --- HERO UNITS: the Three.js pass -----------------------------------------
+  //
+  // A SECOND RENDERER, FOR HERO UNITS ONLY, and this table is the entire list
+  // of who goes through it. Everything not named here -- all twenty-four other
+  // enemy types, every tower, every recruit, every blub -- is drawn by
+  // `drawActor` out of GLModels exactly as it always was, and nothing in this
+  // block can reach them.
+  //
+  // Why there are two renderers at all is argued in js/gl/three-loader.js and
+  // in AGENTS.md's "Two renderers" section. The short version: the baked
+  // pipeline throws textures away, which is right for flat-shaded low-poly and
+  // wrong for the units a player looks AT.
+  //
+  // THE KEY IS THE BAKED MODEL, NOT THE TYPE ID, and that is deliberate. It
+  // means the swap happens at the last possible moment -- after `enemyModel`
+  // has already applied every variant rule (revived, shieldBroken, shieldOut,
+  // camo shadowing) -- so a type with variants gets each of them considered
+  // separately and this table never has to restate a rule that already exists
+  // above.
+  //
+  // THE DINOMECH, AND WHY IT COSTS NOTHING TO MOVE IT (2026-08-29, at the
+  // owner's instruction). js/gl/models/enemy-dinomech.js is `glb/dragon.glb`
+  // put through glb_to_model.py: 16 894 triangles and EIGHT FLAT COLOURS out
+  // of a source carrying three 2048x2048 maps and 100 568 triangles. Same
+  // mesh, same silhouette, same size -- the only thing the swap changes on
+  // screen is that the textures are there.
+  //
+  // AND THERE IS NO WALK TO LOSE. `node tools/check-gait-slip.js` reports this
+  // body as `! no weight-bearing group found`, with a 18.59 px sawtooth at
+  // 227% -- it has four identity frames and slides. That is the state the
+  // baked import left it in; the Three pass does not make it worse and the
+  // gait check reads the same before and after, because the generated file is
+  // untouched.
+  var THREE_BY_MODEL = {
+    "enemy-dinomech": "boss-dragon"
+  };
+
+  // Every hero model this build knows how to load, and where its bytes are.
+  var HERO_MODELS = [
+    { name: "boss-dragon", src: "assets/gltf/dragon.glb.js" }
+  ];
+
+  // Collected during the body loop, flushed once after it. One array, reused,
+  // because this runs every frame.
+  var heroActors = [];
+  // Enemy object -> a stable actor id, so an instance in the Three scene stays
+  // with the body it belongs to across frames rather than being handed round
+  // by array position. Guarded exactly as js/gl/blub-summon.js guards its own
+  // -- `Map` is the one non-ES5 runtime this project already leans on, and the
+  // fallback below is what happens without it.
+  var heroIds = (typeof Map === "function") ? new Map() : null;
+  var heroIdSeq = 0;
+
+  function heroIdOf(e, index) {
+    if (!heroIds) return "hero-" + index;
+    var id = heroIds.get(e);
+    if (id === undefined) { id = "hero-" + (heroIdSeq++); heroIds.set(e, id); }
+    return id;
+  }
+
+  // HOW LONG THE BAKED BODY IS, along its own forward axis, in model units.
+  //
+  // This is what locks the two pipelines to one size. The baked draw scales by
+  // `unitsToPx * sizeScale`; measuring the SAME mesh here and multiplying by
+  // the SAME two numbers means the textured body arrives at exactly the size
+  // the flat one would have, and stays there if either is ever retuned. A
+  // constant typed in instead would be a second opinion about how big a boss
+  // is, and it would be the copy that goes stale.
+  //
+  // Measured once per model. `GLModels.get` has already expanded and cached
+  // the positions by the time anything asks.
+  var bakedSpan = Object.create(null);
+
+  function bakedSpanOf(model) {
+    if (bakedSpan[model] !== undefined) return bakedSpan[model];
+    var m = GLModels.get(renderer, model);
+    var span = 0;
+    if (m && m.positions) {
+      var lo = Infinity, hi = -Infinity;
+      for (var i = 0; i < m.positions.length; i += 3) {
+        if (m.positions[i] < lo) lo = m.positions[i];
+        if (m.positions[i] > hi) hi = m.positions[i];
+      }
+      span = hi - lo;
+    }
+    bakedSpan[model] = span;
+    return span;
+  }
+
+  // Hand one body to the Three pass instead of drawing it flat.
+  //
+  // Returns TRUE if it took the body, and the caller must then skip its own
+  // draw. Returns FALSE for every body that is not a hero unit, and -- just as
+  // importantly -- for a hero unit whose model has not finished loading or
+  // failed to load at all.
+  //
+  // THAT FALSE IS THE ENTIRE LOADING STATE, AND IT IS BETTER THAN A SPINNER.
+  // Five megabytes arrive asynchronously, so there is a real window where the
+  // board is up and the textured body is not, plus a permanent state where the
+  // payload is missing. In both, this returns false, the caller draws the BAKED
+  // body, and the player sees the boss it has always seen -- right size, right
+  // silhouette, right place, animated exactly as before -- which then upgrades
+  // to the textured mesh the moment it is ready. Nothing pops, nothing is
+  // missing, and there is no placeholder to explain.
+  function heroBody(model, e, index, x, y, yaw, scale, lift, dt) {
+    if (typeof ThreeGL === "undefined" || !ThreeGL.isEnabled()) return false;
+    var three = THREE_BY_MODEL[model];
+    if (!three || ThreeGL.status(three) !== "ready") return false;
+    var span = bakedSpanOf(model);
+    if (!(span > 0)) return false;
+    heroActors.push({
+      id: heroIdOf(e, index),
+      model: three,
+      x: x, y: y, z: lift, yaw: yaw,
+      lengthPx: span * GLModels.unitsToPx(model) * scale,
+      dt: dt
+    });
+    return true;
+  }
+
+  // The Three pass itself. Called once, after every opaque GL body, with
+  // whatever `heroBody` collected. No-ops entirely if js/gl/three-loader.js or
+  // vendor/three is absent, so a build without them renders byte for byte as it
+  // did before.
+  function drawHeroUnits() {
+    if (!heroActors.length) return;
+    if (typeof ThreeGL === "undefined" || !ThreeGL.isEnabled()) return;
+
+    // THE LIGHT THE BOARD IS UNDER THIS FRAME, handed across rather than
+    // recomputed. `renderer` has already been given the composed environment at
+    // the top of drawWorld, so reading it back off the renderer is what keeps a
+    // hero unit on the same sunrise as everything standing beside it -- and it
+    // needs no second copy of the environment rules to go stale.
+    ThreeGL.setLighting({
+      keyDir: renderer.keyDir, fillDir: renderer.fillDir,
+      ambient: renderer.ambient, fillColor: renderer.fillColor,
+      keyColor: renderer.keyColor, keyStrength: renderer.keyStrength
+    });
+    ThreeGL.draw(camera, heroActors);
+  }
+
   function drawWorld(ctx, state) {
     if (!enabled) return false;
     resize();
@@ -1921,6 +2183,10 @@ var World3D = (function () {
     // array at the end of the update tick it dies in, so a death is only ever
     // visible as an ABSENCE by the time anything draws.
     if (typeof EnemyWreck !== "undefined") EnemyWreck.update(state);
+
+    // Hero bodies are collected during the body loop below and flushed once
+    // after it, so the list starts every frame empty.
+    heroActors.length = 0;
 
     var vp = camera.viewProjection();
     // THE VOID BEHIND A FOGGED BOARD IS THAT BOARD'S OWN BACKGROUND.
@@ -2313,6 +2579,23 @@ var World3D = (function () {
         ? e.path.tangentAt(e.progress) : null;
       var yaw = heading ? Math.atan2(heading.y, heading.x) : 0;
       var radius = e.radiusPx ? e.radiusPx() : 11;
+      // MID-LEAP, THE BODY IS NOT WHERE THE SIMULATION SAYS IT IS -- and that
+      // is the whole of the difference, kept in three locals so nothing below
+      // has to ask twice. `Enemy.prototype.leapPose` is the one place either
+      // board turns a dive's wind-up into a position; see its header for why
+      // the simulation still reads `pos` and always will.
+      var leap = e.leapPose ? e.leapPose() : null;
+      var bodyX = leap ? leap.x : e.pos.x;
+      var bodyY = leap ? leap.y : e.pos.y;
+      // IT FACES WHAT IT IS JUMPING AT, not the way the road runs. A diver
+      // leaves the path by design (the `lunge` branch in js/enemy.js) and a
+      // body crossing the board sideways is the one thing that would make the
+      // jump read as a shove rather than as a pounce. Measured from the
+      // TAKE-OFF point rather than from the moving one, so the heading is
+      // fixed for the whole flight instead of spinning as the gap closes.
+      if (leap) {
+        yaw = Math.atan2(leap.target.y - e.pos.y, leap.target.x - e.pos.x);
+      }
       // THE WALK, driven by distance covered -- one bob per stride, feet and
       // ground agreeing, a slowed enemy visibly trudging. The same reason the
       // sprite pack advanced its frames by progress rather than by a clock.
@@ -2322,7 +2605,8 @@ var World3D = (function () {
       // A flier rides above its own path point; a walker sits on it. Read once
       // here so the mesh branch and the sphere branch cannot drift apart, and
       // so the sphere types that are still fliers rise too.
-      var lift = groundHeightAt(e.pos.x, e.pos.y, e.isFlying) + bodyLift(e, radius);
+      var lift = groundHeightAt(bodyX, bodyY, e.isFlying) + bodyLift(e, radius) +
+        (leap ? leap.lift : 0);
       // BUILT ONCE PER RENDERED FRAME, DELIBERATELY OUTSIDE THE CAMO LOOP.
       // `strikeOf` is written to be idempotent within a frame -- the latch
       // moves only when the drive RISES -- but relying on that where hoisting
@@ -2335,6 +2619,15 @@ var World3D = (function () {
       // ever stops being true, because a strike is a 0.4 s flourish and the
       // shards are the whole of what a broken Vanguard is.
       var shards = shardPose(e, model, yaw, radius / 11, lift);
+      // The pitch, built only for a body that is actually off the ground: the
+      // gather is a crouch, and a crouching animal is level.
+      var tilt = null;
+      if (leap && leap.airborne) {
+        leapTilt.rx = 0;
+        leapTilt.ry = LEAP_PITCH * (2 * leap.t - 1);
+        leapTilt.pivotZ = LEAP_PITCH_PIVOT_Z;
+        tilt = leapTilt;
+      }
       // A CAMO BODY IS DRAWN TWICE: depth first, then colour.
       //
       // With depth writes off, EVERY front-facing surface of a translucent body
@@ -2384,8 +2677,24 @@ var World3D = (function () {
         var pulse = supportGlow(e);
         if (pulse) renderer.setGlow(pulse, supportTint(e));
         else if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
-        drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk,
-          shards || strike);
+        // A HERO BODY GOES TO THE OTHER RENDERER, and only on the first
+        // sub-pass: the camo branch draws twice (depth pre-pass, then the
+        // translucent pass) and collecting on both would queue the same body
+        // twice. No hero type is camouflaged today, so this is a guard rather
+        // than a live case.
+        //
+        // Everything above this line still ran -- the walk frame, the strike
+        // override, the glow -- because they are what the BAKED draw needs and
+        // it is still the fallback while the textured mesh loads. Everything
+        // below is skipped only when the Three pass actually took the body.
+        if (sub === 0 &&
+            heroBody(model, e, i, bodyX, bodyY, yaw, radius / 11, lift,
+                     state.dt || 1 / 60)) {
+          // taken by the Three pass; nothing to draw here
+        } else {
+        drawActor(model, bodyX, bodyY, yaw, radius / 11, lift, walk,
+          shards || strike, tilt);
+        }
         // Put it back. setGlow is state, not an argument, so a flier that left
         // it lit would hand its lantern to the next body drawn.
         if (pulse || e.isFlying) renderer.setGlow(0, null);
@@ -2395,7 +2704,7 @@ var World3D = (function () {
         // One that is off the road has no ground to beat against, and whatever
         // holds it up is already in `lift`.
         var beat = afloat(e) ? 0 : Math.abs(Math.sin(phase));
-        renderer.draw(enemySphere(e).mesh, e.pos.x, e.pos.y,
+        renderer.draw(enemySphere(e).mesh, bodyX, bodyY,
           lift + beat * radius * 0.22, yaw,
           radius * (0.94 + beat * 0.10));
       }
@@ -2410,6 +2719,19 @@ var World3D = (function () {
       // and to every later frame's first body.
       if (wantCamo) { renderer.setDepthOnly(false); renderer.setFade(1); }
     }
+    // THE WARHEADS, which are opaque and therefore belong here rather than in
+    // the overlay pass that used to draw the whole of them. See
+    // drawMissileBodies.
+    drawMissileBodies(state);
+    // THE HERO UNITS, through Three.js, on this same canvas and this same depth
+    // buffer -- see drawHeroUnits above and js/gl/three-loader.js.
+    //
+    // HERE AND NOT LATER, AND THE ORDER IS THE WHOLE ARGUMENT. Everything below
+    // this line is blended with depth writes OFF and has to composite against a
+    // finished opaque frame; the Three pass draws opaque geometry, so it belongs
+    // with the opaque geometry. Put it after the wrecks and a dying body would
+    // be composited against a frame the dragon had not been added to yet.
+    drawHeroUnits();
     // THE WRECKS, drawn last of the bodies. They were the only translucent
     // thing on the board until camo enemies joined them, and a blended draw
     // with depth writes off has to come after everything opaque or it
@@ -2800,7 +3122,74 @@ var World3D = (function () {
     // band -- a check that cannot return the right answer, in the direction
     // that looks like diligence.
     "enemy-angry": { group: "mast", pivot: [0, 0, 0.8004],
-                     pitch: -0.1745329, slide: -0.12 }
+                     pitch: -0.1745329, slide: -0.12 },
+
+    // THE DINOMECH'S TAIL, 2026-08-28, and the first record here to name its
+    // own DRIVE.
+    //
+    // `attackFlash` is set by every attack that resolves and the Dinomech has
+    // two of them, so a tail driven off it would swing when the SILOS fired --
+    // a picture of the wrong mechanic, playing at the wrong moment, twice as
+    // often as the move it is supposed to be showing. `slamFlash` is set by a
+    // `slam` spec and by nothing else (js/enemy.js) and decays on the same
+    // shared constant, so the gesture is the same 0.4 s length as every other
+    // strike in the game and fires only when the tail actually came down.
+    //
+    // ---- RE-MEASURED 2026-08-29, ON A DIFFERENT ANIMAL ---------------------
+    //
+    // Every number below was measured on `glb/biomech.glb` for one day: a
+    // quadruped that faced -x and carried a scythe of a tail curled up and
+    // FORWARD over its own spine. That file was withdrawn and the body is the
+    // skeletal biped again (`glb/dinomech.glb`), whose tail is straight, level
+    // and behind it -- so the pivot moved, and the sign of the swing INVERTED.
+    // Both are re-derived from the shipped mesh below rather than adjusted.
+    //
+    // THE PIVOT IS THE TAIL'S ROOT AND IS NOT [0, 0, 0]. `saurian_pivot_of` in
+    // tools/glb_to_model.py measures it as the slice of the tail group NEAREST
+    // THE HIP LINE -- where the tail leaves the body -- and the rig stores the
+    // group's geometry in WORLD space (`origin_pivot`), so the renderer has to
+    // supply the joint. Measured off the shipped mesh rather than typed by
+    // eye: the hip line (the mean of the two leg pivots, y zeroed) is at
+    // (0.1421, 0, 0.3840), and the mean of the 345 tail vertices within 0.06 u
+    // of its closest approach to it is (-0.020, -0.010, 0.359). Get this wrong
+    // and the tail sweeps about the road instead of about its own base, which
+    // is a plausible picture with the wrong mechanism under it and no still
+    // frame shows it.
+    //
+    // THE SIGN IS DERIVED, NOT TAKEN FROM THE WORD "DOWN", and it is the
+    // opposite of what this record carried yesterday. `GLMath.localPose` maps
+    // (x, z) -> (cos*x + sin*z, -sin*x + cos*z). This tail projects BACKWARD
+    // along -x -- its tip sits 0.873 u behind its own root and only 0.025 u
+    // above it, which is level -- so a NEGATIVE rotation is what drives the far
+    // end toward the road. The quadruped's tail pointed forward and up, and on
+    // that body the same negative sign swept it back and down; the sign agreed
+    // by coincidence and the magnitude did not.
+    //
+    // -0.30 rad IS 17 DEGREES, AND IT IS CHOSEN ON TARMAC CLEARANCE. Swept on
+    // the shipped mesh at this body's sizeScale of 2.6 (82.7 board px per model
+    // unit), reading the LOWEST point of the whole tail rather than the tip,
+    // because the blade is what would ground first:
+    //
+    //     -0.22   10.2 px clear      -0.34    3.4 px clear
+    //     -0.26    7.9 px clear      -0.38    1.2 px clear
+    //     -0.30    5.6 px clear      -0.42   -0.9 px  THROUGH THE ROAD
+    //
+    // 5.6 px is the same clearance the withdrawn quadruped's -2.6 rad bought,
+    // which is why the swing reads the same at a glance despite the number
+    // being an eighth of the size: on that body the tail had to travel from
+    // over the shoulders, and on this one it starts already pointing at the
+    // ground it is going to hit.
+    //
+    // THE LEGS ARE NOT AT RISK ON THIS BODY, unlike the last one, and it is
+    // worth writing down that the check was made rather than skipped. The legs
+    // span x 0.010..0.276 and the tail never swings forward of x 0.026 at any
+    // angle in the table -- the 16 vertices the two share are the tail's own
+    // root, inside the pelvis, and their count is IDENTICAL at every angle
+    // including the rest pose. The swing introduces no contact at all.
+    //
+    // No slide: a tail hinges, it does not recoil.
+    "enemy-dinomech": { group: "tail", pivot: [-0.020, -0.010, 0.359],
+                        pitch: -0.30, slide: 0, drive: "slamFlash" }
   };
 
   // ONE SCRATCH MATRIX AND ONE SCRATCH OBJECT, allocation-free per frame. Both
@@ -2836,12 +3225,23 @@ var World3D = (function () {
   var strikeLast = null;
 
   function strikeOf(e, model) {
-    // The early out every body on the board takes: one property read and a
-    // compare.
-    var f = e ? e.attackFlash : 0;
-    if (!(f > 0)) return null;
+    // THE EARLY OUT EVERY BODY ON THE BOARD TAKES is now the record lookup
+    // rather than the flash read, and the swap is deliberate: the flash can no
+    // longer be read until the record has said WHICH flash to read. The cost
+    // is the same -- one lookup in a two-entry map against one property read --
+    // and it is taken by exactly the bodies that took the old one, because a
+    // model with no record has no gesture to draw whatever its flash says.
+    //
+    // WHICH FLASH DRIVES THIS BODY'S GESTURE. `attackFlash` for everything
+    // that has one attack, and a named field for a body whose pool has more
+    // than one and only wants the gesture on ONE of them -- see the Dinomech's
+    // record above. Read off the record rather than off the body, so a model
+    // with no record still costs exactly one property read and a compare,
+    // which is what the early out below is for.
     var spec = model ? STRIKE_BY_MODEL[model] : null;
     if (!spec) return null;
+    var f = e ? (e[spec.drive || "attackFlash"] || 0) : 0;
+    if (!(f > 0)) return null;
     var m = GLModels.get(renderer, model);
     var has = false;
     if (m) {
@@ -3878,8 +4278,16 @@ var World3D = (function () {
     // the tethers are: what the board is doing is never buried by what the road
     // is doing.
     drawHasteMarks(ctx, state);
+    // WHAT IS ABOUT TO BE HIT, under every other road mark and under the
+    // telegraph lines that explain it: it is a warning painted on the ground,
+    // so anything that is actually happening belongs on top of it.
+    drawThreatRings(ctx, state);
     drawSabotage(ctx, state);
+    drawSlamMarks(ctx, state);
     drawHazards(ctx, state);
+    // Missiles go OVER the road marks and under the player's own shots, which
+    // is where a thing in the air belongs relative to a thing on the ground.
+    drawMissiles(ctx, state);
     drawShots(ctx, state);
     // A blub's shot is a shot, so it goes exactly where the others go: over the
     // hardware that fired it and under the cosmetic burst layer. The death
@@ -4166,6 +4574,279 @@ var World3D = (function () {
     }
   }
 
+  // A DETERMINISTIC WOBBLE IN -0.5 .. 0.5, for anything that has to look
+  // ragged without being random.
+  //
+  // Math.random lives in js/effects.js and nowhere else in this game's frame
+  // (see the header of that file), and this is the reason a renderer that
+  // needs noise still does not reach for it: the same run must draw the same
+  // picture, or a capture cannot be compared against a capture. The sine hash
+  // is the cheapest thing that decorrelates two nearby integers, which is all
+  // that is being asked of it.
+  function arcNoise(seed) {
+    var x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x) - 0.5;
+  }
+
+  // ONE ELECTRICAL DISCHARGE, from a body to the tower it just switched off.
+  //
+  // Every number on it comes off the spec's own `arcBeam` block through
+  // `mark.arc` -- see Enemy.prototype.makeAttackBeam -- with the defaults here
+  // covering a block that declared only a tint. The filaments are drawn as
+  // polylines in SCREEN space between two PROJECTED endpoints, which is right
+  // for an arc and wrong for anything that should lie on the ground: a bolt of
+  // electricity is a thing in the air between two points, so it is allowed to
+  // be a screen-space zigzag in a way a blast ring is not.
+  function drawDischarge(ctx, enemy, mark) {
+    var arc = mark.arc;
+    var fade = Math.max(0, Math.min(1, mark.life));
+    var r = enemy.radiusPx ? enemy.radiusPx() : 11;
+    var from = project(enemy.pos.x, enemy.pos.y,
+      bodyLift(enemy, r) + r * (arc.liftRadii || 0.9));
+    var to = project(mark.x, mark.y, 10);
+    if (!from || !to) return;
+
+    var rgb = arc.tint || "150,225,255";
+    var bolts = arc.bolts || 3;
+    var stray = ul(arc.jitterUl || 10);
+    // Which SHAPE the discharge is in. Bucketed off its own life so it snaps
+    // through a fixed number of shapes over its life whatever the frame rate.
+    var shape = Math.floor(mark.life * 40);
+    var seed = (enemy.laneIndex || 0) * 131 + shape * 977;
+    var span = Math.hypot(to.x - from.x, to.y - from.y);
+    // Across the line, in screen space. Normalised off the beam's own
+    // direction so a filament strays sideways rather than lengthwise, which is
+    // the difference between a lightning bolt and a stutter.
+    var nx = span > 1e-3 ? -(to.y - from.y) / span : 0;
+    var ny = span > 1e-3 ? (to.x - from.x) / span : 1;
+    var SEGMENTS = 7;
+
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (var b = 0; b < bolts; b++) {
+      // The first filament is the trunk and runs tight to the line; the rest
+      // stray further, so the discharge has a spine instead of being three
+      // equally wrong lines.
+      var wander = stray * (b === 0 ? 0.35 : 1) * from.scale;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      for (var k = 1; k < SEGMENTS; k++) {
+        var u = k / SEGMENTS;
+        // Pinned at both ends: a bolt that missed the tower would be a bolt
+        // pointing at nothing, and one that missed the body would be a bolt
+        // out of thin air. sin(pi*u) is 0 at both and 1 in the middle.
+        var off = arcNoise(seed + b * 17 + k * 7) * wander *
+          Math.sin(Math.PI * u);
+        ctx.lineTo(from.x + (to.x - from.x) * u + nx * off,
+          from.y + (to.y - from.y) * u + ny * off);
+      }
+      ctx.lineTo(to.x, to.y);
+      // Twice: a wide dim pass for the glow and a thin bright one for the
+      // core, which is how every other energy line on this board is built.
+      ctx.strokeStyle = "rgba(" + rgb + "," + (0.20 * fade).toFixed(3) + ")";
+      ctx.lineWidth = Math.max(1, 5 * from.scale);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(236,255,252," + (0.85 * fade).toFixed(3) + ")";
+      ctx.lineWidth = Math.max(0.7, (b === 0 ? 1.9 : 1.1) * from.scale);
+      ctx.stroke();
+    }
+    // The tower end takes a flash of its own, so the eye lands on WHAT was hit
+    // rather than on the pretty line between.
+    drawGroundRing(ctx, mark.x, mark.y, 16 + 10 * (1 - fade),
+      "rgba(" + rgb + "," + (0.8 * fade).toFixed(3) + ")",
+      "rgba(" + rgb + "," + (0.16 * fade).toFixed(3) + ")", 2);
+    ctx.lineCap = "butt";
+  }
+
+  // --- WHAT A TAIL SLAM LEFT ON THE ROAD --------------------------------
+  //
+  // A ring at the point the tail came down, at the blow's TRUE radius from the
+  // first frame, fading with the body's own `slamFlash`.
+  //
+  // AT THE TAIL AND NOT AT THE BODY, which is the whole reason this exists as
+  // its own mark rather than reusing the leap's `shockwaveFlash`: the Dinomech
+  // is 148 board px long, so a ring drawn around `pos` would be centred a
+  // body-length away from the towers that were actually stunned. `slamAt` is
+  // the point the simulation itself measured the blow from (js/enemy.js,
+  // Enemy.prototype.slamPoint), so the mark and the stun cannot disagree.
+  //
+  // NOTHING HERE IS AN ID CHECK. Any body carrying a `slam` spec writes these
+  // two fields and gets this mark.
+  var SLAM_RGB = "255,176,96";
+
+  function drawSlamMarks(ctx, state) {
+    for (var i = 0; i < state.enemies.length; i++) {
+      var e = state.enemies[i];
+      if (!(e.slamFlash > 0) || !e.slamAt) continue;
+      var fade = Math.max(0, Math.min(1, e.slamFlash));
+      var reach = ul(e.lastBlastRadiusUl || 0);
+      if (!(reach > 0)) continue;
+      // The shared shockwave, so a tail landing reads in the same visual
+      // language as every other blast on the board -- and a bright rim on top
+      // of it at the FULL radius, because what a player has to learn from this
+      // mark is how far the stun went, not how far it has spread so far.
+      drawShockwave(ctx, e.slamAt.x, e.slamAt.y, reach, 1 - fade, SLAM_RGB);
+      drawGroundRing(ctx, e.slamAt.x, e.slamAt.y, reach,
+        "rgba(" + SLAM_RGB + "," + (0.85 * fade).toFixed(3) + ")",
+        "rgba(" + SLAM_RGB + "," + (0.10 * fade).toFixed(3) + ")", 2.5);
+    }
+  }
+
+  // --- MISSILES IN THE AIR ------------------------------------------------
+  //
+  // A warhead is a bright head with a tail of exhaust behind it, drawn from
+  // its own position and the position it held a moment ago -- so the streak
+  // points along the path it is really flying rather than at a guessed angle,
+  // which is the same trick the spark pass in drawEffects uses.
+  //
+  // THE HEIGHT IS REAL. `m.lift` is the arc js/systems/missiles.js flies, in
+  // board px above the road, and it is fed to project() as a height rather
+  // than subtracted from y -- so a missile crossing the board rises over the
+  // map instead of sliding northwards across it.
+  //
+  // A SPENT MISSILE STILL DRAWS, faintly, for its afterglow: Effects owns the
+  // explosion, and this is the streak that made it letting go.
+  var MISSILE_RGB = "255,186,110";
+
+  // WHERE THE TRAIL STARTS ONCE THERE IS AN AIRFRAME IN FRONT OF IT.
+  //
+  // The streak used to run all the way to the missile's own position, because
+  // that position was the whole of the missile -- a bright dot with exhaust
+  // behind it. Now `drawMissileBodies` puts 24 board px of finned model there,
+  // and the overlay pass draws AFTER the geometry with no depth buffer, so a
+  // trail that still ended at `m.x` painted a bright bar straight down the
+  // body it is supposed to be coming out of. Seen on the board at three camera
+  // distances before this was written; at close range the model disappears
+  // under it entirely.
+  //
+  // So the trail now stops at the NOZZLE. Half the model's length back along
+  // the flight, converted from board px into a share of the parametric by the
+  // flight's own span, which is what keeps it right for a shot across the map
+  // and for one at the gun next door. Clamped so a very short flight cannot
+  // push the start of the trail behind the launch point.
+  //
+  // AND IT IS THINNER AND DIMMER THAN IT WAS. A trail behind a solid body is
+  // exhaust; a trail behind a dot was the missile itself, and had to carry the
+  // read on its own. The old widths are kept for a page with no model, where
+  // that is still true.
+  var MISSILE_BODY_PX = 24;
+  var MISSILE_TRAIL_BACK = 0.07;
+
+  function missileTrailStart(m, hasModel) {
+    var lead = hasModel
+      ? (MISSILE_BODY_PX * 0.5) / Math.max(1, m.span || 1)
+      : 0;
+    return Math.max(0, Math.min(m.t, m.t - lead));
+  }
+
+  function drawMissiles(ctx, state) {
+    var list = state.missiles;
+    if (!list || !list.length) return;
+    ctx.lineCap = "round";
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      if (m.landed) continue;             // Effects has it from here
+      var hasModel = GLModels.has(MISSILE_MODEL);
+      // WHERE THE TRAIL ENDS -- the nozzle when there is an airframe in front
+      // of it, the missile's own point when there is not. See
+      // missileTrailStart.
+      var nose = missileTrailStart(m, hasModel);
+      var nx = m.x0 + (m.x1 - m.x0) * nose;
+      var ny = m.y0 + (m.y1 - m.y0) * nose;
+      var nl = m.lift0 * (1 - nose) + m.apex * 4 * nose * (1 - nose);
+      var head = project(nx, ny, nl);
+      if (!head) continue;
+      // A tenth of the flight behind it. Read off the same parametric the
+      // simulation flies rather than remembered, so the tail cannot drift out
+      // of step with the head at any frame rate.
+      var back = Math.max(0, nose - MISSILE_TRAIL_BACK);
+      var bx = m.x0 + (m.x1 - m.x0) * back;
+      var by = m.y0 + (m.y1 - m.y0) * back;
+      var bl = m.lift0 * (1 - back) + m.apex * 4 * back * (1 - back);
+      var tail = project(bx, by, bl);
+      if (tail) {
+        var wide = hasModel ? 3.4 : 6;
+        var core = hasModel ? 1.1 : 2;
+        ctx.strokeStyle = "rgba(" + MISSILE_RGB + "," +
+          (hasModel ? "0.22" : "0.30") + ")";
+        ctx.lineWidth = Math.max(1, wide * head.scale);
+        ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(head.x, head.y);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,242,214," + (hasModel ? "0.55" : "0.85") + ")";
+        ctx.lineWidth = Math.max(0.8, core * head.scale);
+        ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(head.x, head.y);
+        ctx.stroke();
+      }
+      // THE HEAD IS THE MODEL NOW, when there is one. `drawMissileBodies` puts
+      // the real airframe in the geometry pass, and a bright dot painted over
+      // the top of it in the overlay would sit in front of the nose it is
+      // supposed to BE -- and in front of the tower it is flying into, since
+      // the overlay has no depth buffer to be occluded by. The dot stays for a
+      // page that does not carry the model, where it is the only head there is.
+      if (!hasModel) {
+        ctx.fillStyle = "rgba(255,248,232,0.95)";
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, Math.max(1.4, 3.2 * head.scale), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // WHERE IT IS GOING, on the ground. A warhead in the air is hard to
+      // trace back to a tower at a glance, and a player who cannot tell which
+      // gun is about to be hit cannot do anything about it.
+      drawGroundRing(ctx, m.x1, m.y1, 12 + 8 * (1 - m.t),
+        "rgba(" + MISSILE_RGB + "," + (0.25 + 0.5 * m.t).toFixed(3) + ")",
+        null, 1.5);
+    }
+    ctx.lineCap = "butt";
+  }
+
+  // --- A RED CIRCLE ON EVERY TOWER SOMETHING HAS ALREADY AIMED AT ------------
+  //
+  // 2026-08-28, at the owner's instruction: "on all targeted towers, include a
+  // red circle around them on the ground."
+  //
+  // WHICH TOWERS THOSE ARE IS NOT DECIDED HERE. `Enemy.targetedTowers` owns
+  // the rule -- committed wind-ups and warheads already in the air, never mere
+  // candidates -- and the flat board's `drawThreatMarks` reads the same
+  // function, so the two boards cannot come to disagree about what "targeted"
+  // means. See that function's header for what earns a ring and what does not.
+  //
+  // ONE RING PER TOWER, NOT ONE PER THREAT. The list is deduped at source, so
+  // a gun that two Volatiles and a warhead all picked wears exactly the mark a
+  // gun with one warhead over it wears. That is deliberate: this cue answers
+  // "is this tower about to be hit", which is a yes or a no, and stacking rings
+  // would turn it into an unreadable count of things the player cannot act on
+  // separately anyway.
+  //
+  // RED, WHICH NOTHING ELSE ON THE GROUND IS. The Sapper's telegraph is its own
+  // teal, a slam is the blast palette, a warhead's destination ring is the
+  // missile's amber and the build ghost is green-or-rose and only ever appears
+  // under the cursor. Danger to a standing tower had no colour of its own.
+  var THREAT_RGB = "236,64,58";
+  // How far outside the footprint the ring sits, and how far it breathes. The
+  // pulse is what separates a live warning from the static decoration this
+  // board already has a lot of; 1.4 Hz is a heartbeat rather than a strobe.
+  var THREAT_PAD = 1.55;
+  var THREAT_BREATH = 0.10;
+  var THREAT_HZ = 1.4;
+
+  // Refilled every frame, so a board full of threatened towers allocates
+  // nothing.
+  var threatened = [];
+
+  function drawThreatRings(ctx, state) {
+    if (typeof Enemy === "undefined" || !Enemy.targetedTowers) return;
+    var list = Enemy.targetedTowers(state.enemies, state.missiles,
+      state.towers, threatened);
+    if (!list.length) return;
+    var breath = 1 + THREAT_BREATH *
+      Math.sin(boardClock * THREAT_HZ * Math.PI * 2);
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      drawGroundRing(ctx, t.x, t.y, (t.footprintPx || 12) * THREAT_PAD * breath,
+        "rgba(" + THREAT_RGB + ",0.92)", "rgba(" + THREAT_RGB + ",0.13)", 2.5);
+    }
+  }
+
   // A SAPPER'S TELEGRAPH, and the two states a tower can be in because of one.
   //
   // The colour is the Sapper's own body colour, read off its type row rather
@@ -4206,9 +4887,38 @@ var World3D = (function () {
         "rgba(" + SAP_RGB + "," + (0.5 + 0.5 * charge).toFixed(3) + ")", null, 2);
     }
 
+    // 2 -- THE DISCHARGE, which is the moment the telegraph was counting down
+    // to (2026-08-28, at the owner's instruction: "for the sapper, make the
+    // electric beams appear as they hit the affected tower").
+    //
+    // Until this, the instant a tower went dark had NO mark on this board at
+    // all: the cord above stopped, the tower stopped, and a tower that stops
+    // for no visible reason reads as a bug rather than as a mechanic. The flat
+    // board drew a plain orange line for it, which is the mark every attack in
+    // the game draws and says nothing about electricity.
+    //
+    // DRIVEN ENTIRELY OFF `attackBeam`, which the simulation already sets when
+    // any attack lands, and gated on `attackBeam.arc` -- the presentation block
+    // the SPEC carries (js/enemy.js, `arcBeam`). So no id is checked here, and
+    // a second type that wanted a discharge writes the block and needs no
+    // renderer change.
+    //
+    // IT WRITHES, which is the whole difference between an arc and a beam, and
+    // the writhe is DETERMINISTIC: `arcNoise` is a hash of the filament, the
+    // segment and a coarse bucket of the beam's own remaining life, so the
+    // same run draws the same discharge and no Math.random enters the frame.
+    // Bucketing the life rather than reading a clock is what makes it snap
+    // between shapes at a fixed rate instead of shimmering with the frame rate.
+    for (i = 0; i < state.enemies.length; i++) {
+      var live = state.enemies[i];
+      var mark = live.attackBeam;
+      if (!mark || !mark.arc || !(mark.life > 0)) continue;
+      drawDischarge(ctx, live, mark);
+    }
+
     if (typeof TowerHealth === "undefined") return;
 
-    // 2 and 3 -- DISABLED, and IMMUNE, which are two states and get two marks.
+    // 3 and 4 -- DISABLED, and IMMUNE, which are two states and get two marks.
     //
     // A disabled tower already wears the stun mark above (ring, countdown arc,
     // orbiting sparks) and that is right -- it IS stunned, and one silence

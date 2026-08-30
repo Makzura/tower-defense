@@ -3109,6 +3109,12 @@ function restartGame() {
   // sandbox's map switcher -- so clearing it here covers all of them.
   if (typeof Hazards !== "undefined") Hazards.reset();
 
+  // Missiles in the air are run state for exactly the hazards reason above,
+  // and they arrive faster: a salvo the Dinomech fired a second before the
+  // player restarted would land 45 points on towers built by the run that just
+  // began. Cleared through the same door.
+  if (typeof Missiles !== "undefined") Missiles.reset();
+
   // Cosmetic state is run state too -- a restart must not inherit the old
   // run's particles.
   if (typeof Effects !== "undefined") Effects.reset();
@@ -4659,6 +4665,25 @@ function update(dt) {
   // the path, this needs the board. See Enemy.prototype.attackTowers.
   for (i = 0; i < enemies.length; i++) enemies[i].attackTowers(dt, towers);
 
+  // WHAT AN ATTACK PUT IN THE AIR RATHER THAN LANDING ON THE SPOT, emptied out
+  // of the bodies that fired it and handed to the missile system.
+  //
+  // js/enemy.js does not know js/systems/missiles.js exists -- it records the
+  // launches on the body and this is the one place that owns the board, which
+  // is the same seam `deathEffect` has with Hazards.fromDeath in the sweep
+  // below and the same one Enemy.spawnMinions has with the brood it makes.
+  //
+  // Drained here, immediately after the swing that committed them, so a salvo
+  // is in the air on the same step it was fired and never a frame later.
+  if (typeof Missiles !== "undefined") {
+    for (i = 0; i < enemies.length; i++) {
+      var launches = enemies[i].takeSalvo();
+      for (var si = 0; si < launches.length; si++) {
+        Missiles.launch(launches[si].from, launches[si].tower, launches[si].spec);
+      }
+    }
+  }
+
   // WHAT A DEATH LEFT ON A FUSE (the Volatile's charge), stepped HERE -- after
   // the enemies have moved and swung, and BEFORE the destroyed-tower sweep
   // below.
@@ -4673,6 +4698,21 @@ function update(dt) {
   // screen, by a loss and by the beam's rewind, and it runs three times as fast
   // at 3x for the same reason everything else does: speed is how many fixed
   // steps frame() hands us, never a scaled step.
+  // AND WHAT IS ALREADY IN THE AIR, stepped in the same window and before the
+  // same sweep, for the same reason: a tower a warhead destroys this step must
+  // not also get a shot off. Missiles are stepped BEFORE hazards only because
+  // one of them has to go first and this is the order they were written in --
+  // neither can produce the other, so no ordering question exists between them.
+  if (typeof Missiles !== "undefined") {
+    var arrivals = Missiles.update(dt, towers);
+    if (arrivals && typeof Effects !== "undefined" && Effects.aoeImpact) {
+      for (i = 0; i < arrivals.length; i++) {
+        Effects.aoeImpact(arrivals[i].x, arrivals[i].y,
+          ul(arrivals[i].blastRadiusUl), arrivals[i].kind, { life: 0.45 });
+      }
+    }
+  }
+
   if (typeof Hazards !== "undefined") {
     var blasts = Hazards.update(dt, towers);
     if (blasts && typeof Effects !== "undefined" && Effects.aoeImpact) {
@@ -5894,6 +5934,10 @@ function worldRenderState() {
     // own array rather than copied -- the same arrangement `towers` and
     // `enemies` already have here -- and nothing that draws it writes to it.
     hazards: (typeof Hazards !== "undefined") ? Hazards.active() : [],
+    // Missiles in flight, on the same terms as `hazards` above: the module's
+    // own array, handed over rather than copied, and nothing that draws it
+    // writes to it.
+    missiles: (typeof Missiles !== "undefined") ? Missiles.active() : [],
     buildGhost: ghost,
     inspected: inspected, aimingTower: aimingTower, worldMouse: worldMouse,
     // Recomputed per frame rather than passing the stored `hoveredEnemy`,
@@ -6022,6 +6066,10 @@ function draw() {
   // (the reach ring and the fuse arc) in its own overlay layer off the same
   // fields -- see drawHazards in js/gl/gl-world.js.
   drawHazardMarks();
+  // AND THE RED CIRCLE ON EVERY TOWER SOMETHING HAS ALREADY AIMED AT, on the
+  // ground beside the charges and for the same reason: it marks a patch of
+  // board, not a body, so nothing standing on it may be painted over.
+  drawThreatMarks();
 
   var i;
   // A tower paints its reach ONLY when the player has asked about it: the one
@@ -6050,6 +6098,11 @@ function draw() {
   for (i = 0; i < actors.length; i++) actors[i].actor.draw(ctx);
 
   for (i = 0; i < bullets.length; i++) bullets[i].draw(ctx);
+
+  // Enemy ordnance in the air, drawn with the player's own for the reason
+  // there is one bullet pass and not four: a thing in flight belongs over the
+  // bodies and under the interface, whichever side fired it.
+  drawMissileMarks();
 
   // THE HOUR OF THE DAY, ON THE WORLD AND NOTHING ELSE.
   //
@@ -6905,6 +6958,116 @@ function drawHazardMarks() {
     ctx.fillStyle = "rgba(255,250,200," + (0.55 + 0.45 * tick).toFixed(3) + ")";
     ctx.fill();
   }
+}
+
+// A RED CIRCLE ON EVERY TOWER SOMETHING HAS ALREADY AIMED AT, 2D board.
+//
+// 2026-08-28, at the owner's instruction: "on all targeted towers, include a
+// red circle around them on the ground." The 3D board draws the same ring in
+// js/gl/gl-world.js (drawThreatRings), and NEITHER of them decides who is on
+// the list: `Enemy.targetedTowers` owns that rule -- committed wind-ups and
+// warheads already in the air, never mere candidates -- so the two boards
+// cannot drift into meaning different things by the word "targeted". See that
+// function's header.
+//
+// What differs between the two is only what a circle IS: there it is projected
+// onto the board's ground plane so it lies flat and turns with the camera;
+// here it is a plain circle drawn in board coordinates, which is what every
+// other ground mark on this board already is -- the hazard's reach, the
+// Sapper's band and the tower footprints all draw with `ctx.arc`.
+//
+// RED, WHICH NOTHING ELSE ON THE GROUND IS. The Sapper's band is its own teal,
+// a live charge is the Volatile's acid green, a warhead's destination ring is
+// the missile's amber, and the build ghost only ever appears under the cursor.
+// Danger to a standing tower had no colour of its own.
+var THREAT_RGB = "236,64,58";
+// How far outside the footprint the ring sits, and how far it breathes. The
+// pulse is what separates a live warning from the static decoration this board
+// already has a lot of; 1.4 Hz is a heartbeat rather than a strobe.
+var THREAT_PAD = 1.55;
+var THREAT_BREATH = 0.10;
+var THREAT_HZ = 1.4;
+// Refilled every frame, so a board full of threatened towers allocates nothing.
+var threatenedTowers = [];
+
+function drawThreatMarks() {
+  if (typeof Enemy === "undefined" || !Enemy.targetedTowers) return;
+  var missiles = (typeof Missiles !== "undefined") ? Missiles.active() : null;
+  var list = Enemy.targetedTowers(enemies, missiles, towers, threatenedTowers);
+  if (!list.length) return;
+
+  // The same wall clock `drawHazardMarks` pulses its fuse core off, one
+  // function up: a cosmetic beat, not a simulated one.
+  var breath = 1 + THREAT_BREATH *
+    Math.sin((lastTime / 1000) * THREAT_HZ * Math.PI * 2);
+
+  for (var i = 0; i < list.length; i++) {
+    var t = list[i];
+    var r = (t.footprintPx || 12) * THREAT_PAD * breath;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(" + THREAT_RGB + ",0.13)";
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(" + THREAT_RGB + ",0.92)";
+    ctx.stroke();
+  }
+}
+
+// MISSILES IN THE AIR, 2D fallback.
+//
+// The 3D board draws these in js/gl/gl-world.js (drawMissiles) off the same
+// list, and neither knows about the other. What differs is what a HEIGHT is:
+// there a lift is fed to project() as a real height above the road, and here
+// it is a screen offset subtracted from y -- the same trick every other lifted
+// thing on the flat board uses, and the reason js/systems/missiles.js carries
+// `lift` beside x and y rather than folded into them.
+//
+// THE TARGET RING IS THE POINT OF THIS MARK. A warhead crossing the board is
+// easy to see and hard to trace, and a player who cannot tell which gun is
+// about to take 45 cannot do anything about it -- so the ring tightens onto
+// the destination as the missile closes.
+function drawMissileMarks() {
+  if (typeof Missiles === "undefined") return;
+  var list = Missiles.active();
+  if (!list.length) return;
+  ctx.lineCap = "round";
+  for (var i = 0; i < list.length; i++) {
+    var m = list[i];
+    // A landed one belongs to Effects now: the explosion is already drawing
+    // where the streak used to be.
+    if (m.landed) continue;
+
+    // A tenth of the flight behind it, read off the same parametric the
+    // simulation flies rather than remembered, so the tail cannot drift out of
+    // step with the head at any frame rate.
+    var back = Math.max(0, m.t - 0.07);
+    var bx = m.x0 + (m.x1 - m.x0) * back;
+    var by = m.y0 + (m.y1 - m.y0) * back;
+    var bl = m.lift0 * (1 - back) + m.apex * 4 * back * (1 - back);
+
+    ctx.beginPath();
+    ctx.moveTo(bx, by - bl);
+    ctx.lineTo(m.x, m.y - m.lift);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(255,186,110,0.30)";
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,242,214,0.85)";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(m.x, m.y - m.lift, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,248,232,0.95)";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(m.x1, m.y1, 12 + 8 * (1 - m.t), 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255,186,110," + (0.25 + 0.5 * m.t).toFixed(3) + ")";
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
 }
 
 // DISABLED, AND IMMUNE -- two states, two marks.

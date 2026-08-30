@@ -97,6 +97,12 @@
      presentation: towers lose real hit points to it, so it is stepped from
      update(). Reads a type's `deathEffect` block and knows no type ids. -->
 <script src="js/systems/hazards.js"></script>
+<!-- Missiles an enemy attack put in the air (the Dinomech's silo salvo).
+     Simulation for the hazards reason: a tower loses real hit points when one
+     arrives, so the arrival time is a fact about the game and the flight is
+     stepped from update(). Reads an attack's `salvo` block and knows no type
+     ids. -->
+<script src="js/systems/missiles.js"></script>
 <script src="js/tower.js"></script>
 
 <!-- Longshot: config + systems + runtime, then the adapter that gives it the
@@ -170,6 +176,24 @@
 <script src="js/gl/gl-math.js"></script>
 <script src="js/gl/gl-renderer.js"></script>
 <script src="js/gl/gl-camera.js"></script>
+<!-- THE SECOND RENDERER, for towers and bosses only. Three.js r147 -- the last
+     release line that ships a UMD build and a plain-script GLTFLoader, so this
+     is classic <script> tags like everything else and nothing needs a module,
+     a bundler or a server. The nineteen baked enemy bodies do not go through
+     it and are not affected by it; see the header of js/gl/three-loader.js for
+     why a hero unit needs a different pipeline than an enemy does.
+
+     vendor/ rather than js/ ON PURPOSE: this is third-party source and is not
+     written in the project's ES5 house style, and tools/check-constraints.js
+     rightly holds everything under js/ to that style. js/gl/three-loader.js --
+     the part we actually wrote -- is under js/ and passes it.
+
+     If these two files are removed, ThreeGL.install() returns false, every
+     hero unit falls back to its stand-in and the rest of the board is
+     unchanged. -->
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/GLTFLoader.js"></script>
+<script src="js/gl/three-loader.js"></script>
 <script src="js/gl/gl-geometry.js"></script>
 <!-- Organic colour strata for Ironwood's otherwise-flat gameplay ground. -->
 <script src="js/gl/ironwood-ground.js"></script>
@@ -319,6 +343,11 @@
 <script src="js/gl/models/enemy-boss_fast.js"></script>
 <script src="js/gl/models/enemy-boss_fast-shattered.js"></script>
 <script src="js/gl/models/enemy-boss.js"></script>
+<script src="js/gl/models/enemy-herald.js"></script>
+<script src="js/gl/models/enemy-sapper.js"></script>
+<script src="js/gl/models/enemy-dinomech.js"></script>
+<script src="js/gl/models/enemy-volatile.js"></script>
+<script src="js/gl/models/missile.js"></script>
 
 <script src="js/game.js"></script>
 

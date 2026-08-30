@@ -286,6 +286,27 @@ function Enemy(path, health, typeId, overrides) {
   this.attackTimer = this.attack ? this.attack.intervalSeconds : 0;
   this.attackFlash = 0;              // cosmetic, 1 -> 0, set when it swings
 
+  // ONE CLOCK PER ATTACK, FOR THE POOLS THAT ASK FOR IT (2026-08-28).
+  //
+  // `attackTimer` above is a pool-WIDE rhythm: whichever attack fires sets it,
+  // so a pool of two at 14 s each produces one attack every 14 s, alternating.
+  // That is exactly right for the Tyrant, whose two moves are two halves of
+  // one beat and were authored as such -- and it cannot express the Dinomech,
+  // whose owner's brief gives its salvo a 12 s cooldown and its tail slam a
+  // 10 s one. Under a shared timer those two numbers would produce each attack
+  // once every 22 s, which is neither of them.
+  //
+  // So a spec may carry `independentCooldown: true` and keep its own clock.
+  // Read off the SPEC, never off a type id (see the header on Enemy.TYPES),
+  // and OPT-IN: a pool with no such spec never looks at this array, so every
+  // type that predates it -- the Tyrant included -- keeps the exact rhythm it
+  // was balanced with. These start FULL for the same reason `attackTimer`
+  // does.
+  this.attackTimers = [];
+  for (var at = 0; at < this.attacks.length; at++) {
+    this.attackTimers.push(this.attacks[at].intervalSeconds || 0);
+  }
+
   // Wind-up. An attack with `windUpSeconds` makes the enemy STOP for that long
   // before it resolves -- a telegraph, and the reason a heavy attack is fair.
   // `windUpAttack` is the spec it committed to, so the attack that lands is
@@ -310,6 +331,49 @@ function Enemy(path, health, typeId, overrides) {
   this.windUpTarget = null;
   this.shockwaveFlash = 0;           // cosmetic, for a leap's landing
   this.attackBeam = null;            // cosmetic, {x, y, life} -- where a shot went
+
+  // A TAIL SLAM'S OWN FLASH, and it is a second channel rather than a reuse of
+  // `attackFlash` for one reason: `attackFlash` is set by EVERY attack that
+  // resolves, and the Dinomech has two. A renderer driving a tail off it would
+  // swing the tail when the silos fired, which is a picture of the wrong
+  // mechanic. Set to 1 by a `slam` spec and by nothing else, and decayed at
+  // the same rate `attackFlash` is so the two gestures read as one language.
+  //
+  // Cosmetic, like `attackBeam`: the stun and the radius above it are already
+  // decided by the time this is written, and nothing in the simulation reads
+  // it back.
+  this.slamFlash = 0;
+  // Where the tail came down, in board px, for as long as `slamFlash` lasts.
+  // The renderers draw the shockwave ring there; a slam whose radius was drawn
+  // around the BODY would be pointing at the wrong end of a body that is 148
+  // px long.
+  this.slamAt = null;
+
+  // THE SHOTS A SALVO HAS COMMITTED TO AND NOT YET PUT IN THE AIR.
+  //
+  // Filled by resolveAttack, drained by the caller. This file does not know
+  // js/systems/missiles.js exists and must not: the same arrangement
+  // `deathEffect` has with js/systems/hazards.js, where the TYPE declares the
+  // effect, the enemy carries the fact, and the one place that owns the board
+  // -- update() in js/game.js -- is the only thing that touches the system.
+  // Enemy.spawnMinions hands its brood back the same way and for the same
+  // reason.
+  this.salvoLaunches = [];
+
+  // THE DETERMINISTIC STREAM A SALVO PICKS ITS TARGETS OUT OF.
+  //
+  // The Dinomech's brief asks for six towers "at random", and this project
+  // does not use Math.random in the simulation -- see Enemy.laneOffsetFor and
+  // the note on the boss's attack cycle -- because a run that cannot be
+  // replayed cannot be tested. A seeded xorshift is random to the player and
+  // reproducible to the harness, and it is the same arrangement BlubTower
+  // makes for "un point aleatoire".
+  //
+  // SEEDED FROM `laneIndex`, which is this body's own spawn number: unique,
+  // monotonic, and reset by Enemy.resetLanes when the run restarts. So two
+  // Dinomechs on one board do not fire the same salvo, and the same run
+  // produces the same salvo every time it is played.
+  this.salvoRng = Enemy.seedFrom(this.laneIndex);
 
   // THE TETHERS A SUPPORT PULSE THREW, and the one place in this file that
   // holds a reference to another enemy.
@@ -1391,6 +1455,33 @@ Enemy.TYPES = {
         immuneSeconds: 4,           // AFTER it recovers, so 2 + 4 = 6 s of
                                     // invalidity from the moment it goes dark
         immunityKey: "sapper"
+      },
+      // THE DISCHARGE, added 2026-08-28 at the owner's instruction: "for the
+      // sapper, make the electric beams appear as they hit the affected
+      // tower." Presentation only, carried on the spec exactly as the Tyrant's
+      // `eyeBeam` is -- see Enemy.prototype.makeAttackBeam.
+      //
+      // IT IS THE MOMENT OF CONTACT AND NOT THE TELEGRAPH. The 1.1 s cord that
+      // says WHICH tower is about to go dark is drawn from `windUpTarget` and
+      // already existed on both boards; what was missing is the half-second
+      // where the mechanic actually happens, which until now was a plain
+      // orange line on the 2D board and nothing at all on the 3D one -- so the
+      // tower simply stopped, and stopping is what a bug looks like.
+      //
+      // 0.55 s IS HALF THE TELEGRAPH AND A QUARTER OF THE STUN. Long enough to
+      // read as a discharge rather than a flicker, short enough that what is
+      // left of the two dark seconds belongs to the tower's own stun mark and
+      // not to the Sapper.
+      //
+      // 96,226,214 is the Sapper's own body colour, read off nothing -- it is
+      // typed here because a palette entry is what a colour is, and the two
+      // renderers already spell it the same way for the telegraph.
+      arcBeam: {
+        seconds: 0.55,
+        bolts: 3,                   // one is a wire, three is a discharge
+        jitterUl: 11,               // how far a filament strays off the line
+        liftRadii: 0.9,             // it leaves the prongs, not the wheels
+        tint: "96,226,214"
       }
     }
   },
@@ -1490,12 +1581,52 @@ Enemy.TYPES = {
                                     // margin the fastest that acts on towers
     color: { r: 190, g: 240, b: 62 },
     outlineWidth: 2,
-    sizeScale: 0.9,
+    // 0.6 SINCE 2026-08-28, at the owner's instruction ("make them smaller").
+    // It was 0.9. This is the knob that moves the WHOLE body and not only the
+    // mesh -- `radiusPx` is sizeScale times Enemy.RADIUS_PX, so the hit box,
+    // the health bar, the cast shadow, the frost ring and the death burst all
+    // shrink with the picture and stay in register. Shrinking the imported
+    // model instead (`default_size` on the `volatile` rig in
+    // tools/glb_to_model.py) would have drawn a smaller animal standing inside
+    // the hit box it used to fill.
+    //
+    // AND THAT IS A GAMEPLAY CHANGE, not a skin: a 6.6 px body is a smaller
+    // thing for a round to intersect than a 9.9 px one, so the type that
+    // "almost any shot kills" is now marginally harder for a shot to FIND.
+    // That is the trade the instruction buys and it is written down here
+    // rather than discovered later. 0.6 is still above the Swarm's 0.55, which
+    // remains the smallest body on the roster.
+    sizeScale: 0.6,
     laneSpread: 0.8,
     attack: {
       damage: 13,                   // the same 13 the charge deals
       reachUl: 75,                  // how far it will cross to reach a tower
       intervalSeconds: 0,           // see above -- it never gets a second swing
+      // THE LEAP IS 0.28 s LONG, AND IT HAS TO BE (2026-08-28, at the owner's
+      // instruction: "add a jumping animation where we see them jump into the
+      // towers"). A dive that resolves on the step it is chosen is a body that
+      // teleports: there is no interval for a renderer to draw an arc across,
+      // and no frame in which the thing is in the air. So the dive now uses
+      // the wind-up every other telegraphed attack in this file uses, and
+      // BOTH renderers spend it flying -- see `leapPose`, which is the one
+      // place either board turns this number into a position.
+      //
+      // `commitsTarget` FREEZES THE GUN IT IS AIMED AT, which is what makes
+      // the picture honest rather than approximately right: the arc is drawn
+      // at `windUpTarget` from the first frame, so the tower it visibly leaves
+      // the road for is the tower it lands on. Without it the dive re-picks
+      // when it resolves and an arc already halfway across the board could end
+      // somewhere else. See the `lunge` branch in resolveAttack for what
+      // happens when that tower is gone before it arrives.
+      //
+      // WHAT IT COSTS THE PLAYER IS WHAT A WIND-UP ALWAYS COSTS THE ENEMY: the
+      // body STOPS for those 0.28 s (currentSpeedUlps), so it commits from 75
+      // u.l. out and then covers no ground of its own. A gun that kills it in
+      // the air pays nothing at all -- there is no fizzle refund and no second
+      // swing, because `intervalSeconds` is 0 and a dead body cancels its own
+      // telegraph at the top of attackTowers.
+      windUpSeconds: 0.28,
+      commitsTarget: true,
       lunge: true,                  // move ONTO the tower, then hit it
       selfDestructs: true           // and die of the impact
     },
@@ -1536,23 +1667,52 @@ Enemy.TYPES = {
   // as long as it takes. That IS the fight: the Tyrant asks whether the board
   // has DEPTH, and this one asks whether it has THROUGHPUT.
   //
-  // IT BREAKS TOWERS WHERE THE TYRANT SILENCES THEM. Two attacks in a pool it
-  // cycles deterministically (`attackIndex`, never Math.random), and the split
-  // between them is the same shape as the Tyrant's -- one blow that picks the
-  // board's single best gun wherever it stands, one that takes a whole corner:
+  // IT BREAKS TOWERS WHERE THE TYRANT SILENCES THEM. Two attacks in a pool,
+  // and the split between them is the same shape as the Tyrant's -- one blow
+  // that reaches across the whole board, one that takes a whole corner. Both
+  // were retuned on 2026-08-28 at the owner's instruction, and the new pair is
+  // the type's whole character:
   //
-  //   RAIL      60 damage and a 2.5 s stun to the highest-DPS tower on the
-  //             board, every 14 s, after a 1.4 s wind-up. No `reachUl`, so it
-  //             is the whole map, exactly as the Tyrant's aimed shot is.
-  //   STOMP     it crouches for 2 s, jumps 70 u.l. up the road and lands with a
-  //             140 u.l. shockwave for 90 damage. NO STUN AT ALL, deliberately:
-  //             a tower caught by this is meant to be REBUILT, not waited out,
-  //             and stacking a second silence on top of the rail would make the
-  //             fight a lockout rather than a race.
+  //   SILO SALVO   every 12 s it opens its racks and puts SIX missiles in the
+  //                air, one each at six towers picked AT RANDOM anywhere on the
+  //                map. Each warhead deals 45 when it arrives. With six or more
+  //                towers standing, six different guns are hit; with fewer, one
+  //                tower can take several; with none, nothing is fired.
+  //   TAIL SLAM    every 10 s it brings its tail down behind itself and stuns
+  //                everything within 80 u.l. of where it landed for 3 s. NO
+  //                DAMAGE AT ALL -- the salvo is the damage and this is the
+  //                silence, and a move that did both would leave nothing for
+  //                the other one to be.
   //
-  // Both stop it dead for their wind-up (`currentSpeedUlps` enforces it), which
+  // THE TWO COOLDOWNS ARE INDEPENDENT, and that is a change to the ENGINE
+  // rather than a number here: `attackTimer` is a pool-wide rhythm, so 12 and
+  // 10 under it would produce each attack once every 22 s. Both specs carry
+  // `independentCooldown`, which gives each its own clock -- see the field in
+  // the Enemy constructor and its gate in attackTowers. Every type that
+  // predates the flag, the Tyrant included, keeps the shared rhythm it was
+  // balanced with.
+  //
+  // WHY THE SALVO IS PROJECTILES AND NOT A NUMBER SUBTRACTED IN PLACE. The
+  // owner's brief asks for the missiles to be VISIBLE leaving the silos and
+  // arriving, and the honest way to draw a thing arriving is for it to arrive:
+  // the flight is simulated in js/systems/missiles.js on the same fixed step as
+  // everything else, so the damage lands when the warhead does. Two consequences
+  // fall out of that and both are the mechanic rather than side effects -- a
+  // tower sold while a missile is in the air costs nothing, and a missile
+  // already launched cannot be redirected onto a different gun.
+  //
+  // 6 x 45 IS 270 A VOLLEY, against the rail-and-stomp pair's 60 and 90. That
+  // is a large step up in raw output and it is meant to be, because it is
+  // SPREAD: the old pair concentrated everything on the board's best tower and
+  // one corner, and this one is six holes in six places. A wide board eats it;
+  // a board of six towers loses 45 off every one of them every twelve seconds.
+  //
+  // BOTH STOP IT DEAD FOR THEIR WIND-UP (`currentSpeedUlps` enforces it), which
   // is what keeps a heavy blow fair and is also the only thing that makes 45 000
-  // hit points crossable at all inside a wave with no ceiling.
+  // hit points crossable at all inside a wave with no ceiling. The salvo's is
+  // the longer of the two: 1.4 s of silo doors, against 0.7 s of a tail coming
+  // up. What the player buys with those seconds is the same thing the Sapper's
+  // telegraph buys -- time to read what is about to happen.
   //
   // SPEED 0.25 -- 12.5 u.l./s, the slowest body in the game, under the Tyrant's
   // 15. It crosses the reference route in about two and a half minutes if
@@ -1565,16 +1725,30 @@ Enemy.TYPES = {
   // to buy. It is paid so the final kill still reads as a kill; it is not a
   // purse anybody can spend.
   //
-  // NO MESH. There is no js/gl/models/enemy-dinomech.js, so `enemyModel` finds
-  // nothing and the 3D board draws it as an untextured sphere at sizeScale 2.6
-  // -- the documented fallback for every unmodelled type. That is a known
-  // visual gap and it is recorded in AGENTS.md rather than hidden here; adding
-  // a body is a modelling job with its own gates, not a side effect of a
-  // schedule change.
+  // IT HAS A BODY (2026-08-28). js/gl/models/enemy-dinomech.js is
+  // `glb/dinomech.glb` imported through the `saurian` rig -- the only rig in
+  // tools/glb_to_model.py that reads its grouping off the geometry rather than
+  // off names, because that file arrives as one undivided mesh. It is 1.041
+  // model units tall, which at sizeScale 2.6 is 86 board px and makes it the
+  // tallest body in the game, and 1.787 units long, which is 148 -- by a wide
+  // margin the longest, because 45% of it is straight tail. The TAIL is a
+  // group of its own, and that is not for the walk: it is what
+  // js/gl/gl-world.js swings for the slam.
+  //
+  // A DIFFERENT ANIMAL WORE THIS TYPE FOR ONE DAY. `glb/biomech.glb`, a
+  // generated 502 250-triangle QUADRUPED with its tail curled over its own
+  // back, was swapped in on 2026-08-28 and WITHDRAWN on 2026-08-29; the
+  // skeletal biped is the body again. Nothing on this row moved in either
+  // direction: a body is not a stat block, and every number below was balanced
+  // against the schedule rather than against a silhouette. What the round trip
+  // did cost is written up in the rig -- the two meshes face OPPOSITE ways,
+  // and a rig left carrying the other one's `source_forward` walks the finale
+  // down the road tail-first with every instrument in the toolchain reporting
+  // green.
   dinomech: {
     id: "dinomech",
     displayName: "Dinomech",
-    description: "The Normal campaign's final boss: 45 000 hit points of walking siege frame, with no shield, no second life and no phase change. It rails the board's single best tower for 60 and a 2.5 s stun, and stomps for 90 across a 140 u.l. landing with no stun at all. Nothing heals it, nothing shields it, and it calls nothing in -- what it asks for is sustained damage, for as long as it takes.",
+    description: "The Normal campaign's final boss: 45 000 hit points of walking siege frame, with no shield, no second life and no phase change. Every 12 s its silos put six missiles in the air at six towers chosen at random anywhere on the map, 45 damage each; every 10 s its tail comes down behind it and stuns everything within 80 u.l. for 3 s. Nothing heals it, nothing shields it, and it calls nothing in -- what it asks for is sustained damage, for as long as it takes.",
     health: 45000,
     bounty: 6000,
     speedMultiplier: 0.25,          // 12.5 u.l./s -- slower than the Tyrant
@@ -1586,27 +1760,66 @@ Enemy.TYPES = {
     // No armor and no defense, for the Tyrant's reason: 45 000 is meant to be a
     // wall you grind, not a wall that also taxes every shot that reaches it.
     attacks: [{
-      id: "rail",
+      id: "silo-salvo",
       windUpSeconds: 1.4,
-      intervalSeconds: 14,
-      // NO reachUl -- a missing reach is the whole map, the same reading
-      // attackCandidates gives the Tyrant's aimed shot.
-      target: "highestDps",
-      targets: 1,
-      damage: 60,
-      stunSeconds: 2.5
-    }, {
-      id: "stomp",
-      windUpSeconds: 2,
-      intervalSeconds: 14,
-      reachUl: 240,                 // how far a tower may be and still be worth
-                                    // jumping at
-      damage: 90,
-      // Deliberately no stunSeconds. See the note above.
-      leap: {
-        distanceUl: 70,
-        radiusUl: 140
+      intervalSeconds: 12,
+      independentCooldown: true,
+      // NO reachUl and NO `damage`. The reach is the whole map, the same
+      // reading attackCandidates gives the Tyrant's aimed shot -- "6 towers on
+      // the map", not "6 towers near me". The damage lives on the warhead,
+      // where the thing that actually deals it reads it, and is absent here
+      // rather than 0 for the never-materialise-a-default reason the wave data
+      // follows: resolveAttack tests `spec.damage > 0`, so a salvo cannot also
+      // hit something on the spot.
+      salvo: {
+        shots: 6,
+        damage: 45,
+        // 340 u.l./s. Fast enough that a volley is not a lull the player waits
+        // through -- the far corner of a 1230 u.l. board is under four seconds
+        // away -- and slow enough that six streaks are six things you can
+        // watch, count and trace back to what they are aimed at.
+        speedUlps: 340,
+        // How high the arc rises over the middle of the flight, capped in
+        // js/systems/missiles.js against the length of the shot so a warhead
+        // fired at the gun beside it goes almost flat instead of looping.
+        apexUl: 90,
+        // The two racks, on the shoulders, in RADII of the body -- so they stay
+        // on the shoulders at sizeScale 2.6 rather than being a pixel count
+        // that is right at one size only. Measured against the mesh: the body
+        // is 1.79 u long against a plan radius of 1 u, so 0.45 radii back is
+        // just behind the hips and 1.15 up is the top of the spine.
+        silo: { backRadii: 0.45, liftRadii: 1.15, spreadRadii: 0.38 },
+        // How wide the explosion is DRAWN. Cosmetic: a missile damages the one
+        // tower it was aimed at and nothing else, which is what makes six
+        // warheads cost exactly six times one wherever the towers are standing.
+        blastRadiusUl: 26,
+        kind: "dinomech-missile"
       }
+    }, {
+      id: "tail-slam",
+      windUpSeconds: 0.7,
+      intervalSeconds: 10,
+      independentCooldown: true,
+      // Deliberately no `damage` and no `reachUl`. A slam is chosen by whether
+      // anything is inside its OWN radius, measured from the tail rather than
+      // from the body -- see Enemy.prototype.attackRadiusOf -- so it can never
+      // be telegraphed at a tower it would then miss.
+      slam: {
+        // How far behind the body the tail comes down, in radii. The mesh's
+        // tail runs from just behind the hips to 0.89 u back on a plan radius
+        // of 1 u, so 1.7 radii is the last third of it -- the part that is
+        // moving fastest and the part a player watching the animation would
+        // point at.
+        behindRadii: 1.7,
+        radiusUl: 80
+      },
+      // ON THE SPEC AND NOT INSIDE `slam`, which is exactly where the Tyrant's
+      // leap keeps its own damage and stun: a shape block says WHERE an attack
+      // reaches and the spec says WHAT it does when it gets there. So one
+      // per-tower loop in resolveAttack lands every attack in the game, and a
+      // slam that wanted damage as well would add `damage: n` here and need no
+      // code at all.
+      stunSeconds: 3
     }]
   }
 };
@@ -1739,6 +1952,33 @@ Enemy.laneSequence = 0;
 Enemy.resetLanes = function () { Enemy.laneSequence = 0; };
 
 Enemy.nextLaneIndex = function () { return Enemy.laneSequence++; };
+
+// --- the seeded stream a salvo picks its targets out of ---------------------
+//
+// The same xorshift BlubTower runs, written here rather than shared because
+// the two seed differently and neither file may require the other: a summoner
+// seeds off its own POSITION (two summoners on one board must not lay their
+// blubs down in the same pattern) and a body seeds off its SPAWN NUMBER (it
+// has no fixed position to seed from -- it is walking).
+//
+// Why a stream at all rather than a hash of the frame: a salvo makes six draws
+// in one instant, and a hash of anything the six share would return the same
+// tower six times.
+Enemy.seedFrom = function (index) {
+  var seed = (Math.imul(index + 1, 2654435761) ^ 0x5bf03635) >>> 0;
+  // A zero state is a fixed point of xorshift and would return 0 forever.
+  return seed === 0 ? 0x9e3779b9 : seed;
+};
+
+Enemy.prototype.nextRandom = function () {
+  var s = this.salvoRng >>> 0;
+  s ^= (s << 13) >>> 0;
+  s = s >>> 0;
+  s ^= s >>> 17;
+  s ^= (s << 5) >>> 0;
+  this.salvoRng = s >>> 0;
+  return (this.salvoRng >>> 8) / 16777216;      // 24 bits, [0, 1)
+};
 
 // Where the nth enemy walks across the road, in -1..1.
 //
@@ -2090,8 +2330,22 @@ Enemy.prototype.update = function (dt) {
   }
 
   if (this.attackBeam) {
-    this.attackBeam.life -= dt * 4;
+    // The rate is the beam's own: 4 for the plain bolt every attack has drawn
+    // since the Hedger (a quarter of a second), and 1/seconds for a spec that
+    // declared an `arcBeam`. See Enemy.prototype.makeAttackBeam.
+    this.attackBeam.life -= dt * (this.attackBeam.rate || 4);
     if (this.attackBeam.life <= 0) this.attackBeam = null;
+  }
+
+  // The tail's own flash, decayed at exactly the rate `attackFlash` is decayed
+  // at above -- shared constant, not a matching number -- so the swing and
+  // every other strike gesture in the game last the same 0.4 s. The landing
+  // point is dropped with it: a ring drawn at a point the renderer is no
+  // longer allowed to fade is a mark with nothing driving it.
+  if (this.slamFlash > 0) {
+    this.slamFlash = Math.max(0,
+      this.slamFlash - dt * Enemy.ATTACK_FLASH_DECAY_PER_SECOND);
+    if (this.slamFlash === 0) this.slamAt = null;
   }
 
   if (this.progress >= this.path.length) {
@@ -2630,7 +2884,28 @@ Enemy.traitsOf = function (source) {
   for (var i = 0; i < attacks.length; i++) {
     var a = attacks[i];
     var lead = (i === 0);
-    if (a.target === "highestDps") {
+    // THE TWO SHAPE BLOCKS COME FIRST, and the order is load-bearing rather
+    // than tidy: a `slam` carries `stunSeconds`, so the generic stun branch
+    // below would claim it and print "a 3 s stun every 10 s" with no mention
+    // of where the blow lands -- which is the one thing about a tail slam a
+    // player has to know, because it lands BEHIND a body 148 board px long.
+    if (a.salvo) {
+      add("attack-salvo", "Shells the whole board",
+        "Every " + a.intervalSeconds + " s its silos fire " +
+        plural(a.salvo.shots, "missile") + " at towers chosen at random " +
+        "anywhere on the map, " + a.salvo.damage +
+        " damage each. With fewer towers standing than missiles, one tower " +
+        "takes several; with none standing, it fires nothing. Nothing is " +
+        "dealt until a warhead arrives, so a tower sold in flight costs it.",
+        C.blast, lead ? "SHELLS THE WHOLE BOARD" : null);
+    } else if (a.slam) {
+      add("attack-slam", "Slams its tail",
+        "Every " + a.intervalSeconds + " s it brings its tail down BEHIND " +
+        "itself and silences every tower within " + a.slam.radiusUl +
+        " u.l. of the landing for " + (a.stunSeconds || 0) +
+        " s. It deals no damage — what it takes is the seconds.",
+        C.disable, lead ? "SLAMS ITS TAIL" : null);
+    } else if (a.target === "highestDps") {
       add("attack-best", "Hunts your best tower",
         (a.damage || 0) + " damage" +
         (a.stunSeconds ? " and a " + a.stunSeconds + " s stun" : "") +
@@ -2962,6 +3237,48 @@ Enemy.prototype.committedTargetValid = function (spec, tower, towers) {
   return true;
 };
 
+// --- where an attack is measured FROM, and how far it reaches ---------------
+//
+// Every attack in the game before 2026-08-28 was measured from the body's own
+// `pos` and bounded by its own `reachUl`, and those two lines were written
+// straight into attackTowers. A `slam` is not: it is a blow struck by the far
+// end of a body 148 board px long, and the tower it can reach is the tower
+// near the TAIL, not the tower near the animal. Measuring it from `pos` would
+// have made a 80 u.l. shockwave that lands behind the machine be chosen as
+// though it landed under the machine -- so the Dinomech would telegraph a slam
+// at the gun in front of its nose and then hit nothing at all.
+//
+// SO THE ORIGIN AND THE REACH ARE READ OFF THE SPEC, in one place, used by
+// BOTH the eligibility test and the resolution -- which is what makes "a slam
+// that was chosen is a slam that connects" true by construction rather than by
+// two pieces of arithmetic agreeing. Every other spec answers exactly what it
+// answered before: `pos` and `reachUl`, with a missing reach meaning the whole
+// map.
+
+// Where the tail comes down, in board px. Behind the body along its own
+// heading, by a distance in RADII rather than pixels -- the same unit
+// FLIGHT_LIFT_RADII and a hover's `liftRadii` use -- so it stays at the tail of
+// the mesh at whatever sizeScale the type is drawn at instead of being a pixel
+// count that is right at one size only.
+//
+// A body with no heading (one that has not moved yet) slams straight backwards
+// along +x, which is the road's own direction at the start of every route.
+Enemy.prototype.slamPoint = function (spec) {
+  var slam = spec && spec.slam;
+  if (!slam) return this.pos;
+  var heading = this.headingVec() || { x: 1, y: 0 };
+  var back = this.radiusPx() * (slam.behindRadii || 0);
+  return { x: this.pos.x - heading.x * back, y: this.pos.y - heading.y * back };
+};
+
+Enemy.prototype.attackOriginOf = function (spec) {
+  return spec && spec.slam ? this.slamPoint(spec) : this.pos;
+};
+
+Enemy.prototype.attackRadiusOf = function (spec) {
+  return spec && spec.slam ? spec.slam.radiusUl : (spec ? spec.reachUl : undefined);
+};
+
 // The towers an attack would hit, best first. `spec.target` picks the ordering:
 // "highestDps" for the boss's aimed shot, nearest for everything else.
 Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
@@ -3093,8 +3410,33 @@ Enemy.prototype.attackTowers = function (dt, towers) {
     return this.resolveAttack(committed, towers, committedTarget);
   }
 
+  // EVERY CLOCK RUNS, AND WHICH ONE GATES AN ATTACK IS THE SPEC'S TO SAY.
+  //
+  // `attackTimer` is the pool-wide rhythm every type before 2026-08-28 has;
+  // `attackTimers[i]` is one spec's own, and only a spec that asked for it
+  // (`independentCooldown`) is gated by it. Both are decremented every step
+  // whether or not anything reads them, because a clock that only runs while
+  // it is being watched drifts the moment two of them exist.
+  //
+  // A POOL WITH NO INDEPENDENT SPEC IS BIT-IDENTICAL TO WHAT THIS DID BEFORE:
+  // `shared` is false only when at least one spec opted in, so the early
+  // return below is the same early return, on the same timer, at the same
+  // moment.
   this.attackTimer -= dt;
-  if (this.attackTimer > 0) return null;
+  var shared = this.attackTimer <= 0;
+  var anyIndependent = false;
+  var ready = false;
+  for (var ti = 0; ti < this.attacks.length; ti++) {
+    if (!this.attacks[ti].independentCooldown) {
+      if (shared) ready = true;
+      continue;
+    }
+    anyIndependent = true;
+    this.attackTimers[ti] -= dt;
+    if (this.attackTimers[ti] <= 0) ready = true;
+  }
+  if (!anyIndependent) ready = shared;
+  if (!ready) return null;
 
   // IT NEVER SKIPS ITS TURN WHILE THERE IS ANYTHING TO HIT (2026-07-30, at the
   // owner's instruction: "make sure he never stops attacking but keep his
@@ -3123,12 +3465,34 @@ Enemy.prototype.attackTowers = function (dt, towers) {
   // Checked BEFORE the wind-up so a boss does not stand still telegraphing at
   // an empty stretch of road.
   var spec = null;
+  var specIndex = -1;
   var candidates = null;
   for (var i = 0; i < this.attacks.length; i++) {
-    var option = this.attacks[(this.attackIndex + i) % this.attacks.length];
-    var found = this.attackCandidates(option, towers, option.reachUl);
+    var pick = (this.attackIndex + i) % this.attacks.length;
+    var option = this.attacks[pick];
+    // AN ATTACK IS ONLY AN OPTION WHILE THE CLOCK THAT GATES IT IS UP, and
+    // which clock that is, is the spec's to say. Without the first half the
+    // round-robin would let a ready salvo fire on the tail slam's turn, which
+    // is the whole thing independent cooldowns exist to stop.
+    //
+    // THE SECOND HALF IS FOR A POOL THIS ROSTER DOES NOT HAVE YET: one that
+    // MIXES a spec on its own clock with a spec on the pool's. `ready` above
+    // is true if EITHER kind came up, so without this test an independent
+    // timer expiring would be enough to fire a shared-timer spec that still
+    // had ten seconds left on it. It is a no-op on every pool that exists --
+    // an all-shared pool cannot reach this line unless `shared` is true, and
+    // an all-independent one never evaluates it -- and it is here so that the
+    // first mixed pool written is not the thing that discovers the hole.
+    if (option.independentCooldown) {
+      if (this.attackTimers[pick] > 0) continue;
+    } else if (!shared) {
+      continue;
+    }
+    var found = this.attackCandidates(option, towers,
+      this.attackRadiusOf(option), this.attackOriginOf(option));
     if (found.length) {
       spec = option;
+      specIndex = pick;
       candidates = found;          // reused below rather than searched twice
       this.attackIndex += i;      // a skipped attack loses its turn, it does not queue
       break;
@@ -3142,7 +3506,12 @@ Enemy.prototype.attackTowers = function (dt, towers) {
   if (!spec) return null;
 
   this.attackIndex++;
-  this.attackTimer = spec.intervalSeconds;
+  // WHICHEVER CLOCK GATED IT IS THE CLOCK THAT IS SPENT, and only that one. A
+  // spec on its own timer must not reset the pool's rhythm -- doing so would
+  // silence every OTHER spec in the pool for its interval, which is exactly
+  // the coupling `independentCooldown` was added to remove.
+  if (spec.independentCooldown) this.attackTimers[specIndex] = spec.intervalSeconds;
+  else this.attackTimer = spec.intervalSeconds;
 
   // Opt-in on the SPEC, never on the type id (see the header on Enemy.TYPES):
   // a plural `attacks` pool may carry the flag on one element and not the
@@ -3227,6 +3596,153 @@ Enemy.prototype.emitEyeBeam = function (spec, tower) {
     "tyrant-blast", { life: eye.blastLife || 0.5 });
 };
 
+// --- WHERE A SHOT WENT, AND WHAT IT LOOKED LIKE -----------------------------
+//
+// `attackBeam` has been a straight orange line from a body's centre to the
+// tower it hit since the Hedger was the only thing that hit towers, and it
+// stays exactly that for every spec that says nothing else. What a spec may
+// now say is `arcBeam`, which is presentation data carried on the SPEC in the
+// same way `eyeBeam` already is -- never on a type id -- and it is the whole
+// of the answer to the owner's instruction of 2026-08-28: "for the sapper,
+// make the electric beams appear as they hit the affected tower."
+//
+// WHY IT IS A FIELD ON THE BODY AND NOT AN `Effects.aoeImpact` LIKE THE
+// TYRANT'S GAZE. A gaze is a straight line that fades; an arc is a line that
+// WRITHES, so it has to be redrawn differently on every frame of its life, and
+// an Effects mark is authored once at the moment it is emitted. Living on the
+// body also means it dies with the body -- a Sapper shot dead half a second
+// after it fired takes its discharge with it, which a mark in a global list
+// would not do.
+//
+// WHAT IT CARRIES, all optional, all read off the spec by the two renderers:
+//
+//   seconds     how long the discharge lasts. `rate` below is 1/seconds
+//   bolts       how many separate filaments are drawn between the two ends
+//   jitterUl    how far a filament may stray from the straight line
+//   tint        "r,g,b"
+//   liftRadii   how high up the body the filaments leave from, in radii
+//
+// NOTHING HERE IS READ BACK BY THE SIMULATION. The tower went dark when
+// TowerHealth.stun was called a few lines below; this says so on screen, and a
+// game with no renderer plays identically -- the standing rule for everything
+// cosmetic in this project.
+Enemy.prototype.makeAttackBeam = function (spec, tower) {
+  var arc = spec.arcBeam || null;
+  return {
+    x: tower.x, y: tower.y, life: 1,
+    arc: arc,
+    // The plain bolt's 4 is a quarter of a second and is what every attack
+    // before this drew; an arc declares its own life in SECONDS, which is the
+    // unit a person authoring one thinks in, and this is the only place the
+    // reciprocal is taken.
+    rate: arc && arc.seconds > 0 ? 1 / arc.seconds : 4
+  };
+};
+
+// --- THE SILO SALVO ---------------------------------------------------------
+//
+// 2026-08-28, at the owner's instruction: "dinomech chooses 6 towers at random
+// on the map and fires 1 missile from his silo at those towers. if less than 6
+// towers are on the board, 1 tower can receive multiple missiles. if no
+// towers, no missiles."
+//
+// ALL THREE OF THOSE SENTENCES ARE ONE RULE, and it is the bag below. Draw
+// without replacement until the bag is empty, then refill it and keep drawing:
+// with six or more towers on the board every warhead lands on a different gun,
+// with two towers each of them takes three, and with none the bag is empty on
+// the first refill and the loop makes nothing. There is no case in here for
+// "fewer than six" -- it is what drawing from a bag does.
+//
+// RANDOM TO THE PLAYER, REPRODUCIBLE TO THE HARNESS. `nextRandom` is the
+// seeded xorshift the constructor gives every body (see Enemy.seedFrom): the
+// same run fires the same salvo every time it is played, two Dinomechs on one
+// board do not fire the same salvo as each other, and no pinned kill or leak
+// figure in the suite becomes a coin toss. Math.random lives in js/effects.js
+// and nowhere else in this game's simulation.
+Enemy.prototype.salvoTargets = function (spec, towers) {
+  // The whole map: a salvo has no `reachUl` and is not meant to have one --
+  // "6 towers on the map", not "6 towers near me".
+  var pool = this.attackCandidates(spec, towers);
+  var shots = spec.salvo.shots || 0;
+  var picks = [];
+  var bag = [];
+  while (picks.length < shots) {
+    if (!bag.length) {
+      if (!pool.length) break;         // no towers: no missiles, and no loop
+      bag = pool.slice();
+    }
+    var k = Math.floor(this.nextRandom() * bag.length);
+    // nextRandom is [0, 1) so this cannot reach bag.length -- clamped anyway,
+    // because an off-by-one here would be an undefined tower handed to the
+    // missile system three seconds after the mistake was made.
+    if (k >= bag.length) k = bag.length - 1;
+    picks.push(bag[k].tower);
+    bag.splice(k, 1);
+  }
+  return picks;
+};
+
+// Where the nth missile of a salvo leaves the body.
+//
+// TWO SILOS, ALTERNATING, and the pair is not decoration: six warheads leaving
+// one point read as a fountain, and six leaving two shoulders read as a
+// machine emptying its racks. Which one a shot uses is the shot's ORDINAL, so
+// it is the same on every replay.
+//
+// MEASURED IN RADII, like FLIGHT_LIFT_RADII and a hover's own `liftRadii`, so
+// the silos stay on the shoulders at whatever sizeScale the type is drawn at
+// instead of being a pixel count that is right at one size only. `backRadii`
+// walks back along the body's own heading, `spreadRadii` steps sideways off
+// it, and `liftRadii` is a real height above the road -- carried separately
+// from x and y for the reason js/effects.js gives for `lift`: on the 3D board
+// a launch height is a height, and folding it into `y` would slide the missile
+// northwards across the map.
+Enemy.prototype.siloPoint = function (spec, ordinal) {
+  var silo = (spec.salvo && spec.salvo.silo) || {};
+  var r = this.radiusPx();
+  var heading = this.headingVec() || { x: 1, y: 0 };
+  var side = { x: -heading.y, y: heading.x };
+  var back = r * (silo.backRadii || 0);
+  var out = r * (silo.spreadRadii || 0) * (ordinal % 2 === 0 ? 1 : -1);
+  return {
+    x: this.pos.x - heading.x * back + side.x * out,
+    y: this.pos.y - heading.y * back + side.y * out,
+    lift: r * (silo.liftRadii || 0) + this.visualBodyLift()
+  };
+};
+
+// Commit a salvo: choose the towers and record one launch per warhead.
+//
+// NOTHING IS DAMAGED HERE and nothing is put in the air here. The launches go
+// onto `salvoLaunches` for the caller to drain -- see the note on that field
+// -- so this file stays ignorant of js/systems/missiles.js exactly as it is
+// ignorant of js/systems/hazards.js.
+Enemy.prototype.fireSalvo = function (spec, towers) {
+  var picks = this.salvoTargets(spec, towers);
+  for (var i = 0; i < picks.length; i++) {
+    this.salvoLaunches.push({
+      from: this.siloPoint(spec, i),
+      tower: picks[i],
+      spec: spec.salvo
+    });
+  }
+  return picks.length;
+};
+
+// Hand over whatever is waiting in the silos, and empty them.
+//
+// Returns the live array and replaces it, rather than copying: the caller is
+// the board and consumes it immediately. Called every step by update() in
+// js/game.js, which is the same one-way seam Enemy.spawnMinions has with the
+// brood it makes -- and the reason a body with no salvo costs one length
+// check.
+Enemy.prototype.takeSalvo = function () {
+  if (!this.salvoLaunches.length) return this.salvoLaunches;
+  var out = this.salvoLaunches;
+  this.salvoLaunches = [];
+  return out;
+};
+
 // Land an attack that has finished winding up (or had no wind-up).
 Enemy.prototype.resolveAttack = function (spec, towers, committed) {
   if (!spec) return null;
@@ -3234,7 +3750,42 @@ Enemy.prototype.resolveAttack = function (spec, towers, committed) {
 
   var hits;
 
-  if (spec.leap) {
+  if (spec.salvo) {
+    // OPEN THE SILOS. Nothing is damaged HERE: the salvo picks its targets,
+    // puts a missile in the air at each of them, and every one of those
+    // missiles deals its own damage when it ARRIVES, in js/systems/missiles.js,
+    // on the same fixed step as the rest of the simulation.
+    //
+    // THAT SEPARATION IS THE MECHANIC AND NOT A RENDERING DETAIL. The player
+    // is given the flight time to watch six warheads leave one body and pick
+    // out six of their own guns, and the towers that are hit are the ones that
+    // were chosen -- not the ones that happen to be standing when the damage
+    // lands. Selling a tower in the two seconds a missile is in the air saves
+    // its hit points and does not redirect the missile; see Missiles.launch.
+    //
+    // `hits` IS LEFT EMPTY ON PURPOSE, and the loop below therefore does
+    // nothing. `spec.damage` is deliberately absent from a salvo spec -- the
+    // damage lives on `salvo.damage`, where the thing that actually deals it
+    // reads it -- so even a `hits` that was not empty could not double up.
+    hits = [];
+    this.fireSalvo(spec, towers);
+    this.lastBlastRadiusUl = 0;
+  } else if (spec.slam) {
+    // BRING THE TAIL DOWN. An area blow like a leap's landing, and the one
+    // difference is the only one that matters: a leap hits around where the
+    // body JUMPED TO and this hits around where the body's far end came down,
+    // which on a machine 148 board px long is nowhere near the same place.
+    //
+    // See `slamPoint` for the geometry, and note that the SAME origin and the
+    // SAME radius chose this attack a moment ago in attackTowers -- so a slam
+    // that was telegraphed is a slam that connects.
+    var at = this.slamPoint(spec);
+    this.slamAt = { x: at.x, y: at.y };
+    this.slamFlash = 1;
+    this.lastBlastRadiusUl = spec.slam.radiusUl;
+    hits = this.attackCandidates(spec, towers, spec.slam.radiusUl, at);
+    // A shockwave takes EVERYTHING it reaches. `targets` is for aimed attacks.
+  } else if (spec.leap) {
     // JUMP FORWARD, then hit whatever is near where it landed. The order
     // matters and is the whole feel of the move: the shockwave belongs to the
     // landing, not to where it took off from.
@@ -3266,8 +3817,29 @@ Enemy.prototype.resolveAttack = function (spec, towers, committed) {
     // Hazards.fromDeath and to Effects.enemyKilled. So the charge is armed on
     // the tower it dived into, and the death burst plays there -- both for
     // free, with no case in either about who moved and when.
-    hits = this.attackCandidates(spec, towers, spec.reachUl)
-      .slice(0, spec.targets || 1);
+    // A COMMITTED DIVE LANDS ON THE TOWER IT WAS AIMED AT, and this is the
+    // half of `commitsTarget` that is about the SIMULATION rather than about
+    // the picture. Both boards draw the leap from the road to `windUpTarget`
+    // over the whole wind-up, so by the time this runs the player has watched
+    // a body cross the board at one particular gun; re-picking the nearest
+    // here would let it land on a different one -- most visibly when the gun
+    // it left for was destroyed mid-air and the next one along is behind it.
+    //
+    // AND IT FALLS BACK RATHER THAN FIZZLING, which is the opposite of what
+    // `commitsTarget` does for a Sapper's disable and is the right answer for
+    // this body. A fizzle costs a Sapper one cycle of a repeating attack; a
+    // Volatile has ONE swing in it and no cooldown to wait out, so a dive that
+    // declined to land would leave a live diver standing in the middle of the
+    // guns with its telegraph spent. If the tower it chose is gone it takes
+    // whatever else is in reach, and if nothing is, it does not die.
+    hits = null;
+    if (committed && this.committedTargetValid(spec, committed, towers)) {
+      hits = [{ tower: committed, d: 0, dps: Enemy.towerDps(committed) }];
+    }
+    if (!hits) {
+      hits = this.attackCandidates(spec, towers, spec.reachUl)
+        .slice(0, spec.targets || 1);
+    }
     if (hits.length) {
       // COPIED, never aliased: `pos` is replaced wholesale by positionAt()
       // every step, and holding the tower's own object would hand a mutable
@@ -3296,7 +3868,7 @@ Enemy.prototype.resolveAttack = function (spec, towers, committed) {
       ? [{ tower: committed, d: 0, dps: Enemy.towerDps(committed) }]
       : [];
     if (hits.length && !spec.eyeBeam) {
-      this.attackBeam = { x: hits[0].tower.x, y: hits[0].tower.y, life: 1 };
+      this.attackBeam = this.makeAttackBeam(spec, hits[0].tower);
     }
     this.lastBlastRadiusUl = 0;
   } else {
@@ -3310,7 +3882,7 @@ Enemy.prototype.resolveAttack = function (spec, towers, committed) {
       // one rather than drawing both -- see emitEyeBeam. The plain bolt leaves
       // the body's CENTRE, so on the Tyrant it read as a shot from the belly.
       if (!spec.eyeBeam) {
-        this.attackBeam = { x: hits[0].tower.x, y: hits[0].tower.y, life: 1 };
+        this.attackBeam = this.makeAttackBeam(spec, hits[0].tower);
       } else {
         this.emitEyeBeam(spec, hits[0].tower);
       }
@@ -3348,17 +3920,26 @@ Enemy.prototype.resolveAttack = function (spec, towers, committed) {
   // shot meant for a real tower -- and an AREA attack sweeps them separately
   // here for its stun alone.
   //
-  // Only a leap qualifies. An aimed shot picks one tower by name and has no
-  // area to speak of, so making it silence the blubs beside its victim would be
-  // inventing reach the attack does not have.
-  if (spec.leap && spec.stunSeconds > 0 && typeof TowerHealth !== "undefined") {
-    var wave = ul(spec.leap.radiusUl);
+  // Only an AREA attack qualifies -- a leap's landing, or a tail slam. An
+  // aimed shot picks one tower by name and has no area to speak of, so making
+  // it silence the blubs beside its victim would be inventing reach the attack
+  // does not have; and a salvo aims six warheads at six towers, which is six
+  // aimed shots and not an area at all.
+  //
+  // THE CENTRE IS THE ATTACK'S OWN ORIGIN, not `pos`, which is why this reads
+  // it through the same pair of helpers the candidate search does: a slam
+  // centred on the body would silence blubs standing beside the animal and
+  // spare the ones standing under the tail it just dropped on them.
+  var area = spec.leap ? spec.leap.radiusUl : (spec.slam ? spec.slam.radiusUl : 0);
+  if (area > 0 && spec.stunSeconds > 0 && typeof TowerHealth !== "undefined") {
+    var centre = this.attackOriginOf(spec);
+    var wave = ul(area);
     for (var s = 0; s < towers.length; s++) {
       var summon = towers[s];
       if (!summon.isSummon || summon.enemyTargetable) continue;
       if (summon.isDestroyed && summon.isDestroyed()) continue;
-      var sdx = summon.x - this.pos.x;
-      var sdy = summon.y - this.pos.y;
+      var sdx = summon.x - centre.x;
+      var sdy = summon.y - centre.y;
       if (sdx * sdx + sdy * sdy > wave * wave) continue;
       TowerHealth.stun(summon, spec.stunSeconds);
     }
@@ -3927,6 +4508,84 @@ Enemy.prototype.knockBack = function (distancePx) {
 //
 // Omitting the argument keeps the 2D reading, so every existing caller and
 // every fixture that passes two arguments behaves exactly as before.
+// --- the flat board's electrical discharge ----------------------------------
+//
+// The 2D twin of drawDischarge in js/gl/gl-world.js: same field, same spec
+// block, same deterministic wobble, and neither renderer knows the other
+// exists. See Enemy.prototype.makeAttackBeam for what `arcBeam` carries and
+// why the mark lives on the body rather than in Effects.
+//
+// DETERMINISTIC, NOT RANDOM. Math.random lives in js/effects.js and nowhere
+// else in this game's frame, so the ragged line is a hash of the filament, the
+// segment and a coarse bucket of the beam's own remaining life -- which also
+// makes it SNAP between shapes at a fixed rate rather than shimmering with
+// whatever frame rate the machine is running at.
+Enemy.arcNoise = function (seed) {
+  var v = Math.sin(seed * 12.9898) * 43758.5453;
+  return v - Math.floor(v) - 0.5;
+};
+
+Enemy.prototype.drawDischarge = function (ctx, x, y) {
+  var mark = this.attackBeam;
+  var arc = mark.arc;
+  var fade = Math.max(0, Math.min(1, mark.life));
+  var r = this.radiusPx();
+  // It leaves the prongs rather than the wheels. In 2D a lift is a SCREEN
+  // offset, which is the same reading visualBodyY takes -- see the note on
+  // containsPoint for why the two boards spend this differently.
+  var ax = x;
+  var ay = y - r * (arc.liftRadii || 0.9);
+  var bx = mark.x;
+  var by = mark.y;
+
+  var rgb = arc.tint || "150,225,255";
+  var bolts = arc.bolts || 3;
+  var stray = ul(arc.jitterUl || 10);
+  var shape = Math.floor(mark.life * 40);
+  var seed = (this.laneIndex || 0) * 131 + shape * 977;
+  var span = Math.hypot(bx - ax, by - ay);
+  // Across the line, so a filament strays sideways rather than lengthwise --
+  // the difference between a lightning bolt and a stutter.
+  var nx = span > 1e-3 ? -(by - ay) / span : 0;
+  var ny = span > 1e-3 ? (bx - ax) / span : 1;
+  var SEGMENTS = 7;
+
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  for (var b = 0; b < bolts; b++) {
+    // The first filament is the trunk and runs tight to the line; the others
+    // stray further, so the discharge has a spine instead of being three
+    // equally wrong lines.
+    var wander = stray * (b === 0 ? 0.35 : 1);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    for (var k = 1; k < SEGMENTS; k++) {
+      var u = k / SEGMENTS;
+      // Pinned at both ends: a bolt that missed the tower points at nothing,
+      // and one that missed the body comes out of thin air.
+      var off = Enemy.arcNoise(seed + b * 17 + k * 7) * wander *
+        Math.sin(Math.PI * u);
+      ctx.lineTo(ax + (bx - ax) * u + nx * off, ay + (by - ay) * u + ny * off);
+    }
+    ctx.lineTo(bx, by);
+    ctx.strokeStyle = "rgba(" + rgb + "," + (0.20 * fade).toFixed(3) + ")";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(236,255,252," + (0.85 * fade).toFixed(3) + ")";
+    ctx.lineWidth = b === 0 ? 1.9 : 1.1;
+    ctx.stroke();
+  }
+
+  // The tower end takes a flash of its own, so the eye lands on WHAT was hit
+  // rather than on the line between.
+  ctx.beginPath();
+  ctx.arc(bx, by, 16 + 10 * (1 - fade), 0, Math.PI * 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(" + rgb + "," + (0.8 * fade).toFixed(3) + ")";
+  ctx.stroke();
+  ctx.lineCap = "butt";
+};
+
 Enemy.prototype.containsPoint = function (x, y, flat) {
   var dx = x - this.pos.x;
   var dy = y - (flat === false ? this.pos.y : this.visualBodyY());
@@ -3976,10 +4635,168 @@ Enemy.prototype.visualBodyY = function () {
   return this.pos.y - this.visualBodyLift();
 };
 
+// --- A BODY THAT IS IN THE AIR BECAUSE IT JUMPED ----------------------------
+//
+// 2026-08-28, at the owner's instruction: "add a jumping animation where we
+// see them jump into the towers." One function, read by BOTH boards, so the
+// flat board and the 3D board cannot disagree about where a diver is
+// mid-flight -- the same arrangement `visualBodyLift` already has, and for the
+// reason written above it: a height retyped in two files is a height that gets
+// changed in one.
+//
+// PRESENTATION ONLY, AND IT HAS TO BE. Nothing here is read back by the
+// simulation: the body's `pos` is still the patch of road it took off from and
+// stays there until `resolveAttack` puts it on the tower, so range checks,
+// targeting, the slow field and every other question anybody asks about where
+// this enemy IS get the same answer they got before there was an animation.
+// What changes is only what is drawn. A headless run (every suite) never calls
+// this.
+//
+// THE ARC IS THE WIND-UP AND NOTHING ELSE TIMES IT. `windUpTimer` is the clock
+// the simulation is already running toward the moment the dive lands, so the
+// body touches down on the exact frame the tower loses its hit points --
+// automatically, at any frame rate, at 1x/2x/3x, and frozen when the board is.
+// There is no second clock here to fall out of step with the first.
+//
+// IT ONLY EVER DRAWS A `lunge`. A wind-up is how half the roster telegraphs an
+// attack -- a Sapper's disable, a Dinomech's silo doors -- and every one of
+// those is a body STANDING STILL, which is exactly what makes the trade
+// legible. Read off `spec.lunge` rather than off a type id, so the second
+// diver written gets the leap and nothing else does.
+
+// The share of the wind-up spent gathering before the body leaves the road, and
+// how far it sinks while it does. A leap that starts moving on the first frame
+// reads as a body being dragged; the crouch is what makes it read as a jump.
+Enemy.LEAP_GATHER = 0.22;
+Enemy.LEAP_CROUCH_RADII = 0.34;
+// How high the arc rises over the middle of the flight, in RADII -- so it
+// survives a change to `sizeScale` instead of being a pixel count that is
+// right at one size -- capped against the LENGTH of the leap, so a dive at the
+// gun it is already standing beside hops instead of looping.
+Enemy.LEAP_APEX_RADII = 2.6;
+Enemy.LEAP_APEX_SPAN = 0.34;
+
+Enemy.prototype.leapPose = function () {
+  var spec = this.windUpAttack;
+  if (!spec || !spec.lunge || !(this.windUpTimer > 0)) return null;
+  var to = this.windUpTarget;
+  if (!to) return null;
+  var full = spec.windUpSeconds || 1;
+  // 0 on the frame it commits, 1 on the frame it lands.
+  var w = Math.max(0, Math.min(1, 1 - this.windUpTimer / full));
+
+  var radius = this.radiusPx();
+  var dx = to.x - this.pos.x;
+  var dy = to.y - this.pos.y;
+  var span = Math.hypot(dx, dy);
+
+  if (w < Enemy.LEAP_GATHER) {
+    // THE GATHER. Still on its own patch of road, sinking onto its legs. The
+    // dip eases in and back out over the crouch so the frame the body leaves
+    // the ground is the frame it is at its lowest -- which is what makes the
+    // launch read as a push rather than as a jump-cut.
+    var c = w / Enemy.LEAP_GATHER;
+    return {
+      x: this.pos.x, y: this.pos.y,
+      lift: -radius * Enemy.LEAP_CROUCH_RADII * Math.sin(c * Math.PI * 0.5),
+      t: 0, airborne: false, target: to, span: span
+    };
+  }
+
+  // THE FLIGHT. A straight line on the ground and a parabola in the air, the
+  // same pair js/systems/missiles.js flies and for the same reason: it leaves
+  // rising and arrives FALLING, and arriving falling is the whole of what
+  // makes a thing land on something rather than pass over it.
+  var t = (w - Enemy.LEAP_GATHER) / (1 - Enemy.LEAP_GATHER);
+  var apex = Math.min(radius * Enemy.LEAP_APEX_RADII,
+    span * Enemy.LEAP_APEX_SPAN);
+  return {
+    x: this.pos.x + dx * t,
+    y: this.pos.y + dy * t,
+    // Zero at both ends, `apex` at the middle -- the 4 is what makes the peak
+    // exactly `apex` rather than a quarter of it.
+    lift: apex * 4 * t * (1 - t),
+    t: t, airborne: true, target: to, span: span
+  };
+};
+
+// --- WHICH TOWERS ARE UNDER A DECLARED THREAT RIGHT NOW ----------------------
+//
+// 2026-08-28, at the owner's instruction: "on all targeted towers, include a
+// red circle around them on the ground." One list, built here, read by BOTH
+// boards -- the same arrangement `leapPose` and `visualBodyLift` have, and for
+// the same reason: a rule about WHICH towers are in danger that is written
+// twice is a rule that will mean two different things by the end of the month.
+//
+// "TARGETED" MEANS COMMITTED, NOT CONSIDERED. Every enemy on the board is
+// forever evaluating candidates, and a ring that lit up for that would be lit
+// on every tower in range of anything, permanently, which tells the player
+// nothing. What earns a ring is a threat that has already been DECLARED and
+// can no longer be re-aimed:
+//
+//   A WIND-UP THAT FROZE ITS TARGET -- `windUpTarget`, which only a spec
+//   carrying `commitsTarget` ever sets (see attackTowers). Today that is a
+//   Sapper about to switch a gun off and a Volatile in mid-dive; tomorrow it
+//   is whatever else is written that way, with no edit here.
+//
+//   A WARHEAD ALREADY IN THE AIR -- js/systems/missiles.js commits to a point
+//   at launch and cannot pick a new victim mid-flight, which is exactly what
+//   makes "these six towers were chosen" a true sentence the player can act
+//   on. A spent missile is dropped: it has already landed.
+//
+// A TOWER THAT IS NO LONGER THERE GETS NO RING, and `towers` is the test that
+// covers SELLING as well as rubble -- membership in the live array, the same
+// question Missiles.stillThere and committedTargetValid both ask, for the same
+// reason. Ordnance in the air does not know the gun was sold; the player does
+// not need a circle drawn on the empty ground it is about to hit.
+//
+// PRESENTATION ONLY. Nothing reads the result back, and a headless run never
+// calls it.
+//
+// `out` is an optional array to fill, so a renderer can keep one and allocate
+// nothing per frame.
+Enemy.targetedTowers = function (enemies, missiles, towers, out) {
+  var list = out || [];
+  list.length = 0;
+  var i;
+
+  function claim(tower) {
+    if (!tower) return;
+    if (towers && towers.indexOf(tower) === -1) return;
+    if (tower.isDestroyed && tower.isDestroyed()) return;
+    if (list.indexOf(tower) !== -1) return;
+    list.push(tower);
+  }
+
+  if (enemies) {
+    for (i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e || e.dead || e.leaked) continue;
+      if (!(e.windUpTimer > 0)) continue;
+      claim(e.windUpTarget);
+    }
+  }
+  if (missiles) {
+    for (i = 0; i < missiles.length; i++) {
+      if (missiles[i].landed) continue;
+      claim(missiles[i].target);
+    }
+  }
+  return list;
+};
+
 Enemy.prototype.draw = function (ctx, options) {
   if (VisualModels.draw("enemy", this.typeId + ":complete", ctx, this, options)) return;
   var x = this.pos.x;
   var y = this.pos.y;
+  // MID-LEAP, THE GROUND POINT MOVES AND THE BODY RIDES ABOVE IT. `leap.x/y`
+  // is where the diver's shadow belongs -- the point of road it is currently
+  // over -- and `leap.lift` is how far the body is off it, which is added to
+  // `bodyY` below beside the walk's own lift. Every mark in this function is
+  // drawn from those three locals, so the shadow, the body, the outline and
+  // the health bar all travel together for free.
+  var leap = this.leapPose();
+  if (leap) { x = leap.x; y = leap.y; }
 
   // Body, flashing white when hit, starting from the type's own colour. A
   // slowed enemy is dragged towards blue by however hard it is slowed, so a
@@ -3992,7 +4809,7 @@ Enemy.prototype.draw = function (ctx, options) {
   var b = Math.round(base.b + (255 - base.b) * f + (255 - base.b) * chill * 0.7);
 
   var radius = this.radiusPx();
-  var bodyY = this.visualBodyY();
+  var bodyY = y - this.visualBodyLift() - (leap ? leap.lift : 0);
 
   // The path coordinate is the enemy's feet. A cast shadow at that point and
   // a lifted body centre are the two cues that turn the old coloured counter
@@ -4142,7 +4959,16 @@ Enemy.prototype.draw = function (ctx, options) {
 
   // The aimed shot: a bolt from the body to whatever it picked, so the player
   // can see that it went for their best tower rather than their nearest.
-  if (this.attackBeam) {
+  //
+  // A SPEC MAY ASK FOR A DISCHARGE INSTEAD, and the Sapper does: `arcBeam` on
+  // the spec (js/enemy.js's `sapper` row) turns the one straight line into
+  // three writhing filaments in the type's own colour. Read off the mark, so
+  // no id is checked here and the 3D board's drawDischarge is driven by the
+  // same field -- neither renderer knows the other exists, which is the
+  // standing arrangement for every v0.5.1 road mark.
+  if (this.attackBeam && this.attackBeam.arc) {
+    this.drawDischarge(ctx, x, y);
+  } else if (this.attackBeam) {
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(this.attackBeam.x, this.attackBeam.y);
@@ -4160,6 +4986,23 @@ Enemy.prototype.draw = function (ctx, options) {
     ctx.lineWidth = 3 + this.shockwaveFlash * 4;
     ctx.strokeStyle = "rgba(255,160,110," + (0.85 * this.shockwaveFlash).toFixed(3) + ")";
     ctx.stroke();
+  }
+
+  // A TAIL SLAM'S LANDING, which is the leap's shockwave drawn somewhere else
+  // -- and "somewhere else" is the whole of the difference. A leap hits around
+  // the body, so its ring is centred on `x, y`; a slam hits around the point
+  // the tail came down, which on a machine 148 board px long is most of a body
+  // away. `slamAt` is the point the simulation measured the blow from, so the
+  // mark and the stun cannot disagree.
+  if (this.slamFlash > 0 && this.slamAt && this.lastBlastRadiusUl) {
+    ctx.beginPath();
+    ctx.arc(this.slamAt.x, this.slamAt.y, ul(this.lastBlastRadiusUl),
+      0, Math.PI * 2);
+    ctx.lineWidth = 3 + this.slamFlash * 4;
+    ctx.strokeStyle = "rgba(255,176,96," + (0.85 * this.slamFlash).toFixed(3) + ")";
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,176,96," + (0.10 * this.slamFlash).toFixed(3) + ")";
+    ctx.fill();
   }
 
   // STUNNED: a broken ring that does not turn, plus a bright flash on the

@@ -1460,6 +1460,34 @@ var Codex = (function () {
         "its death leaves.";
     }
 
+    // A SALVO CARRIES ITS DAMAGE ON THE WARHEAD, so the sentence below -- which
+    // is built around `attack.damage` -- would open by saying it hits for 0.
+    // Returned early, off the spec's own `salvo` block, exactly as the dive and
+    // the disable are and with no type id anywhere in it.
+    if (attack.salvo) {
+      var s = attack.salvo;
+      return "Every " + attack.intervalSeconds + " s, after a " +
+        (attack.windUpSeconds || 0) + " s wind-up it stands still for, its " +
+        "silos fire " + s.shots + " missiles at towers chosen AT RANDOM " +
+        "anywhere on the map, " + s.damage + " damage each. " +
+        "With fewer towers standing than missiles, one tower takes several; " +
+        "with no towers at all, nothing is fired. Nothing is dealt until a " +
+        "warhead ARRIVES, so a tower sold while one is in the air costs it.";
+    }
+
+    // A SLAM LANDS SOMEWHERE ELSE, and that is the one fact the generic
+    // sentence cannot express: it reads `reachUl`, and a slam has none --
+    // its radius is measured from the tail rather than from the body.
+    if (attack.slam) {
+      return "Every " + attack.intervalSeconds + " s it brings its tail down " +
+        "BEHIND itself" +
+        (attack.windUpSeconds ? ", after a " + attack.windUpSeconds +
+          " s wind-up" : "") +
+        ", and stuns every tower within " + attack.slam.radiusUl +
+        " u.l. of where it landed for " + (attack.stunSeconds || 0) +
+        " s. It deals NO damage: what it takes is the seconds.";
+    }
+
     // A DISABLE IS NOT A DAMAGE ATTACK, and the card must not open by saying it
     // hits for 0. Read off the spec's own `disable` block, so a second
     // saboteur type would print correctly with nothing edited here.

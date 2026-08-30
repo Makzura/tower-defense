@@ -797,7 +797,63 @@ var BASELINE = [
     // the route-width branch and did not survive that branch being squashed
     // into the forest board; restartButtonRect and changeMapButtonRect are both
     // still live and still drawn, so the test was collateral, not retired.
-    file: "tests/content.test.js", pass: 302, fail: 0,
+    // 317 on 2026-08-28, from 302: the Dinomech's new kit, the Sapper's
+    // discharge, and the three v0.5.1 bodies getting meshes.
+    //
+    // FIFTEEN tests added and none removed, in four groups:
+    //
+    //   THE SILO SALVO (seven) -- the numbers as authored; six missiles on six
+    //   towers landing on six DIFFERENT guns; two towers taking three each,
+    //   which is the "fewer than six" clause falling out of a bag that refills
+    //   rather than out of a case; an empty board firing nothing AND not
+    //   spending its cycle; the seeded stream reproducing itself and two bodies
+    //   not sharing a salvo; the damage landing on ARRIVAL rather than at
+    //   launch; and a tower sold in flight costing nothing while the warhead
+    //   refuses to re-aim.
+    //   THE TAIL SLAM (two) -- that the blow is measured from the tail and not
+    //   from the body, through the same origin/reach pair the eligibility test
+    //   uses, and that a tower the same distance past its NOSE is untouched.
+    //   That second one is the whole feature: on a mesh 148 board px long the
+    //   difference between the two ends is most of a body.
+    //   TWO CLOCKS ON ONE BODY (two) -- that 12 and 10 stay 12 and 10, and the
+    //   regression guard that matters more than either: the Tyrant's pool has
+    //   not opted in, so it keeps the shared rhythm it was balanced with.
+    //   THE SAPPER'S DISCHARGE (three) -- that it appears at the moment of
+    //   contact and not during the telegraph, that a FIZZLED disable draws
+    //   nothing (a cue for an effect that did not land is a cue that lies), and
+    //   that an ordinary attack still draws the plain quarter-second bolt.
+    //
+    // FOUR ASSERTIONS MOVED, each the feature rather than a drift: the
+    // Dinomech's trait rows, its index badge and its card all describe the
+    // salvo and the slam instead of the rail and the stomp, and the
+    // data-not-branches sweep now walks FOUR ids instead of three and reads
+    // js/systems/missiles.js as well as js/systems/hazards.js.
+    //
+    // 326 on 2026-08-28, from 317: the Volatile's leap and the red circle on a
+    // targeted tower, both at the owner's instruction the same day.
+    //
+    // NINE tests added and none removed, in two groups:
+    //
+    //   THE LEAP (five) -- that the dive COMMITS on the step it is chosen and
+    //   lands 0.28 s later instead of resolving on the spot, holding still for
+    //   all of it; that a dive whose gun is sold mid-air takes another rather
+    //   than fizzling, which is the opposite of what `commitsTarget` does for a
+    //   Sapper and is right for a body with one swing and no cooldown; that a
+    //   dive with nowhere left to land does not blow itself up; that
+    //   `leapPose` gathers, flies, arrives on the tower AND never moves `pos`,
+    //   which is the property the whole arrangement rests on; and that a
+    //   Sapper's much longer telegraph draws no arc, because the pose is read
+    //   off `spec.lunge` and never off a type id.
+    //   TOWERS UNDER A DECLARED THREAT (four) -- that a committed wind-up and a
+    //   warhead in the air both mark their target and a mere candidate does
+    //   not; that two threats on one gun are still ONE ring; that a sold tower
+    //   and a landed warhead mark nothing; and that a body shot out of the air
+    //   takes its threat with it.
+    //
+    // TWO ASSERTIONS MOVED, both the feature: the Volatile's `sizeScale` is
+    // 0.6 where it was 0.9, and the four dive tests drive the wind-up through
+    // the new `dive` helper instead of asserting that one step is enough.
+    file: "tests/content.test.js", pass: 326, fail: 0,
     failing: []
   },
   {

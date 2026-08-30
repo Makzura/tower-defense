@@ -8,6 +8,26 @@
 // low-poly with one sun: that is perhaps 3% of what a general engine does, so
 // vendoring 600 kB to use 20 of them is a bad trade even where it is possible.
 //
+// THAT PARAGRAPH IS STILL TRUE OF THIS FILE, AND SINCE 2026-08-29 IT IS NO
+// LONGER TRUE OF THE WHOLE GAME. `js/gl/three-loader.js` is a SECOND renderer
+// that draws towers and bosses through Three.js r147, on this same canvas and
+// through this same GL context. Nothing below changed for it, and no enemy
+// goes anywhere near it -- all twenty-five are still drawn by the program in
+// this file, out of GLModels, exactly as before.
+//
+// BOTH OBJECTIONS ABOVE ARE ANSWERED RATHER THAN WAIVED, which is the only
+// reason it was allowed. r147 is the last line that ships a UMD build and a
+// plain-script GLTFLoader, so it is classic <script> tags like everything else;
+// and GLTFLoader.parse() takes bytes rather than a URL, so the .glb is base64'd
+// into a .js file by tools/glb_to_three.py and nothing is ever fetched. The
+// game still opens by double-clicking index.html -- measured, from a real
+// file:// origin.
+//
+// The trade is different for a HERO unit, and that is the whole argument. This
+// file's art carries no textures; `glb/dragon.glb` carries three 2048x2048
+// maps, and the baked import of it -- js/gl/models/enemy-dinomech.js -- is
+// eight flat colours. See "Two renderers" in AGENTS.md.
+//
 // WHAT THE ART STYLE BUYS US. The models carry no textures at all -- every
 // surface is a flat material colour straight off td_scene's palette. That is
 // not just cheap, it is what makes the whole 3D plan viable from `file://`:

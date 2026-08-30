@@ -146,7 +146,11 @@ var SIZE_SCALE = {
   // Graded at the WORST tier, for the same reason the Revenant's variant is
   // graded at its parent's 1.2 rather than at the default: a gate reads the
   // summary, and a summary that flatters the body is worse than no summary.
-  "enemy-fractal_slime": 2.4
+  "enemy-fractal_slime": 2.4,
+  // The three v0.5.1 bodies, 2026-08-28. The Dinomech's 2.6 is the largest
+  // multiplier in this table -- larger than the Tyrant's 2.4 -- so grading it
+  // at the default 1 would understate its slip by 160%.
+  "enemy-herald": 1.15, "enemy-sapper": 1, "enemy-dinomech": 2.6
 };
 // Types whose frames are NOT distance-driven: gl-world.js drives these by a
 // CLOCK -- a flier's wingbeat at `HOVER_HZ`, a hovering body's drift at its own
@@ -198,6 +202,36 @@ var GLIDES = {
   // wheels and the reason no rig change could bring this number down.
   "enemy-boss_fast#0": true,
   "enemy-boss_fast-shattered#0": true
+};
+
+// AND A FOURTH CATEGORY, WHICH IS THE ONE CONTACT THAT MOVES AND IS STILL
+// CORRECT: A WHEEL THAT IS ROLLING.
+//
+// `GLIDES` above is for a contact that is MEANT to slide -- the Vanguard on
+// its skates. This is not that, and conflating the two would file a solved
+// problem under an accepted one. A rolling wheel's contact patch is
+// momentarily at REST: that is the definition of rolling, `roll_cycle` in
+// tools/glb_to_model.py solves each wheel's rate off its own measured radius so
+// that it is true, and the Herald -- whose plant window happens to be four
+// frames -- reads A = 1.5 px on exactly that rig.
+//
+// WHAT A IS MEASURING ON THE OTHER ONE IS THE CYCLOID, NOT A DEFECT. This file
+// picks a foot's `sole` as every vertex within SOLE_BAND (0.02 u) of the
+// group's lowest, which on a foot is the underside of a boot and on a wheel is
+// a 60-degree ARC of tyre -- and then tracks that arc's MEAN x. On a small
+// wheel turning 28 degrees a frame the arc is most of the way round the rim
+// within one plant window, so the mean sweeps a full sine of the wheel's own
+// radius. The Sapper reads 8.0 px of that and every pixel is the wheel going
+// round. Making the number small would mean making the wheel large or stopping
+// it, and both are worse pictures.
+//
+// KEYED PER BAND like `GLIDES`, for the same reason, and it is an exemption
+// from A and NOT from the file: both carts are still walked, still measured
+// and still printed with their real numbers, so a rig change that broke the
+// roll would still show up in a diff of this output.
+var ROLLS = {
+  "enemy-herald#0": true,
+  "enemy-sapper#0": true
 };
 
 // ---------------------------------------------------------------------------
@@ -270,6 +304,13 @@ function analyse(name, data, opts) {
   if (HOVERS[name]) {
     out.notes.push("CLOCK-DRIVEN (boardClock * the body's own rate), not " +
       "distance-driven -- A is not a slip figure for this body");
+  }
+  if (ROLLS[name + "#" + (opts.band || 0)]) {
+    out.rolls = true;
+    out.notes.push("ROLLING CONTACT -- the wheels are solved to roll TRUE " +
+      "(roll_cycle in tools/glb_to_model.py, off each wheel's own radius). A " +
+      "here is the cycloid traced by the rest-pose sole band as the tyre " +
+      "turns, not slip");
   }
   if (GLIDES[name + "#" + (opts.band || 0)]) {
     out.glides = true;

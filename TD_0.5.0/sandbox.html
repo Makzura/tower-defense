@@ -281,6 +281,12 @@
      presentation: towers lose real hit points to it, so it is stepped from
      update(). Reads a type's `deathEffect` block and knows no type ids. -->
 <script src="js/systems/hazards.js"></script>
+<!-- Missiles an enemy attack put in the air (the Dinomech's silo salvo).
+     Simulation for the hazards reason: a tower loses real hit points when one
+     arrives, so the arrival time is a fact about the game and the flight is
+     stepped from update(). Reads an attack's `salvo` block and knows no type
+     ids. -->
+<script src="js/systems/missiles.js"></script>
 <script src="js/tower.js"></script>
 
 <!-- Longshot: config + systems + runtime, then the adapter that gives it the
@@ -348,6 +354,23 @@
 <script src="js/gl/gl-math.js"></script>
 <script src="js/gl/gl-renderer.js"></script>
 <script src="js/gl/gl-camera.js"></script>
+<!-- THE SECOND RENDERER, for hero units (the Dinomech today). IDENTICAL to
+     index.html's block, and it must stay that way for the reason the
+     tower/systems block above says in full: the sandbox's whole promise is
+     that what you learn here is true in the game, and that stops being so the
+     moment the two pages load different code.
+
+     THIS WAS MISSED WHEN THE PATH SHIPPED ON 2026-08-29, and the symptom is
+     worth writing down because it looks nothing like a missing file. Without
+     these three tags `ThreeGL` is simply undefined, `heroBody` in gl-world.js
+     returns false exactly as it does for a model still loading, and the BAKED
+     flat body draws instead. No error, no warning, no 404 -- the boss just
+     renders as the chunky untextured mesh it used to be, on this page only,
+     while index.html shows it correctly. That is a fallback behaving exactly
+     as designed, hiding a page that was never wired. -->
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/GLTFLoader.js"></script>
+<script src="js/gl/three-loader.js"></script>
 <script src="js/gl/gl-geometry.js"></script>
 <!-- Organic colour strata for Ironwood's otherwise-flat gameplay ground. -->
 <script src="js/gl/ironwood-ground.js"></script>
@@ -487,6 +510,11 @@
 <script src="js/gl/models/enemy-boss_fast.js"></script>
 <script src="js/gl/models/enemy-boss_fast-shattered.js"></script>
 <script src="js/gl/models/enemy-boss.js"></script>
+<script src="js/gl/models/enemy-herald.js"></script>
+<script src="js/gl/models/enemy-sapper.js"></script>
+<script src="js/gl/models/enemy-dinomech.js"></script>
+<script src="js/gl/models/enemy-volatile.js"></script>
+<script src="js/gl/models/missile.js"></script>
 
 <script src="js/game.js"></script>
 
