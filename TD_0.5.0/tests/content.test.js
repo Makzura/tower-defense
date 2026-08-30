@@ -4870,10 +4870,21 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   // so the exemption is asserted BY NAME against the type's own `sandboxOnly`
   // flag rather than as a hole in the list. A type that is neither scheduled
   // nor flagged is still a failure, which is the rule that was always meant.
+  //
+  // THE EXEMPTION IS NOW ACTUALLY READ, which it was not until 2026-08-30: the
+  // paragraph above has always said it is asserted against the type's own
+  // `sandboxOnly` flag, and the assertion below simply demanded an empty list
+  // because every type happened to be scheduled. The Skimmer is the first one
+  // that is not, and the rule the comment states is the rule now enforced --
+  // a type that is neither scheduled NOR flagged is still a failure.
   var seen = {};
   var unscheduled = [];
+  var parked = [];
   enemies.forEach(function (e) {
-    if (!e.waves.length) unscheduled.push(e.id);
+    if (!e.waves.length) {
+      if (h.game.Enemy.TYPES[e.id].sandboxOnly) parked.push(e.id);
+      else unscheduled.push(e.id);
+    }
     e.waves.forEach(function (n) { seen[n] = true; });
   });
   // ACROSS EVERY SCHEDULE, because `model.waves` is the UNION of the
@@ -4888,7 +4899,10 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   t.eq(longest, 40, "the longest campaign is Normal's forty waves");
   t.eq(Object.keys(seen).length, longest,
     "every wave of every schedule is claimed by at least one type");
-  t.deep(unscheduled, [], "and no type is left off the schedule");
+  t.deep(unscheduled, [],
+    "and no type is left off the schedule without saying so");
+  t.deep(parked, ["skimmer"],
+    "the one type that is off it declares itself sandboxOnly");
 
   // And the late-campaign scaling shows: a stock normal is 4 HP, and the guide
   // must say what the heaviest scheduled one is.
@@ -11052,6 +11066,213 @@ test("every authored node survives a reload with its effect intact", function (t
   t.eq(h.run("towers[0].damage"), 2, "the effect is rebuilt after the reload");
   t.eq(h.run("towers[0].cost"), 250, "and so is the build price");
   t.eq(h.run("towers[0].upgradeCost('A1')"), 250, "and the tier surcharge");
+});
+
+// ---------------------------------------------------------------------------
+// THE SKIMMER — the first body that does not use the road (2026-08-30)
+//
+// `offPath` is a trait ORTHOGONAL to `isFlying`: the Aether Wisp flies and
+// still walks every bend. This one takes the chord from the road's mouth to the
+// base, and the design decision the rest of the file rests on is that
+// `progress` STAYS IN ROAD UNITS for everybody -- a position along the body's
+// own route, expressed as the fraction travelled times `path.length`.
+// ---------------------------------------------------------------------------
+
+function bootSkimmer() {
+  var h = harness.boot(null);
+  h.chooseMap(h.game.Maps.DEFAULT_ID);
+  h.run("enemies = []; waveIndex = WAVES.length; waveSpawned = 0");
+  return h;
+}
+
+test("the Skimmer is a 50 HP camo flier that ignores the road", function (t) {
+  var h = bootSkimmer();
+  var type = h.game.Enemy.TYPES.skimmer;
+
+  t.eq(type.health, 50, "fifty hit points");
+  t.eq(type.isCamo, true, "camouflaged");
+  t.eq(type.isFlying, true, "and airborne");
+  t.eq(type.offPath, true, "and off the road");
+  t.eq(type.speedMultiplier, 1, "at the roster's base walking speed");
+
+  // PARKED, NOT SCHEDULED. `sandboxOnly` is the documented way to hold a type
+  // in the index and the sandbox while it is being designed, and tests/run.js
+  // enforces it in both directions.
+  t.eq(type.sandboxOnly, true, "and kept out of the fixed campaign for now");
+
+  // THE PLACEHOLDER IS THE ABSENCE OF A MODEL. The 3D board draws a sphere for
+  // any type it has no mesh for, so "use a placeholder sphere" is a model file
+  // that does not exist rather than one pretending to be art.
+  t.eq(h.run("GLModels.has('enemy-skimmer')"), false,
+    "it ships no mesh, so the board draws its sphere");
+
+  // The sidebar and the index read one list, and this body leads with the fact
+  // that road coverage is not the answer to it.
+  var traits = h.run("Enemy.traitsOf('skimmer').map(function (r) { return r.label; })");
+  t.deep(traits, ["Ignores the road", "Flies", "Camouflaged"],
+    "three traits, most-defining first");
+  t.eq(h.run("Enemy.traitsOf('skimmer')[0].badge"),
+    "OFF-ROAD — flies straight to the base", "and the index badge says so");
+});
+
+test("the Skimmer flies the chord, and never the road", function (t) {
+  var h = bootSkimmer();
+  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}))");
+
+  var chord = h.run("Enemy.chordOf(path)");
+  var road = h.run("path.length");
+  t.ok(chord.length < road, "the straight line is shorter than the road (" +
+    Math.round(chord.length) + " against " + Math.round(road) + ")");
+
+  // EVERY POINT OF ITS FLIGHT IS ON THE STRAIGHT LINE, to within its own lane
+  // offset. Measured as the perpendicular distance from the chord, which is
+  // the whole claim of the type in one number.
+  var worst = h.run("(function () {" +
+    "  var e = enemies[0], c = Enemy.chordOf(path), worst = 0;" +
+    "  for (var i = 0; i < 400; i++) {" +
+    "    e.update(1 / 10);" +
+    "    if (e.leaked) break;" +
+    "    var dx = e.pos.x - c.from.x, dy = e.pos.y - c.from.y;" +
+    "    var off = Math.abs(dx * c.unit.y - dy * c.unit.x);" +
+    "    if (off > worst) worst = off;" +
+    "  }" +
+    "  return worst; })()");
+  var lane = h.run("Math.abs(ul(enemies[0].laneOffsetUl)) + 0.001");
+  t.ok(worst <= lane, "it never leaves the line by more than its own lane (" +
+    worst.toFixed(3) + " against " + lane.toFixed(3) + ")");
+
+  // AND IT FACES DOWN THAT LINE, CONSTANTLY. It is flying one straight course
+  // and never turns; asking the road's tangent would bank it through bends it
+  // is nowhere near.
+  var heading = h.run("enemies[0].headingVec()");
+  t.near(heading.x, chord.unit.x, 1e-9, "its heading is the chord's");
+  t.near(heading.y, chord.unit.y, 1e-9, "in both components");
+});
+
+test("the Skimmer arrives sooner, at the same speed, by exactly the shortcut",
+function (t) {
+  var h = bootSkimmer();
+  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}));" +
+        "enemies.push(new Enemy(path, null, 'normal', {}))");
+
+  // IT IS NOT FASTER. One step of one second moves it the same number of
+  // pixels as the walker -- the shortcut is the whole of its advantage, and
+  // that is what makes the type retunable by moving the chord rather than a
+  // speed multiplier nobody can see.
+  // Measured as GROUND COVERED ALONG EACH ONE'S OWN ROUTE -- progress divided
+  // by its route scale -- and not as straight-line displacement, which is not
+  // the same quantity for a body on a bend: a walker's lane offset swings
+  // sideways as the road turns and adds a little to the chord between two
+  // points of one second's walking.
+  var moved = h.run("(function () {" +
+    "  var a = enemies[0], b = enemies[1];" +
+    "  var a0 = a.progress, b0 = b.progress;" +
+    "  a.update(1); b.update(1);" +
+    "  return { skimmer: (a.progress - a0) / a.routeScale()," +
+    "           walker: (b.progress - b0) / b.routeScale() }; })()");
+  t.near(moved.skimmer, moved.walker, 1e-9,
+    "both cover the same ground in a second (" + moved.skimmer.toFixed(2) + " px)");
+  t.near(moved.skimmer, h.run("ul(Enemy.BASE_SPEED_ULPS)"), 1e-9,
+    "which is the roster's own walking speed");
+
+  // PROGRESS IS IN ROAD UNITS FOR BOTH, which is what lets the leak test and
+  // targeting stay branch-free: the Skimmer's advances faster because the same
+  // pixel is a bigger share of a shorter route.
+  var scale = h.run("enemies[0].routeScale()");
+  var expected = h.run("path.length / Enemy.chordOf(path).length");
+  t.near(scale, expected, 1e-9, "its route scale is road over chord");
+  t.eq(h.run("enemies[1].routeScale()"), 1, "and a walker's is exactly one");
+
+  // The arrival, timed. Both leak at `progress >= path.length` with no branch
+  // anywhere, and the ratio of the two times is the ratio of the two routes.
+  var times = h.run("(function () {" +
+    "  var out = { skimmer: 0, walker: 0 }, step = 1 / 20;" +
+    "  for (var i = 0; i < 5000; i++) {" +
+    "    if (!enemies[0].leaked) { enemies[0].update(step); if (enemies[0].leaked) out.skimmer = (i + 1) * step; }" +
+    "    if (!enemies[1].leaked) { enemies[1].update(step); if (enemies[1].leaked) out.walker = (i + 1) * step; }" +
+    "    if (out.skimmer && out.walker) break;" +
+    "  }" +
+    "  return out; })()");
+  t.ok(times.skimmer > 0 && times.walker > 0, "both reach the base");
+  t.ok(times.skimmer < times.walker, "the Skimmer gets there first (" +
+    times.skimmer.toFixed(1) + " s against " + times.walker.toFixed(1) + " s)");
+  t.near(times.skimmer / times.walker, 1 / scale, 0.02,
+    "and the margin is the shortcut and nothing else");
+
+  // IT ENDS ON THE BASE, not merely past a threshold.
+  var end = h.run("path.pointAt(path.length)");
+  var landed = h.run("enemies[0].pos");
+  t.ok(Math.hypot(landed.x - end.x, landed.y - end.y) < 4,
+    "it finishes on the base itself");
+});
+
+test("the Skimmer takes slows but not the road's pace profile", function (t) {
+  var h = bootSkimmer();
+  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}));" +
+        "enemies.push(new Enemy(path, null, 'normal', {}))");
+
+  var normal = h.run("({ skimmer: enemies[0].currentSpeedUlps()," +
+    "                   walker: enemies[1].currentSpeedUlps() })");
+  t.eq(normal.skimmer, normal.walker, "both start at the same speed");
+
+  // A PACE PROFILE IS A FACT ABOUT THE TARMAC. "Nothing crosses that basin
+  // quickly" cannot be addressed to a body that is over the basin, so the
+  // Skimmer is the one body on the board that does not read it.
+  var paced = h.run("(function () {" +
+    "  var real = path.paceScaleAt;" +
+    "  path.paceScaleAt = function () { return 0.5; };" +
+    "  var out = { skimmer: enemies[0].currentSpeedUlps()," +
+    "              walker: enemies[1].currentSpeedUlps() };" +
+    "  path.paceScaleAt = real;" +
+    "  return out; })()");
+  t.eq(paced.skimmer, normal.skimmer, "a slow stretch of road does not slow it");
+  t.near(paced.walker, normal.walker * 0.5, 1e-9, "while it halves the walker");
+
+  // EVERYTHING THAT IS NOT THE ROAD STILL REACHES IT. A tower's slow is a fact
+  // about the body, not about the tarmac.
+  h.run("enemies[0].applySlow(0.5, 2)");
+  t.near(h.run("enemies[0].currentSpeedUlps()"), normal.skimmer * 0.5, 1e-9,
+    "a tower's slow works on it exactly as on anything else");
+});
+
+test("knocking a Skimmer back keeps it on its own line", function (t) {
+  var h = bootSkimmer();
+  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}))");
+  h.run("for (var i = 0; i < 60; i++) enemies[0].update(1 / 6)");
+
+  // THE BUG THIS PINS: anything that writes `progress` and then asks
+  // `path.pointAt` directly snaps the body onto the road's centreline --
+  // which for this type means teleporting it onto tarmac it has never
+  // touched. js/systems/death-denial.js did exactly that until 2026-08-30.
+  var moved = h.run("(function () {" +
+    "  var e = enemies[0], c = Enemy.chordOf(path);" +
+    "  e.progress = Math.max(0, e.progress - 200);" +
+    "  e.refreshPos();" +
+    "  var dx = e.pos.x - c.from.x, dy = e.pos.y - c.from.y;" +
+    "  return Math.abs(dx * c.unit.y - dy * c.unit.x); })()");
+  var lane = h.run("Math.abs(ul(enemies[0].laneOffsetUl)) + 0.001");
+  t.ok(moved <= lane, "after a knockback it is still on its chord");
+});
+
+test("a Skimmer and a walker at the same point of their journey rank alike",
+function (t) {
+  var h = bootSkimmer();
+  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}));" +
+        "enemies.push(new Enemy(path, null, 'normal', {}))");
+
+  // TARGETING COMPARES RAW `progress` for "first" and "last", and this is why
+  // progress is kept in road units rather than in pixels of actual travel: a
+  // body on a shorter route would otherwise rank as permanently further behind,
+  // and "the enemy about to reach your base" would never pick it.
+  var ranked = h.run("(function () {" +
+    "  var a = enemies[0], b = enemies[1];" +
+    "  a.progress = path.length * 0.75;" +
+    "  b.progress = path.length * 0.75;" +
+    "  a.refreshPos(); b.refreshPos();" +
+    "  return { first: Targeting.score('first', a) - Targeting.score('first', b)," +
+    "           last: Targeting.score('last', a) - Targeting.score('last', b) }; })()");
+  t.eq(ranked.first, 0, "three quarters home is three quarters home, to 'first'");
+  t.eq(ranked.last, 0, "and to 'last'");
 });
 
 runner.run();

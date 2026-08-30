@@ -13,6 +13,56 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Skimmer: a body that does not use the road.**
+
+The owner's idea — *"one that doesn't follow the path and flies in a straight
+line to the base, and of course it's camo"*. 50 hit points, camo, flying, base
+walking speed, and it takes the chord from the road's mouth to your base.
+
+**`offPath` is a new trait and it is ORTHOGONAL to `isFlying`.** The Aether Wisp
+flies and still walks every bend; this one is airborne AND ignores the road, and
+a future body could cut the corner without leaving the ground. What it costs the
+player is the point of the type: a board built along the road's bends may have
+no circle at all over the middle of the map, and this walks through the gap.
+
+**`progress` stays in ROAD UNITS for every body**, which is the decision the
+rest falls out of. It is a position along the body's own route, expressed as the
+fraction travelled times `path.length` — so a Skimmer halfway home reads exactly
+what a walker halfway home reads. The leak test stays `progress >= path.length`
+with no branch, targeting's "first" and "last" compare like with like instead of
+ranking a short route as permanently behind, and knockBack and every fixture
+that writes `progress` keep working with no idea any of this exists.
+
+`routeScale()` is the one place the two units meet. **The Skimmer is not
+faster** — it covers the same ground per second as anything else, and the
+shortcut is the whole of its advantage, which makes it retunable by moving the
+chord rather than by a speed multiplier nobody can see. On the default board it
+flies 1401 px against the road's 1940 and arrives in 27 s against 38.
+
+It keeps its lane, taken along the chord's own normal, so a flight arrives
+spread out rather than stacked. It does NOT read the road's width profile or its
+pace profile — a chokepoint and a slow basin are facts about tarmac this body is
+not on — while slows, hastes, fields and its own sprint window all still reach
+it. It faces down the chord, constantly: one straight course, never a turn.
+
+**One real bug fell out of writing it.** `js/systems/death-denial.js` wrote
+`progress` and then asked `path.pointAt` directly — the exact thing
+`refreshPos` exists to prevent, and it had been quietly snapping knocked-back
+bodies onto the centreline and losing their lane. On a Skimmer it would have
+teleported one onto road it has never touched.
+
+**Parked, not scheduled.** It carries `sandboxOnly`, which is this repository's
+documented way to hold a type in the index and the sandbox while it is being
+looked at; the roster test enforces that in both directions. Scheduling it is a
+balance decision and nobody has made it.
+
+**The placeholder sphere is the absence of a model.** The board already draws a
+sphere for any type it has no mesh for, so the placeholder is a file that does
+not exist rather than one pretending to be art. Two roster tests were widened
+honestly rather than patched: the camo-shadow rule now reads "resolve to a mesh
+— your own or a shadow — or be parked", and the index's coverage test finally
+reads the `sandboxOnly` exemption its own comment has claimed since 2026-08-29.
+
 **2026-08-30 — The build ghost draws the ring the tower actually gets.**
 
 Placing a Warbringer with a reach perk equipped previewed the OLD circle:

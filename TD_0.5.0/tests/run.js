@@ -2904,7 +2904,7 @@ function (t) {
   t.eq(h.game.pendingBounty, 0, "with nothing left owed at the end");
 });
 
-test("Normal carries all twenty-five types, and Easy's twenty-one", function (t) {
+test("Normal carries every campaign type, and Easy's twenty-one", function (t) {
   var h = schedulesBoot();
   var seen = {};
   h.game.NORMAL_WAVES.forEach(function (wave) {
@@ -2915,11 +2915,22 @@ test("Normal carries all twenty-five types, and Easy's twenty-one", function (t)
     });
   });
   var roster = Object.keys(h.game.Enemy.TYPES);
-  t.eq(roster.length, 25, "twenty-five types exist");
+  t.eq(roster.length, 26, "twenty-six types exist");
   t.ok(seen.dinomech > 0, "the Dinomech among them, in wave 40");
 
-  var missing = roster.filter(function (id) { return !seen[id]; });
-  t.eq(missing.join(", "), "", "and Normal schedules every one of them");
+  // `sandboxOnly` IS THE EXEMPTION, the same one the roster test above reads.
+  // A type carrying it is parked in the index and the sandbox while it is being
+  // looked at, and scheduling it is a separate, deliberate decision -- so it is
+  // held OUT of this count rather than quietly counted as missing.
+  var parked = roster.filter(function (id) {
+    return h.game.Enemy.TYPES[id].sandboxOnly;
+  });
+  t.deep(parked, ["skimmer"], "one type is parked out of the campaign");
+
+  var missing = roster.filter(function (id) {
+    return !seen[id] && !h.game.Enemy.TYPES[id].sandboxOnly;
+  });
+  t.eq(missing.join(", "), "", "and Normal schedules every campaign type");
 });
 
 // THE ACT TOTALS. They are the CURVE, and a retune that holds the total while
@@ -6303,9 +6314,28 @@ test("every camo type is drawn as the body it shadows, not as a sphere", functio
   });
   t.ok(camo.length >= 3, "the roster still has camo types (" + camo.join(", ") + ")");
 
+  // WHAT THIS ACTUALLY GUARDS is a camo type falling through to the sphere by
+  // ACCIDENT -- no mesh of its own and nobody added the mapping. A camo type
+  // with its own `enemy-<id>` needs no mapping at all (`enemyModel` reads
+  // `CAMO_SHADOWS[id] || id`), and a type still being designed is ENTITLED to
+  // the sphere: that is what the placeholder is for.
+  //
+  // So the rule is "resolve to a mesh, or be parked". `sandboxOnly` is the
+  // flag that says parked, and the moment such a type is scheduled into a
+  // campaign this test starts demanding a body or a shadow for it -- which is
+  // exactly when it should.
   camo.forEach(function (id) {
     var shadowed = shadows[id];
-    t.ok(!!shadowed, id + " names the type it shadows");
+    if (!shadowed && !h.game.GLModels.has("enemy-" + id)) {
+      t.ok(h.game.Enemy.TYPES[id].sandboxOnly,
+        id + " has no mesh and no shadow, so it must still be parked " +
+        "(sandboxOnly) rather than shipping as an accidental sphere");
+      return;
+    }
+    if (!shadowed) {
+      t.ok(h.game.GLModels.has("enemy-" + id), id + " draws its own body");
+      return;
+    }
     // The mapped id must be a REAL type and not itself a camo one, which is
     // what "modelled as their normal variant" means.
     t.ok(!!h.game.Enemy.TYPES[shadowed], id + " shadows a type that exists (" + shadowed + ")");

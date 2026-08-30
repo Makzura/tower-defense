@@ -113,7 +113,13 @@ var DeathDenial = (function () {
       // Dragged along the PATH, not through open space -- the route runs
       // backwards under them, corners and all.
       move.enemy.progress = move.from + (move.to - move.from) * eased;
-      move.enemy.pos = move.enemy.path.pointAt(move.enemy.progress);
+      // THROUGH `refreshPos`, NEVER `path.pointAt` (2026-08-30). That is the
+      // rule refreshPos exists to state: writing `progress` and then asking the
+      // path directly snaps the body onto the centreline and loses its lane --
+      // and since a body may now be on a route that is not the road at all
+      // (see `offPath` in js/enemy.js), it would also teleport a Skimmer being
+      // knocked back onto tarmac it has never touched.
+      move.enemy.refreshPos();
       move.enemy.leaked = false;
     }
 

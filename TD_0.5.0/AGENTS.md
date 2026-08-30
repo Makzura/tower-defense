@@ -2196,6 +2196,70 @@ payout has to be knowable in advance to be worth anything.
 
 ---
 
+## A body that does not use the road — `offPath` (2026-08-30)
+
+The owner's idea: *"one that doesn't follow the path and flies in a straight
+line to the base, and of course it's camo."* The **Skimmer** is the first type
+carrying `offPath`, and the trait is **orthogonal to `isFlying`** — the Aether
+Wisp flies and still walks every bend; a future body could cut the corner
+without being airborne at all.
+
+**`progress` STAYS IN ROAD UNITS FOR EVERY BODY**, and that is the decision
+everything else falls out of. It is a position along the body's OWN route,
+expressed as the fraction of that route travelled times `path.length`. So a
+Skimmer halfway home reads `0.5 × path.length` exactly as a walker halfway home
+does. Three things come free:
+
+- the leak test stays `progress >= path.length` and needs no branch;
+- targeting's `first` and `last` compare like with like, instead of ranking a
+  body on a shorter route as permanently further behind;
+- `knockBack`, the sandbox's spacing and every fixture that writes `progress`
+  keep working with no idea any of this exists.
+
+What differs is the SCALE. `Enemy.prototype.routeScale()` is `path.length /
+chord.length` — how much progress one pixel of travel buys — and it is the ONE
+place the two units meet, applied in the single line of `update` that advances
+progress. **The Skimmer is not faster**: it covers the same ground per second as
+anything else, and the shortcut is the whole of its advantage, which is what
+makes it retunable by moving the chord rather than by a speed multiplier nobody
+can see. On the default board that is 1401 px against the road's 1940, so it
+arrives in about 72% of the time.
+
+`Enemy.chordOf(path)` measures both ends off the PATH rather than off the map,
+so a route that is re-authored, generated or swapped moves the chord with it.
+`positionAt` keeps the body's lane offset, taken along the chord's own normal —
+a flight arrives spread out rather than stacked — and deliberately does NOT read
+the road's width profile: a chokepoint is a fact about tarmac this body is not
+on. `headingVec` returns the chord's constant unit vector; it flies one straight
+course and never turns.
+
+**A pace profile is a fact about the tarmac too.** `currentSpeedUlps` skips
+`paceScaleAt` for an off-path body — "nothing crosses that basin quickly" cannot
+be addressed to something over the basin. Slows, hastes, Farm fields and its own
+sprint window all still apply; only the road's own profile is skipped.
+
+**`refreshPos`, never `path.pointAt`.** That rule already existed for lane
+offsets and `js/systems/death-denial.js` was breaking it — writing `progress`
+and asking the path directly. On a Skimmer that would teleport a knocked-back
+body onto road it has never touched. Fixed the same day.
+
+**PARKED, NOT SCHEDULED.** The type carries `sandboxOnly`, which is this
+repository's documented way to hold a type in the index and the sandbox while it
+is being designed; `tests/run.js` enforces it in both directions. Scheduling it
+is a balance decision and nobody has made it. **50 HP, camo, flying, base
+walking speed, 65 bounty** — the health and the traits are the owner's, the
+bounty and the speed are balance values.
+
+**The placeholder is the ABSENCE of a model.** The 3D board already draws a
+sphere for any type it has no mesh for (`enemyModel` in `js/gl/gl-world.js`), so
+"use a placeholder sphere" is a model file that does not exist rather than one
+pretending to be art. The camo-shadow test in `tests/run.js` was widened to
+match: a camo type must resolve to a mesh — its own or a shadow — **or** be
+parked, and the moment such a type is scheduled the test starts demanding a body
+for it.
+
+---
+
 ## The core invariant: all distances are u.l., converted once, at the edge
 
 **2026-07-26: this replaces the old path-calibrated meter system** (the

@@ -97,7 +97,33 @@ function Enemy(path, health, typeId, overrides) {
   this.laneOffsetUl = Enemy.laneOffsetFor(this.laneIndex) *
     Enemy.LANE_SPREAD_UL * (type.laneSpread === undefined ? 1 : type.laneSpread);
 
-  this.progress = 0;                 // distance travelled ALONG the road, in px
+  // A ROUTE THAT IS NOT THE ROAD (2026-08-30).
+  //
+  // `offPath` on the type means this body ignores the tarmac entirely and
+  // flies the CHORD -- a straight line from where the road starts to where it
+  // ends. It is a second, ORTHOGONAL trait to `isFlying`: the Aether Wisp
+  // flies and still follows every bend, and a future body could cut the corner
+  // without being airborne at all.
+  //
+  // `progress` STAYS IN ROAD UNITS for everybody, and that is the decision the
+  // rest of this works out from. It is a position along the body's own route,
+  // expressed as the fraction of that route travelled times `path.length` --
+  // so a Skimmer halfway home reads 0.5 x path.length exactly as a walker
+  // halfway home does. Three things fall out of it for free:
+  //
+  //   * the leak test stays `progress >= path.length` and needs no branch;
+  //   * targeting's "first" and "last" compare like with like, instead of
+  //     ranking a body on a shorter route as permanently further behind;
+  //   * knockBack, the sandbox's spacing and every fixture that writes
+  //     `progress` keep working with no idea any of this exists.
+  //
+  // What differs is the SCALE: one pixel of travel is worth more progress on a
+  // short route than on a long one. `routeScale()` is that ratio and
+  // `positionAt` is where progress becomes a point.
+  this.offPath = !!type.offPath;
+  this.chord = this.offPath ? Enemy.chordOf(path) : null;
+
+  this.progress = 0;                 // position along this body's ROUTE, in road px
   this.pos = this.positionAt(0);
 
   // --- things that happen TO an enemy, rather than things it IS -------------
@@ -636,6 +662,52 @@ Enemy.TYPES = {
     sizeScale: 0.85,
     laneSpread: 0.8,
     isFlying: true
+  },
+
+  // THE ONE THAT DOES NOT USE THE ROAD (2026-08-30, the owner's idea: "one
+  // that doesn't follow the path and flies in a straight line to the base, and
+  // of course it's camo").
+  //
+  // `offPath` is a NEW TRAIT and it is orthogonal to `isFlying`. The Aether
+  // Wisp above flies and still walks every bend; this one cuts the chord from
+  // the road's mouth to the base and arrives in the time that straight line
+  // takes. Everything a route does to a body -- its width profile, its pace
+  // profile, its bends -- is simply not addressed to this one.
+  //
+  // WHAT THAT COSTS THE PLAYER is the whole point of the type: a board built
+  // along the road's bends may not have a single circle over the middle of the
+  // map, and this walks through the gap between them. It is camo AND flying on
+  // top, so the towers that CAN see it are the ones with detection that also
+  // target flight -- deliberately few, and deliberately the thing the type
+  // asks a player to have thought about.
+  //
+  // SANDBOX AND INDEX ONLY, for now. `sandboxOnly` is this file's documented
+  // way to park a type while it is being looked at, and the roster test in
+  // tests/run.js enforces it in both directions -- with the flag it must NOT
+  // appear in a campaign wave. Scheduling it is a balance decision and nobody
+  // has made it.
+  //
+  // NO MESH, ON PURPOSE. The owner asked for a placeholder sphere and the 3D
+  // board already draws exactly that for any type it has no model for (see
+  // `enemyModel` in js/gl/gl-world.js) -- so the placeholder is the absence of
+  // a model file rather than a model file pretending to be one.
+  skimmer: {
+    id: "skimmer",
+    displayName: "Skimmer",
+    health: 50,
+    // BALANCE VALUE. Between the 45 HP body that pays 60 and the 60 HP one that
+    // pays 75, nudged up for the two traits: a body nothing on the board can
+    // legally shoot is worth more to the player who built the answer to it.
+    bounty: 65,
+    speedMultiplier: 1,
+    // Camo green, cooled towards the flier's blue -- it is both, and the
+    // sidebar names both.
+    color: { r: 118, g: 176, b: 168 },
+    outlineWidth: 2,
+    isCamo: true,
+    isFlying: true,
+    offPath: true,
+    sandboxOnly: true
   },
 
   // The one that hits BACK. Every other enemy walks past your towers; this
@@ -1833,11 +1905,58 @@ Enemy.prototype.radiusPx = function () {
   return Enemy.RADIUS_PX * (this.type.sizeScale || 1) * this.fractalSizeScale;
 };
 
+// THE STRAIGHT LINE FROM THE ROAD'S MOUTH TO THE BASE, measured once per body.
+//
+// Both ends come off the path rather than from the map, so a route that is
+// re-authored, generated or swapped mid-run moves the chord with it and there
+// is no second place holding a copy of where the base is.
+//
+// `length` can be zero on a degenerate fixture path; `unit` falls back to a
+// heading of (1, 0) so nothing downstream divides by it.
+Enemy.chordOf = function (path) {
+  var from = path.pointAt(0);
+  var to = path.pointAt(path.length);
+  var dx = to.x - from.x, dy = to.y - from.y;
+  var length = Math.sqrt(dx * dx + dy * dy);
+  return {
+    from: from, to: to, length: length,
+    unit: length > 0 ? { x: dx / length, y: dy / length } : { x: 1, y: 0 }
+  };
+};
+
+// HOW MUCH PROGRESS ONE PIXEL OF TRAVEL BUYS. 1 for a body on the road, where
+// progress and distance are the same quantity; more than 1 for a body cutting
+// across, because the same journey is fewer pixels.
+//
+// This is the ONE place the two units meet. Everything else in the file --
+// the leak test, targeting, knockBack, the sprint window -- goes on reading
+// `progress` as a position along the road, which is what makes a body on a
+// different route cost no branches anywhere else.
+Enemy.prototype.routeScale = function () {
+  if (!this.chord || !(this.chord.length > 0)) return 1;
+  return this.path.length / this.chord.length;
+};
+
 // Where this enemy stands, given how far along the road it has walked: the
 // point on the centreline, pushed sideways by its own lane offset along the
 // road's normal. The ONE place progress becomes a position, so the walk, the
 // spawn and knockBack cannot each compute it differently.
 Enemy.prototype.positionAt = function (progress) {
+  // A BODY ON THE CHORD, and it keeps its lane: the offset is taken along the
+  // chord's own normal, so a flight of Skimmers arrives spread out rather than
+  // stacked in one column. The road's width profile is deliberately NOT read
+  // -- a chokepoint is a fact about the tarmac, and this body is not on it.
+  if (this.chord) {
+    var span = this.path.length > 0
+      ? Math.max(0, Math.min(1, progress / this.path.length)) : 0;
+    var c = this.chord;
+    var x = c.from.x + (c.to.x - c.from.x) * span;
+    var y = c.from.y + (c.to.y - c.from.y) * span;
+    if (!this.laneOffsetUl) return { x: x, y: y };
+    var lane = ul(this.laneOffsetUl);
+    return { x: x - c.unit.y * lane, y: y + c.unit.x * lane };
+  }
+
   var centre = this.path.pointAt(progress);
   if (!this.laneOffsetUl) return centre;
 
@@ -1894,6 +2013,10 @@ Enemy.prototype.refreshPos = function () {
 // second -- an angle, never converted. See Enemy.ATTACK_TURN_RADIANS_PER_SECOND.
 Enemy.prototype.headingVec = function () {
   if (this.attackPosture) return this.attackPosture.facing;
+  // A body on the chord faces down the chord, which is CONSTANT -- it is
+  // flying one straight line and never turns. Asking the road's tangent would
+  // have it banking through bends it is nowhere near.
+  if (this.chord) return this.chord.unit;
   if (!this.path || !this.path.tangentAt) return null;
   return this.path.tangentAt(this.progress);
 };
@@ -1961,6 +2084,13 @@ Enemy.prototype.currentSpeedUlps = function () {
   // Multiplied, not substituted: a slow applied by a tower still halves the
   // speed of something running a fast stretch. 1 on every route that declares
   // no pace profile.
+  // A BODY THAT IS NOT ON THE ROAD DOES NOT READ THE ROAD'S PACE. The comment
+  // above says it exactly: pace is a property of the ROUTE, "nothing crosses
+  // that basin quickly" -- and a Skimmer is over the basin, not in it. Slows,
+  // hastes, fields and its own sprint window all still apply; only the tarmac's
+  // own profile is skipped.
+  if (this.chord) return speed;
+
   return speed * this.path.paceScaleAt(this.progress);
 };
 
@@ -2041,7 +2171,11 @@ Enemy.prototype.update = function (dt) {
     }
   }
 
-  this.progress += ul(this.currentSpeedUlps()) * dt;
+  // THE ONE CONVERSION. `currentSpeedUlps` is how fast this body moves through
+  // the world; `routeScale` turns those pixels into progress along its own
+  // route. Both are 1:1 for everything on the road, which is why this line
+  // reads the same as it always did for every body but a Skimmer.
+  this.progress += ul(this.currentSpeedUlps()) * dt * this.routeScale();
   this.pos = this.positionAt(this.progress);
 
   if (this.flash > 0) {
@@ -2623,6 +2757,22 @@ Enemy.traitsOf = function (source) {
 
   function plural(n, word) {
     return n + " " + word + (n === 1 ? "" : "s");
+  }
+
+  // IGNORING THE ROAD OUTRANKS EVERYTHING, and goes first for the reason the
+  // order paragraph gives: this list runs most-defining first, and "your towers
+  // are not where it is going" is a bigger fact about a body than what it takes
+  // to shoot it. It leads the badge too -- a player reading the card needs to
+  // know their road coverage is not the answer before they read what detection
+  // it wants.
+  //
+  // Since 2026-08-30. `offPath` is read as a block like every other trait here,
+  // so a second type carrying it gets this row with nothing edited.
+  if (type.offPath) {
+    add("offPath", "Ignores the road",
+      "Flies the straight line from the road's mouth to your base. Towers " +
+      "placed along the bends may never have it in reach at all.",
+      C.air, "OFF-ROAD — flies straight to the base");
   }
 
   // TWO IFS, NOT AN IF/ELSE, even though no type on the roster is both. A body
