@@ -22,7 +22,7 @@ var cdp = require("./cdp");
 var serve = require("./serve");
 
 var PORT = 8800, DEVTOOLS = 9340;
-var URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var ROOT = path.resolve(__dirname, "..", "..");
 
 var BODIES = [

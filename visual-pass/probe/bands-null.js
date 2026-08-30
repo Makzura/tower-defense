@@ -71,11 +71,11 @@ async function hash(S,k){return S.evaluate("(function(){var b=TDProbe.frames['"+
       }
       return res;
     }
-    var O=await boot("http://127.0.0.1:"+PORT+"/visual-pass/tmp/bands-base/TD_0.5.0/index.html");
-    out.baseGrep=sh('grep -c "walkBand" "'+BASE.split("\\").join("/")+'/TD_0.5.0/js/gl/gl-world.js" || true').trim();
+    var O=await boot("http://127.0.0.1:"+PORT+"/visual-pass/tmp/bands-base/game/index.html");
+    out.baseGrep=sh('grep -c "walkBand" "'+BASE.split("\\").join("/")+'/game/js/gl/gl-world.js" || true').trim();
     var before=await sweep(O,"base");
-    var N=await boot("http://127.0.0.1:"+PORT+"/TD_0.5.0/index.html");
-    out.newGrep=sh('grep -c "walkBand" TD_0.5.0/js/gl/gl-world.js').trim();
+    var N=await boot("http://127.0.0.1:"+PORT+"/game/index.html");
+    out.newGrep=sh('grep -c "walkBand" game/js/gl/gl-world.js').trim();
     var after=await sweep(N,"new");
     out.null_perBody={}; var moved=[];
     Object.keys(before.bodies).forEach(function(t){

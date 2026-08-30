@@ -16,7 +16,7 @@ exists because **the Chrome MCP forces `https://` onto any URL and can never ope
 game instance, and Chrome is the better surface because it can genuinely RELOAD,
 which the preview pane cannot.
 
-Then open `http://127.0.0.1:8792/TD_0.5.0/index.html` in as many Chrome tabs as
+Then open `http://127.0.0.1:8792/game/index.html` in as many Chrome tabs as
 you need, and inject `/visual-pass/harness.js` in each. `TDObs.showcase()` draws
 arbitrary registered models in a row at true game scale — that is the review rig.
 

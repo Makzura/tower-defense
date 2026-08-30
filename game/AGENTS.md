@@ -78,11 +78,11 @@ way back out, because a stopped clock puts nothing else on screen to click.
 on 2026-07-29; its totals are authored to a stated figure. See the note at the
 end of the `WAVES` comment in game.js.
 
-(The folder is `TD_0.5.0` and the version above matches it. The two have
-drifted twice before — the header said 0.4.7 against a 0.4.9 folder until
-2026-07-30 — which is exactly the failure earlier entries in this file record.
-The game's version is the one that counts, and nothing in the code encodes it,
-so this line and the header are the only places it lives.)
+(The folder is `game` and no longer carries a version. That retires a failure
+this file records twice — the header said 0.4.7 against a 0.4.9 folder until
+2026-07-30 — because a folder that names a version is a second place for the
+version to be wrong. The game's version is the one that counts, nothing in the
+code encodes it, so the header above is now the only place it lives.)
 
 A 2D tower defense game. Long-term goal is a Steam release. Right now it is a
 deliberately minimal foundation: correct mechanics, and the first content on
@@ -484,9 +484,11 @@ Any future replay, fast-forward, or headless balancing work depends on it.
 ## Architecture
 
 **Where the repository starts, because it is not where you are standing.** The
-git root is **`TD_0.5.1/`**; the game is one level down in **`TD_0.5.0/`**, and
-every path in this file is relative to that game folder unless it says
-otherwise. A second tracked directory sits beside the game at the root:
+game is one level down from the git root, in **`game/`**, and every path in
+this file is relative to that game folder unless it says otherwise. (It was
+`TD_0.5.0/` until 2026-08-30; the checkout directory above it is whatever each
+machine called it and is not tracked, so do not rely on its name.) A second
+tracked directory sits beside the game at the root:
 **`visual-pass/`** — the design corpus the models and effects were built
 against (`SIPHON-SOCLE.md`, `DIRECTION.md`, `CALIBRATION.md`, `HANDOFF.md`,
 per-lot review records), plus the `git-sync.sh` that the post-commit hook runs.
@@ -495,7 +497,7 @@ per-lot review records), plus the `git-sync.sh` that the post-commit hook runs.
 from where you work. `js/gl/gl-world.js`, `js/gl/siphon-enemy-fx.js`,
 `js/gl/siphon-ground.js`, `tools/blender/siphon_beam.py` and
 `tools/blender/siphon_idol.py` all name `visual-pass/SIPHON-SOCLE.md`, and a
-`grep` or `ls` for it from inside `TD_0.5.0/` finds nothing — so the document
+`grep` or `ls` for it from inside `game/` finds nothing — so the document
 looks deleted. **It is not.** On 2026-08-12 that cost two people a search and
 came within one step of a "reconstruction" of a file that was tracked, intact
 and unchanged the whole time, which would have produced a second copy of a live

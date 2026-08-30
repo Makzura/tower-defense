@@ -19,7 +19,7 @@ var serve = require("./serve");
 var identity = require("./model-identity");
 
 var PORT = 8796, DEVTOOLS = 9336;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var ROOT = path.resolve(__dirname, "..", "..");
 var OUT = path.join(ROOT, "visual-pass", "captures", "easy-five");
 
@@ -53,16 +53,16 @@ async function main() {
   // during the shoot; the multiset digest identifies the MODEL, which a hash
   // cannot -- re-exporting unchanged source gives a new hash every time.
   var prov = BODIES.map(function (b) {
-    var f = path.join(ROOT, "TD_0.5.0", "js", "gl", "models", "enemy-" + b.typeId + ".js");
+    var f = path.join(ROOT, "game", "js", "gl", "models", "enemy-" + b.typeId + ".js");
     var id = identity.identify(f);
     return {
       typeId: b.typeId, name: b.name, md5: id.md5,
       multiset: id.multiset.slice(0, 12), triangles: id.triangles,
-      commit: sh('git log --oneline -1 -- "TD_0.5.0/js/gl/models/enemy-' + b.typeId + '.js"').split(" ")[0]
+      commit: sh('git log --oneline -1 -- "game/js/gl/models/enemy-' + b.typeId + '.js"').split(" ")[0]
     };
   });
-  var dirty = sh("git status --porcelain TD_0.5.0/js");
-  if (dirty) throw new Error("TD_0.5.0/js is dirty -- refusing to shoot:\n" + dirty);
+  var dirty = sh("git status --porcelain game/js");
+  if (dirty) throw new Error("game/js is dirty -- refusing to shoot:\n" + dirty);
 
   var server = await new Promise(function (res, rej) {
     serve.start(PORT, function (e, s) { e ? rej(e) : res(s); });
@@ -366,7 +366,7 @@ async function main() {
 
   // Hash again after the shoot: proves nothing moved under us mid-run.
   out.provenanceAfter = BODIES.map(function (b) {
-    var f = path.join(ROOT, "TD_0.5.0", "js", "gl", "models", "enemy-" + b.typeId + ".js");
+    var f = path.join(ROOT, "game", "js", "gl", "models", "enemy-" + b.typeId + ".js");
     return { typeId: b.typeId, md5: crypto.createHash("md5")
       .update(fs.readFileSync(f)).digest("hex") };
   });

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert Claude Design's full Ironwood S-path into its file:// asset.
 
-Run from TD_0.5.0:
+Run from game:
 
     python3 tools/glb_to_path.py ../glb/ironwood_forest_path_moduleS.glb
 

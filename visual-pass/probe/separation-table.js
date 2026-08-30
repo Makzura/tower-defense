@@ -50,7 +50,7 @@ var crypto = require("crypto");
 var serve = require("./serve");
 
 var PORT = 8798, DEVTOOLS = 9338;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var FRAME = 0;
 var GUARD = 0.80;
 
@@ -84,7 +84,7 @@ function compare(fa, fb) {
   // opposite responses. Checked before any pair is compared.
   if (!report.sameTreeAcrossPasses) {
     report.verdict = "NO-GO: the two passes loaded DIFFERENT trees -- a file under " +
-      "TD_0.5.0 changed between launches, so any difference below is the game " +
+      "game changed between launches, so any difference below is the game " +
       "moving and not the rig. Re-run both passes on a still tree.";
     console.log(JSON.stringify(report, null, 1));
     process.exit(1);
@@ -148,7 +148,7 @@ if (process.argv[2] === "--compare") {
 // enemy-shielded.js reads "??" -- so a sha would report "clean" straight across
 // a re-export of the very file being measured. This hashes what is on disk.
 function treeFingerprint() {
-  var root = path.join(__dirname, "..", "..", "TD_0.5.0");
+  var root = path.join(__dirname, "..", "..", "game");
   var files = [path.join(root, "index.html")];
   // ONLY WHAT THE PAGE LOADS: js/**/*.js plus index.html. tools/ and tests/
   // live under the same root and change constantly without touching a pixel.

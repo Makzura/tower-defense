@@ -74,7 +74,7 @@ async function main() {
               accelerated2dCanvas: !NO2DGPU, framesPerRun: FRAMES, cases: [] };
   try {
     await cdp.waitForDevTools(PORT, 80);
-    var o = await cdp.open(PORT, "http://127.0.0.1:" + HTTP + "/TD_0.5.0/index.html");
+    var o = await cdp.open(PORT, "http://127.0.0.1:" + HTTP + "/game/index.html");
     var s = o.session;
     await cdp.sleep(2500);
     var J = async function (e) { return JSON.parse(await s.evaluate("JSON.stringify(" + e + ")")); };

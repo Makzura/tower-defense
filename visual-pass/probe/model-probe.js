@@ -25,14 +25,14 @@ var serve = require("./serve");
 
 var PORT = 8793;
 var DEVTOOLS = 9333;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var ROOT = path.resolve(__dirname, "..", "..");
 
 // The authored palette, read out of the model FILE. GLModels.expand() nulls
 // model.raw once the model is expanded, so by capture time there is no authored
 // value left in the page to compare a pixel against.
 function paletteOf(name) {
-  var file = path.join(ROOT, "TD_0.5.0", "js", "gl", "models", name + ".js");
+  var file = path.join(ROOT, "game", "js", "gl", "models", name + ".js");
   var fd = fs.openSync(file, "r");
   var buf = Buffer.alloc(8192);
   var n = fs.readSync(fd, buf, 0, 8192, 0);

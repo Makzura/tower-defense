@@ -13,6 +13,37 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The game folder is `game/`, and it no longer names a version.**
+
+`TD_0.5.0/` became `game/`. 477 files moved and not one of them changed: the
+rename is its own commit, with the content merge in the one before it, so that
+anyone rebasing a branch across this resolves a pure rename rather than a
+rename tangled up with edits.
+
+**The folder was a second place for the version to be wrong**, and it had been
+wrong before — the header said 0.4.7 against a 0.4.9 folder until 2026-07-30,
+which `AGENTS.md` records as a failure and now cannot repeat. The version lives
+in the `AGENTS.md` header and nowhere else.
+
+**What moved with it, and what deliberately did not.** The CI workflow's three
+`working-directory` keys and the two `git diff` paths in the model-rebuild job;
+`visual-pass/`'s probe scripts, `git-sync.sh`, `model-review.js` and the
+runnable commands in `HANDOFF.md` and `RESUME.md`; the usage comments in
+`tools/glb_to_path.py` and `tools/check-script-manifest.js`; and
+`.claude/launch.json`. `check-script-manifest.js` needed no code change — it
+reads its prefix from `git rev-parse --show-prefix` and always did.
+
+Left alone on purpose: this file's older entries and `visual-pass/LOG.md`, which
+are history and were true when written; and the absolute `C:/Users/...` paths in
+`visual-pass/INVENTORY.{md,json}` and `tools/check-parts.js`, which point at one
+machine's download folder and never resolved from a checkout anyway.
+
+Verified: `ci-check` 327/0 and clean on every suite from the new path, the
+winding gate clean, and the game served from `game/` loading with `THREE`
+r147, `ThreeGL.isEnabled()` true and no console errors.
+
+---
+
 **2026-08-30 — The sandbox was never wired for the textured path, and a
 correct fallback hid it.**
 

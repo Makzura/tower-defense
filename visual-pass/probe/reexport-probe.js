@@ -30,10 +30,10 @@ var cdp = require("./cdp");
 var serve = require("./serve");
 
 var PORT = 8795, DEVTOOLS = 9335;
-var GAME_URL = "http://127.0.0.1:" + PORT + "/TD_0.5.0/index.html";
+var GAME_URL = "http://127.0.0.1:" + PORT + "/game/index.html";
 var ROOT = path.resolve(__dirname, "..", "..");
 var MODEL = "enemy-normal";
-var COMMITTED = path.join(ROOT, "TD_0.5.0", "js", "gl", "models", MODEL + ".js");
+var COMMITTED = path.join(ROOT, "game", "js", "gl", "models", MODEL + ".js");
 
 function md5(f) {
   return crypto.createHash("md5").update(fs.readFileSync(f)).digest("hex");

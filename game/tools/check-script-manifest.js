@@ -3,7 +3,7 @@
 // points at a file that exists.
 //
 //   node tools/check-script-manifest.js           check this checkout
-//   node tools/check-script-manifest.js <root>    check another TD_0.5.0 root
+//   node tools/check-script-manifest.js <root>    check another game root
 //
 // WHY THIS EXISTS, AND WHY NO SUITE COULD EVER REPLACE IT. `tests/harness.js`
 // takes its script list out of `index.html`. A file with no <script> tag is
@@ -134,7 +134,7 @@ function derivePages() {
   }
 }
 
-// Where ROOT sits inside the repo, e.g. "TD_0.5.0/". The game is one level down
+// Where ROOT sits inside the repo, e.g. "game/". The game is one level down
 // from the git root, so every path in a git object carries that prefix.
 function repoPrefix() {
   try {
@@ -373,7 +373,7 @@ var broken = Object.keys(tagged).filter(function (src) {
 }).sort();
 
 // THIRD LEG: the git index. `--full-name` gives repo-root-relative paths from
-// any subdirectory, and the game sits one level down in TD_0.5.0/, so strip
+// any subdirectory, and the game sits one level down in game/, so strip
 // whatever prefix the repo puts in front of `js/`.
 function trackedSet() {
   var out;
