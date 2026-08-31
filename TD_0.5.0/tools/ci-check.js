@@ -872,7 +872,15 @@ var BASELINE = [
     // that nothing was lost is to read the list. The twenty-nine new ones are
     // the thirty new nodes' effects, the four cooldown combinations, the
     // composition tests and the card/runtime cross-check.
-    file: "tests/content.test.js", pass: 395, fail: 0,
+    // ---- 436 on 2026-08-31, the second batch of permanent upgrades -------
+    // 395 -> 436: forty-one ADDED and none removed or renamed. The Siphon, the
+    // Summoner and the Farm each got their first tree, so unlike the 366 -> 395
+    // step this one really is a pure addition -- there was no placeholder
+    // content on these three to rename. One existing name was REWRITTEN rather
+    // than moved: "a tower with no tree is an empty tree, not a broken one" now
+    // asks an UNREGISTERED id, because all six towers have content and the
+    // engine rule it states had quietly stopped being tested.
+    file: "tests/content.test.js", pass: 436, fail: 0,
     failing: []
   },
   {

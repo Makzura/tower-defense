@@ -160,7 +160,7 @@ baseline:
 
 ```
 node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
-node tests/content.test.js        395 pass / 0 fail   content, visuals and index
+node tests/content.test.js        436 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
@@ -174,6 +174,10 @@ The nine placeholder-named nodes became nine of the thirty-nine confirmed ones,
 so every test that named `[R-A]` or `[W-N]` was renamed and rewritten rather
 than deleted. **Diff the NAMES**, which is the lesson the paragraph below
 already records — a rename reads as one removal and one addition.
+
+**Then 395 → 436 the same day**, with the second batch of permanent upgrades —
+the Siphon's, the Summoner's and the Farm's first trees. Forty-one added and
+nothing removed; there was no placeholder content on those three to rename.
 
 **Re-measured 2026-08-27 after the Normal difficulty landed:** run.js 139 → 157
 and content 225 → 263, all in the change that earned them; nothing was removed.
@@ -4539,11 +4543,14 @@ purchase's refusal cannot disagree.
 
 ### The authored content
 
-**Thirty-nine confirmed nodes across three trees** (2026-08-31), and every
-number in them is the owner's. They replaced a nine-node first pass whose names
-were placeholders (`[R-N] Base damage`); **the nine ids were KEPT and only their
-display names changed**, because an id is the persistence format and renaming
-one un-buys it for every existing player.
+**Sixty-nine confirmed nodes across SIX trees** (2026-08-31), and every number
+in them is the owner's, delivered in two batches: the Rifleman, the Warbringer
+and the Arcane Sniper first, then the Siphon, the Summoner and the Farm. The
+first batch replaced a nine-node pass whose names were placeholders (`[R-N] Base
+damage`); **those nine ids were KEPT and only their display names changed**,
+because an id is the persistence format and renaming one un-buys it for every
+existing player. The other three towers had no tree at all, so nothing there had
+to be reconciled.
 
 **THE BRANCHES ARE DELIBERATELY UNFINISHED AND MUST NOT BE FILLED IN.** A branch
 that stops after two nodes has not been designed past two. There are no
@@ -4555,14 +4562,19 @@ never appear as a purchasable node: `Crowd Momentum`, `Fault Counter`,
 `Guided Bolt`, `Buyback Sigil`. Two more are liked but never costed and are not
 in scope either: `Marked Quarry` and `Deep Epicenter`.
 
-**Every one of the thirty-nine is `minLevel: 0`** — buyable the moment the tower
+**Every one of the sixty-nine is `minLevel: 0`** — buyable the moment the tower
 is owned and the coins are there, and equippable by none of them until the tower
 reaches level 1. That is where "buying is not equipping" really bites.
 
-**Every node is a ROOT except `war_a2`.** No prerequisite was invented for the
-thirty new ones: the data model does not need one, and a fabricated edge would
+**Every node is a ROOT except `war_a2`.** No prerequisite was invented for any of
+the sixty new ones: the data model does not need one, and a fabricated edge would
 be a design decision made by the implementation. `war_a2`'s edge was authored
 and is kept.
+
+**THE ARM IS THE BRANCH, on every tree:** path A west, path B east, the general
+upper branch north, the general lower branch south. The Farm is the one
+exception and it is stated rather than inferred — it has three in-run paths, so
+its south arm is PATH C and it has no lower-general branch.
 
 #### The Rifleman — twelve
 
@@ -4638,13 +4650,105 @@ one, so it is the shot and nothing else now. Its 120 coins are unchanged.
 **`war_a1` GAINED the ×0.90 range** in the same pass, inside the same `hasA4`
 group as the speed, so a tier cannot pay the cost without the benefit.
 
-**The three other towers have NO TREE, and that is the shipping state.** The
-Siphon, the Summoner and the Farm are out of scope; the player has no tree
-either. A tower with no `js/perks/*-perks.js` file has an EMPTY tree: no nodes,
-empty inventory, empty loadout, nothing to refund, and its type's own build
-price. The screens draw it as empty rather than as broken, and a test pins that.
+#### The Siphon — fourteen
+
+| node | what it does | meta coins |
+|---|---|---:|
+| `sip_n1` Runic Pressure | ×1.08 beam damage, ×0.97 tick rate (+4.8% DPS) | 100 |
+| `sip_n2` Long Conduits | +12 u.l. reach; ×0.85 maximum health | 90 |
+| `sip_n3` Camo Polarity | sees camo from placement, without B1; placement +75 | 120 |
+| `sip_n4` Preloaded Lock | a new lock opens at ×1.25 ramp; 0.30 s to acquire one | 110 |
+| `sip_s1` Light Basin | placement 800→675; ×0.75 maximum health | 60 |
+| `sip_s2` Ceramic Coating | takes ×0.70 damage; deals ×0.95 | 100 |
+| `sip_a1` Brutal Primer | ramp +0.22/s to ×2.7 (A1–A3), +0.27/s to ×3.2 (A4–A5) | 100 |
+| `sip_a2` Selective Drain | defence pierce 25%→40%; ×0.95 damage. Never flat armor | 120 |
+| `sip_a3` Greedy Capacitor | every charge threshold ×0.85; a charge pays 0.42 not 0.50 | 130 |
+| `sip_a4` Vital Flow | A4+: the high-health bonus 30%→40%; −15 u.l. reach | 150 |
+| `sip_b1` Dense Transfusion | B3+: lifesteal ×1.20; ×0.95 tick rate | 100 |
+| `sip_b2` Voracious Fan | B5: 50→60 targets, +5 u.l.; ×0.90 damage | 140 |
+| `sip_b3` Viscous Slow | B4+: the slow 15%→22%; −15 u.l. reach | 130 |
+| `sip_b4` Second Wind | B5's save drags 650 not 500 and leaves 50 not 1; B5 +1 500 mana | 220 |
+
+#### The Summoner — thirteen
+
+| node | what it does | meta coins |
+|---|---|---:|
+| `blb_n1` Extended Ritual Circle | +25 u.l. of SUMMONING range; placement +75 | 90 |
+| `blb_n2` Ethereal Spores | every blub sees camo AND flying; ×0.90 rate; placement +150 | 120 |
+| `blb_n3` Twin Embryo | 15% chance of a second identical blub; ×1.10 every interval | 150 |
+| `blb_n4` Compressed Bodies | ×0.85 footprint; ×0.95 HP/ammunition | 100 |
+| `blb_s1` Stripped Altar | placement 450→350; the SUMMONER's ×0.70 health | 60 |
+| `blb_s2` Central Brood | main line ×1.15 damage, Mini and Heavy ×0.92; placement +50 | 120 |
+| `blb_a1` Fragile Brood | A3+: family A +1 damage, −1 HP/ammunition | 120 |
+| `blb_a2` Rapid Incubation | A3+: family A intervals ×0.92, their rate ×0.90 | 130 |
+| `blb_a3` Fleeting Toxin | A4+: the weaken debuff +0.15 pp a hit, 3.5 s not 5 | 150 |
+| `blb_b1` Overcharged Cores | B3+: family B ×1.10 damage, intervals ×1.06 | 110 |
+| `blb_b2` Compressed Cadence | B3+: family B −2 s flat; their reach ×0.85 | 120 |
+| `blb_b3` Wide Detonation | the MK2's blast 25→35 u.l.; family B ×0.96 damage | 150 |
+| `blb_b4` Superconductor | the lance every 7th attack not 10th; ×0.95 ordinary damage | 180 |
+
+**A BLUB'S HP IS ITS AMMUNITION** — one ordinary attack spends one point — so a
+node that takes health off a blub takes an attack off it too, and every card
+says HP/ammunition rather than "charge". **A percentage on a blub's HP ROUNDS TO
+NEAREST** (2026-08-31, the owner's ruling): that is the rule the game did not
+have before Compressed Bodies asked for one, and `summonStats` is the one place
+it is applied. Floored at 1, so a living blub always has at least one attack.
+
+#### The Farm — thirteen, and PATH C REPLACES THE LOWER-GENERAL BRANCH
+
+The Farm is the only tower with three in-run paths, so its four permanent
+sections are A, B, the general upper branch, and C on the south arm.
+
+| node | what it does | meta coins |
+|---|---|---:|
+| `frm_n1` Arcane Fertilizer | +30 FIXED mana a wave; placement +150 | 90 |
+| `frm_n2` Compact Estate | ×0.80 footprint (35→28, C1's 25→20); ×0.90 health | 100 |
+| `frm_n3` Liquid License | refunds 70% not 50%; ×0.92 production | 110 |
+| `frm_n4` Consortium | −5% alone, +3 pp per other living Farm to +12 | 120 |
+| `frm_a1` Accelerated Boiler | A3+: a tick every 4.5 s; ×0.90 FIXED per-wave payment | 100 |
+| `frm_a2` Patient Investment | A5: a tranche is +6% not +5%; a surge ×4 not ×5 | 160 |
+| `frm_a3` Mana Armor | A4+: up to 50% less damage, 50 stored mana a point | 180 |
+| `frm_b1` Extended Jurisdiction | B3+: +30 u.l. of field; B4+ −5 pp amplification | 110 |
+| `frm_b2` Paralyzing Field | B4+: +5 pp slow; ×0.90 FIXED per-wave payment | 130 |
+| `frm_b3` Execution Tithe | B5: executes under 15 or 7.5%; 14→10 mana a kill | 150 |
+| `frm_c1` Jet Protected | a natural 1 and a natural maximum are both halved | 100 |
+| `frm_c2` Amortized Reset | face 8 sets `P = (P + B) / 2` instead of `P = B` | 120 |
+| `frm_c3` Extra Die | C3+: one more die; every ordinary gain and loss ×0.75 | 180 |
+
+**A FARM HAS EIGHT KINDS OF MANA AND THEY ARE NOT ONE QUANTITY**: the fixed
+per-wave payment, A3+ timed ticks, mana already STORED, the A4/A5 clone, a
+withdrawal, the B path's kill bounty, the C network's B and P, and a refund.
+They merely share a unit. **PRODUCTION means the fixed payment and the timed
+ticks and nothing else** — that is the rule `productionScale` states once, and
+it is why Liquid License and Consortium do not touch a clone, a withdrawal, a
+kill bounty or a refund. `productionScale` is applied at the SOURCE (in
+`producesPerWave` and at the tick's own call site), which is what keeps it
+applied exactly once whether a farm is paid directly or through the C network.
+
+**JET PROTECTED AND EXTRA DIE COMPOSE MULTIPLICATIVELY**, and a `×2` face is
+scaled as its BONUS ABOVE ONE: `1 + 1.0 × 0.50 × 0.75 = ×1.375`. Halving the
+multiplier instead would turn a protected double into a loss. Qualification for
+Jet Protected is the face the die THREW — a reroll is natural again, a face
+walked up by a face-14 or face-16 charge is not — and a queued modifier changing
+what a natural face is later worth does not disqualify it.
+
+**Four things elsewhere in the codebase became live for this batch, and three of
+them closed a latent duplication.** `DeathDenial` read two module constants and
+ignored the `death_denial` block its own config had carried since the tower was
+written; it reads the HOLDER's resolved parameters now. `FarmTower`'s tick
+length, tranche figures and execute thresholds were type constants and are
+instance fields resolved FROM those constants. `sellValue` in js/game.js takes a
+per-tower `sellRefundRate` when one is set. And `RampTracker` grew `rampStart`, a
+FLOOR on the bonus rather than an addition to it, so Preloaded Lock buys the
+first second of the climb and never a higher ceiling.
+
+**The player has no tree, and that is the shipping state.** Every TOWER now has
+one. A tower with no `js/perks/*-perks.js` file would have an EMPTY tree: no
+nodes, empty inventory, empty loadout, nothing to refund, and its type's own
+build price — the screens draw that as empty rather than as broken, and a test
+pins it against an unregistered id rather than against a shipping tower.
 **Adding a tower's tree is adding one file and one `<script>` tag**, which is
-exactly what the Arcane Sniper's cost.
+exactly what each of the four new ones cost.
 
 ### Authoring a tree
 
@@ -4664,7 +4768,7 @@ against authored content: they are engine rules, none of the three shipping
 trees holds either shape today, and a rule that is only tested where content
 happens to use it stops being tested the moment the content changes.
 
-**Five things the engine grew for the confirmed content** (2026-08-31), each
+**Six things the engine grew for the confirmed content** (2026-08-31), each
 because a node could not otherwise say what it says:
 
 - **`preAdd`** — a delta that lands BEFORE the multipliers, so the order is
@@ -4690,6 +4794,12 @@ because a node could not otherwise say what it says:
   `snp_b3` would have moved a number nothing read; and its footprint and reach
   are cached on the adapter by a `refreshDerived` that has already run. It must
   be idempotent — it runs on every restat.
+- **`wrapNextTierCost`** — the adapters' spelling of the same one door. A
+  config-driven tower has no `upgradeCost(id)`; it prices the NEXT tier on a
+  named path, so a `tiers: { B5: { cost: 1500 } }` reached the two hand-written
+  towers and silently missed the Siphon and the Arcane Sniper. The tier id is
+  DERIVED (the path's name plus the tier this call would buy), so one vocabulary
+  covers both tower shapes.
 - **`previewStat(Type, fields, base, context)`** — the ghost may now answer the
   conditions it CAN vouch for. `previewRangePx` knows what is under the cursor,
   so it passes `{ onHighGround, onFlatGround }` and `snp_n2` draws the ring the

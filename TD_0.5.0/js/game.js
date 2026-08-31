@@ -2401,7 +2401,13 @@ function sellValue(tower) {
   // about what was paid, which is what the end-of-run screen reports.
   var sunk = (typeof tower.unrefundableSpent === "number")
     ? tower.unrefundableSpent : 0;
-  return Math.ceil(Math.max(0, spent - sunk) * SELL_REFUND_FRACTION);
+  // A TOWER MAY BUY A BETTER RATE. `sellRefundRate` is a permanent upgrade's
+  // (the Farm's Liquid License, 70%) and is 0 -- meaning "the game's" -- on
+  // every other tower and on every Farm without it. What is SUNK stays sunk
+  // whatever the rate: the Farm's C5 gives back nothing at either.
+  var rate = (typeof tower.sellRefundRate === "number" && tower.sellRefundRate > 0)
+    ? tower.sellRefundRate : SELL_REFUND_FRACTION;
+  return Math.ceil(Math.max(0, spent - sunk) * rate);
 }
 
 // The path, in u.l. -- like every other distance in the game (see

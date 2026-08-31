@@ -723,6 +723,7 @@ var TowerPerks = (function () {
 
     wrapRestat(tower);
     wrapUpgradeCost(tower, towerId);
+    wrapNextTierCost(tower, towerId);
     applyEffects(tower);
   }
 
@@ -770,6 +771,31 @@ var TowerPerks = (function () {
       var base = inner.call(this, id);
       if (typeof base !== "number") return base;
       return Math.max(0, base + tierCostDelta(towerId, id));
+    };
+  }
+
+  // THE SAME ONE DOOR, SPELLED THE ADAPTERS' WAY (2026-08-31). A config-driven
+  // tower has no `upgradeCost(id)` at all: it prices the NEXT tier on a named
+  // path, and `nextTierCost("B")` is what its panel button, its hover card, its
+  // `performAction` and the `totalSpent` a sale refunds half of all read. So a
+  // `tiers: { B5: { cost: 1500 } }` reached the Rifleman and the Warbringer and
+  // silently missed the Siphon and the Arcane Sniper.
+  //
+  // The tier id is DERIVED, not stored: the path's name plus the number of the
+  // tier this call would buy. That is exactly the `B5` a tree already writes,
+  // so one vocabulary covers both tower shapes and neither file learns the
+  // other's. `null` (a finished path) is passed straight through.
+  function wrapNextTierCost(tower, towerId) {
+    if (typeof tower.nextTierCost !== "function") return;
+    if (Object.prototype.hasOwnProperty.call(tower, "nextTierCost")) return;
+
+    var inner = tower.nextTierCost;
+    tower.nextTierCost = function (pathName) {
+      var base = inner.call(this, pathName);
+      if (typeof base !== "number") return base;
+      var owned = (this.core && this.core.purchased)
+        ? (this.core.purchased[pathName] || 0) : 0;
+      return Math.max(0, base + tierCostDelta(towerId, pathName + (owned + 1)));
     };
   }
 

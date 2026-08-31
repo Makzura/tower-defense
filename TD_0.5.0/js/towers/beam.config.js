@@ -53,7 +53,24 @@ TowerConfigs.beam = {
     // Present so the stat resolver has something to add deltas onto; the
     // beam has no cone, but the shared targeting system reads these.
     targetShape: "circle",
-    coneArcDeg: 0
+    coneArcDeg: 0,
+
+    // --- NEUTRALS THE PERMANENT UPGRADES MOVE (2026-08-31) -----------------
+    //
+    // Declared here, at their inert values, so an unequipped node is not
+    // merely harmless but arithmetically absent -- and so a `mul` from one node
+    // has a number to multiply whatever order the loadout is in. No tier
+    // touches any of them.
+    //
+    //   damageMult      every ordinary beam multiplier lands here rather than
+    //                   on `ad`, because A5's gold bonus is added AFTER `ad`
+    //                   (see effectiveAD) and a factor on the stat would miss
+    //                   it. Runic Pressure, Selective Drain, Voracious Fan and
+    //                   Ceramic Coating all multiply this one field
+    //   incomingDamageMult   what a hit on this tower is worth. Ceramic
+    //                   Coating's reduction, and NOT extra maximum HP
+    damageMult: 1,
+    incomingDamageMult: 1
   },
 
   crosspath: {
@@ -220,7 +237,10 @@ TowerConfigs.beam = {
   // Every module's shape, so the resolver always has something to overwrite.
   // A mechanic that no purchased tier switched on is simply never consulted.
   mechanics: {
-    ramp_per_target: { rampRate: 0, rampCap: 0 },
+    // `rampStart` is the multiplier a FRESH lock opens on, as a bonus above 1,
+    // and it is zero for every tier -- Preloaded Lock is the only thing in the
+    // game that moves it. See RampTracker.multiplier.
+    ramp_per_target: { rampRate: 0, rampCap: 0, rampStart: 0 },
     def_pierce: { defPierce: 0 },
     charge_to_gold: {
       // The resolver always carries these defaults, but gold is banked only

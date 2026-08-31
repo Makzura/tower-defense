@@ -13,6 +13,57 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — The confirmed permanent upgrades, batch 2: the Siphon, the
+Summoner and the Farm.**
+
+Forty more confirmed nodes, so all six towers have a tree and the game holds
+sixty-nine. None of the three had any content before, so unlike the first batch
+nothing had to be reconciled and no id moved. The player still has no tree.
+
+**The Siphon — fourteen.** Its ramp arrives faster and stops lower, its defence
+pierce goes to 40% for 5% of the beam, its charge ladder shifts 15% left for 16%
+less a charge, and B5's death denial drags 650 u.l. and leaves the base on 50.
+`Camo Polarity` replaces the rejected `Double Polarity` package: detection, and
+neither a flying sight nor a damage matchup.
+
+**The Summoner — thirteen.** A blub's HP is its AMMUNITION, so `Fragile Brood`'s
+point of damage really does cost an attack, and every card says HP/ammunition
+rather than "charge". **A percentage on a blub's HP rounds to NEAREST**, which
+is the owner's ruling on a question the game had never had to answer.
+`Twin Embryo` rolls once, on the body that appeared, and the duplicate never
+rolls again.
+
+**The Farm — thirteen, and Path C replaces the lower-general branch.** Most of
+the work here is keeping the Farm's eight kinds of mana apart: the fixed
+per-wave payment, the timed ticks, stored mana, the clone, a withdrawal, the
+kill bounty, the C network's B and P, and a refund. PRODUCTION means the fixed
+payment and the ticks and nothing else, which is what `productionScale` states
+once — and it is applied at the SOURCE so a networked farm cannot be billed
+twice. `Mana Armor` burns fifty stored mana a point and buys what it can afford.
+`Jet Protected` and `Extra Die` compose multiplicatively on the bonus ABOVE one,
+so C5's face 22 reads ×1.375; halving the multiplier instead would have turned a
+protected double into a loss.
+
+**One engine addition, and it closed a real hole.** `tiers` reached the two
+hand-written towers and silently missed both ADAPTERS, which price the next tier
+on a named path rather than by id. `wrapNextTierCost` derives the id from the
+path and the tier the call would buy, so one vocabulary covers both shapes — and
+the Siphon's Second Wind can charge 1 500 mana for B5.
+
+**Four latent duplications became live.** `DeathDenial` read two module
+constants and ignored the `death_denial` block its own config had carried since
+the tower was written; it reads the holder's resolved parameters now.
+`FarmTower`'s tick length, tranche figures and execute thresholds were type
+constants and are instance fields resolved from those constants. `sellValue`
+takes a per-tower refund rate when one is set. And `RampTracker` grew
+`rampStart`, a FLOOR on the bonus rather than an addition, so Preloaded Lock buys
+the first second of the climb and never a higher ceiling.
+
+One existing test was rewritten rather than moved: "a tower with no tree is an
+empty tree" now asks an unregistered id, because all six towers have content and
+the ENGINE rule it states had quietly stopped being tested. content 395 → 436,
+forty-one added and nothing removed.
+
 **2026-08-31 — The confirmed permanent upgrades: thirty-nine nodes on three
 towers.**
 

@@ -10380,15 +10380,34 @@ function (t) {
 test("a tower with no tree is an empty tree, not a broken one", function (t) {
   var h = bootProgress();
 
-  // FOUR OF THE SIX TOWERS HAVE NO TREE, and that is the shipping state: only
-  // the two starters have authored content. An unauthored tower must read as
-  // empty everywhere rather than as missing.
+  // ALL SIX TOWERS HAVE A TREE SINCE 2026-08-31, so this is asked of an
+  // UNREGISTERED id rather than of a shipping tower. That is the honest shape
+  // for it either way: the claim is an ENGINE rule -- an unauthored tower reads
+  // as empty everywhere rather than as missing -- and a rule tested only where
+  // content happens to lack a tree stops being tested the moment content
+  // arrives, which is exactly what just happened to it.
+  //
+  // The `openTree()` half at the bottom still needs a real, owned tower to
+  // select, so it uses one with a tree and asks the weaker question: that the
+  // screen opens and draws.
+  t.deep(h.run("TowerPerks.nodes('no_such_tower')"), [],
+    "an unregistered tower has no nodes");
+  t.eq(h.run("TowerPerks.treeOf('no_such_tower')"), null,
+    "and no tree registered");
+  t.deep(h.run("TowerPerks.inventory('no_such_tower')"), [],
+    "its inventory is empty");
+  t.deep(h.run("TowerPerks.loadout('no_such_tower')"),
+    [null, null, null, null, null], "and so is its loadout");
+  t.eq(h.run("TowerPerks.refundValue('no_such_tower')"), 0, "nothing to refund");
+  t.eq(h.run("TowerPerks.priceOf(null)"), 0, "and no type is no price");
+
+  // AND EVERY OWNED TOWER NOW HAS ONE, which is the other half of the state
+  // this test records.
   var without = h.run("MetaProgress.snapshot().owned.filter(function (id) {" +
     "  return TowerPerks.nodes(id).length === 0; })");
-  t.ok(without.length > 0, "some owned tower has no tree yet");
+  t.deep(without, [], "every owned tower has authored content");
 
-  var id = without[0];
-  t.eq(h.run("TowerPerks.treeOf('" + id + "')"), null, "it has no tree registered");
+  var id = h.run("MetaProgress.snapshot().owned[0]");
   t.deep(h.run("TowerPerks.inventory('" + id + "')"), [], "its inventory is empty");
   t.deep(h.run("TowerPerks.loadout('" + id + "')"),
     [null, null, null, null, null], "and so is its loadout");
@@ -10507,6 +10526,13 @@ function towerWith(h, towerId, nodeIds, tiers, x, y) {
 // `whyCannotUpgrade` at all and buys the NEXT tier on a named path. Spelling
 // both as "A3" here is what lets a combination test read the same either way.
 function buyTiers(h, expr, tiers) {
+  // THE SIPHON'S B5 IS GATED ON HEALING DONE, pooled across every tower, and on
+  // the one-per-game death-denial slot. Both are real conditions rather than UI
+  // chrome, so a fixture that wants a B5 has to meet them -- `restartGame`
+  // already cleared the slot, and this is the healing a run would have done.
+  if ((tiers || []).indexOf("B5") !== -1) {
+    h.run("HealingLedger.record(6000)");
+  }
   (tiers || []).forEach(function (tier) {
     h.run("(function () { var tw = " + expr + ";" +
           "  if (typeof tw.whyCannotUpgrade === 'function') {" +
@@ -12276,6 +12302,1567 @@ test("every authored node survives a reload with its effect intact", function (t
   t.eq(h.run("towers[0].damage"), 2, "the effect is rebuilt after the reload");
   t.eq(h.run("towers[0].cost"), 250, "and so is the build price");
   t.eq(h.run("towers[0].upgradeCost('A1')"), 250, "and the tier surcharge");
+});
+
+
+// ---------------------------------------------------------------------------
+// THE CONFIRMED TREE CONTENT, BATCH 2 (2026-08-31) — the Siphon's fourteen,
+// the Summoner's thirteen and the Farm's thirteen.
+//
+// Same rules as the block above: these name ids and assert exact figures,
+// because the numbers ARE the specification. The three towers here are the
+// three that had no tree at all until now.
+// ---------------------------------------------------------------------------
+
+test("the second batch's three trees hold exactly the confirmed nodes",
+function (t) {
+  var h = bootContent();
+
+  var WANT = {
+    siphon: [
+      ["sip_n1", "Runic Pressure", 100, "north"],
+      ["sip_n2", "Long Conduits", 90, "north"],
+      ["sip_n3", "Camo Polarity", 120, "north"],
+      ["sip_n4", "Preloaded Lock", 110, "north"],
+      ["sip_s1", "Light Basin", 60, "south"],
+      ["sip_s2", "Ceramic Coating", 100, "south"],
+      ["sip_a1", "Brutal Primer", 100, "west"],
+      ["sip_a2", "Selective Drain", 120, "west"],
+      ["sip_a3", "Greedy Capacitor", 130, "west"],
+      ["sip_a4", "Vital Flow", 150, "west"],
+      ["sip_b1", "Dense Transfusion", 100, "east"],
+      ["sip_b2", "Voracious Fan", 140, "east"],
+      ["sip_b3", "Viscous Slow", 130, "east"],
+      ["sip_b4", "Second Wind", 220, "east"]
+    ],
+    blub: [
+      ["blb_n1", "Extended Ritual Circle", 90, "north"],
+      ["blb_n2", "Ethereal Spores", 120, "north"],
+      ["blb_n3", "Twin Embryo", 150, "north"],
+      ["blb_n4", "Compressed Bodies", 100, "north"],
+      ["blb_s1", "Stripped Altar", 60, "south"],
+      ["blb_s2", "Central Brood", 120, "south"],
+      ["blb_a1", "Fragile Brood", 120, "west"],
+      ["blb_a2", "Rapid Incubation", 130, "west"],
+      ["blb_a3", "Fleeting Toxin", 150, "west"],
+      ["blb_b1", "Overcharged Cores", 110, "east"],
+      ["blb_b2", "Compressed Cadence", 120, "east"],
+      ["blb_b3", "Wide Detonation", 150, "east"],
+      ["blb_b4", "Superconductor", 180, "east"]
+    ],
+    farm: [
+      ["frm_n1", "Arcane Fertilizer", 90, "north"],
+      ["frm_n2", "Compact Estate", 100, "north"],
+      ["frm_n3", "Liquid License", 110, "north"],
+      ["frm_n4", "Consortium", 120, "north"],
+      ["frm_a1", "Accelerated Boiler", 100, "west"],
+      ["frm_a2", "Patient Investment", 160, "west"],
+      ["frm_a3", "Mana Armor", 180, "west"],
+      ["frm_b1", "Extended Jurisdiction", 110, "east"],
+      ["frm_b2", "Paralyzing Field", 130, "east"],
+      ["frm_b3", "Execution Tithe", 150, "east"],
+      // PATH C REPLACES THE LOWER-GENERAL BRANCH on this tower, so the south
+      // arm is C and there is no separate lower-general section.
+      ["frm_c1", "Jet Protected", 100, "south"],
+      ["frm_c2", "Amortized Reset", 120, "south"],
+      ["frm_c3", "Extra Die", 180, "south"]
+    ]
+  };
+
+  Object.keys(WANT).forEach(function (towerId) {
+    var nodes = h.run("TowerPerks.nodes('" + towerId + "')");
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+
+    t.eq(nodes.length, WANT[towerId].length,
+      towerId + " has exactly " + WANT[towerId].length + " nodes and no invented extra");
+
+    WANT[towerId].forEach(function (row) {
+      var n = byId[row[0]];
+      t.ok(!!n, towerId + ": " + row[0] + " exists");
+      if (!n) return;
+      t.eq(n.name, row[1], row[0] + " is called " + row[1]);
+      t.eq(n.cost, row[2], row[1] + " costs " + row[2] + " meta coins");
+      t.eq(n.minLevel || 0, 0, row[1] + " needs no tower level");
+      t.ok(!!n.blurb && n.blurb.length > 20, row[1] + " carries a description");
+      var arm = n.at.x < 0 ? "west" : n.at.x > 0 ? "east"
+        : n.at.y < 0 ? "north" : "south";
+      t.eq(arm, row[3], row[1] + " sits on the " + row[3] + " arm");
+      t.deep(n.requires || [], [], row[1] + " is a root");
+    });
+
+    var forbidden = ["Capital Bound", "Blood Triage", "Initial Overpressure",
+      "Tight Base", "Survival Valve", "Close Circuit", "Double Polarity",
+      "Swarm Density", "Early Coagulation", "Reinforced Cells", "Shared Optics",
+      "Fortified Ritual", "Recycled Biomass", "Sacrificial Guard",
+      "Pressurized Reserve", "Sealed Vault", "Aggressive Tithe",
+      "Fortified Dividends", "Reinforced Structure", "Ascending Dice",
+      "Banker's Stop"];
+    var present = nodes.map(function (n) { return n.name; })
+      .filter(function (name) { return forbidden.indexOf(name) !== -1; });
+    t.deep(present, [], towerId + " exposes no rejected name");
+  });
+
+  // ALL SIX TOWERS HAVE A TREE NOW, and no tower has two.
+  t.deep(h.run("TowerPerks.towersWithTrees().sort()"),
+    ["blub", "farm", "longshot", "siphon", "smasher", "soldier"].sort(),
+    "every tower in the catalogue has authored content");
+});
+
+test("a fresh profile leaves the second batch's three towers exactly as authored",
+function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+
+  var siphon = h.run("(function () { var s = new BeamTower(200, 200, path);" +
+    "  addTower(s); var c = s.core.stats;" +
+    "  return { ad: s.effectiveAD(0), rate: c.attackRate, range: s.rangeUl," +
+    "    hp: s.maxHp, cost: s.cost, targets: c.maxTargets, camo: c.seesCamo," +
+    "    delay: c.reacquireDelay, dmgMult: c.damageMult," +
+    "    inc: c.incomingDamageMult, pierce: s.defPierce() }; })()");
+  t.deep(siphon, { ad: 1, rate: 10, range: 75, hp: 250, cost: 800, targets: 1,
+    camo: false, delay: 0, dmgMult: 1, inc: 1, pierce: 0 },
+    "an unperked Siphon is the authored Siphon");
+
+  var summ = h.run("(function () { var s = new BlubTower(400, 200, path);" +
+    "  addTower(s); var u = s.summonStats('blub1');" +
+    "  return { range: s.rangeUl, hp: s.maxHp, cost: s.cost," +
+    "    dmg: u.damage, rate: u.rate, ammo: u.hp, foot: u.footprintUl," +
+    "    camo: u.seesCamo, flying: u.seesFlying," +
+    "    interval: s.intervalFor('blub1'), weaken: s.weakenPerHit," +
+    "    weakenFor: s.weakenSeconds, twin: s.perkTwinChance }; })()");
+  t.deep(summ, { range: 75, hp: 100, cost: 450, dmg: 2, rate: 1, ammo: 10,
+    foot: 10, camo: false, flying: false, interval: 20, weaken: 0.001,
+    weakenFor: 5, twin: 0 }, "an unperked Summoner is the authored Summoner");
+
+  var f = h.run("(function () { var s = new FarmTower(600, 200, path);" +
+    "  addTower(s);" +
+    "  return { wave: s.producesPerWave(), hp: s.maxHp, cost: s.cost," +
+    "    foot: s.footprintRadiusUl, tick: s.tickSeconds," +
+    "    refund: sellValue(s), tranche: s.trancheBonus, temp: s.tempMultiplier," +
+    "    exFlat: s.executeFlat, exFrac: s.executeFraction," +
+    "    armor: s.manaArmorPerPoint, dice: s.diceCount," +
+    "    scale: s.productionScale() }; })()");
+  t.deep(f, { wave: 200, hp: 200, cost: 1200, foot: 35, tick: 5, refund: 600,
+    tranche: 0.05, temp: 5, exFlat: 10, exFrac: 0.05, armor: 0, dice: 0,
+    scale: 1 }, "an unperked Farm is the authored Farm");
+});
+
+test("owning a second-batch node does nothing; equipping it is what does",
+function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); });" +
+        "MetaProgress.buyNode('siphon', 'sip_n2', 0);" +
+        "MetaProgress.buyNode('blub', 'blb_n1', 0);" +
+        "MetaProgress.buyNode('farm', 'frm_n1', 0);" +
+        "openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+
+  var owned = h.run("(function () {" +
+    "  var a = new BeamTower(200, 200, path); addTower(a);" +
+    "  var b = new BlubTower(400, 200, path); addTower(b);" +
+    "  var c = new FarmTower(600, 200, path); addTower(c);" +
+    "  return { beam: a.rangeUl, blub: b.rangeUl, farm: c.producesPerWave() }; })()");
+  t.deep(owned, { beam: 75, blub: 75, farm: 200 },
+    "three bought nodes, none equipped, and nothing has moved");
+
+  h.run("openMenu();" +
+        "MetaProgress.equipPerk('siphon', 'sip_n2', 0);" +
+        "MetaProgress.equipPerk('blub', 'blb_n1', 0);" +
+        "MetaProgress.equipPerk('farm', 'frm_n1', 0);" +
+        "startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  var live = h.run("(function () {" +
+    "  var a = new BeamTower(200, 200, path); addTower(a);" +
+    "  var b = new BlubTower(400, 200, path); addTower(b);" +
+    "  var c = new FarmTower(600, 200, path); addTower(c);" +
+    "  return { beam: a.rangeUl, blub: b.rangeUl, farm: c.producesPerWave() }; })()");
+  t.deep(live, { beam: 87, blub: 100, farm: 230 }, "equipped, all three land");
+
+  h.run("openMenu(); MetaProgress.unequipPerk('siphon', 0);" +
+        "MetaProgress.unequipPerk('blub', 0); MetaProgress.unequipPerk('farm', 0);" +
+        "startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  var off = h.run("(function () {" +
+    "  var a = new BeamTower(200, 200, path); addTower(a);" +
+    "  var b = new BlubTower(400, 200, path); addTower(b);" +
+    "  var c = new FarmTower(600, 200, path); addTower(c);" +
+    "  return { beam: a.rangeUl, blub: b.rangeUl, farm: c.producesPerWave() }; })()");
+  t.deep(off, { beam: 75, blub: 75, farm: 200 },
+    "unequipped before the run, and all three are authored again");
+  t.eq(h.run("MetaProgress.ownsNode('farm', 'frm_n1')"), true,
+    "while the nodes are still owned");
+});
+
+// --- Siphon -----------------------------------------------------------------
+
+var SIP_A = ["A1", "A2", "A3", "A4", "A5"];
+var SIP_B = ["B1", "B2", "B3", "B4", "B5"];
+
+test("Brutal Primer arrives sooner and stops lower", function (t) {
+  var h = bootContent();
+
+  // THE AUTHORED RAMP FIRST. `rampCap` is the bonus ABOVE 1, so the design
+  // figures x3.0 and x3.5 are 2.0 and 2.5 here -- reading them the other way
+  // round would turn this node's nerf into a buff.
+  var plain = towerWith(h, "siphon", [], ["A1"]);
+  var p = h.run(plain + ".core.stats.mechanics.ramp_per_target");
+  t.deep({ rate: p.rampRate, cap: p.rampCap }, { rate: 0.15, cap: 2.0 },
+    "A1 normally climbs at 0.15 to a x3.0 ceiling");
+
+  var a1 = towerWith(h, "siphon", ["sip_a1"], ["A1"]);
+  var q = h.run(a1 + ".core.stats.mechanics.ramp_per_target");
+  t.deep({ rate: q.rampRate, cap: q.rampCap }, { rate: 0.22, cap: 1.7 },
+    "with it, 0.22 to x2.7");
+  t.near(h.run(a1 + ".ramp.params.rampRate"), 0.22, 1e-9,
+    "and the live tracker is pointed at the same object");
+
+  var a4 = towerWith(h, "siphon", ["sip_a1"], ["A1", "A2", "A3", "A4"]);
+  var r = h.run(a4 + ".core.stats.mechanics.ramp_per_target");
+  t.deep({ rate: r.rampRate, cap: r.rampCap }, { rate: 0.27, cap: 2.2 },
+    "A4 replaces it wholesale with 0.27 to x3.2");
+
+  // FIVE UNINTERRUPTED SECONDS AT A5, measured through the real tracker.
+  var plainA5 = towerWith(h, "siphon", [], SIP_A);
+  var normal = h.run("(function () { var tw = " + plainA5 + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  tw.ramp.update(5, [e]);" +
+    "  return { at5: tw.ramp.multiplier(e)," +
+    "           cap: 1 + tw.core.stats.mechanics.ramp_per_target.rampCap }; })()");
+  var fastA5 = towerWith(h, "siphon", ["sip_a1"], SIP_A);
+  var primed = h.run("(function () { var tw = " + fastA5 + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  tw.ramp.update(5, [e]);" +
+    "  return { at5: tw.ramp.multiplier(e)," +
+    "           cap: 1 + tw.core.stats.mechanics.ramp_per_target.rampCap }; })()");
+  t.near(normal.at5, 2.0, 1e-9, "an ordinary A5 reads x2.00 after five seconds");
+  t.near(primed.at5, 2.35, 1e-9, "a primed one reads x2.35");
+  t.near(normal.cap, 3.5, 1e-9, "and their ceilings are x3.5");
+  t.near(primed.cap, 3.2, 1e-9, "against x3.2 — about 8.6% lower");
+  t.near(primed.cap / normal.cap, 1 - 0.0857, 1e-3, "which is the stated 8.6%");
+});
+
+test("Selective Drain ignores percentage defence and never flat armor",
+function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "siphon", [], ["A1"]);
+  t.near(h.run(plain + ".defPierce()"), 0.25, 1e-9, "A1 normally pierces 25%");
+
+  var s = towerWith(h, "siphon", ["sip_a2"], ["A1"]);
+  t.near(h.run(s + ".defPierce()"), 0.40, 1e-9, "with it, 40%");
+  t.near(h.run(s + ".effectiveAD(0)"), 0.95, 1e-9, "for 5% off the beam");
+
+  // WHAT A BODY ACTUALLY TAKES, through the shared mitigation. An enemy with
+  // 50 percentage defence and no plate: -5% raw against +6.4% net.
+  var out = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'normal', {}); e.defense = 50; e.armor = 0;" +
+    "  return { plain: Mitigation.mitigate(1, e, 0.25, 0)," +
+    "           drain: Mitigation.mitigate(0.95, e, 0.40, 0)," +
+    "           bare: Mitigation.mitigate(0.95, e, 0.40, 0) }; })()");
+  t.near(out.plain, 0.625, 1e-9, "an ordinary A1 tick lands 0.625");
+  t.near(out.drain, 0.665, 1e-9, "and a drained one 0.665");
+  t.near(out.drain / out.plain, 1.064, 1e-3, "about +6.4%");
+  t.ok(out.drain % 1 !== 0, "and neither figure was rounded to a whole number");
+
+  // FLAT ARMOR IS UNTOUCHED. A Brute's five points meet the smaller tick and
+  // eat all of it, exactly as they would without the node.
+  var plated = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'brute', {});" +
+    "  return { armor: e.armor, took: Mitigation.mitigate(0.95, e, 0.40, 0) }; })()");
+  t.eq(plated.armor, 5, "a Brute carries five flat");
+  t.eq(plated.took, 0, "and a 0.95 tick still lands nothing at all through it");
+});
+
+test("Greedy Capacitor moves every threshold and what a charge is worth",
+function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "siphon", [], ["A1", "A2", "A3"]);
+  var before = h.run("(function () { var tw = " + plain + ";" +
+    "  return { first: tw.charge.thresholdFor(1), fourth: tw.charge.thresholdFor(4)," +
+    "    per: tw.core.stats.mechanics.charge_to_gold.perCharge }; })()");
+  t.near(before.first, 500, 1e-9, "the first charge normally needs 500");
+  t.near(before.per, 0.50, 1e-9, "and pays 0.50 mana");
+
+  var s = towerWith(h, "siphon", ["sip_a3"], ["A1", "A2", "A3"]);
+  var after = h.run("(function () { var tw = " + s + ";" +
+    "  return { first: tw.charge.thresholdFor(1), fourth: tw.charge.thresholdFor(4)," +
+    "    per: tw.core.stats.mechanics.charge_to_gold.perCharge," +
+    "    growth: tw.core.stats.mechanics.charge_to_gold.growth," +
+    "    cap: tw.core.stats.mechanics.charge_to_gold.capTotal }; })()");
+  t.near(after.first, 425, 1e-9, "with it the first needs 425");
+  t.near(after.fourth, before.fourth * 0.85, 1e-9,
+    "and EVERY later one is 15% lower too, because they are one geometry");
+  t.near(after.per, 0.42, 1e-9, "each charge pays 0.42 — 16% less");
+  t.near(after.growth, 1.65, 1e-9, "the ladder's shape is untouched");
+  t.near(after.cap, 5.00, 1e-9, "and so is the ceiling");
+});
+
+test("Vital Flow pays from A4 and charges reach for it", function (t) {
+  var h = bootContent();
+
+  var a3 = towerWith(h, "siphon", ["sip_a4"], ["A1", "A2", "A3"]);
+  t.eq(h.run(a3 + ".rangeUl"), 150, "nothing at A3, on either half");
+
+  var plain = towerWith(h, "siphon", [], ["A1", "A2", "A3", "A4"]);
+  t.near(h.run(plain + ".core.stats.mechanics.hp_scaling.maxBonus"), 0.30, 1e-9,
+    "A4 normally adds 30% against a full-health body");
+  t.eq(h.run(plain + ".rangeUl"), 175, "and reaches 175");
+
+  var s = towerWith(h, "siphon", ["sip_a4"], ["A1", "A2", "A3", "A4"]);
+  t.near(h.run(s + ".core.stats.mechanics.hp_scaling.maxBonus"), 0.40, 1e-9,
+    "with it, 40%");
+  t.eq(h.run(s + ".rangeUl"), 160, "for 15 u.l. of reach");
+
+  // THE THRESHOLD AND THE QUALIFICATION ARE A4's OWN and are not touched: a
+  // body at half health still gets nothing, and one at full gets the whole of
+  // whatever the bonus now is.
+  var scaled = h.run("(function () { var tw = " + towers1() + ";" +
+    "  function at(frac) { return tw.hpScale({ health: frac, maxHealth: 1 }); }" +
+    "  return { full: at(1), threeQ: at(0.75), half: at(0.5), low: at(0.2) }; })()");
+  t.near(scaled.full, 1.40, 1e-9, "a full-health body takes 40% more");
+  t.near(scaled.threeQ, 1.20, 1e-9, "three quarters is halfway up the slope");
+  t.near(scaled.half, 1, 1e-9, "and the floor is still half health");
+  t.near(scaled.low, 1, 1e-9, "with nothing below it");
+
+  var a5 = towerWith(h, "siphon", ["sip_a4"], SIP_A);
+  t.eq(h.run(a5 + ".rangeUl"), 160, "and the reach penalty persists at A5");
+});
+
+test("Dense Transfusion drains harder and ticks slower", function (t) {
+  var h = bootContent();
+
+  var b2 = towerWith(h, "siphon", ["sip_b1"], ["B1", "B2"]);
+  t.eq(h.run(b2 + ".core.stats.attackRate"), 10, "nothing before B3");
+
+  var b3 = towerWith(h, "siphon", ["sip_b1"], ["B1", "B2", "B3"]);
+  var got = h.run("(function () { var c = " + b3 + ".core.stats;" +
+    "  return { steal: c.mechanics.lifesteal.ratio, rate: c.attackRate }; })()");
+  t.near(got.steal, 0.12, 1e-9, "B3's 10% becomes 12%");
+  t.near(got.rate, 9.5, 1e-9, "and the beam ticks 9.5 times a second");
+
+  var b5 = towerWith(h, "siphon", ["sip_b1"], SIP_B);
+  t.near(h.run(b5 + ".core.stats.mechanics.lifesteal.ratio"), 0.36, 1e-9,
+    "B5's 30% becomes 36%");
+
+  // THE RATE AND NOT THE DAMAGE. A -5% written onto the beam would have healed
+  // 5% less as well, which is the opposite of the node.
+  t.near(h.run(b5 + ".effectiveAD(0)"), 3, 1e-9, "each tick still deals its full 3");
+  var plainB5 = towerWith(h, "siphon", [], SIP_B);
+  var sustained = h.run("(function () { var c = " + plainB5 + ".core.stats;" +
+    "  return { dps: 3 * c.attackRate," +
+    "           heal: 3 * c.attackRate * c.mechanics.lifesteal.ratio }; })()");
+  t.near(3 * 9.5 / sustained.dps, 0.95, 1e-9, "about -5% DPS");
+  t.near(3 * 9.5 * 0.36 / sustained.heal, 1.14, 1e-9, "for about +14% healing");
+});
+
+test("Voracious Fan lights sixty beams at a tenth off", function (t) {
+  var h = bootContent();
+
+  var b4 = towerWith(h, "siphon", ["sip_b2"], ["B1", "B2", "B3", "B4"]);
+  var atB4 = h.run("(function () { var tw = " + b4 + ";" +
+    "  return { targets: tw.core.stats.maxTargets, ad: tw.effectiveAD(0)," +
+    "           range: tw.rangeUl }; })()");
+  t.deep(atB4, { targets: 10, ad: 2, range: 55 }, "nothing at all before B5");
+
+  var plain = towerWith(h, "siphon", [], SIP_B);
+  t.eq(h.run(plain + ".core.stats.maxTargets"), 50, "a B5 normally holds 50");
+
+  var s = towerWith(h, "siphon", ["sip_b2"], SIP_B);
+  var got = h.run("(function () { var tw = " + s + ";" +
+    "  return { targets: tw.core.stats.maxTargets, ad: tw.effectiveAD(0)," +
+    "           range: tw.rangeUl }; })()");
+  t.deep(got, { targets: 60, ad: 2.7, range: 80 },
+    "with it, 60 beams at 2.7 damage and +5 u.l.");
+  t.near(60 * 2.7 / (50 * 3), 1.08, 1e-9,
+    "sixty beams is about +8% total; fifty or fewer is a straight -10%");
+});
+
+test("Viscous Slow thickens the beam and shortens it", function (t) {
+  var h = bootContent();
+
+  var b3 = towerWith(h, "siphon", ["sip_b3"], ["B1", "B2", "B3"]);
+  t.near(h.run(b3 + ".core.stats.mechanics.slow.fraction"), 0.10, 1e-9,
+    "nothing before B4");
+  t.eq(h.run(b3 + ".rangeUl"), 50, "and no reach penalty either");
+
+  var b4 = towerWith(h, "siphon", ["sip_b3"], ["B1", "B2", "B3", "B4"]);
+  t.near(h.run(b4 + ".core.stats.mechanics.slow.fraction"), 0.22, 1e-9,
+    "B4's 15% becomes 22%");
+  t.eq(h.run(b4 + ".rangeUl"), 40, "for 15 u.l. of reach");
+
+  // THE APPLICATION RULE IS UNTOUCHED: re-asserted every frame at the shared
+  // refresh duration, and the strongest slow still wins on the body.
+  var applied = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  tw.x = e.pos.x; tw.y = e.pos.y;" +
+    "  tw.update(1 / 60, [e], [], { gold: 0 });" +
+    "  return { mult: e.slowMultiplier, timer: e.slowTimer }; })()");
+  t.near(applied.mult, 0.78, 1e-9, "a body under the beam keeps 78% of its speed");
+  t.near(applied.timer, h.run("BeamTower.SLOW_REFRESH_SECONDS"), 1e-9,
+    "on the same short refresh it always used");
+});
+
+test("Second Wind drags further, leaves more, and charges for it", function (t) {
+  var h = bootContent();
+
+  var b4 = towerWith(h, "siphon", ["sip_b4"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(b4 + ".nextTierCost('B')"), 6500,
+    "the surcharge is on B5's price and is quoted before it is bought");
+
+  var plain = towerWith(h, "siphon", [], SIP_B);
+  var normal = h.run("(function () { var p = DeathDenial.heldParams();" +
+    "  return { back: p.knockbackUl, left: p.restoreBaseHpTo }; })()");
+  t.deep(normal, { back: 500, left: 1 }, "an ordinary save drags 500 and leaves 1");
+
+  var s = towerWith(h, "siphon", ["sip_b4"], SIP_B);
+  var wind = h.run("(function () { var p = DeathDenial.heldParams();" +
+    "  return { back: p.knockbackUl, left: p.restoreBaseHpTo }; })()");
+  t.deep(wind, { back: 650, left: 50 }, "with it, 650 and 50");
+  t.eq(h.run("DeathDenial.isHeld()"), true, "and it is still ONE save");
+  t.eq(h.run("DeathDenial.isAvailable().ok"), false,
+    "still one per game, not two");
+
+  // AND THE SAVE REALLY SPENDS THOSE NUMBERS.
+  var spent = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length; e.refreshPos(); enemies = [e];" +
+    "  var out = DeathDenial.tryConsume({ towers: towers, enemies: enemies," +
+    "    sellTower: sellTower });" +
+    "  DeathDenial.updateRewind(DeathDenial.REWIND_SECONDS + 1);" +
+    "  return { left: out.restoreBaseHpTo, back: path.length - e.progress }; })()");
+  t.eq(spent.left, 50, "the base is left standing on 50");
+  t.near(spent.back, h.run("ul(650)"), 1e-6, "and everything was dragged 650 u.l.");
+});
+
+test("Runic Pressure keeps its fractions", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "siphon", ["sip_n1"], []);
+  var got = h.run("(function () { var tw = " + s + ";" +
+    "  return { ad: tw.effectiveAD(0), rate: tw.core.stats.attackRate," +
+    "           raw: tw.core.stats.ad }; })()");
+  t.near(got.ad, 1.08, 1e-9, "1 damage becomes 1.08 and is NOT rounded back to 1");
+  t.near(got.rate, 9.7, 1e-9, "ten ticks a second become 9.7");
+  t.eq(got.raw, 1, "the stat itself is untouched — the multiplier is its own field");
+  t.near(got.ad * got.rate, 10.476, 1e-9, "10.476 DPS, about +4.76%");
+
+  // AND IT REACHES A5's GOLD BONUS TOO, which is why the multiplier is not
+  // written onto `ad`: that bonus is added AFTER the stat resolves.
+  var a5 = towerWith(h, "siphon", ["sip_n1"], SIP_A);
+  var withGold = h.run("(function () { var tw = " + a5 + ";" +
+    "  return { none: tw.effectiveAD(0), rich: tw.effectiveAD(1000000) }; })()");
+  t.ok(withGold.rich > withGold.none, "gold still raises it");
+  t.near(withGold.rich / (withGold.rich / 1.08), 1.08, 1e-9,
+    "and the whole of it carries the 8%");
+
+  // DEATH DENIAL AND THE OTHER UTILITY EFFECTS ARE NOT DAMAGE.
+  var b5 = towerWith(h, "siphon", ["sip_n1"], SIP_B);
+  var p = h.run("DeathDenial.heldParams()");
+  t.deep({ back: p.knockbackUl, left: p.restoreBaseHpTo }, { back: 500, left: 1 },
+    "the save is exactly what it was");
+  t.eq(h.run(b5 + ".core.stats.maxTargets"), 50, "and so is the target count");
+});
+
+test("Long Conduits, Camo Polarity, Preloaded Lock, Light Basin and Ceramic Coating",
+function (t) {
+  var h = bootContent();
+
+  var conduits = towerWith(h, "siphon", ["sip_n2"], []);
+  t.eq(h.run(conduits + ".rangeUl"), 87, "Long Conduits: 75 -> 87 u.l.");
+  t.near(h.run(conduits + ".maxHp"), 212.5, 1e-9, "and 250 -> 212.5 health");
+  t.near(h.run(conduits + ".rangePx"),
+    h.run("elevatedRangePx(" + conduits + ", 87)"), 1e-9, "with the ring re-derived");
+
+  var polarity = towerWith(h, "siphon", ["sip_n3"], []);
+  var camo = h.run("(function () { var tw = " + polarity + ";" +
+    "  var e = new Enemy(path, null, 'camo_normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  tw.x = e.pos.x; tw.y = e.pos.y;" +
+    "  var f = new Enemy(path, null, 'normal', {}); f.isFlying = true;" +
+    "  f.progress = path.length * 0.5; f.refreshPos();" +
+    "  return { camo: tw.canHold(e), flying: tw.canHold(f)," +
+    "           price: TowerPerks.priceOf(BeamTower) }; })()");
+  t.eq(camo.camo, true, "Camo Polarity: a camo body is holdable from placement");
+  t.eq(camo.flying, false, "and it grants NO flying detection");
+  t.eq(camo.price, 875, "placement 800 -> 875");
+
+  var lock = towerWith(h, "siphon", ["sip_n4"], ["A1"]);
+  var ramp = h.run("(function () { var tw = " + lock + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  var fresh = tw.ramp.multiplier(e);" +
+    "  tw.ramp.update(20, [e]);" +
+    "  return { fresh: fresh, held: tw.ramp.multiplier(e)," +
+    "           delay: tw.core.stats.reacquireDelay }; })()");
+  t.near(ramp.fresh, 1.25, 1e-9, "Preloaded Lock: a fresh target opens at x1.25");
+  t.near(ramp.held, 3.0, 1e-9, "and the ceiling is still A1's x3.0");
+  t.near(ramp.delay, 0.30, 1e-9, "with a 0.30 s wait before each new lock");
+
+  var basin = towerWith(h, "siphon", ["sip_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(BeamTower)"), 675, "Light Basin: 800 -> 675");
+  t.near(h.run(basin + ".maxHp"), 187.5, 1e-9, "and 250 -> 187.5 health");
+
+  var coat = towerWith(h, "siphon", ["sip_s2"], []);
+  var hit = h.run("(function () { var tw = " + coat + ";" +
+    "  var before = tw.currentHp; tw.takeDamage(100);" +
+    "  return { ad: tw.effectiveAD(0), lost: before - tw.currentHp," +
+    "           max: tw.maxHp }; })()");
+  t.near(hit.ad, 0.95, 1e-9, "Ceramic Coating: 5% off the beam");
+  t.near(hit.lost, 70, 1e-9, "a hundred-damage blow costs 70");
+  t.eq(hit.max, 250, "and it is NOT extra health — the maximum is untouched");
+});
+
+test("the Siphon's placement prices compose in any order", function (t) {
+  var h = bootContent();
+  towerWith(h, "siphon", ["sip_n3"], []);
+  t.eq(h.run("TowerPerks.priceOf(BeamTower)"), 875, "Camo Polarity alone: 875");
+  towerWith(h, "siphon", ["sip_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(BeamTower)"), 675, "Light Basin alone: 675");
+  towerWith(h, "siphon", ["sip_n3", "sip_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(BeamTower)"), 750, "both: 675 + 75 = 750");
+  t.eq(h.run("towers[0].cost"), 750, "and the tower was charged that");
+  towerWith(h, "siphon", ["sip_s1", "sip_n3"], []);
+  t.eq(h.run("TowerPerks.priceOf(BeamTower)"), 750, "whichever slots they sit in");
+});
+
+test("the Siphon's confirmed nodes compose without an order mattering",
+function (t) {
+  var h = bootContent();
+
+  // VORACIOUS FAN + VISCOUS SLOW at B5: +5 and -15 is a net -10 u.l., the
+  // damage is x0.90 and the slow is 22%.
+  var pair = towerWith(h, "siphon", ["sip_b2", "sip_b3"], SIP_B);
+  var got = h.run("(function () { var tw = " + pair + ";" +
+    "  return { range: tw.rangeUl, targets: tw.core.stats.maxTargets," +
+    "    ad: tw.effectiveAD(0), slow: tw.core.stats.mechanics.slow.fraction }; })()");
+  t.deep(got, { range: 65, targets: 60, ad: 2.7, slow: 0.22 },
+    "75 + 5 - 15 = 65, sixty beams at 2.7, slowing 22%");
+
+  // BRUTAL PRIMER + PRELOADED LOCK: the delay, then x1.25, then the faster
+  // climb toward the LOWER cap.
+  var primed = towerWith(h, "siphon", ["sip_a1", "sip_n4"], SIP_A);
+  var climb = h.run("(function () { var tw = " + primed + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  var out = { fresh: tw.ramp.multiplier(e), delay: tw.core.stats.reacquireDelay };" +
+    "  tw.ramp.update(2, [e]); out.at2 = tw.ramp.multiplier(e);" +
+    "  tw.ramp.update(30, [e]); out.cap = tw.ramp.multiplier(e);" +
+    "  return out; })()");
+  t.near(climb.delay, 0.30, 1e-9, "the acquisition still costs 0.30 s");
+  t.near(climb.fresh, 1.25, 1e-9, "a new lock opens at x1.25");
+  t.near(climb.at2, 1 + 0.27 * 2, 1e-9, "and climbs at Brutal Primer's 0.27");
+  t.near(climb.cap, 3.2, 1e-9, "toward Brutal Primer's lower x3.2");
+
+  // FOUR MULTIPLIERS ON ONE FIELD, and they multiply rather than summing.
+  var A5 = SIP_A;
+  var ids = ["sip_n1", "sip_a2", "sip_s2", "sip_a1", "sip_a4"];
+  var fw = towerWith(h, "siphon", ids, A5);
+  var a = h.run("(function () { var tw = " + fw + ";" +
+    "  return { ad: tw.effectiveAD(0), rate: tw.core.stats.attackRate," +
+    "    range: tw.rangeUl, pierce: tw.defPierce()," +
+    "    cap: tw.core.stats.mechanics.ramp_per_target.rampCap," +
+    "    hpBonus: tw.core.stats.mechanics.hp_scaling.maxBonus," +
+    "    inc: tw.core.stats.incomingDamageMult }; })()");
+  var bw = towerWith(h, "siphon", ids.slice().reverse(), A5);
+  var b = h.run("(function () { var tw = " + bw + ";" +
+    "  return { ad: tw.effectiveAD(0), rate: tw.core.stats.attackRate," +
+    "    range: tw.rangeUl, pierce: tw.defPierce()," +
+    "    cap: tw.core.stats.mechanics.ramp_per_target.rampCap," +
+    "    hpBonus: tw.core.stats.mechanics.hp_scaling.maxBonus," +
+    "    inc: tw.core.stats.incomingDamageMult }; })()");
+  t.deep(b, a, "the slots the five sit in change nothing");
+  t.near(a.ad, 10 * 1.08 * 0.95 * 0.95, 1e-9,
+    "three factors on one field multiply — never 1 + 0.08 - 0.05 - 0.05");
+  t.near(a.rate, 9.7, 1e-9, "and only Runic Pressure moved the tick rate");
+  t.eq(a.range, 160, "Vital Flow's 15 u.l. is the only reach change");
+  t.near(a.pierce, 0.40, 1e-9, "Selective Drain's pierce is live");
+  t.near(a.cap, 2.2, 1e-9, "Brutal Primer's ceiling too");
+  t.near(a.hpBonus, 0.40, 1e-9, "and Vital Flow's high-health bonus");
+  t.near(a.inc, 0.70, 1e-9, "with Ceramic Coating's protection on top");
+});
+
+// --- Summoner ---------------------------------------------------------------
+//
+// A BLUB'S HP IS ITS AMMUNITION -- one ordinary attack spends one point -- so
+// every assertion about `hp` below is also an assertion about how many attacks
+// that body will make. `summonStats` is the one door the numbers come through.
+
+var BLB_B = ["A1", "A2", "B1", "B2", "B3", "B4", "B5"];
+
+// The resolved stats of one unit on a Summoner built with these nodes and
+// tiers. Through the real `summonStats`, which is what `summon` hands a body.
+function blubStats(h, nodeIds, tiers, unitId) {
+  var expr = towerWith(h, "blub", nodeIds, tiers);
+  return h.run("(function () { var tw = " + expr + ";" +
+    "  var u = tw.summonStats('" + unitId + "');" +
+    "  u.interval = tw.intervalFor('" + unitId + "');" +
+    "  return u; })()");
+}
+
+test("Fragile Brood trades an attack for a point of damage", function (t) {
+  var h = bootContent();
+
+  var a2 = blubStats(h, ["blb_a1"], ["A1", "A2"], "blub3");
+  t.deep({ dmg: a2.damage, ammo: a2.hp }, { dmg: 6, ammo: 20 },
+    "nothing at all before A3");
+
+  var plain = blubStats(h, [], ["A1", "A2", "A3"], "blub3");
+  t.deep({ dmg: plain.damage, ammo: plain.hp }, { dmg: 6, ammo: 20 },
+    "a Blub III normally deals 6 and carries 20 HP/ammunition");
+
+  var s = blubStats(h, ["blb_a1"], ["A1", "A2", "A3"], "blub3");
+  t.deep({ dmg: s.damage, ammo: s.hp }, { dmg: 7, ammo: 19 },
+    "with it, 7 damage and 19 — one attack fewer, since HP is what it shoots with");
+
+  var mini = blubStats(h, ["blb_a1"], ["A1", "A2", "A3"], "mini1");
+  t.deep({ dmg: mini.damage, ammo: mini.hp }, { dmg: 3, ammo: 5 },
+    "and the Mini Blub too, because it is path A family");
+
+  // PATH B'S FAMILY GETS NOTHING, whatever tier the tower is on.
+  var cyber = blubStats(h, ["blb_a1"], ["A1", "A2", "B1", "B2", "B3"], "cyber");
+  t.deep({ dmg: cyber.damage, ammo: cyber.hp }, { dmg: 13, ammo: 41 },
+    "a Cyberblub is untouched — B1's +1 damage and B2's +1 ammunition, and " +
+    "nothing from a path A node");
+
+  // AND THE ATTACKS REALLY GO AWAY. A body with 19 ammunition makes 19 ordinary
+  // attacks, driven through the real spend.
+  towerWith(h, "blub", ["blb_a1"], ["A1", "A2", "A3"]);
+  var fired = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var b = new Blub(tw, 400, 400, tw.summonStats('blub3'));" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.health = 1e9; e.maxHealth = 1e9; e.pos = { x: 405, y: 400 };" +
+    "  var n = 0;" +
+    "  while (!b.isDestroyed() && n < 200) { b.resolveAttack(e, [e]); n++; }" +
+    "  return n; })()");
+  t.eq(fired, 19, "nineteen points of ammunition really is nineteen attacks");
+
+  // NEVER ZERO OR NEGATIVE. The smallest body in the game is a Mini Blub I at 6.
+  var floors = h.run("(function () { var tw = " + towers1() + ";" +
+    "  return Object.keys(BlubTower.UNITS).map(function (id) {" +
+    "    return tw.summonStats(id).hp; }); })()");
+  t.ok(Math.min.apply(null, floors) >= 1,
+    "no unit is ever created with less than one point of ammunition");
+});
+
+test("Rapid Incubation summons sooner and fires slower", function (t) {
+  var h = bootContent();
+
+  var a2 = blubStats(h, ["blb_a2"], ["A1", "A2"], "blub3");
+  t.near(a2.interval, 15, 1e-9, "nothing before A3");
+  t.near(a2.rate, 1.5, 1e-9, "on either half");
+
+  var s = blubStats(h, ["blb_a2"], ["A1", "A2", "A3"], "blub3");
+  t.near(s.interval, 15 * 0.92, 1e-9, "with it, a 13.8 s cycle instead of 15");
+  t.near(s.rate, 1.5 * 0.90, 1e-9, "and 1.35 attacks a second instead of 1.5");
+  t.eq(s.damage, 6, "damage per attack is untouched");
+  t.eq(s.hp, 20, "and so is HP/ammunition — the body simply lasts longer");
+
+  var mini = blubStats(h, ["blb_a2"], ["A1", "A2", "A3"], "mini1");
+  t.near(mini.interval, 4 * 0.92, 1e-9, "every path A line, not just the main one");
+
+  var cyber = blubStats(h, ["blb_a2"], ["A1", "A2", "B1", "B2", "B3"], "cyber");
+  t.near(cyber.interval, 19, 1e-9, "path B's lines are untouched");
+  t.near(cyber.rate, 2.0, 1e-9, "and so is their rate");
+});
+
+test("Fleeting Toxin builds half again as fast and expires sooner", function (t) {
+  var h = bootContent();
+
+  var a3 = towerWith(h, "blub", ["blb_a3"], ["A1", "A2", "A3"]);
+  var before = h.run("(function () { var tw = " + a3 + ";" +
+    "  return { per: tw.weakenPerHit, secs: tw.weakenSeconds," +
+    "           on: tw.hasWeaken }; })()");
+  t.deep(before, { per: 0.001, secs: 5, on: false }, "nothing before A4");
+
+  var s = towerWith(h, "blub", ["blb_a3"], ["A1", "A2", "A3", "A4"]);
+  var after = h.run("(function () { var tw = " + s + ";" +
+    "  return { per: tw.weakenPerHit, secs: tw.weakenSeconds, on: tw.hasWeaken }; })()");
+  t.near(after.per, 0.0015, 1e-12, "+0.15 points a hit instead of +0.10");
+  t.near(after.secs, 3.5, 1e-9, "for 3.5 seconds instead of 5");
+  t.eq(after.on, true, "and A4 switched the debuff on");
+
+  // WHAT AN ENEMY ACTUALLY CARRIES, through the shared DamageAmp -- whose stack
+  // cap, refresh and cleanup are its own and are untouched.
+  var stacked = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  for (var i = 0; i < 100; i++) tw.applyWeaken(e);" +
+    "  var at100 = DamageAmp.multiplier(e);" +
+    "  DamageAmp.tick(e, 3.4); var at34 = DamageAmp.multiplier(e);" +
+    "  DamageAmp.tick(e, 0.2); return { at100: at100, at34: at34," +
+    "    after: DamageAmp.multiplier(e) }; })()");
+  t.near(stacked.at100, 1.15, 1e-9, "a hundred hits is +15%, half again the +10%");
+  t.near(stacked.at34, 1.15, 1e-9, "still standing at 3.4 s");
+  t.near(stacked.after, 1, 1e-9, "and gone by 3.6");
+});
+
+test("Overcharged Cores waits for B3 and never touches a fixed effect",
+function (t) {
+  var h = bootContent();
+
+  // B1 AND B2 ARE STILL CALLING PATH A's BLUBS, so there is nothing for this to
+  // act on there -- and the node is gated on B3 as well, twice over.
+  var b2 = blubStats(h, ["blb_b1"], ["A1", "A2", "B1", "B2"], "blub3");
+  t.eq(b2.damage, 7, "at B2 the main line is a Blub III with B1's flat +1 only");
+  t.near(b2.interval, 14, 1e-9, "on its ordinary shortened cycle");
+
+  var plain = blubStats(h, [], BLB_B, "mecha2");
+  t.deep({ dmg: plain.damage, cycle: plain.interval, blast: plain.deathBlast.damage,
+           radius: plain.deathBlast.radiusUl },
+    { dmg: 101, cycle: 25, blast: 250, radius: 25 },
+    "a B5 MK2 normally deals 101, every 25 s, detonating for 250 in 25 u.l.");
+
+  var s = blubStats(h, ["blb_b1"], BLB_B, "mecha2");
+  t.near(s.damage, 101 * 1.10, 1e-9, "with it, 10% more ordinary damage");
+  t.near(s.interval, 25 * 1.06, 1e-9, "and a 6% longer cycle");
+  t.eq(s.deathBlast.damage, 250, "the detonation is EXACTLY 250, untouched");
+  t.eq(s.deathBlast.radiusUl, 25, "at its authored radius");
+
+  var sup = blubStats(h, ["blb_b1"], BLB_B, "superb");
+  t.near(sup.damage, 201 * 1.10, 1e-9, "the SuperBlub's ordinary attacks too");
+  t.eq(sup.laser.damage, 400, "and its lance is EXACTLY 400, untouched");
+  t.eq(sup.laser.every, 10, "on its authored count");
+
+  // AND THE SHARED ROSTER WAS NOT WRITTEN THROUGH.
+  t.eq(h.run("BlubTower.UNITS.mecha2.deathBlast.radiusUl"), 25,
+    "the table itself is untouched — the stats block is a copy");
+});
+
+test("Compressed Cadence takes two seconds flat, before any multiplier",
+function (t) {
+  var h = bootContent();
+
+  var b2 = blubStats(h, ["blb_b2"], ["A1", "A2", "B1", "B2"], "blub3");
+  t.near(b2.interval, 14, 1e-9, "nothing before B3");
+
+  var mk2 = blubStats(h, ["blb_b2"], BLB_B, "mecha2");
+  t.near(mk2.interval, 23, 1e-9, "the MK2's 25 s becomes 23");
+  t.near(mk2.rangeUl, 150 * 0.85, 1e-9, "for 15% of its reach");
+
+  var sup = blubStats(h, ["blb_b2"], BLB_B, "superb");
+  t.near(sup.interval, 93, 1e-9, "and the SuperBlub's 95 becomes 93");
+  t.near(sup.rangeUl, 300 * 0.85, 1e-9, "at 255 u.l. instead of 300");
+
+  // FLAT THEN MULTIPLICATIVE, which is what the two B interval nodes together
+  // have to resolve to: (30 - 5 - 2) x 1.06 and never 30 x 1.06 - 5 - 2.
+  var both = blubStats(h, ["blb_b1", "blb_b2"], BLB_B, "mecha2");
+  t.near(both.interval, 23 * 1.06, 1e-9, "(25 - 2) x 1.06 = 24.38 s");
+  t.ok(Math.abs(both.interval - (25 * 1.06 - 2)) > 0.05,
+    "and emphatically not 25 x 1.06 - 2");
+
+  // THE FLOOR STILL HOLDS. Nothing in the game reaches it today, and that is
+  // what the floor is there for.
+  var floors = h.run("(function () { var tw = " + towers1() + ";" +
+    "  return Object.keys(BlubTower.UNITS).map(function (id) {" +
+    "    return tw.intervalFor(id); }); })()");
+  t.ok(Math.min.apply(null, floors) >= h.run("BlubTower.MIN_INTERVAL_SECONDS"),
+    "no line's cycle ever reaches zero");
+});
+
+test("Wide Detonation widens the blast without strengthening it", function (t) {
+  var h = bootContent();
+  var s = blubStats(h, ["blb_b3"], BLB_B, "mecha2");
+  t.eq(s.deathBlast.radiusUl, 35, "25 u.l. becomes 35 — a 50 to 70 diameter");
+  t.eq(s.deathBlast.damage, 250, "and the blast still deals EXACTLY 250");
+  t.near(s.damage, 101 * 0.96, 1e-9, "every path B blub deals 4% less ordinarily");
+
+  var sup = blubStats(h, ["blb_b3"], BLB_B, "superb");
+  t.near(sup.damage, 201 * 0.96, 1e-9, "the SuperBlub too");
+  t.eq(sup.laser.damage, 400, "and its lance is untouched");
+
+  // THE BODIES A WIDER BLAST ACTUALLY REACHES, measured rather than claimed.
+  var caught = h.run("(function () { var tw = " + towers1() + ";" +
+    "  function reach(radius) {" +
+    "    var stats = tw.summonStats('mecha2');" +
+    "    stats.deathBlast = { radiusUl: radius, damage: 250 };" +
+    "    var b = new Blub(tw, 400, 400, stats);" +
+    "    var e = new Enemy(path, null, 'normal', {});" +
+    "    e.health = 1e9; e.maxHealth = 1e9;" +
+    "    e.pos = { x: 400 + ul(40), y: 400 };" +
+    // AN ANCHOR ON THE BLUB ITSELF, because `detonate` walks to the nearest
+    // body in reach before it bursts -- without one the far enemy IS the
+    // centre and every radius reaches it.
+    "    var anchor = new Enemy(path, null, 'normal', {});" +
+    "    anchor.health = 1e9; anchor.maxHealth = 1e9;" +
+    "    anchor.pos = { x: 400, y: 400 };" +
+    "    b.detonate([anchor, e]); return e.lastDamageTaken; }" +
+    "  return { narrow: reach(25), wide: reach(35) }; })()");
+  t.eq(caught.narrow, 0, "a body at 40 u.l. is outside the authored blast");
+  t.eq(caught.wide, 250, "and inside the widened one, for its full 250");
+});
+
+test("Superconductor fires the lance oftener at the price of the ordinary shot",
+function (t) {
+  var h = bootContent();
+  var plain = blubStats(h, [], BLB_B, "superb");
+  t.deep({ every: plain.laser.every, dmg: plain.damage, lance: plain.laser.damage },
+    { every: 10, dmg: 201, lance: 400 },
+    "a SuperBlub normally lances every tenth attack");
+
+  var s = blubStats(h, ["blb_b4"], BLB_B, "superb");
+  t.eq(s.laser.every, 7, "with it, every seventh");
+  t.near(s.damage, 201 * 0.95, 1e-9, "and its ordinary attacks deal 5% less");
+  t.eq(s.laser.damage, 400, "the lance's own damage is unchanged");
+
+  // THE LANCE IS FREE, so a 52-ammunition body now throws seven of them.
+  var lances = h.run("(function () { var tw = " + towers1() + ";" +
+    "  function count(every) {" +
+    "    var stats = tw.summonStats('superb');" +
+    "    stats.laser = { every: every, widthUl: 10, damage: 400 };" +
+    "    var b = new Blub(tw, 400, 400, stats);" +
+    "    var e = new Enemy(path, null, 'normal', {});" +
+    "    e.health = 1e9; e.maxHealth = 1e9; e.pos = { x: 405, y: 400 };" +
+    "    var n = 0, guard = 0;" +
+    "    while (!b.isDestroyed() && guard++ < 500) {" +
+    "      var before = b.currentHp; b.resolveAttack(e, [e]);" +
+    "      if (b.currentHp === before) n++; }" +
+    "    return n; }" +
+    "  return { slow: count(10), fast: count(7) }; })()");
+  // THE LANCE COSTS NO AMMUNITION, so 52 points buy 52 ORDINARY attacks and the
+  // lances fall between them: 57 shots at every-ten, 60 at every-seven.
+  t.eq(lances.slow, 5, "five free lances out of 52 points of ammunition");
+  t.eq(lances.fast, 8, "and eight once the lance comes every seventh attack");
+
+  // AND THE MK2's OWN NUMBERS ARE NOT THIS NODE'S BUSINESS.
+  var mk2 = blubStats(h, ["blb_b4"], BLB_B, "mecha2");
+  t.eq(mk2.damage, 101, "the MK2's ordinary damage is untouched");
+  t.eq(mk2.deathBlast.damage, 250, "and its detonation");
+});
+
+test("the Summoner's four general nodes, and what each costs", function (t) {
+  var h = bootContent();
+
+  var circle = towerWith(h, "blub", ["blb_n1"], []);
+  t.eq(h.run(circle + ".rangeUl"), 100, "Extended Ritual Circle: 75 -> 100 u.l.");
+  t.eq(h.run("TowerPerks.priceOf(BlubTower)"), 525, "placement 450 -> 525");
+  t.eq(h.run(circle + ".summonStats('blub1').rangeUl"), 100,
+    "and a blub's OWN attack range is untouched at its authored 100");
+
+  var spores = blubStats(h, ["blb_n2"], [], "blub1");
+  t.deep({ camo: spores.seesCamo, flying: spores.seesFlying, rate: spores.rate },
+    { camo: true, flying: true, rate: 0.9 },
+    "Ethereal Spores: both sights, for a tenth of the fire rate");
+  t.eq(h.run("TowerPerks.priceOf(BlubTower)"), 600, "placement 450 -> 600");
+  var sees = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var b = new Blub(tw, 400, 400, tw.summonStats('blub1'));" +
+    "  var c = new Enemy(path, null, 'camo_normal', {});" +
+    "  var f = new Enemy(path, null, 'normal', {}); f.isFlying = true;" +
+    "  return { camo: Targeting.sees(b.view, c), fly: Targeting.sees(b.view, f) }; })()");
+  t.deep(sees, { camo: true, fly: true }, "and the blub really can target both");
+
+  var twin = towerWith(h, "blub", ["blb_n3"], []);
+  t.near(h.run(twin + ".perkTwinChance"), 0.15, 1e-9, "Twin Embryo: a 15% chance");
+  t.near(h.run(twin + ".intervalFor('blub1')"), 22, 1e-9,
+    "for 10% on every line's cycle");
+  // NO RECURSION AND NO QUEUE: many summons, and never more than two bodies
+  // out of one call.
+  var twinned = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var most = 0, total = 0;" +
+    "  for (var i = 0; i < 200; i++) {" +
+    "    tw.blubs.forEach(function (b) { b.removed = true; });" +
+    "    tw.blubs = []; towers = towers.filter(function (x) { return !x.isSummon; });" +
+    "    tw.summon('blub1');" +
+    "    most = Math.max(most, tw.blubs.length); total += tw.blubs.length; }" +
+    "  return { most: most, total: total }; })()");
+  t.eq(twinned.most, 2, "one summoning event creates at most one duplicate");
+  t.ok(twinned.total > 200 && twinned.total < 260,
+    "and about fifteen per cent of them do (" + twinned.total + " of 200)");
+
+  var packed = blubStats(h, ["blb_n4"], [], "blub3");
+  t.near(packed.footprintUl, 20 * 0.85, 1e-9, "Compressed Bodies: 15% less ground");
+  t.eq(packed.hp, 19, "and 20 HP/ammunition becomes 19");
+  var rounded = h.run("(function () { var tw = " + towers1() + ";" +
+    "  return { blub1: tw.summonStats('blub1').hp," +
+    "    mini1: tw.summonStats('mini1').hp," +
+    "    superb: tw.summonStats('superb').hp," +
+    "    mecha: tw.summonStats('mecha').hp }; })()");
+  t.deep(rounded, { blub1: 10, mini1: 6, superb: 48, mecha: 71 },
+    "rounded to NEAREST, which is this game's rule for a percentage on a blub");
+});
+
+test("Stripped Altar and Central Brood", function (t) {
+  var h = bootContent();
+
+  var altar = towerWith(h, "blub", ["blb_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(BlubTower)"), 350, "Stripped Altar: 450 -> 350");
+  t.near(h.run(altar + ".maxHp"), 70, 1e-9, "the Summoner itself 100 -> 70");
+  t.eq(h.run(altar + ".summonStats('blub1').hp"), 10,
+    "and not one point of blub ammunition");
+
+  // BY LINE, so the tower needs the lines to exist before it can be measured.
+  var brood = towerWith(h, "blub", ["blb_s2"], ["A1", "A2", "A3", "A4"]);
+  var lines = h.run("(function () { var tw = " + brood + ";" +
+    "  var u = tw.lineUnits();" +
+    "  return { units: u, main: tw.summonStats(u.main).damage," +
+    "    mini: tw.summonStats(u.mini).damage," +
+    "    heavy: tw.summonStats(u.heavy).damage }; })()");
+  t.deep(lines.units, { main: "blub3", mini: "mini2", heavy: "hungry" },
+    "at A4 the three lines are a Blub III, a Mini Blub II and a Hungry Blub");
+  t.near(lines.main, 6 * 1.15, 1e-9, "the main line deals 15% more");
+  t.near(lines.mini, 3 * 0.92, 1e-9, "the Mini line 8% less");
+  t.near(lines.heavy, 20 * 0.92, 1e-9, "and the Heavy line too");
+  t.eq(h.run("TowerPerks.priceOf(BlubTower)"), 500, "placement 450 -> 500");
+
+  // WHICHEVER UNIT THE MAIN CLOCK IS CALLING. A crosspathed tower whose main
+  // line is a Mechablub gains on it exactly as one calling a Blub I does.
+  var bMain = blubStats(h, ["blb_s2"], BLB_B, "mecha2");
+  t.near(bMain.damage, 101 * 1.15, 1e-9, "a B5 main line is a MK2 and gains 15%");
+  var bHeavy = blubStats(h, ["blb_s2"], BLB_B, "superb");
+  t.near(bHeavy.damage, 201 * 0.92, 1e-9, "while its Heavy line pays 8%");
+});
+
+test("the Summoner's placement prices compose in any order", function (t) {
+  var h = bootContent();
+  [["blb_n1", 525], ["blb_n2", 600], ["blb_s1", 350], ["blb_s2", 500]]
+    .forEach(function (row) {
+      towerWith(h, "blub", [row[0]], []);
+      t.eq(h.run("TowerPerks.priceOf(BlubTower)"), row[1],
+        row[0] + " alone: " + row[1]);
+    });
+
+  var all = ["blb_n1", "blb_n2", "blb_s1", "blb_s2"];
+  towerWith(h, "blub", all, []);
+  t.eq(h.run("TowerPerks.priceOf(BlubTower)"), 625,
+    "all four: 350 + 75 + 150 + 50 = 625");
+  t.eq(h.run("towers[0].cost"), 625, "and the tower was charged that");
+  towerWith(h, "blub", all.slice().reverse(), []);
+  t.eq(h.run("TowerPerks.priceOf(BlubTower)"), 625, "whichever slots they sit in");
+});
+
+test("the Summoner's confirmed nodes compose without an order mattering",
+function (t) {
+  var h = bootContent();
+
+  // FRAGILE BROOD + COMPRESSED BODIES: the flat first, then the factor, then
+  // rounded once. (20 - 1) x 0.95 = 18.05, so 18.
+  var pair = blubStats(h, ["blb_a1", "blb_n4"], ["A1", "A2", "A3"], "blub3");
+  t.eq(pair.hp, 18, "one flat and one factor, applied exactly once each");
+  t.eq(pair.damage, 7, "with Fragile Brood's point of damage intact");
+  t.near(pair.footprintUl, 17, 1e-9, "and the smaller footprint");
+
+  // TWIN EMBRYO'S TEMPO PENALTY composes with the line nodes it meets, and only
+  // on the lines those nodes affect.
+  var tempo = h.run("(function () { var tw = " +
+    towerWith(h, "blub", ["blb_n3", "blb_a2"], ["A1", "A2", "A3"]) + ";" +
+    "  return { a: tw.intervalFor('blub3'), mini: tw.intervalFor('mini1') }; })()");
+  t.near(tempo.a, 15 * 0.92 * 1.10, 1e-9, "path A pays both");
+  t.near(tempo.mini, 4 * 0.92 * 1.10, 1e-9, "on every path A line");
+  var tempoB = h.run("(function () { var tw = " +
+    towerWith(h, "blub", ["blb_n3", "blb_a2"], BLB_B) + ";" +
+    "  return tw.intervalFor('mecha2'); })()");
+  t.near(tempoB, 25 * 1.10, 1e-9,
+    "while a path B line pays only Twin Embryo's — Rapid Incubation is not its node");
+
+  // FIVE AT ONCE ON A FINISHED PATH B, in both orders.
+  var ids = ["blb_b1", "blb_b2", "blb_b3", "blb_b4", "blb_s2"];
+  var fw = blubStats(h, ids, BLB_B, "superb");
+  var bw = blubStats(h, ids.slice().reverse(), BLB_B, "superb");
+  t.deep(bw, fw, "the slots the five sit in change nothing");
+  t.near(fw.damage, 201 * 1.10 * 0.96 * 0.95 * 0.92, 1e-9,
+    "four factors on one number, multiplied and never summed");
+  t.near(fw.interval, (100 - 5 - 2) * 1.06, 1e-9, "the flat inside the factor");
+  t.eq(fw.laser.every, 7, "the lance every seventh attack");
+  t.eq(fw.laser.damage, 400, "still for its fixed 400");
+  var mk2 = blubStats(h, ids, BLB_B, "mecha2");
+  t.eq(mk2.deathBlast.radiusUl, 35, "and the MK2's blast is wide");
+  t.eq(mk2.deathBlast.damage, 250, "at its fixed 250");
+});
+
+// --- Farm -------------------------------------------------------------------
+//
+// THE FARM'S MANA IS NOT ONE QUANTITY. The fixed per-wave payment, the A3+
+// timed ticks, stored mana, the A4/A5 clone, a withdrawal, the B path's kill
+// bounty, the C network's B and P, and a refund are eight separate things that
+// merely share a unit, and most of what these tests check is that a node moved
+// exactly the one it names.
+
+// A perked Farm, then ONE scripted wave of dice. Modelled on the `faceRun`
+// helper in tests/farm.test.js: the die is scripted, never sampled, so "face 20
+// pays this" is a statement about face 20 and not about a seed.
+function farmDice(h, nodeIds, tiers, faces, startP, wave) {
+  var expr = towerWith(h, "farm", nodeIds, tiers);
+  return h.run("(function () { var tw = " + expr + ";" +
+    "  Farms.network.P = " + startP + ";" +
+    "  var seq = " + JSON.stringify(faces) + ", i = 0;" +
+    "  Farms.setDie(function () { return seq[Math.min(i++, seq.length - 1)]; });" +
+    "  Farms.settleWave(" + wave + ");" +
+    "  var out = { P: Farms.network.P, B: Farms.network.B," +
+    "              dice: tw.diceCount, rolled: (tw.lastRolls || []).length };" +
+    "  Farms.setDie(null); return out; })()");
+}
+
+test("Accelerated Boiler moves the clock and pays for it out of the wave",
+function (t) {
+  var h = bootContent();
+
+  var a2 = towerWith(h, "farm", ["frm_a1"], ["A1", "A2"]);
+  var before = h.run("(function () { var tw = " + a2 + ";" +
+    "  return { tick: tw.tickSeconds, wave: tw.producesPerWave() }; })()");
+  t.deep(before, { tick: 5, wave: 400 }, "nothing before A3");
+
+  var s = towerWith(h, "farm", ["frm_a1"], ["A1", "A2", "A3"]);
+  var after = h.run("(function () { var tw = " + s + ";" +
+    "  return { tick: tw.tickSeconds, wave: tw.producesPerWave()," +
+    "    perTick: tw.perTickProduction, clone: FarmTower.CLONE_RATE," +
+    "    cap: tw.cloneCap }; })()");
+  t.near(after.tick, 4.5, 1e-9, "a tick every 4.5 s instead of 5");
+  t.near(after.wave, 360, 1e-9, "and the fixed payment is 400 x 0.90 = 360");
+  t.eq(after.perTick, 50, "the VALUE of a tick is untouched");
+  t.eq(after.cap, 0, "and A3 has no clone to touch");
+
+  // THE TICKS REALLY ARRIVE SOONER, driven through the tower's own clock.
+  var ticked = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var was = cash; for (var i = 0; i < 60 * 60; i++) tw.update(1 / 60, []);" +
+    "  return cash - was; })()");
+  t.near(ticked, Math.floor(60 / 4.5) * 50, 1e-6,
+    "sixty seconds pays thirteen ticks of 50, where five-second ticks pay twelve");
+
+  // STORAGE, CLONING AND WITHDRAWALS ARE OTHER QUANTITIES AND ARE UNTOUCHED.
+  var stored = towerWith(h, "farm", ["frm_a1"], ["A1", "A2", "A3", "A4"]);
+  var vault = h.run("(function () { var tw = " + stored + ";" +
+    "  tw.stock = 10000; var cloned = tw.cloneStock();" +
+    "  var was = cash; tw.collect();" +
+    "  return { cloned: cloned, stock: tw.stock, out: cash - was," +
+    "           cap: tw.cloneCap }; })()");
+  t.near(vault.cloned, 500, 1e-9, "five per cent of the stock is cloned, undiminished");
+  t.eq(vault.cap, 1000, "at A4's authored cap");
+  t.near(vault.out, 10500, 1e-9, "and a withdrawal hands over every point of it");
+  t.eq(vault.stock, 0, "leaving nothing behind");
+});
+
+test("Patient Investment raises the permanent half and lowers the surge",
+function (t) {
+  var h = bootContent();
+
+  var a4 = towerWith(h, "farm", ["frm_a2"], ["A1", "A2", "A3", "A4"]);
+  var before = h.run("(function () { var tw = " + a4 + ";" +
+    "  return { each: tw.trancheBonus, surge: tw.tempMultiplier }; })()");
+  t.deep(before, { each: 0.05, surge: 5 }, "nothing before A5");
+
+  var s = towerWith(h, "farm", ["frm_a2"], ["A1", "A2", "A3", "A4", "A5"]);
+  var after = h.run("(function () { var tw = " + s + ";" +
+    "  return { each: tw.trancheBonus, surge: tw.tempMultiplier," +
+    "    size: FarmTower.TRANCHE, max: FarmTower.MAX_TRANCHES," +
+    "    secs: FarmTower.TEMP_SECONDS }; })()");
+  t.near(after.each, 0.06, 1e-9, "+6% a tranche instead of +5%");
+  t.eq(after.surge, 4, "and a surge multiplies it four times instead of five");
+  t.deep({ size: after.size, max: after.max, secs: after.secs },
+    { size: 10000, max: 10, secs: 30 },
+    "tranche size, the ceiling and the surge's length are untouched");
+
+  // WHAT TEN TRANCHES ARE ACTUALLY WORTH, through the real investment door.
+  var granted = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var target = new Smasher(700, 400, path); addTower(target);" +
+    "  for (var i = 1; i <= 5; i++) target.applyUpgrade('A' + i);" +
+    "  tw.stock = 100000; tw.invest(target, false);" +
+    "  var perm = FarmBoost.multiplier(target);" +
+    "  var t2 = new Smasher(760, 460, path); addTower(t2);" +
+    "  for (var j = 1; j <= 5; j++) t2.applyUpgrade('A' + j);" +
+    "  tw.stock = 100000; tw.invest(t2, true);" +
+    "  return { perm: perm, surge: FarmBoost.multiplier(t2)," +
+    "           bonus: tw.investmentBonus() }; })()");
+  t.near(granted.perm, 1.60, 1e-9, "ten tranches is +60% permanent, not +50%");
+  t.near(granted.surge, 3.40, 1e-9, "and +240% temporary, not +250%");
+  t.near(granted.bonus, 0.60, 1e-9, "and the record of it agrees");
+});
+
+test("Mana Armor spends its own vault, and only what it has", function (t) {
+  var h = bootContent();
+
+  var a3 = towerWith(h, "farm", ["frm_a3"], ["A1", "A2", "A3"]);
+  t.eq(h.run(a3 + ".manaArmorPerPoint"), 0, "nothing before A4");
+
+  var s = towerWith(h, "farm", ["frm_a3"], ["A1", "A2", "A3", "A4"]);
+  var cases = h.run("(function () { var tw = " + s + ";" +
+    "  function hit(stock, blow) {" +
+    "    tw.stock = stock; tw.currentHp = tw.maxHp; tw.dodgeChance = 0;" +
+    "    tw.takeDamage(blow);" +
+    "    return { took: tw.maxHp - tw.currentHp, left: tw.stock }; }" +
+    "  return { rich: hit(5000, 100), exact: hit(2500, 100)," +
+    "           poor: hit(1000, 100), empty: hit(0, 100)," +
+    "           nothing: hit(5000, 0), tiny: hit(5000, 1)," +
+    "           lethal: hit(5000, 100000) }; })()");
+
+  t.deep(cases.rich, { took: 50, left: 2500 },
+    "a hundred-damage blow costs 50 damage and 2 500 stored mana");
+  t.deep(cases.exact, { took: 50, left: 0 },
+    "exactly enough buys exactly half and empties the vault");
+  t.deep(cases.poor, { took: 80, left: 0 },
+    "a thousand buys twenty points and the rest lands");
+  t.eq(cases.empty.took, 100, "an empty vault protects nothing");
+  t.eq(cases.nothing.left, 5000, "a blow of zero spends nothing");
+  t.near(cases.tiny.left, 5000 - 25, 1e-9, "and a fractional half is bought too");
+  t.ok(cases.lethal.left === 0, "a death-sized hit spends the whole vault");
+  t.ok(cases.lethal.took >= h.run(towers1() + ".maxHp"),
+    "and still kills the tower");
+
+  // ITS OWN VAULT, and never the purse or another Farm's.
+  var apart = h.run("(function () { var a = towers[towers.length - 1];" +
+    "  var b = new FarmTower(760, 460, path); addTower(b);" +
+    "  ['A1','A2','A3','A4'].forEach(function (id) { b.applyUpgrade(id); });" +
+    "  a.stock = 5000; b.stock = 5000; a.currentHp = a.maxHp;" +
+    "  a.dodgeChance = 0; var purse = cash;" +
+    "  a.takeDamage(100);" +
+    "  return { mine: a.stock, theirs: b.stock, purse: cash - purse }; })()");
+  t.deep(apart, { mine: 2500, theirs: 5000, purse: 0 },
+    "one farm's armour spends one farm's stock, and no player mana at all");
+});
+
+test("Extended Jurisdiction widens the field and the amplification pays",
+function (t) {
+  var h = bootContent();
+  var B = ["B1", "B2", "B3", "B4", "B5"];
+
+  var b2 = towerWith(h, "farm", ["frm_b1"], ["B1", "B2"]);
+  t.eq(h.run(b2 + ".rangeUl"), 0, "nothing before B3 — there is no field yet");
+
+  var b3 = towerWith(h, "farm", ["frm_b1"], ["B1", "B2", "B3"]);
+  var atB3 = h.run("(function () { var tw = " + b3 + ";" +
+    "  return { range: tw.rangeUl, amp: tw.fieldAmp, slow: tw.fieldSlow," +
+    "           kill: tw.manaPerKill }; })()");
+  t.deep(atB3, { range: 180, amp: 0, slow: 0, kill: 1 },
+    "B3's 150 becomes 180, and it had no amplification to lose");
+
+  var b4 = towerWith(h, "farm", ["frm_b1"], ["B1", "B2", "B3", "B4"]);
+  var atB4 = h.run("(function () { var tw = " + b4 + ";" +
+    "  return { range: tw.rangeUl, amp: tw.fieldAmp, slow: tw.fieldSlow," +
+    "           kill: tw.manaPerKill, hp: tw.baseHpPerKill }; })()");
+  t.deep(atB4, { range: 230, amp: 0, slow: 0.05, kill: 4, hp: 4 },
+    "B4 reads 230 u.l. and an EXPLICIT 0% amplification");
+
+  var b5 = towerWith(h, "farm", ["frm_b1"], B);
+  var atB5 = h.run("(function () { var tw = " + b5 + ";" +
+    "  return { range: tw.rangeUl, amp: tw.fieldAmp, slow: tw.fieldSlow," +
+    "           kill: tw.manaPerKill }; })()");
+  t.deep(atB5, { range: 330, amp: 0.05, slow: 0.10, kill: 14 },
+    "and B5 reads 330 and 5%");
+
+  // A ZERO IS A ZERO AND NOT A MISSING MODIFIER: the field is still there, it
+  // still slows, and what it adds to an enemy's damage taken is nothing.
+  // ASKED WHERE THE FARM IS STANDING. Moving a tower after it is built leaves
+  // its `groundHeight` behind, and `covers` runs a real line-of-sight test off
+  // that eye -- so a fixture that teleports one can find itself blind.
+  var live = h.run("(function () { var tw = " +
+    towerWith(h, "farm", ["frm_b1"], ["B1", "B2", "B3", "B4"]) + ";" +
+    "  return { field: !!Farms.fieldAt(tw.x, tw.y)," +
+    "    amp: Farms.damageAmpAt(tw.x, tw.y), slow: Farms.slowAt(tw.x, tw.y) }; })()");
+  t.eq(live.field, true, "a B4 field still exists on the board");
+  t.eq(live.amp, 0, "amplifying nothing");
+  t.near(live.slow, 0.05, 1e-9, "while still slowing");
+});
+
+test("Paralyzing Field slows harder out of the wave's own purse", function (t) {
+  var h = bootContent();
+
+  var b3 = towerWith(h, "farm", ["frm_b2"], ["B1", "B2", "B3"]);
+  var atB3 = h.run("(function () { var tw = " + b3 + ";" +
+    "  return { slow: tw.fieldSlow, wave: tw.producesPerWave() }; })()");
+  t.near(atB3.slow, 0, 1e-9, "no slow to raise before B4");
+  t.near(atB3.wave, 400 * 0.90, 1e-9,
+    "though the production penalty is not tier-gated and applies at once");
+
+  var b4 = towerWith(h, "farm", ["frm_b2"], ["B1", "B2", "B3", "B4"]);
+  var atB4 = h.run("(function () { var tw = " + b4 + ";" +
+    "  return { slow: tw.fieldSlow, kill: tw.manaPerKill, hp: tw.baseHpPerWave }; })()");
+  t.near(atB4.slow, 0.10, 1e-9, "B4's 5% becomes 10%");
+  t.eq(atB4.kill, 4, "kill mana is untouched");
+  t.eq(atB4.hp, 250, "and so is the base health a wave grants");
+
+  var b5 = towerWith(h, "farm", ["frm_b2"], ["B1", "B2", "B3", "B4", "B5"]);
+  t.near(h.run(b5 + ".fieldSlow"), 0.15, 1e-9, "and B5's 10% becomes 15%");
+});
+
+test("Execution Tithe reaches further up and pays less", function (t) {
+  var h = bootContent();
+  var B = ["B1", "B2", "B3", "B4", "B5"];
+
+  var b4 = towerWith(h, "farm", ["frm_b3"], ["B1", "B2", "B3", "B4"]);
+  var before = h.run("(function () { var tw = " + b4 + ";" +
+    "  return { flat: tw.executeFlat, frac: tw.executeFraction," +
+    "           kill: tw.manaPerKill }; })()");
+  t.deep(before, { flat: 10, frac: 0.05, kill: 4 }, "nothing before B5");
+
+  var s = towerWith(h, "farm", ["frm_b3"], B);
+  var after = h.run("(function () { var tw = " + s + ";" +
+    "  return { flat: tw.executeFlat, frac: tw.executeFraction," +
+    "    kill: tw.manaPerKill, hp: tw.baseHpPerKill," +
+    "    small: tw.executeThreshold({ maxHealth: 100 })," +
+    "    big: tw.executeThreshold({ maxHealth: 1000 }) }; })()");
+  t.near(after.flat, 15, 1e-9, "15 flat instead of 10");
+  t.near(after.frac, 0.075, 1e-9, "and 7.5% instead of 5%");
+  t.eq(after.kill, 10, "for 10 mana a kill instead of 14");
+  t.eq(after.hp, 9, "the 9 base HP a kill grants is untouched");
+  // THE HIGHER OF THE TWO, which is B5's own rule and is not this node's.
+  t.near(after.small, 15, 1e-9, "a 100 HP body is executed under 15");
+  t.near(after.big, 75, 1e-9, "and a 1 000 HP one under 75");
+
+  // AND THE FIELD REALLY TAKES A BODY THE AUTHORED THRESHOLD WOULD HAVE MISSED.
+  var took = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.maxHealth = 100; e.health = 12; e.pos = { x: tw.x, y: tw.y };" +
+    "  var wide = Farms.executes(e);" +
+    "  tw.executeFlat = 10; tw.executeFraction = 0.05;" +
+    "  return { wide: wide, narrow: Farms.executes(e) }; })()");
+  t.eq(took.wide, true, "a body on 12 of 100 is executed by the wider threshold");
+  t.eq(took.narrow, false, "and the authored 10 flat would have missed it");
+});
+
+test("Arcane Fertilizer and Compact Estate", function (t) {
+  var h = bootContent();
+
+  var fert = towerWith(h, "farm", ["frm_n1"], []);
+  var f = h.run("(function () { var tw = " + fert + ";" +
+    "  return { wave: tw.producesPerWave(), nominal: tw.nominalProduction()," +
+    "    price: TowerPerks.priceOf(FarmTower), tick: tw.perTickProduction }; })()");
+  t.eq(f.wave, 230, "Arcane Fertilizer: 200 -> 230 mana a wave");
+  t.eq(f.nominal, 230, "and the C network's baseline sees the same number");
+  t.eq(f.price, 1350, "placement 1 200 -> 1 350");
+  t.eq(f.tick, 0, "it adds nothing to a timed tick");
+
+  // THE +30 FOLLOWS THE FARM'S ORDINARY DESTINATION: into the stock from A4.
+  var stored = h.run("(function () { var tw = " +
+    towerWith(h, "farm", ["frm_n1"], ["A1", "A2", "A3", "A4"]) + ";" +
+    "  tw.stock = 0; var was = cash; tw.produce(tw.producesPerWave());" +
+    "  return { stock: tw.stock, purse: cash - was }; })()");
+  t.eq(stored.stock, 430, "an A4 farm stores 400 + 30");
+  t.eq(stored.purse, 0, "and pays the purse nothing, exactly as it always did");
+
+  var estate = towerWith(h, "farm", ["frm_n2"], []);
+  var e = h.run("(function () { var tw = " + estate + ";" +
+    "  return { foot: tw.footprintRadiusUl, px: tw.footprintPx, hp: tw.maxHp," +
+    "           range: tw.rangeUl, ghost: buildFootprintUl(FarmTower) }; })()");
+  t.near(e.foot, 28, 1e-9, "Compact Estate: 35 -> 28 u.l. of ground");
+  t.near(e.px, h.run("ul(28)"), 1e-9, "in pixels too");
+  t.near(e.hp, 180, 1e-9, "-10% maximum health");
+  t.eq(e.range, 0, "its field's radius is not a footprint and is untouched");
+  t.near(e.ghost, 28, 1e-9, "and the placement rules use the smaller skirt");
+
+  var c1 = towerWith(h, "farm", ["frm_n2"], ["C1"]);
+  t.near(h.run(c1 + ".footprintRadiusUl"), 20, 1e-9, "with C1, 25 -> 20");
+});
+
+test("Liquid License pays back more and produces less", function (t) {
+  var h = bootContent();
+
+  var plain = towerWith(h, "farm", [], []);
+  t.eq(h.run("sellValue(" + plain + ")"), 600, "a Farm normally refunds half");
+
+  var s = towerWith(h, "farm", ["frm_n3"], []);
+  var got = h.run("(function () { var tw = " + s + ";" +
+    "  return { rate: tw.sellRefundRate, refund: sellValue(tw)," +
+    "           wave: tw.producesPerWave() }; })()");
+  t.near(got.rate, 0.70, 1e-9, "the rate is 70%");
+  t.eq(got.refund, 840, "so 1 200 gives back 840");
+  t.near(got.wave, 184, 1e-9, "and it produces 200 x 0.92 = 184");
+
+  // C5's 250 000 IS STILL SUNK, at either rate: `sellValue` takes what is
+  // unrefundable off BEFORE the rate, so a better rate cannot buy any back.
+  var C = ["C1", "C2", "C3", "C4", "C5"];
+  var sunkPlain = h.run("(function () { var tw = " +
+    towerWith(h, "farm", [], C) + ";" +
+    "  return { spent: tw.totalSpent, sunk: tw.unrefundableSpent," +
+    "           refund: sellValue(tw) }; })()");
+  var sunkLic = h.run("(function () { var tw = " +
+    towerWith(h, "farm", ["frm_n3"], C) + ";" +
+    "  return { spent: tw.totalSpent, sunk: tw.unrefundableSpent," +
+    "           refund: sellValue(tw) }; })()");
+  t.eq(sunkPlain.sunk, 250000, "C5's price is recorded as unrefundable");
+  t.eq(sunkLic.sunk, 250000, "and stays so under a better rate");
+  t.eq(sunkLic.refund,
+    Math.ceil((sunkLic.spent - 250000) * 0.70),
+    "the refund is 70% of everything EXCEPT the 250 000");
+  t.ok(sunkLic.refund < 250000, "which is nowhere near buying C5 back");
+
+  // A WITHDRAWAL IS NOT PRODUCTION and is handed over whole.
+  var out = h.run("(function () { var tw = " +
+    towerWith(h, "farm", ["frm_n3"], ["A1", "A2", "A3", "A4"]) + ";" +
+    "  tw.stock = 10000; var was = cash; tw.collect();" +
+    "  return cash - was; })()");
+  t.eq(out, 10000, "ten thousand stored comes out as ten thousand");
+
+  // AND A TICK IS, so it carries the penalty exactly once.
+  var ticked = h.run("(function () { var tw = towers[towers.length - 1];" +
+    "  tw.stock = 0; tw.tickTimer = 0;" +
+    "  for (var i = 0; i < 60 * 6; i++) tw.update(1 / 60, []);" +
+    "  return tw.stock; })()");
+  t.near(ticked, 75 * 0.92, 1e-6, "one A4 tick of 75 stores 69");
+});
+
+test("Consortium counts the other living Farms and nothing else", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "farm", ["frm_n4"], []);
+  t.near(h.run(s + ".producesPerWave()"), 190, 1e-9, "alone, -5%: 200 -> 190");
+
+  var band = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var out = { one: tw.producesPerWave() }, made = [];" +
+    "  for (var i = 0; i < 6; i++) {" +
+    "    var f = new FarmTower(500 + i * 90, 400, path); addTower(f); made.push(f);" +
+    "    out['n' + (i + 1)] = tw.producesPerWave(); }" +
+    "  made[0].currentHp = 0;" +
+    "  towers = towers.filter(function (x) { return x !== made[1]; });" +
+    "  Farms.unregister(made[1]);" +
+    "  out.afterLoss = tw.producesPerWave();" +
+    "  out.others = made[2].producesPerWave();" +
+    "  return out; })()");
+  t.near(band.n1, 200 * 0.98, 1e-9, "one other Farm: -5% + 3 = -2%");
+  t.near(band.n2, 200 * 1.01, 1e-9, "two others: +1%");
+  t.near(band.n4, 200 * 1.07, 1e-9, "four others is the ceiling, +7%");
+  t.near(band.n5, 200 * 1.07, 1e-9, "and a fifth adds nothing");
+  t.near(band.n6, 200 * 1.07, 1e-9, "nor a sixth");
+  t.near(band.afterLoss, 200 * 1.07, 1e-9,
+    "a dead one and a sold one stop counting, and four still stand");
+
+  // A LOADOUT IS PER TYPE, so every Farm on the board carries this node -- and
+  // each one still resolves its OWN 200 x 1.07 from its OWN count of others.
+  // Nothing reads another farm's already-modified output, which is what stops
+  // five of them compounding into each other.
+  t.near(band.others, 200 * 1.07, 1e-9,
+    "every Farm resolves the same plain 214 from the same board");
+});
+
+test("Jet Protected halves both ends of the table", function (t) {
+  var h = bootContent();
+  var C3 = ["C1", "C2", "C3"];
+  var C4 = ["C1", "C2", "C3", "C4"];
+  var C5 = ["C1", "C2", "C3", "C4", "C5"];
+
+  t.near(farmDice(h, [], C3, [20], 1000, 1).P, 1430, 1e-9,
+    "C3 face 20 normally pays +300 then +10%");
+  t.near(farmDice(h, ["frm_c1"], C3, [20], 1000, 2).P, 1207.5, 1e-9,
+    "protected, +150 then +5%");
+
+  // C4 ROLLS TWO DICE, so a single-face claim about it is a claim about two of
+  // them. Face 9 is a flat +60 and has no percentage tail, which makes the pair
+  // readable: 1000 + 60 + 60.
+  t.near(farmDice(h, [], C4, [9, 9], 1000, 3).P, 1120, 1e-9,
+    "C4's two dice each pay face 9's +60");
+  t.near(farmDice(h, ["frm_c1"], C4, [9, 9], 1000, 4).P, 1120, 1e-9,
+    "and face 9 is neither end of the table, so it is not protected");
+
+  // ONE DIE AT A TIME for face 20, using C3.
+  t.near(farmDice(h, [], C3, [1], 1000, 5).P, 650, 1e-9, "C3 face 1 normally costs 35%");
+  t.near(farmDice(h, ["frm_c1"], C3, [1], 1000, 6).P, 825, 1e-9,
+    "protected, 17.5%");
+
+  // C5's FACE 22, and its purge is a deferred effect that stays whole.
+  var plain22 = farmDice(h, [], C5, [22, 22, 22], 1000, 7);
+  t.near(plain22.P, 8000, 1e-9, "three natural 22s double three times");
+  var jet22 = farmDice(h, ["frm_c1"], C5, [22, 22, 22], 1000, 8);
+  t.near(jet22.P, 1000 * Math.pow(1.5, 3), 1e-6,
+    "protected, x1.5 three times instead of x2");
+  t.eq(h.run("Farms.prepState().cullBelow9"), true,
+    "and face 22 still queues its purge, at full strength");
+
+  // A FACE THAT WAS WALKED UP TO THE MAXIMUM IS NOT NATURAL. C5's face 14 arms
+  // a +1 for the next series, so a 19 becomes a 20 -- and 20 is not C5's
+  // maximum anyway, which is why this uses the flat gain to prove the flag.
+  var walked = h.run("(function () { var tw = " +
+    towerWith(h, "farm", ["frm_c1"], C5) + ";" +
+    "  Farms.network.P = 1000;" +
+    "  var seq = [14, 14, 14], i = 0;" +
+    "  Farms.setDie(function () { return seq[Math.min(i++, 2)]; });" +
+    "  Farms.settleWave(20);" +
+    "  var armed = Farms.prepState().dieBonuses.length;" +
+    "  Farms.network.P = 1000;" +
+    "  var seq2 = [21, 21, 21], j = 0;" +
+    "  Farms.setDie(function () { return seq2[Math.min(j++, 2)]; });" +
+    "  Farms.settleWave(21);" +
+    "  Farms.setDie(null);" +
+    "  return { armed: armed, P: Farms.network.P }; })()");
+  t.eq(walked.armed, 3, "three face-14s arm three +1 charges");
+  // Each 21 is walked to 22 by a charge, so it is NOT a natural maximum and
+  // is not protected: three full doubles.
+  t.near(walked.P, 8000, 1e-9,
+    "a 21 nudged to 22 doubles in full — it is not a NATURAL maximum");
+});
+
+test("Amortized Reset meets the baseline halfway, in order", function (t) {
+  var h = bootContent();
+  var C3 = ["C1", "C2", "C3"];
+  var C4 = ["C1", "C2", "C3", "C4"];
+
+  var plain = farmDice(h, [], C3, [8], 1000, 1);
+  t.eq(plain.B, 300, "one C3 Farm's baseline is 300");
+  t.near(plain.P, 300, 1e-9, "and face 8 normally resets P to it");
+
+  var s = farmDice(h, ["frm_c2"], C3, [8], 1000, 2);
+  t.near(s.P, 650, 1e-9, "with it, halfway: (1000 + 300) / 2");
+
+  var below = farmDice(h, ["frm_c2"], C3, [8], 100, 3);
+  t.near(below.P, 200, 1e-9,
+    "and it is WORSE below the baseline: (100 + 300) / 2 rather than 300");
+
+  // SEQUENTIAL: the second die sees what the first produced.
+  var twice = farmDice(h, ["frm_c2"], C4, [8, 8], 1000, 4);
+  t.eq(twice.B, 500, "a C4 Farm's baseline is 500");
+  t.near(twice.P, 625, 1e-9, "(1000+500)/2 = 750, then (750+500)/2 = 625");
+});
+
+test("Extra Die rolls one more and scales every one of them", function (t) {
+  var h = bootContent();
+  var C3 = ["C1", "C2", "C3"];
+  var C4 = ["C1", "C2", "C3", "C4"];
+  var C5 = ["C1", "C2", "C3", "C4", "C5"];
+
+  t.eq(farmDice(h, [], C3, [9], 1000, 1).dice, 1, "C3 normally rolls one die");
+  var c3 = farmDice(h, ["frm_c3"], C3, [9], 1000, 2);
+  t.eq(c3.dice, 2, "with Extra Die it rolls two");
+  t.eq(c3.rolled, 2, "and really throws both");
+  t.near(c3.P, 1000 + 30 * 0.75 * 2, 1e-9,
+    "each of them worth three quarters — including the one it already had");
+
+  t.eq(farmDice(h, ["frm_c3"], C4, [9], 1000, 3).dice, 3, "C4 rolls three");
+  t.eq(farmDice(h, ["frm_c3"], C5, [9], 1000, 4).dice, 4, "and C5 four");
+  t.eq(farmDice(h, ["frm_c3"], ["C1", "C2"], [9], 1000, 5).dice, 0,
+    "a Farm below C3 has no die to add one to");
+
+  // A x2 BECOMES x1.75, because only the bonus above one is scaled.
+  var doubled = farmDice(h, ["frm_c3"], C5, [21, 21, 21, 21], 1000, 6);
+  t.near(doubled.P, 1000 * Math.pow(1.75, 4), 1e-6,
+    "four face-21s at x1.75 each, not x2 and not x1.5");
+
+  // A RESET IS NOT A NUMERIC GAIN and stays whole.
+  var reset = farmDice(h, ["frm_c3"], C3, [8, 8], 1000, 7);
+  t.near(reset.P, 300, 1e-9, "face 8 still resets straight to B");
+
+  // AND A LOSS IS SCALED TOO, in the player's favour.
+  var lost = farmDice(h, ["frm_c3"], C3, [3, 3], 1000, 8);
+  t.near(lost.P, 1000 - 170 * 0.75 * 2, 1e-9, "-170 becomes -127.5, twice");
+});
+
+test("Jet Protected and Extra Die compose to x1.375 on C5's maximum",
+function (t) {
+  var h = bootContent();
+  var C5 = ["C1", "C2", "C3", "C4", "C5"];
+
+  // THE CONFIRMED CASE. x2 is a bonus of +1.0 above one; Jet Protected keeps
+  // half of it and Extra Die keeps three quarters of what is left, so
+  // 1 + 1.0 x 0.50 x 0.75 = x1.375. Four dice, so four of them.
+  var both = farmDice(h, ["frm_c1", "frm_c3"], C5, [22, 22, 22, 22], 1000, 1);
+  t.eq(both.dice, 4, "C5 with Extra Die rolls four");
+  t.near(both.P, 1000 * Math.pow(1.375, 4), 1e-6,
+    "and a natural 22 is x1.375 under both");
+  t.eq(h.run("Farms.prepState().cullBelow9"), true,
+    "while the purge it queues is untouched at full strength");
+
+  // AND ON AN ADDITIVE MAXIMUM: 37.5% of its ordinary numeric value.
+  var C3 = ["C1", "C2", "C3"];
+  var flat = farmDice(h, ["frm_c1", "frm_c3"], C3, [20, 20], 1000, 2);
+  var step = function (p) { return (p + 300 * 0.375) * (1 + 0.10 * 0.375); };
+  t.near(flat.P, step(step(1000)), 1e-6,
+    "C3's +300 and +10% both land at 37.5% — two dice, in sequence");
+
+  // ALL THREE TOGETHER, on the face each of them owns.
+  var all = ["frm_c1", "frm_c2", "frm_c3"];
+  var reset = farmDice(h, all, C3, [8, 8], 1000, 3);
+  // TWO DICE, because Extra Die added one, and the reset is not scaled by
+  // either node -- so it simply happens twice, sequentially:
+  // (1000 + 300) / 2 = 650, then (650 + 300) / 2 = 475.
+  t.near(reset.P, 475, 1e-9,
+    "the reset is Amortized on both dice and neither node scales it");
+  var one = farmDice(h, all, C3, [1, 1], 1000, 4);
+  t.near(one.P, 1000 * Math.pow(1 - 0.35 * 0.375, 2), 1e-9,
+    "and a natural 1 costs 37.5% of its ordinary loss, twice");
+});
+
+test("the Farm's production nodes compose exactly as confirmed", function (t) {
+  var h = bootContent();
+
+  // (200 + 30) x 0.90 = 207, the flat inside the multiplier. Paralyzing Field's
+  // production penalty is not tier-gated, which is what lets this be measured
+  // on a Farm with no tiers at all.
+  var pair = towerWith(h, "farm", ["frm_n1", "frm_b2"], []);
+  t.near(h.run(pair + ".producesPerWave()"), 207, 1e-9,
+    "Arcane Fertilizer + Paralyzing Field: (200 + 30) x 0.90 = 207");
+  var rev = towerWith(h, "farm", ["frm_b2", "frm_n1"], []);
+  t.near(h.run(rev + ".producesPerWave()"), 207, 1e-9,
+    "whichever slots they sit in");
+
+  // BOTH 0.90 PENALTIES APPLY, for x0.81, and only the boiler moves the clock.
+  var two = towerWith(h, "farm", ["frm_a1", "frm_b2"], ["A1", "A2", "A3"]);
+  var got = h.run("(function () { var tw = " + two + ";" +
+    "  return { wave: tw.producesPerWave(), tick: tw.tickSeconds," +
+    "           perTick: tw.perTickProduction }; })()");
+  t.near(got.wave, 400 * 0.81, 1e-9, "Accelerated Boiler + Paralyzing Field: x0.81");
+  t.near(got.tick, 4.5, 1e-9, "and only the boiler shortened the clock");
+  t.eq(got.perTick, 50, "the tick's value is neither node's business");
+
+  // FERTILIZER INSIDE THE BOILER.
+  var three = towerWith(h, "farm", ["frm_n1", "frm_a1"], ["A1", "A2", "A3"]);
+  t.near(h.run(three + ".producesPerWave()"), (400 + 30) * 0.90, 1e-9,
+    "Arcane Fertilizer + Accelerated Boiler: (400 + 30) x 0.90 = 387");
+
+  // LIQUID LICENSE AND CONSORTIUM BOTH LAND, once each, on production only.
+  var scaled = towerWith(h, "farm", ["frm_n3", "frm_n4"], []);
+  var s = h.run("(function () { var tw = " + scaled + ";" +
+    "  var was = cash; tw.produce(tw.producesPerWave());" +
+    "  var paid = cash - was;" +
+    "  return { wave: tw.producesPerWave(), paid: paid," +
+    "           refund: sellValue(tw) }; })()");
+  t.near(s.wave, 200 * 0.92 * 0.95, 1e-9, "-8% and -5% multiply, never sum");
+  t.near(s.paid, s.wave, 1e-6, "and the purse is paid exactly that, once");
+  t.eq(s.refund, 840, "while the refund carries only the licence's better rate");
+
+  // FIVE AT ONCE, in both orders.
+  var ids = ["frm_n1", "frm_n2", "frm_n3", "frm_n4", "frm_a1"];
+  var A = ["A1", "A2", "A3"];
+  var fw = towerWith(h, "farm", ids, A);
+  var a = h.run("(function () { var tw = " + fw + ";" +
+    "  return { wave: tw.producesPerWave(), tick: tw.tickSeconds," +
+    "    foot: tw.footprintRadiusUl, hp: tw.maxHp," +
+    "    refund: sellValue(tw), price: TowerPerks.priceOf(FarmTower) }; })()");
+  var bw = towerWith(h, "farm", ids.slice().reverse(), A);
+  var b = h.run("(function () { var tw = " + bw + ";" +
+    "  return { wave: tw.producesPerWave(), tick: tw.tickSeconds," +
+    "    foot: tw.footprintRadiusUl, hp: tw.maxHp," +
+    "    refund: sellValue(tw), price: TowerPerks.priceOf(FarmTower) }; })()");
+  t.deep(b, a, "the slots the five sit in change nothing");
+  t.near(a.wave, (400 + 30) * 0.90 * 0.92 * 0.95, 1e-9,
+    "flat, then the fixed-payment penalty, then the two production scales");
+  t.near(a.tick, 4.5, 1e-9, "with the shorter clock");
+  t.near(a.foot, 28, 1e-9, "the smaller footprint");
+  t.eq(a.price, 1350, "and the dearer placement");
+});
+
+test("what a second-batch card says is what the tower resolves", function (t) {
+  var h = bootContent();
+  var blurbs = h.run("(function () { var out = {};" +
+    "  ['siphon', 'blub', 'farm'].forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) { out[n.id] = n.blurb; }); });" +
+    "  return out; })()");
+
+  Object.keys(blurbs).forEach(function (id) {
+    t.ok(blurbs[id] && blurbs[id].length > 20, id + " has a description");
+  });
+
+  // Every node here trades something away, and every card says so.
+  var missing = Object.keys(blurbs).filter(function (id) {
+    return !/−|less|slower|longer|shorter|instead|→|unchanged|untouched|unaffected|no |No |never|Never|not /.test(blurbs[id]);
+  });
+  t.deep(missing, [], "every card states its downside as well as its gain");
+
+  t.ok(/800 → 675/.test(blurbs.sip_s1), "Light Basin quotes 800 -> 675");
+  towerWith(h, "siphon", ["sip_s1"], []);
+  t.eq(h.run("towers[0].cost"), 675, "and the tower is charged 675");
+
+  t.ok(/×2\.7/.test(blurbs.sip_a1) && /×3\.2/.test(blurbs.sip_a1),
+    "Brutal Primer quotes both ceilings as FINAL multipliers");
+  var primed = towerWith(h, "siphon", ["sip_a1"], ["A1", "A2", "A3", "A4"]);
+  t.near(1 + h.run(primed + ".core.stats.mechanics.ramp_per_target.rampCap"),
+    3.2, 1e-9, "and the tower really tops out at x3.2");
+
+  t.ok(/25 → 23 s/.test(blurbs.blb_b2), "Compressed Cadence quotes the MK2's cycle");
+  t.near(blubStats(h, ["blb_b2"], BLB_B, "mecha2").interval, 23, 1e-9,
+    "and that is the cycle it resolves");
+
+  t.ok(/50 → 70/.test(blurbs.blb_b3), "Wide Detonation quotes the DIAMETER");
+  t.eq(blubStats(h, ["blb_b3"], BLB_B, "mecha2").deathBlast.radiusUl * 2, 70,
+    "and the blast really spans 70 u.l.");
+
+  t.ok(/200 → 230/.test(blurbs.frm_n1), "Arcane Fertilizer quotes 200 -> 230");
+  t.eq(h.run(towerWith(h, "farm", ["frm_n1"], []) + ".producesPerWave()"), 230,
+    "and the Farm really makes 230 a wave");
+
+  t.ok(/×1\.75/.test(blurbs.frm_c3), "Extra Die quotes the x1.75 a double becomes");
+  t.near(farmDice(h, ["frm_c3"], ["C1", "C2", "C3"], [9], 1000, 40).P,
+    1045, 1e-9, "and its 75% really lands on both dice");
 });
 
 // ---------------------------------------------------------------------------

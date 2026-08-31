@@ -328,6 +328,51 @@ FarmTower.prototype.recalcStats = function () {
   this.diceTable = null;
   this.upgradeCount = 0;
 
+  // --- what the PERMANENT upgrades write, at their neutral values -----------
+  //
+  // ALL INERT AS SET HERE. The five that are absolutes are declared FROM the
+  // tower's own constants, so an unequipped Farm resolves the authored number
+  // by construction rather than by a copy somebody has to keep in step.
+  //
+  // **A FARM HAS SEVERAL DIFFERENT KINDS OF MANA AND THEY ARE NOT ONE
+  // QUANTITY.** Fixed per-wave production, A3+ timed ticks, mana already
+  // STORED, the A4/A5 clone, a withdrawal, B-path kill bounty, the C network's
+  // B and P, and a refund are eight separate things that merely share a unit.
+  // Each field below states which of them it touches and no node may quietly
+  // widen it:
+  //
+  //   tickSeconds       Accelerated Boiler. The A3+ CLOCK, and not the value
+  //                     of a tick
+  //   outputMult        Liquid License. PRODUCTION -- the fixed per-wave
+  //                     payment and the timed ticks. Not the clone, not a
+  //                     withdrawal, not a kill bounty, not a refund
+  //   consortiumSolo / consortiumPer / consortiumCap
+  //                     Consortium, resolved LIVE from how many other farms are
+  //                     standing, so a farm dying mid-run moves it at once
+  //   sellRefundRate    Liquid License's other half; 0 means "use the game's"
+  //   trancheBonus / tempMultiplier   Patient Investment, A5's two figures
+  //   manaArmorPerPoint / manaArmorMax   Mana Armor: stored mana per point of
+  //                     damage prevented, and the largest share it may prevent
+  //   executeFlat / executeFraction   Execution Tithe, B5's two thresholds
+  //   diceProtectNatural / diceAmortizedReset / diceGainScale
+  //                     Path C. Read off the FARM whose die is resolving, so
+  //                     two farms in one network roll under their own loadouts
+  this.tickSeconds = FarmTower.TICK_SECONDS;
+  this.outputMult = 1;
+  this.consortiumSolo = 0;
+  this.consortiumPer = 0;
+  this.consortiumCap = 0;
+  this.sellRefundRate = 0;
+  this.trancheBonus = FarmTower.TRANCHE_BONUS;
+  this.tempMultiplier = FarmTower.TEMP_MULTIPLIER;
+  this.manaArmorPerPoint = 0;
+  this.manaArmorMax = 0;
+  this.executeFlat = FarmTower.EXECUTE_FLAT;
+  this.executeFraction = FarmTower.EXECUTE_FRACTION;
+  this.diceProtectNatural = 0;
+  this.diceAmortizedReset = 0;
+  this.diceGainScale = 1;
+
   for (var i = 0; i < FarmTower.UPGRADES.length; i++) {
     var u = FarmTower.UPGRADES[i];
     if (!this.hasUpgrade(u.id)) continue;
@@ -367,6 +412,17 @@ FarmTower.prototype.recalcStats = function () {
   if (this.currentHp === undefined) this.currentHp = maxHp;
 };
 
+// THE FARM'S OWN LAST WORD, called by TowerPerks once the equipped nodes have
+// written onto this instance -- which is AFTER `recalcStats` has already
+// cached the two derived world-space numbers from the pre-perk values. Compact
+// Estate shrinks the footprint and nothing else here moves, but both are
+// re-derived from the resolved stats rather than adjusted, so this is safe to
+// run on every restat.
+FarmTower.prototype.afterPerks = function () {
+  this.footprintPx = ul(this.footprintRadiusUl);
+  this.rangePx = this.rangeUl > 0 ? elevatedRangePx(this, this.rangeUl) : 0;
+};
+
 // PRODUCTION IS BOTH A WAVE'S WORTH AND A TICK'S, from A3 on.
 //
 // It was EITHER/OR until 2026-08-28, on the brief's word "remplace": A3 read
@@ -382,7 +438,33 @@ FarmTower.prototype.recalcStats = function () {
 // something else it buys, which is the rule the rest of the tree already
 // follows and the one this line was the only exception to.
 FarmTower.prototype.producesPerWave = function () {
-  return this.perWaveProduction;
+  return this.perWaveProduction * this.productionScale();
+};
+
+// WHAT MULTIPLIES THIS FARM'S PRODUCTION, and production means exactly two
+// things: the fixed per-wave payment and the A3+ timed ticks. **The clone, a
+// withdrawal, a kill bounty and a refund are not production** and never come
+// through here -- see the note on `outputMult` in recalcStats.
+//
+// It is APPLIED ONCE PER AMOUNT. A farm outside the C network is paid through
+// `produce(producesPerWave())`; one inside it contributes
+// `nominalProduction()` -- the same function -- to the network's B and is not
+// paid separately, so neither route can bill the same mana twice.
+//
+// Consortium is resolved LIVE rather than folded into a stat, because the
+// answer changes when a farm elsewhere on the board dies or is sold. It counts
+// OTHER farms only and reads nothing about their output, so it can neither
+// count itself nor compound against another farm's already-modified figure.
+FarmTower.prototype.productionScale = function () {
+  var scale = this.outputMult;
+  if (this.consortiumPer > 0 || this.consortiumSolo !== 0) {
+    var others = 0;
+    var all = Farms.living();
+    for (var i = 0; i < all.length; i++) if (all[i] !== this) others++;
+    scale *= 1 + this.consortiumSolo +
+      Math.min(this.consortiumCap, this.consortiumPer * others);
+  }
+  return scale;
 };
 
 // What this farm contributes to the C network's baseline B. A farm on the C
@@ -679,10 +761,17 @@ FarmTower.prototype.update = function (dt, enemies) {
   // property of time, so it advances at 3x speed and freezes with the run,
   // exactly like every other cooldown in the game.
   if (this.perTickProduction > 0) {
+    // OFF THE INSTANCE since 2026-08-31: Accelerated Boiler shortens the clock
+    // and nothing else does. The VALUE of a tick is `perTickProduction` and
+    // that node does not touch it -- what it buys is a tick arriving sooner.
+    var period = this.tickSeconds > 0 ? this.tickSeconds : FarmTower.TICK_SECONDS;
     this.tickTimer += dt;
-    while (this.tickTimer >= FarmTower.TICK_SECONDS) {
-      this.tickTimer -= FarmTower.TICK_SECONDS;
-      this.produce(this.perTickProduction);
+    while (this.tickTimer >= period) {
+      this.tickTimer -= period;
+      // A tick is PRODUCTION, so it carries the same scale the per-wave
+      // payment does -- and carries it here, once, rather than inside
+      // `produce`, which the clone and a withdrawal also pass through.
+      this.produce(this.perTickProduction * this.productionScale());
       this.lastTick = this.animClock;
     }
   }
@@ -806,11 +895,10 @@ FarmTower.prototype.invest = function (target, temporary) {
     this.tempTranches = n;
     this.tempTimer = FarmTower.TEMP_SECONDS;
     this.tempTarget = target;
-    FarmBoost.grant(target, n * FarmTower.TRANCHE_BONUS * FarmTower.TEMP_MULTIPLIER,
-      true);
+    FarmBoost.grant(target, n * this.trancheBonus * this.tempMultiplier, true);
   } else {
     this.investedTranches += n;
-    FarmBoost.grant(target, n * FarmTower.TRANCHE_BONUS, false);
+    FarmBoost.grant(target, n * this.trancheBonus, false);
   }
   // The vault engine has a clip for each: a long beam for the permanent one,
   // a short bright burst for the surge. Same stamp, one flag to tell them apart.
@@ -834,7 +922,7 @@ FarmTower.prototype.clearSurge = function () {
 // fraction. Kept for the panel: the effect itself is on the towers it was
 // spent on, and this is only the record of what was spent.
 FarmTower.prototype.investmentBonus = function () {
-  return this.investedTranches * FarmTower.TRANCHE_BONUS;
+  return this.investedTranches * this.trancheBonus;
 };
 
 
@@ -867,9 +955,13 @@ FarmTower.prototype.covers = function (x, y) {
     { x: x, y: y });
 };
 
+// THE HIGHER OF THE TWO, and only the two constants move. Execution Tithe
+// replaces them with 15 and 7.5%; the rule that combines them is B5's own and
+// is untouched. Off the instance since 2026-08-31 so a permanent upgrade on one
+// farm cannot change what another farm executes.
 FarmTower.prototype.executeThreshold = function (enemy) {
-  return Math.max(FarmTower.EXECUTE_FLAT,
-    (enemy.maxHealth || 0) * FarmTower.EXECUTE_FRACTION);
+  return Math.max(this.executeFlat,
+    (enemy.maxHealth || 0) * this.executeFraction);
 };
 
 
@@ -880,7 +972,31 @@ FarmTower.prototype.takeDamage = function (amount) {
   // is answered here, at the one door damage comes through, and `Farms.dodged`
   // is what a stun asks before it lands.
   if (this.rollDodge()) return 0;
-  return TowerHealth.damage(this, amount);
+  return TowerHealth.damage(this, this.spendManaArmor(amount));
+};
+
+// MANA ARMOR: this farm's OWN stored mana, burnt to make a hit smaller.
+//
+// Fifty stored mana buys one point of damage prevented, and at most half of any
+// blow may be bought off. A farm that cannot afford the whole half buys what it
+// can and takes the rest -- so an empty vault is simply no protection rather
+// than a special case, and the stock can never go negative.
+//
+// IT IS THE TOWER'S ARMOUR AND NOT THE BASE'S, and it spends nothing that is
+// not this farm's: never the player's purse, never another farm's stock. A blow
+// that was already zero buys nothing, because there is nothing to prevent.
+FarmTower.prototype.spendManaArmor = function (amount) {
+  if (!(this.manaArmorPerPoint > 0) || !(this.manaArmorMax > 0)) return amount;
+  if (!(amount > 0) || !this.stores || !(this.stock > 0)) return amount;
+
+  var want = amount * this.manaArmorMax;
+  var afford = this.stock / this.manaArmorPerPoint;
+  var prevented = Math.min(want, afford);
+  if (!(prevented > 0)) return amount;
+
+  this.stock = Math.max(0, this.stock - prevented * this.manaArmorPerPoint);
+  this.lastArmor = this.animClock;
+  return amount - prevented;
 };
 
 FarmTower.prototype.rollDodge = function () {
@@ -1765,21 +1881,24 @@ var Farms = (function () {
     if (!enemy || !enemy.pos) return false;
     var f = fieldAt(enemy.pos.x, enemy.pos.y);
     if (!f || !f.executes) return false;
-    var threshold = Math.max(FarmTower.EXECUTE_FLAT,
-      (enemy.maxHealth || 0) * FarmTower.EXECUTE_FRACTION);
-    if (!(enemy.health > 0 && enemy.health < threshold)) return false;
-    // THE PANOPTICON FIRES ITS BEAM WHEN THE FIELD ACTUALLY TAKES SOMETHING.
-    // Stamped on every farm whose circle covers the body and that carries the
-    // execution -- `fieldAt` already established that one does, and several may.
-    // The answer is unchanged either way: this only records the moment.
+
+    // ASKED OF EACH FARM THAT COVERS THE BODY, because the threshold is the
+    // FARM's now and not the type's: Execution Tithe is a permanent upgrade, so
+    // two B5 farms on one board may execute at different health. Any one of
+    // them taking the body is enough, which is the same "several may" rule the
+    // stamp below already lives under.
+    var took = false;
     for (var i = 0; i < list.length; i++) {
       var farm = list[i];
       if (!farm.executes) continue;
       if (farm.isDestroyed && farm.isDestroyed()) continue;
       if (!farm.covers(enemy.pos.x, enemy.pos.y)) continue;
+      if (!(enemy.health > 0 && enemy.health < farm.executeThreshold(enemy))) continue;
+      // THE PANOPTICON FIRES ITS BEAM WHEN THE FIELD ACTUALLY TAKES SOMETHING.
       farm.lastExecute = farm.animClock;
+      took = true;
     }
-    return true;
+    return took;
   }
 
   // --- kills in range -------------------------------------------------------
@@ -1992,7 +2111,12 @@ var Farms = (function () {
       m[i].lastRolls = [];
       for (k = 0; k < m[i].diceCount; k++) {
         var sides = FarmDice.sides(m[i].diceTable);
-        rolls.push({ farm: m[i], table: m[i].diceTable, n: rollDie(sides) });
+        // `modified` IS WHAT MAKES A FACE NATURAL. A die that was rerolled is
+        // natural again -- it was genuinely thrown -- while one nudged up by a
+        // face-14 or face-16 charge is not, and Jet Protected asks exactly that
+        // question. See `resolve`.
+        rolls.push({ farm: m[i], table: m[i].diceTable, n: rollDie(sides),
+                     modified: false });
       }
     }
 
@@ -2049,6 +2173,7 @@ var Farms = (function () {
     for (i = 0; i < rolls.length && rerolls > 0; i++) {
       if (rolls[i].n !== 8) continue;
       rolls[i].n = rollDie(FarmDice.sides(rolls[i].table));
+      rolls[i].modified = false;      // thrown again, so natural again
       rerolls--;
       // The die that was rescued is the one that respins on screen.
       stampPrep(rolls[i].farm, "reroll_eight");
@@ -2064,6 +2189,10 @@ var Farms = (function () {
       // A +2 THAT LANDS EXACTLY ON 8 BECOMES 9. Only a +2: the brief names the
       // face-16 charge, and a +1 arriving on 8 is left alone.
       if (add === 2 && moved === 8) moved = 9;
+      // Only when the number ACTUALLY moved: a charge that lands on a face
+      // already at the ceiling has changed nothing, so the face is still the
+      // one the die threw.
+      if (moved !== rolls[i].n) rolls[i].modified = true;
       rolls[i].n = moved;
     }
 
@@ -2094,7 +2223,43 @@ var Farms = (function () {
     var f = FarmDice.faceOf(entry.table, entry.n);
     if (!f) return;
 
-    if (f.reset) { network.P = network.B; return; }
+    // --- the two Path C permanent upgrades that touch a face's ARITHMETIC ---
+    //
+    // Read off the FARM whose die this is, never off the network: two farms in
+    // one network roll under their own loadouts, and one player's Extra Die
+    // must not scale the other's throw.
+    //
+    // JET PROTECTED asks whether the face is NATURAL -- the number the die
+    // actually threw. A reroll is natural again; a face nudged upward by a
+    // face-14 or face-16 charge is not, so a 19 walked up to 20 is unprotected
+    // and a genuine 20 stays protected however its resolved value is later
+    // changed by a queued modifier.
+    //
+    // EXTRA DIE scales every ordinary gain and loss to 75%, on EVERY die that
+    // farm rolls and not merely the one it added.
+    //
+    // THE TWO COMPOSE MULTIPLICATIVELY, so a protected natural maximum keeps
+    // 0.50 x 0.75 = 37.5% of its numeric value under both. Neither of them
+    // touches a reset, a reroll, a queued modifier or a purge: those are
+    // deferred and non-numeric, and they stay at full strength.
+    var farm = entry.farm;
+    var scale = (farm && farm.diceGainScale > 0) ? farm.diceGainScale : 1;
+    var isNatural = !entry.modified;
+    var guarded = !!(farm && farm.diceProtectNatural > 0) && isNatural &&
+      (entry.n === 1 || entry.n === FarmDice.sides(entry.table));
+    var numeric = scale * (guarded ? 0.5 : 1);
+
+    if (f.reset) {
+      // AMORTIZED RESET meets P halfway to B instead of replacing it, using
+      // the values as they stand at the moment THIS die resolves -- so a later
+      // die in the same series sees what this one produced. Better than the
+      // ordinary reset while P is above B and worse below it, which is the
+      // whole trade.
+      network.P = (farm && farm.diceAmortizedReset > 0)
+        ? (network.P + network.B) / 2
+        : network.B;
+      return;
+    }
 
     if (f.prep) {
       if (f.prep.rerollEights) {
@@ -2115,7 +2280,15 @@ var Farms = (function () {
     }
     if (f.nextMult !== undefined) series.nextMult *= f.nextMult;
 
-    if (f.double) { network.P = Math.max(0, network.P * 2); return; }
+    if (f.double) {
+      // SCALED AS A BONUS ABOVE ONE, which is the only reading that composes:
+      // x2 is "+100%", so Jet Protected halving it and Extra Die taking three
+      // quarters of what is left gives 1 + 1.0 x 0.50 x 0.75 = x1.375, and
+      // either alone gives x1.5 or x1.75. Halving the MULTIPLIER instead would
+      // make a protected double a LOSS.
+      network.P = Math.max(0, network.P * (1 + (2 - 1) * numeric));
+      return;
+    }
 
     var delta = 0;
     if (f.worstOf) {
@@ -2129,6 +2302,10 @@ var Farms = (function () {
       delta = f.flat;
     }
 
+    // THE FACE'S OWN NUMBER, scaled. The queued charges below are deliberately
+    // NOT scaled: they are deferred modifiers and both nodes leave those whole.
+    delta *= numeric;
+
     if (delta > 0) {
       // A "next gain" charge is spent on the next gain and on nothing else, so
       // it is applied here and cleared here.
@@ -2140,7 +2317,10 @@ var Farms = (function () {
 
     network.P = Math.max(0, network.P + delta);
     if (f.thenPercent !== undefined) {
-      network.P = Math.max(0, network.P * (1 + f.thenPercent));
+      // The second half of a face-20 is its own numeric gain and is scaled with
+      // the first: C3's "+300 and +10%" reads "+150 and +5%" under Jet
+      // Protected, which is the confirmed figure.
+      network.P = Math.max(0, network.P * (1 + f.thenPercent * numeric));
     }
   }
 

@@ -15,6 +15,9 @@
 //
 // Parameters come from config and are replaced wholesale by later tiers --
 // A4 raises rate 0.15 -> 0.20 and cap 2.0 -> 2.5, giving x3.5 instead of x3.
+// **`rampCap` IS THE BONUS ABOVE 1**, so the FINAL multiplier is 1 + cap: the
+// design figures x3.0 and x3.5 are 2.0 and 2.5 here. A permanent upgrade
+// written against the design figure has to be authored as the bonus.
 // ---------------------------------------------------------------------------
 
 function RampTracker(params) {
@@ -51,9 +54,16 @@ RampTracker.prototype.timeOn = function (target) {
   return this.lockedTime[this.keyFor(target)] || 0;
 };
 
+// `rampStart` IS A FLOOR ON THE BONUS, NOT AN ADDITION TO IT. The Siphon's
+// Preloaded Lock opens every new lock at x1.25 and the ramp then climbs from
+// there toward the SAME cap -- so what the node buys is the first second and a
+// half of the climb, never a higher ceiling. Zero on every tier, which makes
+// this exactly the old expression for a tower without the node.
 RampTracker.prototype.multiplier = function (target) {
   var held = this.timeOn(target);
-  return 1 + Math.min(this.params.rampRate * held, this.params.rampCap);
+  var start = this.params.rampStart || 0;
+  var earned = Math.max(start, this.params.rampRate * held);
+  return 1 + Math.min(earned, this.params.rampCap);
 };
 
 if (typeof module !== "undefined" && module.exports) {

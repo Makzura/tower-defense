@@ -21,6 +21,14 @@
 
 var DeathDenial = (function () {
 
+  // THE DEFAULTS, and they are the fallback rather than the answer since
+  // 2026-08-31. The B5 tier has carried `death_denial: { knockbackUl,
+  // restoreBaseHpTo }` in its config since the tower was written and nothing
+  // read them -- these two module constants were the live numbers and the
+  // config block was a duplicate that could not be moved. `paramsOf` reads the
+  // HOLDER's resolved parameters now, so the config is what it always claimed
+  // to be and the Siphon's Second Wind permanent upgrade has somewhere to
+  // write. A tower that resolves neither still gets exactly 500 and 1.
   var KNOCKBACK_UL = 500;
   var RESTORE_TO = 1;
 
@@ -28,6 +36,30 @@ var DeathDenial = (function () {
   var holder = null;
 
   function register(tower) { holder = tower; }
+
+  // WHAT THE SAVE IS WORTH, off the tower that is holding it. A config-driven
+  // tower keeps its resolved mechanic parameters in `core.stats.mechanics`,
+  // which is also where a permanent upgrade writes -- so the two halves of
+  // "how far back, and how much health" have one source.
+  function paramsOf(tower) {
+    var p = tower && tower.core && tower.core.stats && tower.core.stats.mechanics
+      ? tower.core.stats.mechanics.death_denial : null;
+    return {
+      knockbackUl: (p && typeof p.knockbackUl === "number")
+        ? p.knockbackUl : KNOCKBACK_UL,
+      restoreBaseHpTo: (p && typeof p.restoreBaseHpTo === "number")
+        ? p.restoreBaseHpTo : RESTORE_TO
+    };
+  }
+
+  // What the HELD save would do, for the panel, the index and the tests. Null
+  // when nothing is held.
+  function heldParams() { return holder === null ? null : paramsOf(holder); }
+
+  // The distance the last consumed save actually dragged everything, kept only
+  // so the rewind overlay can quote the number it really used rather than the
+  // module's default.
+  var lastKnockbackUl = KNOCKBACK_UL;
 
   function isHeld() { return holder !== null; }
 
@@ -73,6 +105,11 @@ var DeathDenial = (function () {
     holder = null;              // one save, consumed before anything else can
                                 // re-enter this
 
+    // READ BEFORE THE TOWER IS SOLD, because selling it below is what takes it
+    // off the board and, with it, the stats these come from.
+    var params = paramsOf(tower);
+    lastKnockbackUl = params.knockbackUl;
+
     var moves = [];
     for (var i = 0; i < context.enemies.length; i++) {
       var enemy = context.enemies[i];
@@ -86,7 +123,7 @@ var DeathDenial = (function () {
       moves.push({
         enemy: enemy,
         from: enemy.progress,
-        to: Math.max(0, enemy.progress - ul(KNOCKBACK_UL))
+        to: Math.max(0, enemy.progress - ul(params.knockbackUl))
       });
     }
 
@@ -95,7 +132,7 @@ var DeathDenial = (function () {
     if (tower.onDeathDenialSpent) tower.onDeathDenialSpent();
     context.sellTower(tower, { refund: false });
 
-    return { restoreBaseHpTo: RESTORE_TO, tower: tower };
+    return { restoreBaseHpTo: params.restoreBaseHpTo, tower: tower };
   }
 
   // Advances the animation. The game loop calls ONLY this while it runs.
@@ -188,7 +225,8 @@ var DeathDenial = (function () {
 
     ctx.font = "15px system-ui, sans-serif";
     ctx.fillStyle = "rgba(214,170,255," + (0.9 * strength).toFixed(3) + ")";
-    ctx.fillText("every enemy dragged back " + KNOCKBACK_UL + " u.l.", cx, cy + radius + 70);
+    ctx.fillText("every enemy dragged back " + lastKnockbackUl + " u.l.",
+      cx, cy + radius + 70);
 
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
@@ -198,11 +236,14 @@ var DeathDenial = (function () {
   function reset() {
     holder = null;
     rewind = null;
+    lastKnockbackUl = KNOCKBACK_UL;
   }
 
   return {
     KNOCKBACK_UL: KNOCKBACK_UL,
     REWIND_SECONDS: REWIND_SECONDS,
+    paramsOf: paramsOf,
+    heldParams: heldParams,
     register: register,
     isHeld: isHeld,
     isAvailable: isAvailable,

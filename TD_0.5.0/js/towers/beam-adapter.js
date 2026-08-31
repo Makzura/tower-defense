@@ -128,6 +128,17 @@ BeamTower.SLOW_REFRESH_SECONDS = 0.2;
 
 BeamTower.prototype.refreshDerived = function () {
   var s = this.core.stats;
+
+  // WHICH TIERS THIS TOWER HAS BOUGHT, as the flat `hasA4`-shaped booleans the
+  // hand-written towers carry, derived from the counts and never stored. They
+  // exist for the PERMANENT UPGRADES: a `when: [{ has: "hasB5" }]` group tests
+  // a field on the TOWER, and a config-driven tower had nothing for one to
+  // test. Same two lines as the Arcane Sniper's, for the same reason.
+  for (var t = 1; t <= 5; t++) {
+    this["hasA" + t] = this.core.purchased.A >= t;
+    this["hasB" + t] = this.core.purchased.B >= t;
+  }
+
   this.rangeUl = s.range;
   // Footprint is fixed for every tier by design -- read from base, not from
   // the resolved stats, so a stray delta could never move it.
@@ -155,7 +166,16 @@ BeamTower.prototype.refreshDerived = function () {
 BeamTower.prototype.effectiveAD = function (gold) {
   var ad = this.core.stats.ad;
   if (this.core.stats.flags.gold_to_power) ad += GoldPower.bonusAD(gold || 0);
-  return ad;
+  // THE PERMANENT MULTIPLIERS LAND HERE AND NOT ON `ad`, which is why they are
+  // a separate field: A5's gold bonus is added to the stat above, so a factor
+  // written onto `ad` would leave the largest part of a late Siphon's damage
+  // untouched. Runic Pressure, Selective Drain, Voracious Fan and Ceramic
+  // Coating all multiply `damageMult`, so they compose by multiplying and never
+  // by summing percentages -- and it is exactly 1 on an unperked tower.
+  //
+  // FRACTIONS SURVIVE. Nothing here rounds: 1 x 1.08 is 1.08 a tick, and a beam
+  // that rounded back to 1 would make the node do literally nothing.
+  return ad * (this.core.stats.damageMult || 1);
 };
 
 BeamTower.prototype.defPierce = function () {
@@ -290,7 +310,7 @@ BeamTower.prototype.faceLocks = function (dt) {
 // Existing locks are NEVER re-sorted or dropped for a "better" target. The
 // ramp is per target and builds over seconds, so re-picking the best set each
 // tick would reset it constantly and quietly delete the tower's damage.
-BeamTower.prototype.updateLocks = function (enemies) {
+BeamTower.prototype.updateLocks = function (enemies, dt) {
   var self = this;
 
   var kept = [];
@@ -307,11 +327,25 @@ BeamTower.prototype.updateLocks = function (enemies) {
   this.locks = kept;
 
   var free = this.core.stats.maxTargets - this.locks.length;
-  if (free <= 0) return;
+  if (free <= 0) { this.acquireTimer = 0; return; }
 
   var candidates = enemies.filter(function (e) {
     return self.locks.indexOf(e) === -1 && self.canHold(e);
   });
+
+  // PRELOADED LOCK'S HALF-SECOND OF WINDING UP, and it is charged per genuine
+  // ACQUISITION rather than per tick. The timer only runs while there is both a
+  // free slot and something legal to put in it, and it is cleared the moment
+  // either goes away -- so a beam that is already full pays nothing, and one
+  // that keeps a target it already had pays nothing either. Zero on a Siphon
+  // without the node, and the whole block then costs one comparison.
+  var delay = this.core.stats.reacquireDelay || 0;
+  if (delay > 0) {
+    if (!candidates.length) { this.acquireTimer = 0; return; }
+    this.acquireTimer = (this.acquireTimer || 0) + (dt || 0);
+    if (this.acquireTimer < delay) return;
+    this.acquireTimer = 0;
+  }
 
   // Ordered by this tower's targeting mode, through the shared comparator in
   // js/targeting.js -- the same scoring and the same tie-break a gunner uses
@@ -330,7 +364,7 @@ BeamTower.prototype.update = function (dt, enemies, bullets, world) {
   // leaves the glow at full rather than immediately one frame stale.
   if (this.healGlow > 0) this.healGlow = Math.max(0, this.healGlow - dt * 2);
 
-  this.updateLocks(enemies);
+  this.updateLocks(enemies, dt);
   this.faceLocks(dt);
   this.ramp.update(dt, this.locks);
 
@@ -690,7 +724,13 @@ BeamTower.prototype.performAction = function (id, context) {
 
 // Damage from an Angry enemy, and the death test the main loop sweeps on --
 // both through the mirrored HP on the core. See js/systems/tower-health.js.
+// CERAMIC COATING IS INCOMING-DAMAGE REDUCTION, and deliberately not extra
+// maximum HP, armor, defence or a heal: the blow is smaller, the tower's
+// numbers are not bigger. Exactly 1 -- and therefore absent -- on any Siphon
+// that has not equipped it.
 BeamTower.prototype.takeDamage = function (amount) {
+  var mult = this.core.stats.incomingDamageMult;
+  if (typeof mult === "number" && mult !== 1) amount = amount * mult;
   return TowerHealth.damage(this, amount);
 };
 

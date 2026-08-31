@@ -392,6 +392,65 @@ BlubTower.prototype.recalcStats = function () {
   this.swarmCap = 0;
   this.upgradeCount = 0;
 
+  // --- what the PERMANENT upgrades write, at their neutral values -----------
+  //
+  // ALL INERT AS SET HERE, so a Summoner with nothing equipped resolves the
+  // identical blubs it always did. Reset on every restat with the perk pass
+  // re-applying after it, so nothing accumulates across purchases.
+  //
+  // A BLUB'S HP IS ITS AMMUNITION: one ordinary attack spends one point (see
+  // Blub.resolveAttack), so anything below that moves `hp` is also moving how
+  // many attacks that body will ever make. The word "charge" is avoided in
+  // player-facing text for exactly that reason.
+  //
+  //   THE SCOPES, and they are not interchangeable. `A` and `B` are the unit's
+  //   own `family`; `main` / `mini` / `heavy` are the LINE it is summoned on;
+  //   `All` is every blub this tower calls; and `Super` is the SuperBlub alone.
+  //
+  //   perkDamageAddA        Fragile Brood: +1 flat, family A, A3+
+  //   perkHpAddA            and the ammunition it costs, -1
+  //   perkIntervalMultA     Rapid Incubation
+  //   perkRateMultA         and the fire rate it costs
+  //   perkIntervalAddB      Compressed Cadence: a FLAT -2 s, before the mults
+  //   perkRangeMultB        and the reach it costs
+  //   perkDamageMultB       Overcharged Cores x1.10 and Wide Detonation x0.96
+  //   perkIntervalMultB     Overcharged Cores, slower spawning
+  //   perkBlastRadiusUl     Wide Detonation, an ABSOLUTE; 0 means unchanged
+  //   perkLaserEvery        Superconductor, an ABSOLUTE; 0 means unchanged
+  //   perkDamageMultSuper   and the ordinary damage it costs the SuperBlub
+  //   perkRateMultAll       Ethereal Spores
+  //   perkBlubSeesCamo / perkBlubSeesFlying   the sight it buys
+  //   perkTwinChance        Twin Embryo
+  //   perkIntervalMultAll   and the tempo it costs every line
+  //   perkFootprintMult     Compressed Bodies
+  //   perkHpMultAll         and the ammunition it costs
+  //   perkDamageMultMain / perkDamageMultSide   Central Brood, by LINE
+  //   weakenPerHit / weakenSeconds   Fleeting Toxin, both absolutes, declared
+  //                         off the tower's own constants so an unequipped
+  //                         Summoner reads exactly them
+  this.perkDamageAddA = 0;
+  this.perkHpAddA = 0;
+  this.perkIntervalMultA = 1;
+  this.perkRateMultA = 1;
+  this.perkIntervalAddB = 0;
+  this.perkRangeMultB = 1;
+  this.perkDamageMultB = 1;
+  this.perkIntervalMultB = 1;
+  this.perkBlastRadiusUl = 0;
+  this.perkLaserEvery = 0;
+  this.perkDamageMultSuper = 1;
+  this.perkRateMultAll = 1;
+  this.perkBlubSeesCamo = 0;
+  this.perkBlubSeesFlying = 0;
+  this.perkTwinChance = 0;
+  this.perkIntervalMultAll = 1;
+  this.perkFootprintMult = 1;
+  this.perkHpMultAll = 1;
+  this.perkDamageMultMain = 1;
+  this.perkDamageMultSide = 1;
+  this.weakenPerHit = BlubTower.WEAKEN_PER_HIT;
+  this.weakenSeconds = BlubTower.WEAKEN_SECONDS;
+
   for (var i = 0; i < BlubTower.UPGRADES.length; i++) {
     var u = BlubTower.UPGRADES[i];
     if (!this.hasUpgrade(u.id)) continue;
@@ -493,7 +552,33 @@ BlubTower.prototype.clampTimersToCycle = function () {
 BlubTower.prototype.intervalFor = function (unitId) {
   var unit = BlubTower.unitById(unitId);
   if (!unit) return BlubTower.MIN_INTERVAL_SECONDS;
-  return Math.max(BlubTower.MIN_INTERVAL_SECONDS, unit.interval + this.intervalDelta);
+
+  // FLAT FIRST, THEN THE MULTIPLIERS, which is the project's ordinary stat
+  // resolution and the order the confirmed content asks for by name: path B's
+  // authored `intervalDelta` and Compressed Cadence's flat -2 s land together,
+  // and Rapid Incubation, Overcharged Cores and Twin Embryo scale what is left.
+  //
+  // A worked case, an MK2 on a finished path B: 30 authored, -5 from the tiers,
+  // -2 from Compressed Cadence is 23, and Overcharged Cores then reads 24.38.
+  var seconds = unit.interval + this.intervalDelta;
+  if (unit.family === "B") seconds += this.perkIntervalAddB;
+
+  var mult = this.perkIntervalMultAll;
+  if (unit.family === "A") mult *= this.perkIntervalMultA;
+  if (unit.family === "B") mult *= this.perkIntervalMultB;
+
+  return Math.max(BlubTower.MIN_INTERVAL_SECONDS, seconds * mult);
+};
+
+// WHICH LINE CALLS THIS UNIT, or null. Derived from `lineUnits` rather than
+// stored, so it cannot disagree with it -- and a unit is on at most one line at
+// a time by construction, which is what makes the question answerable at all.
+BlubTower.prototype.lineOf = function (unitId) {
+  var units = this.lineUnits();
+  for (var i = 0; i < BlubTower.LINE_IDS.length; i++) {
+    if (units[BlubTower.LINE_IDS[i]] === unitId) return BlubTower.LINE_IDS[i];
+  }
+  return null;
 };
 
 // The finished numbers a blub is born with. Resolved HERE and handed over at
@@ -504,18 +589,59 @@ BlubTower.prototype.intervalFor = function (unitId) {
 BlubTower.prototype.summonStats = function (unitId) {
   var unit = BlubTower.unitById(unitId);
   if (!unit) return null;
+
+  var isA = unit.family === "A";
+  var isB = unit.family === "B";
+  var line = this.lineOf(unit.id);
+
+  // ORDINARY ATTACK DAMAGE: the flats first, then every multiplier that names
+  // this unit. The FIXED special effects below are deliberately outside it --
+  // the brief is explicit that the MK2's detonation and the SuperBlub's lance
+  // are never moved by anything, and the confirmed content keeps that.
+  var damage = unit.damage + this.summonDamageBonus + (isA ? this.perkDamageAddA : 0);
+  if (isB) damage *= this.perkDamageMultB;
+  if (unit.id === "superb") damage *= this.perkDamageMultSuper;
+  if (line === "main") damage *= this.perkDamageMultMain;
+  else if (line === "mini" || line === "heavy") damage *= this.perkDamageMultSide;
+
+  // HP IS AMMUNITION, so this is also how many attacks it will make. Flats
+  // first, then the multiplier, then ROUNDED TO NEAREST -- the rule chosen for
+  // this game on 2026-08-31, because a body that spends whole points cannot
+  // usefully own a fraction of one. Floored at 1: a living blub always has at
+  // least one attack in it.
+  var hp = unit.hp + this.summonHpBonus + (isA ? this.perkHpAddA : 0);
+  hp = Math.max(1, Math.round(hp * this.perkHpMultAll));
+
+  var rate = unit.rate * this.perkRateMultAll * (isA ? this.perkRateMultA : 1);
+  var rangeUl = unit.rangeUl * (isB ? this.perkRangeMultB : 1);
+
   return {
     unitId: unit.id,
     name: unit.name,
-    damage: unit.damage + this.summonDamageBonus,
-    rate: unit.rate,
-    hp: unit.hp + this.summonHpBonus,
-    rangeUl: unit.rangeUl,
-    footprintUl: unit.footprintUl,
+    damage: damage,
+    rate: rate,
+    hp: hp,
+    rangeUl: rangeUl,
+    footprintUl: unit.footprintUl * this.perkFootprintMult,
     splashUl: unit.splashUl || 0,
     growth: unit.growth || 0,
-    deathBlast: unit.deathBlast || null,
-    laser: unit.laser || null
+    seesCamo: !!this.perkBlubSeesCamo,
+    seesFlying: !!this.perkBlubSeesFlying,
+    // COPIED, NEVER HANDED OVER. `BlubTower.UNITS` is a shared table and these
+    // two blocks are objects on it; a perk writing through a reference would
+    // retune the roster for every Summoner in the game and for the next run.
+    // The damage inside them is carried across untouched, which is the whole
+    // point of them being fixed.
+    deathBlast: unit.deathBlast ? {
+      radiusUl: this.perkBlastRadiusUl > 0
+        ? this.perkBlastRadiusUl : unit.deathBlast.radiusUl,
+      damage: unit.deathBlast.damage
+    } : null,
+    laser: unit.laser ? {
+      every: this.perkLaserEvery > 0 ? this.perkLaserEvery : unit.laser.every,
+      widthUl: unit.laser.widthUl,
+      damage: unit.laser.damage
+    } : null
   };
 };
 
@@ -743,9 +869,14 @@ BlubTower.prototype.swarmBonusFor = function (blub) {
 // Every enemy a blub of this summoner hits takes this, once per hit. Called by
 // the blubs rather than by the damage pipeline, because "hit by a blub of THIS
 // invoker" is exactly the condition and nothing downstream knows it.
+// OFF THE INSTANCE, not the constants (2026-08-31). The two are resolved in
+// recalcStats from `BlubTower.WEAKEN_*` and are exactly them on a Summoner with
+// nothing equipped; Fleeting Toxin is the only thing that moves either. The
+// stack cap, the refresh rule, which sources the debuff affects and what
+// happens to it when the body dies are all DamageAmp's and are untouched.
 BlubTower.prototype.applyWeaken = function (enemy) {
   if (!this.hasWeaken || !enemy) return;
-  DamageAmp.add(enemy, BlubTower.WEAKEN_PER_HIT, BlubTower.WEAKEN_SECONDS);
+  DamageAmp.add(enemy, this.weakenPerHit, this.weakenSeconds);
 };
 
 
@@ -861,6 +992,28 @@ BlubTower.prototype.findRoadSpot = function (footprintUl, reachPx) {
 // Put one unit of `unitId` on the board. Returns the blub, or null if there was
 // no room -- which is not an error and is not logged: the cycle simply resets.
 BlubTower.prototype.summon = function (unitId) {
+  var blub = this.summonOne(unitId);
+  if (!blub) return null;
+
+  // TWIN EMBRYO, and it is rolled ONCE on the body that actually appeared.
+  //
+  // NO RECURSION: the duplicate goes through `summonOne`, which never rolls, so
+  // one summoning event creates at most one extra body however lucky it is. A
+  // duplicate that cannot be placed legally is simply not created and is NOT
+  // queued for later -- the chance was spent on this summon.
+  //
+  // The copy is built from a fresh `summonStats`, so it is identical by
+  // construction rather than by a clone somebody has to keep in step.
+  if (this.perkTwinChance > 0 && this.nextRandom() < this.perkTwinChance) {
+    this.summonOne(unitId);
+  }
+  return blub;
+};
+
+// ONE BODY, no duplicate roll. The door `summon` and Twin Embryo both come
+// through, so the placement rule, the serial and the registration are written
+// once.
+BlubTower.prototype.summonOne = function (unitId) {
   var stats = this.summonStats(unitId);
   if (!stats) return null;
 
@@ -1636,9 +1789,13 @@ function Blub(owner, x, y, stats, monsterTier) {
   // blub itself because inspectionLayout draws the targeting cycle for anything
   // carrying a string `targeting`, and offering a choice the unit does not have
   // would be a button that lies.
+  // `seesCamo` / `seesFlying` are FALSE on every blub in the game unless the
+  // Summoner has Ethereal Spores equipped, which is the only thing that grants
+  // either. Targeting.pick reads this view object, so the two flags reach the
+  // shared rule the same way a tower's do.
   this.view = {
     x: x, y: y, rangePx: this.rangePx, targeting: "first",
-    seesCamo: false, seesFlying: false
+    seesCamo: !!stats.seesCamo, seesFlying: !!stats.seesFlying
   };
 
   this.attacksMade = 0;
