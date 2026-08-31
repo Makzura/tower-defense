@@ -10358,13 +10358,25 @@ function (t) {
   t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId,
     "and leaves it exactly where it was");
 
-  // AND THE RED BUTTON TAKES IT OUT, without un-buying it.
-  h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
-  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null, "UNEQUIP empties the slot");
+  // AND A THIRD BUTTON OPENS UNDER THE SLOT ITSELF, which is the same action
+  // again -- wherever you clicked, the control is beside your cursor.
+  var underSlot = h.run("Upgrades.slotActionRect()");
+  t.ok(underSlot !== null, "a strip opens under the slot holding it");
+  t.eq(underSlot.x, slotA.x, "in the slot's own column");
+  t.ok(underSlot.y > slotA.y + slotA.h, "directly below it");
+  t.ok(underSlot.y + underSlot.h < h.run("Upgrades.inventoryRect().y"),
+    "in the gap the slots already left above the list — nothing moved for it");
+
+  h.run("Upgrades.onClick(" + (underSlot.x + 40) + ", " + (underSlot.y + 10) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null,
+    "pressing it empties the slot");
   t.eq(h.run("MetaProgress.ownsNode('soldier', '" + firstId + "')"), true,
     "and the node is still owned — unequipping is not un-buying");
+  t.eq(h.run("Upgrades.slotActionRect()"), null,
+    "and the strip goes with the module that was in the slot");
 
-  // Put it back for the drag cases below.
+  // Put it back for the drag cases below, through the panel's control -- the
+  // third of the three, and the same action once more.
   h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
   t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId, "back in slot 1");
 

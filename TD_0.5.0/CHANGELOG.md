@@ -53,12 +53,15 @@ UNEQUIP in the same place while it is in. Hovering previews; the control is
 drawn only for a pinned module, so sweeping the cursor over the list cannot arm
 an action. Dragging still works and is how a player picks WHICH slot.
 
-**The control is drawn twice and is one action** — at the foot of the detail
-panel and as a strip directly under the pinned card, because the panel is on the
-other side of the screen from the card that was just clicked. The strip is part
-of the LAYOUT rather than an overlay: the rows below the pinned one are pushed
-down by exactly its height, so it covers no card, scrolls with the list, and
-cannot be clicked through.
+**The control is drawn three times and is one action** — at the foot of the
+detail panel, as a strip directly under the pinned card, and under the SLOT the
+pinned module is in. The panel is on the other side of the screen from whatever
+was just clicked, so wherever the click landed the button is beside the cursor.
+The card's strip is part of the LAYOUT rather than an overlay: the rows below the
+pinned one are pushed down by exactly its height, so it covers no card, scrolls
+with the list, and cannot be clicked through. The slot's sits in the gap the
+slots already left above the list, so nothing had to move for it, and it is
+always the red UNEQUIP -- a slot only ever holds an equipped module.
 
 content 436 → 437: one added, and the loadout test kept its name and changed its
 claims, because the claims were the thing that changed.

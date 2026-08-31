@@ -4538,13 +4538,20 @@ the same place while it is in. Hovering previews a module when nothing is
 pinned; the control is drawn only for a pinned one, so sweeping the cursor over
 the list cannot arm an action.
 
-**That control is drawn TWICE and is ONE action** — at the foot of the detail
-panel, and as a strip directly UNDER the pinned card, because the panel is on
-the other side of the screen from the card that was just clicked. Both call
-`perkActionPressed`. **The strip is part of the LAYOUT rather than an overlay**:
-the rows below the pinned one are pushed down by exactly its height, so it
-covers no card, scrolls with the list, and cannot be clicked through to
-something underneath.
+**That control is drawn THREE TIMES and is ONE action** — at the foot of the
+detail panel, as a strip directly UNDER the pinned card, and under the SLOT the
+pinned module is sitting in. The panel is on the other side of the screen from
+whatever was just clicked, so wherever the click landed the button is beside the
+cursor. All three call `perkActionPressed`.
+
+**The card's strip is part of the LAYOUT rather than an overlay**: the rows below
+the pinned one are pushed down by exactly its height, so it covers no card,
+scrolls with the list, and cannot be clicked through to something underneath.
+**The slot's sits in the gap the slots already leave above the list**, so nothing
+had to move for it, and it is ALWAYS the red UNEQUIP — a slot only ever holds an
+equipped module, so there is no state in which it could offer to equip. The
+pinned module is lit green in its slot as well, so the strip reads as belonging
+to the module rather than to whichever slot the cursor is near.
 
 **Dragging still works and is how a player picks WHICH slot** — a module dropped
 on a slot goes there, one dragged from a slot back onto the list comes out — and

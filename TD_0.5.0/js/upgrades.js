@@ -44,13 +44,20 @@
 // hand card and grows the one control that moves a loadout: a green EQUIP while
 // it is out, a red UNEQUIP while it is in, in the same place.
 //
-// THAT CONTROL IS DRAWN TWICE AND IS ONE ACTION. Once at the foot of the detail
-// panel, and once as a strip directly UNDER the pinned card -- because the
-// panel is on the other side of the screen from the card that was just clicked,
-// and reaching across for it is the gesture this screen was meant to remove.
-// Both call `perkActionPressed`. The strip is part of the LAYOUT rather than an
-// overlay: the rows below the pinned one are pushed down by exactly its height,
-// so it covers no card, scrolls with the list, and cannot be clicked through.
+// THAT CONTROL IS DRAWN THREE TIMES AND IS ONE ACTION -- at the foot of the
+// detail panel, as a strip directly UNDER the pinned card, and under the SLOT
+// the pinned module is sitting in. The panel is on the other side of the screen
+// from whatever was just clicked, and reaching across for it is the gesture this
+// screen was meant to remove; wherever you clicked, the button is beside your
+// cursor. All three call `perkActionPressed`, so there is one action and not
+// three implementations that can drift.
+//
+// The card's strip is part of the LAYOUT rather than an overlay: the rows below
+// the pinned one are pushed down by exactly its height, so it covers no card,
+// scrolls with the list, and cannot be clicked through. The slot's sits in the
+// gap the slots already leave above the list, so nothing had to move for it,
+// and it is ALWAYS the red UNEQUIP -- a slot only ever holds an equipped
+// module, so there is no state in which it could offer to equip.
 //
 // DRAG AND DROP STILL WORKS, and is the way to choose WHICH slot: a perk
 // pressed and dropped on a slot goes there, and one dragged from a slot back
@@ -273,6 +280,22 @@ var Upgrades = (function () {
   function inventoryScrollMax() {
     var box = inventoryRect();
     return Math.max(0, inventoryLayout().height - (box.h - INV_TOP));
+  }
+
+  // WHERE THE STRIP UNDER THE PINNED MODULE'S SLOT IS, or null.
+  //
+  // A slot only ever holds an EQUIPPED module, so this one is always the red
+  // UNEQUIP -- there is no state in which a slot could offer to equip. It sits
+  // in the gap the slots already leave above the module list, so nothing had to
+  // move to make room for it.
+  var SLOT_ACTION_H = 24;
+
+  function slotActionRect() {
+    if (!selected || !detailNode) return null;
+    var at = slotOf(detailNode);
+    if (at === -1) return null;
+    var r = slotRect(at);
+    return { x: r.x, y: r.y + r.h + 6, w: r.w, h: SLOT_ACTION_H };
   }
 
   // WHERE THE STRIP UNDER THE PINNED CARD IS, or null when nothing is pinned.
@@ -567,6 +590,8 @@ var Upgrades = (function () {
         perkActionPressed();
         return;
       }
+      var underSlot = slotActionRect();
+      if (underSlot && pointInRect(x, y, underSlot)) { perkActionPressed(); return; }
       if (pointInRect(x, y, perkActionRect())) { perkActionPressed(); return; }
     }
     // The slots and the cards are answered by the press/release pair above, so
@@ -1066,11 +1091,16 @@ var Upgrades = (function () {
       }
 
       if (node && !(drag && drag.fromSlot === i && drag.moved)) {
+        // THE PINNED MODULE IS LIT IN ITS SLOT TOO, so the strip below the slot
+        // reads as belonging to the module you are looking at rather than to
+        // whichever slot the cursor happens to be near.
+        var reading = detailNode === node.id;
         sigil(node.id, r.x + r.w / 2, r.y + 32, 15,
-          "rgba(" + ASH_EMBER + ",0.95)", node.icon);
+          "rgba(" + (reading ? ASH_GO : ASH_EMBER) + ",0.95)", node.icon);
         ctx.textAlign = "center";
         ctx.font = "10px system-ui, sans-serif";
-        ctx.fillStyle = "rgba(" + ASH_BONE + ",0.9)";
+        ctx.fillStyle = reading ? "rgba(" + ASH_GO + ",0.95)"
+          : "rgba(" + ASH_BONE + ",0.9)";
         wrapCentred(node.name, r.x + r.w / 2, r.y + 56, r.w - 8, 12, 2);
         ctx.textAlign = "left";
       } else {
@@ -1080,6 +1110,14 @@ var Upgrades = (function () {
         drawMenuText("EMPTY", r.x + r.w / 2, r.y + r.h / 2, 1.2);
         ctx.textAlign = "left";
       }
+    }
+
+    // AND THE THIRD PLACE THE SAME ACTION IS OFFERED: under the slot the pinned
+    // module is sitting in. A slot only ever holds an equipped module, so this
+    // one is always the red UNEQUIP.
+    var underSlot = slotActionRect();
+    if (underSlot) {
+      drawAshControl(underSlot, "UNEQUIP", { accent: ASH_STOP, active: true });
     }
   }
 
@@ -1660,6 +1698,7 @@ var Upgrades = (function () {
     perkDetailRect: perkDetailRect,
     perkActionRect: perkActionRect,
     inventoryActionRect: inventoryActionRect,
+    slotActionRect: slotActionRect,
     branchOf: function (nodeId) {
       var node = selected ? TowerPerks.nodeOf(selected, nodeId) : null;
       return node ? branchOf(selected, node) : null;
