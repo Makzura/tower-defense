@@ -1642,6 +1642,33 @@ var World3D = (function () {
   // buffer order is not observable on a body this size at this alpha.
   var CAMO_ALPHA = 0.62;
 
+  // A BODY WITH A TRANSLUCENT SKIN OVER A SOLID HULL, which is one thing the
+  // model format cannot say on its own: its palette is [r, g, b, emissive] and
+  // carries no opacity, so a pane authored at 0.19 arrives opaque like any
+  // other triangle.
+  //
+  // WHY THAT WAS NOT MERELY DIM BUT INVERTED. A camo body is drawn twice -- a
+  // depth pre-pass, then colour with depthFunc EQUAL -- so exactly one layer
+  // blends per pixel, and the layer that wins is the NEAREST. The Veil Dart's
+  // veil ENCLOSES its hull, so the veil won every pixel it covered and the
+  // craft vanished behind its own camouflage. The owner, exactly: "the veil
+  // which is supposed to be more transparent is more opaque, and the body which
+  // should be more opaque is more transparent."
+  //
+  // So the body is drawn in THREE passes rather than two: the hull lays the
+  // depth and blends against it as before, and the veil then blends OVER that
+  // hull with the depth compare back at LEQUAL -- it is in front, so it passes
+  // -- at a fraction of the body's own alpha. The hull is the solid thing and
+  // the veil is a skin on it, which is what the pack's own law asks for.
+  //
+  // Keyed by MODEL and matched by GROUP NAME, because only the model knows
+  // which of its groups are skin. A model with no entry is drawn exactly as it
+  // always was, in two passes or one.
+  var VEIL_ALPHA = 0.45;             // of whatever the body is already drawn at
+  var VEIL_GROUPS = {
+    "enemy-veil_dart": function (name) { return /^(veil|wake)/.test(name); }
+  };
+
   // The camo ring's colour, dash and radius are lifted verbatim from the 2D
   // pack (js/enemy.js) so a player who learns the cue on one path reads it
   // unchanged on the other. Only the projection differs.
@@ -2772,11 +2799,28 @@ var World3D = (function () {
       // pixels departed from the single-layer law, mean 30/255, worst 107/255,
       // against a rim that was clean at 4/255 -- which is what ruled out
       // antialiasing, since a coverage artefact would do the opposite.
-      for (var sub = 0; sub < (wantCamo ? 2 : 1); sub++) {
-      if (wantCamo) {
+      // THE SKIN IS ONE MORE PASS, and only for a model that declares one.
+      // `hull` is the filter for the passes that were already here; `skin` is
+      // the extra one. Both are null when the model has no skin, and the loop
+      // is then the two-pass (or one-pass) body it has always been.
+      var skinOf = model ? VEIL_GROUPS[model] : null;
+      var hull = skinOf ? function (n) { return !skinOf(n); } : null;
+      var passes = (wantCamo ? 2 : 1) + (skinOf ? 1 : 0);
+      for (var sub = 0; sub < passes; sub++) {
+      var skinPass = skinOf && sub === passes - 1;
+      if (wantCamo && !skinPass) {
         if (sub === 0) { renderer.setFade(1); renderer.setDepthOnly(true); }
         else { renderer.setDepthOnly(false); renderer.setFade(CAMO_ALPHA);
                renderer.setDepthEqual(true); }
+      }
+      if (skinPass) {
+        // LEQUAL, not EQUAL: the skin is in FRONT of the hull whose depth the
+        // pre-pass laid, so it must be allowed to pass rather than matched
+        // against. Depth writes are already off inside setFade, so the skin
+        // lays none of its own and cannot occlude the next body.
+        renderer.setDepthOnly(false);
+        renderer.setDepthEqual(false);
+        renderer.setFade((wantCamo ? CAMO_ALPHA : 1) * VEIL_ALPHA);
       }
       if (model) {
         // THE WALK, ADVANCED BY DISTANCE. One full cycle per stride, so a
@@ -2813,7 +2857,7 @@ var World3D = (function () {
         if (pulse) renderer.setGlow(pulse, supportTint(e));
         else if (e.isFlying) renderer.setGlow(lanternGlow(e), lanternTint(e));
         drawActor(model, e.pos.x, e.pos.y, yaw, radius / 11, lift, walk,
-          shards || strike);
+          shards || strike, null, skinPass ? skinOf : hull);
         // Put it back. setGlow is state, not an argument, so a flier that left
         // it lit would hand its lantern to the next body drawn.
         if (pulse || e.isFlying) renderer.setGlow(0, null);
@@ -2832,6 +2876,12 @@ var World3D = (function () {
       // only ever correct against a pre-pass this body just laid, and leaving
       // it on would silently reject the next body's every fragment.
       if (wantCamo) renderer.setDepthEqual(false);
+      // A SKIN PASS ON AN OPAQUE BODY LEAVES THE FADE ON, and fade is state.
+      // The camo pass restores it for the whole pass afterwards; a non-camo
+      // body has to put it back itself or it hands its translucency to the
+      // next body drawn. No such body exists today -- the one model with a
+      // skin is camo -- and the line costs nothing against the day one does.
+      if (skinOf && !wantCamo) renderer.setFade(1);
     }
       // Put it back, for the same reason setGlow is put back: fade is STATE,
       // and a pass that left it on would hand its translucency to the wrecks
@@ -3648,7 +3698,11 @@ var World3D = (function () {
     return shardOverrides;
   }
 
-  function drawActor(model, x, y, yaw, scale, lift, frame, overrides, tilt) {
+  // `only` is an optional predicate on a group's NAME. Absent, every group is
+  // drawn, which is every caller but one and is bit-identical to before this
+  // argument existed. Present, it is what lets ONE body be drawn in two passes
+  // at two different alphas -- see VEIL_GROUPS and the camo block above.
+  function drawActor(model, x, y, yaw, scale, lift, frame, overrides, tilt, only) {
     var m = model ? GLModels.get(renderer, model) : null;
     if (!m) {
       renderer.draw(prims.block, x, y, lift || 0, yaw || 0, 34);
@@ -3686,6 +3740,10 @@ var World3D = (function () {
     if (!m.frames.length) {
       instanceOf(instanceMat, x, y, lift, yaw, size, tilt);
       if (!bound) renderer.bind(m.gpu);
+      // A STATIC MODEL IS ONE RANGE, so a filter can only be all or nothing on
+      // it. No filtered caller draws one today; refusing rather than silently
+      // drawing everything is what keeps that true.
+      if (only) return;
       renderer.drawRange(instanceMat, fixed, m.gpu.count - fixed);
       return;
     }
@@ -3696,6 +3754,7 @@ var World3D = (function () {
     for (var g = 0; g < m.groups.length; g++) {
       var grp = m.groups[g];
       if (!grp.count) continue;
+      if (only && !only(grp.name)) continue;
       if (g === fixedGroup) continue;         // already drawn, without the yaw
       var first = grp.first, count = grp.count;
       // The unnamed group is the one GLParts partitioned; its map-fixed head

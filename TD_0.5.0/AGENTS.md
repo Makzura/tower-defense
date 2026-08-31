@@ -2367,34 +2367,41 @@ points afterwards, so the mesh and the animation deltas (`C · D · C⁻¹`) sta
 one basis. It spins about the VERTICAL, so ground contact is untouched. The Veil
 Dart is imported at `--yaw -90`.
 
-**THE ENVELOPING VEIL IS EXCLUDED AT IMPORT, and that is this repository's
-existing answer to translucent geometry.** The palette is `[r, g, b, emissive]`
-and has no opacity, so a pane authored at 0.19 comes in OPAQUE. Worse, the camo
-draw lays a depth pre-pass and blends only the nearest layer — and the veil
-encloses the hull, so it won every pixel: the craft read as a cyan shell with
-its own body invisible behind it. The owner saw it exactly: *"the veil which is
-supposed to be more transparent is more opaque, and the body which should be
-more opaque is more transparent."*
+**A TRANSLUCENT SKIN OVER A SOLID HULL IS A THIRD PASS**, and it took one,
+because the model format cannot say it: the palette is `[r, g, b, emissive]` and
+carries no opacity, so a pane authored at 0.19 arrives opaque like any other
+triangle.
 
-**The Farm's three imports already do this**: their glass bottles, jars and
-chambers are `--exclude`d for the same reason. The Veil Dart excludes
-`veil_nose`, `veil_l`, `veil_r`, `veil_top` and `veil_rear` — and keeps the four
-WAKE shards, which are the veil's visible remnant ("the broken refractive
-trail") and carry the ley colour at emissive 0.99. So the craft reads as a solid
-body with a glowing cyan wake rather than as a shell. 204 triangles.
+**And it was not merely dim, it was INVERTED.** A camo body is drawn twice — a
+depth pre-pass, then colour with depthFunc EQUAL — so exactly one layer blends
+per pixel and the layer that wins is the NEAREST. The veil ENCLOSES the hull, so
+the veil won every pixel it covered and the craft vanished behind its own
+camouflage. The owner: *"the veil which is supposed to be more transparent is
+more opaque, and the body which should be more opaque is more transparent."*
 
-**`--two-sided <substrings>` stays, and the wake needs it.** `GLRenderer` culls
-back faces — right for a closed body, which hides its own anyway — and the wake
-shards are flat sheets, invisible from behind without it. It emits a named
-group's triangles a second time with the winding reversed and the normal
-recomputed from the reversed face.
+So a model may now declare which of its groups are SKIN — `VEIL_GROUPS`, keyed
+by model and matched by group name, because only the model knows. Such a body is
+drawn in three passes rather than two:
 
-**WHAT WOULD BRING THE ENVELOPING VEIL BACK** is not an import option: the camo
-depth pre-pass would have to SKIP the veil groups, so the hull wins the pre-pass
-and the veil then blends over it at a lower alpha. That is three draws instead
-of two plus a group filter through `drawActor`, in the most delicate part of the
-render path, and it touches every camo body on the roster. Nobody has asked for
-it.
+1. depth pre-pass, **hull only**;
+2. colour at `CAMO_ALPHA` with depthFunc EQUAL, **hull only**;
+3. **skin only**, depth compare back at LEQUAL — the skin is in FRONT of the
+   hull whose depth was just laid, so it passes rather than being matched — at
+   `VEIL_ALPHA` (0.45) of whatever the body is already drawn at.
+
+`drawActor` grew an optional `only` predicate on the group name to make that
+possible. Absent, every group is drawn and the call is bit-identical to before
+it existed, which is every caller but this one. A model with no `VEIL_GROUPS`
+entry is drawn in the two passes (or one) it always was.
+
+**`--two-sided <substrings>` is what makes the skin visible at all.**
+`GLRenderer` culls back faces — right for a closed body, which hides its own
+anyway — and the veil is flat sheets, invisible from behind without it. It emits
+a named group's triangles a second time with the winding reversed and the normal
+recomputed from the reversed face. 286 triangles with the veil doubled.
+
+**The Farm's glass is still `--exclude`d and should stay so**: those bottles and
+jars are not a skin over anything, so the three-pass shape buys them nothing.
 
 **`ENEMY_CLIP` picks the clip BY NAME.** `ENEMY_GAIT_BAND` beside it picks a band
 by index, which is right for a solved cycle the exporter laid out and wrong for a

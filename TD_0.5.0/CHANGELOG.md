@@ -13,6 +13,39 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The veil is a skin over the hull, in a third pass.**
+
+Excluding the veil was the wrong answer to the right complaint. The owner:
+*"the veil doesn't even exist anymore. We can't see it."* Correct — I had
+deleted it rather than making it transparent, which is not what was asked.
+
+**What made it opaque, and what made it INVERTED, are two different things.**
+The model format's palette is `[r, g, b, emissive]` and carries no opacity, so a
+pane authored at 0.19 arrives opaque. That alone would have been a dim veil. The
+inversion came from the camo draw: a depth pre-pass then colour with depthFunc
+EQUAL, so exactly one layer blends per pixel and the NEAREST wins — and the veil
+encloses the hull, so it took every pixel and the craft disappeared behind its
+own camouflage.
+
+**A model may now declare which of its groups are SKIN.** `VEIL_GROUPS` is keyed
+by model and matched by group name, because only the model knows. Such a body is
+drawn in three passes rather than two: the depth pre-pass and the colour pass
+both run on the HULL ONLY, and the skin then blends over the result with the
+depth compare back at LEQUAL — it is in front of the depth just laid, so it
+passes rather than being matched — at 0.45 of whatever alpha the body is already
+drawn at. `drawActor` grew an optional `only` predicate on the group name to
+make that possible; absent, it draws every group and is bit-identical to before
+the argument existed, which is every caller but this one.
+
+The enveloping veil is back in the import, doubled by `--two-sided` so its flat
+sheets survive the back-face cull. 286 triangles. The result is what the pack's
+own law asks for and what was asked for here: a solid craft — pale dorsal plate,
+dark chassis, amber sensor — with a translucent cyan skin over it that you can
+see the hull through.
+
+The Farm's glass stays `--exclude`d: those bottles and jars are not a skin over
+anything, so the three-pass shape buys them nothing.
+
 **2026-08-30 — The Veil Dart points its nose forward, and stops being a shell.**
 
 Two more from the owner, both look rather than behaviour.
