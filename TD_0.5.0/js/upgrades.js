@@ -1060,11 +1060,15 @@ var Upgrades = (function () {
       MetaProgress.coins() + " ⬡", d.x + 20, y, 1.3);
     y += 22;
 
-    if (treeNode.minLevel) {
-      ctx.fillStyle = "rgba(" + ASH_LEY + ",0.85)";
-      drawMenuText("NEEDS TOWER LEVEL " + treeNode.minLevel, d.x + 20, y, 1.3);
-      y += 20;
-    }
+    // STATED EITHER WAY, and the zero case is the one worth printing: every
+    // node authored so far is buyable at level 0, and a card that simply says
+    // nothing leaves the player to infer it. It still has to be EQUIPPED into a
+    // slot the level opens, which is the distinction this line keeps visible.
+    ctx.fillStyle = "rgba(" + ASH_LEY + ",0.85)";
+    drawMenuText(treeNode.minLevel
+      ? "NEEDS TOWER LEVEL " + treeNode.minLevel
+      : "NEEDS TOWER LEVEL 0", d.x + 20, y, 1.3);
+    y += 20;
     if (treeNode.requires && treeNode.requires.length) {
       ctx.fillStyle = "rgba(" + ASH_DUST + ",0.8)";
       drawMenuText(treeNode.requires.length === 1 ? "REQUIRES" : "REQUIRES ALL OF",

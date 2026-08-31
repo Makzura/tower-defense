@@ -241,11 +241,12 @@ var TowerPerks = (function () {
       frozen[towerId] = MetaProgress.equippedPerks(towerId);
     });
     runLoadout = frozen;
+    placements = {};
   }
 
   // Back to the live profile. Called when a run is left for the menu, so the
   // preparation screens read what the player is actually editing.
-  function releaseRun() { runLoadout = null; }
+  function releaseRun() { runLoadout = null; placements = {}; }
 
   function isLocked() { return runLoadout !== null; }
 
@@ -267,16 +268,27 @@ var TowerPerks = (function () {
 
   // --- effects ---------------------------------------------------------------
   //
-  // SIX KINDS, AND AN ORDER THAT IS STATED RATHER THAN EMERGENT:
+  // SEVEN KINDS, AND AN ORDER THAT IS STATED RATHER THAN EMERGENT:
   //
-  //   mul      every factor for a field multiplies together, first
+  //   preAdd   a delta that lands BEFORE the multipliers -- see below
+  //   mul      every factor for a field multiplies together
   //   add      every delta for a field sums, on top of that
   //   addRate  a PERIOD field raised by a RATE -- see below
   //   set      an absolute value; the last equipped slot holding one wins
-  //   price    the placement cost -- { mul, add }, same order
+  //   price    the placement cost -- { mul, add, firstAdd, laterAdd }
   //   tiers    { A1: { cost: +50 }, ... } -- what an IN-RUN tier costs
   //
-  //   final = base * (all muls) + (all adds), then addRate, then any set
+  //   final = (base + all preAdds) * (all muls) + (all adds),
+  //           then addRate, then any set
+  //
+  // `preAdd` EXISTS BECAUSE "PLUS A THIRD OF A SECOND, BEFORE THE LATER
+  // MULTIPLIERS" IS A DIFFERENT NUMBER FROM "PLUS A THIRD OF A SECOND". The
+  // Warbringer's Dense Hammerhead adds 0.30 s to the resolved swing cycle and
+  // Light Haft then multiplies the rate; on a 3.2 s base the two orders read
+  // 3.18 s and 3.21 s, and only one of them is what the node says it does. Both
+  // are still flat-versus-proportional in the way the rest of this file means
+  // them -- `preAdd` is a position in the arithmetic, not a fourth category.
+  // Nothing else uses it, and a tree that never writes one is unaffected.
   //
   // Slot order does not change a result for `mul` or `add`, which is what makes
   // "drag it to a different slot" free of consequence. It does for `set`, and
@@ -315,6 +327,55 @@ var TowerPerks = (function () {
   // conditional node that still charged would be the dishonest half of the
   // effect. A node either changes what a tower costs or it changes what one
   // tier does -- never both.
+  //
+  // A FIELD NAME MAY BE A DOTTED PATH, and that is what lets a tree reach the
+  // MECHANIC PARAMETERS of a config-driven tower. The Arcane Sniper keeps its
+  // pierce decay, its kill-stack window, its execute floor, its reload and its
+  // ability's damage in `stats.mechanics.<name>.<param>` -- five of its
+  // confirmed nodes move one of those and none of them is a top-level stat. So
+  // `set: { "mechanics.executeScaling.floorFraction": 0.75 }` walks the object
+  // and writes the leaf.
+  //
+  // **A DOTTED PATH NEVER CREATES ANYTHING.** If any container along the way is
+  // missing the write is skipped, so a node authored against a mechanic this
+  // tower does not have is inert rather than a crash or an invented block. A
+  // bare (undotted) name still creates on `set`, which is how a tree adds a
+  // neutral-by-default multiplier a runtime reads with `|| 1`.
+  //
+  // Mutating `stats.mechanics` is SAFE and is why this is not a hack:
+  // StatResolver deep-clones `config.mechanics` on every resolve, so what a
+  // perk writes is a per-tower copy and the shared config is never touched.
+
+  // Read/write a field that may be a dotted path into `target`. `writeField`
+  // answers whether it wrote, so a caller can tell "there was no such place"
+  // from "the value happened to be the same".
+  function readField(target, field) {
+    if (!target) return undefined;
+    if (field.indexOf(".") === -1) return target[field];
+    var parts = field.split(".");
+    var obj = target;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!obj || typeof obj !== "object") return undefined;
+      obj = obj[parts[i]];
+    }
+    return (obj && typeof obj === "object") ? obj[parts[parts.length - 1]] : undefined;
+  }
+
+  function writeField(target, field, value) {
+    if (!target) return false;
+    if (field.indexOf(".") === -1) {
+      target[field] = value;
+      return true;
+    }
+    var parts = field.split(".");
+    var obj = target;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!obj || typeof obj[parts[i]] !== "object" || obj[parts[i]] === null) return false;
+      obj = obj[parts[i]];
+    }
+    obj[parts[parts.length - 1]] = value;
+    return true;
+  }
 
   // WHERE THE NUMBERS LIVE ON THIS TOWER, and there are three shapes of that.
   //
@@ -339,7 +400,7 @@ var TowerPerks = (function () {
     if (!list.length) return;
 
     var target = statTarget(tower);
-    var muls = {}, adds = {}, sets = {};
+    var muls = {}, adds = {}, sets = {}, pre = {};
 
     var rates = {};
 
@@ -356,6 +417,7 @@ var TowerPerks = (function () {
     });
 
     function gather(block) {
+      collect(block.preAdd, pre, function (have, v) { return have + v; }, 0);
       collect(block.mul, muls, function (have, v) { return have * v; }, 1);
       collect(block.add, adds, function (have, v) { return have + v; }, 0);
       collect(block.addRate, rates, function (have, v) { return have + v; }, 0);
@@ -365,24 +427,41 @@ var TowerPerks = (function () {
     var hpBefore = readHp(tower, target);
     var rangeBefore = readRange(tower, target);
 
-    Object.keys(muls).forEach(function (field) {
-      if (typeof target[field] === "number") target[field] *= muls[field];
-    });
-    Object.keys(adds).forEach(function (field) {
-      if (typeof target[field] === "number") target[field] += adds[field];
-    });
-    Object.keys(rates).forEach(function (field) {
-      var period = target[field];
-      if (typeof period !== "number" || !(period > 0)) return;
-      var raised = 1 / period + rates[field];
-      target[field] = raised > 0 ? 1 / raised : period;
+    function bump(bucket, fold) {
+      Object.keys(bucket).forEach(function (field) {
+        var have = readField(target, field);
+        if (typeof have !== "number") return;
+        writeField(target, field, fold(have, bucket[field]));
+      });
+    }
+
+    bump(pre, function (have, v) { return have + v; });
+    bump(muls, function (have, v) { return have * v; });
+    bump(adds, function (have, v) { return have + v; });
+    bump(rates, function (period, rate) {
+      if (!(period > 0)) return period;
+      var raised = 1 / period + rate;
+      return raised > 0 ? 1 / raised : period;
     });
     Object.keys(sets).forEach(function (field) {
-      target[field] = sets[field];
+      writeField(target, field, sets[field]);
     });
 
     settleHp(tower, target, hpBefore);
     settleRange(tower, target, rangeBefore);
+
+    // THE TOWER'S OWN LAST WORD, and the mirror of the two settles above.
+    //
+    // A stat a perk moves is sometimes not the number the tower actually uses:
+    // the Arcane Sniper builds its reload and kill-stack TRACKERS from
+    // `stats.mechanics` before any perk exists, and the Rifleman keeps its rate
+    // of fire in three fields that have to move together. Both are resolutions
+    // that can only run once the perks have landed, and neither belongs in this
+    // file -- so a tower may declare `afterPerks()` and it is called here, last.
+    //
+    // It runs on EVERY restat, like everything else in this pass, so it must be
+    // idempotent: derive from the resolved stats, never accumulate.
+    if (typeof tower.afterPerks === "function") tower.afterPerks();
   }
 
   // WHAT ONE IN-RUN TIER COSTS EXTRA (or less) UNDER THE ACTIVE PERKS. Summed
@@ -487,19 +566,48 @@ var TowerPerks = (function () {
   //
   // Floored at 1: a trade that reads "cheaper" must never reach free, and a
   // free tower would break the opening-stake invariant from the other side.
+  //
+  // `firstAdd` / `laterAdd` ARE THE SAME DELTA CHANNEL, picked by how many of
+  // this type have already been PLACED this run. The Rifleman's Advance Unit
+  // takes 100 off the first and puts 40 on every one after it, and because both
+  // are ordinary additions on the type's own base they compose with a flat
+  // discount by summing rather than by an order somebody has to remember:
+  // Cheap Receiver's -50 beside Advance Unit reads 150 and then 290, whichever
+  // slots the two sit in.
   function priceOf(Type) {
     if (!Type || typeof Type.COST !== "number") return 0;
     var base = Type.COST;
     var list = activeNodes(Type.ID);
+    var later = placementCount(Type.ID) > 0;
     var mul = 1, add = 0;
     list.forEach(function (node) {
       var price = node.effects && node.effects.price;
       if (!price) return;
       if (typeof price.mul === "number") mul *= price.mul;
       if (typeof price.add === "number") add += price.add;
+      var step = later ? price.laterAdd : price.firstAdd;
+      if (typeof step === "number") add += step;
     });
     if (mul === 1 && add === 0) return base;
     return Math.max(1, Math.round(base * mul + add));
+  }
+
+  // --- how many of a type have been PLACED this run --------------------------
+  //
+  // Run state, beside `runLoadout` and cleared by the same call, because it is
+  // the same kind of thing: a fact about the board that must not leak from one
+  // run into the next. It counts COMPLETED PLACEMENTS -- `notePlacement` is
+  // called from `addTower`, the one door a tower joins the board through, and
+  // never from a hover, a ghost, a refused placement or the throwaway specimen
+  // the armoury card measures (that one never reaches `addTower`, so a card
+  // quotes the price of the NEXT one, which is the honest promise to make).
+  var placements = {};
+
+  function placementCount(towerId) { return placements[towerId] || 0; }
+
+  function notePlacement(towerId) {
+    if (!towerId || !MetaProgress.entry(towerId)) return;
+    placements[towerId] = (placements[towerId] || 0) + 1;
   }
 
   // --- what a tower would be, BEFORE it exists -------------------------------
@@ -514,37 +622,80 @@ var TowerPerks = (function () {
   // So the same question `priceOf` answers for money is answered here for a
   // stat: what would a FRESH one of these have?
   //
-  // ONLY THE UNCONDITIONAL PART, and that is correct rather than a limitation.
-  // Every `when` group keys on an in-run tier and a tower being placed has
-  // bought none of them -- the Warbringer's range rebuild reads 57.5 on the
-  // ghost and only starts subtracting once B1 is on the tower, which is exactly
-  // what the player will see. `onlyIf` is skipped for the same reason.
+  // THE UNCONDITIONAL PART, PLUS WHATEVER THE CALLER CAN VOUCH FOR. Every
+  // `when` group keys on a field of the tower, and a tower being placed has
+  // bought no tier -- the Warbringer's range rebuild reads 57.5 on the ghost
+  // and only starts subtracting once B1 is on it, which is exactly what the
+  // player will see.
+  //
+  // But some conditions ARE knowable before the tower exists, and the ghost has
+  // to fold those in or it breaks its own promise. `context` is what the caller
+  // can answer: `previewRangePx` knows what the cursor is over, so it can say
+  // `{ onHighGround: true }` and the Arcane Sniper's High-Ground Doctrine draws
+  // the ring the placed tower will actually have. A group whose `has` is not in
+  // the context is skipped, exactly as before.
   //
   // `fields` is a LIST because a tree is authored against its own tower's own
   // names: `rangeUl` on the hand-written towers, `range` on the config-driven
   // ones. Only one of them is ever present in a given tree.
-  function previewStat(Type, fields, base) {
+  function previewStat(Type, fields, base, context) {
     if (!Type || typeof base !== "number") return base;
-    var mul = 1, add = 0, set = null;
+    var mul = 1, preAdd = 0, add = 0, set = null;
+
+    function fold(block) {
+      fields.forEach(function (field) {
+        if (block.preAdd && typeof block.preAdd[field] === "number") {
+          preAdd += block.preAdd[field];
+        }
+        if (block.mul && typeof block.mul[field] === "number") mul *= block.mul[field];
+        if (block.add && typeof block.add[field] === "number") add += block.add[field];
+        if (block.set && typeof block.set[field] === "number") set = block.set[field];
+      });
+    }
+
     activeNodes(Type.ID).forEach(function (node) {
       var fx = node.effects;
-      if (!fx || fx.onlyIf) return;
-      fields.forEach(function (field) {
-        if (fx.mul && typeof fx.mul[field] === "number") mul *= fx.mul[field];
-        if (fx.add && typeof fx.add[field] === "number") add += fx.add[field];
-        if (fx.set && typeof fx.set[field] === "number") set = fx.set[field];
+      if (!fx) return;
+      if (fx.onlyIf && !(context && context[fx.onlyIf])) return;
+      fold(fx);
+      (fx.when || []).forEach(function (group) {
+        if (!group || !group.has) return;
+        if (!(context && context[group.has])) return;
+        fold(group);
       });
     });
     if (set !== null) return set;
-    return base * mul + add;
+    return (base + preAdd) * mul + add;
   }
 
   // The reach a freshly placed tower of this type would have, in u.l. Read by
   // js/game.js's `previewRangePx`, which is the ONE derivation the ghost, the
   // sight shadows and the built tower all share.
-  function previewRangeUl(Type) {
+  function previewRangeUl(Type, context) {
     if (!Type || typeof Type.BASE_RANGE_UL !== "number") return 0;
-    return previewStat(Type, ["rangeUl", "range"], Type.BASE_RANGE_UL);
+    return previewStat(Type, ["rangeUl", "range"], Type.BASE_RANGE_UL, context);
+  }
+
+  // The GROUND a freshly placed tower of this type would take, in u.l.
+  //
+  // FOOTPRINT WAS DELIBERATELY OUT OF SCOPE HERE UNTIL 2026-08-31, and the
+  // reason it was is still the reason this function exists rather than a plain
+  // `add` on the instance: a footprint that moved AFTER a tower was standing
+  // would move where it may stand, and could leave it overlapping a neighbour
+  // it was legally placed beside. So the Arcane Sniper's Compact Chassis is
+  // folded in HERE, before the tower exists -- `whyCannotBuild`,
+  // `resolveBuildPoint`, `buildClearanceOn` and the ghost all ask this, so the
+  // smaller skirt is decided at the moment of placement and is never a surprise
+  // afterwards. The placed instance then resolves to the same number through
+  // its own stats, which is what keeps the two halves honest.
+  //
+  // Unconditional part only, exactly as `previewRangeUl` -- see previewStat.
+  function previewFootprintUl(Type, context) {
+    if (!Type || typeof Type.FOOTPRINT_RADIUS_UL !== "number") {
+      return Type ? Type.FOOTPRINT_RADIUS_UL : 0;
+    }
+    return previewStat(Type, ["footprintRadiusUl", "footprint"],
+      Type.FOOTPRINT_RADIUS_UL, context);
   }
 
   // --- reaching a tower ------------------------------------------------------
@@ -579,6 +730,14 @@ var TowerPerks = (function () {
   // the instance rather than the prototype: two Riflemen may be on the board
   // under different profiles in a test, and a prototype wrap would also stack
   // itself once per tower built.
+  //
+  // **THE WRAPPED FUNCTION MUST RESOLVE FROM BASE**, and for the two ADAPTERS
+  // that is a rule on the CALLER rather than on this file: `refreshDerived`
+  // only reads `core.stats`, so calling it without `core._refreshStats()` first
+  // hands this pass a stat block the perks have already been folded into, and
+  // they fold in again on top of themselves. Every caller in the game does the
+  // resolve first -- `purchase` through `core.purchase`, FarmBoost.refresh and
+  // the sandbox's two controls explicitly -- and a new one must too.
   function wrapRestat(tower) {
     // THE RECOMPUTE HAS THREE NAMES, one per tower shape, and the ADAPTERS ARE
     // THE ONE THAT IS EASY TO MISS: `refreshDerived` is what the Arcane Sniper
@@ -634,8 +793,11 @@ var TowerPerks = (function () {
     priceOf: priceOf,
     previewStat: previewStat,
     previewRangeUl: previewRangeUl,
+    previewFootprintUl: previewFootprintUl,
     tierCostDelta: tierCostDelta,
     applyTo: applyTo,
+    notePlacement: notePlacement,
+    placementCount: placementCount,
     statTarget: statTarget
   };
 })();

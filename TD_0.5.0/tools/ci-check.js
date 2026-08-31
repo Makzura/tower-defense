@@ -524,7 +524,9 @@ var BASELINE = [
     // currentSpeedUlps(), so a body that had stopped was aimed in front of --
     // and a rooted Revenant standing side-on past ~157 u.l. could not be hit
     // at all. Verified failing on the old code before they were kept.
-    file: "tests/run.js", pass: 236, fail: 0,
+    // ---- 237 on 2026-08-30, the Veil Dart -------------------------------
+    // 236 -> 237: one added with the first body that does not use the road.
+    file: "tests/run.js", pass: 237, fail: 0,
     // Was 105/3. The three Arcane-Sniper names were repaired on 2026-08-12:
     // the ability is channelled and these fixtures never stepped the clock.
     failing: []
@@ -855,7 +857,22 @@ var BASELINE = [
     // renderer, and no other test could see it because neither number reaches
     // the simulation. It reads both out of the source and also holds the
     // ceilings the tone-down brought them under.
-    file: "tests/content.test.js", pass: 321, fail: 0,
+    // ---- 366 on 2026-08-30, permanent progression and the Veil Dart -----
+    // 321 -> 366: forty-five added across three changes that landed together --
+    // the permanent tower progression (levels, trees, perks, the two screens),
+    // the first authored tree content, and the Veil Dart. Nothing was removed.
+    // ---- 395 on 2026-08-31, the confirmed permanent upgrades -------------
+    // 366 -> 395: twenty-nine ADDED and, uniquely on this line, THIRTEEN
+    // REPLACED. The nine placeholder-named nodes became nine of the thirty-nine
+    // confirmed ones, so the tests that named `[R-A]` and `[W-N]` were renamed
+    // and rewritten rather than deleted -- `[R-N] doubles the Rifleman's base
+    // damage` is now `Commissioned Ammunition doubles base damage`, and so on
+    // through all nine. **DIFF THE NAMES, NOT THE TOTAL**, here of all places:
+    // a rename reads as one removal and one addition, and the only way to see
+    // that nothing was lost is to read the list. The twenty-nine new ones are
+    // the thirty new nodes' effects, the four cooldown combinations, the
+    // composition tests and the card/runtime cross-check.
+    file: "tests/content.test.js", pass: 395, fail: 0,
     failing: []
   },
   {

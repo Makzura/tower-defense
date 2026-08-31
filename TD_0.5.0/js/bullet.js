@@ -63,12 +63,17 @@
 // which already reach behind cover on purpose -- a consequence of a shot that
 // already landed, never a choice of target.
 
-function Bullet(x, y, target, damage, onHit, owner, defenseFlatPierce) {
+function Bullet(x, y, target, damage, onHit, owner, defenseFlatPierce, armorPierce) {
   this.x = x;
   this.y = y;
   this.target = target;
   this.damage = damage;
   this.defenseFlatPierce = defenseFlatPierce || 0;
+  // FLAT ARMOR points this round ignores -- a different stat from the one
+  // above, and the two are never spelled for each other (js/systems/
+  // mitigation.js). Zero on every shot in the game except a Rifleman's and its
+  // recruits' while Piercing Orders is equipped.
+  this.armorPierce = armorPierce || 0;
   this.onHit = onHit || null;
 
   // The tower that fired this, for crediting damage and kills to its panel.
@@ -115,7 +120,7 @@ Bullet.prototype.update = function (dt) {
     // landed yet, and this one is landing right now.
     this.release();
     var dealt = TowerScore.apply(this.owner, this.target, this.damage, 0,
-      this.defenseFlatPierce);
+      this.defenseFlatPierce, undefined, this.armorPierce);
     if (this.onHit) this.onHit(this.target, dealt);
     return dealt;
   }
@@ -247,6 +252,16 @@ function PierceBullet(opts) {
   // on; the extra enemies it happens to pass through are not claimed, so two
   // Longshots covering the same crowd can overlap on those. Documented as a
   // known limitation rather than pretended away.
+  // WHAT THIS ROUND IS WORTH AGAINST EACH KIND OF BODY. Plain numbers rather
+  // than a rule, because a bullet outlives the frame it was fired in and must
+  // never hold a reference back to its tower -- see `tint` above. Both 1 unless
+  // the Arcane Sniper's Skybane is equipped, and a shot with 1 and 1 resolves
+  // byte-for-byte what it always did.
+  this.flyingDamageMult = (typeof opts.flyingDamageMult === "number")
+    ? opts.flyingDamageMult : 1;
+  this.groundDamageMult = (typeof opts.groundDamageMult === "number")
+    ? opts.groundDamageMult : 1;
+
   this.primary = opts.primary || null;
   this.claimed = false;
   if (this.primary) {
@@ -344,7 +359,11 @@ PierceBullet.prototype.update = function (dt, enemies) {
     if (enemy === this.primary) this.release();
 
     this.hitEnemies.push(enemy);
-    enemy.takeDamage(damage);
+    // The matchup rides on the damage this body takes and NOT on the falloff:
+    // `currentDamage()` above is the shot's own remaining strength, and it is
+    // the same whichever body it happens to meet next.
+    enemy.takeDamage(damage *
+      (enemy.isFlying ? this.flyingDamageMult : this.groundDamageMult));
     // Pierce bullets apply their own hit before notifying the Longshot, so
     // they cannot go through TowerScore.apply. Read the same physical-damage
     // figure TowerScore uses: $0 Hive brood and shields still count on the

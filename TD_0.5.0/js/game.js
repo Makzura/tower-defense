@@ -3829,11 +3829,17 @@ function onClick(event) {
     // primary route used by the target-claiming update order.
     built.pathProgress = route.progress / route.path.length * path.length;
     addTower(built);
-    // THE PERKED PRICE, NOT THE TYPE'S OWN. `addTower` has just handed the
-    // tower to TowerPerks, which set `built.cost` to the same number this
-    // charges -- one source, so the bar's label, the affordability check and
-    // the till cannot quote three different prices.
-    cash -= TowerPerks.priceOf(type);
+    // THE PRICE THIS TOWER WAS GIVEN, read off the tower. `addTower` has just
+    // handed it to TowerPerks, which set `built.cost` -- one source, so the
+    // bar's label, the affordability check and the till cannot quote three
+    // different prices.
+    //
+    // It reads `built.cost` rather than calling `priceOf(type)` a second time
+    // because the type's price is not a constant any more: Advance Unit makes
+    // the FIRST Rifleman of a run cheaper and the rest dearer, and `addTower`
+    // has already counted this one -- so a second call would quote the NEXT
+    // one's price, which is what the bar should show and not what this cost.
+    cash -= built.cost;
 
     // The placement clink. Here and not in addTower(), deliberately: a
     // Summoner's blubs go through addTower too (js/blub.js), and a tower being
@@ -3863,7 +3869,14 @@ function addTower(tower) {
   // the sandbox's roster and a test's fixture all arrive by this line. Summons
   // pass through it too and are skipped inside -- a blub is not a tower TYPE
   // and has no tree, no level and no xp of its own.
-  if (typeof TowerPerks !== "undefined") TowerPerks.applyTo(tower);
+  if (typeof TowerPerks !== "undefined") {
+    TowerPerks.applyTo(tower);
+    // AND THE TALLY, AFTER the perks have priced this one. A node whose price
+    // depends on how many are already up (the Rifleman's Advance Unit) has to
+    // see the board as it was when this tower was decided on; counting first
+    // would charge every tower the price of the one after it.
+    TowerPerks.notePlacement(tower.constructor && tower.constructor.ID);
+  }
   towers.push(tower);
   towers.sort(function (a, b) { return a.pathProgress - b.pathProgress; });
 }
@@ -4410,11 +4423,27 @@ function refreshBlockReason() {
     ? whyCannotBuild(worldMouse.x, worldMouse.y, type) : null;
 }
 
+// THE GROUND A TOWER OF THIS TYPE WOULD TAKE, in u.l., with the equipped
+// permanent upgrades folded in. Every placement rule below asks this rather
+// than `type.FOOTPRINT_RADIUS_UL`, for the same reason `previewRangePx` asks
+// TowerPerks for the reach: the ghost, the block-reason readout and the click
+// that places the tower have to agree, and the Arcane Sniper's Compact Chassis
+// makes them disagree the moment one of them reads the constructor directly.
+//
+// Deciding it HERE, before the tower exists, is also what keeps the footprint
+// out of the "a perk moved it after it was standing there" trap the note in
+// js/systems/tower-perks.js describes.
+function buildFootprintUl(type) {
+  if (!type) return 0;
+  if (typeof TowerPerks === "undefined") return type.FOOTPRINT_RADIUS_UL;
+  return TowerPerks.previewFootprintUl(type);
+}
+
 // How far a tower's CENTRE must stay from the road centre line: half the road,
 // plus the tower's own footprint. Derived, so a tower sits exactly flush
 // against the road edge and widening the road moves the rule automatically.
 function buildClearancePx(type) {
-  return ul(ROAD_WIDTH_UL / 2 + type.FOOTPRINT_RADIUS_UL);
+  return ul(ROAD_WIDTH_UL / 2 + buildFootprintUl(type));
 }
 
 // The same rule, on a route whose road CHANGES WIDTH along its length (see the
@@ -4443,7 +4472,7 @@ function roadHalfWidthAt(routePath, progress) {
 }
 
 function buildClearanceOn(routePath, progress, type) {
-  return roadHalfWidthAt(routePath, progress) + ul(type.FOOTPRINT_RADIUS_UL);
+  return roadHalfWidthAt(routePath, progress) + ul(buildFootprintUl(type));
 }
 
 function nearestPathTo(x, y) {
@@ -4488,7 +4517,7 @@ function resolveBuildPoint(x, y, type) {
   var spot = { x: x, y: y, platform: null, straddles: null };
   var geo = Maps.geometryOf(currentMap);
   if (!geo.any || !geo.platforms.length) return spot;
-  var reach = type ? ul(type.FOOTPRINT_RADIUS_UL) : 0;
+  var reach = type ? ul(buildFootprintUl(type)) : 0;
   for (var i = 0; i < geo.platforms.length; i++) {
     var pf = geo.platforms[i];
     var dx = x - pf.x, dy = y - pf.y;
@@ -4517,7 +4546,7 @@ function whyCannotBuild(x, y, type) {
   // room on it, which is exactly the kind of refusal that reads as a bug.
   var spot = resolveBuildPoint(x, y, type);
   if (spot.straddles) {
-    return ul(type.FOOTPRINT_RADIUS_UL) > spot.straddles.radius
+    return ul(buildFootprintUl(type)) > spot.straddles.radius
       ? "too big for this stump" : "half on the stump";
   }
 
@@ -4527,7 +4556,7 @@ function whyCannotBuild(x, y, type) {
   // maps that have no geometry at all, so they pay nothing for this.
   var geo = Maps.geometryOf(currentMap);
   if (geo.any && type &&
-      MapGeometry.containsAny(geo.noBuild, x, y, ul(type.FOOTPRINT_RADIUS_UL))) {
+      MapGeometry.containsAny(geo.noBuild, x, y, ul(buildFootprintUl(type)))) {
     return "blocked by terrain";
   }
 
@@ -4553,7 +4582,7 @@ function whyCannotBuild(x, y, type) {
     if (towers[i].isDestroyed && towers[i].isDestroyed()) continue;
     // Two footprints may touch but not overlap, so the gap is the sum of the
     // two radii -- which is what makes this work for mixed tower sizes.
-    var gap = ul(type.FOOTPRINT_RADIUS_UL + towers[i].footprintRadiusUl);
+    var gap = ul(buildFootprintUl(type) + towers[i].footprintRadiusUl);
     var dx = towers[i].x - x;
     var dy = towers[i].y - y;
     if (dx * dx + dy * dy < gap * gap) {
@@ -4580,7 +4609,7 @@ function whyCannotBuild(x, y, type) {
   // with WebGL unavailable the world is flat and every spot is level, so the
   // 2D fallback keeps exactly the placement rules it has always had.
   if (typeof World3D !== "undefined" && World3D.isEnabled() &&
-      !World3D.isLevelUnder(x, y, ul(type.FOOTPRINT_RADIUS_UL))) {
+      !World3D.isLevelUnder(x, y, ul(buildFootprintUl(type)))) {
     return "not level here";
   }
 
@@ -5756,6 +5785,15 @@ function endWave(delaySeconds, overshoot) {
     TowerXP.settleWave(waveIndex + 1, WAVES.length, xpDifficultyScale());
   }
 
+  // AND THE PER-WAVE STACKS ON THE BOARD, through the same one exit. A tower
+  // whose permanent upgrade banks something "for the rest of the wave" -- the
+  // Rifleman's Veteran Rhythm is the only one today -- clears it here, so the
+  // boundary is the same instant for every tower and for the xp above. A tower
+  // type that declares nothing is skipped and pays nothing.
+  for (var w = 0; w < towers.length; w++) {
+    if (typeof towers[w].onWaveBoundary === "function") towers[w].onWaveBoundary();
+  }
+
   var spent = overshoot > 0 ? overshoot : 0;
   waveIndex++;
   waveSpawned = 0;
@@ -6143,7 +6181,7 @@ function worldRenderState() {
       !overInterfaceChrome(mouse.x, mouse.y)) {
     ghost = {
       x: worldMouse.x, y: worldMouse.y,
-      radius: ul(type.FOOTPRINT_RADIUS_UL),
+      radius: ul(buildFootprintUl(type)),
       rangePx: previewRangePx(type, worldMouse.x, worldMouse.y),
       ok: blockReason === null
     };
@@ -6944,8 +6982,16 @@ function previewRangePx(type, x, y) {
   // reach, and this function's whole promise is that the ring on the ghost is
   // the ring the placed tower gets -- so it has to ask the same layer the
   // placed tower's numbers come from. See TowerPerks.previewRangeUl.
-  return elevatedRangePx({ groundHeight: groundHeightUnder(x, y) },
-    TowerPerks.previewRangeUl(type));
+  //
+  // AND IT KNOWS WHAT IS UNDER THE CURSOR, which is what lets the ghost answer
+  // a perk that pays differently on a stump than on dirt (the Arcane Sniper's
+  // High-Ground Doctrine). The two flags are spelled exactly as the tower
+  // derives them for itself in refreshDerived, so the ring the player is shown
+  // and the ring they get come out of the same condition.
+  var height = groundHeightUnder(x, y);
+  return elevatedRangePx({ groundHeight: height },
+    TowerPerks.previewRangeUl(type,
+      { onHighGround: height > 0, onFlatGround: !(height > 0) }));
 }
 
 // THE PATCH OF GROUND ONE OBSTACLE HIDES, as a ring of WORLD points.
@@ -7278,7 +7324,7 @@ function drawBuildPreview() {
   if (overInterfaceChrome(mouse.x, mouse.y)) return;
 
   var rangeRingPx = previewRangePx(type, worldMouse.x, worldMouse.y);
-  var footprintPx = ul(type.FOOTPRINT_RADIUS_UL);
+  var footprintPx = ul(buildFootprintUl(type));
 
   // UNDER THE CURSOR, because that is where it builds. This used to ask
   // resolveBuildPoint for a snapped position; nothing snaps any more.

@@ -147,24 +147,33 @@ body at an extreme. Distinguish "not drawn" from "clipped" explicitly — a
 measuring routine that conflates them will drive a solver confidently the wrong
 way and report success. See the 2026-08-13 rank-rig entry in the change log.
 
-**Run the test suite:** all six, none of which import each other — **five unit
+**Run the test suite:** all seven, none of which import each other — **six unit
 suites plus `sandbox.smoke.js`, which is a smoke test rather than a suite.**
-Where this file says "the five unit suites" it means these six minus the smoke
-test, and that is a correct count, not a stale one. Name the set a count counts
-before repairing it. These are the current measured results, **re-run
-2026-08-28, with the elevation repair, Normal’s extension to forty waves
-and the HUD pause button all in**, through
+Where this file says "the unit suites" it means these seven minus the smoke
+test. (It said "five plus one" until 2026-08-31 and had done since
+`farm.test.js` was written, which is exactly the drift this paragraph asks a
+reader to repair rather than copy. Name the set a count counts before repairing
+it.) These are the current measured results, **re-run
+2026-08-31, with the confirmed permanent upgrades in**, through
 `node tools/ci-check.js`, which is the gate and holds these same numbers as its
 baseline:
 
 ```
-node tests/run.js                 232 pass / 0 fail   core game, schedules, difficulty
-node tests/content.test.js        302 pass / 0 fail   content, visuals and index
+node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
+node tests/content.test.js        395 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
+node tests/farm.test.js           87 pass / 0 fail   the Farm acceptance list
 node tests/sandbox.smoke.js       passed              sandbox integration
 ```
+
+**content 366 → 395 on 2026-08-31**, and it is the one raise on this line where
+the total is a bad summary: twenty-nine were ADDED and thirteen were REPLACED.
+The nine placeholder-named nodes became nine of the thirty-nine confirmed ones,
+so every test that named `[R-A]` or `[W-N]` was renamed and rewritten rather
+than deleted. **Diff the NAMES**, which is the lesson the paragraph below
+already records — a rename reads as one removal and one addition.
 
 **Re-measured 2026-08-27 after the Normal difficulty landed:** run.js 139 → 157
 and content 225 → 263, all in the change that earned them; nothing was removed.
@@ -1749,9 +1758,12 @@ particular thing:
   **This moved on 2026-07-30 and the gap is worth knowing.** B4 used to carry 6
   points of FLAT ARMOR pierce, which took a brute's armor to zero and made B4
   itself the counter — an awkward one, at 2.5 DPS. That pierce is now 10 points
-  of *defence* instead (see the Rifleman's section), and **nothing in the game
-  pierces flat armor any more**, so a B4 Rifleman's 5 damage does literally
-  nothing to a brute. Path B's answer arrives one tier later than it used to.
+  of *defence* instead (see the Rifleman's section), so a B4 Rifleman's 5 damage
+  does literally nothing to a brute. Path B's answer arrives one tier later than
+  it used to. **No TIER pierces flat armor**; since 2026-08-31 one PERMANENT
+  upgrade does — the Rifleman's Piercing Orders, two points — and that is a
+  loadout decision made before the run rather than something the schedule may
+  assume.
 - **Wave 26 is the first Hive** — the only wave whose cost is decided by how
   fast the player answers it. Hives also appear at 30 (three of them) and 33
   (two).
@@ -4363,15 +4375,23 @@ own tower's own field names, which is correct rather than lazy — the trees are
 unique per tower by design, so a shared stat vocabulary would buy nothing and
 would forbid exactly the tower-specific effects the system exists for.
 
-**Effects, and their order:** `mul` (all factors multiply), then `add` (all
-deltas sum), then `addRate`, then `set` (absolute; last equipped slot wins).
-Slot order cannot change a `mul` or an `add` result, which is what makes
-dragging a perk between slots free of consequence.
+**Effects, and their order:** `preAdd` (deltas that land BEFORE the factors),
+then `mul` (all factors multiply), then `add` (all deltas sum), then `addRate`,
+then `set` (absolute; last equipped slot wins) —
+`(base + preAdd) * mul + add`. Slot order cannot change any of the first three,
+which is what makes dragging a perk between slots free of consequence.
 
-`price: { mul, add }` moves the BUILD price and `TowerPerks.priceOf` is what
-every reader of one goes through — the build bar's label and its affordability
-check, the placement itself, the armoury card, the index card and
-`MetaProgress.loadoutProblem`.
+**A FIELD NAME MAY BE A DOTTED PATH** (`"mechanics.reload.reloadDurationSeconds"`),
+which is what lets a tree reach the MECHANIC PARAMETERS of a config-driven
+tower. It never creates a container, so a node authored against a mechanic this
+tower does not have is inert rather than a crash. See Authoring a tree.
+
+`price: { mul, add, firstAdd, laterAdd }` moves the BUILD price and
+`TowerPerks.priceOf` is what every reader of one goes through — the build bar's
+label and its affordability check, the placement itself, the armoury card, the
+index card and `MetaProgress.loadoutProblem`. `firstAdd` / `laterAdd` are the
+same delta channel picked by how many of the type have already been PLACED this
+run, counted from `addTower` and cleared with the frozen loadout.
 
 **`addRate` exists because "+0.15 attacks a second" is not "−0.15 seconds".**
 Attack speed is stored as a PERIOD on several towers (`cooldownSeconds`,
@@ -4397,9 +4417,14 @@ own. `onlyIf` is the same idea for a whole node.
 `rangePx` through `elevatedRangePx`, and that cache is what targeting, the range
 ring and the bullets read — so `settleRange` re-derives it after a perk moves
 `rangeUl` (or `stats.range`). A perk that moved one and not the other would draw
-one circle and shoot another. Footprint is deliberately NOT handled: it is
-placement-only on every tower, and moving it would move where a tower may stand
-after it is standing there.
+one circle and shoot another.
+
+**FOOTPRINT IS DECIDED BEFORE THE TOWER STANDS**, and never moved after (2026-08-31,
+for the Arcane Sniper's Compact Chassis). It was out of scope entirely until
+then, because moving it on a standing tower would move where that tower may
+stand — so the answer is a PREVIEW: `buildFootprintUl` in js/game.js routes
+every placement rule through `TowerPerks.previewFootprintUl`, and the placed
+instance resolves to the same number through its own stats.
 
 **And a THIRD reach: the one the build ghost draws, before any tower exists.**
 `previewRangePx` promises that "the ring the player is shown is the ring they
@@ -4514,76 +4539,192 @@ purchase's refusal cannot disagree.
 
 ### The authored content
 
-**The Rifleman's four roots and the Warbringer's four roots plus one child are
-the owner's own numbers** (2026-08-30) and replaced a first pass written to
-prove the format. Do not extend either tree: the rest of both is a later
-decision.
+**Thirty-nine confirmed nodes across three trees** (2026-08-31), and every
+number in them is the owner's. They replaced a nine-node first pass whose names
+were placeholders (`[R-N] Base damage`); **the nine ids were KEPT and only their
+display names changed**, because an id is the persistence format and renaming
+one un-buys it for every existing player.
 
-Names are placeholders and say so — `[R-N] Base damage`, `[W-A2] Path A prices`
-— and icons are indices into the drawn marks in `js/upgrades.js` rather than art
-that does not exist yet. **The `id` is the persistence format**; the name and
-the icon can be replaced at any time without a player losing a node.
+**THE BRANCHES ARE DELIBERATELY UNFINISHED AND MUST NOT BE FILLED IN.** A branch
+that stops after two nodes has not been designed past two. There are no
+Masteries, no children beyond the one authored edge, no Tier 6, and no
+placeholder to hold a gap open. Several names were explicitly REJECTED and must
+never appear as a purchasable node: `Crowd Momentum`, `Fault Counter`,
+`Broad Sweep`, `Tempered Body`, `Compact Footing`, `Braced Recovery`,
+`Quick Carriage`, `Deep-Line Resonance`, `Quick Breech`, `Overwound Spring`,
+`Guided Bolt`, `Buyback Sigil`. Two more are liked but never costed and are not
+in scope either: `Marked Quarry` and `Deep Epicenter`.
+
+**Every one of the thirty-nine is `minLevel: 0`** — buyable the moment the tower
+is owned and the coins are there, and equippable by none of them until the tower
+reaches level 1. That is where "buying is not equipping" really bites.
+
+**Every node is a ROOT except `war_a2`.** No prerequisite was invented for the
+thirty new ones: the data model does not need one, and a fabricated edge would
+be a design decision made by the implementation. `war_a2`'s edge was authored
+and is kept.
+
+#### The Rifleman — twelve
 
 | node | what it does | meta coins |
 |---|---|---:|
-| `rif_n1` | +1 base damage (1→2); +50 mana on all ten tiers; placement unchanged | 100 |
-| `rif_s1` | placement 300→250; nothing else | 60 |
-| `rif_a1` | one more burst shot from A3 — 3/4/5/6/6 at A1–A5; A3 +100 | 120 |
-| `rif_b1` | B4 sends 3, B5 sends 5; B4 +200, B5 +350 | 120 |
-| `war_n1` | +5 u.l. base reach (40→45); placement 600→700 | 100 |
-| `war_a1` | +0.15 attacks/s from A4; A4 +250 | 120 |
-| `war_a2` | A1–A4 each −50 mana; needs `war_a1` to BUY only | 150 |
-| `war_b1` | B2/B3/B4 each +1 damage (cumulative to +3); blast 15→18; B2/B3/B4 +50 | 120 |
-| `war_s1` | +17.5 u.l. base reach; placement +50; B gains rebuilt to +3/+11/+6 | 80 |
+| `rif_n1` Commissioned Ammunition | +1 base damage (1→2); +50 mana on all ten tiers | 100 |
+| `rif_n2` Long Glass | +10 u.l. reach and +25% projectile speed; placement +50 | 90 |
+| `rif_n3` Veteran Rhythm | −6% fire rate at each wave's start, +2 points a kill to +12 | 130 |
+| `rif_s1` Cheap Receiver | placement 300→250; nothing else | 60 |
+| `rif_s2` Advance Unit | the run's FIRST Rifleman −100 mana, every later one +40 | 100 |
+| `rif_a1` Overloaded Drum | A3+: one more burst shot — 5/6/6 at A3–A5 | 120 |
+| `rif_a2` Breach Chamber | A5: the burst's last shot ×2, every earlier one ×0.9 | 160 |
+| `rif_a3` Ratchet Pressure | a clean burst shortens the next cycle 12%, a collapsed one lengthens it 15% | 150 |
+| `rif_b1` Reinforcement Manifest | B4 sends 3, B5 sends 5; B4 +200, B5 +350 | 120 |
+| `rif_b2` Rapid Muster | recruit cooldown 40 s; every recruit −10% health | 110 |
+| `rif_b3` Piercing Orders | B3+: 2 points of FLAT armor ignored, tower and recruits; both −5% rate | 150 |
+| `rif_b4` Entrenchment Protocol | a recruit holding 1.5 s digs in (+25% reach, +25% rate, −25% taken); cooldown 55 s | 160 |
 
-**Every one of the nine is `minLevel: 0`** — buyable the moment the tower is
-owned and the coins are there, and equippable by none of them until the tower
-reaches level 1. That is the first content where "buying is not equipping"
-really bites.
+#### The Warbringer — thirteen
 
-**`rif_a1` was cut from three shots to one on 2026-08-30**, at the owner's word
-("way too strong"). It granted two at A2 and a third at A3 — 6/7/8/8 — and
-charged A2 200 mana for the first half. The A2 group and the A2 surcharge are
-both gone; the node is A3's alone. Its own 120 coins and A3's 100-mana surcharge
-were left where they were.
+| node | what it does | meta coins |
+|---|---|---:|
+| `war_n1` Long Haft | +5 u.l. base reach (40→45); placement 600→700 | 100 |
+| `war_n2` Dense Hammerhead | +4 swing damage; +0.30 s on the cycle, BEFORE later multipliers | 110 |
+| `war_n3` Witchlight Dust | may target camo; ×0.85 damage to everything that is not | 130 |
+| `war_s1` Extended Stance | +17.5 u.l. base reach; placement +50; B gains rebuilt to +3/+11/+6 | 80 |
+| `war_s2` Light Haft | ×1.10 attacks a second; −2 swing damage | 100 |
+| `war_s3` Salvaged Anvil | placement 600→500; −40 maximum health | 90 |
+| `war_a1` Redline Rhythm | A4+: +0.15 attacks/s AND ×0.90 range; A4 +250 | 120 |
+| `war_a2` Forgemaster's Schedule | A1–A4 each −50 mana; needs `war_a1` to BUY only | 150 |
+| `war_a3` Centered Blow | inner half of the radius +35%, outer half −10% | 130 |
+| `war_a4` Fracture Stamp | A4+: ×0.90 swing, and each direct hit files 1 flat armor off that body | 180 |
+| `war_b1` Kiln Resonance | B2/B3/B4 each +1 damage; blast 15→18; those three +50 | 120 |
+| `war_b2` Long Echo | every B3+ slow +1 s, chains included; −2 swing damage | 110 |
+| `war_b3` Wide Fracture | blast radius ×1.20; blast damage −3 | 140 |
 
-Three of them are worth reading the note in the file for. `rif_a1` **cannot leak
-into automatic fire**, and not by care: B3 switches the Rifleman to
-`shotsPerSecond`, which is derived from the auto base and never from
-`shotsPerBurst`. `rif_b1` is **one +1, not two** — B5's count is an absolute
-that replaces B4's, so a single delta gives 3 then 5 and two would have given
-six. `war_s1`'s **negative groups are what keep the tiers honest**: +17.5 on top
-of the authored B bonuses would have reached 107.5 at B5 and swallowed what each
-tier promises, so the tiers are rebuilt to +3/+11/+6 and the player receives
-57.5 / 60.5 / 71.5 / 71.5 / 77.5 / 92.5.
+#### The Arcane Sniper — fourteen, and the first tree on a CONFIG-DRIVEN tower
 
-**The other four towers have NO TREE, and that is the shipping state.** The
-Arcane Sniper, the Siphon, the Summoner and the Farm each carried a first
-authored pass for a few hours on 2026-08-30 and it was deleted at the owner's
-instruction — the content is his to write, and invented placeholder trees on
-four of six towers were four trees somebody would eventually have to argue with.
+| node | what it does | meta coins |
+|---|---|---:|
+| `snp_n1` Arcane Charge | ×1.10 shot damage, ×0.95 fire rate (+4.5% on paper) | 100 |
+| `snp_n2` High-Ground Doctrine | ×1.15 range on a rise, ×0.90 on the flat | 80 |
+| `snp_n3` Skybane | +25% to fliers, −12% to everything else, per BODY | 120 |
+| `snp_n4` First Omen | after 3 s idle the next shot +35%; every other ordinary shot −5% | 140 |
+| `snp_s1` Stripped Mount | placement 900→750; ×0.75 maximum health | 60 |
+| `snp_s2` Compact Chassis | footprint 20→16 u.l.; −10 u.l. range | 80 |
+| `snp_s3` Emergency Discharge | below 30% health: ×1.20 rate, ×0.80 range | 120 |
+| `snp_a1` Narrow Prism | A4+: ×1.08 damage; the cone stops at 20° instead of A5's 24° | 100 |
+| `snp_a2` Piercing Persistence | A3+: falloff decay 0.95→0.962; the shot starts ×0.95 | 120 |
+| `snp_a3` Patient Harvest | A5: kill stacks last 5.5 s instead of 4. No downside | 140 |
+| `snp_b1` Critical Calibration | B3+: +5 POINTS of crit chance, −10 points of crit damage | 110 |
+| `snp_b2` Execution Curve | B4+: execute floor 0.90→0.75 (caps at 25% HP), maximum 0.60→0.55 | 140 |
+| `snp_b3` Covenant Round | B5: the guaranteed fourth shot +10%; reload 1 s→1.5 s | 180 |
+| `snp_b4` Grand Sigil | B5 ability: 18 000→15 000 damage, radius 25→35 u.l. | 220 |
 
-A tower with no `js/perks/*-perks.js` file has an EMPTY tree: no nodes, empty
-inventory, empty loadout, nothing to refund, and its type's own build price. The
-screens draw it as empty rather than as broken, and a test pins that. **Adding a
-tower's tree is adding one file and one `<script>` tag, and nothing else.**
+Six of them are worth reading the file for. `rif_a1` **cannot leak into automatic
+fire**, and not by care: B3 switches the Rifleman to `shotsPerSecond`, which is
+derived from the auto base and never from `shotsPerBurst`. `rif_b1` is **one +1,
+not two** — B5's count is an absolute that replaces B4's. **`rif_b2` and
+`rif_b4` each name an ABSOLUTE cooldown and the pair CANCELS**: 45 / 40 / 55 /
+45, a designed exception stated once in `Soldier.resolvedRecruitCooldown` rather
+than two deltas that would have summed to 50. `war_s1`'s **negative groups keep
+the tiers honest** — +17.5 on top of the authored B bonuses would have reached
+107.5 at B5. `war_a4` is **the only thing in the game that edits an enemy's
+stored `armor`**, which is exactly what separates it from `rif_b3`'s pierce
+(that clamps a value for one hit and leaves the body untouched). And
+**`war_b1` + `war_b3` resolve the blast back to the authored 15** over a fifth
+more ground, which falls out of `add` summing rather than needing a rule.
+
+**`rif_a1` LOST ITS A3 MANA SURCHARGE on 2026-08-31.** It charged +100 on A3
+from 2026-08-30; the confirmed node states its whole effect and does not include
+one, so it is the shot and nothing else now. Its 120 coins are unchanged.
+**`war_a1` GAINED the ×0.90 range** in the same pass, inside the same `hasA4`
+group as the speed, so a tier cannot pay the cost without the benefit.
+
+**The three other towers have NO TREE, and that is the shipping state.** The
+Siphon, the Summoner and the Farm are out of scope; the player has no tree
+either. A tower with no `js/perks/*-perks.js` file has an EMPTY tree: no nodes,
+empty inventory, empty loadout, nothing to refund, and its type's own build
+price. The screens draw it as empty rather than as broken, and a test pins that.
+**Adding a tower's tree is adding one file and one `<script>` tag**, which is
+exactly what the Arcane Sniper's cost.
 
 ### Authoring a tree
 
 `TowerPerks.register({ towerId, nodes: [...] })` from a file in `js/perks/`.
 A node is `{ id, name, blurb, cost, requires, minLevel, at: {x, y}, effects }`
 and everything but `id` and `name` is optional. `at` is in node units with the
-tower at the origin. **`id` is a PERSISTENCE FORMAT** — renaming one un-buys it
-for every existing player.
+tower at the origin, and **the arm IS the branch**: path A west, path B east,
+the general upper branch north, the general lower branch south. **`id` is a
+PERSISTENCE FORMAT** — renaming one un-buys it for every existing player.
 
 A tower with no tree is a legal state the screens draw as empty. A test asserts
 every tree is well formed: no duplicate id, no dangling parent, no free node, no
 self-reference, no conditional price, and at least one root.
 
 **The AND-convergence and the level gate are tested against a PROBE tree**, not
-against authored content: they are engine rules, the two shipping trees hold
-neither shape today, and a rule that is only tested where content happens to use
-it stops being tested the moment the content changes.
+against authored content: they are engine rules, none of the three shipping
+trees holds either shape today, and a rule that is only tested where content
+happens to use it stops being tested the moment the content changes.
+
+**Five things the engine grew for the confirmed content** (2026-08-31), each
+because a node could not otherwise say what it says:
+
+- **`preAdd`** — a delta that lands BEFORE the multipliers, so the order is
+  `(base + preAdd) * mul + add`, then `addRate`, then `set`. `war_n2` adds
+  0.30 s to the swing cycle "before later attack-rate multipliers", which on a
+  3.2 s base beside `war_s2` is 3.18 s and not 3.21 s. It is a POSITION in the
+  arithmetic, not a fourth category.
+- **Dotted field paths** — `set: { "mechanics.executeScaling.floorFraction":
+  0.75 }`. Five of the Arcane Sniper's nodes move a MECHANIC PARAMETER, which
+  lives in `stats.mechanics.<name>.<param>` and is not a top-level stat. A
+  dotted path NEVER creates a container: a node authored against a mechanic this
+  tower does not have is inert. Safe because StatResolver deep-clones
+  `config.mechanics` on every resolve.
+- **`price: { firstAdd, laterAdd }`** — the same delta channel picked by how
+  many of the type have been PLACED this run. `TowerPerks.notePlacement` is
+  called from `addTower`, the one door, so a hover, a ghost, a refused click and
+  the armoury's throwaway specimen never move it. The count is cleared by
+  `lockForRun`/`releaseRun` beside the frozen loadout, for the same reason.
+- **`tower.afterPerks()`** — a tower's own last word, called after `settleHp`
+  and `settleRange`. Two things can only be settled there: the Arcane Sniper's
+  `killStacks` and `reload` TRACKERS are built from `stats.mechanics` in the
+  ConfiguredTower's constructor, long before a perk exists, so `snp_a3` and
+  `snp_b3` would have moved a number nothing read; and its footprint and reach
+  are cached on the adapter by a `refreshDerived` that has already run. It must
+  be idempotent — it runs on every restat.
+- **`previewStat(Type, fields, base, context)`** — the ghost may now answer the
+  conditions it CAN vouch for. `previewRangePx` knows what is under the cursor,
+  so it passes `{ onHighGround, onFlatGround }` and `snp_n2` draws the ring the
+  placed tower will actually have. A group whose `has` is not in the context is
+  skipped exactly as before.
+
+**AND FOOTPRINT IS HANDLED NOW, BEFORE THE TOWER STANDS.** It was deliberately
+out of scope until `snp_s2`, and the reason it was is still the reason the
+answer is a PREVIEW rather than an instance field: a footprint that shrank after
+placement could leave a tower overlapping a legal neighbour. `buildFootprintUl`
+in js/game.js routes every placement rule — `whyCannotBuild`,
+`resolveBuildPoint`, `buildClearanceOn`, `buildClearancePx`, the ghost and the
+level test — through `TowerPerks.previewFootprintUl`, so the smaller skirt is
+decided at the moment of placement and the placed instance then resolves to the
+same number through its own stats.
+
+**A CONFIG-DRIVEN TOWER'S TREE IS AUTHORED IN THE SAME VOCABULARY.**
+`LongshotTower.refreshDerived` derives `hasA1..hasA5` / `hasB1..hasB5` from
+`core.purchased` and `onHighGround` / `onFlatGround` from `groundHeight`, so a
+`when: [{ has: "hasB5" }]` group works there exactly as it does on a
+hand-written tower. Two fields for the ground rather than one, because there is
+no "has NOT".
+
+**THE WRAPPED RECOMPUTE MUST RESOLVE FROM BASE**, and for the two adapters that
+is a rule on the CALLER: `refreshDerived` only reads `core.stats`, so calling it
+without `core._refreshStats()` first hands the perk pass a stat block the perks
+are already in, and they fold in again on top of themselves. Every caller does
+the resolve first — `purchase` through `core.purchase`, `FarmBoost.refresh`, and
+the sandbox's two controls, which were fixed on 2026-08-31.
+
+**A NEUTRAL FIELD IS DECLARED ON THE TOWER, NOT INVENTED BY THE PERK.** Every
+runtime field the three trees write is initialised to its inert value in
+`recalcStats` (or read with a `|| 1` fallback on the config towers), which is
+what makes "owned but not equipped does nothing" structural rather than
+something each node has to be careful about.
 
 ### The cheat panel — `js/debug-cheats.js`, and it is meant to be deleted
 
@@ -7550,9 +7691,17 @@ armor."*
 **Mind the vocabulary, because his and the code's are swapped.** In this
 codebase `armor` is the FLAT subtraction and `defense` is the PERCENTAGE; in his
 words "blindage" is the flat one and "armor" is the percentage. So the tier now
-strips **10 percentage points of `defense`**, and **nothing in the game pierces
-flat armor any more.** The old `armorPierce` parameter was removed rather than
-left unused; if it is ever wanted back it is four lines.
+strips **10 percentage points of `defense`**, and **no TIER pierces flat armor.**
+
+**`armorPierce` CAME BACK on 2026-08-31**, as the fifth argument the old note
+said it would be, for the Rifleman's `rif_b3` **Piercing Orders** permanent
+upgrade: two points off the flat subtraction, for the tower and its recruits,
+clamped at zero and **leaving the enemy's stored `armor` untouched**. It is a
+separate argument from `defenseFlatPierce` all the way down, precisely so the
+two can never be spelled for each other — one moves `armor`, the other moves
+`defense`, and Piercing Orders says out loud that it does not touch percentage
+defence. (Contrast the Warbringer's `war_a4` Fracture Stamp, which really does
+edit `enemy.armor`; that is the only thing in the game that does.)
 
 There are therefore two ways to pierce defence, and they are different shapes:
 
@@ -10038,7 +10187,8 @@ no mechanic was moved to match the description.
 | Enemy gameplay radius | 11 px × the type's `sizeScale` — swarm 0.55 is the smallest, boss 2.4 the largest, and a type that declares none counts as 1. A fractal split multiplies again by its own `fractalSizeScale`. This is the hit test, the rings and the 2D body; on the 3D board it scales the mesh but is not the mesh's drawn extent — see the sprite-extent note in Enemies | `Enemy.RADIUS_PX`, `Enemy.prototype.radiusPx` |
 | Camo detection | Arcane Sniper **A1** (not B — see the naming section), Siphon B1, **Rifleman B3** — nothing else has it | `seesCamo` |
 | Flying eligibility | fail-closed: Arcane Sniper at base and Siphon A4 can target flyers; flat towers cannot unless `seesFlying` is explicit | `Targeting.sees`, `RangeFilter.canTarget` |
-| Defence pierce (flat) | Rifleman B4 only: 10 percentage points off `defense`, clamped at 0 so it is never a damage bonus. Nothing pierces flat armor | `Mitigation.mitigate`'s 4th argument |
+| Defence pierce (flat) | Rifleman B4 only: 10 percentage points off `defense`, clamped at 0 so it is never a damage bonus | `Mitigation.mitigate`'s 4th argument |
+| Armor pierce (flat) | Rifleman `rif_b3` Piercing Orders only, a PERMANENT upgrade: 2 points off `armor` for that tower and its recruits, clamped at 0, and the enemy's stored armor is never edited | `Mitigation.mitigate`'s 5th argument |
 | Targeting modes | first, last, weakest, strongest, fastest, nearest | `Targeting.MODES` in js/targeting.js |
 | Reference range | 100 u.l. — the yardstick the whole u.l. system is anchored to. Carried by the Rifleman since the gunner was deleted | `Soldier.BASE_RANGE_UL`, `Maps.REFERENCE_TOWER` |
 | Shared footprint | 11.25 u.l. radius — Warbringer and Rifleman both take it from here | `Tower.FOOTPRINT_RADIUS_UL` |

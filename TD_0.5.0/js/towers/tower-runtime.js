@@ -89,10 +89,20 @@ ConfiguredTower.prototype._refreshStats = function () {
     this.maxHp = resolved.hp;
     this.currentHp = resolved.hp;
   } else {
-    var delta = resolved.hp - previousMaxHp;
+    // AGAINST THE LAST *RESOLVED* MAXIMUM, not against `maxHp`, and the two are
+    // the same number on every tower that has not equipped a permanent upgrade
+    // touching health. When one has -- the Arcane Sniper's Stripped Mount takes
+    // a quarter off -- `maxHp` carries that cut and `resolved.hp` does not, so
+    // differencing against `maxHp` would hand the tier's delta PLUS the perk's
+    // cut back as current health and quietly heal the tower on every purchase.
+    // `resolvedMaxHp` is the pre-perk figure, so the delta is the tier's alone.
+    var baseline = (typeof this.resolvedMaxHp === "number")
+      ? this.resolvedMaxHp : previousMaxHp;
+    var delta = resolved.hp - baseline;
     this.maxHp = resolved.hp;
     this.currentHp = Math.min(this.currentHp + delta, this.maxHp);
   }
+  this.resolvedMaxHp = resolved.hp;
 };
 
 // Attempts to buy the next tier on `pathName`. Delegates the crosspath rule
@@ -148,8 +158,45 @@ ConfiguredTower.prototype.previewNextTier = function (pathName) {
   };
 };
 
+// PUSH THE RESOLVED MECHANIC PARAMETERS BACK INTO THE TRACKERS.
+//
+// `killStacks` and `reload` are built ONCE, in the constructor, out of
+// `stats.mechanics`. Everything that resolves a stat afterwards -- a purchased
+// tier through `setParams`, or a permanent upgrade writing straight into
+// `stats.mechanics` (js/systems/tower-perks.js) -- lands in the stat block and
+// not in the objects that actually keep the clocks. This is the one line that
+// closes that gap, and it is idempotent: it copies, it never adds.
+//
+// Deliberately NOT called from `_refreshStats`. A permanent upgrade applies
+// AFTER the resolve, so the tower's own adapter calls this from `afterPerks`,
+// which is the only moment both halves are settled.
+ConfiguredTower.prototype.syncMechanics = function () {
+  var stacks = this.stats.mechanics.killStackAttackSpeed;
+  if (this.killStacks && stacks) {
+    if (typeof stacks.maxStacks === "number") this.killStacks.maxStacks = stacks.maxStacks;
+    if (typeof stacks.stackDurationSeconds === "number") {
+      this.killStacks.durationSeconds = stacks.stackDurationSeconds;
+    }
+  }
+  var reload = this.stats.mechanics.reload;
+  if (this.reload && reload) {
+    if (typeof reload.shotsBeforeReload === "number") {
+      this.reload.shotsBeforeReload = reload.shotsBeforeReload;
+    }
+    if (typeof reload.reloadDurationSeconds === "number") {
+      this.reload.reloadDurationSeconds = reload.reloadDurationSeconds;
+    }
+  }
+};
+
+// `liveFireRateMult` IS RUN STATE, NOT A STAT, and is folded in here so that
+// the panel's attack-speed row, the DPS row, the codex and the firing clock
+// itself all read one number. The Arcane Sniper's Emergency Discharge writes it
+// each step from how hurt the tower is; absent (and therefore 1) on every other
+// tower and on every tower that has not equipped it.
 ConfiguredTower.prototype.effectiveFireRate = function () {
-  var base = this.stats.fireRate;
+  var live = this.liveFireRateMult || 1;
+  var base = this.stats.fireRate * live;
   if (!this.stats.flags.killStackAttackSpeed) return base;
   var perStack = this.stats.mechanics.killStackAttackSpeed.perStackBonus;
   return base * (1 + perStack * (this.killStacks ? this.killStacks.count() : 0));
@@ -208,9 +255,18 @@ ConfiguredTower.prototype.fire = function (targetHpFraction, rng) {
   var crit = guaranteedShot || (rng() < this.stats.critChance / 100);
   var executeBonus = Execute.resolveExecuteBonus(this.stats, targetHpFraction, guaranteedShot);
 
+  // THE GUARANTEED SHOT MAY BE WORTH MORE THAN THE ORDINARY ONE, and the
+  // multiplier goes on BEFORE the crit and the execute rather than after --
+  // "+10% damage" on a round that is then doubled and executed is +10% of the
+  // whole blow, which is what the Arcane Sniper's Covenant Round buys.
+  // `finalShotDamageMult` is absent on every tower that has not equipped it, so
+  // this is exactly `this.stats.damage` in every other case.
+  var shotMult = (guaranteedShot && typeof this.stats.finalShotDamageMult === "number")
+    ? this.stats.finalShotDamageMult : 1;
+
   var hasFalloff = !!this.stats.flags.pierceFalloff;
   var sequence = DamagePipeline.resolveShot({
-    damage: this.stats.damage,
+    damage: this.stats.damage * shotMult,
     crit: crit,
     critDamagePercent: this.stats.critDamage,
     executeBonus: executeBonus,

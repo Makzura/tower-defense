@@ -36,25 +36,39 @@
 // produce -10, and `1 - (-10)/100` is a 10% damage BONUS against everything
 // unarmoured in the game. Pierce removes mitigation; it never adds damage.
 //
-// **Flat ARMOR pierce is gone** (same day). B4 used to carry 6 flat armor
-// pierce -- the mirror image of defPierce, sized to strip a brute's 5 -- and the
-// owner moved that tier onto defence instead. Nothing pierces flat armor now, so
-// the parameter was removed rather than left as an unused fifth argument. If it
-// is ever wanted back it is four lines: `max(0, armor - armorPierce)` here and a
-// channel to carry it.
+// **Flat ARMOR pierce came BACK on 2026-08-31**, as the fifth argument this
+// note said it would be. It went in 2026-07-30 when B4 moved from armor to
+// defence, and the Rifleman's Piercing Orders -- a permanent upgrade, not a
+// tier -- asks for exactly the shape that was removed: ignore N points of the
+// FLAT subtraction, nothing else.
+//
+// `armorPierce` IS NOT `defenseFlatPierce`, and the two must never be spelled
+// for each other. One takes points off `armor`, the flat subtraction; the other
+// takes percentage POINTS off `defense`, the proportional one. Piercing Orders
+// says in as many words that it does not touch percentage defence, and keeping
+// them as two arguments is what makes that structural.
+//
+// **THE ENEMY'S OWN ARMOR IS NEVER TOUCHED.** This clamps the value USED for
+// one hit; `enemy.armor` is left where it was, so the same body meets the next
+// tower's shot at full plate. (The Warbringer's Fracture Stamp does the other
+// thing on purpose -- it really does file the armor down -- and that is why it
+// lives on the enemy and not here.)
 // ---------------------------------------------------------------------------
 
 var Mitigation = (function () {
 
   var DEFENSE_CAP = 99;
 
-  function mitigate(raw, enemy, defPierce, defenseFlatPierce) {
+  function mitigate(raw, enemy, defPierce, defenseFlatPierce, armorPierce) {
     var armor = enemy.armor || 0;
     var defense = enemy.defense || 0;
     var pierce = defPierce || 0;
     var flat = Math.max(0, defenseFlatPierce || 0);
+    var plate = Math.max(0, armorPierce || 0);
 
-    var afterArmor = Math.max(0, raw - armor);
+    // Clamped at zero on both sides: pierce removes mitigation and never adds
+    // damage, which is the same rule the defence clamp below is protecting.
+    var afterArmor = Math.max(0, raw - Math.max(0, armor - plate));
 
     // Cap AFTER both reductions, and clamp the low end too -- see the note
     // above on why the zero clamp is not optional.

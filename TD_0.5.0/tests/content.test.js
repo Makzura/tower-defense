@@ -10177,7 +10177,11 @@ function (t) {
 test("resetting a tree refunds the nodes, keeps the level, and cools down",
 function (t) {
   var h = bootProgress();
-  var coins = bankCoins(h, 12);
+  // ENOUGH TO BUY THE WHOLE TREE, whatever it grows to. The Rifleman's twelve
+  // confirmed nodes come to 1 450 coins, and a purchase that silently fails for
+  // want of change would make every figure below agree with itself and with
+  // nothing else -- so the buys are asserted, not assumed.
+  var coins = bankCoins(h, 40);
 
   var roots = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
     "  return !(n.requires && n.requires.length) && !n.minLevel; })" +
@@ -10185,10 +10189,12 @@ function (t) {
   t.ok(roots.length >= 2, "the Rifleman has root nodes to buy");
 
   var spent = 0;
+  var refused = [];
   roots.forEach(function (n) {
-    h.run("TowerPerks.buy('soldier', '" + n.id + "')");
+    if (!h.run("TowerPerks.buy('soldier', '" + n.id + "').ok")) refused.push(n.id);
     spent += n.cost;
   });
+  t.deep(refused, [], "every root was actually bought");
   h.run("MetaProgress.addXp('soldier', 3000)");
   h.run("MetaProgress.equipPerk('soldier', '" + roots[0].id + "', 0)");
 
@@ -10438,12 +10444,16 @@ test("every authored tree is well formed", function (t) {
 });
 
 // ---------------------------------------------------------------------------
-// THE FIRST AUTHORED TREE CONTENT (2026-08-30) — the Rifleman's four roots and
-// the Warbringer's four roots plus one child.
+// THE CONFIRMED TREE CONTENT (2026-08-31) — the Rifleman's twelve, the
+// Warbringer's thirteen and the Arcane Sniper's fourteen.
 //
-// NINE NODES, AND THESE ARE THE OWNER'S OWN NUMBERS, so unlike the section
-// above these tests DO name ids and DO assert exact figures: the numbers are
-// the specification. A retune is meant to turn these red.
+// THIRTY-NINE NODES, AND THESE ARE THE OWNER'S OWN NUMBERS, so unlike the
+// section above these tests DO name ids and DO assert exact figures: the
+// numbers are the specification. A retune is meant to turn these red.
+//
+// THE BRANCHES ARE DELIBERATELY UNFINISHED and the counts below are asserted
+// AS THEY STAND rather than as a target. A branch stopping after two nodes is
+// content that has not been designed, not content that is missing.
 // ---------------------------------------------------------------------------
 
 // A profile at level 5 on every tower with coins to spend -- the state in which
@@ -10471,7 +10481,11 @@ function bootContent() {
 // having to know what will be asked. The price is that a SECOND call replaces
 // what the first one pointed at: read the numbers you want before building the
 // next tower, never two expressions and then two reads.
-function towerWith(h, towerId, nodeIds, tiers) {
+//
+// AT MOST FIVE NODES. The loadout is five slots and `equipPerk` refuses a
+// sixth, so a combination test that wants more is testing something the game
+// cannot produce.
+function towerWith(h, towerId, nodeIds, tiers, x, y) {
   h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
   h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
         "  MetaProgress.addXp(id, 20000); })");
@@ -10483,70 +10497,256 @@ function towerWith(h, towerId, nodeIds, tiers) {
   });
   h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
   h.run("(function () { var Type = MetaProgress.constructorOf('" + towerId + "');" +
-        "  addTower(new Type(200, 200, path)); })()");
-  (tiers || []).forEach(function (tier) {
-    h.run("buyUpgrade(towers[towers.length - 1], '" + tier + "')");
-  });
+        "  addTower(new Type(" + (x || 200) + ", " + (y || 200) + ", path)); })()");
+  buyTiers(h, "towers[towers.length - 1]", tiers);
   return "towers[towers.length - 1]";
 }
 
-test("the Rifleman's four roots sit in the right directions and open at level 0",
-function (t) {
+// TWO TOWER SHAPES, ONE VOCABULARY. The hand-written towers buy a tier by id
+// through `buyUpgrade`; a config-driven one (the Arcane Sniper) has no
+// `whyCannotUpgrade` at all and buys the NEXT tier on a named path. Spelling
+// both as "A3" here is what lets a combination test read the same either way.
+function buyTiers(h, expr, tiers) {
+  (tiers || []).forEach(function (tier) {
+    h.run("(function () { var tw = " + expr + ";" +
+          "  if (typeof tw.whyCannotUpgrade === 'function') {" +
+          "    buyUpgrade(tw, '" + tier + "');" +
+          "  } else { tw.purchase('" + tier.charAt(0) + "'); } })()");
+  });
+}
+
+// Shorthand for the expression `towerWith` returns, for a follow-up read on the
+// tower it just built. Same string, named once.
+function towers1() { return "towers[towers.length - 1]"; }
+
+// ONE WHOLE BURST, as the damage of every round it actually fired.
+//
+// Driven through the tower's real `update` rather than by calling `fire`
+// directly, because the thing under test is which shot the burst calls its
+// LAST -- and that is decided by the loop, not by the damage.
+function burstDamages(h, expr) {
+  return h.run("(function () { var tw = " + expr + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = e.pos.x + 20; tw.y = e.pos.y;" +
+    "  tw.cooldown = 0; tw.shotTimer = 0; tw.burstShotsLeft = 0;" +
+    "  var out = [];" +
+    "  for (var i = 0; i < 400; i++) {" +
+    "    tw.update(1 / 60, [e], out);" +
+    "    if (out.length && tw.burstShotsLeft === 0) break; }" +
+    "  return out.map(function (b) { return b.damage; }); })()");
+}
+
+test("the three confirmed trees hold exactly the confirmed nodes", function (t) {
   var h = bootContent();
-  var nodes = h.run("TowerPerks.nodes('soldier')");
-  t.eq(nodes.length, 4, "four nodes, and no fifth invented");
 
-  var byId = {};
-  nodes.forEach(function (n) { byId[n.id] = n; });
-  t.ok(byId.rif_n1 && byId.rif_s1 && byId.rif_a1 && byId.rif_b1,
-    "the four authored ids are all present");
+  // THE WHOLE CATALOGUE, id by id, with its price and its branch. Written out
+  // rather than derived: this list IS the specification, and a node that
+  // quietly changes price or moves branch has to turn this red.
+  var WANT = {
+    soldier: [
+      ["rif_n1", "Commissioned Ammunition", 100, "north"],
+      ["rif_n2", "Long Glass", 90, "north"],
+      ["rif_n3", "Veteran Rhythm", 130, "north"],
+      ["rif_s1", "Cheap Receiver", 60, "south"],
+      ["rif_s2", "Advance Unit", 100, "south"],
+      ["rif_a1", "Overloaded Drum", 120, "west"],
+      ["rif_a2", "Breach Chamber", 160, "west"],
+      ["rif_a3", "Ratchet Pressure", 150, "west"],
+      ["rif_b1", "Reinforcement Manifest", 120, "east"],
+      ["rif_b2", "Rapid Muster", 110, "east"],
+      ["rif_b3", "Piercing Orders", 150, "east"],
+      ["rif_b4", "Entrenchment Protocol", 160, "east"]
+    ],
+    smasher: [
+      ["war_n1", "Long Haft", 100, "north"],
+      ["war_n2", "Dense Hammerhead", 110, "north"],
+      ["war_n3", "Witchlight Dust", 130, "north"],
+      ["war_s1", "Extended Stance", 80, "south"],
+      ["war_s2", "Light Haft", 100, "south"],
+      ["war_s3", "Salvaged Anvil", 90, "south"],
+      ["war_a1", "Redline Rhythm", 120, "west"],
+      ["war_a2", "Forgemaster's Schedule", 150, "west"],
+      ["war_a3", "Centered Blow", 130, "west"],
+      ["war_a4", "Fracture Stamp", 180, "west"],
+      ["war_b1", "Kiln Resonance", 120, "east"],
+      ["war_b2", "Long Echo", 110, "east"],
+      ["war_b3", "Wide Fracture", 140, "east"]
+    ],
+    longshot: [
+      ["snp_n1", "Arcane Charge", 100, "north"],
+      ["snp_n2", "High-Ground Doctrine", 80, "north"],
+      ["snp_n3", "Skybane", 120, "north"],
+      ["snp_n4", "First Omen", 140, "north"],
+      ["snp_s1", "Stripped Mount", 60, "south"],
+      ["snp_s2", "Compact Chassis", 80, "south"],
+      ["snp_s3", "Emergency Discharge", 120, "south"],
+      ["snp_a1", "Narrow Prism", 100, "west"],
+      ["snp_a2", "Piercing Persistence", 120, "west"],
+      ["snp_a3", "Patient Harvest", 140, "west"],
+      ["snp_b1", "Critical Calibration", 110, "east"],
+      ["snp_b2", "Execution Curve", 140, "east"],
+      ["snp_b3", "Covenant Round", 180, "east"],
+      ["snp_b4", "Grand Sigil", 220, "east"]
+    ]
+  };
 
-  // DIRECTIONS, because the brief names them: north is damage, south is the
-  // build price, west is path A and east is path B.
-  t.ok(byId.rif_n1.at.y < 0 && byId.rif_n1.at.x === 0, "damage is north");
-  t.ok(byId.rif_s1.at.y > 0 && byId.rif_s1.at.x === 0, "the build price is south");
-  t.ok(byId.rif_a1.at.x < 0 && byId.rif_a1.at.y === 0, "path A is west");
-  t.ok(byId.rif_b1.at.x > 0 && byId.rif_b1.at.y === 0, "path B is east");
+  Object.keys(WANT).forEach(function (towerId) {
+    var nodes = h.run("TowerPerks.nodes('" + towerId + "')");
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
 
-  nodes.forEach(function (n) {
-    t.eq(n.minLevel || 0, 0, n.id + " needs no level");
-    t.deep(n.requires || [], [], n.id + " is a root");
-    t.ok(/^\[R-/.test(n.name), n.id + " carries a placeholder name: " + n.name);
-    t.eq(typeof n.icon, "number", n.id + " carries a placeholder icon");
+    t.eq(nodes.length, WANT[towerId].length,
+      towerId + " has exactly " + WANT[towerId].length + " nodes and no invented extra");
+
+    WANT[towerId].forEach(function (row) {
+      var n = byId[row[0]];
+      t.ok(!!n, towerId + ": " + row[0] + " exists");
+      if (!n) return;
+      t.eq(n.name, row[1], row[0] + " is called " + row[1]);
+      t.eq(n.cost, row[2], row[1] + " costs " + row[2] + " meta coins");
+      t.eq(n.minLevel || 0, 0, row[1] + " needs no tower level");
+      t.ok(!!n.blurb && n.blurb.length > 20, row[1] + " carries a description");
+
+      // A LEFT, B RIGHT, GENERAL UPPER ABOVE, GENERAL LOWER BELOW. The layout
+      // is the branch, so a node in the wrong arm is in the wrong branch.
+      var arm = n.at.x < 0 ? "west" : n.at.x > 0 ? "east"
+        : n.at.y < 0 ? "north" : "south";
+      t.eq(arm, row[3], row[1] + " sits on the " + row[3] + " arm");
+      t.ok(n.at.x === 0 || n.at.y === 0, row[1] + " is on one arm, not diagonal");
+    });
+
+    // NO REJECTED OR UNCONFIRMED NAME IS PURCHASABLE.
+    var forbidden = ["Marked Quarry", "Crowd Momentum", "Fault Counter",
+      "Deep Epicenter", "Broad Sweep", "Tempered Body", "Compact Footing",
+      "Braced Recovery", "Quick Carriage", "Deep-Line Resonance", "Quick Breech",
+      "Overwound Spring", "Guided Bolt", "Buyback Sigil"];
+    var present = nodes.map(function (n) { return n.name; })
+      .filter(function (name) { return forbidden.indexOf(name) !== -1; });
+    t.deep(present, [], towerId + " exposes no rejected name");
   });
 
-  // DISTINCT PLACEHOLDERS, so a node can be pointed at and tested.
-  var icons = nodes.map(function (n) { return n.icon; });
-  t.eq(new Set(icons).size, 4, "no two share an icon");
-  t.eq(new Set(nodes.map(function (n) { return n.name; })).size, 4,
-    "and no two share a name");
-
-  t.deep([100, 60, 120, 120],
-    [byId.rif_n1.cost, byId.rif_s1.cost, byId.rif_a1.cost, byId.rif_b1.cost],
-    "the authored meta-coin prices");
-
-  // BUYABLE AT LEVEL 0, EQUIPPABLE AT NONE OF IT.
-  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
-  for (var i = 0; i < 6; i++) {
-    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
-      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
-  }
-  t.eq(h.run("MetaProgress.progressOf('soldier').level"), 0, "still level 0");
-  t.eq(h.run("TowerPerks.stateOf('soldier', 'rif_s1').state"), "buyable",
-    "and a root is buyable there");
-  t.eq(h.run("TowerPerks.buy('soldier', 'rif_s1').ok"), true, "the purchase goes through");
-  t.eq(h.run("MetaProgress.equipPerk('soldier', 'rif_s1', 0).ok"), false,
-    "but a level-0 tower has no slot to put it in");
+  // EVERY NODE IS A ROOT EXCEPT THE ONE AUTHORED EDGE. No prerequisite was
+  // invented for any of the thirty new nodes.
+  var parents = h.run("(function () { var out = [];" +
+    "  TowerPerks.towersWithTrees().forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) {" +
+    "      if (n.requires && n.requires.length)" +
+    "        out.push(id + ':' + n.id + '<-' + n.requires.join('+')); }); });" +
+    "  return out.sort(); })()");
+  t.deep(parents, ["smasher:war_a2<-war_a1"],
+    "the Warbringer's child is the only authored prerequisite in the game");
 });
 
-test("[R-N] doubles the Rifleman's base damage and puts 50 mana on every tier",
+test("a fresh profile leaves all three towers exactly as authored", function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+
+  // NOTHING OWNED, NOTHING EQUIPPED. Every number a player would notice, read
+  // off real towers rather than off the tables they came from.
+  var rifle = h.run("(function () { var s = new Soldier(200, 200, path); addTower(s);" +
+    "  return { dmg: s.damage, shots: s.shotsPerBurst, spacing: s.shotSpacing," +
+    "    cycle: s.burstCooldown, range: s.rangeUl, hp: s.maxHp, cost: s.cost," +
+    "    rate: s.attacksPerSecond(), pierce: s.armorPierce," +
+    "    a1: s.upgradeCost('A1'), b5: s.upgradeCost('B5')," +
+    "    recruitCd: s.resolvedRecruitCooldown() }; })()");
+  t.deep(rifle, { dmg: 1, shots: 3, spacing: 0.15, cycle: 1.2, range: 100,
+    hp: 80, cost: 300, rate: 2.5, pierce: 0, a1: 200, b5: 3800, recruitCd: 45 },
+    "an unperked Rifleman is the authored Rifleman");
+
+  var war = h.run("(function () { var s = new Smasher(400, 200, path); addTower(s);" +
+    "  return { dmg: s.attackDamage(), cycle: s.cooldownSeconds, range: s.rangeUl," +
+    "    hp: s.maxHp, cost: s.cost, camo: !!s.seesCamo, blast: s.explosionDamage," +
+    "    blastR: s.explosionRadiusUl, a1: s.upgradeCost('A1') }; })()");
+  t.deep(war, { dmg: 14, cycle: 3.2, range: 40, hp: 150, cost: 600, camo: false,
+    blast: 15, blastR: 18.75, a1: 250 },
+    "an unperked Warbringer is the authored Warbringer");
+
+  var sniper = h.run("(function () { var s = new LongshotTower(600, 200, path);" +
+    "  addTower(s);" +
+    "  return { dmg: s.core.stats.damage, range: s.rangeUl, rate: s.attacksPerSecond()," +
+    "    hp: s.maxHp, cost: s.cost, foot: s.footprintRadiusUl," +
+    "    crit: s.core.stats.critChance, critDmg: s.core.stats.critDamage," +
+    "    decay: s.core.stats.mechanics.pierceFalloff.decay," +
+    "    reload: s.core.stats.mechanics.reload.reloadDurationSeconds," +
+    "    stackFor: s.core.stats.mechanics.killStackAttackSpeed.stackDurationSeconds," +
+    "    floor: s.core.stats.mechanics.executeScaling.floorFraction," +
+    "    nuke: s.core.stats.mechanics.activeAbility.damage," +
+    "    nukeR: s.core.stats.mechanics.activeAbility.aoeRadius }; })()");
+  t.deep(sniper, { dmg: 10, range: 250, rate: 0.5, hp: 100, cost: 900, foot: 20,
+    crit: 0, critDmg: 100, decay: 0.95, reload: 1, stackFor: 4, floor: 0.90,
+    nuke: 18000, nukeR: 25 },
+    "an unperked Arcane Sniper is the authored Arcane Sniper");
+
+  // AND THE PLACEMENT RULES SEE THE AUTHORED FOOTPRINTS.
+  t.eq(h.run("buildFootprintUl(LongshotTower)"), 20, "the ghost's footprint too");
+});
+
+test("owning a node does nothing; equipping it is what does", function (t) {
+  var h = bootContent();
+
+  // BOUGHT AND LEFT IN THE INVENTORY on all three towers at once, so the claim
+  // is about ownership rather than about one node happening to be inert.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); });" +
+        "MetaProgress.buyNode('soldier', 'rif_n1', 0);" +
+        "MetaProgress.buyNode('smasher', 'war_n1', 0);" +
+        "MetaProgress.buyNode('longshot', 'snp_s1', 0);" +
+        "openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+
+  var owned = h.run("(function () {" +
+    "  var a = new Soldier(200, 200, path); addTower(a);" +
+    "  var b = new Smasher(400, 200, path); addTower(b);" +
+    "  var c = new LongshotTower(600, 200, path); addTower(c);" +
+    "  return { dmg: a.damage, range: b.rangeUl, cost: c.cost, hp: c.maxHp }; })()");
+  t.deep(owned, { dmg: 1, range: 40, cost: 900, hp: 100 },
+    "three bought nodes, none equipped, and nothing has moved");
+  t.eq(h.run("TowerPerks.inventory('soldier').length"), 1,
+    "the node really is owned");
+
+  // NOW EQUIP THEM.
+  h.run("openMenu();" +
+        "MetaProgress.equipPerk('soldier', 'rif_n1', 0);" +
+        "MetaProgress.equipPerk('smasher', 'war_n1', 0);" +
+        "MetaProgress.equipPerk('longshot', 'snp_s1', 0);" +
+        "startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  var live = h.run("(function () {" +
+    "  var a = new Soldier(200, 200, path); addTower(a);" +
+    "  var b = new Smasher(400, 200, path); addTower(b);" +
+    "  var c = new LongshotTower(600, 200, path); addTower(c);" +
+    "  return { dmg: a.damage, range: b.rangeUl, cost: c.cost, hp: c.maxHp }; })()");
+  t.deep(live, { dmg: 2, range: 45, cost: 750, hp: 75 },
+    "equipped, all three land");
+
+  // AND OUT AGAIN, WITHOUT UN-BUYING ANYTHING.
+  h.run("openMenu(); MetaProgress.unequipPerk('soldier', 0);" +
+        "MetaProgress.unequipPerk('smasher', 0);" +
+        "MetaProgress.unequipPerk('longshot', 0);" +
+        "startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  var off = h.run("(function () {" +
+    "  var a = new Soldier(200, 200, path); addTower(a);" +
+    "  var b = new Smasher(400, 200, path); addTower(b);" +
+    "  var c = new LongshotTower(600, 200, path); addTower(c);" +
+    "  return { dmg: a.damage, range: b.rangeUl, cost: c.cost, hp: c.maxHp }; })()");
+  t.deep(off, { dmg: 1, range: 40, cost: 900, hp: 100 },
+    "unequipped before the run, and the towers are authored again");
+  t.eq(h.run("MetaProgress.ownsNode('longshot', 'snp_s1')"), true,
+    "while the node is still owned");
+});
+
+// --- Rifleman ---------------------------------------------------------------
+
+test("Commissioned Ammunition doubles base damage and puts 50 mana on every tier",
 function (t) {
   var h = bootContent();
   var plain = towerWith(h, "soldier", [], []);
   t.eq(h.run(plain + ".damage"), 1, "a plain Rifleman deals 1");
 
   var s = towerWith(h, "soldier", ["rif_n1"], []);
-  t.eq(h.run(s + ".damage"), 2, "with [R-N] it deals 2");
+  t.eq(h.run(s + ".damage"), 2, "with it the Rifleman deals 2");
   t.eq(h.run("TowerPerks.priceOf(Soldier)"), 300, "and still costs 300 to place");
   t.eq(h.run(s + ".cost"), 300, "on the tower itself too");
 
@@ -10567,7 +10767,76 @@ function (t) {
   t.eq(quoted, "250 mana", "and the upgrade button says so");
 });
 
-test("[R-S] makes the Rifleman cheaper to place and touches nothing else",
+test("Long Glass buys reach and muzzle velocity as two separate things",
+function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "soldier", [], []);
+  t.eq(h.run(plain + ".projectileSpeedMult"), 1, "an unperked round flies at the base speed");
+
+  var s = towerWith(h, "soldier", ["rif_n2"], []);
+  t.eq(h.run(s + ".rangeUl"), 110, "reach 100 -> 110");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 350, "placement 300 -> 350");
+  t.near(h.run(s + ".projectileSpeedMult"), 1.25, 1e-9, "rounds fly 25% faster");
+  t.near(h.run(s + ".rangePx"), h.run("elevatedRangePx(" + s + ", 110)"), 1e-9,
+    "and the pixel reach was re-derived with the stat");
+
+  // A FASTER ROUND, NOT A LONGER ONE. The bullet carries the speed; nothing
+  // about how far the tower may shoot came from it.
+  var shot = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {}); e.progress = path.length * 0.5;" +
+    "  e.refreshPos(); tw.x = e.pos.x + 20; tw.y = e.pos.y;" +
+    "  var out = []; for (var i = 0; i < 20 && !out.length; i++)" +
+    "    tw.update(1 / 60, [e], out);" +
+    "  return out.length ? out[0].speedUlps : null; })()");
+  t.near(shot, h.run("Bullet.BASE_SPEED_ULPS") * 1.25, 1e-6,
+    "the round it fires really is 25% quicker");
+});
+
+test("Veteran Rhythm opens a wave down six per cent and climbs back on kills",
+function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "soldier", [], []);
+  t.eq(h.run(plain + ".attacksPerSecond()"), 2.5, "a plain Rifleman fires 2.5 a second");
+
+  var s = towerWith(h, "soldier", ["rif_n3"], []);
+  t.near(h.run(s + ".attacksPerSecond()"), 2.5 * 0.94, 1e-9,
+    "a wave opens at -6%");
+
+  // TWO POINTS A KILL, and the counter it reads is the tower's own lifetime
+  // kills against a per-wave baseline -- which is what makes a recruit's kill,
+  // credited to its owner, count exactly once.
+  [[1, 0.96], [3, 1.00], [6, 1.06], [9, 1.06], [40, 1.06]].forEach(function (row) {
+    var mult = h.run("(function () { var tw = " + towers1() + ";" +
+      "  tw.kills = " + row[0] + "; return tw.rhythmMult(); })()");
+    t.near(mult, row[1], 1e-9, row[0] + " kills reads x" + row[1]);
+  });
+
+  // AND IT IS SPENT AT THE WAVE BOUNDARY. `endWave` is the one exit a wave has.
+  h.run("(function () { var tw = " + towers1() + "; tw.kills = 20; })()");
+  t.near(h.run(towers1() + ".rhythmMult()"), 1.06, 1e-9, "the band is at its top");
+  h.run("endWave(3, 0)");
+  t.near(h.run(towers1() + ".rhythmMult()"), 0.94, 1e-9,
+    "and the next wave opens on the penalty again");
+  t.eq(h.run(towers1() + ".kills"), 20, "without touching the lifetime count");
+
+  // THE CLOCK REALLY MOVES. Fire rate on this tower is three numbers, so the
+  // claim is checked against the burst it actually opens rather than a field.
+  var cycles = h.run("(function () {" +
+    "  var tw = " + towers1() + "; tw.kills = tw.rhythmKillBase;" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos(); e.health = 1e9;" +
+    "  e.maxHealth = 1e9; tw.x = e.pos.x + 20; tw.y = e.pos.y;" +
+    "  tw.cooldown = 0; tw.burstShotsLeft = 0;" +
+    "  var opens = [], clock = 0;" +
+    "  for (var i = 0; i < 600; i++) {" +
+    "    var was = tw.burstShotsLeft; tw.update(1 / 60, [e], []);" +
+    "    if (was === 0 && tw.burstShotsLeft > 0) opens.push(clock);" +
+    "    clock += 1 / 60; }" +
+    "  return opens.length > 2 ? opens[2] - opens[1] : null; })()");
+  t.near(cycles, 1.2 / 0.94, 0.02, "a wave-opening burst cycle is 1.2 / 0.94 s");
+});
+
+test("Cheap Receiver makes the Rifleman cheaper to place and touches nothing else",
 function (t) {
   var h = bootContent();
   var s = towerWith(h, "soldier", ["rif_s1"], []);
@@ -10579,7 +10848,48 @@ function (t) {
   t.eq(h.run(s + ".upgradeCost('B5')"), 3800, "including the last one");
 });
 
-test("[R-A] gives path A one more burst shot from A3, and never an automatic one",
+test("Advance Unit discounts the first Rifleman of a run and taxes the rest",
+function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "MetaProgress.addXp('soldier', 20000);" +
+        "MetaProgress.buyNode('soldier', 'rif_s2', 0);" +
+        "MetaProgress.equipPerk('soldier', 'rif_s2', 0);" +
+        "openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 200, "the first is quoted at 200");
+  // A HOVER, A GHOST AND A REFUSED CLICK MOVE NOTHING. Only `addTower` counts.
+  h.run("previewRangePx(Soldier, 300, 300); whyCannotBuild(300, 300, Soldier)");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 200, "and previewing does not spend it");
+
+  var paid = [];
+  for (var i = 0; i < 3; i++) {
+    paid.push(h.run("(function () { var before = cash;" +
+      "  var s = new Soldier(" + (200 + i * 60) + ", 200, path); addTower(s);" +
+      "  cash -= s.cost; return { cost: s.cost, spent: before - cash }; })()"));
+  }
+  t.eq(paid[0].cost, 200, "the first Rifleman placed really costs 200");
+  t.eq(paid[1].cost, 340, "the second costs 340");
+  t.eq(paid[2].cost, 340, "and so does every one after it");
+  t.eq(paid[0].spent, 200, "the till charged what the tower was given");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 340, "and the bar now quotes 340");
+
+  // A NEW RUN IS A NEW COUNT.
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 200, "the next run opens on 200 again");
+
+  // WITH CHEAP RECEIVER, 150 AND 290, whichever slots the two sit in.
+  ["forwards", "backwards"].forEach(function (order) {
+    var ids = order === "forwards" ? ["rif_s1", "rif_s2"] : ["rif_s2", "rif_s1"];
+    towerWith(h, "soldier", ids, []);
+    t.eq(h.run("towers[0].cost"), 150, order + ": the first costs 150");
+    var second = h.run("(function () { var s = new Soldier(320, 200, path);" +
+      "  addTower(s); return s.cost; })()");
+    t.eq(second, 290, order + ": every later one costs 290");
+  });
+});
+
+test("Overloaded Drum gives path A one more burst shot from A3, and never an automatic one",
 function (t) {
   var h = bootContent();
 
@@ -10591,23 +10901,21 @@ function (t) {
       "normal " + row[0] + " fires " + row[1]);
   });
 
-  // ONE SHOT, FROM A3, AND IT PERSISTS. Nothing at A1 or A2 -- the node granted
-  // two at A2 and a third at A3 until the owner cut it on 2026-08-30.
+  // ONE SHOT, FROM A3, AND IT PERSISTS.
   [["A1", 3], ["A2", 4], ["A3", 5], ["A4", 6], ["A5", 6]].forEach(function (row, i) {
     var tiers = ["A1", "A2", "A3", "A4", "A5"].slice(0, i + 1);
     var s = towerWith(h, "soldier", ["rif_a1"], tiers);
     t.eq(h.run(s + ".shotsPerBurst"), row[1],
-      "with [R-A] " + row[0] + " fires " + row[1]);
+      "with Overloaded Drum " + row[0] + " fires " + row[1]);
   });
 
-  // ONE SURCHARGE, AND ONLY ONE. A2's went with the shots it was paying for.
+  // NO MANA SURCHARGE AT ALL. It carried +100 on A3 until 2026-08-31; the
+  // confirmed node states its whole effect and does not include one.
   var s = towerWith(h, "soldier", ["rif_a1"], []);
-  t.eq(h.run(s + ".upgradeCost('A1')"), 200, "A1 is unchanged");
-  t.eq(h.run(s + ".upgradeCost('A2')"), 325, "A2 is unchanged");
-  t.eq(h.run(s + ".upgradeCost('A3')"), 800, "A3 costs 100 more");
-  t.eq(h.run(s + ".upgradeCost('A4')"), 1900, "A4 is unchanged");
-  t.eq(h.run(s + ".upgradeCost('A5')"), 3275, "A5 is unchanged");
-  t.eq(h.run(s + ".upgradeCost('B4')"), 2100, "and path B is untouched");
+  ["A1", "A2", "A3", "A4", "A5", "B4"].forEach(function (id, i) {
+    t.eq(h.run(s + ".upgradeCost('" + id + "')"),
+      [200, 325, 700, 1900, 3275, 2100][i], id + " costs its authored price");
+  });
 
   // AN AUTOMATIC RIFLEMAN GAINS NOTHING. B3 switches the fire mode, and an
   // automatic Rifleman fires on `shotsPerSecond`, which is derived from the
@@ -10620,7 +10928,97 @@ function (t) {
     "and its rate of fire is exactly the normal one");
 });
 
-test("[R-B] sends three recruits at B4 and five at B5, and nothing else moves",
+test("Breach Chamber doubles the last shot of a completed burst and shaves the rest",
+function (t) {
+  var h = bootContent();
+
+  // A5 ONLY. At A4 the node is inert and every shot is the tower's damage.
+  var a4 = burstDamages(h, towerWith(h, "soldier", ["rif_a2"],
+    ["A1", "A2", "A3", "A4"]));
+  t.deep(a4, [4, 4, 4, 4, 4], "at A4 the burst is five plain shots of 4");
+
+  var a5 = burstDamages(h, towerWith(h, "soldier", ["rif_a2"],
+    ["A1", "A2", "A3", "A4", "A5"]));
+  t.deep(a5, [7.2, 7.2, 7.2, 7.2, 16],
+    "at A5 four shots at 7.2 and a last one at 16");
+
+  // THE LAST SHOT IS THE RESOLVED LAST SHOT. With Overloaded Drum the burst is
+  // six long and the doubled round is the sixth, not the fifth.
+  var both = burstDamages(h, towerWith(h, "soldier", ["rif_a2", "rif_a1"],
+    ["A1", "A2", "A3", "A4", "A5"]));
+  t.deep(both, [7.2, 7.2, 7.2, 7.2, 7.2, 16],
+    "with Overloaded Drum it is the sixth round that doubles");
+
+  // A BURST THAT ENDS EARLY PROMOTES NOBODY. The window is emptied before the
+  // last shot is owed, and nothing that did fire is retroactively doubled.
+  var cut = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = e.pos.x + 20; tw.y = e.pos.y;" +
+    "  tw.cooldown = 0; tw.burstShotsLeft = 0; tw.shotTimer = 0;" +
+    "  var out = [];" +
+    "  for (var i = 0; i < 200; i++) {" +
+    "    tw.update(1 / 60, [e], out);" +
+    "    if (out.length === 3) { e.dead = true; }" +
+    "    if (tw.burstShotsLeft === 0 && out.length >= 3) break; }" +
+    "  return out.map(function (b) { return b.damage; }); })()");
+  t.deep(cut, [7.2, 7.2, 7.2],
+    "three reduced shots and no doubled one when the burst collapses");
+});
+
+test("Ratchet Pressure lends the next cycle exactly one modifier", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "soldier", ["rif_a3"], []);
+  t.near(h.run(s + ".ratchetGain"), 0.88, 1e-9, "a clean burst pays 12%");
+  t.near(h.run(s + ".ratchetLoss"), 1.15, 1e-9, "a collapsed one costs 15%");
+  t.eq(h.run(s + ".ratchetPending"), 1, "and nothing is owed at birth");
+
+  // A CLEAN BURST, then the cycle it lends to, then a cycle judged on its own.
+  var run = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = e.pos.x + 20; tw.y = e.pos.y;" +
+    "  var opens = [], settled = [];" +
+    "  for (var i = 0; i < 400; i++) {" +
+    "    var was = tw.burstShotsLeft; tw.update(1 / 60, [e], []);" +
+    "    if (was === 0 && tw.burstShotsLeft > 0) opens.push(tw.cooldown);" +
+    "    if (was > 0 && tw.burstShotsLeft === 0) settled.push(tw.ratchetPending); }" +
+    "  return { opens: opens.slice(0, 3), settled: settled.slice(0, 3) }; })()");
+  t.near(run.opens[0], 1.2, 1e-9, "the first cycle is the authored 1.2 s");
+  t.near(run.opens[1], 1.2 * 0.88, 1e-9, "the one after a clean burst is 12% shorter");
+  t.near(run.opens[2], 1.2 * 0.88, 1e-9,
+    "and so is the next, because that burst was clean too");
+  // ONE MODIFIER, NEVER TWO: each burst leaves exactly 0.88 owed, and the
+  // opening above spends it -- so it is 0.88 again after the next burst rather
+  // than 0.88 x 0.88.
+  t.deep(run.settled, [0.88, 0.88, 0.88],
+    "every clean burst leaves exactly one twelve-per-cent modifier owed");
+
+  // A COLLAPSED WINDOW COSTS 15%, and one missed shot costs nothing at all.
+  [[3, 1.15], [1, 1], [0, 0.88]].forEach(function (row) {
+    var next = h.run("(function () { var tw = " + towers1() + ";" +
+      "  tw.ratchetPending = 1; tw.burstMissed = " + row[0] + ";" +
+      "  tw.settleRatchet(); return tw.ratchetPending; })()");
+    t.near(next, row[1], 1e-9,
+      row[0] + " lost shots lends x" + row[1]);
+  });
+
+  // AND NOTHING REACHES B3'S AUTOMATIC FIRE.
+  var auto = towerWith(h, "soldier", ["rif_a3"], ["B1", "B2", "B3"]);
+  var plainAuto = h.run(towerWith(h, "soldier", [], ["B1", "B2", "B3"]) +
+    ".attacksPerSecond()");
+  t.eq(h.run(auto + ".automatic"), true, "the tower is automatic");
+  t.eq(h.run(auto + ".attacksPerSecond()"), plainAuto,
+    "and fires at exactly the normal rate");
+  var held = h.run("(function () { var tw = " + towers1() + ";" +
+    "  for (var i = 0; i < 200; i++) tw.update(1 / 60, [], []);" +
+    "  return tw.ratchetPending; })()");
+  t.eq(held, 1, "an automatic Rifleman never banks a modifier");
+});
+
+test("Reinforcement Manifest sends three recruits at B4 and five at B5",
 function (t) {
   var h = bootContent();
 
@@ -10631,10 +11029,10 @@ function (t) {
   var normal = h.run("(function () { var tw = towers[towers.length - 1];" +
     "  return { hp: tw.recruitHp, dmg: tw.recruitDamage," +
     "           rate: tw.recruitShotsPerSecond, range: tw.recruitRangeUl," +
-    "           cd: tw.recruitCooldownSeconds }; })()");
+    "           cd: tw.resolvedRecruitCooldown() }; })()");
 
   var s4 = towerWith(h, "soldier", ["rif_b1"], ["B1", "B2", "B3", "B4"]);
-  t.eq(h.run(s4 + ".recruitCount"), 3, "with [R-B] B4 sends 3");
+  t.eq(h.run(s4 + ".recruitCount"), 3, "with it B4 sends 3");
   t.eq(h.run(s4 + ".upgradeCost('B4')"), 2300, "and B4 costs 2300");
 
   var s5 = towerWith(h, "soldier", ["rif_b1"], ["B1", "B2", "B3", "B4", "B5"]);
@@ -10645,7 +11043,7 @@ function (t) {
   var perked = h.run("(function () { var tw = towers[towers.length - 1];" +
     "  return { hp: tw.recruitHp, dmg: tw.recruitDamage," +
     "           rate: tw.recruitShotsPerSecond, range: tw.recruitRangeUl," +
-    "           cd: tw.recruitCooldownSeconds }; })()");
+    "           cd: tw.resolvedRecruitCooldown() }; })()");
   t.deep(perked, normal, "no other recruit number moved");
 
   // A RIFLEMAN THAT NEVER BOUGHT B4 GAINS NOTHING FROM IT.
@@ -10654,272 +11052,1084 @@ function (t) {
   t.eq(h.run(bare + ".recruitCount"), 2, "and the base count is untouched");
 });
 
-test("the Rifleman's roots stack exactly as authored", function (t) {
+test("Rapid Muster and Entrenchment Protocol resolve 45 / 40 / 55 / 45",
+function (t) {
+  var h = bootContent();
+
+  // THE TABLE, AND IT IS A STATED EXCEPTION RATHER THAN ARITHMETIC: two hands
+  // on the same clock cancel, so the pair is back on the tower's own 45.
+  [[[], 45], [["rif_b2"], 40], [["rif_b4"], 55],
+   [["rif_b2", "rif_b4"], 45], [["rif_b4", "rif_b2"], 45]].forEach(function (row) {
+    var s = towerWith(h, "soldier", row[0], ["B1", "B2", "B3", "B4"]);
+    t.eq(h.run(s + ".resolvedRecruitCooldown()"), row[1],
+      "[" + row[0].join(", ") + "] -> " + row[1] + " s");
+    t.eq(h.run(s + ".recruitStats().cooldownSeconds"), row[1],
+      "and the squad is sent on that clock");
+  });
+
+  // NEITHER REQUIRES THE OTHER, and the tree says so.
+  var nodes = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return n.id === 'rif_b2' || n.id === 'rif_b4'; })" +
+    "  .map(function (n) { return (n.requires || []).length; })");
+  t.deep(nodes, [0, 0], "both are roots and neither needs the other");
+
+  // RAPID MUSTER'S RECRUITS ARE THINNER.
+  var b4 = towerWith(h, "soldier", ["rif_b2"], ["B1", "B2", "B3", "B4"]);
+  t.near(h.run(b4 + ".recruitHp"), 18, 1e-9, "a B4 recruit has 18 health, not 20");
+  var b5 = towerWith(h, "soldier", ["rif_b2"], ["B1", "B2", "B3", "B4", "B5"]);
+  t.near(h.run(b5 + ".recruitHp"), 36, 1e-9, "a B5 recruit has 36, not 40");
+  t.eq(h.run(b5 + ".recruitDamage"), 3, "and nothing else about it moved");
+
+  // A RECRUIT ALREADY ON THE ROAD KEEPS THE BODY IT WAS CALLED WITH.
+  var kept = h.run("(function () { var tw = " + towers1() + ";" +
+    "  tw.callRecruits(); tw.updateRecruits(1, [], []);" +
+    "  var born = tw.recruits[0].maxHp;" +
+    "  MetaProgress.unequipPerk('soldier', 0); tw.recalcStats();" +
+    "  return { born: born, still: tw.recruits[0].maxHp }; })()");
+  t.near(kept.born, 36, 1e-9, "it was born with 36");
+  t.eq(kept.still, kept.born, "and still has 36 whatever the tower is told later");
+});
+
+test("Piercing Orders ignores two points of flat armor and never percentage defense",
+function (t) {
+  var h = bootContent();
+
+  // NOT BELOW B3.
+  var b2 = towerWith(h, "soldier", ["rif_b3"], ["B1", "B2"]);
+  t.eq(h.run(b2 + ".armorPierce"), 0, "nothing at B2");
+  t.eq(h.run(b2 + ".fireRateMult"), 1, "and no rate penalty either");
+
+  var s = towerWith(h, "soldier", ["rif_b3"], ["B1", "B2", "B3"]);
+  t.eq(h.run(s + ".armorPierce"), 2, "two flat points from B3");
+  t.eq(h.run(s + ".recruitArmorPierce"), 2, "and the same for its recruits");
+  t.eq(h.run(s + ".defenseFlatPierce"), 0,
+    "and NOT one point of percentage defence — B4's stat is a different stat");
+  t.near(h.run(s + ".fireRateMult"), 0.95, 1e-9, "both fire 5% slower");
+  t.near(h.run(s + ".recruitShotsPerSecond"), 2 * 0.95, 1e-9,
+    "the recruits' rate carries it too");
+
+  // WHAT AN ARMOURED BODY ACTUALLY TAKES. A Brute carries 5 flat armor.
+  var landed = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'brute', {});" +
+    "  return { armor: e.armor," +
+    "    plain: Mitigation.mitigate(10, e, 0, 0, 0)," +
+    "    pierced: Mitigation.mitigate(10, e, 0, 0, 2) }; })()");
+  t.eq(landed.armor, 5, "a Brute has five points of flat armor");
+  t.eq(landed.plain, 5, "ten damage normally lands five");
+  t.eq(landed.pierced, 7, "and seven with two points ignored");
+
+  // THE BODY'S OWN ARMOR IS NEVER EDITED, which is exactly what separates this
+  // from the Warbringer's Fracture Stamp.
+  var untouched = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'brute', {});" +
+    "  e.takeDamage(10, 0, 0, undefined, 2); return e.armor; })()");
+  t.eq(untouched, 5, "the Brute still has five points afterwards");
+
+  // AND PERCENTAGE DEFENCE IS UNTOUCHED. An Armored enemy's 20% stays 20%.
+  var defended = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'armored', {});" +
+    "  return { def: e.defense," +
+    "    plain: Mitigation.mitigate(100, e, 0, 0, 0)," +
+    "    pierced: Mitigation.mitigate(100, e, 0, 0, 2) }; })()");
+  t.eq(defended.pierced, defended.plain,
+    "flat armor pierce does nothing at all to a body with only defence");
+});
+
+test("an entrenched recruit is braced, and moving ends it", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "soldier", ["rif_b4"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(s + ".recruitEntrenchSeconds"), 1.5, "the node sets the 1.5 s");
+
+  var dug = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  var r = new SoldierRecruit(path, tw, true, tw.recruitStats());" +
+    "  e.progress = r.progress - ul(40); e.refreshPos();" +
+    "  var ring = ul(r.rangeUl);" +
+    "  var seen = [];" +
+    "  for (var i = 0; i < 120; i++) {" +
+    "    r.update(1 / 60, [e], []);" +
+    "    seen.push({ t: +(i / 60).toFixed(3), dug: r.entrenched," +
+    "                px: r.rangePx, taken: r.damageTakenMult }); }" +
+    "  var before = seen[Math.round(1.4 * 60) - 1];" +
+    "  var after = seen[Math.round(1.6 * 60) - 1];" +
+    "  e.dead = true;" +
+    "  r.update(1 / 60, [], []);" +
+    "  return { ring: ring, before: before, after: after," +
+    "           moved: { dug: r.entrenched, px: r.rangePx," +
+    "                    taken: r.damageTakenMult } }; })()");
+
+  t.eq(dug.before.dug, false, "at 1.4 s it is still merely standing");
+  t.near(dug.before.px, dug.ring, 1e-6, "with its ordinary reach");
+  t.eq(dug.after.dug, true, "at 1.6 s it has dug in");
+  t.near(dug.after.px, dug.ring * 1.25, 1e-6, "and sees a quarter further");
+  t.near(dug.after.taken, 0.75, 1e-9, "and takes a quarter less");
+  t.eq(dug.moved.dug, false, "the moment it walks again it is out of it");
+  t.near(dug.moved.px, dug.ring, 1e-6, "the ring comes back in");
+  t.near(dug.moved.taken, 1, 1e-9, "and so does the damage it takes");
+
+  // THE FIRE RATE, MEASURED AS SHOTS RATHER THAN AS A FIELD.
+  var rate = h.run("(function () { var tw = " + towers1() + ";" +
+    "  function shots(entrench) {" +
+    "    var stats = tw.recruitStats(); stats.entrenchSeconds = entrench;" +
+    "    var e = new Enemy(path, null, 'normal', {});" +
+    "    e.health = 1e9; e.maxHealth = 1e9;" +
+    "    var r = new SoldierRecruit(path, tw, true, stats);" +
+    "    e.progress = r.progress - ul(40); e.refreshPos();" +
+    "    var out = [];" +
+    "    for (var i = 0; i < 60 * 5; i++) r.update(1 / 60, [e], out);" +
+    "    return out.length; }" +
+    "  return { plain: shots(0), dug: shots(1.5) }; })()");
+  t.ok(rate.dug > rate.plain,
+    "a dug-in recruit gets more shots away (" + rate.plain + " -> " + rate.dug + ")");
+
+  // AND IT STILL WALKS AT ITS ORDINARY SPEED.
+  var speed = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var r = new SoldierRecruit(path, tw, true, tw.recruitStats());" +
+    "  return r.speedUlps; })()");
+  t.eq(speed, h.run("Soldier.RECRUIT_SPEED_ULPS"), "nothing slowed it down");
+});
+
+test("the Rifleman's confirmed nodes compose without an order mattering",
+function (t) {
   var h = bootContent();
 
   var both = towerWith(h, "soldier", ["rif_n1", "rif_s1"], []);
-  t.eq(h.run(both + ".damage"), 2, "north + south: 2 damage");
+  t.eq(h.run(both + ".damage"), 2, "damage + build price: 2 damage");
   t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "placed for 250");
   t.eq(h.run(both + ".upgradeCost('A1')"), 250, "and the tiers still pay +50");
 
   var nb = towerWith(h, "soldier", ["rif_n1", "rif_b1"], ["B1", "B2", "B3", "B4"]);
-  t.eq(h.run(nb + ".upgradeCost('B4')"), 2350, "north + east: B4 costs 2350");
-  t.eq(h.run(nb + ".upgradeCost('B5')"), 4200, "and B5 costs 4200");
+  t.eq(h.run(nb + ".upgradeCost('B4')"), 2350, "B4 costs 2350 under both");
   t.eq(h.run(nb + ".recruitCount"), 3, "with three recruits at B4");
-  var nb5 = towerWith(h, "soldier", ["rif_n1", "rif_b1"],
-    ["B1", "B2", "B3", "B4", "B5"]);
-  t.eq(h.run(nb5 + ".recruitCount"), 5, "and five at B5");
 
-  var na = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2"]);
-  t.eq(h.run(na + ".upgradeCost('A2')"), 375, "north + west: A2 pays north's 50 only");
-  t.eq(h.run(na + ".shotsPerBurst"), 4, "and still fires 4");
-  var na3 = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2", "A3"]);
-  t.eq(h.run(na3 + ".upgradeCost('A3')"), 850, "A3 pays both, so 850");
-  t.eq(h.run(na3 + ".shotsPerBurst"), 5, "and fires 5");
-  var na4 = towerWith(h, "soldier", ["rif_n1", "rif_a1"], ["A1", "A2", "A3", "A4"]);
-  t.eq(h.run(na4 + ".upgradeCost('A4')"), 1950, "A4 costs 1950");
-  t.eq(h.run(na4 + ".shotsPerBurst"), 6, "and fires 6");
-  var na5 = towerWith(h, "soldier", ["rif_n1", "rif_a1"],
-    ["A1", "A2", "A3", "A4", "A5"]);
-  t.eq(h.run(na5 + ".upgradeCost('A5')"), 3325, "A5 costs 3325");
-  t.eq(h.run(na5 + ".shotsPerBurst"), 6, "and still fires 6");
+  // REACH AND DAMAGE FROM DIFFERENT BRANCHES.
+  var glass = towerWith(h, "soldier", ["rif_n1", "rif_n2"], []);
+  t.eq(h.run(glass + ".rangeUl"), 110, "reach is Long Glass's alone");
+  t.eq(h.run(glass + ".damage"), 2, "damage is Commissioned Ammunition's alone");
+  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 350, "and only Long Glass moves the price");
 
-  // ALL FOUR AT ONCE.
-  // A3 is bought here, so the tier's own damage is in play too -- the claim is
-  // that north still adds its one point on top, measured rather than assumed.
-  var plainA3 = h.run(towerWith(h, "soldier", [], ["A1", "A2", "A3"]) + ".damage");
-  var all = towerWith(h, "soldier", ["rif_n1", "rif_s1", "rif_a1", "rif_b1"],
-    ["A1", "A2", "A3"]);
-  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "all four: placed for 250");
-  t.eq(h.run(all + ".damage"), plainA3 + 1, "north's point of damage on top");
-  t.eq(h.run(all + ".shotsPerBurst"), 5, "path A's burst bonus is live at A3");
-  t.eq(h.run(all + ".upgradeCost('A3')"), 850, "A3 pays both surcharges once");
-  t.eq(h.run(all + ".upgradeCost('A2')"), 375, "A2 pays only north's");
-  t.eq(h.run(all + ".upgradeCost('B4')"), 2350, "and B4 pays both");
+  // FIVE AT ONCE, IN BOTH ORDERS, on a finished path A.
+  var A5 = ["A1", "A2", "A3", "A4", "A5"];
+  var forwards = towerWith(h, "soldier",
+    ["rif_n1", "rif_n2", "rif_a1", "rif_a2", "rif_s1"], A5);
+  var fw = h.run("(function () { var tw = " + forwards + ";" +
+    "  return { dmg: tw.damage, shots: tw.shotsPerBurst, range: tw.rangeUl," +
+    "    price: TowerPerks.priceOf(Soldier), a5: tw.upgradeCost('A5')," +
+    "    fin: tw.burstFinalShotMult, early: tw.burstEarlyShotMult }; })()");
+  var backwards = towerWith(h, "soldier",
+    ["rif_s1", "rif_a2", "rif_a1", "rif_n2", "rif_n1"], A5);
+  var bw = h.run("(function () { var tw = " + backwards + ";" +
+    "  return { dmg: tw.damage, shots: tw.shotsPerBurst, range: tw.rangeUl," +
+    "    price: TowerPerks.priceOf(Soldier), a5: tw.upgradeCost('A5')," +
+    "    fin: tw.burstFinalShotMult, early: tw.burstEarlyShotMult }; })()");
+  t.deep(fw, { dmg: 9, shots: 6, range: 125, price: 300, a5: 3325,
+    fin: 2, early: 0.9 }, "five equipped nodes resolve to one stated tower");
+  t.deep(bw, fw, "and the slots they sit in change nothing");
 });
 
-test("unequipping a Rifleman perk restores the normal numbers without un-buying it",
-function (t) {
-  var h = bootContent();
-  towerWith(h, "soldier", ["rif_n1", "rif_s1"], []);
-  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 250, "the perks are live");
+// --- Warbringer -------------------------------------------------------------
 
-  h.run("openMenu(); MetaProgress.unequipPerk('soldier', 0);" +
-        "MetaProgress.unequipPerk('soldier', 1)");
-  t.eq(h.run("MetaProgress.ownsNode('soldier', 'rif_n1')"), true,
-    "the node is still owned");
-  t.eq(h.run("TowerPerks.inventory('soldier').length"), 2,
-    "and still in the inventory");
-
-  h.run("startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000; towers = [];" +
-        "addTower(new Soldier(200, 200, path))");
-  t.eq(h.run("TowerPerks.priceOf(Soldier)"), 300, "the next run pays 300 again");
-  t.eq(h.run("towers[0].damage"), 1, "and deals 1 again");
-  t.eq(h.run("towers[0].upgradeCost('A1')"), 200, "with the authored tier price");
-});
-
-test("the Warbringer's tree is four roots and one child behind the A root",
-function (t) {
-  var h = bootContent();
-  var nodes = h.run("TowerPerks.nodes('smasher')");
-  t.eq(nodes.length, 5, "five nodes, and no sixth invented");
-
-  var byId = {};
-  nodes.forEach(function (n) { byId[n.id] = n; });
-  t.ok(byId.war_n1 && byId.war_a1 && byId.war_a2 && byId.war_b1 && byId.war_s1,
-    "the five authored ids are all present");
-
-  t.ok(byId.war_n1.at.y < 0 && byId.war_n1.at.x === 0, "range is north");
-  t.ok(byId.war_a1.at.x < 0 && byId.war_a1.at.y === 0, "path A speed is west");
-  t.ok(byId.war_b1.at.x > 0 && byId.war_b1.at.y === 0, "path B damage is east");
-  t.ok(byId.war_s1.at.y > 0 && byId.war_s1.at.x === 0, "the range rebuild is south");
-
-  // THE CHILD IS NOT A FIFTH ROOT: it sits further out on the same branch and
-  // its only prerequisite is the root it grows from.
-  t.deep(byId.war_a2.requires, ["war_a1"], "the child needs the A root and only it");
-  t.ok(byId.war_a2.at.x < byId.war_a1.at.x,
-    "and is drawn further out along that branch");
-
-  [byId.war_n1, byId.war_a1, byId.war_b1, byId.war_s1].forEach(function (n) {
-    t.deep(n.requires || [], [], n.id + " is a root");
-  });
-  nodes.forEach(function (n) {
-    t.eq(n.minLevel || 0, 0, n.id + " needs no level");
-    t.ok(/^\[W-/.test(n.name), n.id + " carries a placeholder name: " + n.name);
-  });
-  t.eq(new Set(nodes.map(function (n) { return n.icon; })).size, 5,
-    "no two share an icon");
-
-  t.deep([100, 120, 150, 120, 80],
-    [byId.war_n1.cost, byId.war_a1.cost, byId.war_a2.cost,
-     byId.war_b1.cost, byId.war_s1.cost],
-    "the authored meta-coin prices");
-
-  // THE PREREQUISITE GATES THE PURCHASE AND NOTHING ELSE.
-  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
-  for (var i = 0; i < 20; i++) {
-    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
-      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
-  }
-  t.eq(h.run("TowerPerks.stateOf('smasher', 'war_a2').state"), "locked",
-    "the child cannot be bought before its root");
-  h.run("TowerPerks.buy('smasher', 'war_a1')");
-  t.eq(h.run("TowerPerks.buy('smasher', 'war_a2').ok"), true,
-    "and can once the root is bought");
-  h.run("MetaProgress.addXp('smasher', 20000)");
-  t.eq(h.run("MetaProgress.equipPerk('smasher', 'war_a2', 0).ok"), true,
-    "the child may be equipped WITHOUT its parent in a slot");
-  t.eq(h.run("MetaProgress.equippedPerks('smasher').indexOf('war_a1')"), -1,
-    "the parent really is not equipped");
-});
-
-test("[W-N] adds five u.l. of base reach for a hundred mana", function (t) {
+test("Long Haft adds five u.l. of base reach for a hundred mana", function (t) {
   var h = bootContent();
   var plain = towerWith(h, "smasher", [], []);
   t.eq(h.run(plain + ".rangeUl"), 40, "a plain Warbringer reaches 40");
   t.eq(h.run("TowerPerks.priceOf(Smasher)"), 600, "and costs 600");
 
   var s = towerWith(h, "smasher", ["war_n1"], []);
-  t.eq(h.run(s + ".rangeUl"), 45, "with [W-N] it reaches 45");
+  t.eq(h.run(s + ".rangeUl"), 45, "with it the Warbringer reaches 45");
   t.eq(h.run("TowerPerks.priceOf(Smasher)"), 700, "and costs 700");
   t.eq(h.run(s + ".upgradeCost('A1')"), 250, "no tier price moves");
   t.eq(h.run(s + ".upgradeCost('B5')"), 2900, "not one of them");
 });
 
-test("[W-A] adds 0.15 attacks a second from A4, as a RATE and not a subtraction",
+test("Dense Hammerhead adds its third of a second BEFORE any later multiplier",
+function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "smasher", ["war_n2"], []);
+  t.eq(h.run(s + ".attackDamage()"), 18, "+4 base swing damage");
+  t.near(h.run(s + ".cooldownSeconds"), 3.5, 1e-9, "and 0.30 s on the cycle");
+  t.eq(h.run(s + ".explosionDamage"), 15, "the blast is untouched");
+
+  // THE ORDER IS THE NODE. `preAdd` lands before `mul`, so the pair reads
+  // (3.2 + 0.3) / 1.1 and not 3.2 / 1.1 + 0.3 -- 3.182 s against 3.209 s.
+  var pair = towerWith(h, "smasher", ["war_n2", "war_s2"], []);
+  t.near(h.run(pair + ".cooldownSeconds"), (3.2 + 0.3) / 1.1, 1e-9,
+    "with Light Haft the cycle is (3.2 + 0.3) / 1.1");
+  t.ok(Math.abs(h.run(pair + ".cooldownSeconds") - (3.2 / 1.1 + 0.3)) > 0.02,
+    "and emphatically not 3.2 / 1.1 + 0.3");
+  t.eq(h.run(pair + ".attackDamage()"), 16, "+4 then -2 is +2 on the damage");
+
+  // THE REVERSAL IS THE TRADE. On a late-tier cycle the third of a second
+  // costs more than the four points buy back, and that is confirmed content.
+  var lateP = h.run(towerWith(h, "smasher", [], ["B1", "B2", "B3", "B4", "B5"]) +
+    ".attackDamage()");
+  var lateC = h.run(towers1() + ".cooldownSeconds");
+  var late = towerWith(h, "smasher", ["war_n2"], ["B1", "B2", "B3", "B4", "B5"]);
+  var dps = h.run("(function () { var tw = " + late + ";" +
+    "  return tw.attackDamage() / tw.cooldownSeconds; })()");
+  t.ok(dps < lateP / lateC,
+    "a finished path B swings for less DPS with it (" +
+    (lateP / lateC).toFixed(2) + " -> " + dps.toFixed(2) + ")");
+});
+
+test("Witchlight Dust buys camo at the price of everything else", function (t) {
+  var h = bootContent();
+  var plain = towerWith(h, "smasher", [], []);
+  t.eq(h.run(plain + ".seesCamo"), false, "a Warbringer normally sees no camo");
+
+  var s = towerWith(h, "smasher", ["war_n3"], []);
+  t.eq(h.run(s + ".seesCamo"), true, "with it, it does");
+  t.near(h.run(s + ".nonCamoDamageMult"), 0.85, 1e-9, "for 15% off everything else");
+
+  // IT MAY NOW START A SWING ON A CAMO BODY. `sightedIn` is the trigger half of
+  // the rule; the wedge always damaged them.
+  var sees = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var c = new Enemy(path, null, 'camo_normal', {});" +
+    "  c.progress = path.length * 0.5; c.refreshPos();" +
+    "  tw.x = c.pos.x; tw.y = c.pos.y;" +
+    "  return tw.sightedIn([c]); })()");
+  t.eq(sees, true, "a camo body is something it can swing at");
+
+  // AND WHAT EACH KIND TAKES.
+  var dealt = h.run("(function () { var tw = " + towers1() + ";" +
+    "  function hit(type) {" +
+    "    var e = new Enemy(path, null, type, {});" +
+    "    e.progress = path.length * 0.5; e.refreshPos();" +
+    "    e.health = 1e9; e.maxHealth = 1e9;" +
+    "    tw.x = e.pos.x; tw.y = e.pos.y;" +
+    "    tw.swing([e], [e]); return e.lastDamageTaken; }" +
+    "  return { camo: hit('camo_normal'), plain: hit('normal') }; })()");
+  t.near(dealt.camo, 14, 1e-9, "a camo body takes the full 14 — normal, not more");
+  t.near(dealt.plain, 14 * 0.85, 1e-9, "and everything else takes 11.9");
+});
+
+test("Extended Stance rebuilds path B's reach onto the base", function (t) {
+  var h = bootContent();
+  var ladder = [[[], 57.5], [["B1"], 60.5], [["B1", "B2"], 71.5],
+    [["B1", "B2", "B3"], 71.5], [["B1", "B2", "B3", "B4"], 77.5],
+    [["B1", "B2", "B3", "B4", "B5"], 92.5]];
+  ladder.forEach(function (row) {
+    var s = towerWith(h, "smasher", ["war_s1"], row[0]);
+    t.eq(h.run(s + ".rangeUl"), row[1],
+      "after [" + row[0].join(",") + "] it reaches " + row[1]);
+    t.near(h.run(s + ".rangePx"), h.run("elevatedRangePx(" + s + ", " + row[1] + ")"),
+      1e-9, "and the pixel reach agrees");
+  });
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 650, "placement 600 -> 650");
+  t.eq(h.run(towers1() + ".upgradeCost('B5')"), 2900, "and no B price moved");
+});
+
+test("Light Haft and Salvaged Anvil trade what they say they trade", function (t) {
+  var h = bootContent();
+
+  var light = towerWith(h, "smasher", ["war_s2"], []);
+  t.near(h.run(light + ".cooldownSeconds"), 3.2 / 1.1, 1e-9, "+10% attack speed");
+  t.near(h.run(light + ".attacksPerSecond()"), 1.1 / 3.2, 1e-9, "as a rate too");
+  t.eq(h.run(light + ".attackDamage()"), 12, "-2 swing damage");
+  t.eq(h.run(light + ".explosionDamage"), 15, "explosion untouched");
+
+  // CLAMPED AT ZERO, and the clamp is real rather than decorative: Light Haft
+  // and Long Echo together take four off a fourteen-damage base, and a tower
+  // whose tiers gave less could reach it.
+  var both = towerWith(h, "smasher", ["war_s2", "war_b2"], []);
+  t.eq(h.run(both + ".attackDamage()"), 10, "the two flat cuts sum to four");
+  var floored = h.run("(function () { var tw = " + towers1() + ";" +
+    "  tw.damage = -5; return tw.attackDamage(); })()");
+  t.eq(floored, 0, "and the swing never goes below zero");
+
+  var anvil = towerWith(h, "smasher", ["war_s3"], []);
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 500, "placement 600 -> 500");
+  t.eq(h.run(anvil + ".maxHp"), 110, "maximum health 150 -> 110");
+  t.eq(h.run(anvil + ".currentHp"), 110, "and it is placed full, not hurt");
+  t.eq(h.run(anvil + ".attackDamage()"), 14, "nothing else moved");
+});
+
+test("Redline Rhythm pays and charges from A4, as a RATE and not a subtraction",
 function (t) {
   var h = bootContent();
 
   var plain = towerWith(h, "smasher", [], ["A1", "A2", "A3", "A4"]);
   var normalRate = h.run(plain + ".attacksPerSecond()");
+  var normalRange = h.run(plain + ".rangeUl");
   t.near(normalRate, 1 / 3, 1e-9, "a pure path A swings about 0.333 a second");
+  t.eq(normalRange, 66.25, "and reaches 66.25");
+
+  // NOTHING BEFORE A4, on either half.
+  var plainA3 = h.run(towerWith(h, "smasher", [], ["A1", "A2", "A3"]) +
+    ".attacksPerSecond()");
+  t.eq(h.run(towerWith(h, "smasher", ["war_a1"], ["A1", "A2", "A3"]) +
+    ".attacksPerSecond()"), plainA3, "A3 swings at exactly the normal rate");
+  t.eq(h.run(towers1() + ".rangeUl"), 60, "and reaches its normal 60");
 
   var s = towerWith(h, "smasher", ["war_a1"], ["A1", "A2", "A3", "A4"]);
   t.near(h.run(s + ".attacksPerSecond()"), normalRate + 0.15, 1e-9,
-    "with [W-A] it is exactly 0.15 a second faster");
+    "at A4 it is exactly 0.15 a second faster");
   t.near(h.run(s + ".cooldownSeconds"), 1 / (normalRate + 0.15), 1e-9,
-    "which is about one swing every 2.07 s, not 0.15 s off the period");
-  t.eq(h.run(s + ".upgradeCost('A4')"), 1650, "A4 costs 1650");
-  t.eq(h.run(s + ".upgradeCost('A5')"), 1950, "and A5 is unchanged");
+    "which is a period of 1/(1/f + 0.15) and not f - 0.15");
+  t.near(h.run(s + ".rangeUl"), normalRange * 0.9, 1e-9, "and 10% shorter");
+  t.near(h.run(s + ".rangePx"), h.run("elevatedRangePx(" + s + ", " +
+    (normalRange * 0.9) + ")"), 1e-6, "with the ring re-derived");
 
-  // NOT BEFORE A4, AND STILL THERE AT A5.
-  ["A1", "A2", "A3"].forEach(function (top, i) {
-    var tiers = ["A1", "A2", "A3"].slice(0, i + 1);
-    var before = towerWith(h, "smasher", [], tiers);
-    var beforeRate = h.run(before + ".attacksPerSecond()");
-    var with_ = towerWith(h, "smasher", ["war_a1"], tiers);
-    t.near(h.run(with_ + ".attacksPerSecond()"), beforeRate, 1e-9,
-      "nothing at " + top);
-  });
-  var plain5 = h.run(towerWith(h, "smasher", [], ["A1", "A2", "A3", "A4", "A5"]) +
-    ".attacksPerSecond()");
-  var at5 = h.run(towerWith(h, "smasher", ["war_a1"], ["A1", "A2", "A3", "A4", "A5"]) +
-    ".attacksPerSecond()");
-  t.near(at5, plain5 + 0.15, 1e-9, "and it persists at A5");
-});
+  var a5 = towerWith(h, "smasher", ["war_a1"], ["A1", "A2", "A3", "A4", "A5"]);
+  t.near(h.run(a5 + ".attacksPerSecond()"), 1 / 3 + 0.15, 1e-9,
+    "and it persists at A5");
 
-test("[W-A2] takes fifty mana off A1 to A4, and stacks with its parent", function (t) {
-  var h = bootContent();
-  var s = towerWith(h, "smasher", ["war_a2"], []);
-  t.eq(h.run(s + ".upgradeCost('A1')"), 200, "A1 costs 200");
-  t.eq(h.run(s + ".upgradeCost('A2')"), 350, "A2 costs 350");
-  t.eq(h.run(s + ".upgradeCost('A3')"), 550, "A3 costs 550");
-  t.eq(h.run(s + ".upgradeCost('A4')"), 1350, "A4 costs 1350");
-  t.eq(h.run(s + ".upgradeCost('A5')"), 1950, "A5 is unchanged");
-  t.eq(h.run(s + ".upgradeCost('B1')"), 250, "and path B is untouched");
-  t.eq(h.run(s + ".rangeUl"), 40, "no stat moves");
-
-  // BOTH EQUIPPED: +250 and -50 on A4, which is 1600, and the speed as well.
-  var both = towerWith(h, "smasher", ["war_a1", "war_a2"], []);
-  t.eq(h.run(both + ".upgradeCost('A4')"), 1600, "together A4 costs 1600");
-  var plainRate = h.run(towerWith(h, "smasher", [], ["A1", "A2", "A3", "A4"]) +
-    ".attacksPerSecond()");
-  var bothRate = h.run(towerWith(h, "smasher", ["war_a1", "war_a2"],
-    ["A1", "A2", "A3", "A4"]) + ".attacksPerSecond()");
-  t.near(bothRate, plainRate + 0.15, 1e-9, "and the speed bonus is live");
-});
-
-test("[W-B] puts three more damage on a B4 Warbringer and takes its blast to 18",
-function (t) {
-  var h = bootContent();
-
-  var rows = [["B1", 0], ["B2", 1], ["B3", 2], ["B4", 3], ["B5", 3]];
-  rows.forEach(function (row, i) {
-    var tiers = ["B1", "B2", "B3", "B4", "B5"].slice(0, i + 1);
-    var plain = towerWith(h, "smasher", [], tiers);
-    var normal = h.run(plain + ".damage");
-    var s = towerWith(h, "smasher", ["war_b1"], tiers);
-    t.eq(h.run(s + ".damage"), normal + row[1],
-      "at " + row[0] + " it carries " + row[1] + " more damage");
-  });
-
-  var b4 = towerWith(h, "smasher", ["war_b1"], ["B1", "B2", "B3", "B4"]);
-  t.eq(h.run(b4 + ".explosionDamage"), 18, "the chain blast is 18 from B4");
-  var b5 = towerWith(h, "smasher", ["war_b1"], ["B1", "B2", "B3", "B4", "B5"]);
-  t.eq(h.run(b5 + ".explosionDamage"), 18, "and stays 18 at B5");
-  t.eq(h.run("Smasher.EXPLOSION_RADIUS_UL"), 18.75, "the radius is untouched");
-
-  var bare = towerWith(h, "smasher", ["war_b1"], []);
-  t.eq(h.run(bare + ".explosionDamage"), 15, "an unupgraded blast is still 15");
-  t.eq(h.run(bare + ".upgradeCost('B1')"), 250, "B1 is unchanged");
-  t.eq(h.run(bare + ".upgradeCost('B2')"), 500, "B2 costs 500");
-  t.eq(h.run(bare + ".upgradeCost('B3')"), 950, "B3 costs 950");
-  t.eq(h.run(bare + ".upgradeCost('B4')"), 1950, "B4 costs 1950");
-  t.eq(h.run(bare + ".upgradeCost('B5')"), 2900, "B5 is unchanged");
-});
-
-test("[W-S] rebuilds path B's reach onto the base without swallowing the tiers",
-function (t) {
-  var h = bootContent();
-
-  var base = towerWith(h, "smasher", ["war_s1"], []);
-  t.eq(h.run(base + ".rangeUl"), 57.5, "base reach is 57.5");
-  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 650, "and it costs 650 to place");
-
-  // THE PROGRESSION THE PLAYER ACTUALLY RECEIVES, tier by tier. This is the
-  // requirement: the bigger base must not eat what B1, B2 and B4 promise.
-  var want = [["B1", 60.5], ["B2", 71.5], ["B3", 71.5], ["B4", 77.5], ["B5", 92.5]];
-  want.forEach(function (row, i) {
-    var tiers = ["B1", "B2", "B3", "B4", "B5"].slice(0, i + 1);
-    var s = towerWith(h, "smasher", ["war_s1"], tiers);
-    t.eq(h.run(s + ".rangeUl"), row[1], "after " + row[0] + " it reaches " + row[1]);
-  });
-
-  // AND THE PIXEL REACH FOLLOWS, which is what targeting and the ring read.
-  var last = towerWith(h, "smasher", ["war_s1"], ["B1", "B2"]);
-  t.near(h.run(last + ".rangePx"),
-    h.run("elevatedRangePx(towers[0], 71.5)"), 1e-9,
-    "the drawn and fired reach is the same 71.5");
-
-  var prices = towerWith(h, "smasher", ["war_s1"], []);
-  [["B1", 250], ["B2", 450], ["B3", 900], ["B4", 1900], ["B5", 2900]]
+  // THE SURCHARGE IS A4'S ALONE.
+  var costs = towerWith(h, "smasher", ["war_a1"], []);
+  t.eq(h.run(costs + ".upgradeCost('A4')"), 1650, "A4 costs 250 more");
+  [["A1", 250], ["A2", 400], ["A3", 600], ["A5", 1950], ["B4", 1900]]
     .forEach(function (row) {
-      t.eq(h.run(prices + ".upgradeCost('" + row[0] + "')"), row[1],
-        row[0] + " still costs " + row[1]);
+      t.eq(h.run(costs + ".upgradeCost('" + row[0] + "')"), row[1],
+        row[0] + " is unchanged at " + row[1]);
     });
 });
 
-test("the Warbringer's roots stack exactly as authored", function (t) {
+test("Forgemaster's Schedule takes fifty mana off A1 to A4, and stacks with its parent",
+function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "smasher", ["war_a2"], []);
+  [["A1", 200], ["A2", 350], ["A3", 550], ["A4", 1350], ["A5", 1950]]
+    .forEach(function (row) {
+      t.eq(h.run(s + ".upgradeCost('" + row[0] + "')"), row[1],
+        row[0] + " costs " + row[1]);
+    });
+  t.eq(h.run(s + ".upgradeCost('B1')"), 250, "path B is untouched");
+  t.eq(h.run(s + ".attacksPerSecond()"), 1 / 3.2, "and it changes no stat at all");
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 600, "nor the build price");
+
+  // THE DISCOUNT AND THE SURCHARGE MEET ON A4, and both apply once.
+  var pair = towerWith(h, "smasher", ["war_a1", "war_a2"], []);
+  t.eq(h.run(pair + ".upgradeCost('A4')"), 1600, "A4 is 1400 + 250 - 50");
+  t.eq(h.run(pair + ".upgradeCost('A1')"), 200, "A1 keeps its discount");
+});
+
+test("Centered Blow measures the radius, not the area", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "smasher", ["war_a3"], []);
+  t.near(h.run(s + ".swingInnerMult"), 1.35, 1e-9, "the inner half");
+  t.near(h.run(s + ".swingOuterMult"), 0.90, 1e-9, "and the outer");
+
+  // HALF THE REACH IS THE LINE. A body at 0.6 of the radius is OUTSIDE, even
+  // though most of the circle is behind it -- which is the whole point.
+  var dealt = h.run("(function () { var tw = " + towers1() + ";" +
+    "  tw.x = 400; tw.y = 400; tw.aim = 0; tw.arcDegrees = 360;" +
+    "  tw.arcRadians = Math.PI * 2; tw.fullCircle = true;" +
+    "  function at(fraction) {" +
+    "    var e = new Enemy(path, null, 'normal', {});" +
+    "    e.health = 1e9; e.maxHealth = 1e9;" +
+    "    e.pos = { x: 400 + tw.rangePx * fraction, y: 400 };" +
+    "    tw.swing([e], [e]); return e.lastDamageTaken; }" +
+    "  return { deep: at(0.1), justIn: at(0.49), justOut: at(0.51)," +
+    "           far: at(0.9) }; })()");
+  t.near(dealt.deep, 14 * 1.35, 1e-9, "a body at a tenth of the reach takes 18.9");
+  t.near(dealt.justIn, 14 * 1.35, 1e-9, "and so does one at 0.49");
+  t.near(dealt.justOut, 14 * 0.90, 1e-9, "one at 0.51 takes 12.6");
+  t.near(dealt.far, 14 * 0.90, 1e-9, "and so does one at the rim");
+
+  // THE DIRECT SWING ONLY: the blast is its own number and is not scaled.
+  var blast = towerWith(h, "smasher", ["war_a3"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(blast + ".explosionDamage"), 15, "the chain blast is untouched");
+});
+
+test("Fracture Stamp files the plate down, and only after the blow", function (t) {
+  var h = bootContent();
+
+  // NOT BELOW A4.
+  var a3 = towerWith(h, "smasher", ["war_a4"], ["A1", "A2", "A3"]);
+  t.eq(h.run(a3 + ".fractureArmor"), 0, "nothing at A3");
+  t.eq(h.run(a3 + ".attackDamage()"),
+    h.run(towerWith(h, "smasher", [], ["A1", "A2", "A3"]) + ".attackDamage()"),
+    "and no damage penalty either");
+
+  var s = towerWith(h, "smasher", ["war_a4"], ["A1", "A2", "A3", "A4"]);
+  var plainA4 = 47;
+  t.eq(h.run(s + ".fractureArmor"), 1, "one point a hit from A4");
+  t.near(h.run(s + ".attackDamage()"), plainA4 * 0.9, 1e-9, "for 10% off the swing");
+
+  // THE CURRENT HIT MEETS THE OLD ARMOR; the next one meets less.
+  var hits = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'brute', {});" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = 400; tw.y = 400; e.pos = { x: 405, y: 400 };" +
+    "  var out = [];" +
+    "  for (var i = 0; i < 7; i++) {" +
+    "    var before = e.armor; tw.swing([e], [e]);" +
+    "    out.push({ armor: before, took: e.lastDamageTaken, after: e.armor }); }" +
+    "  return out; })()");
+  t.eq(hits[0].armor, 5, "the first blow meets five points");
+  t.near(hits[0].took, plainA4 * 0.9 - 5, 1e-9, "and is reduced by five");
+  t.eq(hits[0].after, 4, "and leaves four behind");
+  t.eq(hits[1].armor, 4, "the second meets four");
+  t.near(hits[1].took, plainA4 * 0.9 - 4, 1e-9, "and is reduced by four");
+  t.eq(hits[4].after, 0, "five blows strip it entirely");
+  t.eq(hits[5].after, 0, "and it clamps there");
+  t.eq(hits[6].armor, 0, "rather than going negative");
+
+  // PERCENTAGE DEFENCE IS NOT ARMOR AND IS NOT TOUCHED.
+  var def = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'armored', {});" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = 400; tw.y = 400; e.pos = { x: 405, y: 400 };" +
+    "  tw.swing([e], [e]); tw.swing([e], [e]); return e.defense; })()");
+  t.eq(def, 20, "an Armored enemy still has its twenty per cent");
+
+  // A FRESH BODY OF THE SAME TYPE IS FRESH. Nothing is pooled, and this pins it.
+  var fresh = h.run("(function () {" +
+    "  var a = new Enemy(path, null, 'brute', {}); a.armor -= 3;" +
+    "  return new Enemy(path, null, 'brute', {}).armor; })()");
+  t.eq(fresh, 5, "the next Brute spawned carries its own five points");
+});
+
+test("Kiln Resonance and Wide Fracture resolve the blast to fifteen at a wider radius",
+function (t) {
+  var h = bootContent();
+
+  var kilnB4 = towerWith(h, "smasher", ["war_b1"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(kilnB4 + ".explosionDamage"), 18, "Kiln alone takes the blast to 18");
+  t.eq(h.run(kilnB4 + ".explosionRadiusUl"), 18.75, "at the authored radius");
+  var plainB4 = h.run(towerWith(h, "smasher", [], ["B1", "B2", "B3", "B4"]) +
+    ".attackDamage()");
+  t.eq(plainB4, 26, "a plain B4 Warbringer swings for 26");
+  t.eq(h.run(towerWith(h, "smasher", ["war_b1"], ["B1", "B2", "B3", "B4"]) +
+    ".attackDamage()"), 29, "and 29 with Kiln's three points");
+  [["B2", 500], ["B3", 950], ["B4", 1950], ["B5", 2900]].forEach(function (row) {
+    t.eq(h.run(towers1() + ".upgradeCost('" + row[0] + "')"), row[1],
+      row[0] + " costs " + row[1]);
+  });
+
+  var wide = towerWith(h, "smasher", ["war_b3"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(wide + ".explosionDamage"), 12, "Wide alone takes the blast to 12");
+  t.near(h.run(wide + ".explosionRadiusUl"), 22.5, 1e-9, "at 1.20 the radius");
+  t.eq(h.run(wide + ".attackDamage()"), 26, "the swing is untouched");
+  t.eq(h.run(wide + ".rangeUl"), h.run(towerWith(h, "smasher", [],
+    ["B1", "B2", "B3", "B4"]) + ".rangeUl"), "and so is the swing's reach");
+
+  var both = towerWith(h, "smasher", ["war_b1", "war_b3"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(both + ".explosionDamage"), 15,
+    "15 base + 3 Kiln - 3 Wide is the authored 15");
+  t.near(h.run(both + ".explosionRadiusUl"), 22.5, 1e-9, "over a fifth more ground");
+
+  // THE BLAST REALLY REACHES FURTHER. Measured by killing one body and asking
+  // what a neighbour just outside the authored radius took.
+  var reach = h.run("(function () { var tw = " + towers1() + ";" +
+    "  tw.x = 400; tw.y = 400;" +
+    "  var dead = new Enemy(path, null, 'normal', {});" +
+    "  dead.pos = { x: 405, y: 400 }; dead.health = 1; dead.maxHealth = 1;" +
+    "  var near = new Enemy(path, null, 'normal', {});" +
+    "  near.pos = { x: 405 + ul(20.5), y: 400 };" +
+    "  near.health = 1e9; near.maxHealth = 1e9;" +
+    "  tw.swing([dead], [dead, near]);" +
+    "  return { dead: dead.dead, took: near.lastDamageTaken }; })()");
+  t.eq(reach.dead, true, "the swing killed the first body");
+  t.near(reach.took, 15, 1e-9,
+    "and a neighbour at 20.5 u.l. — outside the authored 18.75 — took the blast");
+});
+
+test("Long Echo lengthens every slow this Warbringer makes and pays for it in the swing",
+function (t) {
+  var h = bootContent();
+
+  var plain = towerWith(h, "smasher", [], ["B1", "B2", "B3"]);
+  t.eq(h.run(plain + ".slowSeconds()"), 2.0, "B3 normally slows for 2 s");
+  t.eq(h.run(plain + ".attackDamage()"), 20, "and swings for 20");
+
+  var s = towerWith(h, "smasher", ["war_b2"], ["B1", "B2", "B3"]);
+  t.eq(h.run(s + ".slowSeconds()"), 3.0, "with it, 3 s");
+  t.eq(h.run(s + ".attackDamage()"), 18, "for two points off the swing");
+  t.eq(h.run(s + ".slow.seconds"), 2.0,
+    "and the shared upgrade table row is NOT written through");
+
+  // THE PANEL QUOTES THE RESOLVED DURATION.
+  var row = h.run("(function () { var out = null;" +
+    "  " + towers1() + ".statLines().forEach(function (r) {" +
+    "    if (r[0] === 'Slow') out = r[1]; }); return out; })()");
+  t.ok(/3\.0 s/.test(String(row)), "the panel says 3.0 s (" + row + ")");
+
+  // A PROPAGATED SLOW IS STILL THIS WARBRINGER'S SLOW.
+  var chained = towerWith(h, "smasher", ["war_b2"], ["B1", "B2", "B3", "B4"]);
+  var out = h.run("(function () { var tw = " + chained + ";" +
+    "  tw.x = 400; tw.y = 400;" +
+    "  var dead = new Enemy(path, null, 'normal', {});" +
+    "  dead.pos = { x: 405, y: 400 }; dead.health = 1; dead.maxHealth = 1;" +
+    "  var near = new Enemy(path, null, 'normal', {});" +
+    "  near.pos = { x: 405 + ul(8), y: 400 };" +
+    "  near.health = 1e9; near.maxHealth = 1e9;" +
+    "  tw.swing([dead], [dead, near]);" +
+    "  return { slowFor: near.slowTimer, took: near.lastDamageTaken }; })()");
+  t.near(out.slowFor, 3.5, 1e-9,
+    "a body slowed only by the chain carries B4's 2.5 s plus the second");
+  t.eq(out.took, 15, "and the blast's own damage is NOT reduced by this node");
+});
+
+test("the Warbringer's confirmed nodes compose without an order mattering",
+function (t) {
   var h = bootContent();
 
   var ns = towerWith(h, "smasher", ["war_n1", "war_s1"], []);
-  t.eq(h.run(ns + ".rangeUl"), 62.5, "north + south: 62.5 base reach");
+  t.eq(h.run(ns + ".rangeUl"), 62.5, "two reach nodes: 62.5 base");
   t.eq(h.run("TowerPerks.priceOf(Smasher)"), 750, "and 750 to place");
 
-  // East and south together: the damage and its surcharges, and the reach
-  // following the rebuilt gains rather than the authored ones.
   var plainDamage = h.run(towerWith(h, "smasher", [], ["B1", "B2"]) + ".damage");
   var bs = towerWith(h, "smasher", ["war_b1", "war_s1"], ["B1", "B2"]);
-  t.eq(h.run(bs + ".damage"), plainDamage + 1,
-    "east + south: B2 carries its extra damage");
+  t.eq(h.run(bs + ".damage"), plainDamage + 1, "B2 carries Kiln's extra damage");
   t.eq(h.run(bs + ".rangeUl"), 71.5, "and the reach follows the rebuild");
-  t.eq(h.run(bs + ".upgradeCost('B3')"), 950, "with east's surcharge on B3");
+  t.eq(h.run(bs + ".upgradeCost('B3')"), 950, "with Kiln's surcharge on B3");
 
-  var nsb = towerWith(h, "smasher", ["war_n1", "war_s1", "war_b1"],
-    ["B1", "B2", "B3", "B4"]);
-  t.eq(h.run(nsb + ".rangeUl"), 82.5, "all three: 77.5 plus north's five");
-  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 750, "both price rises apply");
-  t.eq(h.run(nsb + ".explosionDamage"), 18, "and the blast is still 18");
+  // THE THREE PRICE NODES, and the price never reaches zero.
+  var priced = towerWith(h, "smasher", ["war_n1", "war_s1", "war_s3"], []);
+  t.eq(h.run("TowerPerks.priceOf(Smasher)"), 650, "600 + 100 + 50 - 100");
+  t.eq(h.run(priced + ".cost"), 650, "the tower was charged that");
+  t.eq(h.run(priced + ".maxHp"), 110, "and carries the Anvil's health cut");
+
+  // FIVE AT ONCE ON A FINISHED PATH A, in both orders.
+  var A5 = ["A1", "A2", "A3", "A4", "A5"];
+  var ids = ["war_a1", "war_a2", "war_a3", "war_a4", "war_n1"];
+  var fw = towerWith(h, "smasher", ids, A5);
+  var a = h.run("(function () { var tw = " + fw + ";" +
+    "  return { dmg: tw.attackDamage(), rate: tw.attacksPerSecond()," +
+    "    range: tw.rangeUl, fracture: tw.fractureArmor," +
+    "    inner: tw.swingInnerMult, a4: tw.upgradeCost('A4')," +
+    "    price: TowerPerks.priceOf(Smasher) }; })()");
+  var bw = towerWith(h, "smasher", ids.slice().reverse(), A5);
+  var b = h.run("(function () { var tw = " + bw + ";" +
+    "  return { dmg: tw.attackDamage(), rate: tw.attacksPerSecond()," +
+    "    range: tw.rangeUl, fracture: tw.fractureArmor," +
+    "    inner: tw.swingInnerMult, a4: tw.upgradeCost('A4')," +
+    "    price: TowerPerks.priceOf(Smasher) }; })()");
+  t.deep(b, a, "the slots the five sit in change nothing");
+  t.eq(a.fracture, 1, "Fracture Stamp is live at A5");
+  t.eq(a.a4, 1600, "A4 costs 1400 + 250 - 50");
+  t.eq(a.price, 700, "and the tower costs 700 to place");
+  t.near(a.dmg, 65 * 0.9, 1e-9, "a finished path A swings for 58.5");
+  // 72.5 x 0.9 + 5, IN THAT ORDER. `mul` lands before `add` (see the effect
+  // order in js/systems/tower-perks.js), so Redline's tenth comes off the
+  // tower's own reach and Long Haft's five goes on after it. A node that
+  // wanted to be inside the multiplier would author `preAdd`.
+  t.near(a.range, 72.5 * 0.9 + 5, 1e-9, "and reaches 70.25");
+});
+
+// --- Arcane Sniper ----------------------------------------------------------
+//
+// THE FIRST TREE ON A CONFIG-DRIVEN TOWER, so these read `core.stats` (and
+// `core.stats.mechanics.*` for the five nodes that move a mechanic parameter)
+// rather than fields on the adapter.
+
+test("Arcane Charge trades rate for damage and leaves the ritual alone",
+function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "longshot", ["snp_n1"], []);
+  var got = h.run("(function () { var tw = " + s + ";" +
+    "  return { dmg: tw.core.stats.damage, rate: tw.attacksPerSecond()," +
+    "    nuke: tw.core.stats.mechanics.activeAbility.damage }; })()");
+  t.near(got.dmg, 11, 1e-9, "10 damage becomes 11");
+  t.near(got.rate, 0.475, 1e-9, "0.5 shots a second becomes 0.475");
+  t.near(got.dmg * got.rate / (10 * 0.5), 1.045, 1e-9, "+4.5% on paper");
+  t.eq(got.nuke, 18000, "and the ability's damage is a different number");
+});
+
+test("High-Ground Doctrine pays by the ground under the tower", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "longshot", ["snp_n2"], []);
+  t.eq(h.run(s + ".onFlatGround"), true, "the default board is flat here");
+  t.near(h.run(s + ".rangeUl"), 225, 1e-9, "so 250 becomes 225");
+
+  // THE GHOST ANSWERS THE SAME CONDITION, which is what keeps "the ring you
+  // are shown is the ring you get" true for a node that depends on the spot.
+  t.near(h.run("TowerPerks.previewRangeUl(LongshotTower, " +
+    "{ onFlatGround: true })"), 225, 1e-9, "the preview on dirt says 225");
+  t.near(h.run("TowerPerks.previewRangeUl(LongshotTower, " +
+    "{ onHighGround: true })"), 287.5, 1e-9, "and on a rise, 287.5");
+  t.near(h.run("previewRangePx(LongshotTower, " +
+    h.run(s + ".x") + ", " + h.run(s + ".y") + ")"),
+    h.run(s + ".rangePx"), 1e-6, "and the ghost's ring is this tower's ring");
+
+  // AND THE INSTANCE ITSELF, standing on a rise. The height is set before
+  // `addTower`, which is where the perks are applied -- exactly as a real
+  // placement on a stump reads it in the constructor.
+  var high = h.run("(function () {" +
+    "  var tw = new LongshotTower(320, 320, path);" +
+    "  tw.groundHeight = 12; tw.refreshDerived(); addTower(tw);" +
+    "  return { high: tw.onHighGround, ul: tw.rangeUl }; })()");
+  t.eq(high.high, true, "a tower on a rise knows it");
+  t.near(high.ul, 287.5, 1e-9, "and reaches 287.5");
+});
+
+test("Skybane is a matchup, applied body by body", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "longshot", ["snp_n3"], []);
+  t.near(h.run(s + ".core.stats.flyingDamageMult"), 1.25, 1e-9, "+25% against fliers");
+  t.near(h.run(s + ".core.stats.groundDamageMult"), 0.88, 1e-9, "-12% against the rest");
+  t.eq(h.run(s + ".core.stats.seesFlying"), true,
+    "and it granted no targeting flag it already had");
+
+  // ONE ROUND, TWO BODIES, TWO ANSWERS.
+  var line = h.run("(function () {" +
+    "  var flier = new Enemy(path, null, 'normal', {});" +
+    "  flier.pos = { x: 10, y: 0 }; flier.isFlying = true;" +
+    "  flier.health = 1e9; flier.maxHealth = 1e9;" +
+    "  var walker = new Enemy(path, null, 'normal', {});" +
+    "  walker.pos = { x: 30, y: 0 };" +
+    "  walker.health = 1e9; walker.maxHealth = 1e9;" +
+    "  var shot = new PierceBullet({ x: 0, y: 0, angle: 0, damage: 100," +
+    "    pierce: 5, hasFalloff: false, maxTravelPx: 10000," +
+    "    flyingDamageMult: 1.25, groundDamageMult: 0.88 });" +
+    "  shot.update(1, [flier, walker]);" +
+    "  return { flier: flier.lastDamageTaken, walker: walker.lastDamageTaken }; })()");
+  t.near(line.flier, 125, 1e-9, "the flier took 125");
+  t.near(line.walker, 88, 1e-9, "and the walker beside it took 88");
+
+  // A ROUND FIRED WITHOUT THE NODE CARRIES NEITHER.
+  var plain = h.run("(function () {" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.pos = { x: 10, y: 0 }; e.isFlying = true;" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  var shot = new PierceBullet({ x: 0, y: 0, angle: 0, damage: 100," +
+    "    pierce: 5, hasFalloff: false, maxTravelPx: 10000 });" +
+    "  shot.update(1, [e]); return e.lastDamageTaken; })()");
+  t.near(plain, 100, 1e-9, "an ordinary piercing round is unchanged");
+});
+
+test("First Omen tells a charged shot from an uncharged one", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "longshot", ["snp_n4"], []);
+  t.eq(h.run(s + ".core.stats.omenIdleSeconds"), 3, "three seconds of quiet");
+
+  var shots = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = e.pos.x + 60; tw.y = e.pos.y;" +
+    "  function fire(idle) {" +
+    "    tw.sinceOrdinaryShot = idle; tw.core.fireCooldown = 0;" +
+    "    if (tw.core.reload) { tw.core.reload.reloading = false;" +
+    "      tw.core.reload.shotsFired = 0; }" +
+    "    var out = []; tw.update(0, [e], out);" +
+    "    return out.length ? out[0].baseDamage : null; }" +
+    "  return { charged: fire(5), cold: fire(0) }; })()");
+  t.near(shots.charged, 10 * 1.35, 1e-9, "a shot after three quiet seconds deals 13.5");
+  t.near(shots.cold, 10 * 0.95, 1e-9, "and every other ordinary shot deals 9.5");
+  t.ok(Math.abs(shots.charged - 10 * 1.35 * 0.95) > 1e-6,
+    "the charged shot takes the bonus INSTEAD of the penalty, never both");
+
+  // FIRING IS WHAT RESETS THE CLOCK.
+  t.eq(h.run(towers1() + ".sinceOrdinaryShot"), 0, "the quiet starts again after a shot");
+});
+
+test("Stripped Mount and Compact Chassis are three separate concepts",
+function (t) {
+  var h = bootContent();
+
+  var mount = towerWith(h, "longshot", ["snp_s1"], []);
+  t.eq(h.run("TowerPerks.priceOf(LongshotTower)"), 750, "placement 900 -> 750");
+  t.eq(h.run(mount + ".cost"), 750, "the tower was charged that");
+  t.near(h.run(mount + ".maxHp"), 75, 1e-9, "maximum health 100 -> 75");
+  t.near(h.run(mount + ".currentHp"), 75, 1e-9, "and it is placed full");
+  t.eq(h.run(mount + ".rangeUl"), 250, "nothing else moved");
+
+  // A TIER AFTER A HEALTH PERK MUST NOT HEAL THE TOWER. `_refreshStats`
+  // differences against the last RESOLVED maximum, not against the perked one.
+  var hurt = h.run("(function () { var tw = " + towers1() + ";" +
+    "  tw.currentHp = 25; tw.purchase('A'); tw.purchase('A');" +
+    "  return { cur: tw.currentHp, max: tw.maxHp }; })()");
+  t.near(hurt.max, 112.5, 1e-9, "A2 takes the maximum to 112.5");
+  t.near(hurt.cur, 75, 1e-9,
+    "and the wounded tower gained exactly A2's own 50 — differencing against " +
+    "the PERKED maximum instead would have handed it 75 and healed it to 100");
+
+  var chassis = towerWith(h, "longshot", ["snp_s2"], []);
+  t.eq(h.run(chassis + ".footprintRadiusUl"), 16, "footprint 20 -> 16");
+  t.near(h.run(chassis + ".footprintPx"), h.run("ul(16)"), 1e-9, "in pixels too");
+  t.eq(h.run(chassis + ".rangeUl"), 240, "range 250 -> 240");
+  t.eq(h.run(chassis + ".core.stats.deadzone"), 50, "the deadzone is untouched");
+  t.eq(h.run("buildFootprintUl(LongshotTower)"), 16,
+    "and the placement rules use the smaller skirt BEFORE the tower stands");
+
+  // THE TWO TOGETHER.
+  var both = towerWith(h, "longshot", ["snp_s1", "snp_s2"], []);
+  var got = h.run("(function () { var tw = " + both + ";" +
+    "  return { price: TowerPerks.priceOf(LongshotTower), hp: tw.maxHp," +
+    "    foot: tw.footprintRadiusUl, range: tw.rangeUl }; })()");
+  t.deep(got, { price: 750, hp: 75, foot: 16, range: 240 },
+    "and they compose without touching each other");
+});
+
+test("Emergency Discharge crosses cleanly at thirty per cent", function (t) {
+  var h = bootContent();
+  var s = towerWith(h, "longshot", ["snp_s3"], []);
+  t.near(h.run(s + ".core.stats.lowHpFraction"), 0.30, 1e-9, "the threshold is a third");
+
+  var seen = h.run("(function () { var tw = " + towers1() + ";" +
+    "  function at(fraction) {" +
+    "    tw.currentHp = tw.maxHp * fraction;" +
+    "    tw.update(1 / 60, [], []);" +
+    "    return { low: tw.lowHpActive(), ul: tw.rangeUl," +
+    "      rate: tw.attacksPerSecond() }; }" +
+    "  return { full: at(1), just: at(0.30), under: at(0.2999)," +
+    "           healed: at(0.8) }; })()");
+  t.eq(seen.full.low, false, "a healthy tower is not in it");
+  t.eq(seen.full.ul, 250, "and reaches its whole 250");
+  t.eq(seen.just.low, false, "exactly thirty per cent is NOT below thirty per cent");
+  t.eq(seen.just.ul, 250, "so nothing has changed there either");
+  t.eq(seen.under.low, true, "a hair under, and it is");
+  t.near(seen.under.ul, 200, 1e-9, "reach pulls in to 200");
+  t.near(seen.under.rate, 0.6, 1e-9, "and the rate goes to 0.6");
+  t.eq(seen.healed.low, false, "healed back out of it");
+  t.eq(seen.healed.ul, 250, "the reach comes back exactly");
+  t.near(seen.healed.rate, 0.5, 1e-9, "and so does the rate — nothing compounded");
+});
+
+test("Narrow Prism caps the cone at twenty degrees and pays for it", function (t) {
+  var h = bootContent();
+
+  var a3 = towerWith(h, "longshot", ["snp_a1"], ["A1", "A2", "A3"]);
+  t.eq(h.run(a3 + ".core.stats.damage"), 40, "nothing before A4");
+
+  var a4 = towerWith(h, "longshot", ["snp_a1"], ["A1", "A2", "A3", "A4"]);
+  t.near(h.run(a4 + ".core.stats.damage"), 150 * 1.08, 1e-9, "at A4, +8% damage");
+  t.eq(h.run(a4 + ".core.stats.coneArcDeg"), 20,
+    "and A4's twenty degrees are already twenty — no invented penalty");
+
+  var plainA5 = h.run(towerWith(h, "longshot", [], ["A1", "A2", "A3", "A4", "A5"]) +
+    ".core.stats.coneArcDeg");
+  t.eq(plainA5, 24, "A5 normally reaches 24 degrees");
+  var a5 = towerWith(h, "longshot", ["snp_a1"], ["A1", "A2", "A3", "A4", "A5"]);
+  t.eq(h.run(a5 + ".core.stats.coneArcDeg"), 20, "with the node it stops at 20");
+  t.near(h.run(a5 + ".core.stats.damage"), 425 * 1.08, 1e-9, "for +8% damage");
+  t.eq(h.run(a5 + ".core.stats.mechanics.activeAbility.damage"), 18000,
+    "and the ritual is untouched");
+});
+
+test("Piercing Persistence flattens the falloff and shortens the head", function (t) {
+  var h = bootContent();
+
+  var a2 = towerWith(h, "longshot", ["snp_a2"], ["A1", "A2"]);
+  t.eq(h.run(a2 + ".core.stats.damage"), 25, "nothing before A3");
+  t.eq(h.run(a2 + ".core.stats.mechanics.pierceFalloff.decay"), 0.95,
+    "and the decay is the authored one");
+
+  var s = towerWith(h, "longshot", ["snp_a2"], ["A1", "A2", "A3"]);
+  t.near(h.run(s + ".core.stats.damage"), 38, 1e-9, "at A3 the shot starts 5% weaker");
+  t.eq(h.run(s + ".core.stats.mechanics.pierceFalloff.decay"), 0.962,
+    "and loses 3.8% a target instead of 5%");
+  t.eq(h.run(s + ".core.stats.mechanics.pierceFalloff.softener"), 20,
+    "the softener is untouched");
+
+  // A RATE PER TARGET, NOT A FLAT 3.8 DAMAGE. Read off the shared formula.
+  var line = h.run("(function () { var m = " + towers1() +
+    ".core.stats.mechanics.pierceFalloff;" +
+    "  return [0, 1, 2, 5].map(function (n) {" +
+    "    return Pierce.damageAtIndex(38, n, m); }); })()");
+  t.near(line[0], 38, 1e-9, "the first body takes the full 38");
+  t.near(line[1], (38 + 20) * 0.962 - 20, 1e-9, "the second, 3.8% down the curve");
+  t.near(line[2], (38 + 20) * 0.962 * 0.962 - 20, 1e-9, "and the third again");
+  t.ok(line[1] > 38 - 3.8, "which is emphatically not a flat 3.8 off");
+
+  // AND THE LINE REALLY IS LONGER. A shot that keeps more of itself reaches
+  // further down a crowd before the falloff wears it out.
+  var lengths = h.run("(function () {" +
+    "  var plain = { softener: 20, decay: 0.95 };" +
+    "  var kept = { softener: 20, decay: 0.962 };" +
+    "  return { plain: Pierce.resolveSequence(40, Infinity, true, plain).length," +
+    "           kept: Pierce.resolveSequence(38, Infinity, true, kept).length }; })()");
+  t.ok(lengths.kept > lengths.plain,
+    "the shot passes through more bodies (" + lengths.plain + " -> " +
+    lengths.kept + ")");
+});
+
+test("Patient Harvest widens the kill-stack window and nothing else", function (t) {
+  var h = bootContent();
+
+  var a4 = towerWith(h, "longshot", ["snp_a3"], ["A1", "A2", "A3", "A4"]);
+  t.eq(h.run(a4 + ".core.stats.flags.killStackAttackSpeed"), undefined,
+    "the mechanic is not granted before A5");
+  t.eq(h.run(a4 + ".core.killStacks.durationSeconds"), 4,
+    "and the window is still the authored four seconds");
+
+  var s = towerWith(h, "longshot", ["snp_a3"], ["A1", "A2", "A3", "A4", "A5"]);
+  var got = h.run("(function () { var tw = " + s + ";" +
+    "  var m = tw.core.stats.mechanics.killStackAttackSpeed;" +
+    "  return { window: m.stackDurationSeconds, max: m.maxStacks," +
+    "    per: m.perStackBonus, liveWindow: tw.core.killStacks.durationSeconds," +
+    "    liveMax: tw.core.killStacks.maxStacks }; })()");
+  t.eq(got.window, 5.5, "the window is 5.5 s");
+  t.eq(got.max, 75, "the ceiling is still 75 — NOT the rejected 60");
+  t.eq(got.per, 0.01, "and a stack is still +1%");
+
+  // THE TRACKER ITSELF, not merely the stat block. `killStacks` is built in the
+  // ConfiguredTower's constructor, long before any perk exists, so a number
+  // that only reached `stats.mechanics` would be a number nothing read.
+  t.eq(got.liveWindow, 5.5, "the live tracker carries the wider window");
+  t.eq(got.liveMax, 75, "and the same ceiling");
+
+  var held = h.run("(function () { var tw = " + towers1() + ";" +
+    "  tw.core.onKill();" +
+    "  tw.core.update(5); var at5 = tw.core.killStacks.count();" +
+    "  tw.core.update(0.6); return { at5: at5, at56: tw.core.killStacks.count() }; })()");
+  t.eq(held.at5, 1, "a stack is still alive at 5 s, where it used to be gone at 4");
+  t.eq(held.at56, 0, "and gone by 5.6");
+
+  var ceiling = h.run("(function () { var tw = " + towers1() + ";" +
+    "  for (var i = 0; i < 200; i++) tw.core.onKill();" +
+    "  return tw.core.killStacks.count(); })()");
+  t.eq(ceiling, 75, "and two hundred kills still buy seventy-five stacks");
+});
+
+test("Critical Calibration moves percentage POINTS", function (t) {
+  var h = bootContent();
+
+  var b2 = towerWith(h, "longshot", ["snp_b1"], ["B1", "B2"]);
+  t.eq(h.run(b2 + ".core.stats.critChance"), 0, "nothing before B3");
+  t.eq(h.run(b2 + ".core.stats.critDamage"), 100, "on either number");
+
+  var b3 = towerWith(h, "longshot", ["snp_b1"], ["B1", "B2", "B3"]);
+  t.eq(h.run(b3 + ".core.stats.critChance"), 25, "20 points becomes 25, not 24");
+  t.eq(h.run(b3 + ".core.stats.critDamage"), 165, "and 175 becomes 165, not 157.5");
+
+  var b5 = towerWith(h, "longshot", ["snp_b1"], ["B1", "B2", "B3", "B4", "B5"]);
+  t.eq(h.run(b5 + ".core.stats.critChance"), 30, "at B5, 25 becomes 30");
+  t.eq(h.run(b5 + ".core.stats.critDamage"), 315, "and 325 becomes 315");
+
+  // THE GUARANTEED FOURTH SHOT STILL CRITS, at the reduced figure.
+  var shot = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var out = null;" +
+    "  for (var i = 0; i < 4; i++) out = tw.core.fire(1, function () { return 0.99; });" +
+    "  return { crit: out.crit, first: out.sequence[0] }; })()");
+  t.eq(shot.crit, true, "the fourth of four is guaranteed");
+  t.near(shot.first, 1575 * (315 / 100) * (1 + 0.60), 1e-6,
+    "and it lands at the reduced critical damage");
+});
+
+test("Execution Curve tops out at a quarter health, for five points less",
+function (t) {
+  var h = bootContent();
+
+  var b3 = towerWith(h, "longshot", ["snp_b2"], ["B1", "B2", "B3"]);
+  var atB3 = h.run("(function () { var m = " + b3 +
+    ".core.stats.mechanics.executeScaling;" +
+    "  return { floor: m.floorFraction, max: m.maxBonus }; })()");
+  t.deep(atB3, { floor: 0.90, max: 0.40 }, "B3's authored curve is untouched");
+
+  var b4 = towerWith(h, "longshot", ["snp_b2"], ["B1", "B2", "B3", "B4"]);
+  var atB4 = h.run("(function () { var m = " + b4 +
+    ".core.stats.mechanics.executeScaling;" +
+    "  return { floor: m.floorFraction, max: m.maxBonus }; })()");
+  t.deep(atB4, { floor: 0.75, max: 0.55 }, "B4 rebuilds it to 0.75 and 0.55");
+
+  // WHAT AN ENEMY ACTUALLY MEETS, through the shared formula.
+  var curve = h.run("(function () { var s = " + towers1() + ".core.stats;" +
+    "  return [1, 0.5, 0.25, 0.10, 0].map(function (f) {" +
+    "    return Execute.resolveExecuteBonus(s, f, false); }); })()");
+  t.near(curve[0], 0, 1e-9, "a full-health body gets no execute");
+  t.near(curve[1], 0.55 * (0.5 / 0.75), 1e-9, "half health is two thirds of the way");
+  t.near(curve[2], 0.55, 1e-9, "a quarter health is the maximum");
+  t.near(curve[3], 0.55, 1e-9, "and it stays there below that");
+  t.near(curve[4], 0.55, 1e-9, "all the way down");
+
+  var plain = h.run("(function () { var s = " +
+    towerWith(h, "longshot", [], ["B1", "B2", "B3", "B4"]) + ".core.stats;" +
+    "  return [0.25, 0.10].map(function (f) {" +
+    "    return Execute.resolveExecuteBonus(s, f, false); }); })()");
+  t.near(plain[0], 0.60 * (0.75 / 0.90), 1e-9,
+    "an unperked B4 is only two-thirds of the way at a quarter health");
+  t.near(plain[1], 0.60, 1e-9, "and reaches its whole +60% at a tenth");
+});
+
+test("Covenant Round pays the fourth shot and lengthens only the reload",
+function (t) {
+  var h = bootContent();
+
+  var b4 = towerWith(h, "longshot", ["snp_b3"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(b4 + ".core.stats.mechanics.reload.reloadDurationSeconds"), 1,
+    "nothing before B5");
+
+  var s = towerWith(h, "longshot", ["snp_b3"], ["B1", "B2", "B3", "B4", "B5"]);
+  var got = h.run("(function () { var tw = " + s + ";" +
+    "  return { stat: tw.core.stats.mechanics.reload.reloadDurationSeconds," +
+    "    live: tw.core.reload.reloadDurationSeconds," +
+    "    mult: tw.core.stats.finalShotDamageMult," +
+    "    shots: tw.core.reload.shotsBeforeReload }; })()");
+  t.eq(got.stat, 1.5, "the reload is 1.5 s");
+  t.eq(got.live, 1.5, "on the tracker that actually keeps the clock");
+  t.near(got.mult, 1.10, 1e-9, "and the fourth shot is worth a tenth more");
+  t.eq(got.shots, 4, "still four shots to a magazine");
+
+  // EXACTLY THE FOURTH. Shots one to three are byte-for-byte the plain ones.
+  function volley(expr) {
+    return h.run("(function () { var tw = " + expr + ";" +
+      "  var out = [];" +
+      "  for (var i = 0; i < 4; i++)" +
+      "    out.push(tw.core.fire(1, function () { return 0.99; }).sequence[0]);" +
+      "  return out; })()");
+  }
+  var perked = volley(towers1());
+  var plain = volley(towerWith(h, "longshot", [], ["B1", "B2", "B3", "B4", "B5"]));
+  t.deep(perked.slice(0, 3), plain.slice(0, 3), "the first three are unchanged");
+  t.near(perked[3], plain[3] * 1.10, 1e-6, "and the fourth is a tenth bigger");
+  t.near(plain[3], 1575 * 3.25 * 1.6, 1e-6, "which is the crit and the execute on it");
+
+  // THE REPLENISH REALLY TAKES HALF A SECOND LONGER. Built again, because the
+  // control volley above replaced what `towers1()` points at.
+  var back = h.run("(function () { var tw = " +
+    towerWith(h, "longshot", ["snp_b3"], ["B1", "B2", "B3", "B4", "B5"]) + ";" +
+    "  for (var i = 0; i < 4; i++) tw.core.fire(1, function () { return 0.99; });" +
+    "  tw.core.update(1.2); var at12 = tw.core.reload.canFire();" +
+    "  tw.core.update(0.4); return { at12: at12, at16: tw.core.reload.canFire() }; })()");
+  t.eq(back.at12, false, "still reloading at 1.2 s, where it used to be done at 1");
+  t.eq(back.at16, true, "and back on line by 1.6");
+});
+
+test("Grand Sigil trades three thousand damage for ten more u.l. of radius",
+function (t) {
+  var h = bootContent();
+
+  var b4 = towerWith(h, "longshot", ["snp_b4"], ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run(b4 + ".core.stats.mechanics.activeAbility.damage"), 18000,
+    "nothing before B5");
+
+  var s = towerWith(h, "longshot", ["snp_b4"], ["B1", "B2", "B3", "B4", "B5"]);
+  var a = h.run(s + ".core.stats.mechanics.activeAbility");
+  t.eq(a.damage, 15000, "18 000 becomes 15 000 a body");
+  t.eq(a.aoeRadius, 35, "and 25 u.l. of radius becomes 35");
+  t.deep({ channel: a.channelSeconds, stun: a.stunSeconds, cd: a.cooldownSeconds,
+           hp: a.maxHpLoss, ignores: a.ignoresDefense },
+    { channel: 3, stun: 7, cd: 60, hp: 300, ignores: true },
+    "and every other rule of the ritual is exactly where it was");
+
+  // THE STRIKE ITSELF, resolved against a crowd laid out across both radii.
+  var hit = h.run("(function () { var tw = " + towers1() + ";" +
+    "  var far = new Enemy(path, null, 'normal', {});" +
+    "  far.pos = { x: 400 + ul(30), y: 400 };" +
+    "  far.health = 1e9; far.maxHealth = 1e9;" +
+    "  var near = new Enemy(path, null, 'normal', {});" +
+    "  near.pos = { x: 400, y: 400 };" +
+    "  near.health = 1e9; near.maxHealth = 1e9;" +
+    "  tw.channel = { x: 400, y: 400, remaining: 0, target: null };" +
+    "  tw.resolveChannel([near, far]);" +
+    "  return { near: near.lastDamageTaken, far: far.lastDamageTaken }; })()");
+  t.eq(hit.near, 15000, "a body under it takes 15 000");
+  t.eq(hit.far, 15000, "and so does one at 30 u.l., which the old 25 could not reach");
+});
+
+test("the Arcane Sniper's B5 nodes compose into one stated fourth shot",
+function (t) {
+  var h = bootContent();
+  var B5 = ["B1", "B2", "B3", "B4", "B5"];
+  var ids = ["snp_b1", "snp_b2", "snp_b3", "snp_b4"];
+
+  var fw = towerWith(h, "longshot", ids, B5);
+  var a = h.run("(function () { var tw = " + fw + ";" +
+    "  var s = tw.core.stats;" +
+    "  var volley = [];" +
+    "  for (var i = 0; i < 4; i++)" +
+    "    volley.push(tw.core.fire(1, function () { return 0.99; }).sequence[0]);" +
+    "  return { crit: s.critChance, critDmg: s.critDamage," +
+    "    floor: s.mechanics.executeScaling.floorFraction," +
+    "    max: s.mechanics.executeScaling.maxBonus," +
+    "    reload: tw.core.reload.reloadDurationSeconds," +
+    "    nuke: s.mechanics.activeAbility.damage," +
+    "    nukeR: s.mechanics.activeAbility.aoeRadius," +
+    "    volley: volley }; })()");
+
+  t.eq(a.crit, 30, "critical chance 25 -> 30");
+  t.eq(a.critDmg, 315, "critical damage 325 -> 315");
+  t.eq(a.floor, 0.75, "the execute floor is rebuilt");
+  t.eq(a.max, 0.55, "and its ceiling with it");
+  t.eq(a.reload, 1.5, "the reload is longer");
+  t.eq(a.nuke, 15000, "the ritual hits for less");
+  t.eq(a.nukeR, 35, "over more ground");
+
+  // THE FOURTH SHOT UNDER ALL FOUR AT ONCE: base x the tenth, then the reduced
+  // crit, then the reduced full execute -- in that order and no other.
+  t.near(a.volley[3], 1575 * 1.10 * 3.15 * 1.55, 1e-6,
+    "the fourth shot is 1575 x 1.10 x 3.15 x 1.55");
+  t.near(a.volley[0], 1575, 1e-9, "and an ordinary shot is untouched by any of it");
+
+  // ORDER-FREE.
+  var bw = towerWith(h, "longshot", ids.slice().reverse(), B5);
+  var b = h.run("(function () { var tw = " + bw + ";" +
+    "  var volley = [];" +
+    "  for (var i = 0; i < 4; i++)" +
+    "    volley.push(tw.core.fire(1, function () { return 0.99; }).sequence[0]);" +
+    "  return volley; })()");
+  t.deep(b, a.volley, "the slots the four sit in change nothing");
+});
+
+test("what a card says is what the tower resolves", function (t) {
+  var h = bootContent();
+
+  // THE CARDS ARE AUTHORED TEXT AND THE TOWERS ARE CODE, which is exactly the
+  // pair that goes stale quietly. Each row below pulls a figure out of the
+  // node's own blurb and asks the live tower for the same number.
+  var blurbs = h.run("(function () { var out = {};" +
+    "  ['soldier', 'smasher', 'longshot'].forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) { out[n.id] = n.blurb; }); });" +
+    "  return out; })()");
+
+  Object.keys(blurbs).forEach(function (id) {
+    t.ok(blurbs[id] && blurbs[id].length > 20, id + " has a description");
+  });
+
+  // Every node that takes something away says so, in the same card that says
+  // what it gives. Six of the thirty-nine are pure gains and are listed by name
+  // rather than left to a regex that would quietly stop testing anything.
+  var PURE_GAIN = ["rif_s1", "war_a2", "snp_a3"];
+  var missing = [];
+  Object.keys(blurbs).forEach(function (id) {
+    if (PURE_GAIN.indexOf(id) !== -1) return;
+    if (!/−|less|longer|slower|more mana|costs|instead|shorter|→|unaffected|untouched|unchanged|Nothing|not/.test(blurbs[id])) {
+      missing.push(id);
+    }
+  });
+  t.deep(missing, [], "every node with a trade states it on its own card");
+
+  t.ok(/300 → 250/.test(blurbs.rif_s1), "Cheap Receiver quotes 300 -> 250");
+  var cheap = towerWith(h, "soldier", ["rif_s1"], []);
+  t.eq(h.run(cheap + ".cost"), 250, "and that is what the tower is charged");
+
+  t.ok(/150, then 290/.test(blurbs.rif_s2), "Advance Unit quotes 150 and 290");
+  towerWith(h, "soldier", ["rif_s1", "rif_s2"], []);
+  t.eq(h.run("towers[0].cost"), 150, "the first really costs 150");
+  t.eq(h.run("(function () { var s = new Soldier(320, 200, path); addTower(s);" +
+    "  return s.cost; })()"), 290, "and the second really costs 290");
+
+  t.ok(/20 → 18 at B4, 40 → 36 at B5/.test(blurbs.rif_b2),
+    "Rapid Muster quotes both recruit bodies");
+  var muster = towerWith(h, "soldier", ["rif_b2"], ["B1", "B2", "B3", "B4", "B5"]);
+  t.near(h.run(muster + ".recruitHp"), 36, 1e-9, "and a B5 recruit really has 36");
+
+  t.ok(/40 → 45/.test(blurbs.war_n1), "Long Haft quotes 40 -> 45");
+  t.eq(h.run(towerWith(h, "smasher", ["war_n1"], []) + ".rangeUl"), 45,
+    "and the tower reaches 45");
+
+  t.ok(/60\.5, 71\.5, 71\.5, 77\.5, 92\.5/.test(blurbs.war_s1),
+    "Extended Stance prints its whole ladder");
+  t.eq(h.run(towerWith(h, "smasher", ["war_s1"], ["B1", "B2", "B3", "B4", "B5"]) +
+    ".rangeUl"), 92.5, "and a finished path B really reaches 92.5");
+
+  t.ok(/18\.75 → 22\.5/.test(blurbs.war_b3), "Wide Fracture quotes the radius");
+  t.near(h.run(towerWith(h, "smasher", ["war_b3"], ["B1", "B2", "B3", "B4"]) +
+    ".explosionRadiusUl"), 22.5, 1e-9, "and the blast really reaches 22.5");
+
+  t.ok(/900 → 750/.test(blurbs.snp_s1), "Stripped Mount quotes 900 -> 750");
+  t.eq(h.run(towerWith(h, "longshot", ["snp_s1"], []) + ".cost"), 750,
+    "and the tower is charged 750");
+
+  t.ok(/15 000/.test(blurbs.snp_b4) && /50 → 70/.test(blurbs.snp_b4),
+    "Grand Sigil quotes the damage and the DIAMETER");
+  var sigil = h.run(towerWith(h, "longshot", ["snp_b4"],
+    ["B1", "B2", "B3", "B4", "B5"]) + ".core.stats.mechanics.activeAbility");
+  t.eq(sigil.damage, 15000, "and the ritual really deals 15 000");
+  t.eq(sigil.aoeRadius * 2, 70, "over a 70 u.l. diameter");
+
+  // THE PANEL'S OWN ROWS, on a tower carrying a perk that moves what they show.
+  var rows = h.run("(function () { var tw = " +
+    towerWith(h, "smasher", ["war_b2", "war_b1"], ["B1", "B2", "B3", "B4"]) + ";" +
+    "  var out = {};" +
+    "  tw.statLines().forEach(function (r) { out[r[0]] = String(r[1]); });" +
+    "  return out; })()");
+  t.ok(/3\.5 s/.test(rows.Slow), "the Slow row quotes the lengthened duration");
+  t.ok(/^18 in/.test(rows["On kill"]), "and the On kill row the raised blast");
 });
 
 test("a tree reset refunds every node, charges ten a node, and cools down for an hour",

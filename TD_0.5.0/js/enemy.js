@@ -3727,13 +3727,17 @@ Enemy.prototype.applyStun = function (seconds) {
 // this one door, so none of them can forget it. A source that ignores some
 // defence passes `defPierce` (0..1, a FRACTION of it); a source that ignores a
 // flat slice of it passes `defenseFlatPierce` (percentage POINTS, the
-// Rifleman's B4). Both act on `defense` and neither touches `armor` -- nothing
-// pierces flat armor since 2026-07-30. `damageKind` is deliberately separate:
+// Rifleman's B4). Both act on `defense`; a source that ignores a flat slice of
+// the ARMOR passes `armorPierce` (points, the Rifleman's Piercing Orders perk,
+// 2026-08-31), and that one is the only one that does. None of the three edits
+// this enemy's stored numbers. `damageKind` is deliberately separate:
 // only a caller that explicitly says `"aoe"` meets an enemy's area resistance,
 // so a piercing line shot is not accidentally treated as area damage.
 // See js/systems/mitigation.js.
-Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, damageKind) {
-  var effective = Mitigation.mitigate(amount, this, defPierce, defenseFlatPierce);
+Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, damageKind,
+                                       armorPierce) {
+  var effective = Mitigation.mitigate(amount, this, defPierce, defenseFlatPierce,
+    armorPierce);
 
   // Resistance is applied after the shared armor/defense pipeline. At present
   // only Fractal Slimes carry it, and only the Warbringer's area attacks and

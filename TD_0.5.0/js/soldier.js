@@ -115,6 +115,24 @@ function Soldier(x, y, path) {
   this.shotTimer = 0;
   this.burstShotsLeft = 0;
 
+  // --- burst run state the PERMANENT upgrades read (2026-08-31) -------------
+  //
+  // RUN STATE, WHICH IS WHY IT IS HERE AND NOT IN recalcStats(). Everything in
+  // recalcStats is derived from the flags and is rebuilt on every purchase --
+  // and previewUpgrade() calls it twice per hover. A one-cycle modifier living
+  // there would be wiped by a hover, or worse, banked twice by one.
+  //
+  //   burstMissed     shots this burst owed that had nothing to shoot at
+  //   ratchetPending  what the NEXT cycle's length is multiplied by, 1 when
+  //                   nothing is owed. Consumed by exactly one burst opening
+  //   rhythmKillBase  this tower's lifetime kill count at the last wave
+  //                   boundary, so Veteran Rhythm's stacks are the kills SINCE
+  //                   -- one counter, which is what makes a recruit's kill
+  //                   (credited to its owner) count once and not twice
+  this.burstMissed = 0;
+  this.ratchetPending = 1;
+  this.rhythmKillBase = 0;
+
   this.targeting = "first";
 
   // Recruits (B5). They live on the tower rather than in a global list, so
@@ -428,6 +446,15 @@ Soldier.RECRUIT_HP = 20;
 Soldier.RECRUIT_RANGE_UL = Soldier.BASE_RANGE_UL;
 Soldier.RECRUIT_SPEED_ULPS = Enemy.BASE_SPEED_ULPS * 0.8;
 
+// WHAT A DUG-IN RECRUIT GAINS -- Entrenchment Protocol's three numbers, in one
+// place, because a recruit reads all three and the tree quotes all three.
+// The node itself only ever writes the SECONDS (`recruitEntrenchSeconds`);
+// these are the shape of the state it switches on, and zero seconds means no
+// recruit ever enters it.
+Soldier.ENTRENCH_RANGE_MULT = 1.25;
+Soldier.ENTRENCH_RATE_MULT = 1.25;
+Soldier.ENTRENCH_DAMAGE_TAKEN_MULT = 0.75;
+
 // Where a recruit's shot leaves its rifle, in u.l. forward of the body. Same
 // derivation as the tower's -- the Blender muzzle in world units times 30.58 --
 // off tools/blender/summon_recruit.py. B4's carbine is short and mended; B5
@@ -469,6 +496,57 @@ Soldier.prototype.recalcStats = function () {
   this.hasRecruitAbility = false;
   this.automatic = false;
   this.upgradeCount = 0;
+
+  // --- what the PERMANENT upgrades write, at their neutral values -----------
+  //
+  // EVERY ONE OF THESE IS INERT AS SET HERE, which is the whole contract: a
+  // Rifleman with no perk equipped resolves the identical numbers it always
+  // did, and a perk is a factor of 1 or a delta of 0 moved off its neutral.
+  // They are reset on every restat and the perk pass re-applies after it (see
+  // js/systems/tower-perks.js), so nothing here can accumulate.
+  //
+  //   fireRateMult          the STATIC part of this tower's rate of fire.
+  //                         Attack speed is three numbers on a Rifleman -- the
+  //                         automatic rate, the spacing inside a burst and the
+  //                         cycle between them -- so it is applied to the CLOCK
+  //                         in update() rather than to any one of them, which
+  //                         is the same statement in one place instead of three
+  //   burstEarly/FinalShotMult   Breach Chamber: what an early shot and the
+  //                         resolved LAST shot of a burst are multiplied by
+  //   ratchetGain/Loss      Ratchet Pressure: what the next cycle's length is
+  //                         multiplied by after a clean burst and after a
+  //                         collapsed one
+  //   armorPierce           FLAT armor points this tower's shots ignore. NOT
+  //                         `defenseFlatPierce`, which is percentage points of
+  //                         DEFENCE and is B4's -- see js/systems/mitigation.js
+  //   recruitArmorPierce    the same, for its recruits
+  //   recruitCooldownRapid / recruitCooldownEntrench
+  //                         an absolute recruit cooldown each of the two
+  //                         cooldown nodes asks for; 0 means "not equipped".
+  //                         See resolvedRecruitCooldown for what happens when
+  //                         both are
+  //   recruitEntrenchSeconds  how long a recruit must hold before it digs in.
+  //                         0 disables the state outright
+  //   projectileSpeedMult   how fast this tower's rounds fly. Reach is NOT
+  //                         derived from it -- a faster bullet is a bullet that
+  //                         arrives sooner, not one that goes further
+  //   rhythmStartMult / rhythmPerKill / rhythmKillCap
+  //                         Veteran Rhythm: the penalty a wave opens on, what
+  //                         one kill buys back, and how many kills count
+  this.fireRateMult = 1;
+  this.burstEarlyShotMult = 1;
+  this.burstFinalShotMult = 1;
+  this.ratchetGain = 1;
+  this.ratchetLoss = 1;
+  this.armorPierce = 0;
+  this.recruitArmorPierce = 0;
+  this.recruitCooldownRapid = 0;
+  this.recruitCooldownEntrench = 0;
+  this.recruitEntrenchSeconds = 0;
+  this.projectileSpeedMult = 1;
+  this.rhythmStartMult = 1;
+  this.rhythmPerKill = 0;
+  this.rhythmKillCap = 0;
 
   // The base recruit, before B5's boost. Resolved here rather than read from
   // the constants at spawn time so that a recruit is handed finished numbers and
@@ -573,9 +651,66 @@ Soldier.prototype.recruitStats = function () {
     shotsPerSecond: this.recruitShotsPerSecond,
     rangeUl: this.recruitRangeUl,
     speedUlps: Soldier.RECRUIT_SPEED_ULPS,
-    cooldownSeconds: this.recruitCooldownSeconds,
+    cooldownSeconds: this.resolvedRecruitCooldown(),
+    armorPierce: this.recruitArmorPierce,
+    entrenchSeconds: this.recruitEntrenchSeconds,
     visualTier: this.recruitVisualTier
   };
+};
+
+// HOW LONG UNTIL THE NEXT SQUAD, once the permanent upgrades have had their
+// say. Both cooldown nodes name an ABSOLUTE, and **two hands on the same clock
+// cancel**: Rapid Muster asks for 40, Entrenchment Protocol asks for 55, and a
+// Rifleman carrying both is back on the tower's own 45.
+//
+//   neither        45 s     the authored number, untouched
+//   Rapid only     40 s
+//   Entrench only  55 s
+//   both           45 s
+//
+// It is a designed exception rather than arithmetic, which is exactly why it
+// is a stated rule here instead of two deltas that would have summed to 50.
+// Order-independent by construction: the answer depends on WHICH nodes are
+// equipped and never on which slot each sits in.
+Soldier.prototype.resolvedRecruitCooldown = function () {
+  var rapid = this.recruitCooldownRapid;
+  var dug = this.recruitCooldownEntrench;
+  if (rapid > 0 && dug > 0) return this.recruitCooldownSeconds;
+  if (rapid > 0) return rapid;
+  if (dug > 0) return dug;
+  return this.recruitCooldownSeconds;
+};
+
+// EVERYTHING THAT MULTIPLIES THIS TOWER'S RATE OF FIRE, as one number.
+//
+// The static half comes off the equipped perks (`fireRateMult`); the live half
+// is Veteran Rhythm, which opens every wave down and climbs back with kills. It
+// is applied to the CLOCK in update(), so both firing models -- the burst and
+// B3's automatic rifle -- feel it without either of them being written twice.
+Soldier.prototype.fireRateScale = function () {
+  return this.fireRateMult * this.rhythmMult();
+};
+
+// Veteran Rhythm, resolved from the kills banked since the last wave boundary.
+// PERCENTAGE POINTS, summed and applied once: -6% at the wave's start and +2
+// per kill up to +12, so the band is 0.94 to 1.06 and never wider.
+//
+// It reads the tower's own lifetime `kills` against a baseline rather than
+// keeping a second counter, which is what makes "a recruit's kill is credited
+// to its owner" count exactly once -- there is only ever one number to move.
+Soldier.prototype.rhythmMult = function () {
+  if (this.rhythmStartMult === 1 && this.rhythmPerKill === 0) return 1;
+  var earned = Math.max(0, (this.kills || 0) - this.rhythmKillBase);
+  if (this.rhythmKillCap > 0) earned = Math.min(earned, this.rhythmKillCap);
+  return this.rhythmStartMult + this.rhythmPerKill * earned;
+};
+
+// A wave has ended. Veteran Rhythm's stacks are per-wave, so the baseline moves
+// up to whatever this tower has killed by now and the next wave opens on its
+// penalty again. Called from endWave in js/game.js -- the ONE exit a wave has,
+// beside the bounty, the farms and the experience, and for the same reason.
+Soldier.prototype.onWaveBoundary = function () {
+  this.rhythmKillBase = this.kills || 0;
 };
 
 // The recruits this Soldier WOULD send if it also owned `id` -- measured by
@@ -865,10 +1000,19 @@ Soldier.prototype.findTarget = function (enemies) {
 Soldier.prototype.update = function (dt, enemies, bullets) {
   var landed = this.updateRecruits(dt, enemies, bullets);
 
+  // THE PERMANENT UPGRADES MOVE THE CLOCK, NOT THE THREE NUMBERS ON IT.
+  // A Rifleman keeps its rate of fire in three places -- the automatic rate,
+  // the spacing inside a burst and the cycle between bursts -- and a perk that
+  // says "-5% fire rate" means all three. Scaling the time they are all
+  // measured against says it once, and it is the only form Veteran Rhythm
+  // could take anyway: its multiplier changes DURING a wave, so it is not a
+  // stat recalcStats could have resolved. Neutral at 1 for an unperked tower.
+  var clock = dt * this.fireRateScale();
+
   // Both clamped like the gunner's, so a long wait cannot bank negative time
   // and then let off a double burst when a target finally appears.
-  if (this.cooldown > 0) this.cooldown -= dt;
-  if (this.shotTimer > 0) this.shotTimer -= dt;
+  if (this.cooldown > 0) this.cooldown -= clock;
+  if (this.shotTimer > 0) this.shotTimer -= clock;
 
   var target = this.findTarget(enemies);
   if (target) {
@@ -912,12 +1056,19 @@ Soldier.prototype.update = function (dt, enemies, bullets) {
   if (this.burstShotsLeft === 0 && this.cooldown <= 0) {
     if (!target) return landed;
     this.burstShotsLeft = this.shotsPerBurst;
+    this.burstMissed = 0;
     this.shotTimer = 0;
 
     // Counted from the burst's START, not from its last shot. That is what
     // makes shots-per-burst over burst-cooldown the tower's real rate of fire,
     // and it is the arithmetic the whole upgrade table was priced against.
-    this.cooldown = this.burstCooldown;
+    //
+    // RATCHET PRESSURE IS SPENT HERE, on exactly one cycle. The modifier was
+    // decided when the PREVIOUS burst finished; taking it at the opening and
+    // clearing it in the same breath is what makes "the next cycle" mean one
+    // cycle -- there is no state left for a pause, a stun or a sale to keep.
+    this.cooldown = this.burstCooldown * this.ratchetPending;
+    this.ratchetPending = 1;
   }
 
   // Fire whatever the burst owes and the clock has reached. A `while` rather
@@ -933,16 +1084,42 @@ Soldier.prototype.update = function (dt, enemies, bullets) {
     var shotTarget = this.findTarget(enemies);
     if (shotTarget) {
       this.aim = Math.atan2(shotTarget.pos.y - this.y, shotTarget.pos.x - this.x);
-      this.fire(shotTarget, bullets);
+      // BREACH CHAMBER LANDS HERE, and "the final shot" is the shot the burst
+      // owes LAST -- `burstShotsLeft === 1` -- whatever the resolved count is.
+      // Overloaded Drum makes that shot six of six rather than five of five and
+      // this line needs to know nothing about either node.
+      //
+      // A burst that ends early promotes nobody: if the last shot has nothing
+      // to shoot at it is not fired, so the doubling is simply not collected
+      // and the earlier shots keep the reduction they already paid.
+      this.fire(shotTarget, bullets, this.burstShotsLeft === 1
+        ? this.burstFinalShotMult : this.burstEarlyShotMult);
+    } else {
+      this.burstMissed++;
     }
 
     this.burstShotsLeft--;
     // Added rather than assigned, so a shot fired late keeps the burst's
     // rhythm instead of stretching it a frame at a time.
     this.shotTimer += this.shotSpacing;
+
+    if (this.burstShotsLeft === 0) this.settleRatchet();
   }
 
   return landed;
+};
+
+// RATCHET PRESSURE, decided the instant a burst finishes and spent by the next
+// one. A burst that fired every shot it owed tightens the following cycle; one
+// that lost at least two shots to an empty window loosens it; anything between
+// leaves it alone, and each new burst is judged on its own.
+//
+// It cannot reach B3's automatic fire, and not by care -- an automatic Rifleman
+// returns from update() before the burst block exists.
+Soldier.prototype.settleRatchet = function () {
+  if (this.ratchetGain === 1 && this.ratchetLoss === 1) return;
+  this.ratchetPending = this.burstMissed === 0 ? this.ratchetGain
+    : (this.burstMissed >= 2 ? this.ratchetLoss : 1);
 };
 
 // WHICH RENDERED BODY THIS SOLDIER IS.
@@ -1020,18 +1197,24 @@ Soldier.prototype.muzzle = function () {
   return Soldier.MUZZLE_UL[this.bodyTier()] || Soldier.MUZZLE_UL.base;
 };
 
-Soldier.prototype.fire = function (target, bullets) {
+// `damageMult` is the SHOT's own multiplier, not the tower's: Breach Chamber
+// makes the last round of a burst worth double and the ones before it worth a
+// tenth less, and nothing about the tower has changed between them. Absent on
+// every other call site, which is what keeps an unperked shot byte-for-byte
+// what it always was.
+Soldier.prototype.fire = function (target, bullets, damageMult) {
   var muzzle = this.muzzle();
   var reach = ul(muzzle.forward);
   var muzzleX = this.x + Math.cos(this.aim) * reach;
   var muzzleY = this.y + Math.sin(this.aim) * reach;
+  var damage = this.damage * (typeof damageMult === "number" ? damageMult : 1);
 
   // An ordinary homing Bullet, identical to the gunner's, which is what claims
   // its damage on the target and credits the kill back to this tower. The last
   // argument is B4's DEFENCE pierce, in percentage points -- zero until it is
   // bought, so an unupgraded Soldier's shot is byte-for-byte a gunner's.
   var tier = this.bodyTier();
-  var shot = new Bullet(muzzleX, muzzleY, target, this.damage,
+  var shot = new Bullet(muzzleX, muzzleY, target, damage,
     function (hit) {
       // PRESENTATION ONLY, and the simulation never reads it back -- see
       // Effects in AGENTS.md. It goes through `onHit` rather than into
@@ -1043,7 +1226,7 @@ Soldier.prototype.fire = function (target, bullets) {
       if (!hit || !hit.pos) return;
       Effects.aoeImpact(hit.pos.x, hit.pos.y, ul(tier === "b5" ? 15 : 9),
         "rifleman-hit", { shotBody: tier, particles: tier === "b5" });
-    }, this, this.defenseFlatPierce);
+    }, this, this.defenseFlatPierce, this.armorPierce);
 
   // Two presentation-only fields, set once at fire time and never read by
   // update(). `liftUl` draws the round at barrel height while its real
@@ -1053,6 +1236,12 @@ Soldier.prototype.fire = function (target, bullets) {
   // not change what is already in the air.
   shot.liftUl = muzzle.height;
   shot.shotBody = tier;
+  // A FASTER ROUND ARRIVES SOONER; IT DOES NOT GO FURTHER. Long Glass buys
+  // both reach and muzzle velocity and they are separate purchases -- reach is
+  // `rangeUl`, and this only shortens the flight. Neutral at 1.
+  if (this.projectileSpeedMult !== 1) {
+    shot.speedUlps = Bullet.BASE_SPEED_ULPS * this.projectileSpeedMult;
+  }
   bullets.push(shot);
 };
 
@@ -1151,9 +1340,14 @@ Soldier.prototype.containsPoint = Tower.prototype.containsPoint;
 // shots a second on average, which is the 2.5 DPS the owner's table states.
 // Automatic: the rate as stored, which STARTS at that same 2.5 by derivation.
 Soldier.prototype.attackDamage = function () { return this.damage; };
+// Through fireRateScale, so the panel, the hover cards, the codex and the
+// boss's "highest DPS on the board" all read the tower the player actually has
+// -- including Veteran Rhythm's live band, which moves within a wave. Exactly 1
+// on an unperked Rifleman.
 Soldier.prototype.attacksPerSecond = function () {
-  if (this.automatic) return this.shotsPerSecond;
-  return this.shotsPerBurst / this.burstCooldown;
+  var scale = this.fireRateScale();
+  if (this.automatic) return this.shotsPerSecond * scale;
+  return this.shotsPerBurst / this.burstCooldown * scale;
 };
 
 // Rows for the inspection panel, in the shared order: lifetime totals, damage,
@@ -1180,6 +1374,9 @@ Soldier.prototype.statLines = function () {
 
   if (this.seesCamo) rows.push(["Camo", "Yes"]);
   if (this.defenseFlatPierce > 0) rows.push(["Defense pierce", this.defenseFlatPierce + "%"]);
+  // FLAT ARMOR, and its own row, because the row above is percentage DEFENCE
+  // and a player reading one number for both would be reading the wrong one.
+  if (this.armorPierce > 0) rows.push(["Armor pierce", this.armorPierce + " flat"]);
   // Only while it is actually counting down. A permanent "Recruits  ready" row
   // would cost a line to say what the button under it already says.
   if (this.hasRecruitAbility && this.recruitCooldown > 0) {
@@ -1809,12 +2006,16 @@ function SoldierRecruit(path, owner, seesCamo, stats) {
   // so the stop rule is one readable flag instead of an inference about targets.
   this.holding = false;
 
-  // How long it has been holding, in seconds. PRESENTATION ONLY, and set here
-  // for the same reason `Smasher.slam` is: this is the one place that knows the
-  // moment a recruit stops walking and shoulders its rifle. Nothing in the
-  // simulation reads it -- shots come off `cooldown`, and a recruit whose
-  // renderer ignores this behaves identically.
+  // How long it has been holding, in seconds. It was PRESENTATION ONLY until
+  // 2026-08-31 and is now also the clock Entrenchment Protocol reads: a recruit
+  // that has stood and fired for `stats.entrenchSeconds` digs in. Without that
+  // node the seconds are zero and nothing below ever looks at this again.
   this.holdTime = 0;
+
+  // DUG IN: braced, seeing further, firing faster and harder to kill. It is a
+  // state and not a stat, because the whole of it is undone the moment the
+  // recruit takes a step -- see update(), where `holdTime` resets.
+  this.entrenched = false;
 
   this.facing = 0;
   this.walkPhase = 0;
@@ -1827,12 +2028,27 @@ SoldierRecruit.prototype.update = function (dt, enemies, bullets) {
 
   if (this.cooldown > 0) this.cooldown -= dt;
 
+  // ENTRENCHMENT IS DECIDED BEFORE THE PICK, off the seconds already banked, so
+  // the wider ring is the ring this step's target is chosen with. A recruit that
+  // lost its target last step has a `holdTime` of zero and so is already out of
+  // it -- "moving again immediately removes the state" falls out of that reset
+  // rather than needing a rule of its own.
+  this.updateEntrenchment();
+
   // Targeting happens BEFORE moving, because whether there is a target is what
   // decides whether it moves at all. The old order marched first and shot from
   // wherever that left it, which is exactly the behaviour the stop rule replaces.
   var target = Targeting.pick(this, enemies, true);
   this.holding = target !== null && target !== undefined;
   this.holdTime = this.holding ? this.holdTime + dt : 0;
+
+  // AND AGAIN, NOW THAT THIS STEP'S ANSWER IS IN. The call above decides the
+  // ring the pick is made with; this one is what makes "moving again
+  // immediately removes it" mean THIS step rather than the next -- a recruit
+  // that just lost its target has a `holdTime` of zero here, and its bonuses
+  // are gone before it can fire or be walked through. Idempotent, so the frame
+  // where nothing changed costs a comparison.
+  this.updateEntrenchment();
 
   if (this.holding) {
     this.facing = Math.atan2(target.pos.y - this.y, target.pos.x - this.x);
@@ -1874,18 +2090,38 @@ SoldierRecruit.prototype.update = function (dt, enemies, bullets) {
   // It leaves the end of the rifle rather than the middle of the man, the same
   // correction the tower's own muzzle got. These two are much smaller figures
   // holding much smaller weapons, so the numbers are their own.
+  // FLAT ARMOR, THOUGH, DOES CARRY. Piercing Orders is written as an order to
+  // the squad -- "the parent Rifleman and its recruits ignore two points" --
+  // which is the opposite of the defence-pierce ruling above, and deliberately:
+  // the owner carved that one out by name and this one out loud includes them.
+  // Zero on every recruit whose parent has not equipped it.
   var reach = ul(this.visualTier === "B5"
     ? SoldierRecruit.MUZZLE_B5_UL : SoldierRecruit.MUZZLE_B4_UL);
   var shot = new Bullet(this.x + Math.cos(this.facing) * reach,
     this.y + Math.sin(this.facing) * reach, target, this.stats.damage,
-    null, this.owner);
+    null, this.owner, 0, this.stats.armorPierce || 0);
   shot.liftUl = SoldierRecruit.MUZZLE_HEIGHT_UL;
   shot.shotBody = this.visualTier === "B5" ? "recruit-b5" : "recruit-b4";
   bullets.push(shot);
-  this.cooldown = this.stats.shotsPerSecond > 0
-    ? 1 / this.stats.shotsPerSecond
-    : Infinity;
+  var rate = this.stats.shotsPerSecond *
+    (this.entrenched ? Soldier.ENTRENCH_RATE_MULT : 1);
+  this.cooldown = rate > 0 ? 1 / rate : Infinity;
   return landed;
+};
+
+// Is this recruit dug in, and what does that do to its reach? Both answered
+// here so the flag and the ring can never disagree. A `stats.entrenchSeconds`
+// of zero -- every recruit whose parent has not equipped Entrenchment Protocol
+// -- leaves the flag false forever and the ring exactly where it was.
+SoldierRecruit.prototype.updateEntrenchment = function () {
+  var seconds = this.stats.entrenchSeconds || 0;
+  var dug = seconds > 0 && this.holding && this.holdTime >= seconds;
+  if (dug === this.entrenched) return;
+  this.entrenched = dug;
+  this.rangePx = ul(this.rangeUl) * (dug ? Soldier.ENTRENCH_RANGE_MULT : 1);
+  // Read by SummonContact when an enemy walks through it -- the third of the
+  // three things digging in buys, and the only one that is not this file's.
+  this.damageTakenMult = dug ? Soldier.ENTRENCH_DAMAGE_TAKEN_MULT : 1;
 };
 
 // Is the cursor over this recruit? Padded exactly like an enemy's hover test

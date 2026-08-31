@@ -120,12 +120,29 @@ LongshotTower.FOOTPRINT_RADIUS_UL = LongshotTower.CONFIG.base.footprint;
 // Same caching the gunner does in its constructor -- convert once, compare
 // in world space forever after.
 LongshotTower.prototype.refreshDerived = function () {
-  this.rangeUl = this.core.stats.range;
+  // WHICH TIERS THIS TOWER HAS BOUGHT, as the flat `hasA4`-shaped booleans the
+  // hand-written towers carry. Derived from the counts, never stored, so they
+  // cannot disagree with `core.purchased`.
+  //
+  // They exist for the PERMANENT UPGRADES: a `when: [{ has: "hasB5", ... }]`
+  // group tests a field on the TOWER (js/systems/tower-perks.js), and a
+  // config-driven tower had nothing for one to test. Half the Arcane Sniper's
+  // confirmed nodes activate at a named tier, so without these its tree would
+  // have had to be written in a second vocabulary.
+  for (var t = 1; t <= 5; t++) {
+    this["hasA" + t] = this.core.purchased.A >= t;
+    this["hasB" + t] = this.core.purchased.B >= t;
+  }
+
+  // WHERE IT IS STANDING, for the same reason: High-Ground Doctrine pays out
+  // one way on a stump and the other way on dirt, and a `when` group can only
+  // ask a question the tower can answer. Two fields rather than one because
+  // there is no "has NOT" -- see the note on `when` in tower-perks.js.
+  this.onHighGround = (this.groundHeight || 0) > 0;
+  this.onFlatGround = !this.onHighGround;
+
+  this.resolveReach();
   this.footprintRadiusUl = this.core.stats.footprint;
-  // Through elevatedRangePx, like every other tower: the ground under a tower
-  // grows its reach, and the build preview has always DRAWN that bigger ring
-  // for this type (previewRangePx) while the tower delivered the flat one.
-  this.rangePx = elevatedRangePx(this, this.rangeUl);
   this.footprintPx = ul(this.footprintRadiusUl);
 
   // `maxHp` / `currentHp` FORWARD to the core rather than being copied from
@@ -133,6 +150,56 @@ LongshotTower.prototype.refreshDerived = function () {
   // lives (the resolver writes it on every upgrade, and B5 burns max HP
   // directly), and a copy would go stale the moment either happened.
   TowerHealth.mirror(this, this.core);
+};
+
+// --- the permanent upgrades' last word --------------------------------------
+//
+// Called by TowerPerks once the equipped nodes have written onto `core.stats`,
+// which is AFTER `refreshDerived` has already run (the perks wrap it). Three
+// things can only be settled here, and all three are re-derived from scratch
+// rather than accumulated, because this runs on every restat.
+//
+//   the trackers   `killStacks` and `reload` are built from `stats.mechanics`
+//                  in the ConfiguredTower's constructor, long before any perk
+//                  exists. Patient Harvest lengthens the kill-stack window and
+//                  Covenant Round lengthens the reload, and both would have
+//                  been numbers in a stat block nothing read
+//   the footprint  Compact Chassis shrinks it, and refreshDerived copied the
+//                  pre-perk value out
+//   the reach      the same, plus Emergency Discharge's live contraction
+LongshotTower.prototype.afterPerks = function () {
+  this.core.syncMechanics();
+  this.footprintRadiusUl = this.core.stats.footprint;
+  this.footprintPx = ul(this.footprintRadiusUl);
+  this.resolveReach();
+};
+
+// HOW FAR IT REACHES, from the resolved stat and whatever is true right now.
+//
+// One function so the panel's row, the range ring, the targeting filter and the
+// bullets' travel cap are the same number -- Emergency Discharge pulls the
+// reach in while the tower is hurt and pushes it back out when it is healed, so
+// "right now" is a real qualifier on this tower and not a figure of speech.
+//
+// Always computed FROM `core.stats.range`, never from the last answer, so
+// crossing the threshold twice cannot compound.
+LongshotTower.prototype.resolveReach = function () {
+  var mult = this.lowHpActive() ? (this.core.stats.lowHpRangeMult || 1) : 1;
+  this.rangeUl = this.core.stats.range * mult;
+  // Through elevatedRangePx, like every other tower: the ground under a tower
+  // grows its reach, and the build preview has always DRAWN that bigger ring
+  // for this type (previewRangePx) while the tower delivered the flat one.
+  this.rangePx = elevatedRangePx(this, this.rangeUl);
+};
+
+// Is Emergency Discharge live? STRICTLY below the threshold, as the node says,
+// so a tower sitting exactly on 30% is not in it. Inert -- and false -- on any
+// tower that has not equipped the node, because the fraction is 0 there.
+LongshotTower.prototype.lowHpActive = function () {
+  var at = this.core.stats.lowHpFraction || 0;
+  if (!(at > 0)) return false;
+  var max = this.core.maxHp;
+  return max > 0 && this.core.currentHp < max * at;
 };
 
 // Damage from an Angry enemy, and the death test the main loop sweeps on.
@@ -441,6 +508,29 @@ LongshotTower.prototype.performAction = function (id, context) {
 // --- the game's tower contract ---------------------------------------------
 
 LongshotTower.prototype.update = function (dt, enemies, bullets) {
+  // --- the two LIVE permanent upgrades, before anything is decided ----------
+  //
+  // Both are inert unless their node is equipped, and both are recomputed from
+  // scratch every step rather than toggled, so no state can be left behind by a
+  // heal, a stun, a sale or a pause.
+  //
+  // First Omen counts the quiet. `sinceOrdinaryShot` is seconds since this
+  // tower last put an ordinary round downrange -- the active ability is not one
+  // and neither consumes nor earns the charge, which is the design the node
+  // asks for and is free here because resolveChannel does not touch this.
+  this.sinceOrdinaryShot = (this.sinceOrdinaryShot || 0) + dt;
+
+  // Emergency Discharge trades reach for rate below a third of maximum health.
+  // The rate half rides on the core so the panel's row and the firing clock are
+  // one number; the reach half is re-derived only when the threshold is
+  // actually crossed, because that costs an elevatedRangePx.
+  var hurt = this.lowHpActive();
+  this.core.liveFireRateMult = hurt ? (this.core.stats.lowHpFireRateMult || 1) : 1;
+  if (hurt !== this.wasLowHp) {
+    this.wasLowHp = hurt;
+    this.resolveReach();
+  }
+
   this.core.update(dt);
 
   // BEFORE the channel's early return, because the sixty seconds RUN THROUGH
@@ -566,6 +656,20 @@ LongshotTower.prototype.update = function (dt, enemies, bullets) {
   var empowered = !!(this.core.stats.flags.guaranteedReloadShotCrit &&
     this.core.reload && this.core.reload.nextShotIsFinalBeforeReload());
 
+  // FIRST OMEN: was this round charged by the quiet before it? Asked BEFORE
+  // the shot, because firing is what resets the clock -- and asked once, so
+  // the damage below and the clock reset below cannot disagree about it.
+  //
+  // A charged round takes the bonus INSTEAD OF the penalty, never both: the
+  // node's two numbers are two states of one shot, not a bonus and a tax.
+  var omenIdle = this.core.stats.omenIdleSeconds || 0;
+  var charged = omenIdle > 0 && this.sinceOrdinaryShot >= omenIdle;
+  var omenMult = omenIdle > 0
+    ? (charged ? (this.core.stats.omenChargedMult || 1)
+               : (this.core.stats.omenOrdinaryMult || 1))
+    : 1;
+  this.sinceOrdinaryShot = 0;
+
   var shot = this.core.fire(hpFraction);
 
   // ONE projectile per shot, always. Pierce does not multiply shots -- it
@@ -602,8 +706,15 @@ LongshotTower.prototype.update = function (dt, enemies, bullets) {
     x: this.x + Math.cos(muzzleAngle) * muzzlePx,
     y: this.y + Math.sin(muzzleAngle) * muzzlePx,
     angle: muzzleAngle,
-    damage: shot.sequence[0],
+    damage: shot.sequence[0] * omenMult,
     pierce: this.core.stats.pierce,
+    // SKYBANE, and it is per-BODY rather than per-shot: one piercing round can
+    // pass through a flier and a walker in the same line, and the matchup is a
+    // fact about each of them. Both 1 unless the node is equipped, in which
+    // case the bullet carries two plain numbers -- never a reference back to
+    // the tower, which a shot outliving its firer must not hold.
+    flyingDamageMult: this.core.stats.flyingDamageMult || 1,
+    groundDamageMult: this.core.stats.groundDamageMult || 1,
     hasFalloff: !!this.core.stats.flags.pierceFalloff,
     falloffParams: this.core.stats.mechanics.pierceFalloff,
     maxTravelPx: Math.max(ul(1), this.rangePx - muzzlePx),

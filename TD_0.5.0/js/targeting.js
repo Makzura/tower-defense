@@ -40,9 +40,14 @@ var TowerScore = {
   // because it needed that argument, and so counted no kills at all.
   // `damageKind` is currently `"aoe"` only for Warbringer area damage and the
   // Arcane Sniper B5 blast. Piercing line shots intentionally leave it unset.
-  apply: function (tower, enemy, amount, defPierce, defenseFlatPierce, damageKind) {
+  // `armorPierce` is FLAT ARMOR points, and is the one channel of the three
+  // that touches `armor` rather than `defense` -- the Rifleman's Piercing
+  // Orders permanent upgrade is its only source today.
+  apply: function (tower, enemy, amount, defPierce, defenseFlatPierce, damageKind,
+                   armorPierce) {
     var wasDead = enemy.dead;
-    var dealt = enemy.takeDamage(amount, defPierce, defenseFlatPierce, damageKind);
+    var dealt = enemy.takeDamage(amount, defPierce, defenseFlatPierce, damageKind,
+      armorPierce);
     var scored = enemy.lastDamageTaken;
 
     if (tower) {

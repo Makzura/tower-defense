@@ -13,6 +13,82 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — The confirmed permanent upgrades: thirty-nine nodes on three
+towers.**
+
+The owner's confirmed list, implemented and nothing else. The Rifleman goes from
+four nodes to twelve, the Warbringer from five to thirteen, and the Arcane
+Sniper gets its first tree at fourteen. The Siphon, the Summoner, the Farm and
+the player are deliberately untouched.
+
+**THE NINE EXISTING IDS WERE KEPT AND ONLY RENAMED.** `rif_n1` is
+"Commissioned Ammunition" now rather than `[R-N] Base damage`; an id is the
+persistence format, so renaming one would un-buy it for every existing player,
+and every one of the nine mapped onto a confirmed node. Two of them changed
+gameplay: **`rif_a1` lost its +100 mana A3 surcharge** (the confirmed node
+states its whole effect and does not include one) and **`war_a1` gained ×0.90
+range at A4**, inside the same `hasA4` group as the speed so a tier cannot pay
+the cost without the benefit.
+
+**THE BRANCHES ARE UNFINISHED ON PURPOSE.** A branch that stops after two nodes
+has not been designed past two. Twelve rejected names are listed in `AGENTS.md`
+and must never become purchasable nodes; two more are liked but were never
+costed and are equally out of scope. No prerequisite was invented for any of the
+thirty new nodes — the data model does not need one, and a fabricated edge would
+be a design decision made by the implementation.
+
+**Five things the engine grew, each because a node could not otherwise say what
+it says.** They are extensions to the existing vocabulary, not a redesign:
+
+- **`preAdd`** — a delta before the multipliers, so the order is
+  `(base + preAdd) * mul + add`. Dense Hammerhead adds 0.30 s to the swing cycle
+  "before later attack-rate multipliers", which beside Light Haft is
+  (3.2 + 0.3)/1.1 = 3.18 s and not 3.2/1.1 + 0.3 = 3.21 s. Small, and the
+  difference between doing what the node says and not.
+- **Dotted field paths** — five of the Arcane Sniper's nodes move a MECHANIC
+  PARAMETER (`mechanics.executeScaling.floorFraction`, the pierce decay, the
+  kill-stack window, the reload, the ability's damage and radius), none of which
+  is a top-level stat. A dotted path never creates a container, so a node
+  authored against an absent mechanic is inert.
+- **`price: { firstAdd, laterAdd }`** — Advance Unit makes the run's first
+  Rifleman cheaper and the rest dearer. A run-scoped placement count lives
+  beside the frozen loadout and is moved only by `addTower`, so a hover, a
+  ghost, a refused click and the armoury's throwaway specimen never spend it.
+- **`tower.afterPerks()`** — the tower's own last word, after `settleHp` and
+  `settleRange`. The Arcane Sniper's reload and kill-stack TRACKERS are built in
+  the ConfiguredTower's constructor, long before a perk exists, so Patient
+  Harvest and Covenant Round would otherwise have moved numbers nothing read.
+- **A context for the ghost** — `previewStat` now folds the `when` groups the
+  caller can vouch for, so High-Ground Doctrine draws the ring the placed tower
+  will actually have rather than the unconditional one.
+
+**Flat armor pierce came back**, as `Mitigation.mitigate`'s fifth argument and
+exactly as the note in that file said it would: two points for Piercing Orders,
+clamped at zero, and it never edits the enemy's stored `armor`. It is a separate
+channel from `defenseFlatPierce` all the way down so the two can never be
+spelled for each other. Fracture Stamp is the opposite and the only thing in the
+game that really files an enemy's plate down — permanently, one point per direct
+hit, and never from a blast or the earthquake.
+
+**Footprint is handled now, and only before the tower stands.** Compact Chassis
+takes the Arcane Sniper from 20 to 16 u.l., so `buildFootprintUl` routes every
+placement rule through `TowerPerks.previewFootprintUl` — a footprint that shrank
+after placement could leave a tower overlapping a legal neighbour, which is why
+it was out of scope until a node asked for it.
+
+**Two latent bugs found and fixed on the way.** `ConfiguredTower._refreshStats`
+differenced current health against the PERKED maximum, so a health perk made
+every HP tier heal the tower by its own cut as well as by the tier's; it
+differences against the last RESOLVED maximum now, which is the same number on
+every tower with no such perk. And the sandbox's two `refreshDerived()` callers
+did not resolve the core first, which would have folded an adapter's perks in a
+second time on top of themselves.
+
+Cards state both halves with resolved values and now print "NEEDS TOWER LEVEL 0"
+explicitly rather than leaving it to be inferred. content 366 → 395: twenty-nine
+added, thirteen REPLACED (the nine renamed nodes' tests), nothing lost — diff
+the names, not the total.
+
 **2026-08-30 — The Veil Dart flies twenty per cent faster.**
 
 `speedMultiplier` 1 → 1.2, so 60 u.l./s against the roster's 50, at the owner's

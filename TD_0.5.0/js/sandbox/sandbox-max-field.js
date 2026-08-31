@@ -56,6 +56,12 @@
     tower.core._refreshStats();
 
     tower.totalSpent = configBuildCost(tower);
+    // The core first -- see the note in js/sandbox/sandbox.js: the permanent
+    // upgrades run over `core.stats` as a post-pass, so a `refreshDerived`
+    // without a fresh resolve would apply them twice.
+    if (tower.core && typeof tower.core._refreshStats === "function") {
+      tower.core._refreshStats();
+    }
     if (typeof tower.refreshDerived === "function") tower.refreshDerived();
 
     // Siphon B5 is normally gated and globally unique. The forced build still

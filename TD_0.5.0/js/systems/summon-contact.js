@@ -28,6 +28,16 @@ var SummonContact = (function () {
     // not count as kills here: enemy.dead is false after tryRevive(), meaning
     // the summon is still fully spent against that continuing body.
     var spent = enemy.dead ? Math.min(committed, landed) : committed;
+
+    // WHAT THE EXCHANGE COSTS THE SUMMON, and it is not always what it dealt.
+    // `damageTakenMult` is a body's resistance to being walked through -- a
+    // dug-in Rifleman recruit takes a quarter less (js/soldier.js) -- and it
+    // reduces only the half that comes off the summon. The enemy has already
+    // absorbed the full strike above; a brace does not make the blow smaller,
+    // it makes the body better at wearing it. Absent or 1 on every other
+    // summon, which is the whole of the compatibility argument.
+    var resist = Number(summon.damageTakenMult);
+    if (isFinite(resist) && resist >= 0 && resist !== 1) spent *= resist;
     summon.hp = Math.max(0, available - spent);
     summon.dead = summon.hp <= 0;
     return landed;

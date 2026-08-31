@@ -925,6 +925,14 @@
       // map.)
       towers.forEach(function (t) {
         if (typeof t.refreshDerived === "function") {
+          // THE CORE FIRST, exactly as FarmBoost.refresh does it. A config
+          // tower's `refreshDerived` only reads `core.stats`; the equipped
+          // permanent upgrades then run as a post-pass over whatever is in
+          // there, so calling it without a fresh resolve would fold them in a
+          // second time on top of themselves.
+          if (t.core && typeof t.core._refreshStats === "function") {
+            t.core._refreshStats();
+          }
           t.refreshDerived();
         } else {
           t.rangePx = ul(t.rangeUl);

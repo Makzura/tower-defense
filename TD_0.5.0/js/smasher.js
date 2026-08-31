@@ -357,6 +357,37 @@ Smasher.prototype.recalcStats = function () {
   // makes the panel row below quote the blast the tower will actually deal
   // rather than the one the table was authored with. No tier moves it today.
   this.explosionDamage = Smasher.EXPLOSION_DAMAGE;
+  // AND ITS RADIUS, on the instance for the same reason and since 2026-08-31:
+  // Wide Fracture widens the blast, and `explode` read the constant straight
+  // off the type. No tier moves it either.
+  this.explosionRadiusUl = Smasher.EXPLOSION_RADIUS_UL;
+
+  // --- what the PERMANENT upgrades write, at their neutral values -----------
+  //
+  // ALL INERT AS SET HERE. An unperked Warbringer resolves exactly the numbers
+  // it always did; a perk is a factor of 1 or a delta of 0 moved off neutral.
+  // Reset on every restat, with the perk pass re-applying after it, so nothing
+  // can accumulate across purchases -- see js/systems/tower-perks.js.
+  //
+  //   seesCamo             Witchlight Dust. Read by Targeting.sees, which
+  //                        treats a missing field as "no", so this being
+  //                        DECLARED is what makes the default explicit
+  //   nonCamoDamageMult    the other half of that trade: what a swing and a
+  //                        blast are worth against a body that was never hidden
+  //   swingInnerMult / swingOuterMult
+  //                        Centered Blow. The inner half of the damage radius
+  //                        and the outer half, by RADIAL distance
+  //   slowBonusSeconds     Long Echo. Added to whatever the owned tier's slow
+  //                        lasts -- the tier's own row is a shared table entry
+  //                        and is never mutated
+  //   fractureArmor        Fracture Stamp. FLAT armor points a direct hit files
+  //                        off the body it lands on, permanently
+  this.seesCamo = false;
+  this.nonCamoDamageMult = 1;
+  this.swingInnerMult = 1;
+  this.swingOuterMult = 1;
+  this.slowBonusSeconds = 0;
+  this.fractureArmor = 0;
 
   // Summed separately from the absolute column and added AFTER the max, so a
   // "+15" is +15 on top of whatever reach the tower had -- see the note on
@@ -473,6 +504,9 @@ Smasher.prototype.statSnapshot = function () {
     arcDegrees: this.arcDegrees,
     fullCircle: this.fullCircle,
     slow: this.slow,
+    // RESOLVED, so a card quotes the slow this tower really applies -- tier
+    // plus Long Echo -- rather than the shared table row's own number.
+    slowSeconds: this.slowSeconds(),
     explodes: this.explodesOnKill,
     explosionDamage: this.explosionDamage,
     quake: this.hasQuake
@@ -543,7 +577,8 @@ Smasher.prototype.previewUpgrade = function (id) {
     changes.push({
       label: "Slow",
       from: before.slow ? Math.round(before.slow.strength * 100) + "%" : "none",
-      to: Math.round(after.slow.strength * 100) + "% for " + after.slow.seconds.toFixed(1) + " s",
+      to: Math.round(after.slow.strength * 100) + "% for " +
+        after.slowSeconds.toFixed(1) + " s",
       delta: ""
     });
   }
@@ -859,13 +894,22 @@ Smasher.prototype.swing = function (hits, enemies) {
     // Reordering is the whole fix. A hit enemy is slowed, then damaged, so a
     // kill on the first swing bursts exactly like a kill on the third.
     if (this.slow) {
-      e.applySlow(this.slow.strength, this.slow.seconds);
+      e.applySlow(this.slow.strength, this.slowSeconds());
     }
 
     // Every Warbringer swing is an area wedge. Tag it separately from pierce
     // so enemies with AoE resistance can answer the attack without weakening
     // the Arcane Sniper's ordinary line shots.
-    dealt += TowerScore.apply(this, e, this.damage, 0, 0, "aoe");
+    dealt += TowerScore.apply(this, e, this.swingDamageAgainst(e), 0, 0, "aoe");
+
+    // FRACTURE STAMP FILES THE PLATE DOWN, and it does it AFTER the blow, so
+    // this hit met the armor the body still had and the next one meets less.
+    // The reduction is permanent for that body's remaining life and stacks one
+    // point per direct hit; nothing else in the game edits a stored `armor`,
+    // and a blast, an earthquake or another tower's shot never triggers it.
+    if (this.fractureArmor > 0 && typeof e.armor === "number") {
+      e.armor = Math.max(0, e.armor - this.fractureArmor);
+    }
     if (typeof Effects !== "undefined") {
       Effects.aoeImpact(e.pos.x, e.pos.y,
         Math.max(10, e.radiusPx() * 1.35), "warbringer-hit");
@@ -910,7 +954,8 @@ Smasher.prototype.swing = function (hits, enemies) {
 // the file's previous rule ("a blast is a consequence of a blow that already
 // landed, not a second swing"), deliberately and on instruction.
 Smasher.prototype.explode = function (origin, enemies) {
-  var radiusPx = ul(Smasher.EXPLOSION_RADIUS_UL);
+  // OFF THE INSTANCE, not the constant: Wide Fracture widens it by a fifth.
+  var radiusPx = ul(this.explosionRadiusUl);
   var dealt = 0;
 
   var burst = [origin];      // bodies that have already gone up; never twice
@@ -936,13 +981,20 @@ Smasher.prototype.explode = function (origin, enemies) {
       // blast kills outright should still have been slowed by it, and the next
       // link in the chain should inherit the tempo effect rather than only the
       // damage.
+      // A PROPAGATED SLOW IS STILL THIS WARBRINGER'S SLOW, so Long Echo's extra
+      // second travels down the chain with it -- the same `slowSeconds()` the
+      // swing quotes.
       if (this.slow) {
-        e.applySlow(this.slow.strength, this.slow.seconds);
+        e.applySlow(this.slow.strength, this.slowSeconds());
       }
 
       // Blast damage and blast kills belong to the smasher whose B4 caused it,
-      // however many links down the chain they happened.
-      dealt += TowerScore.apply(this, e, this.explosionDamage, 0, 0, "aoe");
+      // however many links down the chain they happened. Long Echo's flat -2
+      // is deliberately NOT here: it pays for its duration out of the SWING,
+      // and `explosionDamage` is its own number. Witchlight Dust's matchup does
+      // apply, because it is a property of the weapon rather than of one blow.
+      dealt += TowerScore.apply(this, e,
+        this.explosionDamage * this.matchupMult(e), 0, 0, "aoe");
 
       // Died to the blast, so it is the next link.
       if (e.dead) {
@@ -1045,8 +1097,52 @@ Smasher.prototype.containsPoint = Tower.prototype.containsPoint;
 // swings, because its whole upgrade table is written that way ("the fastest
 // owned value wins"); this is the one place that becomes a rate, exactly as
 // ul() is the one place a u.l. distance becomes pixels.
-Smasher.prototype.attackDamage = function () { return this.damage; };
+// Floored at zero. Two of the confirmed permanent upgrades take a flat 2 off
+// the swing -- Long Echo pays for its longer slow with it, Light Haft for its
+// faster rate -- and both say "clamped at zero" out loud. Clamping HERE rather
+// than in the perk pass is what makes the panel, the hover card, the DPS row
+// and the blow itself agree, since all four come through this one function.
+Smasher.prototype.attackDamage = function () { return Math.max(0, this.damage); };
 Smasher.prototype.attacksPerSecond = function () { return 1 / this.cooldownSeconds; };
+
+// WHAT ONE ENEMY TAKES FROM A DIRECT SWING, which is not the same number for
+// every body in the wedge any more.
+//
+//   Centered Blow    radial distance, inner half against outer half. The
+//                    RADIUS is halved, not the area -- an enemy at 0.6 of the
+//                    reach is outside even though most of the circle is
+//   Witchlight Dust  a body that was never hidden is worth less to a hammer
+//                    that was reground to find the ones that were
+//
+// Both neutral at 1, so an unperked Warbringer's swing is this tower's own
+// damage and nothing is computed that was not computed before.
+Smasher.prototype.swingDamageAgainst = function (enemy) {
+  var damage = this.attackDamage();
+  if (this.swingInnerMult !== 1 || this.swingOuterMult !== 1) {
+    var dx = enemy.pos.x - this.x;
+    var dy = enemy.pos.y - this.y;
+    var half = this.rangePx / 2;
+    damage *= (dx * dx + dy * dy) <= half * half
+      ? this.swingInnerMult : this.swingOuterMult;
+  }
+  return damage * this.matchupMult(enemy);
+};
+
+// The camo trade, applied to the direct swing AND to the chain blast, because
+// both are damage credited to this Warbringer. Camo bodies take normal damage
+// -- the node buys the ability to hit them at all, not a bonus against them.
+Smasher.prototype.matchupMult = function (enemy) {
+  if (this.nonCamoDamageMult === 1) return 1;
+  return enemy.isCamo ? 1 : this.nonCamoDamageMult;
+};
+
+// How long this tower's slow lasts, tier plus Long Echo. One function so the
+// swing and every link of the chain quote the same duration, and so the shared
+// `Smasher.UPGRADES` row -- which `this.slow` is a REFERENCE to -- is never
+// written through.
+Smasher.prototype.slowSeconds = function () {
+  return this.slow ? this.slow.seconds + this.slowBonusSeconds : 0;
+};
 
 // Rows for the inspection panel. Every shared row comes from TowerStats, so
 // the smasher says "Attack speed 0.25/s" where it used to say "Hit speed
@@ -1065,13 +1161,16 @@ Smasher.prototype.statLines = function () {
     ["Tower HP", TowerHealth.label(this)]
   ]);
 
+  // Both rows quote the INSTANCE, so a permanent upgrade that lengthens the
+  // slow or widens the blast is described by the panel that describes the
+  // tower, and not by the table the tower was authored from.
   if (this.slow) {
     rows.push(["Slow", Math.round(this.slow.strength * 100) + "% for " +
-      this.slow.seconds.toFixed(1) + " s"]);
+      this.slowSeconds().toFixed(1) + " s"]);
   }
   if (this.explodesOnKill) {
     rows.push(["On kill", this.explosionDamage + " in " +
-      TowerStats.distance(Smasher.EXPLOSION_RADIUS_UL) + ", chains"]);
+      TowerStats.distance(this.explosionRadiusUl) + ", chains"]);
   }
   if (this.hasQuake) {
     rows.push(["Earthquake", Smasher.QUAKE_STUN_SECONDS + " s stun, then " +
@@ -1308,7 +1407,7 @@ Smasher.prototype.draw = function (ctx) {
   // B4 blasts: a hammer strike that CRACKS the ground where the slowed enemy
   // died. Four splitting fissures out of the impact point plus the ring that
   // marks how far the burst reached, both fading together.
-  var blastRadius = ul(Smasher.EXPLOSION_RADIUS_UL);
+  var blastRadius = ul(this.explosionRadiusUl);
   for (var i = 0; i < this.blasts.length; i++) {
     var blast = this.blasts[i];
 
