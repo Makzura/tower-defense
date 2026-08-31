@@ -707,7 +707,12 @@ Enemy.TYPES = {
     // pays 75, nudged up for the two traits: a body nothing on the board can
     // legally shoot is worth more to the player who built the answer to it.
     bounty: 65,
-    speedMultiplier: 1,
+    // 1.2 SINCE 2026-08-30, at the owner's word ("make them a bit faster, like
+    // 20") -- 60 u.l./s against the roster's 50. It was 1, on the argument that
+    // the shortcut should be the whole of its advantage; the shortcut is still
+    // most of it, and twenty per cent on top is what the board asked for after
+    // it was played.
+    speedMultiplier: 1.2,
     // Camo green, cooled towards the flier's blue -- it is both, and the
     // sidebar names both.
     color: { r: 118, g: 176, b: 168 },

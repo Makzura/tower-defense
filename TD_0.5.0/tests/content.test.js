@@ -11093,7 +11093,8 @@ test("the Veil Dart is a 50 HP camo flier that ignores the road", function (t) {
   t.eq(type.isCamo, true, "camouflaged");
   t.eq(type.isFlying, true, "and airborne");
   t.eq(type.offPath, true, "and off the road");
-  t.eq(type.speedMultiplier, 1, "at the roster's base walking speed");
+  t.eq(type.speedMultiplier, 1.2,
+    "twenty per cent over the roster's base walk (60 u.l./s against 50)");
 
   // PARKED, NOT SCHEDULED. `sandboxOnly` is the documented way to hold a type
   // in the index and the sandbox while it is being designed, and tests/run.js
@@ -11173,16 +11174,16 @@ test("the Veil Dart flies the chord, and never the road", function (t) {
   t.near(heading.y, chord.unit.y, 1e-9, "in both components");
 });
 
-test("the Veil Dart arrives sooner, at the same speed, by exactly the shortcut",
+test("the Veil Dart's shortcut is its own advantage, on top of its speed",
 function (t) {
   var h = bootVeilDart();
   h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}));" +
         "enemies.push(new Enemy(path, null, 'normal', {}))");
 
-  // IT IS NOT FASTER. One step of one second moves it the same number of
-  // pixels as the walker -- the shortcut is the whole of its advantage, and
-  // that is what makes the type retunable by moving the chord rather than a
-  // speed multiplier nobody can see.
+  // THE SHORTCUT AND THE SPEED ARE TWO SEPARATE ADVANTAGES, and this is what
+  // keeps them separable: the body covers its OWN authored multiple of the
+  // roster's walk -- 1.2 since 2026-08-30, at the owner's word -- and the chord
+  // is on top of that. Either can be retuned without the other moving.
   // Measured as GROUND COVERED ALONG EACH ONE'S OWN ROUTE -- progress divided
   // by its route scale -- and not as straight-line displacement, which is not
   // the same quantity for a body on a bend: a walker's lane offset swings
@@ -11194,10 +11195,11 @@ function (t) {
     "  a.update(1); b.update(1);" +
     "  return { veil_dart: (a.progress - a0) / a.routeScale()," +
     "           walker: (b.progress - b0) / b.routeScale() }; })()");
-  t.near(moved.veil_dart, moved.walker, 1e-9,
-    "both cover the same ground in a second (" + moved.veil_dart.toFixed(2) + " px)");
-  t.near(moved.veil_dart, h.run("ul(Enemy.BASE_SPEED_ULPS)"), 1e-9,
-    "which is the roster's own walking speed");
+  t.near(moved.walker, h.run("ul(Enemy.BASE_SPEED_ULPS)"), 1e-9,
+    "a walker covers the roster's own walking speed in a second");
+  t.near(moved.veil_dart,
+    h.run("ul(Enemy.BASE_SPEED_ULPS * Enemy.TYPES.veil_dart.speedMultiplier)"), 1e-9,
+    "and the Dart its own multiple of it (" + moved.veil_dart.toFixed(2) + " px)");
 
   // PROGRESS IS IN ROAD UNITS FOR BOTH, which is what lets the leak test and
   // targeting stay branch-free: the Veil Dart's advances faster because the same
@@ -11220,8 +11222,12 @@ function (t) {
   t.ok(times.veil_dart > 0 && times.walker > 0, "both reach the base");
   t.ok(times.veil_dart < times.walker, "the Veil Dart gets there first (" +
     times.veil_dart.toFixed(1) + " s against " + times.walker.toFixed(1) + " s)");
-  t.near(times.veil_dart / times.walker, 1 / scale, 0.02,
-    "and the margin is the shortcut and nothing else");
+  // THE MARGIN IS THE TWO ADVANTAGES MULTIPLIED -- a shorter route and a
+  // faster body. Asserting the PRODUCT rather than either half is what makes
+  // this survive a retune of either one.
+  var quicker = h.run("Enemy.TYPES.veil_dart.speedMultiplier");
+  t.near(times.veil_dart / times.walker, 1 / (scale * quicker), 0.02,
+    "and the margin is exactly the shortcut times the speed");
 
   // IT ENDS ON THE BASE, not merely past a threshold.
   var end = h.run("path.pointAt(path.length)");
@@ -11237,7 +11243,10 @@ test("the Veil Dart takes slows but not the road's pace profile", function (t) {
 
   var normal = h.run("({ veil_dart: enemies[0].currentSpeedUlps()," +
     "                   walker: enemies[1].currentSpeedUlps() })");
-  t.eq(normal.veil_dart, normal.walker, "both start at the same speed");
+  t.eq(normal.walker, h.game.Enemy.BASE_SPEED_ULPS, "a walker starts at the base walk");
+  t.eq(normal.veil_dart,
+    h.game.Enemy.BASE_SPEED_ULPS * h.game.Enemy.TYPES.veil_dart.speedMultiplier,
+    "and the Dart at its own multiple of it");
 
   // A PACE PROFILE IS A FACT ABOUT THE TARMAC. "Nothing crosses that basin
   // quickly" cannot be addressed to a body that is over the basin, so the

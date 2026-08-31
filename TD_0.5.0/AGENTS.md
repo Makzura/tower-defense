@@ -2310,9 +2310,14 @@ else can see it at all, and that is the type's whole question to the player.
 **PARKED, NOT SCHEDULED.** The type carries `sandboxOnly`, which is this
 repository's documented way to hold a type in the index and the sandbox while it
 is being designed; `tests/run.js` enforces it in both directions. Scheduling it
-is a balance decision and nobody has made it. **50 HP, camo, flying, base
-walking speed, 65 bounty** — the health and the traits are the owner's, the
-bounty and the speed are balance values.
+is a balance decision and nobody has made it. **50 HP, camo, flying, 1.2x the
+roster's walk (60 u.l./s), 65 bounty** — the health, the traits and the speed
+are the owner's, the bounty is a balance value.
+
+**THE SHORTCUT AND THE SPEED ARE TWO SEPARATE ADVANTAGES**, and the tests assert
+their PRODUCT rather than either half, so retuning one does not move the other.
+It shipped at 1.0 on the argument that the chord should be its whole edge; the
+owner played it and asked for twenty per cent on top.
 
 **It shipped for a few hours as a placeholder sphere**, which is what the board
 gives any type it has no mesh for (`enemyModel`) — the placeholder was a model

@@ -13,6 +13,17 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Veil Dart flies twenty per cent faster.**
+
+`speedMultiplier` 1 → 1.2, so 60 u.l./s against the roster's 50, at the owner's
+word after playing it. It shipped at 1.0 on the argument that the chord should
+be the whole of its advantage; the chord is still most of it.
+
+The three tests that pinned "it is not faster" now assert the two advantages
+SEPARATELY and their product for the arrival margin — `1 / (routeScale ×
+speedMultiplier)` — so either can be retuned without the other moving, and
+neither is a number typed into a test.
+
 **2026-08-30 — The veil is a skin over the hull, in a third pass.**
 
 Excluding the veil was the wrong answer to the right complaint. The owner:
