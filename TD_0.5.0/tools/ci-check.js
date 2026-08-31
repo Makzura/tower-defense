@@ -897,7 +897,14 @@ var BASELINE = [
     // js/meta.js that changed the profile without saving it, and the new name
     // measures the claim through a real store handed to the game's own scope
     // rather than by trusting the call. Verified failing on the old code first.
-    file: "tests/content.test.js", pass: 439, fail: 0,
+    // ---- 440 on 2026-08-31, the arms became chains -----------------------
+    // 439 -> 440: one added ("a chained node cannot be bought before the one
+    // before it"). Three existing names KEPT their titles and changed their
+    // claims, because "every node is a root" stopped being true: the two shape
+    // tests now derive the chain from the layout, and the recruit-cooldown one
+    // asks that neither node is the OTHER's prerequisite rather than that
+    // both are roots.
+    file: "tests/content.test.js", pass: 440, fail: 0,
     failing: []
   },
   {

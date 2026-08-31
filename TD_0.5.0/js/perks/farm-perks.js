@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The Farm's permanent tree — the owner's confirmed content (2026-08-31)
 //
-// THIRTEEN NODES, ALL ROOTS, AND THE BRANCHES ARE DELIBERATELY UNFINISHED:
+// THIRTEEN NODES, ONE CHAIN PER ARM, AND THE BRANCHES ARE DELIBERATELY UNFINISHED:
 //
 //   north  the general upper branch -- 4, one more undesigned
 //   south  PATH C, which REPLACES the lower-general branch on this tower --
@@ -27,8 +27,14 @@
 // the clone, a withdrawal, a kill bounty and a refund are not production and no
 // node here scales them. That is the rule `productionScale` states once.
 //
-// EVERY NODE IS minLevel 0 and every one is a root: no prerequisite has been
-// authored. **The `id` is the persistence format.**
+// EVERY NODE IS minLevel 0. **The `id` is the persistence format.**
+//
+// **EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside
+// the tower is that branch's root; every node further out REQUIRES the one
+// before it, so a branch is bought from the centre outwards and cannot be
+// skipped into. The tree screen draws its links straight off `requires` -- a
+// root to the tower, a child to its parent -- so moving a prerequisite here
+// moves the line and the lock together, and nothing has to be told twice.
 // ---------------------------------------------------------------------------
 
 TowerPerks.register({
@@ -70,6 +76,7 @@ TowerPerks.register({
              "and the model are unchanged.",
       cost: 100,
       minLevel: 0,
+      requires: ["frm_n1"],
       at: { x: 0, y: -2 },
       effects: {
         mul: { footprintRadiusUl: 0.80, maxHp: 0.90 }
@@ -89,6 +96,7 @@ TowerPerks.register({
              "production.",
       cost: 110,
       minLevel: 0,
+      requires: ["frm_n2"],
       at: { x: 0, y: -3 },
       effects: {
         set: { sellRefundRate: 0.70 },
@@ -111,6 +119,7 @@ TowerPerks.register({
              "they took.",
       cost: 120,
       minLevel: 0,
+      requires: ["frm_n3"],
       at: { x: 0, y: -4 },
       effects: {
         set: { consortiumSolo: -0.05, consortiumPer: 0.03, consortiumCap: 0.12 }
@@ -157,6 +166,7 @@ TowerPerks.register({
              "tranches: +60% permanent, +240% temporary.",
       cost: 160,
       minLevel: 0,
+      requires: ["frm_a1"],
       at: { x: -2, y: 0 },
       effects: {
         when: [{ has: "hasA5", set: { trancheBonus: 0.06, tempMultiplier: 4 } }]
@@ -177,6 +187,7 @@ TowerPerks.register({
              "empty vault protects nothing.",
       cost: 180,
       minLevel: 0,
+      requires: ["frm_a2"],
       at: { x: -3, y: 0 },
       effects: {
         when: [{ has: "hasA4", set: { manaArmorPerPoint: 50, manaArmorMax: 0.50 } }]
@@ -218,6 +229,7 @@ TowerPerks.register({
              "mana and base HP per kill are untouched.",
       cost: 130,
       minLevel: 0,
+      requires: ["frm_b1"],
       at: { x: 2, y: 0 },
       effects: {
         when: [{ has: "hasB4", add: { fieldSlow: 0.05 } }],
@@ -237,6 +249,7 @@ TowerPerks.register({
              "unchanged at 9.",
       cost: 150,
       minLevel: 0,
+      requires: ["frm_b2"],
       at: { x: 3, y: 0 },
       effects: {
         when: [{ has: "hasB5",
@@ -281,6 +294,7 @@ TowerPerks.register({
              "when it is below.",
       cost: 120,
       minLevel: 0,
+      requires: ["frm_c1"],
       at: { x: 0, y: 2 },
       effects: { set: { diceAmortizedReset: 1 } }
     },
@@ -302,6 +316,7 @@ TowerPerks.register({
              "becomes ×1.75. Resets, rerolls and purges are unaffected.",
       cost: 180,
       minLevel: 0,
+      requires: ["frm_c2"],
       at: { x: 0, y: 3 },
       effects: {
         when: [{ has: "hasC3", add: { diceCount: 1 }, set: { diceGainScale: 0.75 } }]

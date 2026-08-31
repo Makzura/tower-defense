@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The Rifleman's permanent tree — the owner's confirmed content
 //
-// TWELVE NODES, ALL ROOTS, AND THE BRANCHES ARE DELIBERATELY UNFINISHED. This
+// TWELVE NODES, ONE CHAIN PER ARM, AND THE BRANCHES ARE DELIBERATELY UNFINISHED. This
 // replaced the four-node first pass on 2026-08-31; every number below is the
 // owner's own, out of the confirmed list, and NOTHING here was invented to fill
 // a gap. A branch that stops after two nodes stops there because the rest has
@@ -16,10 +16,12 @@
 // missing nodes are missing on purpose and their absence is the record of what
 // has and has not been decided.
 //
-// EVERY NODE IS A ROOT. `requires` is empty on all twelve because no
-// prerequisite has been authored for any of them -- the engine does not need
-// one (see `war_a2` for the shape when there IS one) and a fabricated edge
-// would be a design decision made by the implementation.
+// **EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside
+// the tower is that branch's root; every node further out REQUIRES the one
+// before it, so a branch is bought from the centre outwards and cannot be
+// skipped into. The tree screen draws its links straight off `requires` -- a
+// root to the tower, a child to its parent -- so moving a prerequisite here
+// moves the line and the lock together, and nothing has to be told twice.
 //
 // **THE `id` IS THE PERSISTENCE FORMAT** -- it is what the save writes down, so
 // renaming one un-buys it for every existing player. The four ids that predate
@@ -85,6 +87,7 @@ TowerPerks.register({
              "Placement 300 → 350. Faster rounds do not reach further.",
       cost: 90,
       minLevel: 0,
+      requires: ["rif_n1"],
       at: { x: 0, y: -2 },
       effects: {
         add: { rangeUl: 10 },
@@ -110,6 +113,7 @@ TowerPerks.register({
              "rest of that wave. Resets each wave.",
       cost: 130,
       minLevel: 0,
+      requires: ["rif_n2"],
       at: { x: 0, y: -3 },
       effects: {
         set: { rhythmStartMult: 0.94, rhythmPerKill: 0.02, rhythmKillCap: 6 }
@@ -151,6 +155,7 @@ TowerPerks.register({
              "then 290.",
       cost: 100,
       minLevel: 0,
+      requires: ["rif_s1"],
       at: { x: 0, y: 2 },
       effects: { price: { firstAdd: -100, laterAdd: 40 } }
     },
@@ -206,6 +211,7 @@ TowerPerks.register({
              "early collects nothing.",
       cost: 160,
       minLevel: 0,
+      requires: ["rif_a1"],
       at: { x: -2, y: 0 },
       effects: {
         when: [{ has: "hasA5", set: { burstFinalShotMult: 2, burstEarlyShotMult: 0.9 } }]
@@ -228,6 +234,7 @@ TowerPerks.register({
              "longer. Lasts one cycle. B3's automatic fire is untouched.",
       cost: 150,
       minLevel: 0,
+      requires: ["rif_a2"],
       at: { x: -3, y: 0 },
       effects: {
         set: { ratchetGain: 0.88, ratchetLoss: 1.15 }
@@ -276,6 +283,7 @@ TowerPerks.register({
              "Protocol also equipped the cooldown is 45 s.",
       cost: 110,
       minLevel: 0,
+      requires: ["rif_b1"],
       at: { x: 2, y: 0 },
       effects: {
         set: { recruitCooldownRapid: 40 },
@@ -302,6 +310,7 @@ TowerPerks.register({
              "body blocks are unaffected.",
       cost: 150,
       minLevel: 0,
+      requires: ["rif_b2"],
       at: { x: 3, y: 0 },
       effects: {
         when: [{
@@ -327,6 +336,7 @@ TowerPerks.register({
              "moves. Recruit cooldown 45 s → 55 s (45 s with Rapid Muster).",
       cost: 160,
       minLevel: 0,
+      requires: ["rif_b3"],
       at: { x: 4, y: 0 },
       effects: {
         set: { recruitCooldownEntrench: 55, recruitEntrenchSeconds: 1.5 }

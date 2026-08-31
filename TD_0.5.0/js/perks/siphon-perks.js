@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The Siphon's permanent tree — the owner's confirmed content (2026-08-31)
 //
-// FOURTEEN NODES, ALL ROOTS, AND THE BRANCHES ARE DELIBERATELY UNFINISHED:
+// FOURTEEN NODES, ONE CHAIN PER ARM, AND THE BRANCHES ARE DELIBERATELY UNFINISHED:
 //
 //   north  the general upper branch -- 4, one more undesigned
 //   south  the general lower branch -- 2, three more undesigned
@@ -30,9 +30,14 @@
 // multipliers -- x3.0, x2.7, x3.5, x3.2 -- and `rampCap` is 2.0, 1.7, 2.5, 2.2.
 // Getting that backwards would turn a nerf into a buff.
 //
-// EVERY NODE IS minLevel 0 and every one is a root: no prerequisite has been
-// authored, and inventing one would be a design decision made by the
-// implementation. **The `id` is the persistence format.**
+// EVERY NODE IS minLevel 0. **The `id` is the persistence format.**
+//
+// **EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside
+// the tower is that branch's root; every node further out REQUIRES the one
+// before it, so a branch is bought from the centre outwards and cannot be
+// skipped into. The tree screen draws its links straight off `requires` -- a
+// root to the tower, a child to its parent -- so moving a prerequisite here
+// moves the line and the lock together, and nothing has to be told twice.
 // ---------------------------------------------------------------------------
 
 TowerPerks.register({
@@ -63,6 +68,7 @@ TowerPerks.register({
       blurb: "+12 u.l. base range (75 → 87). −15% maximum tower health.",
       cost: 90,
       minLevel: 0,
+      requires: ["sip_n1"],
       at: { x: 0, y: -2 },
       effects: { add: { range: 12 }, mul: { hp: 0.85 } }
     },
@@ -79,6 +85,7 @@ TowerPerks.register({
              "Placement 800 → 875. No flying detection and no damage change.",
       cost: 120,
       minLevel: 0,
+      requires: ["sip_n2"],
       at: { x: 0, y: -3 },
       effects: { set: { seesCamo: true }, price: { add: 75 } }
     },
@@ -96,6 +103,7 @@ TowerPerks.register({
              "takes 0.30 s to establish; holding one costs nothing.",
       cost: 110,
       minLevel: 0,
+      requires: ["sip_n3"],
       at: { x: 0, y: -4 },
       effects: {
         set: { "mechanics.ramp_per_target.rampStart": 0.25, reacquireDelay: 0.30 }
@@ -126,6 +134,7 @@ TowerPerks.register({
              "hits themselves are smaller.",
       cost: 100,
       minLevel: 0,
+      requires: ["sip_s1"],
       at: { x: 0, y: 2 },
       effects: { set: { incomingDamageMult: 0.70 }, mul: { damageMult: 0.95 } }
     },
@@ -171,6 +180,7 @@ TowerPerks.register({
              "percentage defence only, never flat armor.",
       cost: 120,
       minLevel: 0,
+      requires: ["sip_a1"],
       at: { x: -2, y: 0 },
       effects: {
         set: { "mechanics.def_pierce.defPierce": 0.40 },
@@ -189,6 +199,7 @@ TowerPerks.register({
              "sooner. Each one is worth 0.42 mana instead of 0.50 — 16% less.",
       cost: 130,
       minLevel: 0,
+      requires: ["sip_a2"],
       at: { x: -3, y: 0 },
       effects: {
         mul: { "mechanics.charge_to_gold.firstThreshold": 0.85 },
@@ -206,6 +217,7 @@ TowerPerks.register({
              "−15 u.l. range, at A5 too.",
       cost: 150,
       minLevel: 0,
+      requires: ["sip_a3"],
       at: { x: -4, y: 0 },
       effects: {
         when: [{ has: "hasA4",
@@ -246,6 +258,7 @@ TowerPerks.register({
              "range. −10% beam damage — a loss until the sixtieth beam is lit.",
       cost: 140,
       minLevel: 0,
+      requires: ["sip_b1"],
       at: { x: 2, y: 0 },
       effects: {
         when: [{ has: "hasB5",
@@ -264,6 +277,7 @@ TowerPerks.register({
       blurb: "B4+ only: the beam's slow is 22% instead of 15%. −15 u.l. range.",
       cost: 130,
       minLevel: 0,
+      requires: ["sip_b2"],
       at: { x: 3, y: 0 },
       effects: {
         when: [{ has: "hasB4",
@@ -284,6 +298,7 @@ TowerPerks.register({
              "mana instead of 5 000. Still one save, still one per game.",
       cost: 220,
       minLevel: 0,
+      requires: ["sip_b3"],
       at: { x: 4, y: 0 },
       effects: {
         when: [{ has: "hasB5",

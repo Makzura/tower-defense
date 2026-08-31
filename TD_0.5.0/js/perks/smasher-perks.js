@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The Warbringer's permanent tree — the owner's confirmed content
 //
-// THIRTEEN NODES: TWELVE ROOTS AND ONE CHILD, AND THE BRANCHES ARE DELIBERATELY
+// THIRTEEN NODES, ONE CHAIN PER ARM, AND THE BRANCHES ARE DELIBERATELY
 // UNFINISHED. This replaced the five-node first pass on 2026-08-31; every
 // number below is the owner's own, out of the confirmed list, and nothing here
 // was invented to fill a gap.
@@ -15,12 +15,17 @@
 // `Fault Counter`, `Broad Sweep`, `Tempered Body`, `Compact Footing` and
 // `Braced Recovery` were all turned down. Do not extend the branches.
 //
-// THE CHILD IS NOT A THIRTEENTH ROOT. `war_a2` sits one step further out on the
-// A branch and its only prerequisite is `war_a1`. **The prerequisite gates the
-// PURCHASE and nothing else** -- once bought, it may be equipped on its own,
-// without the parent in a slot, if a player wants to spend one slot on the
-// discount alone. It is the only authored edge in either tree, kept because it
-// was authored; no edge was invented for any of the eight new nodes.
+// **EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside
+// the tower is that branch's root; every node further out REQUIRES the one
+// before it, so a branch is bought from the centre outwards and cannot be
+// skipped into. The tree screen draws its links straight off `requires` -- a
+// root to the tower, a child to its parent -- so moving a prerequisite here
+// moves the line and the lock together, and nothing has to be told twice.
+//
+// **A PREREQUISITE GATES THE PURCHASE AND NOTHING ELSE.** Once bought, a node
+// may be EQUIPPED on its own, without its parent in a slot -- a player who
+// wants `war_a2`'s discount and not `war_a1`'s speed spends one slot and gets
+// exactly that.
 //
 // **THE `id` IS THE PERSISTENCE FORMAT.** The five ids that predate this pass
 // (`war_n1`, `war_a1`, `war_a2`, `war_b1`, `war_s1`) are KEPT and only their
@@ -69,6 +74,7 @@ TowerPerks.register({
              "earthquake unchanged.",
       cost: 110,
       minLevel: 0,
+      requires: ["war_n1"],
       at: { x: 0, y: -2 },
       effects: {
         add: { damage: 4 },
@@ -93,6 +99,7 @@ TowerPerks.register({
              "normal damage, not more.",
       cost: 130,
       minLevel: 0,
+      requires: ["war_n2"],
       at: { x: 0, y: -3 },
       effects: {
         set: { seesCamo: true },
@@ -150,6 +157,7 @@ TowerPerks.register({
              "Explosion damage unchanged.",
       cost: 100,
       minLevel: 0,
+      requires: ["war_s1"],
       at: { x: 0, y: 2 },
       effects: {
         mul: { cooldownSeconds: 1 / 1.1 },
@@ -167,6 +175,7 @@ TowerPerks.register({
       blurb: "Placement 600 → 500. −40 maximum health (150 → 110).",
       cost: 90,
       minLevel: 0,
+      requires: ["war_s2"],
       at: { x: 0, y: 3 },
       effects: {
         price: { add: -100 },
@@ -244,6 +253,7 @@ TowerPerks.register({
              "and the earthquake are unaffected.",
       cost: 130,
       minLevel: 0,
+      requires: ["war_a2"],
       at: { x: -3, y: 0 },
       effects: {
         set: { swingInnerMult: 1.35, swingOuterMult: 0.90 }
@@ -268,6 +278,7 @@ TowerPerks.register({
              "The hit that strips it still met the old armor.",
       cost: 180,
       minLevel: 0,
+      requires: ["war_a3"],
       at: { x: -4, y: 0 },
       effects: {
         when: [{ has: "hasA4", mul: { damage: 0.90 }, set: { fractureArmor: 1 } }]
@@ -319,6 +330,7 @@ TowerPerks.register({
              "damage, never below 0. Explosion damage unchanged.",
       cost: 110,
       minLevel: 0,
+      requires: ["war_b1"],
       at: { x: 2, y: 0 },
       effects: {
         add: { slowBonusSeconds: 1, damage: -2 }
@@ -341,6 +353,7 @@ TowerPerks.register({
              "radius. Swings and the earthquake are unaffected.",
       cost: 140,
       minLevel: 0,
+      requires: ["war_b2"],
       at: { x: 3, y: 0 },
       effects: {
         mul: { explosionRadiusUl: 1.20 },

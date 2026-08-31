@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The Summoner's permanent tree — the owner's confirmed content (2026-08-31)
 //
-// THIRTEEN NODES, ALL ROOTS, AND THE BRANCHES ARE DELIBERATELY UNFINISHED:
+// THIRTEEN NODES, ONE CHAIN PER ARM, AND THE BRANCHES ARE DELIBERATELY UNFINISHED:
 //
 //   north  the general upper branch -- 4, one more undesigned
 //   south  the general lower branch -- 2, three more undesigned
@@ -27,8 +27,14 @@
 // everything, and no node here moves either. Wide Detonation widens the blast
 // and Superconductor fires the lance oftener; neither touches what it deals.
 //
-// EVERY NODE IS minLevel 0 and every one is a root: no prerequisite has been
-// authored. **The `id` is the persistence format.**
+// EVERY NODE IS minLevel 0. **The `id` is the persistence format.**
+//
+// **EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside
+// the tower is that branch's root; every node further out REQUIRES the one
+// before it, so a branch is bought from the centre outwards and cannot be
+// skipped into. The tree screen draws its links straight off `requires` -- a
+// root to the tower, a child to its parent -- so moving a prerequisite here
+// moves the line and the lock together, and nothing has to be told twice.
 // ---------------------------------------------------------------------------
 
 TowerPerks.register({
@@ -64,6 +70,7 @@ TowerPerks.register({
              "fires 10% slower. Placement 450 → 600.",
       cost: 120,
       minLevel: 0,
+      requires: ["blb_n1"],
       at: { x: 0, y: -2 },
       effects: {
         set: { perkBlubSeesCamo: 1, perkBlubSeesFlying: 1 },
@@ -84,6 +91,7 @@ TowerPerks.register({
              "never twins again.",
       cost: 150,
       minLevel: 0,
+      requires: ["blb_n2"],
       at: { x: 0, y: -3 },
       effects: {
         set: { perkTwinChance: 0.15 },
@@ -104,6 +112,7 @@ TowerPerks.register({
              "bigger ones. The models are not shrunk.",
       cost: 100,
       minLevel: 0,
+      requires: ["blb_n3"],
       at: { x: 0, y: -4 },
       effects: {
         mul: { perkFootprintMult: 0.85, perkHpMultAll: 0.95 }
@@ -137,6 +146,7 @@ TowerPerks.register({
              "damage is unaffected.",
       cost: 120,
       minLevel: 0,
+      requires: ["blb_s1"],
       at: { x: 0, y: 2 },
       effects: {
         mul: { perkDamageMultMain: 1.15, perkDamageMultSide: 0.92 },
@@ -176,6 +186,7 @@ TowerPerks.register({
              "unchanged, so each body simply stays useful longer.",
       cost: 130,
       minLevel: 0,
+      requires: ["blb_a1"],
       at: { x: -2, y: 0 },
       effects: {
         when: [{ has: "hasA3", mul: { perkIntervalMultA: 0.92, perkRateMultA: 0.90 } }]
@@ -194,6 +205,7 @@ TowerPerks.register({
              "fast, expires 30% sooner.",
       cost: 150,
       minLevel: 0,
+      requires: ["blb_a2"],
       at: { x: -3, y: 0 },
       effects: {
         when: [{ has: "hasA4", set: { weakenPerHit: 0.0015, weakenSeconds: 3.5 } }]
@@ -231,6 +243,7 @@ TowerPerks.register({
              "SuperBlub 95 → 93 s). Those blubs have 15% less attack range.",
       cost: 120,
       minLevel: 0,
+      requires: ["blb_b1"],
       at: { x: 2, y: 0 },
       effects: {
         when: [{ has: "hasB3", add: { perkIntervalAddB: -2 },
@@ -250,6 +263,7 @@ TowerPerks.register({
              "The blast still deals exactly 250.",
       cost: 150,
       minLevel: 0,
+      requires: ["blb_b2"],
       at: { x: 3, y: 0 },
       effects: {
         set: { perkBlastRadiusUl: 35 },
@@ -269,6 +283,7 @@ TowerPerks.register({
              "damage is unchanged.",
       cost: 180,
       minLevel: 0,
+      requires: ["blb_b3"],
       at: { x: 4, y: 0 },
       effects: {
         set: { perkLaserEvery: 7 },

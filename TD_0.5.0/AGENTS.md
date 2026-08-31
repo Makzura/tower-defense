@@ -160,7 +160,7 @@ baseline:
 
 ```
 node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
-node tests/content.test.js        439 pass / 0 fail   content, visuals and index
+node tests/content.test.js        440 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
@@ -4642,10 +4642,21 @@ in scope either: `Marked Quarry` and `Deep Epicenter`.
 is owned and the coins are there, and equippable by none of them until the tower
 reaches level 1. That is where "buying is not equipping" really bites.
 
-**Every node is a ROOT except `war_a2`.** No prerequisite was invented for any of
-the sixty new ones: the data model does not need one, and a fabricated edge would
-be a design decision made by the implementation. `war_a2`'s edge was authored
-and is kept.
+**EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside the
+tower is that branch's root; every node further out REQUIRES the one before it,
+so a branch is bought from the centre outwards and cannot be skipped into. Every
+tree was a set of independent roots until then — which the tree screen could not
+help drawing as a lie, because a root's link runs to the TOWER and that line
+passes straight through the nodes between, so four independent roots on one arm
+looked exactly like a chain of four.
+
+**The lock and the line are one field.** `stateOf` refuses a purchase whose
+`requires` is unmet and `drawTreeLinks` draws a node to its PARENT (or to the
+tower when it has none), so re-pointing a prerequisite moves the gate and the
+line together and nothing has to be told twice. A test derives the whole rule
+from the LAYOUT rather than from a list of ids — distance 1 is a root, distance
+*n* requires the node at *n−1* on the same arm — so a retune that adds a node or
+re-points an edge is checked by the same three lines.
 
 **THE ARM IS THE BRANCH, on every tree:** path A west, path B east, the general
 upper branch north, the general lower branch south. The Farm is the one

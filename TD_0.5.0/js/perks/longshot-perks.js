@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // The Arcane Sniper's permanent tree — the owner's confirmed content
 //
-// FOURTEEN NODES, ALL ROOTS, AND THE BRANCHES ARE DELIBERATELY UNFINISHED
+// FOURTEEN NODES, ONE CHAIN PER ARM, AND THE BRANCHES ARE DELIBERATELY UNFINISHED
 // (2026-08-31). Every number below is the owner's own, out of the confirmed
 // list, and nothing here was invented to fill a gap:
 //
@@ -35,9 +35,14 @@
 // from `core.purchased`, so this tree is authored in the same vocabulary as the
 // two hand-written ones.
 //
-// EVERY NODE IS minLevel 0 and every one is a root: no prerequisite has been
-// authored for any of them, and inventing one would be a design decision made
-// by the implementation. **The `id` is the persistence format.**
+// EVERY NODE IS minLevel 0. **The `id` is the persistence format.**
+//
+// **EACH ARM IS A CHAIN** (2026-08-31, at the owner's word). The node beside
+// the tower is that branch's root; every node further out REQUIRES the one
+// before it, so a branch is bought from the centre outwards and cannot be
+// skipped into. The tree screen draws its links straight off `requires` -- a
+// root to the tower, a child to its parent -- so moving a prerequisite here
+// moves the line and the lock together, and nothing has to be told twice.
 //
 // FIELDS THIS TREE CREATES WITH `set` -- `finalShotDamageMult`,
 // `flyingDamageMult`, `groundDamageMult`, `omen*`, `lowHp*` -- do not exist in
@@ -83,6 +88,7 @@ TowerPerks.register({
              "where it stands decides which.",
       cost: 80,
       minLevel: 0,
+      requires: ["snp_n1"],
       at: { x: 0, y: -2 },
       effects: {
         when: [
@@ -107,6 +113,7 @@ TowerPerks.register({
              "everything else. The B5 ability is unaffected.",
       cost: 120,
       minLevel: 0,
+      requires: ["snp_n2"],
       at: { x: 0, y: -3 },
       effects: { set: { flyingDamageMult: 1.25, groundDamageMult: 0.88 } }
     },
@@ -124,6 +131,7 @@ TowerPerks.register({
              "spends nor gains the charge.",
       cost: 140,
       minLevel: 0,
+      requires: ["snp_n3"],
       at: { x: 0, y: -4 },
       effects: {
         set: { omenIdleSeconds: 3, omenChargedMult: 1.35, omenOrdinaryMult: 0.95 }
@@ -165,6 +173,7 @@ TowerPerks.register({
              "unchanged.",
       cost: 80,
       minLevel: 0,
+      requires: ["snp_s1"],
       at: { x: 0, y: 2 },
       effects: { set: { footprint: 16 }, add: { range: -10 } }
     },
@@ -181,6 +190,7 @@ TowerPerks.register({
              "moment it is healed back. The B5 ability is unaffected.",
       cost: 120,
       minLevel: 0,
+      requires: ["snp_s2"],
       at: { x: 0, y: 3 },
       effects: {
         set: { lowHpFraction: 0.30, lowHpFireRateMult: 1.20, lowHpRangeMult: 0.80 }
@@ -226,6 +236,7 @@ TowerPerks.register({
              "lighter.",
       cost: 120,
       minLevel: 0,
+      requires: ["snp_a1"],
       at: { x: -2, y: 0 },
       effects: {
         when: [{
@@ -250,6 +261,7 @@ TowerPerks.register({
              "speed each and still 75 at most.",
       cost: 140,
       minLevel: 0,
+      requires: ["snp_a2"],
       at: { x: -3, y: 0 },
       effects: {
         when: [{
@@ -295,6 +307,7 @@ TowerPerks.register({
              "+40% is untouched.",
       cost: 140,
       minLevel: 0,
+      requires: ["snp_b1"],
       at: { x: 2, y: 0 },
       effects: {
         when: [{
@@ -320,6 +333,7 @@ TowerPerks.register({
              "The other three shots are unchanged.",
       cost: 180,
       minLevel: 0,
+      requires: ["snp_b2"],
       at: { x: 3, y: 0 },
       effects: {
         when: [{
@@ -349,6 +363,7 @@ TowerPerks.register({
              "cooldown and health cost are unchanged.",
       cost: 220,
       minLevel: 0,
+      requires: ["snp_b3"],
       at: { x: 4, y: 0 },
       effects: {
         when: [{

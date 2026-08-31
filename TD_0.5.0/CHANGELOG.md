@@ -13,6 +13,29 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — Each arm of a tree is a chain.**
+
+Every tree was a set of independent roots, because both content briefs said not
+to invent prerequisites. The tree screen could not help drawing that as a lie: a
+root's link runs to the TOWER, and that line passes straight through the nodes
+between it and the centre -- so four independent roots on one arm looked exactly
+like a chain of four, and the outermost was buyable first. Owner: "nodes that are
+leafs to other nodes shouldn't be unlockable before the root node."
+
+So the arms are chains now. The node beside the tower is that branch's root and
+every node further out requires the one before it -- 55 prerequisites, authored
+one by one in the tree files rather than derived from the coordinates, because
+`requires` is the thing that gets edited and a gate that moved when a node was
+dragged would be the worst kind of coupling.
+
+**The lock and the line are one field.** `stateOf` refuses a purchase whose
+`requires` is unmet and `drawTreeLinks` draws a node to its PARENT, so
+re-pointing a prerequisite moves both together -- which is the "make it dynamic"
+half of the ask. The new test derives the whole rule from the LAYOUT rather than
+from a list of ids, so a retune that adds a node or re-points an edge is checked
+by the same three lines, and it also pins that no link is longer than one step:
+that length is exactly what made independent roots look chained.
+
 **2026-08-31 — Buy all towers, and the roster unlock is finally written down.**
 
 The cheat panel's "Unlock all towers" is "Buy all towers" now -- buying is what

@@ -10487,6 +10487,60 @@ test("unlocking the whole roster is written down", function (t) {
   h.run("localStorage = undefined");
 });
 
+test("a chained node cannot be bought before the one before it", function (t) {
+  var h = bootContent();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  for (var i = 0; i < 40; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+
+  // THE THIRD NODE OUT ON A BRANCH, with nothing bought. It is locked, and the
+  // refusal names the node it is waiting on rather than saying "no".
+  var third = h.run("TowerPerks.stateOf('soldier', 'rif_b3')");
+  t.eq(third.state, "locked", "the third node on path B is locked from the start");
+  t.deep(third.missing, ["rif_b2"], "on exactly the node before it");
+  t.ok(/Rapid Muster/.test(third.reason),
+    "and it says which one by name: " + third.reason);
+  t.eq(h.run("TowerPerks.buy('soldier', 'rif_b3').ok"), false, "so it cannot be bought");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', 'rif_b3')"), false, "and was not");
+
+  // BUYING INWARDS OPENS IT, one step at a time and no faster.
+  t.eq(h.run("TowerPerks.buy('soldier', 'rif_b1').ok"), true, "the root buys");
+  t.eq(h.run("TowerPerks.stateOf('soldier', 'rif_b3').state"), "locked",
+    "the third is still locked with only the first bought");
+  t.eq(h.run("TowerPerks.buy('soldier', 'rif_b2').ok"), true, "the second buys");
+  t.eq(h.run("TowerPerks.stateOf('soldier', 'rif_b3').state"), "buyable",
+    "and now the third is buyable");
+
+  // THE DRAWING FOLLOWS THE SAME FIELD, which is what makes it dynamic: the
+  // tree screen links a node to its PARENT, and a node beside the tower to the
+  // tower. Change `requires` and the line moves with the lock.
+  h.run("Upgrades.open(); Upgrades.selectTower('soldier'); Upgrades.openTree()");
+  var links = h.run("(function () {" +
+    "  var out = [];" +
+    "  TowerPerks.nodes('soldier').forEach(function (n) {" +
+    "    var to = Upgrades.nodeScreenPoint(n);" +
+    "    (n.requires || []).forEach(function (r) {" +
+    "      var p = TowerPerks.nodeOf('soldier', r);" +
+    "      var from = Upgrades.nodeScreenPoint(p);" +
+    "      out.push({ id: n.id, dx: Math.round(to.x - from.x)," +
+    "                 dy: Math.round(to.y - from.y) }); }); });" +
+    "  return out; })()");
+  t.eq(links.length, 8, "eight of the Rifleman's twelve nodes hang off another");
+  var longest = 0;
+  links.forEach(function (l) {
+    longest = Math.max(longest, Math.abs(l.dx), Math.abs(l.dy));
+  });
+  var pitch = h.run("(function () {" +
+    "  var a = Upgrades.nodeScreenPoint(TowerPerks.nodeOf('soldier', 'rif_b1'));" +
+    "  var b = Upgrades.nodeScreenPoint(TowerPerks.nodeOf('soldier', 'rif_b2'));" +
+    "  return Math.round(Math.abs(b.x - a.x)); })()");
+  t.eq(longest, pitch,
+    "and every link is exactly ONE step long — no line reaches past a node to " +
+    "the tower, which is what made independent roots look like a chain");
+});
+
 test("the pips beside a tower read its loadout, not its level", function (t) {
   var h = bootContent();
 
@@ -10764,6 +10818,36 @@ function bootContent() {
   return h;
 }
 
+// EVERY ARM IS A CHAIN, and this is what says so for a whole tree at once.
+//
+// The rule is derived from the LAYOUT rather than from a list of ids: a node one
+// step from the tower is that branch's root and requires nothing, and a node
+// further out requires EXACTLY the node one step closer on the same arm. So a
+// retune that moves a node, adds one to a branch or re-points a prerequisite is
+// checked by the same three lines, and the tree screen -- which draws its links
+// straight off `requires` -- cannot drift away from what is purchasable.
+//
+// Returns a list of complaints, empty when the tree is a clean set of chains.
+function chainProblems(h, towerId) {
+  return h.run("(function () {" +
+    "  var out = [], byArm = {};" +
+    "  var list = TowerPerks.nodes('" + towerId + "');" +
+    "  list.forEach(function (n) {" +
+    "    var at = n.at || { x: 0, y: 0 };" +
+    "    var arm = at.x < 0 ? 'W' : at.x > 0 ? 'E' : at.y < 0 ? 'N' : 'S';" +
+    "    var d = Math.abs(at.x) + Math.abs(at.y);" +
+    "    if (at.x !== 0 && at.y !== 0) out.push(n.id + ' is diagonal');" +
+    "    (byArm[arm] = byArm[arm] || {})[d] = n.id;" +
+    "    n.__arm = arm; n.__d = d; });" +
+    "  list.forEach(function (n) {" +
+    "    var want = n.__d > 1 ? byArm[n.__arm][n.__d - 1] : null;" +
+    "    var got = (n.requires || []).join('+');" +
+    "    if (want === null && got) out.push(n.id + ' sits beside the tower but requires ' + got);" +
+    "    if (want !== null && got !== want) out.push(n.id + ' requires ' + (got || 'nothing') + ', not ' + want);" +
+    "  });" +
+    "  return out; })()");
+}
+
 // Buy and equip a list of node ids on one tower, then start a run and put one
 // of them on the board with the given in-run tiers bought.
 //
@@ -10913,8 +10997,11 @@ test("the three confirmed trees hold exactly the confirmed nodes", function (t) 
       var arm = n.at.x < 0 ? "west" : n.at.x > 0 ? "east"
         : n.at.y < 0 ? "north" : "south";
       t.eq(arm, row[3], row[1] + " sits on the " + row[3] + " arm");
-      t.ok(n.at.x === 0 || n.at.y === 0, row[1] + " is on one arm, not diagonal");
     });
+
+    t.deep(chainProblems(h, towerId), [],
+      towerId + "'s arms are chains: beside the tower is a root, and every " +
+      "node further out requires exactly the one before it");
 
     // NO REJECTED OR UNCONFIRMED NAME IS PURCHASABLE.
     var forbidden = ["Marked Quarry", "Crowd Momentum", "Fault Counter",
@@ -10926,16 +11013,25 @@ test("the three confirmed trees hold exactly the confirmed nodes", function (t) 
     t.deep(present, [], towerId + " exposes no rejected name");
   });
 
-  // EVERY NODE IS A ROOT EXCEPT THE ONE AUTHORED EDGE. No prerequisite was
-  // invented for any of the thirty new nodes.
-  var parents = h.run("(function () { var out = [];" +
+  // AND THE RULE HOLDS ON EVERY TREE IN THE GAME, not only the three above.
+  var broken = h.run("TowerPerks.towersWithTrees()").filter(function (id) {
+    return chainProblems(h, id).length > 0;
+  });
+  t.deep(broken, [], "every tower's arms are chains");
+
+  // A PREREQUISITE IS NEVER A LOOP AND NEVER FORWARD. Each one points at a node
+  // that is strictly closer to the tower, which is what makes the chain
+  // buyable at all.
+  var backwards = h.run("(function () { var out = [];" +
     "  TowerPerks.towersWithTrees().forEach(function (id) {" +
     "    TowerPerks.nodes(id).forEach(function (n) {" +
-    "      if (n.requires && n.requires.length)" +
-    "        out.push(id + ':' + n.id + '<-' + n.requires.join('+')); }); });" +
-    "  return out.sort(); })()");
-  t.deep(parents, ["smasher:war_a2<-war_a1"],
-    "the Warbringer's child is the only authored prerequisite in the game");
+    "      var d = Math.abs(n.at.x) + Math.abs(n.at.y);" +
+    "      (n.requires || []).forEach(function (r) {" +
+    "        var p = TowerPerks.nodeOf(id, r); if (!p) return;" +
+    "        var pd = Math.abs(p.at.x) + Math.abs(p.at.y);" +
+    "        if (pd >= d) out.push(id + ':' + n.id + '<-' + r); }); }); });" +
+    "  return out; })()");
+  t.deep(backwards, [], "no prerequisite points outwards or at itself");
 });
 
 test("a fresh profile leaves all three towers exactly as authored", function (t) {
@@ -11366,11 +11462,17 @@ function (t) {
       "and the squad is sent on that clock");
   });
 
-  // NEITHER REQUIRES THE OTHER, and the tree says so.
-  var nodes = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
-    "  return n.id === 'rif_b2' || n.id === 'rif_b4'; })" +
-    "  .map(function (n) { return (n.requires || []).length; })");
-  t.deep(nodes, [0, 0], "both are roots and neither needs the other");
+  // NEITHER REQUIRES THE OTHER. They are both on path B's chain, so each needs
+  // the node before it -- but neither is the other's prerequisite, which is
+  // what "independently equipable" means here.
+  var needs = h.run("(function () { var out = {};" +
+    "  ['rif_b2', 'rif_b4'].forEach(function (id) {" +
+    "    out[id] = (TowerPerks.nodeOf('soldier', id).requires || []).slice(); });" +
+    "  return out; })()");
+  t.deep(needs.rif_b2, ["rif_b1"], "Rapid Muster needs the node before it");
+  t.deep(needs.rif_b4, ["rif_b3"], "and Entrenchment Protocol needs the one before IT");
+  t.eq(needs.rif_b2.indexOf("rif_b4"), -1, "neither is the other's prerequisite");
+  t.eq(needs.rif_b4.indexOf("rif_b2"), -1, "in either direction");
 
   // RAPID MUSTER'S RECRUITS ARE THINNER.
   var b4 = towerWith(h, "soldier", ["rif_b2"], ["B1", "B2", "B3", "B4"]);
@@ -12661,8 +12763,10 @@ function (t) {
       var arm = n.at.x < 0 ? "west" : n.at.x > 0 ? "east"
         : n.at.y < 0 ? "north" : "south";
       t.eq(arm, row[3], row[1] + " sits on the " + row[3] + " arm");
-      t.deep(n.requires || [], [], row[1] + " is a root");
     });
+
+    t.deep(chainProblems(h, towerId), [],
+      towerId + "'s arms are chains, bought from the tower outwards");
 
     var forbidden = ["Capital Bound", "Blood Triage", "Initial Overpressure",
       "Tight Base", "Survival Valve", "Close Circuit", "Double Polarity",
