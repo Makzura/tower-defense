@@ -346,13 +346,7 @@
       refresh();
     }));
     var wipeRow = row(root);
-    wipeRow.appendChild(button("Wipe profile", function () {
-      if (!window.confirm("Wipe the saved profile completely?")) return;
-      MetaProgress.reset();
-      if (typeof rebuildBuildBar === "function") rebuildBuildBar();
-      fillScope();
-      refresh();
-    }));
+    wipeRow.appendChild(button("Reset save", resetSave));
 
     // --- the run -------------------------------------------------------------
     label(root, "This run");
@@ -370,6 +364,50 @@
     root.appendChild(readout);
 
     document.body.appendChild(root);
+    refresh();
+  }
+
+  // BACK TO A FIRST RUN, and it is more than `MetaProgress.reset()`.
+  //
+  // The profile is only half of what a save-reset has to undo. A player wiping
+  // one mid-run is otherwise left on a board playing under a FROZEN loadout of
+  // perks the profile no longer contains, with a healing ledger that still
+  // unlocks the Siphon's B5, a death-denial slot still claimed, a C network
+  // still standing and an Upgrades screen still pointed at a tower that may no
+  // longer be owned. Every one of those is session state rather than saved
+  // state, so none of it goes when the profile does.
+  //
+  // So this leaves the run first and then clears the four session-scoped
+  // singletons a fresh boot would not have. Each is guarded: this file loads
+  // only on index.html and must not assume any particular page's globals.
+  function resetSave() {
+    if (!window.confirm(
+      "Reset the save?\n\nCoins, owned towers, the build bar, every tower's " +
+      "level, xp, bought upgrades and loadout — all of it goes, and the run " +
+      "in progress is left. This cannot be undone.")) return;
+
+    // THE RUN FIRST, because leaving it is what releases the frozen loadout --
+    // and a loadout frozen from a profile that is about to stop existing is
+    // exactly the stale state this button is for.
+    if (typeof openMenu === "function") openMenu();
+
+    // THE PROFILE, through the model's own door.
+    MetaProgress.reset();
+
+    // AND THE SESSION LEDGERS a fresh boot would have empty. `restartGame`
+    // clears all of these on the way INTO a run, so this only matters for what
+    // the menu screens read before the next one -- which is precisely where a
+    // player looks straight after resetting.
+    if (typeof HealingLedger !== "undefined") HealingLedger.reset();
+    if (typeof DeathDenial !== "undefined") DeathDenial.reset();
+    if (typeof Farms !== "undefined") Farms.reset();
+    if (typeof TowerPerks !== "undefined") TowerPerks.releaseRun();
+
+    // The build bar is derived from the profile, so it has to be rebuilt; the
+    // Upgrades screen re-derives which tower it is showing when it is opened.
+    if (typeof rebuildBuildBar === "function") rebuildBuildBar();
+
+    fillScope();
     refresh();
   }
 

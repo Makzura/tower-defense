@@ -4917,9 +4917,20 @@ something each node has to be careful about.
 A DOM panel on the shipping page (opened with the key left of "1", or F8, or the
 dim corner chip) that grants coins, sets levels 0–5, buys or clears a whole
 tree, clears reset cooldowns, fills or empties perk loadouts, unlocks the
-roster, wipes the profile, and — during a run — grants mana, closes the wave
+roster, **resets the save**, and — during a run — grants mana, closes the wave
 through `endWave` so it pays its real xp, and heals the base. It also prints the
 one thing no screen shows: the wave's xp budget and the live investment split.
+
+**RESET SAVE IS MORE THAN `MetaProgress.reset()`** (2026-08-31). The profile is
+only half of what a save-reset has to undo: a player wiping one mid-run is
+otherwise left on a board playing under a FROZEN loadout of perks the profile no
+longer contains, with a healing ledger that still unlocks the Siphon's B5, a
+death-denial slot still claimed and a C network still standing — all session
+state, none of it saved, and none of it cleared by wiping the profile. So the
+button leaves the RUN first (which is what releases the frozen loadout), then
+resets the profile, then clears `HealingLedger`, `DeathDenial` and `Farms`, then
+rebuilds the build bar. Every one of those calls is guarded, because this file
+must not assume a particular page's globals.
 
 **It comes out in three deletes: the file, its one `<script>` tag in
 `index.html`, and `MetaProgress.debugPatch`.** Nothing else in the repository

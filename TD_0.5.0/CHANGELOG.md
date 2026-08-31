@@ -13,6 +13,22 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — Reset save, and it undoes the session as well as the profile.**
+
+The cheat panel's "Wipe profile" is "Reset save" now, and it does the job the
+name promises. `MetaProgress.reset()` is only half of it: a player wiping a
+profile mid-run was left on a board playing under a FROZEN loadout of perks the
+profile no longer contained, with a healing ledger that still unlocked the
+Siphon's B5, a death-denial slot still claimed and a C network still standing.
+All of that is session state rather than saved state, so none of it went when
+the profile did.
+
+It leaves the run first -- which is what releases the frozen loadout -- then
+resets the profile, clears `HealingLedger`, `DeathDenial` and `Farms`, and
+rebuilds the build bar. The confirm now says what is actually going. Every call
+stays guarded and every mutation still goes through the model, so the panel
+still comes out in the same three deletes.
+
 **2026-08-31 — The Upgrades screen reads before it acts, and the tree camera
 takes a trackpad.**
 
