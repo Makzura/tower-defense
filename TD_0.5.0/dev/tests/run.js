@@ -3195,7 +3195,7 @@ function (t) {
   // the point of reading the file is that a derivation is a shape no data
   // assertion above can rule out.
   var src = require("fs").readFileSync(
-    require("path").join(__dirname, "..", "js", "game.js"), "utf8");
+    require("path").join(__dirname, "..", "..", "jeu", "js", "game.js"), "utf8");
   var body = src.slice(src.indexOf("var NORMAL_WAVES"),
     src.indexOf("function waveGroups"));
   t.eq(body.indexOf("EASY_WAVES"), -1,
@@ -3896,7 +3896,7 @@ function (t) {
     "codex.js": "parked panel sprites, never pushed into `enemies`"
   };
 
-  var root = nodePath.join(__dirname, "..", "js");
+  var root = nodePath.join(__dirname, "..", "..", "jeu", "js");
   var files = [];
   (function walk(dir) {
     fs.readdirSync(dir).forEach(function (name) {
@@ -6391,7 +6391,7 @@ test("every camo type is drawn as the body it shadows, not as a sphere", functio
   var fs = require("fs");
   var h = harness.boot();
 
-  var world = fs.readFileSync(__dirname + "/../js/gl/gl-world.js", "utf8");
+  var world = fs.readFileSync(__dirname + "/../../jeu/js/gl/gl-world.js", "utf8");
   var literal = /var CAMO_SHADOWS = (\{[\s\S]*?\});/.exec(world);
   t.ok(!!literal, "gl-world still ships a CAMO_SHADOWS table");
   var shadows = JSON.parse(literal[1].replace(/(\w+):/g, '"$1":').replace(/'/g, '"'));
@@ -6607,7 +6607,7 @@ test("every shield fragment is its own group, so the renderer can throw it", fun
 
 group("Ironwood Frontier — map geometry");
 
-var MapGeom = require("../js/systems/map-geometry.js");
+var MapGeom = require("../../jeu/js/systems/map-geometry.js");
 
 var CIRCLE = { shape: "circle", x: 100, y: 100, radius: 20 };
 var SQUARE = { shape: "polygon", points: [[200, 200], [240, 200], [240, 240], [200, 240]] };
@@ -7340,7 +7340,7 @@ function (t) {
   var fs = require("fs");
   var nodePath = require("path");
   function scripts(page) {
-    var html = fs.readFileSync(nodePath.join(__dirname, "..", page), "utf8");
+    var html = fs.readFileSync(nodePath.join(__dirname, "..", "..", "jeu", page), "utf8");
     var out = [], re = /<script\s+src="([^"]+)"\s*>\s*<\/script>/g, m;
     while ((m = re.exec(html)) !== null) out.push(m[1]);
     return out;

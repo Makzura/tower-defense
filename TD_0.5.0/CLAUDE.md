@@ -21,3 +21,9 @@ way, and add an entry there for every change you make.
 
 If you are an assistant that was pointed at this file by convention, open
 `AGENTS.md` before changing anything.
+
+**The folder is in two halves since 2026-08-31.** `jeu/` is the game — every
+HTML page, every script, every asset, and nothing that is not needed to play.
+`dev/` is the suites, the tools and the Blender sources. The gate is
+`cd dev && node tools/ci-check.js`, and every tool resolves the game as
+`__dirname/../../jeu`.

@@ -31,7 +31,7 @@ var path = require("path");
 var os = require("os");
 var childProcess = require("child_process");
 
-var ROOT = path.join(__dirname, "..");
+var ROOT = path.join(__dirname, "..", "..", "jeu");
 var ENEMY_JS = path.join(ROOT, "js", "enemy.js");
 
 // The guard's own condition, verbatim out of js/enemy.js. A full expression,

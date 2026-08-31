@@ -67,7 +67,7 @@
 var fs = require("fs");
 var path = require("path");
 
-var ROOT = path.resolve(__dirname, "..");
+var ROOT = path.resolve(__dirname, "..", "..", "jeu");
 var MODELS_DIR = path.join(ROOT, "js", "gl", "models");
 var PAGES = ["index.html", "sandbox.html", "3d.html"];
 

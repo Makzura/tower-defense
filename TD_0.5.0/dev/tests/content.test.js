@@ -6675,7 +6675,7 @@ test("the Rifleman's rounds are spelled the same in both renderers", function (t
   var h = harness.boot();
   var fs = require("fs");
   var pathOf = require("path");
-  var root = pathOf.join(__dirname, "..");
+  var root = pathOf.join(__dirname, "..", "..", "jeu");
 
   function tableOf(file) {
     var src = fs.readFileSync(pathOf.join(root, file), "utf8");
@@ -8853,7 +8853,7 @@ group("the three new types are DATA, not branches");
 test("no shared code branches on herald, sapper or volatile", function (t) {
   var fs = require("fs");
   var nodePath = require("path");
-  var root = nodePath.join(__dirname, "..", "js");
+  var root = nodePath.join(__dirname, "..", "..", "jeu", "js");
 
   // THE RULE js/enemy.js OPENS BY STATING: no type has behaviour of its own, so
   // nothing branches on which one an enemy is. Three types at once is exactly
@@ -14292,7 +14292,7 @@ test("the Veil Dart is a 50 HP camo flier that ignores the road", function (t) {
   // table: `GLModels.get` builds a GPU mesh and there is no renderer in the
   // harness, so the registry's own metadata is not reachable through it.
   var fs = require("fs");
-  var src = fs.readFileSync(__dirname + "/../js/gl/models/enemy-veil_dart.js", "utf8");
+  var src = fs.readFileSync(__dirname + "/../../jeu/js/gl/models/enemy-veil_dart.js", "utf8");
   var names = /bandNames:\s*(\[[^\]]*\])/.exec(src);
   var secs = /bandSeconds:\s*(\[[^\]]*\])/.exec(src);
   t.ok(!!names && !!secs, "the import declares its bands");
@@ -14301,7 +14301,7 @@ test("the Veil Dart is a 50 HP camo flier that ignores the road", function (t) {
   t.eq(JSON.parse(secs[1])[1], 1, "and travel is the 1 s loop it was authored as");
 
   // THE BAND IS CHOSEN BY NAME IN gl-world, not by an index typed anywhere.
-  var world = fs.readFileSync(__dirname + "/../js/gl/gl-world.js", "utf8");
+  var world = fs.readFileSync(__dirname + "/../../jeu/js/gl/gl-world.js", "utf8");
   t.ok(/veil_dart:\s*function\s*\(\)\s*\{\s*return\s*"travel"/.test(world),
     "and gl-world names the clip it flies on rather than numbering it");
 

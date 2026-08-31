@@ -1,0 +1,26 @@
+TOWER DEFENSE v0.5.0
+====================
+
+  jeu/     TOUT CE QU'IL FAUT POUR JOUER, et rien d'autre. C'est ce dossier
+           qu'on envoie a quelqu'un : on le zippe tel quel, il fait 71 Mo.
+           On double-clique jeu/index.html, ou "Play Tower Defense.app"
+           (Mac) / ".exe" (Windows), qui ouvrent le HTML a cote d'eux.
+
+           Aucune dependance : pas d'URL, pas de fetch, pas de police web,
+           pas d'etape de build. Chrome, Edge ou Safari plutot que Firefox --
+           la sauvegarde passe par localStorage, qui marche en file:// sur
+           les trois premiers et est capricieux sur le dernier.
+
+           Le menu de triche part avec (la puce en bas a gauche, ou la
+           touche a gauche du 1, ou F8). Pour du playtest c'est voulu ; a
+           supprimer avant une vraie sortie, en trois effacements decrits
+           en haut de jeu/js/debug-cheats.js.
+
+  dev/     RIEN LA-DEDANS N'EST NECESSAIRE POUR JOUER : les suites, les
+           outils, les sources Blender, les rendus de doc. 51 Mo qui ne
+           partent pas. Voir dev/LISEZMOI.txt.
+
+  AGENTS.md      la source de verite du projet : contraintes, architecture,
+                 mecaniques, valeurs courantes
+  CHANGELOG.md   comment on en est arrive la
+  CLAUDE.md      un pointeur vers AGENTS.md

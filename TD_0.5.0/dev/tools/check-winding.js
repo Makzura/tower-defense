@@ -36,7 +36,7 @@ var vm = require("vm");
 var cp = require("child_process");
 var path = require("path");
 
-var ROOT = path.resolve(__dirname, "..");
+var ROOT = path.resolve(__dirname, "..", "..", "jeu");
 var bad = 0;
 
 function report(file, name, nt, out, inw) {
@@ -131,7 +131,7 @@ var py = process.env.PYTHON || "python";
 var outText = "";
 try {
   outText = cp.execSync(JSON.stringify(py) + " -", {
-    cwd: path.join(ROOT, "tools/blender"),
+    cwd: path.join(__dirname, "blender"),
     input: PY_AUDIT, encoding: "utf8"
   });
 } catch (e) {

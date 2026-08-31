@@ -16,7 +16,7 @@ var fs = require("fs");
 var path = require("path");
 var vm = require("vm");
 
-var ROOT = path.join(__dirname, "..");
+var ROOT = path.join(__dirname, "..", "..", "jeu");
 
 var SCRIPTS = [
   "js/units.js",

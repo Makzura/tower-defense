@@ -86,7 +86,7 @@ for (var ai = 0; ai < argv.length; ai++) {
   if (!rootArg) rootArg = argv[ai];
 }
 
-var ROOT = rootArg ? path.resolve(rootArg) : path.resolve(__dirname, "..");
+var ROOT = rootArg ? path.resolve(rootArg) : path.resolve(__dirname, "..", "..", "jeu");
 
 // THE PAGE LIST IS DERIVED, AND IT WAS HARDCODED FOR ONE DAY -- long enough to
 // produce a false accusation, which is why this comment is long.

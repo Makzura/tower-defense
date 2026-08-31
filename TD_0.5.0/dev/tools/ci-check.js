@@ -53,7 +53,15 @@
 var cp = require("child_process");
 var path = require("path");
 
-var ROOT = path.resolve(__dirname, "..");
+var ROOT = path.resolve(__dirname, "..", "..", "jeu");
+
+// TWO ROOTS SINCE THE 2026-08-31 SPLIT, and they are different places. `ROOT` is
+// the GAME -- `jeu/`, what a player is sent -- and is what the suites read pages
+// and scripts out of. `DEV` is this folder's own root, `dev/`, and is where the
+// suites and the tools themselves live. Running a suite from the game's root
+// would not find it, and reading `index.html` from the dev root would not find
+// that; keeping both named is what stops one being used for the other.
+var DEV = path.resolve(__dirname, "..");
 
 // Both runners print "FAIL <test name>", assert.js at four spaces and
 // sandbox.smoke.js at two. Nothing else in either output starts that way.
@@ -997,7 +1005,7 @@ function run(file) {
   var out;
   try {
     out = cp.execSync("node " + JSON.stringify(file), {
-      cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
+      cwd: DEV, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
     });
   } catch (e) {
     // A suite with failures exits non-zero; that is expected here, and its
@@ -1102,8 +1110,8 @@ results.forEach(function (x) {
 // suites stayed green. See tools/check-script-manifest.js for the full story.
 console.log("");
 var manifest = cp.spawnSync("node",
-  [path.join(ROOT, "tools", "check-script-manifest.js")],
-  { cwd: ROOT, encoding: "utf8" });
+  [path.join(DEV, "tools", "check-script-manifest.js")],
+  { cwd: DEV, encoding: "utf8" });
 console.log((manifest.stdout || "").replace(/\n+$/, ""));
 if (manifest.stderr) console.log(manifest.stderr.replace(/\n+$/, ""));
 if (manifest.status !== 0) {

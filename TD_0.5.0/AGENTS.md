@@ -126,7 +126,20 @@ without writing the rule into this file is exactly how the two drift apart.
 
 ## How to run and test
 
-**Run the game:** open `index.html` in a browser. That is the entire build
+**THE FOLDER IS IN TWO HALVES SINCE 2026-08-31, and the split is the whole
+point of it.** `jeu/` is everything needed to play and nothing else — that is
+the folder a playtester is sent, zipped as it stands, 71 Mo. `dev/` is the
+suites, the tools, the Blender sources and the documentation renders: 51 Mo that
+never leaves this machine. `AGENTS.md`, `CHANGELOG.md` and `CLAUDE.md` stay at
+the top, because they are the project rather than either half of it.
+
+**TWO ROOTS, AND THEY ARE DIFFERENT PLACES.** Every tool and every suite
+resolves the GAME as `__dirname/../../jeu` and itself as `dev/`. `ci-check.js`
+names both (`ROOT` and `DEV`) rather than deriving one from the other, because
+running a suite from the game's root would not find it and reading `index.html`
+from the dev root would not find that. A new tool must do the same.
+
+**Run the game:** open `jeu/index.html` in a browser. That is the entire build
 process. No server, no bundler, no install step.
 
 **Test a change:** save the file, press Cmd-R in the browser.
@@ -155,10 +168,16 @@ test. (It said "five plus one" until 2026-08-31 and had done since
 reader to repair rather than copy. Name the set a count counts before repairing
 it.) These are the current measured results, **re-run
 2026-08-31, with the confirmed permanent upgrades in**, through
-`node tools/ci-check.js`, which is the gate and holds these same numbers as its
+`node tools/ci-check.js` from `dev/`, which is the gate and holds these same numbers as its
 baseline:
 
+**Everything below is run from `dev/`**, which is where the suites and the tools
+now live:
+
 ```
+cd dev
+node tools/ci-check.js                                the gate, all seven at once
+
 node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
 node tests/content.test.js        440 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec

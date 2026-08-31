@@ -16,7 +16,7 @@ var fs = require("fs");
 var nodePath = require("path");
 var vm = require("vm");
 
-var ROOT = nodePath.join(__dirname, "..");
+var ROOT = nodePath.join(__dirname, "..", "..", "jeu", "..", "jeu");
 
 // The script list is READ OUT OF index.html rather than duplicated here, so a
 // new game file is picked up by the tests automatically and the two can never

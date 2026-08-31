@@ -18,7 +18,7 @@ var fs = require("fs");
 var nodePath = require("path");
 var vm = require("vm");
 
-var ROOT = nodePath.join(__dirname, "..");
+var ROOT = nodePath.join(__dirname, "..", "..", "jeu", "..", "jeu");
 
 // Read the script list out of sandbox.html, the same way tests/harness.js
 // reads it out of index.html -- so adding a script to the page cannot leave

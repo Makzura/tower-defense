@@ -36,9 +36,9 @@
 // maths one.
 // ---------------------------------------------------------------------------
 
-var CONFIGS = require("../js/towers/long-range-dps.config.js");
-var StatResolver = require("../js/systems/stat-resolver.js");
-var Pierce = require("../js/systems/pierce.js");
+var CONFIGS = require("../../jeu/js/towers/long-range-dps.config.js");
+var StatResolver = require("../../jeu/js/systems/stat-resolver.js");
+var Pierce = require("../../jeu/js/systems/pierce.js");
 
 var CONFIG = CONFIGS.longRangeDPS;
 

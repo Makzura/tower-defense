@@ -40,7 +40,7 @@ var fs = require("fs");
 var path = require("path");
 var os = require("os");
 
-var ROOT = path.resolve(__dirname, "..");
+var ROOT = path.resolve(__dirname, "..", "..", "jeu");
 
 // Files that are on disk, loaded by nothing, and MEANT to be. Listed here with
 // the reason so that nobody has to remember it, and so that deleting one of

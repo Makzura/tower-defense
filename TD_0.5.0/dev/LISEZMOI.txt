@@ -1,0 +1,25 @@
+DEV — RIEN ICI N'EST NECESSAIRE POUR JOUER
+==========================================
+
+Pour envoyer le jeu a quelqu'un : zippe le dossier "jeu" et rien d'autre.
+Ce dossier-ci peut rester sur ton disque, il ne part pas.
+
+  tests/            les suites Node. `cd dev && node tests/run.js`
+  tools/            le portail (`node tools/ci-check.js`), les verificateurs,
+                    les importeurs Blender, et tools/blender (les sources .blend)
+  preview-renders/  des rendus de documentation. Reference nulle part dans le
+                    code : ni le jeu ni les tests ne les ouvrent
+  MODEL_SKINS_GUIDE.md, OPEN-ITEMS.md    des notes
+
+DEUX RACINES, ET CE SONT DEUX ENDROITS DIFFERENTS. Les outils et les suites
+resolvent le JEU comme `__dirname/../../jeu` et eux-memes comme `dev/`. C'est
+pour ca que ci-check.js nomme les deux (`ROOT` et `DEV`) au lieu d'en deduire
+un de l'autre : lancer une suite depuis la racine du jeu ne la trouverait pas,
+et lire index.html depuis la racine de dev non plus.
+
+POUR TOUT LANCER
+
+  cd dev && node tools/ci-check.js
+
+C'est le portail : il joue les sept suites, compare aux totaux de reference et
+signale un NOM de test qui echoue meme si le total n'a pas bouge.

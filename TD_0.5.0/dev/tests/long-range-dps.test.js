@@ -22,18 +22,18 @@ var runner = require("./assert");
 var group = runner.group;
 var test = runner.test;
 
-var Units = require("../js/units.js");
-var TowerConfigs = require("../js/towers/long-range-dps.config.js");
-var StatResolver = require("../js/systems/stat-resolver.js");
-var Crosspath = require("../js/systems/crosspath.js");
-var RangeFilter = require("../js/systems/range-filter.js");
-var Pierce = require("../js/systems/pierce.js");
-var UpgradeEffects = require("../js/systems/upgrade-effects.js");
-var Execute = require("../js/systems/execute.js");
-var TimedStackTracker = require("../js/systems/buff-stacks.js");
-var ReloadTracker = require("../js/systems/reload.js");
-var ActiveAbility = require("../js/systems/active-ability.js");
-var ConfiguredTower = require("../js/towers/tower-runtime.js");
+var Units = require("../../jeu/js/units.js");
+var TowerConfigs = require("../../jeu/js/towers/long-range-dps.config.js");
+var StatResolver = require("../../jeu/js/systems/stat-resolver.js");
+var Crosspath = require("../../jeu/js/systems/crosspath.js");
+var RangeFilter = require("../../jeu/js/systems/range-filter.js");
+var Pierce = require("../../jeu/js/systems/pierce.js");
+var UpgradeEffects = require("../../jeu/js/systems/upgrade-effects.js");
+var Execute = require("../../jeu/js/systems/execute.js");
+var TimedStackTracker = require("../../jeu/js/systems/buff-stacks.js");
+var ReloadTracker = require("../../jeu/js/systems/reload.js");
+var ActiveAbility = require("../../jeu/js/systems/active-ability.js");
+var ConfiguredTower = require("../../jeu/js/towers/tower-runtime.js");
 
 var CONFIG = TowerConfigs.longRangeDPS;
 

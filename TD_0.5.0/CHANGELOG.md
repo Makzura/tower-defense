@@ -13,6 +13,32 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — The folder is in two halves: `jeu/` and `dev/`.**
+
+Owner: separate what is needed to play from what is not, and keep both in the
+same folder. `jeu/` is now every HTML page, every script, every asset and the
+two launchers -- 71 Mo, the folder a playtester is sent, zipped as it stands.
+`dev/` is the suites, the tools, the Blender sources and the documentation
+renders -- 51 Mo that never leaves the machine. Nothing was deleted.
+
+**The game moved as a unit, which is why no HTML or JS path changed.**
+`index.html` reaches `js/` and `assets/` relatively, and the three dev pages
+(`sandbox.html`, `3d.html`, `long-range-dps-debug.html`) reach the same `js/`
+tree -- so they had to travel with it, and they did. Not one `<script src>` was
+touched, and the manifest tool's page discovery still finds all four pages
+beside each other.
+
+**What did move is the tooling's idea of "the root", and it is two roots now.**
+Every tool and every suite resolved the game as `__dirname/..`; they resolve it
+as `__dirname/../../jeu` and themselves as `dev/`. `ci-check.js` names both
+(`ROOT` and `DEV`) rather than deriving one from the other, because running a
+suite from the game's root would not find it and reading `index.html` from the
+dev root would not find that. Four suites also required game modules directly
+and now cross into `jeu/` to do it.
+
+`LISEZMOI.txt` at the top says which half is which and what to zip;
+`dev/LISEZMOI.txt` says what is in the half that stays.
+
 **2026-08-31 — Each arm of a tree is a chain.**
 
 Every tree was a set of independent roots, because both content briefs said not

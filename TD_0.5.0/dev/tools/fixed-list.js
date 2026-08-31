@@ -1,5 +1,5 @@
 var fs = require("fs"), path = require("path");
-var ROOT = require("path").resolve(__dirname, "..");
+var ROOT = require("path").resolve(__dirname, "..", "..", "jeu");
 global.window = global;
 function load(p){ (0,eval)(fs.readFileSync(path.join(ROOT,p),"utf8")); }
 var models = {};

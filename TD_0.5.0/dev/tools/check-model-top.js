@@ -75,7 +75,7 @@ var fs = require("fs");
 var vm = require("vm");
 var path = require("path");
 
-var ROOT = path.resolve(__dirname, "..");
+var ROOT = path.resolve(__dirname, "..", "..", "jeu");
 var MODELS_DIR = path.join(ROOT, "js", "gl", "models");
 
 // crownOf() adds this many board px of headroom above `model.top`. It is the

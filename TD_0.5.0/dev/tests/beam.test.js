@@ -14,16 +14,16 @@ var runner = require("./assert");
 var group = runner.group;
 var test = runner.test;
 
-var Mitigation = require("../js/systems/mitigation.js");
-var StatResolver = require("../js/systems/stat-resolver.js");
-var Crosspath = require("../js/systems/crosspath.js");
-var RampTracker = require("../js/systems/ramp.js");
-var ChargeMeter = require("../js/systems/charge-gold.js");
-var GoldPower = require("../js/systems/gold-power.js");
+var Mitigation = require("../../jeu/js/systems/mitigation.js");
+var StatResolver = require("../../jeu/js/systems/stat-resolver.js");
+var Crosspath = require("../../jeu/js/systems/crosspath.js");
+var RampTracker = require("../../jeu/js/systems/ramp.js");
+var ChargeMeter = require("../../jeu/js/systems/charge-gold.js");
+var GoldPower = require("../../jeu/js/systems/gold-power.js");
 
-var UpgradeEffects = require("../js/systems/upgrade-effects.js");
+var UpgradeEffects = require("../../jeu/js/systems/upgrade-effects.js");
 
-var CONFIG = require("../js/towers/beam.config.js").beam;
+var CONFIG = require("../../jeu/js/towers/beam.config.js").beam;
 
 function enemy(armor, defense) {
   return { armor: armor || 0, defense: defense || 0 };
@@ -427,7 +427,7 @@ test("B5 declares its unlock conditions in config, not in code", function (t) {
 });
 
 test("the healing that gates B5 is pooled across towers", function (t) {
-  var HealingLedger = require("../js/systems/healing-ledger.js");
+  var HealingLedger = require("../../jeu/js/systems/healing-ledger.js");
   HealingLedger.reset();
 
   HealingLedger.record(3000);          // one tower
