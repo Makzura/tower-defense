@@ -888,7 +888,11 @@ var BASELINE = [
     // module now and the green/red button is what moves a loadout. The tree
     // camera's gestures were added to the existing navigation test rather than
     // given one of their own, so they move no count either.
-    file: "tests/content.test.js", pass: 437, fail: 0,
+    // ---- 438 on 2026-08-31, the loadout pips -----------------------------
+    // 437 -> 438: one added. The five pips beside a tower in the Upgrades list
+    // read the LOADOUT rather than the level -- solid, outlined or barred --
+    // which is what they had always looked like and never were.
+    file: "tests/content.test.js", pass: 438, fail: 0,
     failing: []
   },
   {

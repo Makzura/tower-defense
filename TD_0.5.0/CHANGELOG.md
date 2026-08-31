@@ -45,6 +45,15 @@ in-run path gets its band for free — and a card carries a name and one clause.
 Everything quantitative moved to a panel on the right, for the one module being
 read.
 
+**And the five pips beside each tower read its loadout.** They were five solid
+squares filled up to the tower's LEVEL, which is exactly what a loadout looks
+like and is not one — a tower with every slot open and nothing in any of them
+was drawn identically to one carrying five modules. Owner: they "clearly look
+like equipped or unequipped module". Three states now — solid for a slot with a
+module in it, an outline for an open and empty one, a diagonal bar for one the
+level has not opened — and the level is still legible, because how many pips are
+not barred is the level.
+
 **And a click reads instead of equipping.** Clicking an equipped module used to
 take it straight out of its slot, which meant the only way to read what a perk
 you were USING did was to stop using it. A click PINS the module and the one

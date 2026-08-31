@@ -10442,6 +10442,50 @@ function (t) {
     "and the node is still owned — unequipping is not un-buying");
 });
 
+test("the pips beside a tower read its loadout, not its level", function (t) {
+  var h = bootContent();
+
+  // THEY LOOKED LIKE A LOADOUT AND WERE NOT (2026-08-31). Five solid squares
+  // filled up to the tower's LEVEL, so a tower with every slot open and nothing
+  // in any of them was drawn exactly like one carrying five modules.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "openMenu(); Upgrades.open(); Upgrades.selectTower('soldier')");
+
+  function pips() {
+    return h.run("[0,1,2,3,4].map(function (i) {" +
+      "  return Upgrades.slotPipState('soldier', i); })");
+  }
+
+  t.deep(pips(), ["locked", "locked", "locked", "locked", "locked"],
+    "a level-0 tower has five barred slots");
+
+  // LEVEL 2: two open and empty, three still barred -- so how many pips are NOT
+  // barred is still the level, which is what the old drawing was for.
+  h.run("MetaProgress.addXp('soldier', 2500)");
+  t.eq(h.run("MetaProgress.progressOf('soldier').level"), 2, "2 500 xp is level 2");
+  t.deep(pips(), ["empty", "empty", "locked", "locked", "locked"],
+    "two open and empty, three barred");
+
+  h.run("MetaProgress.addXp('soldier', 20000);" +
+        "MetaProgress.buyNode('soldier', 'rif_n1', 0);" +
+        "MetaProgress.buyNode('soldier', 'rif_s1', 0);" +
+        "MetaProgress.equipPerk('soldier', 'rif_n1', 2);" +
+        "MetaProgress.equipPerk('soldier', 'rif_s1', 4)");
+  t.deep(pips(), ["empty", "empty", "filled", "empty", "filled"],
+    "and a filled pip is a slot with a module in it — the third and the fifth");
+
+  // TAKING ONE OUT EMPTIES ITS PIP, which is the whole point of the change.
+  h.run("MetaProgress.unequipPerk('soldier', 2)");
+  t.deep(pips(), ["empty", "empty", "empty", "empty", "filled"],
+    "unequipping empties that pip and no other");
+
+  // AND OWNING A MODULE WITHOUT EQUIPPING IT FILLS NOTHING.
+  h.run("MetaProgress.unequipPerk('soldier', 4)");
+  t.deep(pips(), ["empty", "empty", "empty", "empty", "empty"],
+    "two modules owned, none equipped, and not one pip is filled");
+  t.eq(h.run("TowerPerks.inventory('soldier').length"), 2, "while both are still owned");
+});
+
 test("the modules are grouped by the branch they came off", function (t) {
   var h = bootContent();
 

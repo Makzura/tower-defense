@@ -1005,15 +1005,69 @@ var Upgrades = (function () {
       ctx.fillText("Lv " + progress.level + "  ·  " +
         MetaProgress.ownedNodes(id).length + " bought", r.x + 58, r.y + 38);
 
-      // The slot pips: five, filled to the level, so the list itself shows how
-      // far every tower has come without opening any of them.
+      // The slot pips: five, one per perk slot, so the list itself shows every
+      // tower's LOADOUT without opening any of them.
       for (var p = 0; p < MetaProgress.PERK_SLOTS; p++) {
-        ctx.fillStyle = p < progress.level
-          ? "rgba(" + ASH_EMBER + ",0.85)" : "rgba(" + ASH_DUST + ",0.22)";
-        ctx.fillRect(r.x + r.w - 14 - (MetaProgress.PERK_SLOTS - p) * 9, r.y + 12, 6, 6);
+        drawSlotPip(pipRect(r, p), slotPipState(id, p));
       }
     });
     ctx.textBaseline = "top";
+  }
+
+  // --- the five pips beside a tower in the list ------------------------------
+  //
+  // THEY READ THE LOADOUT, NOT THE LEVEL (2026-08-31, at the owner's word: they
+  // "clearly look like equipped or unequipped module", and they did not -- they
+  // were five solid squares filled up to the tower's LEVEL, so a tower with
+  // every slot open and nothing in any of them looked exactly like one carrying
+  // five modules).
+  //
+  // Three states, and the level is still legible from them, because how many
+  // pips are NOT barred is the level:
+  //
+  //   filled   a module is equipped in that slot
+  //   empty    the slot is open and nothing is in it
+  //   locked   the level has not opened that slot -- a diagonal bar
+  //
+  // One function answering the state and one drawing it, so the list and a test
+  // read the same three words rather than the same pixels.
+  function slotPipState(towerId, index) {
+    if (index >= MetaProgress.progressOf(towerId).level) return "locked";
+    return MetaProgress.equippedPerks(towerId)[index] ? "filled" : "empty";
+  }
+
+  // Eight pixels rather than the old six, because a diagonal inside six reads
+  // as a smudge. The band ends where it always did, so nothing else moved.
+  var PIP = 8, PIP_PITCH = 10;
+
+  function pipRect(row, index) {
+    return {
+      x: row.x + row.w - 12 - (MetaProgress.PERK_SLOTS - index) * PIP_PITCH,
+      y: row.y + 11, w: PIP, h: PIP
+    };
+  }
+
+  function drawSlotPip(r, state) {
+    if (state === "filled") {
+      ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.9)";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      return;
+    }
+    if (state === "empty") {
+      // An outline and no fill: the slot is there and it is waiting.
+      ctx.strokeStyle = "rgba(" + ASH_EMBER + ",0.6)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      return;
+    }
+    // LOCKED: a bar corner to corner, and dimmer than either of the others
+    // because it is the one state the player cannot act on.
+    ctx.strokeStyle = "rgba(" + ASH_DUST + ",0.42)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(r.x + 0.5, r.y + r.h - 0.5);
+    ctx.lineTo(r.x + r.w - 0.5, r.y + 0.5);
+    ctx.stroke();
   }
 
   function drawPanel() {
@@ -1711,6 +1765,7 @@ var Upgrades = (function () {
     perkActionRect: perkActionRect,
     inventoryActionRect: inventoryActionRect,
     slotActionRect: slotActionRect,
+    slotPipState: slotPipState,
     branchOf: function (nodeId) {
       var node = selected ? TowerPerks.nodeOf(selected, nodeId) : null;
       return node ? branchOf(selected, node) : null;

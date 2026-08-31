@@ -160,7 +160,7 @@ baseline:
 
 ```
 node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
-node tests/content.test.js        437 pass / 0 fail   content, visuals and index
+node tests/content.test.js        438 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
@@ -4521,6 +4521,23 @@ types not bought yet belong to the armoury — and shows the selected one's icon
 level, xp bar, five slots, its MODULES, and one module read in full on the
 right. **All five slots are always drawn**, so the whole ladder is visible from
 level 0, and a locked one says which level opens it.
+
+**THE FIVE PIPS BESIDE A TOWER IN THE LIST READ ITS LOADOUT** (2026-08-31).
+They were five solid squares filled up to the tower's LEVEL, which looked
+exactly like a loadout and was not one — a tower with every slot open and
+nothing in any of them was drawn identically to one carrying five modules. Three
+states now, and the level is still legible because how many pips are NOT barred
+IS the level:
+
+| pip | meaning |
+|---|---|
+| solid | a module is equipped in that slot |
+| outlined | the slot is open and nothing is in it |
+| a diagonal bar | the level has not opened that slot |
+
+`Upgrades.slotPipState(towerId, i)` answers the state and `drawSlotPip` draws
+it, so the list and the tests read the same three words rather than the same
+pixels.
 
 **THE MODULES ARE GROUPED BY THE BRANCH THEY CAME OFF** (2026-08-31): PATH A,
 PATH B, PATH C where the tower has a third in-run path, and GENERAL for the
