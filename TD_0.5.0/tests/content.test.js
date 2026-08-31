@@ -10300,21 +10300,55 @@ function (t) {
         "TowerPerks.buy('soldier', '" + roots[1] + "');" +
         "Upgrades.open()");
 
-  // A CLICK -- press and release on the same card, without moving -- puts a
-  // perk in the first open slot. The screen has to work without dragging.
+  // A CLICK READS. It pins the module into the right-hand card and moves NO
+  // loadout -- which is what makes an equipped module readable at all, and is
+  // the whole of the 2026-08-31 change.
   var card = h.run("Upgrades.inventoryCardRect(0)");
+  var firstId = h.run("TowerPerks.inventory('soldier')[0].id");
   h.run("Upgrades.onMouseDown(" + (card.x + 20) + ", " + (card.y + 20) + ");" +
         "Upgrades.onMouseUp(" + (card.x + 20) + ", " + (card.y + 20) + ")");
-  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), roots[0],
-    "clicking an inventory card equips it");
+  t.eq(h.run("Upgrades.state().detail"), firstId,
+    "clicking a module opens it on the right");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null,
+    "and equips nothing at all");
 
-  // A DRAG onto a legal slot moves it there.
+  // THE GREEN BUTTON IS WHAT EQUIPS, into the first slot the level has opened
+  // and left free.
+  var action = h.run("Upgrades.perkActionRect()");
+  h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId,
+    "pressing EQUIP puts it in slot 1");
+  t.ok(/slot 1/i.test(h.run("Upgrades.state().flash.text")), "and says where");
+
+  // AN EQUIPPED MODULE CAN BE READ WITHOUT BEING TAKEN OUT. This is the bug the
+  // change exists to fix: a click on its slot used to unequip it on the spot.
+  var slotA = h.run("Upgrades.slotRect(0)");
+  h.run("Upgrades.onMouseDown(" + (slotA.x + 40) + ", " + (slotA.y + 40) + ");" +
+        "Upgrades.onMouseUp(" + (slotA.x + 40) + ", " + (slotA.y + 40) + ")");
+  t.eq(h.run("Upgrades.state().detail"), firstId,
+    "clicking an equipped module opens it too");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId,
+    "and leaves it exactly where it was");
+
+  // AND THE RED BUTTON TAKES IT OUT, without un-buying it.
+  h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null, "UNEQUIP empties the slot");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', '" + firstId + "')"), true,
+    "and the node is still owned — unequipping is not un-buying");
+
+  // Put it back for the drag cases below.
+  h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId, "back in slot 1");
+
+  // A DRAG onto a legal slot moves it there -- which is how a player chooses
+  // WHICH slot, and the reason dragging is kept beside the button.
+  var secondId = h.run("TowerPerks.inventory('soldier')[1].id");
   var card2 = h.run("Upgrades.inventoryCardRect(1)");
   var slot2 = h.run("Upgrades.slotRect(1)");
   h.run("Upgrades.onMouseDown(" + (card2.x + 20) + ", " + (card2.y + 20) + ");" +
         "Upgrades.onMouseMove(" + (card2.x + 60) + ", " + (card2.y + 20) + ");" +
         "Upgrades.onMouseUp(" + (slot2.x + 40) + ", " + (slot2.y + 40) + ")");
-  t.eq(h.run("MetaProgress.equippedPerks('soldier')[1]"), roots[1],
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[1]"), secondId,
     "dragging one onto slot 2 equips it there");
 
   // A DROP ON A LOCKED SLOT REFUSES AND SAYS WHY, and nothing moves.
@@ -10334,13 +10368,59 @@ function (t) {
   t.deep(h.run("MetaProgress.equippedPerks('soldier')"), bar,
     "a drop that lands nowhere changes nothing");
 
-  // AND A CLICK ON AN EQUIPPED SLOT TAKES IT OUT AGAIN, free and immediate.
+  // AND A DRAG FROM A SLOT BACK ONTO THE LIST TAKES IT OUT, free and immediate.
   var slot1 = h.run("Upgrades.slotRect(0)");
+  var box = h.run("Upgrades.inventoryRect()");
   h.run("Upgrades.onMouseDown(" + (slot1.x + 40) + ", " + (slot1.y + 40) + ");" +
-        "Upgrades.onMouseUp(" + (slot1.x + 40) + ", " + (slot1.y + 40) + ")");
+        "Upgrades.onMouseMove(" + (slot1.x + 90) + ", " + (slot1.y + 60) + ");" +
+        "Upgrades.onMouseUp(" + (box.x + 40) + ", " + (box.y + 60) + ")");
   t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null, "the slot empties");
-  t.eq(h.run("MetaProgress.ownsNode('soldier', '" + roots[0] + "')"), true,
+  t.eq(h.run("MetaProgress.ownsNode('soldier', '" + firstId + "')"), true,
     "and the node is still owned — unequipping is not un-buying");
+});
+
+test("the modules are grouped by the branch they came off", function (t) {
+  var h = bootContent();
+
+  // EVERY NODE OF A TWO-PATH TOWER, so all four bands can be asked for at once.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.addXp('soldier', 20000);" +
+        "TowerPerks.nodes('soldier').forEach(function (n) {" +
+        "  MetaProgress.buyNode('soldier', n.id, 0); });" +
+        "openMenu(); Upgrades.open(); Upgrades.selectTower('soldier')");
+  t.deep(h.run("Upgrades.inventoryGroups()"), ["PATH A", "PATH B", "GENERAL"],
+    "a two-path tower reads PATH A, PATH B and GENERAL");
+
+  // THE ARM IS THE BRANCH, and the tree screen's own layout is where it comes
+  // from -- west is A, east is B, and the two general arms are one band.
+  t.eq(h.run("Upgrades.branchOf('rif_a1')"), "A", "a west node is path A");
+  t.eq(h.run("Upgrades.branchOf('rif_b1')"), "B", "an east node is path B");
+  t.eq(h.run("Upgrades.branchOf('rif_n1')"), "G", "a north node is general");
+  t.eq(h.run("Upgrades.branchOf('rif_s1')"), "G", "and so is a south one");
+
+  // A THREE-PATH TOWER GETS A PATH C BAND, and its south arm IS that path.
+  h.run("MetaProgress.addXp('farm', 20000);" +
+        "TowerPerks.nodes('farm').forEach(function (n) {" +
+        "  MetaProgress.buyNode('farm', n.id, 0); });" +
+        "Upgrades.selectTower('farm')");
+  t.deep(h.run("Upgrades.inventoryGroups()"),
+    ["PATH A", "PATH B", "PATH C", "GENERAL"],
+    "the Farm reads all four");
+  t.eq(h.run("Upgrades.branchOf('frm_c1')"), "C",
+    "its south arm is path C, not a second general branch");
+  t.eq(h.run("Upgrades.branchOf('frm_n1')"), "G", "while its north arm is general");
+
+  // AND EVERY CARD IS INSIDE THE BOX IT SCROLLS IN, whatever the grouping does
+  // to the layout -- the hit test and the drawing read the same function.
+  var placed = h.run("(function () {" +
+    "  var box = Upgrades.inventoryRect();" +
+    "  var n = TowerPerks.inventory('farm').length, bad = 0;" +
+    "  for (var i = 0; i < n; i++) {" +
+    "    var r = Upgrades.inventoryCardRect(i);" +
+    "    if (r.x < box.x || r.x + r.w > box.x + box.w) bad++; }" +
+    "  return { n: n, bad: bad }; })()");
+  t.eq(placed.n, 13, "the Farm owns thirteen modules");
+  t.eq(placed.bad, 0, "and every card is inside the list's own width");
 });
 
 test("the tree screen shows the whole tree, navigates it, and comes back to its tower",
@@ -10364,12 +10444,53 @@ function (t) {
   h.run("Upgrades.beginPan(400, 300); Upgrades.movePan(700, 500); Upgrades.endPan()");
   var moved = h.run("Upgrades.state().view");
   t.ok(moved.x !== home.x || moved.y !== home.y, "a right-drag moves the view");
-  h.run("Upgrades.onWheel(400, 300, -100)");
+  h.run("Upgrades.onWheel(400, 300, -100, 0, true)");
   t.ok(h.run("Upgrades.state().view.zoom") > moved.zoom, "the wheel zooms in");
 
   var re = h.run("Upgrades.recentreRect()");
   h.run("Upgrades.onClick(" + (re.x + 10) + ", " + (re.y + 10) + ")");
   t.deep(h.run("Upgrades.state().view"), home, "and the recentre button restores it");
+
+  // A TWO-FINGER SLIDE PANS AND DOES NOT ZOOM (2026-08-31). A trackpad has no
+  // wheel: two fingers on one emit `wheel` events, so a screen that reads every
+  // wheel as a zoom cannot be panned with a trackpad at all -- which is what
+  // this one was.
+  h.run("Upgrades.onWheel(400, 300, 40, 25, false)");
+  var slid = h.run("Upgrades.state().view");
+  t.eq(slid.zoom, home.zoom, "a slide changes no zoom at all");
+  t.ok(slid.x > home.x, "sliding right pushes the view right");
+  t.ok(slid.y > home.y, "and down, down");
+
+  // A HORIZONTAL SLIDE MOVES SOMETHING, which the old screen could not do at
+  // all -- `deltaX` was not even passed in.
+  h.run("Upgrades.onClick(" + (re.x + 10) + ", " + (re.y + 10) + ")");
+  h.run("Upgrades.onWheel(400, 300, 0, -60, false)");
+  t.ok(h.run("Upgrades.state().view.x") < home.x, "a purely sideways slide pans sideways");
+
+  // AND THE TREE CANNOT BE PUSHED OFF THE BOARD. A hundred hard slides in one
+  // direction, and a node is still reachable -- without the clamp the only way
+  // back was the recentre button.
+  h.run("Upgrades.onClick(" + (re.x + 10) + ", " + (re.y + 10) + ")");
+  h.run("(function () { for (var i = 0; i < 100; i++)" +
+        "  Upgrades.onWheel(400, 300, 400, 400, false); })()");
+  var far = h.run("(function () {" +
+    "  var board = Upgrades.boardRect();" +
+    "  return TowerPerks.nodes('smasher').some(function (n) {" +
+    "    var p = Upgrades.nodeScreenPoint(n);" +
+    "    return p.x > board.x && p.x < board.x + board.w &&" +
+    "           p.y > board.y && p.y < board.y + board.h; }); })()");
+  t.eq(far, true, "some of the tree is still on the board");
+
+  // THE ZOOM BUTTONS AIM AT THE BOARD'S MIDDLE rather than at a cursor sitting
+  // on the button itself, which would walk the tree off screen a notch at a
+  // time.
+  h.run("Upgrades.onClick(" + (re.x + 10) + ", " + (re.y + 10) + ")");
+  var before = h.run("Upgrades.state().view");
+  h.run("Upgrades.onKey('+'); Upgrades.onKey('-')");
+  var after = h.run("Upgrades.state().view");
+  t.near(after.x, before.x, 1e-9, "a zoom in and out returns the centre");
+  t.near(after.y, before.y, 1e-9, "on both axes");
+  t.near(after.zoom, before.zoom, 1e-9, "and the zoom itself");
 
   // LEAVING KEEPS THE TOWER. That is the whole reason this is a screen.
   h.run("Upgrades.onKey('Escape')");

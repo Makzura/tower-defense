@@ -160,7 +160,7 @@ baseline:
 
 ```
 node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
-node tests/content.test.js        436 pass / 0 fail   content, visuals and index
+node tests/content.test.js        437 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
@@ -4518,22 +4518,58 @@ no level and no coin is ever banked.
 
 **Upgrades** (`screen === "upgrades"`) lists every tower the profile OWNS —
 types not bought yet belong to the armoury — and shows the selected one's icon,
-level, xp bar, five slots and inventory. **All five slots are always drawn**, so
-the whole ladder is visible from level 0, and a locked one says which level
-opens it.
+level, xp bar, five slots, its MODULES, and one module read in full on the
+right. **All five slots are always drawn**, so the whole ladder is visible from
+level 0, and a locked one says which level opens it.
 
-A perk is moved by dragging it, and **a plain click does the obvious thing
-instead** (an inventory card goes to the first open slot; a slot's perk comes
-out), because a screen that can only be operated by dragging cannot be operated
-at all on a bad trackpad. A drop that lands nowhere legal puts the perk back and
-says why.
+**THE MODULES ARE GROUPED BY THE BRANCH THEY CAME OFF** (2026-08-31): PATH A,
+PATH B, PATH C where the tower has a third in-run path, and GENERAL for the
+rest. `Upgrades.branchOf` derives that from the ARM the node sits on in the
+tree — west, east, south-on-a-three-path-tower, everything else — so a tree that
+grows a node picks up its heading with nothing else changed. Cards are small and
+carry a name and one clause; everything quantitative is on the right, for the
+one module being read.
+
+**A CLICK READS; IT DOES NOT EQUIP.** Clicking an equipped module used to take
+it straight out of its slot, so the only way to read what a perk you were USING
+did was to stop using it. A click PINS the module into the right-hand card, and
+that card grows the one control that moves a loadout: a green EQUIP while the
+module is out, a red UNEQUIP in the same place while it is in. Hovering previews
+a module when nothing is pinned; the button is drawn only for a pinned one, so
+sweeping the cursor over the list cannot arm an action.
+
+**Dragging still works and is how a player picks WHICH slot** — a module dropped
+on a slot goes there, one dragged from a slot back onto the list comes out — and
+a drop that lands nowhere legal puts the module back and says why.
 
 **Tree** (`screen === "tree"`) draws the whole tree — there is no fog and no
 hidden node; **what a level or a prerequisite locks is the PURCHASE, never the
-view**. Right-drag or two-finger-drag pans, the wheel zooms towards the cursor,
-and ◉ **recentres by FRAMING every node**, derived from the tree rather than
-typed in, because a tree may be any size. Escape goes back to Upgrades with the
-same tower selected.
+view**. ◉ **recentres by FRAMING every node**, derived from the tree rather than
+typed in, because a tree may be any size, and Escape goes back to Upgrades with
+the same tower selected.
+
+**THE CAMERA TAKES TWO GESTURES AND `wheelIsZoom` DECIDES WHICH** (2026-08-31).
+A trackpad has no wheel: two fingers on one emit `wheel` events and so does a
+pinch, so a screen that read every wheel as a zoom could not be panned with a
+trackpad at all — which is what this one was. js/game.js classifies the DEVICE
+gesture, because it owns the DOM event and is the only thing that can see
+`ctrlKey`, `deltaX` and `deltaMode`, and hands the intent down:
+
+| signal | reading |
+|---|---|
+| `ctrlKey` / `metaKey` | a PINCH (and ctrl-wheel on a mouse) — zoom |
+| a non-zero `deltaX` | no mouse wheel makes one — a two-finger slide, so pan |
+| `deltaMode` not pixels | a notched wheel by definition — zoom |
+| `abs(deltaY) >= 40` | a notch, not a glide — zoom; below that, pan |
+
+Right-drag and middle-drag pan as they always did, and a pan that STARTS on the
+board is not interrupted by the cursor leaving it. **The view is clamped to the
+tree's own bounding box grown by ONE NODE PITCH** — one pitch rather than half a
+board, and the difference is the corners: a tree is a PLUS, not a filled
+rectangle, so a diagonal over-pan that stops half a board out on both axes sits
+opposite the empty corner between two arms with nothing at all on screen. The
+zoom buttons and the keyboard aim at the board's middle rather than at a cursor
+sitting on the button itself.
 
 **`requires` is AND, never OR.** A convergence with two parents needs both, and
 the detail card ticks them off one by one. The five node states — owned,

@@ -3509,6 +3509,38 @@ function onRightClick(event) {
 //
 // preventDefault stops the page scrolling underneath the canvas while the
 // roster scrolls, which is why the listener is registered non-passive.
+// IS THIS WHEEL A ZOOM OR A SLIDE? (2026-08-31, at the owner's word: "on a
+// trackpad two fingers sliding around is moving the cam".)
+//
+// A trackpad has no wheel. Two fingers on one emit `wheel` events, and a pinch
+// emits them too -- so a screen that reads every wheel as a zoom cannot be
+// panned with a trackpad at all, which is exactly what the tree screen was.
+// Four signals, in the order they are trustworthy:
+//
+//   ctrl/meta     a PINCH. Every browser on every platform reports a trackpad
+//                 pinch as a ctrl-wheel, and ctrl-wheel on a real mouse is the
+//                 same gesture asked for deliberately
+//   deltaX        no mouse wheel in ordinary use produces one, so a horizontal
+//                 component is a two-finger slide and nothing else
+//   deltaMode     a wheel that reports LINES or PAGES rather than pixels is a
+//                 notched wheel by definition
+//   the size      a notch arrives as one large jump (100 or 120 px in every
+//                 browser this game runs in); a trackpad glides in single
+//                 figures. WHEEL_NOTCH_MIN sits well above the glide and well
+//                 below the notch
+//
+// It is a heuristic and it is the standard one. Getting it wrong costs a zoom
+// where a pan was meant and is undone by moving the fingers again; the
+// alternative -- asking the player which device they have -- is worse.
+var WHEEL_NOTCH_MIN = 40;
+
+function wheelIsZoom(event) {
+  if (event.ctrlKey || event.metaKey) return true;
+  if (event.deltaX) return false;
+  if (event.deltaMode) return true;
+  return Math.abs(event.deltaY) >= WHEEL_NOTCH_MIN;
+}
+
 function onWheel(event) {
   if (event.preventDefault) event.preventDefault();
   var p = toGameCoords(event);
@@ -3518,11 +3550,13 @@ function onWheel(event) {
     return;
   }
 
-  // The inventory scrolls on the Upgrades screen and the whole tree zooms on
-  // the Tree screen -- an arbitrarily large tree is the one thing in this game
-  // that cannot be laid out to fit, so it has to be navigable instead.
+  // The inventory scrolls on the Upgrades screen, and on the Tree screen a
+  // wheel either pans or zooms -- an arbitrarily large tree is the one thing in
+  // this game that cannot be laid out to fit, so it has to be navigable
+  // instead. Which of the two it is belongs HERE, because this is the only
+  // place that can see the DOM event: see `wheelIsZoom`.
   if (screen === "upgrades" || screen === "tree") {
-    Upgrades.onWheel(p.x, p.y, event.deltaY);
+    Upgrades.onWheel(p.x, p.y, event.deltaY, event.deltaX, wheelIsZoom(event));
     return;
   }
 

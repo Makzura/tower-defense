@@ -13,6 +13,50 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — The Upgrades screen reads before it acts, and the tree camera
+takes a trackpad.**
+
+Three complaints from the owner, all about the two progression screens.
+
+**A trackpad could not pan the tree at all.** A trackpad has no wheel: two
+fingers on one emit `wheel` events, and the tree read every wheel as a zoom — so
+a two-finger slide zoomed when the owner meant to push, and a horizontal slide
+did nothing, because `deltaX` was not even passed in. `wheelIsZoom` in
+js/game.js classifies the device gesture now (ctrl/meta is a pinch, a non-zero
+`deltaX` is a slide, a non-pixel `deltaMode` or a jump of 40 pixels or more is a
+notched wheel) and hands the intent down. Right-drag and middle-drag are
+unchanged, except that a pan which STARTS on the board is no longer interrupted
+by the cursor leaving it.
+
+**And the tree could be pushed off the board and lost.** The view is clamped to
+the tree's own bounding box grown by one node pitch. One pitch rather than half
+a board, and the difference is the corners: a tree is a PLUS, not a filled
+rectangle, so a diagonal over-pan that stops half a board out on both axes sits
+opposite the empty corner between two arms with nothing at all on screen. The
+zoom buttons and the keyboard aim at the board's middle rather than at a cursor
+sitting on the button.
+
+**The modules are grouped and their cards are small.** Every card printed the
+node's whole description, in one undifferentiated grid 938 pixels wide, so the
+cards were large and a player could not tell a path A module from a path B one
+without reading it. They are banded by PATH A / PATH B / PATH C / GENERAL now —
+derived from the ARM the node sits on in the tree, so a tower with a third
+in-run path gets its band for free — and a card carries a name and one clause.
+Everything quantitative moved to a panel on the right, for the one module being
+read.
+
+**And a click reads instead of equipping.** Clicking an equipped module used to
+take it straight out of its slot, which meant the only way to read what a perk
+you were USING did was to stop using it. A click PINS the module into the
+right-hand card and the card grows the one control that moves a loadout: a green
+EQUIP while it is out, a red UNEQUIP in the same place while it is in. Hovering
+previews; the button is drawn only for a pinned module, so sweeping the cursor
+over the list cannot arm an action. Dragging still works and is how a player
+picks WHICH slot.
+
+content 436 → 437: one added, and the loadout test kept its name and changed its
+claims, because the claims were the thing that changed.
+
 **2026-08-31 — The confirmed permanent upgrades, batch 2: the Siphon, the
 Summoner and the Farm.**
 

@@ -880,7 +880,15 @@ var BASELINE = [
     // than moved: "a tower with no tree is an empty tree, not a broken one" now
     // asks an UNREGISTERED id, because all six towers have content and the
     // engine rule it states had quietly stopped being tested.
-    file: "tests/content.test.js", pass: 436, fail: 0,
+    // ---- 437 on 2026-08-31, the Upgrades screen and the tree camera ------
+    // 436 -> 437: one added ("the modules are grouped by the branch they came
+    // off") and ONE REWRITTEN. "the Upgrades screen lists what is owned and
+    // drives the loadout by click and by drag" kept its name and changed its
+    // claims, because the claims were the thing that changed: a click READS a
+    // module now and the green/red button is what moves a loadout. The tree
+    // camera's gestures were added to the existing navigation test rather than
+    // given one of their own, so they move no count either.
+    file: "tests/content.test.js", pass: 437, fail: 0,
     failing: []
   },
   {
