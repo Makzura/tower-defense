@@ -548,15 +548,17 @@ def build(gltf, options):
     colour_index = []
     out_groups = []
 
+    two_sided = [s for s in (options.two_sided or "").split(",") if s]
+
     for name in names:
         first = len(colour_index) * 3
+        both = any(token in name for token in two_sided)
         for part in parts:
             if part["group"] != name:
                 continue
             for tri in part["triangles"]:
                 # MODEL SPACE, every group, animated or not -- see the header.
                 local = list(tri[0])
-                n = triangle_normal(local)
                 entry = material_entry(
                     gltf.json["materials"][tri[1]], options.tint, options.glow,
                     options.emit_cap)
@@ -564,10 +566,18 @@ def build(gltf, options):
                 if key not in lookup:
                     lookup[key] = len(palette)
                     palette.append(list(entry))
-                colour_index.append(lookup[key])
-                normals.extend(round(v, PRECISION) for v in n)
-                for p in local:
-                    positions.extend(round(v, PRECISION) for v in p)
+
+                # The authored winding, then -- for a sheet -- its mirror. Two
+                # vertices swapped reverses the winding, and the normal is
+                # recomputed from the reversed triangle rather than negated, so
+                # the two faces cannot disagree about which way they point.
+                faces = [local, [local[0], local[2], local[1]]] if both else [local]
+                for face in faces:
+                    colour_index.append(lookup[key])
+                    normals.extend(round(v, PRECISION)
+                                   for v in triangle_normal(face))
+                    for p in face:
+                        positions.extend(round(v, PRECISION) for v in p)
         out_groups.append({"name": name, "first": first,
                            "count": len(colour_index) * 3 - first})
 
@@ -687,6 +697,27 @@ def main():
                     help="target height in model units; omit to keep the "
                          "source's own scale, which is what these files want")
     ap.add_argument("--exclude", action="append", default=[])
+    # FLAT SHEETS NEED BOTH SIDES, AND THIS RENDERER ONLY DRAWS ONE.
+    #
+    # GLRenderer enables CULL_FACE/BACK, which is right and load-bearing for
+    # closed bodies -- see the axis note at the top of glb_to_model.py, where a
+    # mirrored winding shows you the inside of the far wall. A CLOSED volume
+    # hides its own back faces anyway, so culling costs it nothing.
+    #
+    # An open SHEET is the other case. The Veil Dart's camouflage veil is a set
+    # of flat panes authored `side: DoubleSide` in the source, and single-sided
+    # they vanish from every angle that sees their back -- which is most of
+    # them, most of the time. The owner found it as "we can't see all the veil,
+    # only on the tail".
+    #
+    # So a named group may be emitted TWICE: once as authored and once with the
+    # winding reversed and the normal flipped, which is what DoubleSide means.
+    # It is opt-in and by NAME because only the file knows which of its groups
+    # are sheets; doubling a closed body would just pay for triangles the cull
+    # was already throwing away.
+    ap.add_argument("--two-sided", default="", dest="two_sided",
+                    help="comma-separated group-name substrings whose triangles "
+                         "are also emitted with reversed winding")
     ap.add_argument("--glow", default="emissive")
     ap.add_argument("--emit-cap", type=float, default=None)
     ap.add_argument("--preview", default=None,

@@ -13,6 +13,39 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Veil Dart faces where it flies, and its veil has both sides.**
+
+Two things the owner saw as soon as it was on the board.
+
+**It was drawn facing down the road while flying the chord**, so it slid
+sideways across the map and swung round at bends it was nowhere near. The enemy
+draw computed yaw from `path.tangentAt(progress)` — the FOURTH place in this
+repository to reach past a body and ask the tarmac, after `death-denial.js`,
+`predictedPosition` and the build ghost. It asks `Enemy.prototype.headingVec`
+now, whose third case IS `path.tangentAt(progress)` identically, so the change
+is a provable no-op for every body that walks. It also restored something
+nobody had noticed was missing: the attack posture on the 3D board. A body that
+stops and turns to strike a tower had been drawn facing down the road the whole
+time, because `headingVec`'s first case was never being reached.
+
+**The veil was only visible on the tail.** `GLRenderer` culls back faces —
+right for a closed body, which hides its own anyway — and the veil is a set of
+FLAT panes authored `side: DoubleSide`. Single-sided they vanish from every
+angle that sees their back, which is most of them, most of the time.
+`glb_to_animated.py` grew a `--two-sided <substrings>` option: a named group's
+triangles are emitted a second time with the winding reversed and the normal
+recomputed from the reversed face, which is what DoubleSide means. Opt-in and by
+name, because only the file knows which of its groups are sheets and doubling a
+closed body would just pay for triangles the cull was already discarding. The
+Veil Dart went from 235 to 286 triangles.
+
+**What the format still cannot carry is alpha.** The palette is `[r, g, b,
+emissive]`, so the veil is opaque geometry in the ley colour rather than the
+0.19 translucent layer the pack authored; what makes it read as a veil in play
+is the camo pass fading the whole body. The effect is "the craft is
+translucent" rather than "a translucent skin over a solid hull". Closing that
+is a renderer feature, not an import option.
+
 **2026-08-30 — The Veil Dart gets its body, through the repo's own importer.**
 
 The `Veil_Dart` pack arrived carrying the same creature the Skimmer already was,

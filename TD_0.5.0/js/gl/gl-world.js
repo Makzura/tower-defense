@@ -2721,8 +2721,21 @@ var World3D = (function () {
     for (i = 0; i < state.enemies.length; i++) {
       var e = state.enemies[i];
       if (!!e.isCamo !== wantCamo) continue;
-      var heading = e.path && e.path.tangentAt
-        ? e.path.tangentAt(e.progress) : null;
+      // ASK THE BODY, NOT THE ROAD (2026-08-30). `Enemy.prototype.headingVec`
+      // exists to answer exactly this and states its three cases in order: an
+      // active attack posture's slewed facing, an off-path body's own constant
+      // course, and -- for everything else -- `path.tangentAt(progress)`,
+      // IDENTICALLY, so this is a provable no-op for every body that walks.
+      //
+      // Reading the path here was the fourth place in this repository to make
+      // the same mistake, and the one the owner could see: a Veil Dart flies
+      // the chord and was drawn facing down the tarmac, so it slid sideways
+      // across the map and swung round at every bend it was nowhere near.
+      // The attack posture was being ignored on the 3D board for the same
+      // reason -- a body that stops and turns to strike a tower was drawn
+      // facing down the road throughout.
+      var heading = (typeof e.headingVec === "function") ? e.headingVec()
+        : (e.path && e.path.tangentAt ? e.path.tangentAt(e.progress) : null);
       var yaw = heading ? Math.atan2(heading.y, heading.x) : 0;
       var radius = e.radiusPx ? e.radiusPx() : 11;
       // THE WALK, driven by distance covered -- one bob per stride, feet and

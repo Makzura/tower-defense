@@ -2345,6 +2345,36 @@ stabilisers are called `fin_blade`, and the importer joins the mesh walk to the
 hierarchy BY NAME, so it refused the file. The export uniquifies duplicate node
 names before writing; the vendor's folder is untouched.
 
+**THE BODY IS ASKED FOR ITS HEADING, NOT THE ROAD.** The enemy draw computed
+yaw from `path.tangentAt(progress)` — the fourth place in this repository to
+reach past a body and ask the tarmac, and the one that was visible: a Veil Dart
+flew the chord and was DRAWN facing down the road, so it slid sideways across
+the map and swung round at bends it was nowhere near. It goes through
+`Enemy.prototype.headingVec` now, whose three cases are stated in order and
+whose third IS `path.tangentAt(progress)` identically — so the change is a
+provable no-op for every body that walks. **It also restored the attack posture
+on the 3D board**: a body that stops and turns to strike a tower had been drawn
+facing down the road throughout, because `headingVec`'s first case was never
+reached.
+
+**THE VEIL IS DOUBLE-SIDED, AND THE IMPORTER LEARNED HOW.** `GLRenderer` culls
+back faces, which is right and costs a closed body nothing — it hides its own
+back faces anyway. An open SHEET is the other case, and the veil is a set of
+flat panes authored `side: DoubleSide`: single-sided they vanish from every
+angle that sees their back, which is most of them. `glb_to_animated.py` takes a
+`--two-sided <substrings>` option now, emitting a named group's triangles a
+second time with the winding reversed and the normal recomputed from the
+reversed face. Opt-in and by NAME, because only the file knows which of its
+groups are sheets. 235 triangles became 286.
+
+**WHAT THE FORMAT STILL CANNOT CARRY IS ALPHA.** The palette is `[r, g, b,
+emissive]` and has no opacity, so the veil is opaque geometry in the ley colour
+rather than the 0.19 translucent layer the pack authored. What makes it read as
+a veil in play is the camo pass, which fades the WHOLE body — so the effect is
+"the craft is translucent" rather than "a translucent skin over a solid hull".
+Closing that gap is a renderer feature (per-triangle alpha), not an import
+option.
+
 **`ENEMY_CLIP` picks the clip BY NAME.** `ENEMY_GAIT_BAND` beside it picks a band
 by index, which is right for a solved cycle the exporter laid out and wrong for a
 model that arrives with named clips — an index typed here would point at a
