@@ -47,12 +47,18 @@ read.
 
 **And a click reads instead of equipping.** Clicking an equipped module used to
 take it straight out of its slot, which meant the only way to read what a perk
-you were USING did was to stop using it. A click PINS the module into the
-right-hand card and the card grows the one control that moves a loadout: a green
-EQUIP while it is out, a red UNEQUIP in the same place while it is in. Hovering
-previews; the button is drawn only for a pinned module, so sweeping the cursor
-over the list cannot arm an action. Dragging still works and is how a player
-picks WHICH slot.
+you were USING did was to stop using it. A click PINS the module and the one
+control that moves a loadout appears: a green EQUIP while it is out, a red
+UNEQUIP in the same place while it is in. Hovering previews; the control is
+drawn only for a pinned module, so sweeping the cursor over the list cannot arm
+an action. Dragging still works and is how a player picks WHICH slot.
+
+**The control is drawn twice and is one action** — at the foot of the detail
+panel and as a strip directly under the pinned card, because the panel is on the
+other side of the screen from the card that was just clicked. The strip is part
+of the LAYOUT rather than an overlay: the rows below the pinned one are pushed
+down by exactly its height, so it covers no card, scrolls with the list, and
+cannot be clicked through.
 
 content 436 → 437: one added, and the loadout test kept its name and changed its
 claims, because the claims were the thing that changed.

@@ -41,8 +41,16 @@
 // A CLICK READS; IT DOES NOT EQUIP. Clicking an equipped module used to take it
 // straight out of its slot, which meant the only way to read what a perk you
 // were USING did was to stop using it. A click pins the module into the right
-// hand card and the card grows the one control that moves a loadout: a green
-// EQUIP while it is out, a red UNEQUIP while it is in, in the same place.
+// hand card and grows the one control that moves a loadout: a green EQUIP while
+// it is out, a red UNEQUIP while it is in, in the same place.
+//
+// THAT CONTROL IS DRAWN TWICE AND IS ONE ACTION. Once at the foot of the detail
+// panel, and once as a strip directly UNDER the pinned card -- because the
+// panel is on the other side of the screen from the card that was just clicked,
+// and reaching across for it is the gesture this screen was meant to remove.
+// Both call `perkActionPressed`. The strip is part of the LAYOUT rather than an
+// overlay: the rows below the pinned one are pushed down by exactly its height,
+// so it covers no card, scrolls with the list, and cannot be clicked through.
 //
 // DRAG AND DROP STILL WORKS, and is the way to choose WHICH slot: a perk
 // pressed and dropped on a slot goes there, and one dragged from a slot back
@@ -147,6 +155,17 @@ var Upgrades = (function () {
   var CARD_H = 50, CARD_GAP_X = 14, CARD_GAP_Y = 8;
   var GROUP_HEAD = 24, GROUP_GAP = 12, INV_TOP = 30;
 
+  // The strip that opens UNDER the pinned module (2026-08-31, at the owner's
+  // word: "make the equip/unequip button also right under the module when
+  // clicked, keep the one in the description panel"). It is the SAME action as
+  // the panel's -- both call `perkActionPressed` -- and it exists because the
+  // panel is on the other side of the screen from the card you just clicked.
+  //
+  // IT IS IN THE LAYOUT, NOT OVER IT: the rows below the pinned one are pushed
+  // down by exactly this much, so the strip covers nothing, scrolls with the
+  // list, and cannot be clicked through to a card underneath it.
+  var ACTION_H = 28;
+
   var BRANCH_ORDER = ["A", "B", "C", "G"];
   var BRANCH_LABEL = { A: "PATH A", B: "PATH B", C: "PATH C", G: "GENERAL" };
 
@@ -177,7 +196,7 @@ var Upgrades = (function () {
 
   function inventoryLayout() {
     var box = inventoryRect();
-    var out = { headers: [], items: [], byId: {}, height: 0 };
+    var out = { headers: [], items: [], byId: {}, action: null, height: 0 };
     if (!selected) return out;
 
     var list = TowerPerks.inventory(selected);
@@ -194,21 +213,42 @@ var Upgrades = (function () {
       if (!g.length) return;
       out.headers.push({ label: BRANCH_LABEL[key], count: g.length, y: y });
       y += GROUP_HEAD;
+
+      // WHICH ROW THE PINNED MODULE IS ON, if it is in this band at all. Every
+      // row BELOW it is pushed down by the strip that opens under it; the rows
+      // beside and above it do not move, so the card you clicked stays put.
+      var pinnedRow = -1;
+      g.forEach(function (node, i) {
+        if (node.id === detailNode) pinnedRow = Math.floor(i / 2);
+      });
+      var lift = ACTION_H + CARD_GAP_Y;
+
       g.forEach(function (node, i) {
         var col = i % 2, row = Math.floor(i / 2);
+        var rect = {
+          x: box.x + col * (cardW + CARD_GAP_X),
+          y: y + row * (CARD_H + CARD_GAP_Y) +
+             (pinnedRow >= 0 && row > pinnedRow ? lift : 0),
+          w: cardW, h: CARD_H
+        };
         var item = {
           node: node,
           equipped: equipped.indexOf(node.id) !== -1,
-          rect: {
-            x: box.x + col * (cardW + CARD_GAP_X),
-            y: y + row * (CARD_H + CARD_GAP_Y),
-            w: cardW, h: CARD_H
-          }
+          rect: rect
         };
         out.items.push(item);
         out.byId[node.id] = item;
+        if (node.id === detailNode) {
+          out.action = {
+            nodeId: node.id,
+            equipped: item.equipped,
+            rect: { x: rect.x, y: rect.y + CARD_H + 4, w: cardW, h: ACTION_H }
+          };
+        }
       });
-      y += Math.ceil(g.length / 2) * (CARD_H + CARD_GAP_Y) + GROUP_GAP;
+
+      y += Math.ceil(g.length / 2) * (CARD_H + CARD_GAP_Y) +
+           (pinnedRow >= 0 ? lift : 0) + GROUP_GAP;
     });
 
     // Measured with the scroll added back, so the ceiling below is a property
@@ -233,6 +273,15 @@ var Upgrades = (function () {
   function inventoryScrollMax() {
     var box = inventoryRect();
     return Math.max(0, inventoryLayout().height - (box.h - INV_TOP));
+  }
+
+  // WHERE THE STRIP UNDER THE PINNED CARD IS, or null when nothing is pinned.
+  // A click is accepted only where the strip is actually DRAWN -- the caller
+  // tests the inventory box too -- so a strip scrolled half out of the list
+  // cannot be pressed through the clip.
+  function inventoryActionRect() {
+    var action = inventoryLayout().action;
+    return action ? action.rect : null;
   }
 
   // THE FIRST CLAUSE OF A DESCRIPTION, for a card. The full text -- and every
@@ -508,9 +557,17 @@ var Upgrades = (function () {
       if (pointInRect(x, y, towerRowRect(i))) { select(list[i]); return; }
     }
     if (selected && pointInRect(x, y, treeButtonRect())) { openTree(); return; }
-    if (selected && detailNode && pointInRect(x, y, perkActionRect())) {
-      perkActionPressed();
-      return;
+    // THE TWO BUTTONS ARE ONE ACTION. The strip under the pinned card and the
+    // control at the foot of the detail panel both call `perkActionPressed`,
+    // which is the only thing on this screen that moves a loadout.
+    if (selected && detailNode) {
+      var strip = inventoryActionRect();
+      if (strip && pointInRect(x, y, strip) &&
+          pointInRect(x, y, inventoryRect())) {
+        perkActionPressed();
+        return;
+      }
+      if (pointInRect(x, y, perkActionRect())) { perkActionPressed(); return; }
     }
     // The slots and the cards are answered by the press/release pair above, so
     // a click that reaches here landed on the background.
@@ -1105,6 +1162,17 @@ var Upgrades = (function () {
         ctx.fillRect(r.x + 3, r.y + 8, 2, r.h - 16);
       }
     });
+
+    // THE STRIP UNDER THE PINNED CARD, drawn last inside the clip so it sits
+    // over the band's rule and under nothing. Same action and the same two
+    // colours as the panel's control -- see `perkActionPressed`.
+    var act = layout.action;
+    if (act && act.rect.y + act.rect.h >= box.y && act.rect.y <= box.y + box.h) {
+      drawAshControl(act.rect, act.equipped ? "UNEQUIP" : "EQUIP", {
+        accent: act.equipped ? ASH_STOP : ASH_GO,
+        active: true
+      });
+    }
     ctx.restore();
 
     // The scrollbar, drawn only when there is something to scroll.
@@ -1591,6 +1659,7 @@ var Upgrades = (function () {
     inventoryCardRect: inventoryCardRect,
     perkDetailRect: perkDetailRect,
     perkActionRect: perkActionRect,
+    inventoryActionRect: inventoryActionRect,
     branchOf: function (nodeId) {
       var node = selected ? TowerPerks.nodeOf(selected, nodeId) : null;
       return node ? branchOf(selected, node) : null;

@@ -10313,12 +10313,40 @@ function (t) {
     "and equips nothing at all");
 
   // THE GREEN BUTTON IS WHAT EQUIPS, into the first slot the level has opened
-  // and left free.
+  // and left free. There are TWO of them and they are one action: a strip
+  // directly under the pinned card, and the control at the foot of the panel.
+  var strip = h.run("Upgrades.inventoryActionRect()");
+  t.ok(strip !== null, "a strip opens under the pinned card");
+  t.near(strip.y, card.y + 54, 1e-9, "directly under it");
+  t.eq(strip.x, card.x, "and exactly as wide, in the same column");
+
+  h.run("Upgrades.onClick(" + (strip.x + 40) + ", " + (strip.y + 14) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId,
+    "pressing the strip's EQUIP puts it in slot 1");
+  t.ok(/slot 1/i.test(h.run("Upgrades.state().flash.text")), "and says where");
+
+  // AND THE PANEL'S CONTROL IS THE SAME ACTION, so it takes it straight out.
   var action = h.run("Upgrades.perkActionRect()");
   h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
-  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId,
-    "pressing EQUIP puts it in slot 1");
-  t.ok(/slot 1/i.test(h.run("Upgrades.state().flash.text")), "and says where");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), null,
+    "the panel's UNEQUIP is the same button in another place");
+  h.run("Upgrades.onClick(" + (action.x + 40) + ", " + (action.y + 20) + ")");
+  t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId, "and back again");
+
+  // THE STRIP IS IN THE LAYOUT, NOT OVER IT: nothing is covered, and the rows
+  // below the pinned one moved down by exactly its height.
+  var pushed = h.run("(function () {" +
+    "  var before = Upgrades.inventoryCardRect(1);" +
+    "  var boxed = Upgrades.inventoryRect();" +
+    "  var overlap = false;" +
+    "  var strip = Upgrades.inventoryActionRect();" +
+    "  var n = TowerPerks.inventory('soldier').length;" +
+    "  for (var i = 0; i < n; i++) {" +
+    "    var r = Upgrades.inventoryCardRect(i);" +
+    "    if (strip.y < r.y + r.h && strip.y + strip.h > r.y &&" +
+    "        strip.x < r.x + r.w && strip.x + strip.w > r.x) overlap = true; }" +
+    "  return { overlap: overlap }; })()");
+  t.eq(pushed.overlap, false, "the strip overlaps no card at all");
 
   // AN EQUIPPED MODULE CAN BE READ WITHOUT BEING TAKEN OUT. This is the bug the
   // change exists to fix: a click on its slot used to unequip it on the spot.

@@ -4532,11 +4532,19 @@ one module being read.
 
 **A CLICK READS; IT DOES NOT EQUIP.** Clicking an equipped module used to take
 it straight out of its slot, so the only way to read what a perk you were USING
-did was to stop using it. A click PINS the module into the right-hand card, and
-that card grows the one control that moves a loadout: a green EQUIP while the
-module is out, a red UNEQUIP in the same place while it is in. Hovering previews
-a module when nothing is pinned; the button is drawn only for a pinned one, so
-sweeping the cursor over the list cannot arm an action.
+did was to stop using it. A click PINS the module, and the one control that
+moves a loadout appears: a green EQUIP while the module is out, a red UNEQUIP in
+the same place while it is in. Hovering previews a module when nothing is
+pinned; the control is drawn only for a pinned one, so sweeping the cursor over
+the list cannot arm an action.
+
+**That control is drawn TWICE and is ONE action** — at the foot of the detail
+panel, and as a strip directly UNDER the pinned card, because the panel is on
+the other side of the screen from the card that was just clicked. Both call
+`perkActionPressed`. **The strip is part of the LAYOUT rather than an overlay**:
+the rows below the pinned one are pushed down by exactly its height, so it
+covers no card, scrolls with the list, and cannot be clicked through to
+something underneath.
 
 **Dragging still works and is how a player picks WHICH slot** — a module dropped
 on a slot goes there, one dragged from a slot back onto the list comes out — and
