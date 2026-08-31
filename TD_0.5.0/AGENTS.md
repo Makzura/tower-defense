@@ -4544,14 +4544,22 @@ pinned module is sitting in. The panel is on the other side of the screen from
 whatever was just clicked, so wherever the click landed the button is beside the
 cursor. All three call `perkActionPressed`.
 
-**The card's strip is part of the LAYOUT rather than an overlay**: the rows below
-the pinned one are pushed down by exactly its height, so it covers no card,
-scrolls with the list, and cannot be clicked through to something underneath.
-**The slot's sits in the gap the slots already leave above the list**, so nothing
-had to move for it, and it is ALWAYS the red UNEQUIP — a slot only ever holds an
-equipped module, so there is no state in which it could offer to equip. The
-pinned module is lit green in its slot as well, so the strip reads as belonging
-to the module rather than to whichever slot the cursor is near.
+**NOTHING MOVES WHEN THE PIN DOES**, and that is structural rather than careful.
+The card's strip has a lane RESERVED UNDER EVERY ROW whether one is open or not,
+so the list's geometry does not depend on which module is being read — and the
+strip is therefore always below the card that was clicked and never under the
+cursor that clicked it. It was inserted only under the pinned row until
+2026-08-31, which reflowed the list: pinning a card BELOW the open one made the
+card the player had just clicked jump up under a stationary cursor, with the new
+strip opening exactly where that cursor now was, so one impatient double-click
+equipped something they meant to read. The price of the reserved lane is a
+taller list, and the cards were shortened to pay some of it back.
+
+**The slot's strip sits in the gap the slots already leave above the list**, so
+nothing had to move for it, and it is ALWAYS the red UNEQUIP — a slot only ever
+holds an equipped module. The pinned module is lit green in its slot as well, so
+the strip reads as belonging to the module rather than to whichever slot the
+cursor is near.
 
 **Dragging still works and is how a player picks WHICH slot** — a module dropped
 on a slot goes there, one dragged from a slot back onto the list comes out — and

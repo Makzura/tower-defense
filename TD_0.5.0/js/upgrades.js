@@ -52,12 +52,17 @@
 // cursor. All three call `perkActionPressed`, so there is one action and not
 // three implementations that can drift.
 //
-// The card's strip is part of the LAYOUT rather than an overlay: the rows below
-// the pinned one are pushed down by exactly its height, so it covers no card,
-// scrolls with the list, and cannot be clicked through. The slot's sits in the
-// gap the slots already leave above the list, so nothing had to move for it,
-// and it is ALWAYS the red UNEQUIP -- a slot only ever holds an equipped
-// module, so there is no state in which it could offer to equip.
+// **NOTHING MOVES WHEN THE PIN DOES.** The card's strip has a lane reserved
+// under EVERY row whether one is open or not, so the list's geometry does not
+// depend on which module is being read -- and the strip is therefore always
+// below the card that was clicked and never under the cursor that clicked it.
+// It was inserted only under the pinned row until 2026-08-31, which reflowed
+// the list: pinning a card BELOW the open one made the card the player had just
+// clicked jump up under a stationary cursor, with the new strip opening exactly
+// where that cursor now was. One impatient double-click then equipped something
+// they meant to read. The slot's strip sits in the gap the slots already leave
+// above the list and is ALWAYS the red UNEQUIP -- a slot only ever holds an
+// equipped module, so there is no state in which it could offer to equip.
 //
 // DRAG AND DROP STILL WORKS, and is the way to choose WHICH slot: a perk
 // pressed and dropped on a slot goes there, and one dragged from a slot back
@@ -159,19 +164,33 @@ var Upgrades = (function () {
   // where the tower has one, and everything else under GENERAL. That is derived
   // rather than declared -- see `branchOf` -- so a tree that grows a node picks
   // up its heading without this file learning anything.
-  var CARD_H = 50, CARD_GAP_X = 14, CARD_GAP_Y = 8;
+  var CARD_H = 44, CARD_GAP_X = 14, CARD_GAP_Y = 6;
   var GROUP_HEAD = 24, GROUP_GAP = 12, INV_TOP = 30;
 
-  // The strip that opens UNDER the pinned module (2026-08-31, at the owner's
-  // word: "make the equip/unequip button also right under the module when
-  // clicked, keep the one in the description panel"). It is the SAME action as
-  // the panel's -- both call `perkActionPressed` -- and it exists because the
-  // panel is on the other side of the screen from the card you just clicked.
+  // The strip that opens UNDER the pinned module. It is the SAME action as the
+  // panel's -- both call `perkActionPressed` -- and it exists because the panel
+  // is on the other side of the screen from the card you just clicked.
   //
-  // IT IS IN THE LAYOUT, NOT OVER IT: the rows below the pinned one are pushed
-  // down by exactly this much, so the strip covers nothing, scrolls with the
-  // list, and cannot be clicked through to a card underneath it.
-  var ACTION_H = 28;
+  // **ITS LANE IS RESERVED UNDER EVERY ROW, WHETHER OR NOT ONE IS OPEN**, and
+  // that is the whole point rather than a waste of space (2026-08-31, at the
+  // owner's word: "make sure the module that is clicked doesn't move when
+  // clicked so that clicking twice can't unequip without moving the mouse").
+  //
+  // It was inserted only under the pinned row, which reflowed everything below
+  // it -- and that is a real trap, not merely untidy. Pinning a card BELOW the
+  // one already open removes the old strip, so the card the player just clicked
+  // JUMPS UP by a strip's height under a stationary cursor, and the new strip
+  // opens exactly where that cursor now is. A second click, or one impatient
+  // double-click, then equips or unequips something the player only meant to
+  // read.
+  //
+  // A reserved lane makes that impossible by construction rather than by care:
+  // the list's geometry does not depend on which module is open, so NOTHING
+  // moves when the pin does, and the strip is always below the card that was
+  // clicked and therefore never under the cursor that clicked it. The price is
+  // a taller list, and the cards were shortened to pay some of it back.
+  var ACTION_H = 24, ACTION_GAP = 4;
+  var ROW_PITCH = CARD_H + ACTION_GAP + ACTION_H + CARD_GAP_Y;
 
   var BRANCH_ORDER = ["A", "B", "C", "G"];
   var BRANCH_LABEL = { A: "PATH A", B: "PATH B", C: "PATH C", G: "GENERAL" };
@@ -221,21 +240,14 @@ var Upgrades = (function () {
       out.headers.push({ label: BRANCH_LABEL[key], count: g.length, y: y });
       y += GROUP_HEAD;
 
-      // WHICH ROW THE PINNED MODULE IS ON, if it is in this band at all. Every
-      // row BELOW it is pushed down by the strip that opens under it; the rows
-      // beside and above it do not move, so the card you clicked stays put.
-      var pinnedRow = -1;
-      g.forEach(function (node, i) {
-        if (node.id === detailNode) pinnedRow = Math.floor(i / 2);
-      });
-      var lift = ACTION_H + CARD_GAP_Y;
-
+      // EVERY ROW IS ONE PITCH TALL, pinned or not -- see ROW_PITCH. Nothing
+      // in this loop reads `detailNode` except to decide where to DRAW the
+      // strip, which is what makes the geometry independent of it.
       g.forEach(function (node, i) {
         var col = i % 2, row = Math.floor(i / 2);
         var rect = {
           x: box.x + col * (cardW + CARD_GAP_X),
-          y: y + row * (CARD_H + CARD_GAP_Y) +
-             (pinnedRow >= 0 && row > pinnedRow ? lift : 0),
+          y: y + row * ROW_PITCH,
           w: cardW, h: CARD_H
         };
         var item = {
@@ -249,13 +261,13 @@ var Upgrades = (function () {
           out.action = {
             nodeId: node.id,
             equipped: item.equipped,
-            rect: { x: rect.x, y: rect.y + CARD_H + 4, w: cardW, h: ACTION_H }
+            rect: { x: rect.x, y: rect.y + CARD_H + ACTION_GAP,
+                    w: cardW, h: ACTION_H }
           };
         }
       });
 
-      y += Math.ceil(g.length / 2) * (CARD_H + CARD_GAP_Y) +
-           (pinnedRow >= 0 ? lift : 0) + GROUP_GAP;
+      y += Math.ceil(g.length / 2) * ROW_PITCH + GROUP_GAP;
     });
 
     // Measured with the scroll added back, so the ceiling below is a property
@@ -1181,23 +1193,23 @@ var Upgrades = (function () {
       });
       if (lifted) return;
 
-      sigil(node.id, r.x + 24, r.y + r.h / 2, 12,
+      sigil(node.id, r.x + 24, r.y + r.h / 2, 11,
         "rgba(" + (item.equipped ? ASH_GO : ASH_EMBER) + ",0.9)", node.icon);
 
       ctx.textAlign = "left";
       ctx.font = "600 12px system-ui, sans-serif";
       ctx.fillStyle = item.equipped ? "rgba(" + ASH_GO + ",0.98)" : "#ffe6c4";
-      ctx.fillText(fitText(ctx, node.name, r.w - 56), r.x + 44, r.y + 10);
+      ctx.fillText(fitText(ctx, node.name, r.w - 56), r.x + 44, r.y + 7);
 
       // ONE SHORT LINE, and never the whole description: the card only has to
       // be recognisable, and the numbers are in the panel on the right.
       ctx.font = "10px system-ui, sans-serif";
       ctx.fillStyle = "rgba(" + ASH_DUST + ",0.78)";
-      ctx.fillText(fitText(ctx, shortOf(node), r.w - 56), r.x + 44, r.y + 28);
+      ctx.fillText(fitText(ctx, shortOf(node), r.w - 56), r.x + 44, r.y + 24);
 
       if (item.equipped) {
         ctx.fillStyle = "rgba(" + ASH_GO + ",0.75)";
-        ctx.fillRect(r.x + 3, r.y + 8, 2, r.h - 16);
+        ctx.fillRect(r.x + 3, r.y + 7, 2, r.h - 14);
       }
     });
 

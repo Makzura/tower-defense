@@ -10317,8 +10317,11 @@ function (t) {
   // directly under the pinned card, and the control at the foot of the panel.
   var strip = h.run("Upgrades.inventoryActionRect()");
   t.ok(strip !== null, "a strip opens under the pinned card");
-  t.near(strip.y, card.y + 54, 1e-9, "directly under it");
+  t.near(strip.y, card.y + 48, 1e-9, "directly under it");
   t.eq(strip.x, card.x, "and exactly as wide, in the same column");
+  t.ok(strip.y >= card.y + card.h,
+    "and BELOW it — never under the cursor that pinned it, so a second click " +
+    "in the same place cannot press it");
 
   h.run("Upgrades.onClick(" + (strip.x + 40) + ", " + (strip.y + 14) + ")");
   t.eq(h.run("MetaProgress.equippedPerks('soldier')[0]"), firstId,
@@ -10347,6 +10350,26 @@ function (t) {
     "        strip.x < r.x + r.w && strip.x + strip.w > r.x) overlap = true; }" +
     "  return { overlap: overlap }; })()");
   t.eq(pushed.overlap, false, "the strip overlaps no card at all");
+
+  // AND NOTHING MOVES WHEN THE PIN DOES. The lane the strip sits in is reserved
+  // under EVERY row, so the list's geometry does not depend on which module is
+  // open -- which is what stops a card jumping under a stationary cursor and
+  // putting the button where the next click will land.
+  var frozen = h.run("(function () {" +
+    "  var list = TowerPerks.inventory('soldier');" +
+    "  function snap() { return list.map(function (n, i) {" +
+    "    var r = Upgrades.inventoryCardRect(i); return r.x + ',' + r.y; }); }" +
+    "  var out = { same: true };" +
+    "  var first = snap();" +
+    "  for (var i = 0; i < list.length; i++) {" +
+    "    var r = Upgrades.inventoryCardRect(i);" +
+    "    Upgrades.onMouseDown(r.x + 20, r.y + 10);" +
+    "    Upgrades.onMouseUp(r.x + 20, r.y + 10);" +
+    "    var now = snap();" +
+    "    for (var k = 0; k < now.length; k++) if (now[k] !== first[k]) out.same = false; }" +
+    "  return out; })()");
+  t.eq(frozen.same, true,
+    "pinning every module in turn moves not one card by one pixel");
 
   // AN EQUIPPED MODULE CAN BE READ WITHOUT BEING TAKEN OUT. This is the bug the
   // change exists to fix: a click on its slot used to unequip it on the spot.

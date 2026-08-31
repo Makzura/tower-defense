@@ -57,11 +57,17 @@ an action. Dragging still works and is how a player picks WHICH slot.
 detail panel, as a strip directly under the pinned card, and under the SLOT the
 pinned module is in. The panel is on the other side of the screen from whatever
 was just clicked, so wherever the click landed the button is beside the cursor.
-The card's strip is part of the LAYOUT rather than an overlay: the rows below the
-pinned one are pushed down by exactly its height, so it covers no card, scrolls
-with the list, and cannot be clicked through. The slot's sits in the gap the
-slots already left above the list, so nothing had to move for it, and it is
-always the red UNEQUIP -- a slot only ever holds an equipped module.
+**Nothing moves when the pin does.** The card's strip has a lane reserved under
+EVERY row whether one is open or not, so the list's geometry does not depend on
+which module is being read, and the strip is always below the card that was
+clicked rather than under the cursor that clicked it. It was inserted only under
+the pinned row for the first few hours of that day, which reflowed the list:
+pinning a card BELOW the open one made the card the player had just clicked jump
+up under a stationary cursor, with the new strip opening exactly where that
+cursor now was — so one impatient double-click equipped something they meant to
+read. The owner caught it in one sentence. The slot's strip sits in the gap the
+slots already left above the list and is always the red UNEQUIP, since a slot
+only ever holds an equipped module.
 
 content 436 → 437: one added, and the loadout test kept its name and changed its
 claims, because the claims were the thing that changed.
