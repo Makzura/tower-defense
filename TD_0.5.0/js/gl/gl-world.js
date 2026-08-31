@@ -2782,7 +2782,10 @@ var World3D = (function () {
         // and `flying`), so any constant here would already be wrong twice.
         var em = GLModels.get(renderer, model);
         var eBand = gaitBand(em, e);
-        var rate = clockRate(e);
+        // AN AUTHORED CLIP'S OWN LENGTH FIRST. A body carrying named clips runs
+        // them at the duration they were authored at; everything else keeps the
+        // two rules that were here -- a flier's hover hertz, and the road.
+        var rate = authoredRate(em, e) || clockRate(e);
         var walk = rate
           ? bandFrame(eBand, boardClock * rate)
           : bandFrame(eBand, (e.progress || 0) / stride);
@@ -3097,7 +3100,48 @@ var World3D = (function () {
     }
   };
 
+  // WHICH AUTHORED CLIP A BODY IS PLAYING, BY NAME (2026-08-30).
+  //
+  // The table above picks a band by INDEX, which is right for a solved cycle
+  // the exporter laid out. It is wrong for a body whose model arrives with
+  // NAMED clips: the Veil Dart carries idle_hover, travel, hit_react and death,
+  // the importer orders `idle_` first by convention, and an index typed here
+  // would silently point at a different clip the day a fifth is authored --
+  // exactly the failure `bandNames` was added to prevent (see the note on
+  // `farmBandNow`).
+  //
+  // TRAVEL IS THE VEIL DART'S WHOLE LIFE. Its own handoff says so: "moving (the
+  // normal state, whole life)". It is authored IN PLACE -- the gameplay
+  // supplies the straight line -- so the clip is a 1 s time loop rather than a
+  // stride, and the rate below reads that duration off the model.
+  var ENEMY_CLIP = {
+    veil_dart: function () { return "travel"; }
+  };
+
+  // The index of the named clip this body should be playing, or -1.
+  function clipBandIndex(m, e) {
+    var pick = e ? ENEMY_CLIP[e.typeId] : null;
+    if (!pick || !m || !m.bandNames) return -1;
+    var want = pick(e);
+    return want ? m.bandNames.indexOf(want) : -1;
+  }
+
+  // HOW FAST AN AUTHORED CLIP RUNS: its own duration, in hertz. `bandSeconds`
+  // exists for exactly this, and reading it beats a per-type constant -- retune
+  // the clip in the source and the game plays it at the new length with nothing
+  // edited here. 0 means "this body has no authored clip", and the caller falls
+  // back to `clockRate` and then to the road.
+  function authoredRate(m, e) {
+    var i = clipBandIndex(m, e);
+    if (i < 0 || !m.bandSeconds) return 0;
+    var seconds = m.bandSeconds[i];
+    return (seconds > 0) ? 1 / seconds : 0;
+  }
+
   function gaitBand(m, e) {
+    var named = clipBandIndex(m, e);
+    if (named > 0 && m.bands && m.bands.length > named) return m.bands[named];
+
     var pick = e ? ENEMY_GAIT_BAND[e.typeId] : null;
     if (!pick) return walkBand(m);
     var want = pick(e);

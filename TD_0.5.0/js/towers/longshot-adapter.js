@@ -796,7 +796,7 @@ LongshotTower.prototype.shotSpeedUlps = function () {
 // permanent, and invisible because the shot still usually landed inside the
 // 12 u.l. hit radius.
 //
-// On a Skimmer it was total. That type flies the CHORD from the road's mouth to
+// On a Veil Dart it was total. That type flies the CHORD from the road's mouth to
 // the base (`offPath`, js/enemy.js) and its `progress` is a position along its
 // own route rather than along the tarmac -- so `path.pointAt(progress)` returned
 // a point on a road the body is nowhere near, and this tower fired straight-line

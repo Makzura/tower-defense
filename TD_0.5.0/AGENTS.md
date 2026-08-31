@@ -2248,7 +2248,7 @@ payout has to be knowable in advance to be worth anything.
 ## A body that does not use the road — `offPath` (2026-08-30)
 
 The owner's idea: *"one that doesn't follow the path and flies in a straight
-line to the base, and of course it's camo."* The **Skimmer** is the first type
+line to the base, and of course it's camo."* The **Veil Dart** is the first type
 carrying `offPath`, and the trait is **orthogonal to `isFlying`** — the Aether
 Wisp flies and still walks every bend; a future body could cut the corner
 without being airborne at all.
@@ -2256,7 +2256,7 @@ without being airborne at all.
 **`progress` STAYS IN ROAD UNITS FOR EVERY BODY**, and that is the decision
 everything else falls out of. It is a position along the body's OWN route,
 expressed as the fraction of that route travelled times `path.length`. So a
-Skimmer halfway home reads `0.5 × path.length` exactly as a walker halfway home
+Veil Dart halfway home reads `0.5 × path.length` exactly as a walker halfway home
 does. Three things come free:
 
 - the leak test stays `progress >= path.length` and needs no branch;
@@ -2268,7 +2268,7 @@ does. Three things come free:
 What differs is the SCALE. `Enemy.prototype.routeScale()` is `path.length /
 chord.length` — how much progress one pixel of travel buys — and it is the ONE
 place the two units meet, applied in the single line of `update` that advances
-progress. **The Skimmer is not faster**: it covers the same ground per second as
+progress. **The Veil Dart is not faster**: it covers the same ground per second as
 anything else, and the shortcut is the whole of its advantage, which is what
 makes it retunable by moving the chord rather than by a speed multiplier nobody
 can see. On the default board that is 1401 px against the road's 1940, so it
@@ -2293,12 +2293,12 @@ type and both fixed the same day:
 
 - `js/systems/death-denial.js` wrote `progress` and asked the path directly, so
   a knocked-back body was snapped onto the centreline and lost its lane. On a
-  Skimmer it would have teleported one onto road it has never touched.
+  Veil Dart it would have teleported one onto road it has never touched.
 - **`LongshotTower.prototype.predictedPosition` aimed through the road**, which
   is what the owner reported as *"they can't be touched, the towers don't know
   what to do and shoot at random places"*. On a walker it cost a lane's width of
   lead, permanently and invisibly, because the shot still usually landed inside
-  the 12 u.l. hit radius. On a Skimmer it was total: measured on the default
+  the 12 u.l. hit radius. On a Veil Dart it was total: measured on the default
   board, the aim point sat **62 px** from the body and an A1 sniper standing on
   the flight line left it at full health for twenty seconds. Through
   `positionAt` it kills it in twelve.
@@ -2314,13 +2314,54 @@ is a balance decision and nobody has made it. **50 HP, camo, flying, base
 walking speed, 65 bounty** — the health and the traits are the owner's, the
 bounty and the speed are balance values.
 
-**The placeholder is the ABSENCE of a model.** The 3D board already draws a
-sphere for any type it has no mesh for (`enemyModel` in `js/gl/gl-world.js`), so
-"use a placeholder sphere" is a model file that does not exist rather than one
-pretending to be art. The camo-shadow test in `tests/run.js` was widened to
-match: a camo type must resolve to a mesh — its own or a shadow — **or** be
-parked, and the moment such a type is scheduled the test starts demanding a body
-for it.
+**It shipped for a few hours as a placeholder sphere**, which is what the board
+gives any type it has no mesh for (`enemyModel`) — the placeholder was a model
+file that did not exist rather than one pretending to be art. The camo-shadow
+test in `tests/run.js` was widened for it and stays widened: a camo type must
+resolve to a mesh — its own or a shadow — **or** be parked.
+
+### The body, and how it got in
+
+The `Veil_Dart` pack arrived carrying the same creature to the letter — 50 HP,
+camo, flying, ignores the road, never attacks — with an approved concept sheet.
+**The type took the art's name**; an enemy id is not a persistence format (only
+tower ids are saved), so the rename cost nobody a save.
+
+**IT CAME IN THROUGH THE REPOSITORY'S OWN IMPORTER, not a new one.** The pack is
+three.js and ES modules, which this project has neither of, and its geometry and
+its four clips are authored in a file that only a browser can evaluate. So the
+route was the one `tools/glb_to_animated.py` was written for: the pack's own lab
+page exports a GLB with the clips embedded, and that tool samples it into the
+frame list the model format already has. `../glb/veil-dart.glb` is the input and
+`js/gl/models/enemy-veil_dart.js` the output — same format as every other model,
+and nothing downstream can tell it came from outside.
+
+**235 triangles and four named bands** — `idle_hover` 2.7 s, `travel` 1 s,
+`hit_react` 0.22 s, `death` 0.9 s, with `idle_` first by the importer's own
+convention. For scale, the Aether Wisp is 5 815 triangles.
+
+**ONE AUTHORING COLLISION, FIXED AT THE EXPORT AND NOT IN THE PACK.** Both
+stabilisers are called `fin_blade`, and the importer joins the mesh walk to the
+hierarchy BY NAME, so it refused the file. The export uniquifies duplicate node
+names before writing; the vendor's folder is untouched.
+
+**`ENEMY_CLIP` picks the clip BY NAME.** `ENEMY_GAIT_BAND` beside it picks a band
+by index, which is right for a solved cycle the exporter laid out and wrong for a
+model that arrives with named clips — an index typed here would point at a
+different clip the day a fifth is authored. The Veil Dart flies on `travel`,
+which its own handoff calls "the normal state, whole life".
+
+**An authored clip runs at its own length.** `authoredRate` reads `bandSeconds`
+for the chosen band, so retuning the clip in the source changes how fast the game
+plays it with nothing edited here. It takes precedence over `clockRate` (a
+flier's hover hertz) and over the road's distance drive, which are the two rules
+that were there before.
+
+**THE OTHER THREE CLIPS ARE IN THE FILE AND ARE NOT TRIGGERED YET.** `hit_react`
+needs a per-body one-shot latch like the Farm's, and `death` needs the wreck
+system to hold the body for its 0.9 s rather than removing it on the frame it
+dies. Both are real work and neither was asked for; the model carries them, so
+wiring them later edits `ENEMY_CLIP` and nothing else.
 
 ---
 
@@ -9160,8 +9201,8 @@ the **first enemy authored through `td_mesh`** rather than through Blender or an
 import. Two directory listings cannot tell you any of that; ten lines of
 `struct.unpack` can, and the header of that script carries the numbers.
 
-**`enemy-fast` is the trap of the set, because `enemy_skimmer.py` is still
-there.** The Skimmer mech built that file until the hound replaced it, and its
+**`enemy-fast` is the trap of the set, because `enemy_veil_dart.py` is still
+there.** The Veil Dart mech built that file until the hound replaced it, and its
 row in `export_mesh.py::TARGETS` has been REMOVED for exactly that reason: the
 filename, the registered id and the model contract are identical either way, so
 a batch `--only=enemy-` would have rewritten the hound as the mech with nothing
@@ -9177,14 +9218,14 @@ one.
 **AND IT HAS BEEN SPRUNG A SECOND TIME, WHICH IS WHY IT IS A RULE AND NOT AN
 ANECDOTE.** `enemy-shieldbearer` went the same way on 2026-08-18: the four-legged
 Tender (`enemy_tender.py`) built that filename until `shieldbearer.glb`
-replaced it, and its TARGETS row is gone for exactly the Skimmer's reason. The
+replaced it, and its TARGETS row is gone for exactly the Veil Dart's reason. The
 script is kept for the same kind of reason too — it is the chassis's four-legged
 worked example and `enemy_dray.py` measures against it — but it no longer owns a
 shipped file.
 
 **AND A THIRD TIME, ON 2026-08-19: `enemy-slow`.** The Tun (`enemy_tun.py`)
 built that filename until `slow.glb` — the plodder — replaced it, and its
-TARGETS row is gone for the Skimmer's reason and the Tender's. `enemy_tun.py`
+TARGETS row is gone for the Veil Dart's reason and the Tender's. `enemy_tun.py`
 is kept because `make_preview.py` still builds its contact sheet from it.
 
 **AND A FOURTH, THE SAME DAY: `enemy-boss`.** The container-with-legs
@@ -9232,12 +9273,12 @@ walking the road.
 2026-08-13. Do not re-derive that by matching the two directory listings:
 **the four original bodies are named for their typeId (`enemy_brute`,
 `enemy_hive`, `enemy_normal`, `enemy_swarm`) and the five added 2026-08-13 are
-named for their LORE name** — `enemy_skimmer` → `enemy-fast`, `enemy_tun` →
+named for their LORE name** — `enemy_veil_dart` → `enemy-fast`, `enemy_tun` →
 `enemy-slow`, `enemy_drudge` → `enemy-armored`, `enemy_hedger` → `enemy-angry`,
 `enemy_cooper` → `enemy-camo_normal`. A name-match across the two lists reports
 mismatches that are not real. `enemy_chassis.py` is the shared frame, not a
 body. **Three of those five arrows no longer describe a SHIPPED file** —
-`enemy_skimmer`, `enemy_tender` and `enemy_tun` have all lost their TARGETS
+`enemy_veil_dart`, `enemy_tender` and `enemy_tun` have all lost their TARGETS
 rows to imports, and `enemy_cooper` still has its row but no longer draws the
 Camo Normal, which now wears the `normal`'s body. The arrows are kept because
 they are still what the naming convention IS, and the convention is what this

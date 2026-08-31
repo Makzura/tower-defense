@@ -13,6 +13,46 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Veil Dart gets its body, through the repo's own importer.**
+
+The `Veil_Dart` pack arrived carrying the same creature the Skimmer already was,
+to the letter — 50 HP, camo, flying, ignores the road, never attacks — with an
+approved concept sheet and a name on it. The type took the art's name. An enemy
+id is not a persistence format, so the rename cost nobody a save.
+
+**IT CAME IN THROUGH `tools/glb_to_animated.py`, NOT A NEW TOOL.** The pack is
+three.js and ES modules, which this project has neither of, and its geometry and
+clips live in a file only a browser can evaluate — so writing a converter would
+have meant reimplementing three.js geometry semantics and maintaining a second
+importer beside the one this repository already trusts. The route instead was
+the one that tool exists for: the pack's own lab page exports a GLB with the
+four clips embedded, and the tool samples it into the frame list the model
+format already has. `../glb/veil-dart.glb` in, `js/gl/models/enemy-veil_dart.js`
+out, same format as every other model.
+
+**235 triangles and four named bands** — idle_hover 2.7 s, travel 1 s, hit_react
+0.22 s, death 0.9 s, `idle_` first by the importer's own convention. The Aether
+Wisp is 5 815 triangles, for scale.
+
+**One authoring collision, fixed at the export rather than in the pack.** Both
+stabilisers are called `fin_blade` and the importer joins the mesh walk to the
+hierarchy by name, so it refused the file outright. The export uniquifies
+duplicate node names on the way out; the vendor's folder is untouched.
+
+**`ENEMY_CLIP` picks a clip BY NAME.** The table beside it picks a band by index,
+which is right for a solved cycle the exporter laid out and wrong for a model
+that arrives with named clips: an index typed in gl-world would point at a
+different clip the day a fifth is authored, which is the failure `bandNames` was
+added to prevent. And `authoredRate` runs a clip at its OWN length, read off
+`bandSeconds` — retune the clip in the source and the game plays it at the new
+length with nothing edited here.
+
+**The other three clips are in the file and are not triggered yet**, and that is
+stated rather than hidden. `hit_react` wants a per-body one-shot latch like the
+Farm's; `death` wants the wreck system to hold the body for its 0.9 s instead of
+removing it on the frame it dies. Neither was asked for. The model carries them,
+so wiring them later edits `ENEMY_CLIP` and nothing else.
+
 **2026-08-30 — The Brute arrives three waves later on Easy, four on Normal.**
 
 The owner's instruction, and the swap it asked for. First Brute: Easy wave 20 →
@@ -54,12 +94,12 @@ it was wrong before this change too.
 
 **2026-08-30 — The sniper aims at the body, not at the road under it.**
 
-The owner, on the Skimmer: *"they can't be touched, the towers don't know what
+The owner, on the Veil Dart: *"they can't be touched, the towers don't know what
 to do and shoots at random places when targetting them."*
 
 `LongshotTower.prototype.predictedPosition` asked `enemy.path.pointAt(progress)`
 — the third place in this repository to break the rule `refreshPos` exists to
-state, after `death-denial.js` the same day. A Skimmer's `progress` is a position
+state, after `death-denial.js` the same day. A Veil Dart's `progress` is a position
 along ITS OWN route, the chord from the road's mouth to the base, so the road
 point it answered was somewhere the body has never been. Measured on the default
 board: the aim sat **62 px** from the body against a 12 u.l. hit radius, and an
@@ -73,11 +113,11 @@ because the shot still usually landed inside the hit radius. It keeps the lane
 now, which let the lead test drop the workaround its own comment described: a
 lead of zero is `enemy.pos` exactly rather than "the centreline, near enough".
 
-Two towers may legally engage a Skimmer — the Arcane Sniper, and a Siphon that
+Two towers may legally engage a Veil Dart — the Arcane Sniper, and a Siphon that
 has taken A4 for flight and B1 for camo. Nothing else can see it, which is the
 type's whole question to the player.
 
-**2026-08-30 — The Skimmer: a body that does not use the road.**
+**2026-08-30 — The Veil Dart: a body that does not use the road.**
 
 The owner's idea — *"one that doesn't follow the path and flies in a straight
 line to the base, and of course it's camo"*. 50 hit points, camo, flying, base
@@ -91,13 +131,13 @@ no circle at all over the middle of the map, and this walks through the gap.
 
 **`progress` stays in ROAD UNITS for every body**, which is the decision the
 rest falls out of. It is a position along the body's own route, expressed as the
-fraction travelled times `path.length` — so a Skimmer halfway home reads exactly
+fraction travelled times `path.length` — so a Veil Dart halfway home reads exactly
 what a walker halfway home reads. The leak test stays `progress >= path.length`
 with no branch, targeting's "first" and "last" compare like with like instead of
 ranking a short route as permanently behind, and knockBack and every fixture
 that writes `progress` keep working with no idea any of this exists.
 
-`routeScale()` is the one place the two units meet. **The Skimmer is not
+`routeScale()` is the one place the two units meet. **The Veil Dart is not
 faster** — it covers the same ground per second as anything else, and the
 shortcut is the whole of its advantage, which makes it retunable by moving the
 chord rather than by a speed multiplier nobody can see. On the default board it
@@ -112,7 +152,7 @@ it. It faces down the chord, constantly: one straight course, never a turn.
 **One real bug fell out of writing it.** `js/systems/death-denial.js` wrote
 `progress` and then asked `path.pointAt` directly — the exact thing
 `refreshPos` exists to prevent, and it had been quietly snapping knocked-back
-bodies onto the centreline and losing their lane. On a Skimmer it would have
+bodies onto the centreline and losing their lane. On a Veil Dart it would have
 teleported one onto road it has never touched.
 
 **Parked, not scheduled.** It carries `sandboxOnly`, which is this repository's
@@ -3439,7 +3479,7 @@ draws the field the artist authored in the renderer that can actually blend it.
 The opaque frame-and-node octagon stays, and it is what reads as the barrier.
 
 **`enemy-boss_fast` LEAVES `export_mesh.py::TARGETS`, THE SIXTH TIME THIS TRAP
-HAS BEEN DISARMED** — the Skimmer, the Tender, the Tun, the Tyrant, the Courier
+HAS BEEN DISARMED** — the Veil Dart, the Tender, the Tun, the Tyrant, the Courier
 and now the Vanguard. A `.glb` import and a Blender target must never name the
 same output; whichever runs last wins, in silence. `enemy_vanguard.py` is KEPT
 for a reason unrelated to the row: it was the first body whose swing angle was
@@ -4604,7 +4644,7 @@ floor is white, so a saturated lit part is bought with a small number.
 **AND THE FIFTH TARGETS ROW IS GONE.** `enemy-shielded` was built here by
 `enemy_courier.py`; a `.glb` import and a Blender target must never name the
 same output, and this is the fifth time that trap has been disarmed (the
-Skimmer, the Tender, the Tun, the Tyrant, now the Courier). `enemy_courier.py`
+Veil Dart, the Tender, the Tun, the Tyrant, now the Courier). `enemy_courier.py`
 is kept — `enemy_tender.py` and `enemy_vanguard.py` both measure against its
 chest. `enemy-shielded-broken` has never been built here and must never be
 given a row.
@@ -4714,7 +4754,7 @@ it replaces, and the "82 tall and 70 wide" the roster is balanced against —
 
 **THE TRAP SPRANG A FOURTH TIME, AND REMOVING THE ROW CLOSED A SECOND HAZARD.**
 `enemy_tyrant.py` built `enemy-boss.js` until this import; its TARGETS row is
-gone for the Skimmer's reason, the Tender's and the Tun's. It was also the first
+gone for the Veil Dart's reason, the Tender's and the Tun's. It was also the first
 target name in TARGETS that is a PREFIX of another (`enemy-boss_fast`), so
 `--only=enemy-boss` rewrote the Vanguard too — identical in triangles, not in
 bytes. With the row gone that prefix has one match again. The script is kept: it
@@ -5414,18 +5454,18 @@ grows a quadruped rig, and the Blender exporter gives up the file it no longer
 owns.**
 
 At the owner's instruction: `robo-hound.glb` is the Fast enemy, running on all
-four limbs. It replaces the Skimmer mech, which is the first time an import has
+four limbs. It replaces the Veil Dart mech, which is the first time an import has
 taken over a body this repo had already built — and that, not the animation, is
 where the danger in this change was.
 
 **`export_mesh.py` no longer lists `enemy-fast`, and removing that row is the
-load-bearing half of the commit.** The Skimmer built `enemy-fast.js` from
-`enemy_skimmer.py`; the importer now writes the same filename with the same
+load-bearing half of the commit.** The Veil Dart built `enemy-fast.js` from
+`enemy_veil_dart.py`; the importer now writes the same filename with the same
 registered id under the same model contract. Left as it was, a plain
 `--only=enemy-` — which is every batch run of that file — would have rewritten
 the hound as the mech, and **nothing anywhere would have reported it**: no
 check, no manifest, no test looks at which body a file contains. The only
-symptom is the wrong animal on the road. `enemy_skimmer.py` is kept, because
+symptom is the wrong animal on the road. `enemy_veil_dart.py` is kept, because
 `enemy_courier.py` and `enemy_vanguard.py` both measure against its chest, but
 it no longer owns a shipped file. The general rule went into `AGENTS.md`: an
 import and a Blender target must never name the same output.
@@ -6899,7 +6939,7 @@ moved.**
 **CORRECTION TO THE 39f1f5c ENTRY, WHICH WAS WRONG.** That entry said the roster
 shared one stale `swing_deg = 28.0`. It does not. 28.0 is only the chassis
 DEFAULT; seven of the eight callers override it and they span **14 to 34
-degrees**: Drudge 18, Skimmer 34, Tun 20, Hedger 22, Cooper 28, Courier 26,
+degrees**: Drudge 18, Veil Dart 34, Tun 20, Hedger 22, Cooper 28, Courier 26,
 Tender 18, Dray 14. I read the default and never counted the call sites.
 
 **The finding underneath is stronger than the version it replaces.** These
@@ -7156,7 +7196,7 @@ reads zero:
 | `enemy-normal` (Gleaner) | 1.00 | 8 | 0.277 | 3.575 | 3.852 |
 | `enemy-camo_normal` (Cooper) | 1.00 | 8 | 0.277 | 3.575 | 3.852 |
 | `enemy-shielded` (Courier) | 1.15 | 8 | 0.985 | 4.111 | 5.096 |
-| `enemy-fast` (Skimmer) | 1.00 | 8 | 1.901 | 3.575 | 5.476 |
+| `enemy-fast` (Veil Dart) | 1.00 | 8 | 1.901 | 3.575 | 5.476 |
 | `enemy-slow` (Tun) | 1.00 | 8 | 3.935 | 3.575 | 7.510 |
 | `enemy-armored` (Drudge) | 1.05 | 8 | 3.965 | 3.754 | 7.719 |
 | `enemy-brute` | 1.50 | 8 | 4.192 | 5.363 | 9.555 |
@@ -7377,7 +7417,7 @@ evidence.
 
 **Roster run, all eight bodies with an `export_build()`** — moving / static
 undeclared pairs: cooper 51/72, courier 82/105, **dray 0/0 (declared, CLEAN)**,
-drudge 18/63, hedger 46/80, skimmer 52/73, tender 40/142, tun 58/65. **Only the
+drudge 18/63, hedger 46/80, veil_dart 52/73, tender 40/142, tun 58/65. **Only the
 Dray declares its contacts**, so every other list is a starting point rather
 than a defect list, and most of what is in them is joints. The ones that are not
 joint-shaped and want their owner's eye: the Tender's feet above, the Tun's
@@ -7768,7 +7808,7 @@ and the first body whose unique part is a shape no primitive in the toolkit can
 produce.** 4,552 triangles, 8 frames, built on `enemy_chassis.py` at
 `CHASSIS_VERSION 1` with no change to the shared module.
 
-The body is the narrowed Skimmer frame carrying a FULL-SIZE sealed hold. That
+The body is the narrowed Veil Dart frame carrying a FULL-SIZE sealed hold. That
 combination is the card's "proportionally the largest hold on any small unit"
 taken literally: the cage stays at scale 1.0 and the frame comes in around it,
 so the hold ends up the widest part of the whole body — its side struts at
@@ -8138,7 +8178,7 @@ does not exist while `enemy-flying.js` does — is unchanged and still true.
 > **AND A TRAP RECORDED SO NOBODY RE-DERIVES IT BY MATCHING THE TWO DIRECTORY
 > LISTINGS:** the four original bodies are named for their **typeId**
 > (`enemy_brute`, `enemy_hive`, `enemy_normal`, `enemy_swarm`) and the five added
-> 2026-08-13 for their **lore name** — `enemy_skimmer` → `enemy-fast`,
+> 2026-08-13 for their **lore name** — `enemy_veil_dart` → `enemy-fast`,
 > `enemy_tun` → `enemy-slow`, `enemy_drudge` → `enemy-armored`, `enemy_hedger` →
 > `enemy-angry`, `enemy_cooper` → `enemy-camo_normal`. A name-match across the
 > two lists reports mismatches that are not real.
@@ -8405,7 +8445,7 @@ the debt was visible; these are the six she did not narrate, and they are mine.
   134–151 lit px across its eight walk frames), so a moving part wants a
   per-frame curve rather than a number.
 - **`7b05841`** — *measure adjacent-pair separation at three bearings, and never
-  average a width over yaws.* A mean over 12 bearings called the rebuilt Skimmer
+  average a width over yaws.* A mean over 12 bearings called the rebuilt Veil Dart
   a uniform shrink — the one thing its card forbids — and nearly reverted a
   rebuild that had worked; per bearing the narrowing is −10% head-on and −35%
   broadside, and the separation tracks the anisotropy. Two defects hid behind the
@@ -8416,7 +8456,7 @@ the debt was visible; these are the six she did not narrate, and they are mine.
   merge, as authored, and painted maximally different; report where the authored
   value sits between its own two bounds.
 - **`080c6e8`** — *a separator must name its axis, and only height is
-  bearing-invariant.* The Skimmer separated on y and failed head-on; the Tun
+  bearing-invariant.* The Veil Dart separated on y and failed head-on; the Tun
   separated on x and failed broadside, matching the Gleaner on **both** axes
   visible at that bearing. Neither was a modelling error — both were briefs that
   never named an axis. **For anything that multiplies, prefer a height
@@ -8657,7 +8697,7 @@ while clause 7 has not moved once, so a copy would be the drifting one.
 
 **One convention added, one routed away.** *Name the commit a measurement was
 taken at* — `ddef990` → `1769dcf` is the case, where three people published
-extent tables measured at `ddef990` while the narrowed Skimmer was already on
+extent tables measured at `ddef990` while the narrowed Veil Dart was already on
 disk, and one was a step from correcting a builder about a model that no longer
 existed. It is a company-wide reporting rule, so its home is
 `.claude/org/PROTOCOL.md` and it is only pointed at from the standard, where
@@ -8937,13 +8977,13 @@ feature**. The grab handle is kept as fiction and is expected not to read.
 **3,928 triangles — and the expectation going in was that it would be the
 cheapest of the batch. It is the second DEAREST.**
 
-    Tun     2,584      Skimmer  3,508      Drudge  3,520
+    Tun     2,584      Veil Dart  3,508      Drudge  3,520
     Cooper  3,928      Gleaner  4,032      Hedger  4,072
 
 The reason is structural and it confirms the house standard rather than
 contradicting it: **this is the only body in the batch defined by ADDITION.** The
 Drudge removed a torso, two bands, a hip brace, two knees, two upper arms and
-two shoulders; the Skimmer removed a crown and two full arms; the Tun replaced a
+two shoulders; the Veil Dart removed a crown and two full arms; the Tun replaced a
 sixteen-part cage with a six-part drum. The Cooper is the Gleaner part for part
 plus a lid. *Look for the removal first* is the standard's own advice, and the
 one card that removes nothing is the one that costs most.
@@ -9010,9 +9050,9 @@ of 12 below the body group's own lowest point (0.379..0.414). They differ on
 frame 4 alone. Both correct, different questions — a count against a threshold is
 meaningless without the threshold.
 
-**2026-08-13 — the Skimmer narrowed. The crown deletion was one axis of two.**
+**2026-08-13 — the Veil Dart narrowed. The crown deletion was one axis of two.**
 
-otto measured the first Skimmer as reading like the Gleaner — pairwise separation
+otto measured the first Veil Dart as reading like the Gleaner — pairwise separation
 0.48/0.50 against 0.80 for the next closest pair, stable at both yaws. mira found
 the cause: **every width-defining group was byte-identical to the Gleaner's.**
 Arms, legs and body agreed to three decimals; the only difference anywhere was
@@ -9025,8 +9065,8 @@ stubs", "a thinner outline"). Height untouched at 1.034 — that separator works
 
     rest pose        arm half   chest half   leg half   y span    x span
     Gleaner            0.255       0.210       0.167     0.510     0.498
-    Skimmer before     0.255       0.210       0.167     0.510     0.514
-    Skimmer after      0.125       0.125       0.167     0.334     0.445
+    Veil Dart before     0.255       0.210       0.167     0.510     0.514
+    Veil Dart after      0.125       0.125       0.167     0.334     0.445
 
 **3,812 -> 3,508 triangles.** A removal, so it comes in cheaper and more
 distinct, which is the house standard's own worked example.
@@ -9051,7 +9091,7 @@ is the **worst-bearing plan width: 14.1 -> 11.0 screen px** against the Gleaner'
 separate decision. The arms are no longer a shared asset (stubs are a different
 part, 1104 -> 636 vertices per arm); the legs still are.
 
-Preview sheets re-rendered — `easy_skimmer.png` and `easy_five_compare.png` both
+Preview sheets re-rendered — `easy_veil_dart.png` and `easy_five_compare.png` both
 showed the old body and would have been a superseded file with a picture
 attached.
 
@@ -9059,7 +9099,7 @@ attached.
 
 `make_preview.py --easy-five` renders four craft sheets, the Hedger's crank at
 both extremes, and a five-up comparison including the Gleaner. Rendered from the
-committed geometry: Drudge `a00a774`, Skimmer and Tun `ddef990`, Hedger
+committed geometry: Drudge `a00a774`, Veil Dart and Tun `ddef990`, Hedger
 `e015ef5`, tree verified clean at HEAD first.
 
 **WHAT THESE SHEETS ARE EVIDENCE OF, WHICH IS NARROWER THAN IT LOOKS.** At
@@ -9137,7 +9177,7 @@ is drawn nowhere under `js/gl/` — measured at 0 px on both GL paths against 32
 px on the 2D fallback. Building it would ship a model whose separator does not
 exist. Awaiting Diego's ruling; the brief is written and nothing in it is wasted.
 
-**2026-08-13 — the Skimmer (`enemy-fast`) and the Tun (`enemy-slow`), bodies two
+**2026-08-13 — the Veil Dart (`enemy-fast`) and the Tun (`enemy-slow`), bodies two
 and three of five, both on the shared chassis.**
 
 Committed together, and that is a deviation from one-model-per-commit worth
@@ -9145,7 +9185,7 @@ naming: their `<script>` tags are consecutive lines in the same three pages, so
 splitting them would have meant one commit that leaves a page half-updated. The
 generated files are independent and separately reviewable.
 
-**Skimmer — 3,812 triangles.** The separator is a removal: the crown is gone. The
+**Veil Dart — 3,812 triangles.** The separator is a removal: the crown is gone. The
 Gleaner's raked antenna is the top fifth of the figure (z 0.960 to 1.190) and
 nothing occludes it, so deleting it changes the outline at the one place that
 always reads. It is also view-independent, which an addition at this size is

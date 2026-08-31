@@ -2945,7 +2945,7 @@ test("Normal carries every campaign type, and Easy's twenty-one", function (t) {
   var parked = roster.filter(function (id) {
     return h.game.Enemy.TYPES[id].sandboxOnly;
   });
-  t.deep(parked, ["skimmer"], "one type is parked out of the campaign");
+  t.deep(parked, ["veil_dart"], "one type is parked out of the campaign");
 
   var missing = roster.filter(function (id) {
     return !seen[id] && !h.game.Enemy.TYPES[id].sandboxOnly;
@@ -5682,40 +5682,40 @@ test("a sniper leads a body that is not on the road, and connects", function (t)
   // THE BUG THE OWNER FOUND: "they can't be touched, the towers don't know what
   // to do and shoot at random places when targetting them."
   //
-  // `predictedPosition` asked `enemy.path.pointAt(progress)`, and a Skimmer's
+  // `predictedPosition` asked `enemy.path.pointAt(progress)`, and a Veil Dart's
   // progress is a position along ITS OWN route -- the chord from the road's
   // mouth to the base. So the aim point was a spot on a road the body is
   // nowhere near, and a straight-line PierceBullet went there.
-  var skimmer = new g.Enemy(g.path, undefined, "skimmer");
-  skimmer.progress = g.path.length * 0.5;
-  skimmer.refreshPos();
+  var veil_dart = new g.Enemy(g.path, undefined, "veil_dart");
+  veil_dart.progress = g.path.length * 0.5;
+  veil_dart.refreshPos();
 
   var chord = g.Enemy.chordOf(g.path);
   var sniper = new g.LongshotTower(
     Math.round((chord.from.x + chord.to.x) / 2),
     Math.round((chord.from.y + chord.to.y) / 2) - 60, g.path);
 
-  var aim = sniper.predictedPosition(skimmer);
+  var aim = sniper.predictedPosition(veil_dart);
 
   // THE AIM IS ON THE CHORD, which is the whole claim: the body's own route,
   // not the tarmac. Measured as the perpendicular distance from the line.
   var dx = aim.x - chord.from.x, dy = aim.y - chord.from.y;
   var offLine = Math.abs(dx * chord.unit.y - dy * chord.unit.x);
-  t.ok(offLine < g.ul(Math.abs(skimmer.laneOffsetUl)) + 0.001,
+  t.ok(offLine < g.ul(Math.abs(veil_dart.laneOffsetUl)) + 0.001,
     "the aim point is on the body's own line (" + offLine.toFixed(2) + " px off)");
 
   // AND IT IS LED, not merely pointed at: the body is moving, so the aim sits
   // ahead of it and still well inside what a PierceBullet touches.
-  var lead = Math.hypot(aim.x - skimmer.pos.x, aim.y - skimmer.pos.y);
-  t.ok(lead > 0, "a moving Skimmer is led (" + lead.toFixed(2) + " px)");
+  var lead = Math.hypot(aim.x - veil_dart.pos.x, aim.y - veil_dart.pos.y);
+  t.ok(lead > 0, "a moving Veil Dart is led (" + lead.toFixed(2) + " px)");
   t.ok(lead < g.ul(g.PierceBullet.HIT_RADIUS_UL) * 0.5,
     "and the lead is well inside the shot's hit radius");
 
   // WHAT THE OLD ONE ANSWERED, for the record: a point on the road, tens of
   // pixels away, against a 12 u.l. radius. Kept as a measurement rather than a
   // memory, so nobody has to take the size of the miss on trust.
-  var onRoad = g.path.pointAt(skimmer.progress);
-  t.ok(Math.hypot(onRoad.x - skimmer.pos.x, onRoad.y - skimmer.pos.y) >
+  var onRoad = g.path.pointAt(veil_dart.progress);
+  t.ok(Math.hypot(onRoad.x - veil_dart.pos.x, onRoad.y - veil_dart.pos.y) >
     g.ul(g.PierceBullet.HIT_RADIUS_UL),
     "where the road point it used to answer is outside that radius entirely");
 
@@ -5728,11 +5728,11 @@ test("a sniper leads a body that is not on the road, and connects", function (t)
   t.eq(h.run("towers[0].core.stats.seesCamo"), true, "A1 gives it camo detection");
   t.eq(h.run("towers[0].core.stats.seesFlying"), true, "and it sees flight already");
 
-  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}))");
+  h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}))");
   var killed = h.run("(function () {" +
     "  for (var i = 0; i < 600; i++) { update(1 / 20); if (!enemies.length) return true; }" +
     "  return false; })()");
-  t.ok(killed, "and the Skimmer dies to it rather than flying past untouched");
+  t.ok(killed, "and the Veil Dart dies to it rather than flying past untouched");
 });
 
 // THE END TO END, because the arithmetic above cannot show what it cost.

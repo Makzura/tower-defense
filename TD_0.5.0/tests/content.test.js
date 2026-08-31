@@ -4874,7 +4874,7 @@ test("the enemy tab covers the roster with derived wave appearances", function (
   // THE EXEMPTION IS NOW ACTUALLY READ, which it was not until 2026-08-30: the
   // paragraph above has always said it is asserted against the type's own
   // `sandboxOnly` flag, and the assertion below simply demanded an empty list
-  // because every type happened to be scheduled. The Skimmer is the first one
+  // because every type happened to be scheduled. The Veil Dart is the first one
   // that is not, and the rule the comment states is the rule now enforced --
   // a type that is neither scheduled NOR flagged is still a failure.
   var seen = {};
@@ -4901,7 +4901,7 @@ test("the enemy tab covers the roster with derived wave appearances", function (
     "every wave of every schedule is claimed by at least one type");
   t.deep(unscheduled, [],
     "and no type is left off the schedule without saying so");
-  t.deep(parked, ["skimmer"],
+  t.deep(parked, ["veil_dart"],
     "the one type that is off it declares itself sandboxOnly");
 
   // And the late-campaign scaling shows: a stock normal is 4 HP, and the guide
@@ -11078,16 +11078,16 @@ test("every authored node survives a reload with its effect intact", function (t
 // own route, expressed as the fraction travelled times `path.length`.
 // ---------------------------------------------------------------------------
 
-function bootSkimmer() {
+function bootVeilDart() {
   var h = harness.boot(null);
   h.chooseMap(h.game.Maps.DEFAULT_ID);
   h.run("enemies = []; waveIndex = WAVES.length; waveSpawned = 0");
   return h;
 }
 
-test("the Skimmer is a 50 HP camo flier that ignores the road", function (t) {
-  var h = bootSkimmer();
-  var type = h.game.Enemy.TYPES.skimmer;
+test("the Veil Dart is a 50 HP camo flier that ignores the road", function (t) {
+  var h = bootVeilDart();
+  var type = h.game.Enemy.TYPES.veil_dart;
 
   t.eq(type.health, 50, "fifty hit points");
   t.eq(type.isCamo, true, "camouflaged");
@@ -11100,24 +11100,48 @@ test("the Skimmer is a 50 HP camo flier that ignores the road", function (t) {
   // enforces it in both directions.
   t.eq(type.sandboxOnly, true, "and kept out of the fixed campaign for now");
 
-  // THE PLACEHOLDER IS THE ABSENCE OF A MODEL. The 3D board draws a sphere for
-  // any type it has no mesh for, so "use a placeholder sphere" is a model file
-  // that does not exist rather than one pretending to be art.
-  t.eq(h.run("GLModels.has('enemy-skimmer')"), false,
-    "it ships no mesh, so the board draws its sphere");
+  // IT HAS ITS OWN BODY SINCE 2026-08-30. It shipped for a few hours drawn as
+  // the fallback sphere -- what the board gives any type it has no mesh for --
+  // and the Veil_Dart pack then arrived with the same creature to the letter.
+  // The import is the repository's own `tools/glb_to_animated.py`, so the file
+  // is in the same format as every other model and nothing downstream can tell
+  // it came from outside.
+  t.eq(h.run("GLModels.has('enemy-veil_dart')"), true, "it ships its own mesh");
+
+  // FOUR NAMED CLIPS, and `travel` is the one it flies on -- "moving (the
+  // normal state, whole life)" in the pack's own handoff. Read by NAME, never
+  // by index: the importer puts `idle_` first by convention and an index would
+  // point somewhere else the day a fifth clip is authored.
+  //
+  // READ OFF THE GENERATED FILE, the way the camo-shadow test reads gl-world's
+  // table: `GLModels.get` builds a GPU mesh and there is no renderer in the
+  // harness, so the registry's own metadata is not reachable through it.
+  var fs = require("fs");
+  var src = fs.readFileSync(__dirname + "/../js/gl/models/enemy-veil_dart.js", "utf8");
+  var names = /bandNames:\s*(\[[^\]]*\])/.exec(src);
+  var secs = /bandSeconds:\s*(\[[^\]]*\])/.exec(src);
+  t.ok(!!names && !!secs, "the import declares its bands");
+  t.deep(JSON.parse(names[1]), ["idle_hover", "travel", "hit_react", "death"],
+    "the four authored clips, idle first");
+  t.eq(JSON.parse(secs[1])[1], 1, "and travel is the 1 s loop it was authored as");
+
+  // THE BAND IS CHOSEN BY NAME IN gl-world, not by an index typed anywhere.
+  var world = fs.readFileSync(__dirname + "/../js/gl/gl-world.js", "utf8");
+  t.ok(/veil_dart:\s*function\s*\(\)\s*\{\s*return\s*"travel"/.test(world),
+    "and gl-world names the clip it flies on rather than numbering it");
 
   // The sidebar and the index read one list, and this body leads with the fact
   // that road coverage is not the answer to it.
-  var traits = h.run("Enemy.traitsOf('skimmer').map(function (r) { return r.label; })");
+  var traits = h.run("Enemy.traitsOf('veil_dart').map(function (r) { return r.label; })");
   t.deep(traits, ["Ignores the road", "Flies", "Camouflaged"],
     "three traits, most-defining first");
-  t.eq(h.run("Enemy.traitsOf('skimmer')[0].badge"),
+  t.eq(h.run("Enemy.traitsOf('veil_dart')[0].badge"),
     "OFF-ROAD — flies straight to the base", "and the index badge says so");
 });
 
-test("the Skimmer flies the chord, and never the road", function (t) {
-  var h = bootSkimmer();
-  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}))");
+test("the Veil Dart flies the chord, and never the road", function (t) {
+  var h = bootVeilDart();
+  h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}))");
 
   var chord = h.run("Enemy.chordOf(path)");
   var road = h.run("path.length");
@@ -11149,10 +11173,10 @@ test("the Skimmer flies the chord, and never the road", function (t) {
   t.near(heading.y, chord.unit.y, 1e-9, "in both components");
 });
 
-test("the Skimmer arrives sooner, at the same speed, by exactly the shortcut",
+test("the Veil Dart arrives sooner, at the same speed, by exactly the shortcut",
 function (t) {
-  var h = bootSkimmer();
-  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}));" +
+  var h = bootVeilDart();
+  h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}));" +
         "enemies.push(new Enemy(path, null, 'normal', {}))");
 
   // IT IS NOT FASTER. One step of one second moves it the same number of
@@ -11168,15 +11192,15 @@ function (t) {
     "  var a = enemies[0], b = enemies[1];" +
     "  var a0 = a.progress, b0 = b.progress;" +
     "  a.update(1); b.update(1);" +
-    "  return { skimmer: (a.progress - a0) / a.routeScale()," +
+    "  return { veil_dart: (a.progress - a0) / a.routeScale()," +
     "           walker: (b.progress - b0) / b.routeScale() }; })()");
-  t.near(moved.skimmer, moved.walker, 1e-9,
-    "both cover the same ground in a second (" + moved.skimmer.toFixed(2) + " px)");
-  t.near(moved.skimmer, h.run("ul(Enemy.BASE_SPEED_ULPS)"), 1e-9,
+  t.near(moved.veil_dart, moved.walker, 1e-9,
+    "both cover the same ground in a second (" + moved.veil_dart.toFixed(2) + " px)");
+  t.near(moved.veil_dart, h.run("ul(Enemy.BASE_SPEED_ULPS)"), 1e-9,
     "which is the roster's own walking speed");
 
   // PROGRESS IS IN ROAD UNITS FOR BOTH, which is what lets the leak test and
-  // targeting stay branch-free: the Skimmer's advances faster because the same
+  // targeting stay branch-free: the Veil Dart's advances faster because the same
   // pixel is a bigger share of a shorter route.
   var scale = h.run("enemies[0].routeScale()");
   var expected = h.run("path.length / Enemy.chordOf(path).length");
@@ -11186,17 +11210,17 @@ function (t) {
   // The arrival, timed. Both leak at `progress >= path.length` with no branch
   // anywhere, and the ratio of the two times is the ratio of the two routes.
   var times = h.run("(function () {" +
-    "  var out = { skimmer: 0, walker: 0 }, step = 1 / 20;" +
+    "  var out = { veil_dart: 0, walker: 0 }, step = 1 / 20;" +
     "  for (var i = 0; i < 5000; i++) {" +
-    "    if (!enemies[0].leaked) { enemies[0].update(step); if (enemies[0].leaked) out.skimmer = (i + 1) * step; }" +
+    "    if (!enemies[0].leaked) { enemies[0].update(step); if (enemies[0].leaked) out.veil_dart = (i + 1) * step; }" +
     "    if (!enemies[1].leaked) { enemies[1].update(step); if (enemies[1].leaked) out.walker = (i + 1) * step; }" +
-    "    if (out.skimmer && out.walker) break;" +
+    "    if (out.veil_dart && out.walker) break;" +
     "  }" +
     "  return out; })()");
-  t.ok(times.skimmer > 0 && times.walker > 0, "both reach the base");
-  t.ok(times.skimmer < times.walker, "the Skimmer gets there first (" +
-    times.skimmer.toFixed(1) + " s against " + times.walker.toFixed(1) + " s)");
-  t.near(times.skimmer / times.walker, 1 / scale, 0.02,
+  t.ok(times.veil_dart > 0 && times.walker > 0, "both reach the base");
+  t.ok(times.veil_dart < times.walker, "the Veil Dart gets there first (" +
+    times.veil_dart.toFixed(1) + " s against " + times.walker.toFixed(1) + " s)");
+  t.near(times.veil_dart / times.walker, 1 / scale, 0.02,
     "and the margin is the shortcut and nothing else");
 
   // IT ENDS ON THE BASE, not merely past a threshold.
@@ -11206,38 +11230,38 @@ function (t) {
     "it finishes on the base itself");
 });
 
-test("the Skimmer takes slows but not the road's pace profile", function (t) {
-  var h = bootSkimmer();
-  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}));" +
+test("the Veil Dart takes slows but not the road's pace profile", function (t) {
+  var h = bootVeilDart();
+  h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}));" +
         "enemies.push(new Enemy(path, null, 'normal', {}))");
 
-  var normal = h.run("({ skimmer: enemies[0].currentSpeedUlps()," +
+  var normal = h.run("({ veil_dart: enemies[0].currentSpeedUlps()," +
     "                   walker: enemies[1].currentSpeedUlps() })");
-  t.eq(normal.skimmer, normal.walker, "both start at the same speed");
+  t.eq(normal.veil_dart, normal.walker, "both start at the same speed");
 
   // A PACE PROFILE IS A FACT ABOUT THE TARMAC. "Nothing crosses that basin
   // quickly" cannot be addressed to a body that is over the basin, so the
-  // Skimmer is the one body on the board that does not read it.
+  // Veil Dart is the one body on the board that does not read it.
   var paced = h.run("(function () {" +
     "  var real = path.paceScaleAt;" +
     "  path.paceScaleAt = function () { return 0.5; };" +
-    "  var out = { skimmer: enemies[0].currentSpeedUlps()," +
+    "  var out = { veil_dart: enemies[0].currentSpeedUlps()," +
     "              walker: enemies[1].currentSpeedUlps() };" +
     "  path.paceScaleAt = real;" +
     "  return out; })()");
-  t.eq(paced.skimmer, normal.skimmer, "a slow stretch of road does not slow it");
+  t.eq(paced.veil_dart, normal.veil_dart, "a slow stretch of road does not slow it");
   t.near(paced.walker, normal.walker * 0.5, 1e-9, "while it halves the walker");
 
   // EVERYTHING THAT IS NOT THE ROAD STILL REACHES IT. A tower's slow is a fact
   // about the body, not about the tarmac.
   h.run("enemies[0].applySlow(0.5, 2)");
-  t.near(h.run("enemies[0].currentSpeedUlps()"), normal.skimmer * 0.5, 1e-9,
+  t.near(h.run("enemies[0].currentSpeedUlps()"), normal.veil_dart * 0.5, 1e-9,
     "a tower's slow works on it exactly as on anything else");
 });
 
-test("knocking a Skimmer back keeps it on its own line", function (t) {
-  var h = bootSkimmer();
-  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}))");
+test("knocking a Veil Dart back keeps it on its own line", function (t) {
+  var h = bootVeilDart();
+  h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}))");
   h.run("for (var i = 0; i < 60; i++) enemies[0].update(1 / 6)");
 
   // THE BUG THIS PINS: anything that writes `progress` and then asks
@@ -11254,10 +11278,10 @@ test("knocking a Skimmer back keeps it on its own line", function (t) {
   t.ok(moved <= lane, "after a knockback it is still on its chord");
 });
 
-test("a Skimmer and a walker at the same point of their journey rank alike",
+test("a Veil Dart and a walker at the same point of their journey rank alike",
 function (t) {
-  var h = bootSkimmer();
-  h.run("enemies.push(new Enemy(path, null, 'skimmer', {}));" +
+  var h = bootVeilDart();
+  h.run("enemies.push(new Enemy(path, null, 'veil_dart', {}));" +
         "enemies.push(new Enemy(path, null, 'normal', {}))");
 
   // TARGETING COMPARES RAW `progress` for "first" and "last", and this is why
