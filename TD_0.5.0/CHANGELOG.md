@@ -13,6 +13,46 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Veil Dart points its nose forward, and stops being a shell.**
+
+Two more from the owner, both look rather than behaviour.
+
+**It was ninety degrees off.** The importer's axis remap is `game x <- gltf z,
+y <- gltf x, z <- gltf y`, which is right for every file this project exported
+from Blender — and wrong for one authored nose-along-glTF-+X, whose nose lands
+on the game's +Y. `glb_to_animated.py` takes `--yaw <degrees>` now, composed
+INTO the conversion matrix rather than applied to the points afterwards, so the
+mesh and the animation deltas stay in one basis; it spins about the vertical, so
+ground contact is untouched. The Veil Dart imports at `--yaw -90`. The same edit
+collapsed `convert` into that one matrix, which the file's own comment already
+said it was a second spelling of.
+
+**The veil was opaque and the body was see-through** — *"so it makes a goofy
+effect"*, and exactly backwards from the pack's own law that the veil is
+refraction and the player always sees the enemy. Two things caused it. The model
+format's palette is `[r, g, b, emissive]` with no opacity, so a pane authored at
+0.19 arrives OPAQUE; and the camo draw lays a depth pre-pass and blends only the
+nearest layer, so a veil that ENCLOSES the hull wins every pixel and the craft
+disappears behind its own camouflage.
+
+**This repository already had the answer to translucent geometry: exclude it at
+import.** The Farm's three models `--exclude` their glass bottles, jars and
+chambers for precisely this reason. The Veil Dart now excludes the five
+enveloping panes and keeps the four WAKE shards — the veil's visible remnant,
+"the broken refractive trail", carrying the ley colour at emissive 0.99. The
+craft reads as a solid body with a glowing cyan wake behind it. 204 triangles,
+and the palette still holds all five of the pack's hues including the amber
+sensor at emissive 3.26.
+
+`--two-sided` stays and the wake needs it: the shards are flat sheets and would
+vanish from behind under the back-face cull.
+
+**Bringing the enveloping veil back is a renderer change, not an import flag.**
+The camo depth pre-pass would have to skip the veil groups so the hull wins it
+and the veil blends over the top at a lower alpha — three draws instead of two,
+a group filter through `drawActor`, in the most delicate part of the render path
+and touching every camo body. It is written down rather than done.
+
 **2026-08-30 — The Veil Dart faces where it flies, and its veil has both sides.**
 
 Two things the owner saw as soon as it was on the board.

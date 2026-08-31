@@ -2357,23 +2357,44 @@ on the 3D board**: a body that stops and turns to strike a tower had been drawn
 facing down the road throughout, because `headingVec`'s first case was never
 reached.
 
-**THE VEIL IS DOUBLE-SIDED, AND THE IMPORTER LEARNED HOW.** `GLRenderer` culls
-back faces, which is right and costs a closed body nothing — it hides its own
-back faces anyway. An open SHEET is the other case, and the veil is a set of
-flat panes authored `side: DoubleSide`: single-sided they vanish from every
-angle that sees their back, which is most of them. `glb_to_animated.py` takes a
-`--two-sided <substrings>` option now, emitting a named group's triangles a
-second time with the winding reversed and the normal recomputed from the
-reversed face. Opt-in and by NAME, because only the file knows which of its
-groups are sheets. 235 triangles became 286.
+**THE MODEL IS SPUN AT IMPORT, because its nose is not where the convention
+says.** The axis remap is `game x <- gltf z, y <- gltf x, z <- gltf y`, which is
+right for every file this project exported from Blender. The pack is authored
+nose-along-glTF-+X, and that nose lands on the game's **+Y** — ninety degrees off
+its own heading, which is how it arrived. `glb_to_animated.py` takes `--yaw
+<degrees>` now, composed INTO the conversion matrix rather than applied to the
+points afterwards, so the mesh and the animation deltas (`C · D · C⁻¹`) stay in
+one basis. It spins about the VERTICAL, so ground contact is untouched. The Veil
+Dart is imported at `--yaw -90`.
 
-**WHAT THE FORMAT STILL CANNOT CARRY IS ALPHA.** The palette is `[r, g, b,
-emissive]` and has no opacity, so the veil is opaque geometry in the ley colour
-rather than the 0.19 translucent layer the pack authored. What makes it read as
-a veil in play is the camo pass, which fades the WHOLE body — so the effect is
-"the craft is translucent" rather than "a translucent skin over a solid hull".
-Closing that gap is a renderer feature (per-triangle alpha), not an import
-option.
+**THE ENVELOPING VEIL IS EXCLUDED AT IMPORT, and that is this repository's
+existing answer to translucent geometry.** The palette is `[r, g, b, emissive]`
+and has no opacity, so a pane authored at 0.19 comes in OPAQUE. Worse, the camo
+draw lays a depth pre-pass and blends only the nearest layer — and the veil
+encloses the hull, so it won every pixel: the craft read as a cyan shell with
+its own body invisible behind it. The owner saw it exactly: *"the veil which is
+supposed to be more transparent is more opaque, and the body which should be
+more opaque is more transparent."*
+
+**The Farm's three imports already do this**: their glass bottles, jars and
+chambers are `--exclude`d for the same reason. The Veil Dart excludes
+`veil_nose`, `veil_l`, `veil_r`, `veil_top` and `veil_rear` — and keeps the four
+WAKE shards, which are the veil's visible remnant ("the broken refractive
+trail") and carry the ley colour at emissive 0.99. So the craft reads as a solid
+body with a glowing cyan wake rather than as a shell. 204 triangles.
+
+**`--two-sided <substrings>` stays, and the wake needs it.** `GLRenderer` culls
+back faces — right for a closed body, which hides its own anyway — and the wake
+shards are flat sheets, invisible from behind without it. It emits a named
+group's triangles a second time with the winding reversed and the normal
+recomputed from the reversed face.
+
+**WHAT WOULD BRING THE ENVELOPING VEIL BACK** is not an import option: the camo
+depth pre-pass would have to SKIP the veil groups, so the hull wins the pre-pass
+and the veil then blends over it at a lower alpha. That is three draws instead
+of two plus a group filter through `drawActor`, in the most delicate part of the
+render path, and it touches every camo body on the roster. Nobody has asked for
+it.
 
 **`ENEMY_CLIP` picks the clip BY NAME.** `ENEMY_GAIT_BAND` beside it picks a band
 by index, which is right for a solved cycle the exporter laid out and wrong for a

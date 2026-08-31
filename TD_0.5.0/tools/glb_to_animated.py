@@ -170,6 +170,7 @@
 
 import argparse
 import json
+import math
 import os
 import sys
 
@@ -505,16 +506,40 @@ def build(gltf, options):
     scale = 1.0 if options.size is None else options.size / max(measured, 1e-6)
     floor = min(p[1] for p in raw)
 
-    def convert(p):
-        return (p[2] * scale, p[0] * scale, (p[1] - floor) * scale)
-
-    # The same map as a matrix, so a delta can be conjugated into game space
-    # rather than re-derived by fitting points -- see the header.
-    C = [[0.0, 0.0, scale, 0.0],
-         [scale, 0.0, 0.0, 0.0],
-         [0.0, scale, 0.0, -floor * scale],
-         [0.0, 0.0, 0.0, 1.0]]
+    # WHICH WAY THE SOURCE CALLS FORWARD, and it is not a constant of glTF.
+    #
+    # The remap below is the axis convention (game x <- gltf z, y <- gltf x,
+    # z <- gltf y), and it is right for every file this project has exported
+    # from Blender. It is NOT right for a file authored nose-along-glTF-+X: that
+    # nose lands on the game's +Y, and the body is drawn ninety degrees off its
+    # own heading -- which is exactly how the Veil Dart arrived.
+    #
+    # `--yaw` spins the converted model about the game's VERTICAL, after the
+    # remap. Vertical, so ground contact is untouched: a rotation about z leaves
+    # the z row alone, and `floor` still lands the body on the road.
+    #
+    # It is composed INTO `C` rather than applied to the points afterwards,
+    # which is the whole reason this matrix exists. Points and animation deltas
+    # both go through it -- the deltas by conjugation, `C . D . C^-1` -- so the
+    # rig cannot end up in a different basis from the mesh it poses.
+    spin = math.radians(options.yaw or 0.0)
+    cs, sn = math.cos(spin), math.sin(spin)
+    remap = [[0.0, 0.0, scale, 0.0],
+             [scale, 0.0, 0.0, 0.0],
+             [0.0, scale, 0.0, -floor * scale],
+             [0.0, 0.0, 0.0, 1.0]]
+    rotate = [[cs, -sn, 0.0, 0.0],
+              [sn, cs, 0.0, 0.0],
+              [0.0, 0.0, 1.0, 0.0],
+              [0.0, 0.0, 0.0, 1.0]]
+    C = mat_multiply(rotate, remap)
     C_inv = mat_invert(C)
+
+    # ONE MAP, NOT TWO. `convert` used to spell the remap out a second time,
+    # which was harmless while the two agreed and is exactly the kind of pair
+    # that stops agreeing the moment one of them learns an option.
+    def convert(p):
+        return mat_apply(C, p)
 
     for part in parts:
         part["triangles"] = [([convert(p) for p in tri[0]], tri[1])
@@ -715,6 +740,10 @@ def main():
     # It is opt-in and by NAME because only the file knows which of its groups
     # are sheets; doubling a closed body would just pay for triangles the cull
     # was already throwing away.
+    ap.add_argument("--yaw", type=float, default=0.0,
+                    help="degrees to spin the model about the game's vertical "
+                         "after the axis remap; -90 for a source authored with "
+                         "its nose along glTF +X")
     ap.add_argument("--two-sided", default="", dest="two_sided",
                     help="comma-separated group-name substrings whose triangles "
                          "are also emitted with reversed winding")
