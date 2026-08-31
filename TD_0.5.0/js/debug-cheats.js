@@ -339,7 +339,10 @@
     // --- roster and profile --------------------------------------------------
     label(root, "Roster & profile");
     var rosterRow = row(root);
-    rosterRow.appendChild(button("Unlock all towers", function () {
+    // "BUY" RATHER THAN "UNLOCK", because buying is what the armoury calls it
+    // and paying is the only thing this skips. It also fills the build bar, the
+    // same way an ordinary purchase does.
+    rosterRow.appendChild(button("Buy all towers", function () {
       MetaProgress.unlockAll();
       if (typeof rebuildBuildBar === "function") rebuildBuildBar();
       fillScope();

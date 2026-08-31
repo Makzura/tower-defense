@@ -1147,12 +1147,20 @@ var MetaProgress = (function () {
   // suite that measured a locked roster would be measuring a different game
   // from the one under test. The alternative -- special-casing "are we in a
   // test" inside the gate -- is the thing that rots.
+  // EVERY TOWER OWNED, AND THE BAR REBUILT AROUND THEM.
+  //
+  // **IT SAVES, since 2026-08-31**, and it was the one mutator in this file
+  // that did not. Nothing noticed while its only caller was the test harness --
+  // Node has no localStorage, so the harness profile dies with the process
+  // either way -- but the cheat panel calls it too, and there a profile that
+  // owned everything until the page was reloaded is a profile that lies.
   function unlockAll() {
     var s = ensure();
     CATALOGUE.forEach(function (t) {
       if (s.owned.indexOf(t.id) === -1) s.owned.push(t.id);
     });
     s.equipped = defaultLoadout(s.owned);
+    save();
     return s;
   }
 

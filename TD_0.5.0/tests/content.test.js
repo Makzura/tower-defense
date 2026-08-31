@@ -10442,6 +10442,51 @@ function (t) {
     "and the node is still owned — unequipping is not un-buying");
 });
 
+test("unlocking the whole roster is written down", function (t) {
+  var h = bootProgress();
+  h.run("MetaProgress.reset()");
+  var starter = h.run("MetaProgress.snapshot().owned.length");
+  t.eq(starter, 1, "a fresh profile owns the one starter");
+
+  h.run("MetaProgress.unlockAll()");
+  var owned = h.run("MetaProgress.snapshot().owned");
+  t.eq(owned.length, h.run("MetaProgress.catalogue().length"),
+    "afterwards it owns every tower in the catalogue");
+  t.eq(h.run("MetaProgress.equipped().filter(Boolean).length"),
+    Math.min(owned.length, h.game.MetaProgress.SLOT_COUNT),
+    "and the build bar was filled from them");
+
+  // IT SAVES, which it did not until 2026-08-31 -- it was the one mutator in
+  // js/meta.js that changed the profile without writing it down. Nothing
+  // noticed while the test harness was its only caller, because Node has no
+  // localStorage; the cheat panel calls it too, and there a profile that owned
+  // everything until the page was reloaded is a profile that lies.
+  //
+  // MEASURED THROUGH A REAL STORE rather than by trusting the call. Node has no
+  // `localStorage`, so one is handed to the game's own scope -- `MetaProgress`
+  // reads the free variable and asks `typeof`, so a plain object with the three
+  // methods is all it wants -- and then the bytes it wrote are read back. That
+  // is the only way to tell "the state changed" from "the state was persisted".
+  h.run("localStorage = { data: {}," +
+        "  getItem: function (k) { return this.data[k] === undefined ? null : this.data[k]; }," +
+        "  setItem: function (k, v) { this.data[k] = String(v); }," +
+        "  removeItem: function (k) { delete this.data[k]; } }");
+  h.run("MetaProgress.reset()");
+  var fresh = JSON.parse(h.run("localStorage.getItem(MetaProgress.STORAGE_KEY)"));
+  t.eq(fresh.owned.length, 1, "a reset writes the one starter down");
+
+  h.run("MetaProgress.unlockAll()");
+  var stored = JSON.parse(h.run("localStorage.getItem(MetaProgress.STORAGE_KEY)"));
+  t.eq(stored.owned.length, owned.length,
+    "and unlocking the roster writes every tower down too — it did not, and a " +
+    "reload took them all back");
+  t.eq(stored.equipped.filter(Boolean).length,
+    Math.min(owned.length, h.game.MetaProgress.SLOT_COUNT),
+    "with the build bar it filled");
+
+  h.run("localStorage = undefined");
+});
+
 test("the pips beside a tower read its loadout, not its level", function (t) {
   var h = bootContent();
 

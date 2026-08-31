@@ -13,6 +13,23 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-31 — Buy all towers, and the roster unlock is finally written down.**
+
+The cheat panel's "Unlock all towers" is "Buy all towers" now -- buying is what
+the armoury calls it and paying is the only thing the button skips -- and
+`MetaProgress.unlockAll` SAVES.
+
+It was the one mutator in js/meta.js that changed the profile without writing it
+down. Nothing noticed while the test harness was its only caller, because Node
+has no localStorage and the harness profile dies with the process either way;
+the panel calls it too, and there a profile that owned every tower until the
+page was reloaded is a profile that lies.
+
+The test measures that through a REAL store rather than by trusting the call:
+`localStorage` does not exist in the harness, so one is handed to the game's own
+scope and the bytes the model wrote are read back. Verified failing on the old
+code first -- six towers owned in memory, one on disk.
+
 **2026-08-31 — Reset save, and it undoes the session as well as the profile.**
 
 The cheat panel's "Wipe profile" is "Reset save" now, and it does the job the

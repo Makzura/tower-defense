@@ -160,7 +160,7 @@ baseline:
 
 ```
 node tests/run.js                 237 pass / 0 fail   core game, schedules, difficulty
-node tests/content.test.js        438 pass / 0 fail   content, visuals and index
+node tests/content.test.js        439 pass / 0 fail   content, visuals and index
 node tests/long-range-dps.test.js 74 pass / 0 fail   the Longshot spec
 node tests/beam.test.js           47 pass / 0 fail   the beam acceptance list
 node tests/blub.test.js            53 pass / 0 fail   the Summoner acceptance list
@@ -4916,10 +4916,18 @@ something each node has to be careful about.
 
 A DOM panel on the shipping page (opened with the key left of "1", or F8, or the
 dim corner chip) that grants coins, sets levels 0–5, buys or clears a whole
-tree, clears reset cooldowns, fills or empties perk loadouts, unlocks the
-roster, **resets the save**, and — during a run — grants mana, closes the wave
+tree, clears reset cooldowns, fills or empties perk loadouts, **buys the whole
+roster**, **resets the save**, and — during a run — grants mana, closes the wave
 through `endWave` so it pays its real xp, and heals the base. It also prints the
 one thing no screen shows: the wave's xp budget and the live investment split.
+
+**`unlockAll` SAVES since 2026-08-31**, and it was the one mutator in
+js/meta.js that changed the profile without writing it down. Nothing noticed
+while the test harness was its only caller — Node has no localStorage, so the
+harness profile dies with the process either way — but the panel calls it too,
+and a profile that owned everything until the page was reloaded is a profile
+that lies. The panel's button says **Buy all towers**, because buying is what
+the armoury calls it and paying is the only thing this skips.
 
 **RESET SAVE IS MORE THAN `MetaProgress.reset()`** (2026-08-31). The profile is
 only half of what a save-reset has to undo: a player wiping one mid-run is

@@ -892,7 +892,12 @@ var BASELINE = [
     // 437 -> 438: one added. The five pips beside a tower in the Upgrades list
     // read the LOADOUT rather than the level -- solid, outlined or barred --
     // which is what they had always looked like and never were.
-    file: "tests/content.test.js", pass: 438, fail: 0,
+    // ---- 439 on 2026-08-31, the roster cheat -----------------------------
+    // 438 -> 439: one added. `MetaProgress.unlockAll` was the one mutator in
+    // js/meta.js that changed the profile without saving it, and the new name
+    // measures the claim through a real store handed to the game's own scope
+    // rather than by trusting the call. Verified failing on the old code first.
+    file: "tests/content.test.js", pass: 439, fail: 0,
     failing: []
   },
   {
