@@ -595,16 +595,25 @@ var EASY_WAVES = [
     { at: 2.5, count: 5,  interval: 0.9,  type: "shielded", health: 16 },
     { at: 6,   count: 7,  interval: 0.25, type: "fast", health: 10 }
   ] },
-  // 20, THE BRUTE'S INTRODUCTION, and the wave the whole introduction order is
-  // built around: a gunner does nothing to it, so a board without a Longshot
-  // has no answer at all. Four bodies five seconds apart rather than four at
-  // 2.5 -- the question is asked four separate times, which is what makes it a
-  // check the player can still fail slowly instead of all at once.
-  { duration: 55, groups: [                                       // 300 HP  first flat armor -- PURE
-    { at: 0,  count: 1, interval: 2.5, type: "brute", health: 75 },
-    { at: 5,  count: 1, interval: 2.5, type: "brute", health: 75 },
-    { at: 10, count: 1, interval: 2.5, type: "brute", health: 75 },
-    { at: 15, count: 1, interval: 2.5, type: "brute", health: 75 }
+  // 20 WAS THE BRUTE'S INTRODUCTION AND IS NOW THE ANGRY'S PURE WAVE
+  // (2026-08-30, at the owner's instruction: the first Brutes appear three
+  // waves later on Easy). The Brutes traded places with wave 23's Angry group
+  // -- see the note there -- and the trade is exact: the same counts, the same
+  // healths, the same arrival times, only the type string moved. Both waves
+  // keep their total effective health to the point, so nothing downstream that
+  // reads `waveEffectiveHealth` moves at all.
+  //
+  // THE WAVE'S SHAPE IS THE SAME QUESTION ASKED OF A DIFFERENT CREATURE. Four
+  // bodies five seconds apart rather than four at 2.5 -- asked four separate
+  // times, which is what makes it a check the player can fail slowly instead of
+  // all at once. It was "a gunner does nothing to armour"; it is now "these
+  // ones hit back", and the Angry has been on the board since wave 13, so
+  // nothing is being introduced early by the swap.
+  { duration: 55, groups: [                                       // 300 HP  four that hit back -- PURE
+    { at: 0,  count: 1, interval: 2.5, type: "angry", health: 75 },
+    { at: 5,  count: 1, interval: 2.5, type: "angry", health: 75 },
+    { at: 10, count: 1, interval: 2.5, type: "angry", health: 75 },
+    { at: 15, count: 1, interval: 2.5, type: "angry", health: 75 }
   ] },
   { duration: 58, groups: [                                       // 312 HP  first second wind -- PURE
     { at: 0,  count: 2, interval: 0.8, type: "revenant", health: 26 },
@@ -637,7 +646,10 @@ var EASY_WAVES = [
   // was always meant to mean.
   { duration: 62, groups: [                                       // 652 HP  old 12 + company
     { at: 0,   count: 12, interval: 0.4,  type: "fast", health: 18 },
-    { at: 1.6, count: 4,  interval: 2.2,  type: "brute", health: 85 },
+    // Traded with wave 25's Armored group on 2026-08-30, same count and health.
+    // Wave 22 held the SECOND Brute appearance, and leaving it would have made
+    // wave 22 the first -- two waves later rather than the three asked for.
+    { at: 1.6, count: 4,  interval: 2.2,  type: "armored", health: 85 },
     { at: 3,   count: 20, interval: 0.15, type: "swarm", health: 4 },
     // 16 points, arriving alone at 11 s -- 2.8 s after the last Brute and
     // 5.1 s after the last speck, which is the beat this group was placed on
@@ -649,7 +661,11 @@ var EASY_WAVES = [
   ] },
   { duration: 65, groups: [                                       // 760 HP  old 13 + company
     { at: 0,   count: 14, interval: 0.7, type: "slow", health: 26 },
-    { at: 2.5, count: 6,  interval: 1.4, type: "angry", health: 30 },
+    // THE BRUTE'S INTRODUCTION, moved here from wave 20 on 2026-08-30. Six at
+    // 30 rather than four at 75 -- the group it traded places with, kept at its
+    // own count and health so this wave's total does not move either. The
+    // lesson is unchanged: 5 flat armour, and a gunner does nothing to it.
+    { at: 2.5, count: 6,  interval: 1.4, type: "brute", health: 30 },
     { at: 5,   count: 4,  interval: 1.4, type: "shielded", health: 18 }
   ] },
 
@@ -696,10 +712,11 @@ var EASY_WAVES = [
   // entrance was the sum of every interval and lead above it, so re-timing any
   // group in this wave silently moved it. `at: 15` is the one number that
   // decides it.
-  { duration: 78, groups: [                                       // 784 HP
+  { duration: 78, groups: [                                       // 984 HP
     { at: 0,  count: 20, interval: 0.45, health: 22 },
     { at: 2,  count: 5,  interval: 0.9,  type: "shielded", health: 20 },
-    { at: 4,  count: 10, interval: 0.7,  type: "armored", health: 18 },
+    // Traded with wave 22's Brute group, same count and health -- see there.
+    { at: 4,  count: 10, interval: 0.7,  type: "brute", health: 18 },
     { at: 15, count: 1,  interval: 1,    type: "slow", health: 64 }
   ] },
   { duration: 75, groups: [                                       // 440 HP  first spawner -- its BROOD is the cost
@@ -1130,10 +1147,15 @@ var NORMAL_WAVES = [
   { duration: 60, groups: [                                       // 432 HP
     { at: 0,   count: 7, interval: 0.35, type: "fast",     health: 5 },
     { at: 1.5, count: 3, interval: 1.2,  type: "shielded", health: 14 },
-    { at: 5,   count: 1, interval: 2,    type: "brute",    health: 55 },
+    // THE BRUTES LEFT THIS WAVE ON 2026-08-30, four waves later at the owner's
+    // instruction, trading places with wave 14's two Armored groups. Same
+    // counts, same healths, same arrival times on both sides -- only the type
+    // moved -- so wave 10 and wave 14 each keep their total effective health
+    // exactly.
+    { at: 5,   count: 1, interval: 2,    type: "armored",  health: 55 },
     { at: 7,   count: 7, interval: 0.35, type: "fast",     health: 5 },
     { at: 9,   count: 3, interval: 1.2,  type: "shielded", health: 14 },
-    { at: 12,  count: 1, interval: 2,    type: "brute",    health: 55 }
+    { at: 12,  count: 1, interval: 2,    type: "armored",  health: 55 }
   ] },
   // --- 11: THE AERIAL WARNING. Three Wisps, and a wall of ground. --------
   //
@@ -1196,11 +1218,13 @@ var NORMAL_WAVES = [
   // board has.
   { duration: 61, groups: [                                       // 662 HP
     { at: 0,   count: 8, interval: 0.3, type: "fast",         health: 7 },
-    { at: 1.5, count: 5, interval: 0.7, type: "armored",      health: 10 },
+    // THE BRUTE'S INTRODUCTION on Normal, moved here from wave 10 -- the group
+    // it traded places with, at its own count and health.
+    { at: 1.5, count: 5, interval: 0.7, type: "brute",        health: 10 },
     { at: 3,   count: 1, interval: 3,   type: "shieldbearer", health: 100 },
     { at: 5,   count: 1, interval: 1,   type: "midboss" },
     { at: 8,   count: 8, interval: 0.3, type: "fast",         health: 7 },
-    { at: 9.5, count: 5, interval: 0.7, type: "armored",      health: 10 },
+    { at: 9.5, count: 5, interval: 0.7, type: "brute",        health: 10 },
     { at: 12,  count: 1, interval: 3,   type: "shieldbearer", health: 100 }
   ] },
 

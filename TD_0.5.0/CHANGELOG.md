@@ -13,6 +13,45 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-08-30 — The Brute arrives three waves later on Easy, four on Normal.**
+
+The owner's instruction, and the swap it asked for. First Brute: Easy wave 20 →
+**23**, Normal wave 10 → **14**.
+
+**The swap is a type string and nothing else.** Every group kept its count, its
+health, its `at` and its interval, and the type moved in BOTH directions between
+the paired waves — so each touched wave keeps its body count, its arrival
+pattern and its effective health exactly. Campaign totals unmoved: Easy 25 939,
+Normal 131 595; ratings 1.0000 and 1.4997.
+
+Easy 20 ⟷ 23 traded Brute for Angry at their own healths (four at 75 out, six at
+30 in). Easy 22 ⟷ 25 traded Brute for Armored (four at 85 out, ten at 18 in).
+Normal 10 ⟷ 14 traded Brute for Armored (two at 55 out, two groups of five at 10
+in).
+
+**Easy's wave 22 had to move as well**, and that is the instruction applied
+consistently rather than a second decision: it held the SECOND Brute appearance,
+so moving only wave 20 would have made 22 the first — two waves later, not the
+three asked for.
+
+**Neither partner is introduced early.** The Angry debuts on Easy at 13 and the
+Armored at 9; on Normal the Armored debuts at 4. Everything moved backwards was
+already on the board.
+
+**Eight dollars is the entire economic footprint.** A bounty is priced off the
+TYPE row, so Easy's wave 20 pays $20 more as Angry and wave 23 $12 less as
+Brute: kill bounty $23 132 → **$23 140**, purse $35 831 → **$35 839**, +0.02%.
+Effective health cannot move at all — `waveEffectiveHealth` reads count ×
+health × shield × revive and none of the three types carries a shield or a
+revive — which is why the difficulty ratings did not budge.
+
+Five pinned tables were updated for it, all of them correctly detecting a real
+change: the pre-rewrite composition snapshot, Normal's authored table, the two
+purse totals and wave 22's timing test (whose claims are all about WHEN four
+bodies arrive, and those four bodies are Armored now rather than Brutes). A
+stale `// 784 HP` comment on Easy wave 25 was corrected to the measured 984 —
+it was wrong before this change too.
+
 **2026-08-30 — The sniper aims at the body, not at the road under it.**
 
 The owner, on the Skimmer: *"they can't be touched, the towers don't know what

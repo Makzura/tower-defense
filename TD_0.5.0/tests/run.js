@@ -375,24 +375,30 @@ function (t) {
       "shielded | hp=16 | <no-tier>": 5,
       "fast | hp=10 | <no-tier>": 14
     }],
-    [20,   4,   300,   30,   300, { "brute | hp=75 | <no-tier>": 4 }],
+    // 20 AND 23 TRADED TYPES ON 2026-08-30 (the first Brutes move three waves
+    // later on Easy). Bodies, effective HP and the clear bonus are untouched on
+    // both -- the swap kept every count and health -- and only the KILL column
+    // moves, because a bounty is priced off the type row: +$20 here, -$12 on
+    // 23, +$8 across the campaign.
+    [20,   4,   300,   30,   320, { "angry | hp=75 | <no-tier>": 4 }],
     [21,   6,   312,   31,   198, { "revenant | hp=26 | <no-tier>": 6 }],
     [22,  37,   652,   65,   755, {
       "fast | hp=18 | <no-tier>": 12,
-      "brute | hp=85 | <no-tier>": 4,
+      // Traded with wave 25 the same day, so no Brute is left before 23.
+      "armored | hp=85 | <no-tier>": 4,
       "swarm | hp=4 | <no-tier>": 20,
       "slow | hp=16 | <no-tier>": 1
     }],
-    [23,  24,   760,   76,   578, {
+    [23,  24,   760,   76,   566, {
       "slow | hp=26 | <no-tier>": 14,
-      "angry | hp=30 | <no-tier>": 6,
+      "brute | hp=30 | <no-tier>": 6,
       "shielded | hp=18 | <no-tier>": 4
     }],
     [24,  10,    90,    9,    90, { "flying | hp=9 | <no-tier>": 10 }],
     [25,  36,   984,   98,   731, {
       "<default-normal> | hp=22 | <no-tier>": 20,
       "shielded | hp=20 | <no-tier>": 5,
-      "armored | hp=18 | <no-tier>": 10,
+      "brute | hp=18 | <no-tier>": 10,
       "slow | hp=64 | <no-tier>": 1
     }],
     [26,   2,   440,   44,   514, { "hive | hp=220 | <no-tier>": 2 }],
@@ -537,14 +543,19 @@ function (t) {
   t.eq(totals.health, 25939, "and the table agrees");
   t.eq(live.clear, 2594, "$2594 of clear bounty");
   t.eq(totals.clear, 2594, "and the table agrees");
-  t.eq(totals.kill, 23132, "$23 132 priced off the type rows");
+  // $23 140 SINCE 2026-08-30, from $23 132. The Brute swap moved the KILL
+  // column and nothing else: bodies, effective HP and the clear bonus are
+  // untouched because every count and health stayed put, but a bounty is
+  // priced off the TYPE row, so wave 20 pays $20 more as Angry and wave 23
+  // pays $12 less as Brute. Eight dollars across a 35-wave campaign.
+  t.eq(totals.kill, 23140, "$23 140 priced off the type rows");
   // The game's own pricing over the same bodies. The two used to differ by
   // $666 -- Enemy.bountyOf resolves a Fractal Slime's TIER, which the type-row
   // sum above cannot see -- and since 2026-08-29 the campaign schedules no
   // fractal at all, so every body it prices is priced off its own health and
   // the two formulas land on one number. They must still be asserted apart:
   // the day a tiered body is scheduled again, this is the pair that shows it.
-  t.eq(live.kill, 23132, "and the same $23 132 through Enemy.bountyOf");
+  t.eq(live.kill, 23140, "and the same $23 140 through Enemy.bountyOf");
 
   // --- the roster rules the schedule is built around ----------------------
   //
@@ -1096,17 +1107,22 @@ function (t) {
     var mine = ev.filter(function (e) { return e.groupIndex === index; });
     return { from: mine[0].time, to: mine[mine.length - 1].time, n: mine.length };
   }
-  var fast = windowOf(0), brute = windowOf(1), swarm = windowOf(2), slime = windowOf(3);
-  t.deep([fast.n, brute.n, swarm.n, slime.n], [12, 4, 20, 1],
-    "twelve Fast, four Brutes, twenty Swarm and one slime");
+  // GROUP 1 IS ARMORED SINCE 2026-08-30, not Brute: wave 22 traded its Brute
+  // group with wave 25's so that no Brute appears before wave 23. The count,
+  // the health, the `at` and the interval are all unchanged, so every timing
+  // claim below is the same claim about the same four bodies -- which is what
+  // this test has always been about.
+  var fast = windowOf(0), heavy = windowOf(1), swarm = windowOf(2), slime = windowOf(3);
+  t.deep([fast.n, heavy.n, swarm.n, slime.n], [12, 4, 20, 1],
+    "twelve Fast, four Armored, twenty Swarm and one slime");
   t.near(fast.to, 4.4, 1e-9, "the Fast salvo is out by 4.40 s");
-  t.near(brute.to, 8.2, 1e-9, "the Brutes take until 8.20 s");
+  t.near(heavy.to, 8.2, 1e-9, "the Armored take until 8.20 s");
   t.near(swarm.to, 5.85, 1e-9, "the Swarm until 5.85 s");
   t.eq(slime.from, 11, "and the T2 slime lands at 11.00 s");
 
   function overlaps(a, b) { return a.from <= b.to && b.from <= a.to; }
-  t.ok(overlaps(fast, brute), "the Fast salvo is still arriving when the Brutes start");
-  t.ok(overlaps(brute, swarm), "and the Brutes when the Swarm starts");
+  t.ok(overlaps(fast, heavy), "the Fast salvo is still arriving when the Armored start");
+  t.ok(overlaps(heavy, swarm), "and the Armored when the Swarm starts");
   t.ok(overlaps(fast, swarm), "and all three windows share ground");
   t.notOk(overlaps(swarm, slime), "the slime alone waits for the rest to finish");
 
@@ -1131,7 +1147,7 @@ function (t) {
     live[id] = (live[id] || 0) + 1;
   });
   t.eq(live.fast, 12, "twelve Fast on the road at 4.40 s");
-  t.eq(live.brute, 2, "two of the four Brutes, on their own 2.2 s spacing");
+  t.eq(live.armored, 2, "two of the four Armored, on their own 2.2 s spacing");
   t.eq(live.swarm, 10, "and ten Swarm, from a group that opened after both");
 
   // WAVE 30, GROUPS 6 AND 7, BOTH AUTHORED AT 7.00 s. Two groups do not merely
@@ -2299,7 +2315,8 @@ test("Easy is untouched: thirty-five waves and 830 authored enemies", function (
   // root was replaced point for point -- and this rose $145 anyway, because
   // the four types that replaced them are ordinary bodies at $1 a point where
   // a slime was written at $0.50.
-  t.eq(kill, 23132, "$23 132 of kill bounty");
+  t.eq(kill, 23140, "$23 140 of kill bounty (was 23 132 before the " +
+    "2026-08-30 Brute swap moved wave 20 and wave 23's types)");
   t.eq(h.game.WAVES, E, "and Easy is what a fresh boot plays");
 
   // The three v0.5.1 types are deliberately absent from it. Easy gaining one
@@ -2335,11 +2352,14 @@ var NORMAL_TABLE = [
   [ 7, { armored: 10, slow: 12, swarm: 12 }],
   [ 8, { angry: 8, normal: 14 }],
   [ 9, { camo_normal: 8, camo_fast: 8 }],
-  [10, { shielded: 6, brute: 2, fast: 14 }],
+  // 10 AND 14 TRADED TYPES ON 2026-08-30: the first Brutes appear four waves
+  // later on Normal. Both waves keep their body count and their effective
+  // health exactly -- the swap moved the type string and nothing else.
+  [10, { shielded: 6, armored: 2, fast: 14 }],
   [11, { shieldbearer: 1, armored: 14, fast: 12, flying: 3 }],
   [12, { herald: 2, shielded: 6, swarm: 20 }],
   [13, { sapper: 3, normal: 16, angry: 8 }],
-  [14, { midboss: 1, shieldbearer: 2, armored: 10, fast: 16 }],
+  [14, { midboss: 1, shieldbearer: 2, brute: 10, fast: 16 }],
   [15, { brute: 4, revenant: 8, fast: 10 }],
   [16, { hive: 2, swarm: 20, herald: 2, flying: 10 }],
   [17, { fractal_slime: 2, armored: 16, swarm: 16 }],
@@ -5939,7 +5959,7 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   // ordinary bodies at $1 a point where a slime was $0.50. The conditional
   // $3 188 the cascades used to pay is gone with them: what a board earns for
   // clearing wave 35 is now what this line says it is.
-  t.eq(killIncome, 23132, "scheduled kill bounties");
+  t.eq(killIncome, 23140, "scheduled kill bounties");
   var progressionIncome = 0;
   var escalatingIncome = 0;
   for (var waveNumber = 1; waveNumber <= h.game.WAVES.length; waveNumber++) {
@@ -5959,7 +5979,11 @@ test("wave arithmetic records the incoming burst and total health", function (t)
   // the kill money only, since the substitution matched every root's health and
   // the clear bonus is a tenth of health. The conditional $3 188 the cascades
   // used to pay was never in an AUTHORED purse and must not be added to one.
-  t.eq(purse, 35831, "authored run purse before conditional rewards");
+  // $35 839 SINCE 2026-08-30, from $35 831: the Brute swap moved $8 of kill
+  // bounty and nothing else in this sum -- the clear bounties, the redistributed
+  // $5000, the allowance and the stake are all wave-NUMBER rewards and do not
+  // move with a schedule's composition at all.
+  t.eq(purse, 35839, "authored run purse before conditional rewards");
   var dearest = h.game.BUILD_SLOTS.reduce(function (max, type) {
     return type && type.COST > max ? type.COST : max;
   }, 0);

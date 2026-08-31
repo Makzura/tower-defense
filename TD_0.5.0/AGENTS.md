@@ -1179,7 +1179,7 @@ test is what you update, in the same change, with the reason.
 so it is not `waveKillBounty`.** They read $22 321 and $22 987 while Easy's
 fractal ladder was scheduled; the $666 gap was the six roots, whose tiers only
 `Enemy.bountyOf` can see. Since 2026-08-29 nothing in EASY carries a tier, so
-over that schedule both formulas land on **$23 132**. Both totals are still
+over that schedule both formulas land on **$23 140**. Both totals are still
 pinned apart, deliberately: the day a tiered body is scheduled into Easy again,
 that pair is what shows it. (Normal still carries five tiered groups, and its
 own gate prices them.)
@@ -1643,7 +1643,7 @@ two more numbers matter:
   group — `waveEffectiveHealth` in game.js is the one implementation, and the
   clear bounty reads the same function. **This is NOT the run's purse** — a
   shield is counted here and pays nothing, so effective HP (25 939) and
-  scheduled kill bounties ($23 132) are different quantities and always will
+  scheduled kill bounties ($23 140) are different quantities and always will
   be. A THIRD gap sat beside that one from 2026-08-20 to 2026-08-29 — a Fractal
   Slime's cascade is death-born, so neither figure counted the 6 376 points the
   six scheduled roots turned into or the $3 188 they paid on the way — and it
@@ -1777,8 +1777,8 @@ The full table with per-wave HP is a comment on `WAVES` itself;
 `THE_COMPANY/tools/balance/`, so a clone of this repo cannot reproduce it.**
 
 **The schedule's length is an ECONOMY constraint, not just a difficulty one.**
-Scheduled kill bounties are the bulk of the run's lifetime purse ($23 132 of
-$35 831 all in — see the table in the economy section).
+Scheduled kill bounties are the bulk of the run's lifetime purse ($23 140 of
+$35 839 all in — see the table in the economy section).
 At the old 454 HP the $800 Siphon was unbuyable — it would have sat in
 the build bar permanently greyed out, which is not meaningfully different from
 not shipping it. A test pins `purse > dearest tower × 2`; if a tower is ever
@@ -1968,6 +1968,55 @@ reason about.
 
 ---
 
+## The Brute arrives later, and pays for it with a swap (2026-08-30)
+
+The owner's instruction: *"make it so that the first brutes appear 3 waves later
+in easy and 4 waves later in normal mode, swap them with same total hp other
+type of ennemi from their new waves."*
+
+| | first Brute was | is now |
+|---|---:|---:|
+| Easy | wave 20 | **wave 23** |
+| Normal | wave 10 | **wave 14** |
+
+**THE SWAP IS A TYPE STRING AND NOTHING ELSE.** Every group kept its `count`,
+its `health`, its `at` and its `interval`; only `type` moved, and it moved in
+BOTH directions between the two waves. So each touched wave keeps its body
+count, its arrival pattern and its effective health **exactly**, and the
+campaign totals are untouched: Easy 25 939, Normal 131 595, ratings 1.00 and
+1.50.
+
+- **Easy 20 ⟷ 23**: the four Brutes at 75 became four Angry at 75; wave 23's
+  six Angry at 30 became six Brutes at 30.
+- **Easy 22 ⟷ 25**: four Brutes at 85 became four Armored at 85; wave 25's ten
+  Armored at 18 became ten Brutes at 18.
+- **Normal 10 ⟷ 14**: two Brutes at 55 became two Armored at 55; wave 14's two
+  groups of five Armored at 10 became five Brutes at 10.
+
+**WAVE 22 HAD TO MOVE TOO, and that is not scope creep.** Easy's second Brute
+appearance was wave 22, so moving only wave 20 would have made 22 the first —
+two waves later, not the three asked for. It moved by the same +3, which is the
+instruction applied consistently rather than a second decision.
+
+**Neither partner is introduced early by the trade.** The Angry debuts on Easy
+at wave 13 and the Armored at wave 9; on Normal the Armored debuts at wave 4.
+Every type moved backwards was already on the board.
+
+**THE ONE FIGURE THAT MOVED IS $8.** A bounty is priced off the TYPE row, so
+Easy's wave 20 pays $20 more as Angry and wave 23 pays $12 less as Brute. The
+campaign's kill bounty is **$23 140** (was $23 132) and its purse **$35 839**
+(was $35 831) — +0.02%. Nothing else in the economy is composition-dependent:
+the clear bounties are a tenth of health, and the redistributed $5000, the
+rising allowance and the stake are all wave-NUMBER rewards.
+
+Effective health is untouched because `waveEffectiveHealth` reads count ×
+health × shield × revive, and none of Brute, Angry or Armored carries a shield
+or a revive. What DOES change is the character of those waves: Easy 20 was a
+pure armour check and is now four bodies that hit back, and the Brute's
+introduction is now six small ones rather than four large.
+
+---
+
 ## The Tyrant — Easy's wave-35 boss, and three of it in Normal's wave 39
 
 **IT IS NO LONGER "THE WAVE 35 BOSS" AND THIS HEADING SAID SO UNTIL 2026-08-28.**
@@ -2127,7 +2176,7 @@ fraction is 0.1. About **$2 594** across the schedule.
 
 **The bounty is a tenth of the wave's HP, not a tenth of its cash value** — HP
 and cash are now separate quantities entirely, since a body's bounty prices its
-whole threat rather than its hit points. Against the $35 831 lifetime purse the
+whole threat rather than its hit points. Against the $35 839 lifetime purse the
 clear bonus is about **7%**. Two further rewards ride on the same payout since
 2026-07-31 — the redistributed $5000 and the rising $50 + $5-per-wave allowance
 — and `waveReward()` is where the three are summed. If it is meant to stay a tenth of
@@ -2980,9 +3029,9 @@ The current authored purse is:
 | Easy starting stake | $600 |
 | progression rewards, waves 1–34 | $5 000 |
 | escalating wave allowance, waves 1–34 | $4 505 |
-| scheduled kill bounties | $23 132 |
+| scheduled kill bounties | $23 140 |
 | wave-clear bonuses | $2 594 |
-| **authored total** | **$35 831** |
+| **authored total** | **$35 839** |
 
 The total excludes conditional boss summons, a Hive's brood and the Siphon's A3
 charge bonus. It was $23 438 / $2 590 / $36 133 until the tier ladder was
@@ -3872,7 +3921,7 @@ A test pins both of those zeros.
 **`relief` is capped at `boardCeiling()`** — the five cheapest towers fully
 built, about 128 000 mana — because five slots and a tier-5 cap mean a purse
 past that buys nothing. **It does not bind today** (Easy's whole purse is
-35 831 and Normal's 100 480, so both are still money-limited and `relief` is
+35 839 and Normal's 100 480, so both are still money-limited and `relief` is
 the plain purse ratio) and it is there for the campaign that is not. A table it
 cannot read gives `Infinity`, which is no cap, which is the behaviour of not
 having written it.
@@ -4790,12 +4839,14 @@ on an Enemy is the same idea at the instance level.
    with `bounty` equal to `health`, and nothing enforces that; `Enemy.bountyOf`
    scales bounty with a wave's `health` override, so the ratio survives an
    override but would not survive a retune of either field. Across the whole
-   schedule the ratio is 0.8918, and per type — **each type at its own BASE
+   schedule the ratio is 0.8921, and per type — **each type at its own BASE
    health, which is a property of `Enemy.TYPES` and not of the schedule** — it
    runs 0.4545 (`colossus`) to 1.5 (`fast`, `camo_fast`, `camo_heavy`).
 
    **The denominator is EFFECTIVE HP — what you must actually remove — and
-   naming it is load-bearing.** 0.8918 is `23 132 / 25 939`. (0.9050 =
+   naming it is load-bearing.** 0.8921 is `23 140 / 25 939` (0.8918 =
+   `23 132 / 25 939` until 2026-08-30, when the Brute swap moved $8 of kill
+   bounty and not one point of health). (0.9050 =
    `23 438 / 25 898` until 2026-08-20, when the fractal ladder was scheduled:
    it fell to 0.8862 because a Fractal Slime pays $0.50 a point where an
    ordinary body pays $1, and the cash came back from the generations, which no
@@ -6199,7 +6250,7 @@ being precise about what moved:
   retuned group carries a shield. **This bullet used to read "$4 092 off a
   $42 443 purse, a 10% pay cut", and that was damage-era arithmetic end to
   end**: $4 092 was `CASH_PER_DAMAGE` × a then-current shield total, and
-  $42 443 was the 2026-07-30 purse against a current authored $35 831. Nobody has asked for the
+  $42 443 was the 2026-07-30 purse against a current authored $35 839. Nobody has asked for the
   schedule or the prices to move in compensation and neither was touched.
 
 **HEALED HEALTH PAYS NOTHING EITHER**, for the same reason and by the same
@@ -9940,7 +9991,7 @@ no mechanic was moved to match the description.
 | Cash per damage | **gone since 2026-07-31.** Damage pays nothing | — |
 | Redistributed opening cash | $5000 across waves 1-34 (+$148 on 1-2, +$147 on 3-34) | `WAVE_PROGRESSION_REWARD_TOTAL`, `waveProgressionReward` |
 | Rising wave allowance | $50 on wave 1, +$5 per wave, $215 on wave 34, $4505 total | `WAVE_ESCALATING_REWARD_BASE`, `WAVE_ESCALATING_REWARD_STEP` |
-| Easy run purse | $35 831 = $23 132 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
+| Easy run purse | $35 839 = $23 140 kill bounties + $2 594 clear bounties + $5 000 redistributed + $4 505 allowance + $600 stake. The last three are wave-NUMBER-only and do not move with the schedule; $9 505 of that is the wave-number rewards, $10 105 including the stake | asserted in `tests/run.js` |
 | Sell refund | half, rounded up | `SELL_REFUND_FRACTION` |
 | Summoner | $450, 100 HP, 75 u.l. range, 25 u.l. footprint; plants a Blub I every 20 s and never fires itself | `BlubTower` in js/blub.js |
 | Summoner full A | $52 100 all in, 5 550 tower HP, 250 u.l. range; three summon lines and Coagulation | `BlubTower.UPGRADES` |

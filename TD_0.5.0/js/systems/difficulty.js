@@ -215,7 +215,7 @@ var Difficulty = (function () {
   // are the prices a player actually pays.
   //
   // IT DOES NOT BIND TODAY and that is worth knowing rather than hiding: the
-  // cheapest full board is about 128 000 mana, Easy's whole purse is 35 831 and
+  // cheapest full board is about 128 000 mana, Easy's whole purse is 35 839 and
   // Normal's is 100 480, so both campaigns are still money-limited and `relief`
   // is the plain purse ratio. The cap is here for the campaign that is not.
   //
