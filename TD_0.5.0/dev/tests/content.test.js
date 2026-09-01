@@ -16032,6 +16032,27 @@ test("the tree screen places, hits and frames every square", function (t) {
   t.deep(lostPerks, [], "and every permanent upgrade still takes its own click");
 
   // A RECENTRE FRAMES THE WHOLE TREE, squares included.
+  //
+  // ON EVERY TREE IN THE GAME, and the Player's is what forced the camera's
+  // floor down: sixty-two nodes need 0.26 and the floor was 0.45, so a recentre
+  // showed about half of it with no way to see the rest at once.
+  var unframed = h.run("(function () {" +
+    "  var out = [];" +
+    "  var ids = TowerPerks.towersWithTrees().concat(['player']);" +
+    "  ids.forEach(function (id) {" +
+    "    Upgrades.open(); Upgrades.selectTower(id); Upgrades.openTree();" +
+    "    var all = (id === 'player')" +
+    "      ? PlayerPerks.modules().concat(PlayerPerks.upgrades2())" +
+    "      : TowerPerks.nodes(id).concat(TowerPerks.upgrades2(id));" +
+    "    var b = Upgrades.boardRect();" +
+    "    all.forEach(function (n) {" +
+    "      var p = Upgrades.nodeScreenPoint(n);" +
+    "      if (p.x < b.x || p.x > b.x + b.w || p.y < b.y || p.y > b.y + b.h)" +
+    "        out.push(id + '/' + n.id); }); });" +
+    "  return out; })()");
+  t.deep(unframed, [], "a recentre frames every node of every tree in the game");
+  h.run("Upgrades.open(); Upgrades.selectTower('soldier'); Upgrades.openTree()");
+
   var framed = h.run("(function () {" +
     "  var all = TowerPerks.nodes('soldier').concat(TowerPerks.upgrades2('soldier'));" +
     "  var b = Upgrades.boardRect(), out = [];" +

@@ -127,7 +127,17 @@ var Upgrades = (function () {
   // on, at two thirds the radius, so the spine of the tree stays the twelve
   // permanent upgrades and the satellites read as belonging to them.
   var SQUARE_R = 20;
-  var MIN_ZOOM = 0.45;
+  // HOW FAR OUT THE CAMERA MAY GO, and it is set by the BIGGEST tree rather
+  // than by taste (2026-09-01). It was 0.45, which was ample for a twelve-node
+  // tower tree and too tight for the Player's sixty-two: framing that one needs
+  // 0.26, so a recentre clamped at 0.45 and showed about half of it, with no
+  // way to see the rest at once.
+  //
+  // 0.2 rather than 0.26, so a tree half again as large as the Player's still
+  // fits without this number being revisited. `centreView` never zooms out
+  // further than the tree actually needs, so nothing reaches the floor unless
+  // it has to.
+  var MIN_ZOOM = 0.2;
   var MAX_ZOOM = 1.8;
 
   // NAMES ARE DRAWN AT EVERY LEGAL ZOOM (2026-09-01). There was a 0.62 floor
@@ -139,7 +149,17 @@ var Upgrades = (function () {
   // printed not one name. `labelWidth` now clips each name to the room its own
   // row actually has, so overlap is impossible and the floor had nothing left to
   // protect.
-  var LABEL_ZOOM = MIN_ZOOM;
+  // THE SHORTEST NAME WORTH DRAWING, in pixels. Below this a label is an
+  // ellipsis and two letters -- noise over the node it belongs to -- so it comes
+  // off, and the detail card is where the name is read instead.
+  //
+  // IT IS A WIDTH AND NOT A ZOOM (2026-09-01), because width is what the
+  // question is actually about: `labelWidth` already clips a name to the room
+  // its own row has, so the same zoom can be roomy on one tree and cramped on
+  // another. A fixed zoom floor got that wrong in both directions -- it hid
+  // every name on the Rifleman's tree at 0.605 and would have drawn unreadable
+  // stubs all over the Player's at 0.26.
+  var LABEL_MIN_WIDTH = 34;
 
   // HOW WIDE A NAME MAY BE, in pixels at the current zoom.
   //
@@ -642,6 +662,9 @@ var Upgrades = (function () {
     var spanY = (maxY - minY) + margin * 2;
     var fit = Math.min(board.w / spanX, board.h / spanY);
 
+    // FRAME THE WHOLE TREE, down to the camera's floor. Never zooms IN past 1
+    // -- a four-node tree blown up to fill the board looks broken -- and never
+    // out past MIN_ZOOM, which is now low enough that every authored tree fits.
     view.zoom = Math.max(MIN_ZOOM, Math.min(1, fit));
     view.x = (minX + maxX) / 2;
     view.y = (minY + maxY) / 2;
@@ -1957,11 +1980,12 @@ var Upgrades = (function () {
     // of filled and hollow marks says it without any type to read.
     drawRankPips(p, r, info, accent);
 
-    if (view.zoom < LABEL_ZOOM) return;
+    var wide = labelWidth(118);
+    if (wide < LABEL_MIN_WIDTH) return;
     ctx.textAlign = "center";
     ctx.font = "10px system-ui, sans-serif";
     ctx.fillStyle = "rgba(" + ASH_BONE + "," + Math.min(1, alpha + 0.25) + ")";
-    ctx.fillText(fitText(ctx, node.name, labelWidth(118)), p.x, p.y + r + 12);
+    ctx.fillText(fitText(ctx, node.name, wide), p.x, p.y + r + 12);
 
     ctx.font = "9px " + MENU_TECH_FONT;
     if (info.state === "maxed") {
@@ -2061,11 +2085,12 @@ var Upgrades = (function () {
 
     // The name under the node, and the price under that when it is not bought.
     // Hidden when zoomed far out: unreadable type over a big tree is noise.
-    if (view.zoom < LABEL_ZOOM) return;
+    var room = labelWidth(128);
+    if (room < LABEL_MIN_WIDTH) return;
     ctx.textAlign = "center";
     ctx.font = "10px system-ui, sans-serif";
     ctx.fillStyle = "rgba(" + ASH_BONE + "," + Math.min(1, alpha + 0.25) + ")";
-    ctx.fillText(fitText(ctx, node.name, labelWidth(128)), p.x, p.y + r + 12);
+    ctx.fillText(fitText(ctx, node.name, room), p.x, p.y + r + 12);
     if (info.state !== "owned") {
       ctx.font = "9px " + MENU_TECH_FONT;
       ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.7)";
