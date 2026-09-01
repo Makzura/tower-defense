@@ -4811,6 +4811,26 @@ holds an equipped module. The pinned module is lit green in its slot as well, so
 the strip reads as belonging to the module rather than to whichever slot the
 cursor is near.
 
+**A MODULE'S CARD SHOWS ITS LIVE NUMBERS** (2026-09-01). The `blurb` is the
+authored sentence and states the BASE figures, which stop being true the moment
+a square under it is bought — Intendant reads "60 mana less" for the life of the
+profile even at Inventaire catalogué rank 5, where it is 75. So the card also
+prints the RESOLVED line, from the node's own `valueOf(rankOf)`: the same
+authored prose with the live ranks in it.
+
+**Green is "an upgrade moved this number", and nothing else on the card is
+green.** The line is rendered twice — once with the real ranks, once with every
+rank forced to zero — and the WORDS that differ are drawn green. Comparing
+rendered text rather than fields is deliberate: both strings come out of one
+template, so a positional token diff marks exactly the figures that moved and
+needs no map of which field belongs to which phrase. When a `valueOf` changes
+its wording rather than its numbers the token counts do not align and the whole
+line goes green, which is the honest fallback.
+
+`valueOf` is what opts a node in: a tree whose nodes have none is unchanged.
+A test asserts every node with a square under it states one, and that maxing
+its squares really moves the line.
+
 **A MODULE'S CARD SAYS WHAT IMPROVES IT** (2026-09-01). Under the equipped line
 it lists every upgrade² whose parent is that module, with its rank and what it
 is contributing — read from the content file's own `valueAt`, so a retune moves

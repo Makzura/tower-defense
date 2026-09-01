@@ -952,7 +952,15 @@ var BASELINE = [
     // APPLYING marked -- an unbought one is still listed, and is not dimmed for
     // being unbought. The new name asserts the three states (applying, dormant,
     // unbought) are told apart, for a Player module and for a tower's perk.
-    file: "tests/content.test.js", pass: 490, fail: 0,
+    // ---- 491 on 2026-09-01, the card shows LIVE numbers ------------------
+    // 490 -> 491: one added. A module's description printed the authored blurb,
+    // which states the BASE figures and goes on saying so forever -- Intendant
+    // read "60 mana less" at Inventaire rank 5, where it is 75. The card now
+    // also prints the resolved sentence, and the words that differ from the
+    // rank-0 rendering are drawn GREEN. The new name asserts the diff isolates
+    // exactly the figures that moved, that an untouched module greens nothing,
+    // and that every improvable node on either entity states a value at all.
+    file: "tests/content.test.js", pass: 491, fail: 0,
     failing: []
   },
   {

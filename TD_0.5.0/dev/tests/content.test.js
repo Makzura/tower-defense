@@ -16342,6 +16342,66 @@ function (t) {
   t.ok(true, "the card draws with the block on it");
 });
 
+test("a module's card shows its LIVE numbers, and greens the ones an upgrade moved",
+function (t) {
+  var h = bootPlayer();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); MetaProgress.addPlayerXp(20000);" +
+        "MetaProgress.buyModule('player_intendant_diversified_arsenal', 0);" +
+        "MetaProgress.buyModule('player_guardian_bastion_pact', 0);" +
+        "MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
+  h.run("Upgrades.open(); Upgrades.selectTower('player')");
+
+  // WITH NOTHING BOUGHT UNDER IT the line is the base line and nothing is green.
+  var cold = h.run("Upgrades.resolvedLine('player_intendant_diversified_arsenal')");
+  t.ok(cold !== null, "the module states a resolved value");
+  t.eq(cold.changed, false, "nothing has moved it yet");
+  t.deep(cold.green, [], "so no word is green");
+  t.ok(cold.now.indexOf("−60") !== -1, "and it reads the authored 60: " + cold.now);
+
+  // A RANK MOVES IT, AND ONLY THE FIGURES THAT MOVED GO GREEN.
+  setPlayerRanks(h, { player_intendant_catalogued_inventory: 4,
+                      player_intendant_logistics_tolerance: 2 });
+  var warm = h.run("Upgrades.resolvedLine('player_intendant_diversified_arsenal')");
+  t.eq(warm.changed, true, "four ranks of Inventaire and two of Tolérance move it");
+  t.eq(warm.aligned, true, "the sentence keeps its shape, so the diff is per word");
+  t.deep(warm.green, ["−72", "+22"],
+    "and exactly the two figures that moved are green — 60 + 3x4, and 20 + 4 − 2");
+  t.ok(warm.now.indexOf("−72") !== -1 && warm.now.indexOf("+22") !== -1,
+    "the line itself carries the live numbers: " + warm.now);
+
+  // A MODULE WITH NO RANK BOUGHT IS UNTOUCHED, even beside one that is.
+  var other = h.run("Upgrades.resolvedLine('player_guardian_bastion_pact')");
+  t.eq(other.changed, false, "Gardien has no rank under it");
+  t.deep(other.green, [], "so nothing on its card is green");
+
+  // EVERY NODE THAT CAN BE IMPROVED SAYS WHAT IT IS WORTH, on both entities --
+  // a card that could change and does not say so is the thing this is for.
+  var silent = h.run("(function () {" +
+    "  var out = [];" +
+    "  PlayerPerks.modules().forEach(function (m) {" +
+    "    var has = PlayerPerks.upgrades2().some(function (sq) { return sq.parent === m.id; });" +
+    "    if (has && typeof m.valueOf !== 'function') out.push('player/' + m.id); });" +
+    "  TowerPerks.towersWithTrees().forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) {" +
+    "      var has = TowerPerks.upgrades2(id).some(function (sq) { return sq.parent === n.id; });" +
+    "      if (has && typeof n.valueOf !== 'function') out.push(id + '/' + n.id); }); });" +
+    "  return out; })()");
+  t.deep(silent, [], "every improvable node states a resolved value");
+
+  // AND IT REALLY IS DYNAMIC: maxing every square under a node moves its line.
+  var frozen = h.run("(function () {" +
+    "  var out = [];" +
+    "  TowerPerks.nodes('soldier').forEach(function (n) {" +
+    "    if (typeof n.valueOf !== 'function') return;" +
+    "    var base = n.valueOf(function () { return 0; });" +
+    "    var full = n.valueOf(function (id) {" +
+    "      var sq = TowerPerks.upgrade2Of('soldier', id);" +
+    "      return sq ? sq.maxRank : 0; });" +
+    "    if (base === full) out.push(n.id); });" +
+    "  return out; })()");
+  t.deep(frozen, [], "and every one of them changes when its squares are maxed");
+});
+
 test("the Player levels on the wave budget alone, and a defeat keeps it",
 function (t) {
   var h = bootPlayer();

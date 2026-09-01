@@ -13,6 +13,31 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — A module's card shows its live numbers, and greens what moved.**
+
+Owner: make the value shown in a module's description dynamic, and show what an
+upgrade changed by making it green.
+
+The description was the authored `blurb`, which states the BASE figures and goes
+on saying so forever: Intendant read "60 mana less" at Inventaire catalogué rank
+5, where it is 75. The card now also prints a RESOLVED line from the node's own
+`valueOf(rankOf)` -- the same authored prose with the live ranks in it -- and the
+twelve Rifleman perks were given one, so both entities read the same way.
+
+**GREEN IS "AN UPGRADE MOVED THIS NUMBER" AND NOTHING ELSE IS GREEN.** The line
+is rendered twice, once with the real ranks and once with every rank forced to
+zero, and the WORDS that differ are drawn green. Comparing rendered text rather
+than fields is the point: both strings come out of one template, so a positional
+token diff marks exactly the figures that moved and needs no map of which field
+belongs to which phrase -- and a node that grows a new square is covered with
+nothing added to the drawing. Where a `valueOf` changes its wording rather than
+its numbers the tokens do not align and the whole line goes green, which is the
+honest fallback.
+
+Measured on Breach Chamber at Terminal Charge 3 and Soft Feed 2: the line reads
+"the last shot of a completed burst x2.50 · every earlier shot −9%" with exactly
+`x2.50` and `−9%` green, and the prose around them left alone.
+
 **2026-09-01 — A module's card says what improves it.**
 
 Owner: add what upgrades affect a module and how, and do not grey one out for

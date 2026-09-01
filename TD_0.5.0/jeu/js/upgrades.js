@@ -1665,6 +1665,89 @@ var Upgrades = (function () {
   // the module `readingNode` answers -- a hover when nothing is pinned, the
   // pinned one otherwise -- and the BUTTON is drawn only for a pinned one, so
   // moving the cursor over the list cannot arm an action.
+  // --- WHAT THIS MODULE IS WORTH RIGHT NOW -----------------------------------
+  //
+  // A module's `blurb` is the authored sentence and it states the BASE numbers,
+  // which stop being true the moment a square under it is bought: Intendant
+  // reads "60 mana less" for the whole life of the profile even at Inventaire
+  // catalogué rank 5, where it is 75.
+  //
+  // So the card also prints the RESOLVED line, from the content file's own
+  // `valueOf(rankOf)` -- the same authored prose with the live ranks in it. It
+  // is computed twice, once with the real ranks and once with every rank forced
+  // to zero, and **the words that differ between the two are drawn green**.
+  // That is the whole readout: green is "an upgrade moved this number", and
+  // nothing else in the card is green.
+  //
+  // Comparing rendered text rather than fields is deliberate. Both strings come
+  // out of one template with different numbers, so a token-by-token diff marks
+  // exactly the figures that moved and needs no list of which field belongs to
+  // which phrase -- and a node that grows a new square is covered with nothing
+  // added here.
+  function resolvedLine(node) {
+    if (!node || typeof node.valueOf !== "function") return null;
+    var now, base;
+    try {
+      now = String(node.valueOf(function (id) { return E().rankOf(id); }));
+      base = String(node.valueOf(function () { return 0; }));
+    } catch (e) {
+      return null;                       // an author error must not blank a card
+    }
+    return { now: now, base: base, changed: now !== base };
+  }
+
+  // Draw `text`, wrapped, with every word that differs from `base` in green.
+  //
+  // The two strings come from one template, so they tokenise to the same
+  // length and the diff is positional. When they do not -- a `valueOf` that
+  // changes its wording rather than its numbers -- the whole line goes green,
+  // which is the honest fallback: something in it moved.
+  function drawDiffLine(text, base, x, y, width, lh, maxLines, plain) {
+    var words = String(text).split(" ");
+    var was = String(base).split(" ");
+    var aligned = words.length === was.length;
+    var line = [], drawn = 0;
+
+    function flush() {
+      var cx = x;
+      for (var i = 0; i < line.length; i++) {
+        var changed = aligned ? (line[i].was !== line[i].word) : (text !== base);
+        ctx.fillStyle = changed ? "rgba(" + ASH_GO + ",0.95)" : plain;
+        ctx.fillText(line[i].word, cx, y + drawn * lh);
+        cx += ctx.measureText(line[i].word + " ").width;
+      }
+      drawn++;
+      line = [];
+    }
+
+    for (var i = 0; i < words.length && drawn < maxLines; i++) {
+      var next = line.map(function (t) { return t.word; }).concat(words[i]).join(" ");
+      if (ctx.measureText(next).width > width && line.length) flush();
+      if (drawn >= maxLines) break;
+      line.push({ word: words[i], was: aligned ? was[i] : null });
+    }
+    if (line.length && drawn < maxLines) flush();
+    return drawn;
+  }
+
+  // The block, drawn from `y` and answering how far it got. Nothing at all when
+  // the node states no resolved value -- an authored `valueOf` is what opts a
+  // module in, so a tree without them is unchanged.
+  function drawResolvedLine(x, y, width, node, maxLines) {
+    var v = resolvedLine(node);
+    if (!v) return y;
+    ctx.font = "10px " + MENU_TECH_FONT;
+    ctx.fillStyle = v.changed ? "rgba(" + ASH_GO + ",0.9)"
+                              : "rgba(" + ASH_DUST + ",0.8)";
+    drawMenuText(v.changed ? "RIGHT NOW   ·   GREEN IS WHAT AN UPGRADE MOVED"
+                           : "RIGHT NOW   ·   NOTHING HAS MOVED IT", x, y, 1.3);
+    y += 16;
+    ctx.font = "12px system-ui, sans-serif";
+    y += drawDiffLine(v.now, v.base, x, y, width, 16, maxLines || 4,
+      "rgba(" + ASH_BONE + ",0.9)") * 16 + 6;
+    return y;
+  }
+
   // --- WHAT IMPROVES THIS MODULE, AND BY HOW MUCH ----------------------------
   //
   // Every upgrade² whose parent is this node, whether it is bought or not.
@@ -1781,7 +1864,12 @@ var Upgrades = (function () {
     ctx.fillStyle = "rgba(" + ASH_BONE + ",0.9)";
     var lines = wrapLeft(node.blurb || "No description written for this one yet.",
       d.x + 20, y, d.w - 40, 17, 12);
-    y += lines * 17 + 16;
+    y += lines * 17 + 12;
+
+    // AND WHAT IT IS WORTH RIGHT NOW, with the figures an upgrade moved in
+    // green. The blurb above states the BASE numbers and goes on saying so
+    // forever; this is the same sentence with the live ranks in it.
+    y = drawResolvedLine(d.x + 20, y, d.w - 40, node);
 
     // THE FACTS, one per line and every one of them resolved rather than
     // repeated from the tree: what it cost, what it needs, and where it is.
@@ -2270,6 +2358,8 @@ var Upgrades = (function () {
       });
     }
 
+    y = drawResolvedLine(d.x + 20, y, d.w - 40, treeNode, 3);
+
     // AND WHAT IMPROVES IT, in the same words the inventory card uses. Capped at
     // three rows here: this card is shorter and the buy button is under it, so a
     // module with four squares shows three and the inventory card shows them all.
@@ -2571,6 +2661,21 @@ var Upgrades = (function () {
       return hit ? { id: hit.node.id, kind: hit.kind } : null;
     },
     resetNodeCount: function () { return selected ? E().resetCount() : 0; },
+    // The "RIGHT NOW" line, as data: the resolved sentence, the same sentence
+    // with every rank at zero, and the words between them that differ -- which
+    // are exactly the words the card draws green.
+    resolvedLine: function (nodeId) {
+      var node = selected ? E().nodeOf(nodeId) : null;
+      var v = resolvedLine(node);
+      if (!v) return null;
+      var now = v.now.split(" "), was = v.base.split(" "), green = [];
+      var aligned = now.length === was.length;
+      for (var i = 0; i < now.length; i++) {
+        if (!aligned || now[i] !== was[i]) green.push(now[i]);
+      }
+      return { now: v.now, base: v.base, changed: v.changed,
+               aligned: aligned, green: green };
+    },
     // What the "IMPROVED BY" block on a module's card is listing, as data --
     // so a test can assert what the card says without reading pixels.
     improvedBy: function (nodeId) {
