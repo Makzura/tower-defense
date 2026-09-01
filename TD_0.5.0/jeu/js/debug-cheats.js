@@ -81,8 +81,13 @@
     var progress = {};
     current.owned.forEach(function (id) {
       var row = current.progress[id];
+      // `ranks` IS COPIED LIKE EVERYTHING ELSE, and leaving it out was not a
+      // small omission: `debugPatch` rebuilds each row from whatever this hands
+      // it, so a patch that named only `coins` would have quietly emptied every
+      // upgrade-squared rank on every tower. Pressing "give coins" is not
+      // supposed to undo a tree.
       progress[id] = {
-        xp: row.xp, nodes: row.nodes.slice(),
+        xp: row.xp, nodes: row.nodes.slice(), ranks: copyRanks(row.ranks),
         equipped: row.equipped.slice(), resetAt: row.resetAt
       };
     });
@@ -90,6 +95,12 @@
     build(draft, current);
     MetaProgress.debugPatch(draft);
     refresh();
+  }
+
+  function copyRanks(ranks) {
+    var out = {};
+    Object.keys(ranks || {}).forEach(function (id) { out[id] = ranks[id]; });
+    return out;
   }
 
   function giveCoins(amount) {
@@ -118,6 +129,16 @@
     refresh();
   }
 
+  // EVERY NODE MEANS EVERY NODE (2026-09-01). It bought the twelve equippable
+  // modules and stopped, which was the whole tree when this button was written
+  // and is now two thirds of the Rifleman's: the upgrade-squared nodes are a
+  // second list, they are bought by RANK rather than owned outright, and a
+  // playtest that asked for "everything" was quietly handed a tree with
+  // twenty-two nodes still at zero.
+  //
+  // Every square goes to its MAXIMUM rank, which is what "buy every node" has
+  // to mean for something that has ranks -- a rank 1 of each would be an answer
+  // nobody asked for, and the button is a cheat, not a ladder.
   function buyWholeTree(ids) {
     patch(function (draft) {
       ids.forEach(function (id) {
@@ -125,6 +146,11 @@
         draft.progress[id].nodes = TowerPerks.nodes(id).map(function (n) {
           return n.id;
         });
+        var ranks = {};
+        TowerPerks.upgrades2(id).forEach(function (n) {
+          ranks[n.id] = n.maxRank || 0;
+        });
+        draft.progress[id].ranks = ranks;
       });
     });
   }
@@ -134,6 +160,10 @@
       ids.forEach(function (id) {
         if (!draft.progress[id]) return;
         draft.progress[id].nodes = [];
+        // AND THE RANKS, for the same reason `resetTree` clears them: a square
+        // improves a module that has just been un-bought, so leaving its ranks
+        // behind leaves a rank attached to nothing.
+        draft.progress[id].ranks = {};
         draft.progress[id].equipped = [];
       });
     });
@@ -434,6 +464,22 @@
   // off the Upgrades screen; the wave's xp budget and how it is being split
   // cannot be read anywhere, and they are the two numbers a progression
   // playtest is actually about.
+  // "  n/m ranks" beside the node count, and NOTHING AT ALL for a tower that has
+  // no upgrade-squared content -- five of the six towers do not, and a "0/0"
+  // against each of them would be five lines of noise about a system they are
+  // not in. Ranks are summed rather than counted: how many ranks are paid for is
+  // the question, and a node at 3 of 5 is three of them.
+  function rankLine(towerId, progress) {
+    var list = TowerPerks.upgrades2(towerId);
+    if (!list.length) return "";
+    var have = 0, all = 0;
+    list.forEach(function (n) {
+      all += n.maxRank || 0;
+      have += Math.min(n.maxRank || 0, (progress.ranks || {})[n.id] || 0);
+    });
+    return "  " + have + "/" + all + " ranks";
+  }
+
   function refresh() {
     if (!readout) return;
     var lines = [];
@@ -451,7 +497,8 @@
         pad(name, 14) + "L" + p.level +
         "  " + pad(String(Math.floor(p.xp)), 6) + "xp" +
         "  " + bar +
-        "  " + p.nodes.length + "/" + TowerPerks.nodes(id).length + " nodes");
+        "  " + p.nodes.length + "/" + TowerPerks.nodes(id).length + " nodes" +
+        rankLine(id, p));
     });
 
     if (typeof TowerXP !== "undefined") {

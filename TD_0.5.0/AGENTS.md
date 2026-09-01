@@ -5132,6 +5132,19 @@ same `sanitise` a file off disk goes through — so no cheat can produce a save
 this build would refuse to load. The two things it exists for are the two the
 shipping API will not do: coins from nowhere, and xp that goes down.
 
+**`debugPatch` REPLACES A ROW IT IS GIVEN**, `ranks` along with `nodes` and
+`equipped`, which is why the panel copies all four out of the live snapshot
+before editing one of them (2026-09-01). It did not copy `ranks`, so pressing
+*any* button — "give coins" included — silently emptied every upgrade² rank on
+every tower.
+
+**"Buy every node" buys the upgrade² nodes too, each at its MAXIMUM rank.** It
+bought the twelve equippable modules and stopped, which was the whole tree when
+the button was written and is now a third of the Rifleman's. "Clear tree" clears
+the ranks with the nodes, for the same reason `resetTree` does. The readout
+prints `n/m ranks` beside `n/m nodes`, and nothing at all for the five towers
+that have no upgrade² content.
+
 ---
 
 **The test harness calls `MetaProgress.unlockAll()`** before `init()`. That is

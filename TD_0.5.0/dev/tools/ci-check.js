@@ -922,7 +922,12 @@ var BASELINE = [
     // and one test each for the baseline being untouched at rank 0, the
     // authoring rules, the rejected list staying out, and the tree screen.
     // Nothing was removed and no existing name changed its claim.
-    file: "tests/content.test.js", pass: 466, fail: 0,
+    // ---- 467 on 2026-09-01, the cheat panel's ranks ----------------------
+    // 466 -> 467: one added. `MetaProgress.debugPatch` replaces a row it is
+    // given, and the panel was not copying `ranks` into the row it built -- so
+    // every button, "give coins" included, silently emptied every upgrade²
+    // rank. The new name pins the door's contract from both sides.
+    file: "tests/content.test.js", pass: 467, fail: 0,
     failing: []
   },
   {

@@ -14799,6 +14799,43 @@ function (t) {
     3, "and the tree clamps it to the node's own maximum");
 });
 
+test("the debug door round-trips a rank, and a row that omits one clears it",
+function (t) {
+  var h = bootSquares();
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0)");
+  setRanks(h, { rifleman_overloaded_reinforced_spring: 2 });
+
+  // A PATCH THAT NAMES ONLY THE PURSE LEAVES THE ROWS ALONE.
+  h.run("MetaProgress.debugPatch({ coins: 4242 })");
+  t.eq(h.run("MetaProgress.coins()"), 4242, "the coins moved");
+  t.eq(h.run("TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring')"),
+    2, "and the rank is untouched");
+
+  // A PATCH THAT SUPPLIES A ROW REPLACES THAT ROW, `ranks` included — the same
+  // rule `nodes` and `equipped` follow, and the reason js/debug-cheats.js copies
+  // all three out of the live snapshot before it edits one of them. A row that
+  // omits `ranks` is a row that says there are none.
+  var kept = h.run("(function () {" +
+    "  var s = MetaProgress.snapshot(), row = s.progress.soldier;" +
+    "  MetaProgress.debugPatch({ progress: { soldier: {" +
+    "    xp: row.xp, nodes: row.nodes.slice(), ranks: row.ranks," +
+    "    equipped: row.equipped.slice(), resetAt: row.resetAt } } });" +
+    "  return TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring');" +
+    "})()");
+  t.eq(kept, 2, "a row that carries its ranks keeps them");
+
+  var dropped = h.run("(function () {" +
+    "  var s = MetaProgress.snapshot(), row = s.progress.soldier;" +
+    "  MetaProgress.debugPatch({ progress: { soldier: {" +
+    "    xp: row.xp, nodes: row.nodes.slice()," +
+    "    equipped: row.equipped.slice(), resetAt: row.resetAt } } });" +
+    "  return TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring');" +
+    "})()");
+  t.eq(dropped, 0, "and a row that leaves them out clears them");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', 'rif_a1')"), true,
+    "without touching what the row DID carry");
+});
+
 test("a reset refunds every rank and charges ten a node, whatever rank it held",
 function (t) {
   var h = bootSquares();

@@ -13,6 +13,27 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — "Buy every node" buys every node.**
+
+Owner: the cheat should actually buy all nodes and not just the modules. It
+bought the twelve equippable ones and stopped -- which was the whole tree when
+the button was written, and is now a third of the Rifleman's. Every upgrade²
+node now goes to its MAXIMUM rank, because a rank 1 of each is an answer nobody
+asked for and this is a cheat, not a ladder. "Clear tree" clears the ranks with
+the nodes, the same way `resetTree` does.
+
+**And a worse one found on the way: every OTHER cheat was wiping the ranks.**
+`debugPatch` rebuilds each row from whatever it is handed, and the panel's
+`patch()` copied `xp`, `nodes`, `equipped` and `resetAt` out of the live
+snapshot and not `ranks` -- so pressing "give coins" emptied every upgrade² rank
+on every tower. Fixed at the caller, which is where the other three already are.
+A test pins the door's contract from both sides: a row that carries its ranks
+keeps them, a row that omits them clears them.
+
+The panel's readout prints `n/m ranks` beside `n/m nodes`, and prints nothing at
+all for the five towers with no upgrade² content -- five `0/0`s would be noise
+about a system they are not in.
+
 **2026-09-01 — The Rifleman's tree, untangled.**
 
 Owner: the tree is well implemented but very tangled -- spread it out, size is
