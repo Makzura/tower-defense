@@ -113,6 +113,16 @@ var PlayerEffects = (function () {
       var p = { damage: sharedDamage + streakDamage, fireRate: totemRate,
                 range: -r.radarRangePenaltyPct, speed: 0 };
 
+      // ORDRE DE SURCHARGE, and it is in the RESTAT rather than at the firing
+      // site because it changes exactly twice -- once when it starts and once
+      // when it ends. Veteran Rhythm is live because it moves with every kill;
+      // this does not, so a restat is both cheaper and simpler, and the stun on
+      // the end of it is the game's own `TowerHealth.stun`.
+      if (typeof PlayerRun !== "undefined") {
+        var over = PlayerRun.overdriveScale(tower);
+        if (over !== 1) p.fireRate += (over - 1) * 100;
+      }
+
       if (isCountable(tower) && alive(tower)) {
         // PROXIMITY, AND EACH HALF COUNTS ONCE however many neighbours there
         // are. Architecte's two halves can BOTH be true -- a tower beside one

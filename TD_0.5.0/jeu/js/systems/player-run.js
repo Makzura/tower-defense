@@ -361,6 +361,12 @@ var PlayerRun = (function () {
     if (!tower) return "pick a tower";
     overdrive = { tower: tower, left: s.overdriveSeconds, stun: 0 };
     overdriveUsedWave = waveNumber;
+    // THE BOARD IS TOLD AT ONCE, because the bonus lives in the restat: it
+    // changes twice in its whole life, so it is cheaper and simpler there than
+    // at the firing site, and the stun on the end of it is the game's own.
+    if (typeof PlayerEffects !== "undefined" && typeof towers !== "undefined") {
+      PlayerEffects.refresh(towers);
+    }
     return null;
   }
 
@@ -536,6 +542,17 @@ var PlayerRun = (function () {
         overdrive.left -= dt;
         if (overdrive.left <= 0) {
           overdrive.stun = s ? s.overdriveStunSeconds : 0;
+          // THE STUN IS THE GAME'S OWN. `TowerHealth.stun` is what every type
+          // already obeys -- it stops attacks AND abilities, which is exactly
+          // what "ne peut ni attaquer ni utiliser d'ability" asks for -- so the
+          // module borrows it rather than inventing a second kind of stun that
+          // some tower would eventually not respect.
+          if (overdrive.stun > 0 && typeof TowerHealth !== "undefined") {
+            TowerHealth.stun(overdrive.tower, overdrive.stun);
+          }
+          if (typeof PlayerEffects !== "undefined" && towerList) {
+            PlayerEffects.refresh(towerList);
+          }
           if (overdrive.stun <= 0) overdrive = null;
         }
       } else if (overdrive.stun > 0) {

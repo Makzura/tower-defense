@@ -3514,6 +3514,11 @@ function onRightClick(event) {
     return;
   }
 
+  // A PLAYER TARGET IS CANCELLED FIRST AND COSTS NOTHING. Right-click is the
+  // game's own "never mind", and it must not also clear the selection the
+  // player will want back the moment they are done cancelling.
+  if (typeof PlayerBar !== "undefined" && PlayerBar.cancel()) return;
+
   selectedSlot = null;
   inspected = null;
   aimingTower = null;
@@ -3592,6 +3597,19 @@ function onWheel(event) {
 
 function onClick(event) {
   var p = toGameCoords(event);
+  // THE PLAYER'S COLUMN AND ITS TARGETING GO FIRST, and only during a run.
+  // A press on a button must never also place a tower, and a click that is
+  // answering a "pick a target" prompt must never also inspect what it landed
+  // on -- both are the same rule the build bar already follows: whatever is
+  // drawn on top wins.
+  if (screen === "play" && !paused && !gameOver && !victory &&
+      typeof PlayerBar !== "undefined") {
+    if (PlayerBar.onClick(p.x, p.y)) return;
+    if (PlayerBar.targeting()) {
+      var world = screenToWorld(p.x, p.y);
+      if (PlayerBar.onWorldClick(world, enemyAt(p.x, p.y), towerAt(p.x, p.y))) return;
+    }
+  }
 
   // THE AUTOPLAY GATE. A browser will not let a page make a sound until the
   // user has interacted with it, and this is the interaction. Done here rather
@@ -4043,13 +4061,21 @@ function buyUpgrade(tower, id) {
   if (typeof tower.whyCannotUpgrade !== "function") return "not upgradeable";
 
   var reason = tower.whyCannotUpgrade(id);
-  if (reason) return reason;
+  // THE PERMIT IS ASKED ONLY ABOUT THE LOCK, and it is asked here, where the
+  // refusal is. It is granted and spent in the same breath as the purchase, so
+  // an affordability failure below cannot consume it -- see the order: the
+  // permit is committed only after `playerCanSpend` has said yes.
+  if (reason && !playerPermitCovers(tower, reason, false)) return reason;
 
   var price = playerUpgradePrice(tower, tower.upgradeCost(id));
   var allowed = playerCanSpend(price);
   if (!allowed.ok) return allowed.reason;
 
   cash -= price;
+  // COMMITTED. Only now is the permit actually given and spent -- everything
+  // above could still have refused, and a permit consumed by a purchase that
+  // did not happen would be gone for the run.
+  if (reason) playerPermitCovers(tower, reason, true);
   tower.applyUpgrade(id);
   refreshBlockReason();          // cash changed, so affordability may have too
   return null;
@@ -4063,6 +4089,36 @@ function playerUpgradePrice(tower, price) {
   if (typeof PlayerRun === "undefined" || typeof price !== "number") return price;
   var scale = PlayerRun.upgradeCostScale(tower);
   return scale === 1 ? price : Math.max(0, Math.round(price * scale));
+}
+
+// MAY THE CROSSPATH PERMIT COVER THIS REFUSAL?
+//
+// The permit lets ONE tower a run buy exactly ONE tier past the crosspath lock
+// -- 5-3 instead of 5-2 -- and it is asked HERE, at the moment a purchase is
+// actually refused for that reason and for no other. Asking at the refusal is
+// what makes it impossible to abuse: a tier refused because the path is
+// finished, because its own prerequisite is missing, or because the tower is a
+// three-path one whose validator says something else, is refused exactly as it
+// was. The permit only ever answers the ONE sentence each tower shape uses for
+// the lock.
+//
+// `spend` is false while the panel is only ASKING (an affordability check, a
+// hover card) and true at the moment the purchase commits, so nothing is
+// consumed by looking.
+function playerPermitCovers(tower, reason, spend) {
+  if (typeof PlayerRun === "undefined" || !reason) return false;
+  if (!PlayerRun.permitEquipped()) return false;
+  if (!/already chosen|crosspath lock/.test(String(reason))) return false;
+
+  var holder = PlayerRun.permitHolder();
+  if (holder && holder !== tower) return false;        // one tower a run
+  if (PlayerRun.permitSpent()) return false;           // and one tier
+  if (!holder) {
+    if (!spend) return true;                           // it COULD be given
+    PlayerRun.grantPermit(tower);
+  }
+  if (spend) PlayerRun.spendPermit(tower);
+  return true;
 }
 
 // MAY THIS SPEND HAPPEN? The one question every purchase in a run asks, and the
@@ -4251,6 +4307,15 @@ function onKeyDown(event) {
   // who starts a run from the keyboard has interacted just as much as one who
   // clicked, and without this their first wave arrives in silence.
   Sound.unlock();
+
+  // ESCAPE CANCELS A PLAYER TARGET BEFORE IT OPENS THE PAUSE MENU, and costs
+  // nothing -- the same "never mind" right-click gives, on the key a player
+  // reaches for first. Only while one is actually armed, so Escape still opens
+  // the menu every other time.
+  if (screen === "play" && event.key === "Escape" &&
+      typeof PlayerBar !== "undefined" && PlayerBar.onKey("Escape")) {
+    return;
+  }
 
   // The menu owns the keyboard while it is up. Numbered top to bottom,
   // matching the buttons.
@@ -5018,6 +5083,33 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// THE ONE DOOR EVERY HIT ON THE BASE GOES THROUGH, and the one place three
+// Player modules meet.
+//
+//   1. Brèche contrôlée halves the FIRST LEAK of a wave -- a leak only, which
+//      is why the totem's death damage passes `leak: false` and is not reduced;
+//   2. Bouclier de mana may then absorb up to its fraction of what is left, and
+//      only as many whole points as the purse can pay for. It never spends into
+//      debt, not even with Crédit d'urgence;
+//   3. what remains is what the base ACTUALLY loses -- and it is that number,
+//      never the raw hit, that breaks Prime sans fuite and Série parfaite. A
+//      hit absorbed to nothing keeps a streak alive, which is the brief's rule.
+//
+// Returns the resolved figures so a caller can report them. With no Player
+// module equipped it is `baseHp -= raw` and nothing else, which is what the
+// neutral resolved block guarantees.
+function applyBaseDamage(raw, opts) {
+  if (typeof PlayerRun === "undefined") {
+    baseHp -= raw;
+    return { raw: raw, toBase: raw, absorbed: 0, manaCost: 0 };
+  }
+  var out = PlayerRun.resolveBaseDamage(raw, cash, opts);
+  if (out.manaCost > 0) cash -= out.manaCost;
+  baseHp -= out.toBase;
+  PlayerRun.noteBaseLoss(out.toBase);
+  return out;
+}
+
 function update(dt) {
   // Only a run simulates. Written as "is it play" rather than as a list of
   // screens that are not: the menu was added by listing them, and the
@@ -5044,6 +5136,7 @@ function update(dt) {
   // sweep and Blitz's haste all obey the pause button and the speed toggle
   // without any of them reading a wall clock. See js/systems/player-run.js.
   if (typeof PlayerRun !== "undefined") PlayerRun.update(dt, towers);
+  if (typeof PlayerBar !== "undefined") PlayerBar.update(dt);
 
   // Time is being rewound (the beam tower's death denial). Everything else is
   // frozen -- no movement, no firing, no spawning -- and only the rewind
@@ -5279,34 +5372,7 @@ function update(dt) {
       }
     }
   }
-  // THE ONE DOOR EVERY HIT ON THE BASE GOES THROUGH, and the one place three
-// Player modules meet.
-//
-//   1. Brèche contrôlée halves the FIRST LEAK of a wave -- a leak only, which
-//      is why the totem's death damage passes `leak: false` and is not reduced;
-//   2. Bouclier de mana may then absorb up to its fraction of what is left, and
-//      only as many whole points as the purse can pay for. It never spends into
-//      debt, not even with Crédit d'urgence;
-//   3. what remains is what the base ACTUALLY loses -- and it is that number,
-//      never the raw hit, that breaks Prime sans fuite and Série parfaite. A
-//      hit absorbed to nothing keeps a streak alive, which is the brief's rule.
-//
-// Returns the resolved figures so a caller can report them. With no Player
-// module equipped it is `baseHp -= raw` and nothing else, which is what the
-// neutral resolved block guarantees.
-function applyBaseDamage(raw, opts) {
-  if (typeof PlayerRun === "undefined") {
-    baseHp -= raw;
-    return { raw: raw, toBase: raw, absorbed: 0, manaCost: 0 };
-  }
-  var out = PlayerRun.resolveBaseDamage(raw, cash, opts);
-  if (out.manaCost > 0) cash -= out.manaCost;
-  baseHp -= out.toBase;
-  PlayerRun.noteBaseLoss(out.toBase);
-  return out;
-}
-
-// Last chance before the run ends: a tower may be holding a one-shot save
+  // Last chance before the run ends: a tower may be holding a one-shot save
   // (the beam tower's death denial). The system decides whether one is
   // available and applies its whole effect -- see js/systems/death-denial.js.
   // Nothing here knows which tower it was or what the save does.
@@ -6708,6 +6774,10 @@ function draw() {
   // screen-edge flash and banner do not.
   if (typeof Effects !== "undefined") {
     if (Effects.drawWorld) Effects.drawWorld(ctx);
+    // THE PLAYER'S OWN MARKS ON THE BOARD, in the world layer with the rest of
+    // the feedback: the beacon's circle, the totem and its health, the mark
+    // over its enemy and the ring round the tower carrying the permit.
+    if (typeof PlayerBar !== "undefined") PlayerBar.drawWorld();
     else Effects.draw(ctx);
   }
 
@@ -6756,6 +6826,9 @@ function draw() {
   // the thing that has to stay readable.
   drawEnemySidebar();
   drawInspection();
+  // THE PLAYER'S COLUMN, before the build bar and the panel so those two --
+  // which the player clicked and is still using -- stay on top of it.
+  if (typeof PlayerBar !== "undefined") PlayerBar.draw();
   drawBuildBar();
   drawSpeedButton();
   if (waveControlsShown()) drawAutoSkipButton();
@@ -7848,6 +7921,11 @@ function drawStatus() {
   ctx.fillText(waveStatusText(), 22, 80);
 
   ctx.textAlign = "left";
+  // THE PLAYER'S OWN LINES, under the wave readout and only when the loadout
+  // earned them: the streak's charges, a bounty already owed, a debt in red
+  // with its ceiling and its interest, and what the shield last stopped. An
+  // empty loadout draws none of them and the readout is exactly what it was.
+  if (typeof PlayerBar !== "undefined") PlayerBar.drawReadout(22, 104);
 
   // The skip goes here, under the wave countdown it belongs to. The AUTO
   // toggle is drawn with the speed button instead -- see autoSkipButtonRect.

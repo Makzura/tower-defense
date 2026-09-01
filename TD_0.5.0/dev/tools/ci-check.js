@@ -927,7 +927,19 @@ var BASELINE = [
     // given, and the panel was not copying `ranks` into the row it built -- so
     // every button, "give coins" included, silently emptied every upgrade²
     // rank. The new name pins the door's contract from both sides.
-    file: "tests/content.test.js", pass: 467, fail: 0,
+    // ---- 488 on 2026-09-01, the Player's progression ---------------------
+    // 467 -> 488: twenty-one added, in one new group. The Player's own tree --
+    // twenty-one modules and forty ranked squares -- plus every layer under it:
+    // the `player` save block and its absent-key migration, the resolved block
+    // (an empty loadout resolves the neutral one, which is the current game to
+    // the bit), the 2/3/4/5/6/7 slot ladder, sequential ranks at per-rank
+    // prices, a fusion square shown at 1/2 and refused there, dormancy, a reset
+    // that counts EVERY rank as its own node, and the run systems: prices,
+    // proximity, live composition, destruction refunds, the credit line, the
+    // Brèche-then-shield order, the streak, the beacon, the totem, the orders,
+    // the radar, Blitz and the crosspath permit. Nothing was removed and no
+    // existing name changed its claim.
+    file: "tests/content.test.js", pass: 488, fail: 0,
     failing: []
   },
   {

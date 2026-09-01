@@ -4598,6 +4598,127 @@ of it. `wavesOpened` counts wave OPENINGS — `beginWave` tells every tower, and
 `addTower` tells one placed into a running wave — so the bonus survives the gaps
 between its three waves and is gone the instant the fourth is announced.
 
+## The PLAYER's permanent progression (2026-09-01)
+
+**A THIRD PROGRESSION, AND IT IS NEITHER OF THE OTHER TWO.** The A/B/C tiers
+are mana, in a run, on one body. A tower PERK is meta coins, permanent, and
+sits in one of that TYPE's five loadout slots. A **PLAYER MODULE** is meta
+coins and permanent too, and it belongs to the PLAYER rather than to any tower:
+equipped once, it changes the whole run.
+
+**FOUR FIVES NOW AND THEY ARE ALL DIFFERENT.** `SLOT_COUNT` is types in the
+build bar; `PERK_SLOTS` is perks in one type's loadout; a tower's in-run tiers
+go to five; and **`PLAYER_SLOTS` is SEVEN**, of which `2 + level` are usable —
+2/3/4/5/6/7 at levels 0 to 5. Nothing may read one for another.
+
+| file | what it owns |
+|---|---|
+| `js/meta.js` | the `player` SAVE block: xp, modules, ranks, seven slots, the reset stamp |
+| `js/systems/player-perks.js` | the RULES, the tree, and **the resolved block** |
+| `js/perks/player-modules.js` | the CONTENT: 21 modules and 40 ranked squares |
+| `js/systems/player-effects.js` | how the block reaches a tower, and the aura pass |
+| `js/systems/player-run.js` | the in-run state: debt, orders, beacon, totem, shield, streak, permit |
+| `js/player-bar.js` | the in-run action column and its targeting |
+| `js/upgrades.js` | the Player as an entity on the Upgrades and Tree screens |
+
+### The resolved block is the whole interface
+
+`PlayerPerks.resolved()` answers a plain object of ~50 named numbers, and every
+other file in the game reads that. A module contributes by ADDING to it and by
+nothing else. That gives four properties for free:
+
+* **an empty loadout resolves the NEUTRAL block, which is the current game to
+  the bit** — every reader elsewhere is written against the neutral value;
+* two modules moving the same number compose by **summing percentage POINTS**,
+  with no opinion about slot order, and the reader turns the sum into a factor
+  exactly once;
+* a square is folded in inside its parent module's own pass, so "it applies
+  only while its parent is equipped" is structural rather than a check;
+* nothing is ever written back onto a tower's authored data.
+
+Every formula the owner stated falls straight out of that. `20 + rInventaire −
+rTolérance` is Intendant's `+= 20`, Inventaire's `+= rank` and Tolérance's
+`-= rank`, in any order.
+
+### How it reaches a tower
+
+The same seams a Farm's investment already uses, never a second mechanism:
+**range** through `elevatedRangePx` (one call site, every type); **damage** and
+**attack speed** multiplied by each type in its own recompute beside its
+FarmBoost line; **health** through `PlayerEffects.scaledMaxHp`; **footprint**
+through `buildFootprintUl`, folded in BEFORE the tower exists because a
+footprint that moved after placement would move where a tower may stand.
+
+**The dynamic half is a whole-board pass with one door.** Proximity, the live
+type census, the beacon's circle, the totem, the streak and Surcharge all change
+without any tower being upgraded, so `PlayerEffects.refresh(towers)` recomputes
+them and restats every tower through `FarmBoost.refresh` — called from
+`addTower`, `sellTower`, the destroyed sweep, a beacon that moved, a totem that
+died and a wave that ended.
+
+### Base damage has one door
+
+`applyBaseDamage(raw, { leak })` in game.js, and three modules meet on it:
+Brèche contrôlée halves a wave's FIRST LEAK (a leak only — the totem's death
+damage is not one); Bouclier de mana may then absorb whole points it can pay
+for, and **never into debt, not even with Crédit d'urgence**; what remains is
+what the base actually loses, and it is that number — never the raw hit — that
+breaks Prime sans fuite and Série parfaite. **A hit absorbed to nothing keeps a
+streak alive.**
+
+### Prices
+
+`towerPrice(type)` is the one in-run reader: the type's perked price, plus
+Intendant's first-of-type discount or later-of-type surcharge, plus Arsenal
+partagé's percentage when the placement duplicates a LIVE type. The discount is
+spent by a COMPLETED placement, so selling that tower does not hand it back.
+`playerUpgradePrice` is the same for an in-run tier, and only the crosspath
+permit moves it.
+
+### The two rules that differ from a tower's, deliberately
+
+* **The reset commission counts EVERY Player rank as its own node**; a tower's
+  ranked square counts once however many ranks it holds. Both are the owner's.
+* **The Player's slots are `2 + level`**; a tower's usable slots ARE its level.
+
+### The secret node
+
+`Permis de crosspath` is `???` — no name, price, effect or prerequisite — until
+15 modules are owned, three named squares reach rank 5/5/3 and the totem is
+bought. **The reveal is recomputed from the save, never stored**, so there is
+nothing to persist and a reset correctly hides it again. It has no link on the
+tree at all: a line to any one of its five conditions would lie about the other
+four.
+
+Equipped, it lets ONE tower a run buy exactly ONE tier past the crosspath lock.
+It is asked at the REFUSAL — `playerPermitCovers` reads the one sentence each
+tower shape uses for the lock and answers no to everything else — so a finished
+path, a missing prerequisite or a three-path tower's own validator are refused
+exactly as before, and a permit is committed only after the purchase is paid for.
+
+### Three nodes were rescaled, at the owner's word
+
+The brief wrote Prévision tactique, Troisième dossier and Briefing méthodique
+against a 90-second inter-wave countdown **this game has never had** — its
+transitions are `RUN_START_DELAY` 10 s, `WAVE_CLEAR_DELAY` 5 s and
+`WAVE_CALL_DELAY` 3 s. The ratios were kept and restated against the 5 s that
+exists: halved to 2.5, then 2, bought back 0.4 a rank, never past 5. **Doctrine
+Blitz needed no rescale** — it measures the wave's own 30–125 s window, which a
+Send really does cut short, and 1 mana per 2 s capped at 35 is already the right
+size for it.
+
+### The save
+
+An eighth field, `player`: `{ xp, modules, ranks, equipped, resetAt }`.
+**A profile written before 2026-09-01 has no such key and reads as level 0 with
+nothing bought and seven empty slots** — the migration is the absence itself.
+Module and rank ids are OPEN exactly as node ids are, and the invariants
+`sanitise` enforces are the storage ones: xp is non-negative, an equipped module
+must be owned and may sit in one slot, and no slot past `2 + level` may hold
+anything.
+
+---
+
 ### The save
 
 A seventh field, `progress`, keyed by catalogue id: `{ xp, nodes, ranks,

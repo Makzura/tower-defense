@@ -3178,6 +3178,24 @@ Enemy.prototype.attackCandidates = function (spec, towers, radiusUl, from) {
   var origin = from || this.pos;
   var out = [];
 
+  // THE PLAYER'S TOTEM IS A CANDIDATE AND IS NOT A TOWER. It is not in the
+  // `towers` array -- putting it there would have made it count for
+  // Architecte's proximity, Arsenal partagé's type census, the target-claiming
+  // order and the destroyed sweep, none of which it is -- so it is added HERE,
+  // where a hostile enemy asks what it may hit.
+  //
+  // It duck-types the four fields this scan and the resolution below read:
+  // a position, "am I dead", "hit me", and NOT being a summon. `enemyTargetable`
+  // is deliberately absent for the same reason a blub's is: nothing that
+  // explicitly skips summons should pick it up by accident, and nothing that
+  // explicitly wants TOWERS should either.
+  var totem = (typeof PlayerRun !== "undefined") ? PlayerRun.totem() : null;
+  if (totem && totem.alive) {
+    var tdx = totem.x - origin.x, tdy = totem.y - origin.y;
+    var tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+    if (tdist <= reachPx) out.push({ tower: totemProxy(totem), distance: tdist });
+  }
+
   for (var i = 0; i < towers.length; i++) {
     var t = towers[i];
     // A tower already at zero is a corpse waiting to be swept out this step;
@@ -3752,6 +3770,31 @@ Enemy.prototype.applyStun = function (seconds) {
 // only a caller that explicitly says `"aoe"` meets an enemy's area resistance,
 // so a piercing line shot is not accidentally treated as area damage.
 // See js/systems/mitigation.js.
+// THE TOTEM, WEARING JUST ENOUGH OF A TOWER'S SHAPE to be hit by one.
+//
+// Built fresh per scan rather than held, because it is a VIEW of PlayerRun's
+// state and never a second copy of it: `takeDamage` goes straight back through
+// `PlayerRun.damageTotem`, which owns the health and answers what its death
+// costs the base -- and that damage is then put through `applyBaseDamage`, the
+// one door every hit on the base uses, so the mana shield may absorb it and
+// Brèche contrôlée correctly may not (it is not an enemy reaching the base).
+function totemProxy(totem) {
+  return {
+    x: totem.x, y: totem.y, isPlayerTotem: true,
+    isDestroyed: function () { return !totem.alive; },
+    takeDamage: function (amount) {
+      var owed = PlayerRun.damageTotem(amount);
+      if (owed > 0) {
+        if (typeof applyBaseDamage === "function") applyBaseDamage(owed, { leak: false });
+        // The buff went with it, so every tower has to resolve again.
+        if (typeof PlayerEffects !== "undefined" && typeof towers !== "undefined") {
+          PlayerEffects.refresh(towers);
+        }
+      }
+    }
+  };
+}
+
 Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, damageKind,
                                        armorPierce) {
   // ORDRE PRIORITAIRE'S TRADE, and it is applied HERE because here is the one

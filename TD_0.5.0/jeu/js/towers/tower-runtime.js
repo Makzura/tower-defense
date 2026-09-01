@@ -132,6 +132,18 @@ ConfiguredTower.prototype._refreshStats = function () {
 // or duplicate that rule.
 ConfiguredTower.prototype.purchase = function (pathName) {
   var check = Crosspath.canPurchaseNext(this.purchased, pathName, this.config);
+  // THE PLAYER'S CROSSPATH PERMIT, and only against the LOCK. `canPurchaseNext`
+  // refuses for two reasons and they are not the same: a finished path is a
+  // fact about this tower, and the lock is the rule the permit exists to bend
+  // exactly once. `playerPermitCovers` reads the sentence and answers no to
+  // everything else, so a path at tier 5 stays at tier 5.
+  //
+  // `playerHost` is the ADAPTER, because the permit is given to the tower the
+  // player clicked and the core is not that object.
+  if (!check.ok && typeof playerPermitCovers === "function" &&
+      playerPermitCovers(this.playerHost || this, check.reason, true)) {
+    check = { ok: true, resultingTier: (this.purchased[pathName] || 0) + 1 };
+  }
   if (!check.ok) return check;
 
   this.purchased[pathName] = check.resultingTier;

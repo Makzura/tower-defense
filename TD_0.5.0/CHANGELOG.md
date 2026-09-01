@@ -13,6 +13,73 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — The Player has a progression of its own.**
+
+A THIRD PROGRESSION, and it is neither of the other two. The A/B/C tiers are
+mana, in a run, on one body. A tower PERK is meta coins, permanent, and sits in
+one of that TYPE's five loadout slots. A PLAYER MODULE is meta coins and
+permanent too, and it belongs to the PLAYER: equipped once, it changes the whole
+run. Twenty-one modules and forty ranked squares, all the owner's numbers.
+
+**THE RESOLVED BLOCK IS THE WHOLE INTERFACE.** `PlayerPerks.resolved()` answers
+a plain object of named numbers and every other file reads that; a module
+contributes by adding to it and by nothing else. Four properties come free from
+that shape: an empty loadout resolves the NEUTRAL block, which is the current
+game to the bit; two modules moving the same number compose by summing
+percentage POINTS with no opinion about slot order; a square is folded in inside
+its parent's own pass, so "it applies only while its parent is equipped" is
+structural rather than a check somebody has to remember; and nothing is ever
+written back onto a tower's authored data. Every stated formula falls out of it
+-- `20 + rInventaire − rTolérance` is three additions in any order.
+
+It reaches a tower through the seams a Farm's investment already uses and never
+a second mechanism: range through `elevatedRangePx`, damage and rate beside each
+type's own FarmBoost line, health and footprint by scale. The dynamic half --
+proximity, the live type census, the beacon's circle, the totem, the streak,
+Surcharge -- is a whole-board pass with ONE refresh door, called from every
+place the board changes.
+
+**BASE DAMAGE NOW HAS ONE DOOR.** Brèche contrôlée halves a wave's first LEAK,
+the shield absorbs whole points it can pay for and never into debt, and what
+remains is what the base actually loses -- and it is that number, never the raw
+hit, that breaks a streak. A hit absorbed to nothing keeps one alive.
+
+**THE SLOTS ARE `2 + LEVEL` OUT OF SEVEN**, and the reset counts EVERY Player
+rank as its own node. Both differ from the towers' rules on purpose; both are
+the owner's, and both are written down in both places so nobody "fixes" one into
+the other.
+
+The secret node is `???` -- no name, price, effect or prerequisite -- until 15
+modules, three squares at 5/5/3 and the totem. The reveal is recomputed from the
+save and never stored, so a reset correctly hides it again, and the node has no
+link on the tree at all: a line to any one of its five conditions would lie
+about the other four. Equipped, it lets one tower a run buy one tier past the
+crosspath lock, asked at the REFUSAL so a finished path or a three-path tower's
+own validator is refused exactly as before.
+
+**THREE NODES WERE RESCALED AND THE REASON IS WORTH KEEPING.** The brief wrote
+Prévision tactique, Troisième dossier and Briefing méthodique against a
+90-second inter-wave countdown this game has never had -- its transitions are
+10 s, 5 s and 3 s, and what a Send actually cuts is the wave's own 30-125 s
+window. At the owner's word the ratios were kept and restated against the five
+seconds that exist. Doctrine Blitz needed no rescale at all: it measures that
+window, and 1 mana per 2 s capped at 35 was already the right size for it.
+
+The Player joins the Upgrades screen as an ENTITY beside the towers, through an
+adapter rather than a second screen -- the tree, the inventory, the slot strip
+and the reset are the same controls doing the same job. In a run it gets a
+column of controls down the left edge; targeting is free to cancel with Escape
+or right-click, because the cooldown starts on a successful activation and never
+on opening a picker.
+
+One real bug found by the tests and worth recording: `applyBaseDamage` was
+first written INSIDE `update`, so it was a local function -- and the totem's
+death damage, which reaches it from js/enemy.js, could never have found it. It
+is at the top level now.
+
+content.test.js 467 -> 488, baseline tightened in the same commit. Nothing was
+weakened or removed and no existing name changed its claim.
+
 **2026-09-01 — "Buy every node" buys every node.**
 
 Owner: the cheat should actually buy all nodes and not just the modules. It

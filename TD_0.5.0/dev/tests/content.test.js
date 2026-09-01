@@ -16053,4 +16053,1049 @@ test("the tree screen places, hits and frames every square", function (t) {
   t.ok(true, "the tree draws a square, a fusion and a perk without throwing");
 });
 
+
+// ---------------------------------------------------------------------------
+// THE PLAYER'S PERMANENT PROGRESSION (2026-09-01)
+//
+// TWENTY-ONE MODULES AND FORTY RANKED SQUARES, and the owner's numbers
+// throughout -- so these name ids and assert exact figures, exactly as the
+// tower-content sections above do. A retune is meant to turn them red.
+//
+// FIVE LAYERS, tested through their real entry points:
+//
+//   js/meta.js                      the `player` block and its migration
+//   js/systems/player-perks.js      the rules and THE RESOLVED BLOCK
+//   js/perks/player-modules.js      the content
+//   js/systems/player-effects.js    how the block reaches a tower
+//   js/systems/player-run.js        what it does during a run
+//
+// THE QUESTION UNDER ALL OF THEM is the one the brief opens with: does an
+// EMPTY LOADOUT reproduce the current game exactly? Every module is a delta on
+// a neutral value, so the answer has to be yes by construction -- and the first
+// test below is the one that proves it.
+// ---------------------------------------------------------------------------
+
+group("the Player's permanent progression");
+
+// A profile with the Player at level 5 and coins for anything. The Player has
+// no catalogue entry, so nothing is "owned" -- it simply exists.
+function bootPlayer() {
+  var h = harness.boot();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "TowerXP.setEnabled(true); openMenu()");
+  for (var i = 0; i < 400; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  h.run("MetaProgress.addPlayerXp(20000)");
+  return h;
+}
+
+// Buy and equip modules, set square ranks, and start a run. Straight through
+// the model: these tests are about the EFFECTS, and the purchase rules have
+// their own tests below.
+function playerRun(h, modules, ranks, opts) {
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.addPlayerXp(20000)");
+  (modules || []).forEach(function (id, i) {
+    h.run("MetaProgress.buyModule('" + id + "', 0);" +
+          "MetaProgress.equipModule('" + id + "', " + i + ")");
+  });
+  setPlayerRanks(h, ranks);
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); towers = [];" +
+        "waveIndex = " + ((opts && opts.wave !== undefined) ? opts.wave : "WAVES.length"));
+  if (!opts || opts.cash !== false) h.run("cash = 100000");
+  return h;
+}
+
+function setPlayerRanks(h, ranks) {
+  Object.keys(ranks || {}).forEach(function (id) {
+    var have = h.run("MetaProgress.playerRankOf('" + id + "')");
+    for (var r = have + 1; r <= ranks[id]; r++) {
+      h.run("MetaProgress.buyPlayerRank('" + id + "', 0, " + r + ")");
+    }
+  });
+}
+
+// One Rifleman on the board, built through the game's own door so every price
+// and every aura is the one a player would get.
+function placePlayerTower(h, x, y, typeId) {
+  h.run("(function () { var Type = MetaProgress.constructorOf('" +
+        (typeId || "soldier") + "');" +
+        "  addTower(new Type(" + x + ", " + y + ", path)); })()");
+  return "(function () { for (var i = 0; i < towers.length; i++)" +
+         "  if (towers[i].x === " + x + ") return towers[i]; return null; })()";
+}
+
+test("an empty Player loadout resolves the neutral block and the current game",
+function (t) {
+  var h = bootPlayer();
+  var neutral = h.run("PlayerPerks.neutral()");
+  t.deep(h.run("PlayerPerks.resolved()"), neutral,
+    "nothing equipped resolves exactly the neutral block");
+
+  // EVERY MODULE OWNED AND NOTHING EQUIPPED IS STILL THE NEUTRAL BLOCK, which
+  // is the other half of the promise: buying is not equipping.
+  h.run("PlayerPerks.modules().forEach(function (m) {" +
+        "  MetaProgress.buyModule(m.id, 0); });" +
+        "PlayerPerks.upgrades2().forEach(function (n) {" +
+        "  for (var r = 1; r <= n.maxRank; r++)" +
+        "    MetaProgress.buyPlayerRank(n.id, 0, r); })");
+  t.deep(h.run("PlayerPerks.resolved()"), neutral,
+    "every module and every rank owned, none equipped: still neutral");
+
+  // AND THE RUN IS THE RUN IT ALWAYS WAS.
+  playerRun(h, [], {});
+  t.eq(h.run("cash"), 100000, "the fixture set the purse");
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID))");
+  t.eq(h.run("cash"), h.run("STARTING_CASH"), "a run opens on the authored mana");
+  t.eq(h.run("baseHp"), h.run("BASE_MAX_HP"), "and the authored base health");
+  t.eq(h.run("baseMaxHp"), h.run("BASE_MAX_HP"), "at the authored maximum");
+
+  var tw = placePlayerTower(h, 200, 200);
+  t.eq(h.run(tw + ".damage"), h.run("Soldier.BASE_DAMAGE"), "a tower's damage");
+  t.eq(h.run(tw + ".rangeUl"), h.run("Soldier.BASE_RANGE_UL"), "its reach");
+  t.eq(h.run(tw + ".maxHp"), h.run("Soldier.BASE_HP"), "and its health");
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('soldier'))"),
+    h.run("Soldier.COST"), "and the next one costs what it costs");
+});
+
+test("the Player levels on the wave budget alone, and a defeat keeps it",
+function (t) {
+  var h = bootPlayer();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "TowerXP.setEnabled(true)");
+  t.eq(h.run("MetaProgress.playerProgress().xp"), 0, "a fresh profile is at 0");
+
+  // THE WHOLE BUDGET, NOT A SHARE OF IT, and it does not depend on the board:
+  // no tower is built here at all.
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); towers = []");
+  var budget = h.run("TowerXP.waveBudget(1, WAVES.length, xpDifficultyScale())");
+  h.run("endWave(3, 0)");
+  t.near(h.run("MetaProgress.playerProgress().xp"), budget, 1e-9,
+    "one wave pays the Player the whole of that wave's budget");
+
+  var second = h.run("TowerXP.waveBudget(2, WAVES.length, xpDifficultyScale())");
+  h.run("endWave(3, 0)");
+  t.near(h.run("MetaProgress.playerProgress().xp"), budget + second, 1e-9,
+    "and the next wave pays its own");
+
+  // A DEFEAT KEEPS EVERY POINT, because the points were banked wave by wave.
+  var banked = h.run("MetaProgress.playerProgress().xp");
+  h.run("baseHp = 0; gameOver = true; openMenu()");
+  t.near(h.run("MetaProgress.playerProgress().xp"), banked, 1e-9,
+    "losing the run keeps every point already earned");
+
+  // THE SANDBOX BANKS NOTHING, exactly as it banks no tower xp.
+  h.run("TowerXP.setEnabled(false); openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID))");
+  h.run("endWave(3, 0)");
+  t.near(h.run("MetaProgress.playerProgress().xp"), banked, 1e-9,
+    "and a rig with xp switched off banks none of it");
+  h.run("TowerXP.setEnabled(true)");
+
+  // THE CURVE IS THE TOWERS' OWN, not a second one.
+  var thresholds = h.game.MetaProgress.XP_THRESHOLDS;
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+  thresholds.forEach(function (need, i) {
+    h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+    h.run("MetaProgress.addPlayerXp(" + (need - 1) + ")");
+    t.eq(h.run("MetaProgress.playerProgress().level"), i,
+      "one point short of " + need + " is still level " + i);
+    h.run("MetaProgress.addPlayerXp(1)");
+    t.eq(h.run("MetaProgress.playerProgress().level"), i + 1,
+      need + " xp is level " + (i + 1));
+  });
+});
+
+test("the usable slots are exactly 2 / 3 / 4 / 5 / 6 / 7", function (t) {
+  var h = bootPlayer();
+  var thresholds = h.game.MetaProgress.XP_THRESHOLDS;
+
+  [0, 1, 2, 3, 4, 5].forEach(function (level) {
+    h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+    if (level > 0) h.run("MetaProgress.addPlayerXp(" + thresholds[level - 1] + ")");
+    var p = h.run("MetaProgress.playerProgress()");
+    t.eq(p.level, level, "level " + level);
+    t.eq(p.slots, 2 + level, "opens " + (2 + level) + " slots");
+    t.eq(p.slotCount, 7, "out of seven, always");
+    t.eq(p.equipped.length, 7, "and all seven are in the save");
+  });
+
+  // AND THE SLOTS PAST THE OPEN ONES REFUSE, with the level that opens them.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.buyModule('player_intendant_diversified_arsenal', 0)");
+  t.eq(h.run("MetaProgress.equipModule('player_intendant_diversified_arsenal', 1).ok"),
+    true, "slot 2 is open at level 0");
+  var refused = h.run("MetaProgress.equipModule('player_intendant_diversified_arsenal', 2)");
+  t.eq(refused.ok, false, "slot 3 is not");
+  t.ok(/level 1/.test(refused.reason), "and says which level opens it: " + refused.reason);
+
+  // A MODULE CANNOT SIT IN TWO SLOTS: dropping it on a second MOVES it.
+  h.run("MetaProgress.addPlayerXp(20000);" +
+        "MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
+  var bar = h.run("MetaProgress.equippedModules()");
+  t.eq(bar.filter(function (x) {
+    return x === "player_intendant_diversified_arsenal";
+  }).length, 1, "one copy, in one slot");
+});
+
+test("a module is bought once, a rank one at a time, and both need what they need",
+function (t) {
+  var h = bootPlayer();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+
+  // A CHILD NEEDS ITS PARENT BOUGHT.
+  var cold = h.run("PlayerPerks.stateOf('player_advanced_treasury')");
+  t.eq(cold.state, "locked", "Trésorerie avancée is locked at the start");
+  t.ok(/Intendant/.test(cold.reason), "for want of Intendant: " + cold.reason);
+  t.eq(h.run("PlayerPerks.buy('player_advanced_treasury').ok"), false, "so it refuses");
+
+  // AND THE COINS.
+  var poor = h.run("PlayerPerks.stateOf('player_intendant_diversified_arsenal')");
+  t.eq(poor.state, "poor", "a fresh profile cannot afford a 100-coin root");
+  t.eq(h.run("PlayerPerks.buy('player_intendant_diversified_arsenal').ok"), false,
+    "and the purchase refuses");
+
+  var h2 = bootPlayer();
+  t.eq(h2.run("PlayerPerks.buy('player_intendant_diversified_arsenal').spent"), 100,
+    "with coins it buys, at its authored price");
+  t.eq(h2.run("PlayerPerks.buy('player_intendant_diversified_arsenal').ok"), false,
+    "and cannot be bought twice");
+  t.eq(h2.run("PlayerPerks.stateOf('player_advanced_treasury').state"), "buyable",
+    "which opens its child");
+
+  // RANKS ARE SEQUENTIAL AND EACH PRICE IS ITS OWN.
+  var ID = "player_intendant_catalogued_inventory";
+  [40, 60, 90, 135, 200].forEach(function (price, i) {
+    var out = h2.run("PlayerPerks.buyRank('" + ID + "')");
+    t.eq(out.ok, true, "rank " + (i + 1) + " buys");
+    t.eq(out.spent, price, "for exactly " + price + " — R5's own price, not a total");
+  });
+  t.eq(h2.run("PlayerPerks.buyRank('" + ID + "').ok"), false, "rank 6 does not exist");
+  t.eq(h2.run("PlayerPerks.upgrade2StateOf('" + ID + "').state"), "maxed", "it is maxed");
+  t.eq(h2.run("MetaProgress.buyPlayerRank('player_intendant_logistics_tolerance', 0, 2).ok"),
+    false, "and no caller may skip a rank");
+});
+
+test("a fusion square shows 0/2, 1/2 and 2/2 and cannot be bought at 1/2",
+function (t) {
+  var h = bootPlayer();
+  var FUSION = "player_architect_tolerant_connectors";
+  h.run("MetaProgress.buyModule('player_intendant_diversified_arsenal', 0);" +
+        "MetaProgress.buyModule('player_architect_campaign_network', 0)");
+
+  var none = h.run("PlayerPerks.upgrade2StateOf('" + FUSION + "')");
+  t.eq(none.requirementsTotal, 2, "Connecteurs tolérants has two requirements");
+  t.eq(none.requirementsMet, 0, "0 / 2 to start");
+  t.eq(none.state, "locked", "and it is locked");
+
+  setPlayerRanks(h, { player_architect_dense_network: 2 });
+  var half = h.run("PlayerPerks.upgrade2StateOf('" + FUSION + "')");
+  t.eq(half.requirementsMet, 1, "1 / 2 with Réseau dense at rank 2");
+  t.eq(half.requirements[0].met, true, "the satisfied one is ticked");
+  t.eq(half.requirements[0].have, 2, "with the rank it holds");
+  t.eq(half.requirements[1].met, false, "and the other is crossed");
+  t.eq(half.requirements[1].need, 2, "against the rank it needs");
+  t.eq(half.state, "locked", "it is STILL locked at 1 / 2");
+  t.eq(h.run("PlayerPerks.buyRank('" + FUSION + "').ok"), false, "and refuses");
+  t.ok(/Tolérance/.test(half.reason), "naming only what is short: " + half.reason);
+
+  setPlayerRanks(h, { player_intendant_catalogued_inventory: 2,
+                      player_intendant_logistics_tolerance: 2 });
+  var both = h.run("PlayerPerks.upgrade2StateOf('" + FUSION + "')");
+  t.eq(both.requirementsMet, 2, "2 / 2 at last");
+  t.eq(both.state, "buyable", "and it is buyable");
+  t.eq(both.nextCost, 80, "at F5's first price");
+
+  // AFTER THE PURCHASE ONLY ITS PARENT MODULE HAS TO BE EQUIPPED. The brief is
+  // explicit: the requirements are purchase conditions, never equip ones.
+  h.run("PlayerPerks.buyRank('" + FUSION + "')");
+  playerRun(h, ["player_architect_campaign_network"],
+    { player_architect_dense_network: 2, player_architect_tolerant_connectors: 1,
+      player_intendant_catalogued_inventory: 2,
+      player_intendant_logistics_tolerance: 2 });
+  t.near(h.run("PlayerPerks.resolved().archSamePenaltyPct"),
+    3 + 0.25 * 2 - 0.25 * 1, 1e-9,
+    "it applies with Architecte equipped and Intendant on the bench");
+});
+
+test("a square is dormant while its module is on the bench", function (t) {
+  var h = bootPlayer();
+
+  // Bought, and the module it improves is NOT equipped.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.addPlayerXp(20000);" +
+        "MetaProgress.buyModule('player_scrapper', 0)");
+  setPlayerRanks(h, { player_scrapper_recovery_team: 5 });
+  t.deep(h.run("PlayerPerks.resolved()"), h.run("PlayerPerks.neutral()"),
+    "an owned module and five ranks, none equipped, resolve nothing");
+  var state = h.run("PlayerPerks.upgrade2StateOf('player_scrapper_recovery_team')");
+  t.eq(state.rank, 5, "the ranks are still owned");
+  t.eq(state.dormant, true, "and the model calls it dormant rather than lost");
+
+  h.run("MetaProgress.equipModule('player_scrapper', 0); PlayerPerks.dirty()");
+  t.eq(h.run("PlayerPerks.resolved().destroyRefundPct"), 60,
+    "equipping the module brings its ranks with it");
+  t.eq(h.run("PlayerPerks.upgrade2StateOf('player_scrapper_recovery_team').dormant"),
+    false, "and it is no longer dormant");
+});
+
+test("every stated formula resolves at rank 0, in the middle and at the maximum",
+function (t) {
+  var h = bootPlayer();
+
+  // Each row: the modules to equip, the ranks, the resolved field, the answer.
+  var rows = [
+    // Intendant — discount 60 + 3r, surcharge 20 + rInv − rTol
+    [["player_intendant_diversified_arsenal"], {}, "firstTowerDiscount", 60],
+    [["player_intendant_diversified_arsenal"], {}, "laterTowerSurcharge", 20],
+    [["player_intendant_diversified_arsenal"],
+     { player_intendant_catalogued_inventory: 3 }, "firstTowerDiscount", 69],
+    [["player_intendant_diversified_arsenal"],
+     { player_intendant_catalogued_inventory: 5,
+       player_intendant_logistics_tolerance: 5 }, "laterTowerSurcharge", 20],
+    [["player_intendant_diversified_arsenal"],
+     { player_intendant_logistics_tolerance: 5 }, "laterTowerSurcharge", 15],
+
+    // Trésorerie — mana 250 + 20r, penalty 8 + 0.75a − 0.4b
+    [["player_advanced_treasury"], {}, "startingManaBonus", 250],
+    [["player_advanced_treasury"],
+     { player_treasury_larger_advance: 5 }, "startingManaBonus", 350],
+    [["player_advanced_treasury"],
+     { player_treasury_larger_advance: 5 }, "fixedWaveRewardPenaltyPct", 11.75],
+    [["player_advanced_treasury"],
+     { player_treasury_larger_advance: 5,
+       player_treasury_soft_amortization: 5 }, "fixedWaveRewardPenaltyPct", 9.75],
+
+    // Crédit — limit 300 + 40r, interest 15 + a − 0.5b
+    [["player_emergency_credit"], {}, "debtLimit", 300],
+    [["player_emergency_credit"], { player_credit_extended_line: 5 }, "debtLimit", 500],
+    [["player_emergency_credit"],
+     { player_credit_extended_line: 5 }, "debtInterestPct", 20],
+    [["player_emergency_credit"],
+     { player_credit_extended_line: 5,
+       player_credit_refinancing: 5 }, "debtInterestPct", 17.5],
+
+    // Ferrailleur — refund 50 + 2r, health 15 + a − 0.5b
+    [["player_scrapper"], {}, "destroyRefundPct", 50],
+    [["player_scrapper"], { player_scrapper_recovery_team: 5 }, "destroyRefundPct", 60],
+    [["player_scrapper"], { player_scrapper_recovery_team: 5 }, "towerHpPenaltyPct", 20],
+    [["player_scrapper"], { player_scrapper_recovery_team: 5,
+       player_scrapper_recycled_bracing: 5 }, "towerHpPenaltyPct", 17.5],
+
+    // Architecte — 5 + 0.5a different, 3 + 0.25a − 0.25b same
+    [["player_architect_campaign_network"], {}, "archDifferentBonusPct", 5],
+    [["player_architect_campaign_network"],
+     { player_architect_dense_network: 5 }, "archDifferentBonusPct", 7.5],
+    [["player_architect_campaign_network"],
+     { player_architect_dense_network: 5 }, "archSamePenaltyPct", 4.25],
+    [["player_architect_campaign_network"],
+     { player_architect_dense_network: 5,
+       player_architect_tolerant_connectors: 5 }, "archSamePenaltyPct", 3],
+
+    // Plan compact — footprint 10 + r, health 15 + 0.75a − 0.5b
+    [["player_compact_plan"], {}, "footprintPenaltyPct", 10],
+    [["player_compact_plan"],
+     { player_compact_tighter_template: 5 }, "footprintPenaltyPct", 15],
+    [["player_compact_plan"], { player_compact_tighter_template: 5,
+       player_compact_internal_bracing: 5 }, "towerHpPenaltyPct", 16.25],
+
+    // Arsenal partagé — 1 + 0.1a a type, cap 5 + 0.5a, duplicate 2 + 0.2a − 0.2b
+    [["player_shared_arsenal"], {}, "sharedPerTypePct", 1],
+    [["player_shared_arsenal"],
+     { player_arsenal_combined_doctrine: 5 }, "sharedPerTypePct", 1.5],
+    [["player_shared_arsenal"],
+     { player_arsenal_combined_doctrine: 5 }, "sharedCapPct", 7.5],
+    [["player_shared_arsenal"],
+     { player_arsenal_combined_doctrine: 5 }, "duplicateSurchargePct", 3],
+    [["player_shared_arsenal"], { player_arsenal_combined_doctrine: 5,
+       player_arsenal_secondary_licenses: 5 }, "duplicateSurchargePct", 2],
+
+    // Opérateurs isolés — 10 + 0.75a alone, 5 + 0.25a − 0.4b crowded
+    [["player_isolated_operators"], {}, "isolatedBonusPct", 10],
+    [["player_isolated_operators"],
+     { player_operators_prepared_solitude: 5 }, "isolatedBonusPct", 13.75],
+    [["player_isolated_operators"], { player_operators_prepared_solitude: 5,
+       player_operators_measured_coexistence: 5 }, "crowdedPenaltyPct", 4.25],
+
+    // Commandant — mark 5 + 0.4a, damage 5 + 0.25a − 0.25b
+    [["player_commander_priority_order"], {}, "markSeconds", 5],
+    [["player_commander_priority_order"],
+     { player_commander_extended_signal: 5 }, "markSeconds", 7],
+    [["player_commander_priority_order"],
+     { player_commander_extended_signal: 5,
+       player_commander_rules_of_engagement: 5 }, "markDamagePenaltyPct", 5],
+
+    // Surcharge — rate 30 + 3a, stun 2.5 + 0.15a − 0.1b
+    [["player_overdrive_order"], {}, "overdriveFireRatePct", 30],
+    [["player_overdrive_order"],
+     { player_overdrive_redline: 5 }, "overdriveFireRatePct", 45],
+    [["player_overdrive_order"], { player_overdrive_redline: 5 }, "overdriveStunSeconds", 3.25],
+    [["player_overdrive_order"], { player_overdrive_redline: 5,
+       player_overdrive_disciplined_recovery: 5 }, "overdriveStunSeconds", 2.75],
+
+    // Radar — 8 + 0.8a seconds, 45 + 2a cooldown, range 3 − 0.25b never below 0
+    [["player_radar_sweep"], {}, "radarSeconds", 8],
+    [["player_radar_sweep"], { player_radar_long_echo: 5 }, "radarSeconds", 12],
+    [["player_radar_sweep"], { player_radar_long_echo: 5 }, "radarCooldownSeconds", 55],
+    [["player_radar_sweep"], { player_radar_calibrated_optics: 5 }, "radarRangePenaltyPct", 1.75],
+
+    // Balise — 8 + a speed, 5 + a range, 2 + 0.25a − 0.2b outside
+    [["player_command_beacon"], {}, "beaconRadiusUl", 90],
+    [["player_command_beacon"], { player_beacon_amplified_signal: 5 }, "beaconSpeedPct", 13],
+    [["player_command_beacon"], { player_beacon_amplified_signal: 5 }, "beaconRangePct", 10],
+    [["player_command_beacon"], { player_beacon_amplified_signal: 5,
+       player_beacon_directional_antenna: 5 }, "beaconFarFireRatePenaltyPct", 2.25],
+
+    // Gardien — base 50 + 5a, mana 100 + 8a − 5b
+    [["player_guardian_bastion_pact"], {}, "baseHpBonus", 50],
+    [["player_guardian_bastion_pact"], { player_guardian_thick_wall: 5 }, "baseHpBonus", 75],
+    [["player_guardian_bastion_pact"], { player_guardian_thick_wall: 5 }, "startingManaPenalty", 140],
+    [["player_guardian_bastion_pact"], { player_guardian_thick_wall: 5,
+       player_guardian_garrison_reserve: 5 }, "startingManaPenalty", 115],
+
+    // Brèche — 50 − 2r
+    [["player_controlled_breach"], {}, "firstLeakPct", 50],
+    [["player_controlled_breach"], { player_breach_reinforced_gate: 5 }, "firstLeakPct", 40],
+
+    // Shield — 50 + 2a per cent at 25 + a − b mana
+    [["player_mana_shield"], {}, "shieldMaxFractionPct", 50],
+    [["player_mana_shield"], { player_shield_protective_capacitor: 5 }, "shieldMaxFractionPct", 60],
+    [["player_mana_shield"], { player_shield_protective_capacitor: 5 }, "shieldManaPerDamage", 30],
+    [["player_mana_shield"], { player_shield_protective_capacitor: 5,
+       player_shield_efficient_circuit: 5 }, "shieldManaPerDamage", 25],
+
+    // Prime and Série — 25 + 5r, 1 + 0.2r a charge, 5 − r kept
+    [["player_no_leak_bounty"], {}, "noLeakBounty", 25],
+    [["player_no_leak_bounty"], { player_bounty_perfect_bonus: 5 }, "noLeakBounty", 50],
+    [["player_perfect_streak"], {}, "streakPerChargePct", 1],
+    [["player_perfect_streak"], { player_streak_victorious_cadence: 5 }, "streakPerChargePct", 2],
+    [["player_perfect_streak"], { player_streak_insurance: 3 }, "streakLossCap", 2],
+
+    // Blitz — 2 − 0.05a seconds a mana, haste 3 + 0.25a for 8 − 0.4b
+    [["player_blitz_doctrine"], {}, "blitzSecondsPerMana", 2],
+    [["player_blitz_doctrine"], { player_blitz_rushed_dividend: 5 }, "blitzSecondsPerMana", 1.75],
+    [["player_blitz_doctrine"], { player_blitz_rushed_dividend: 5 }, "blitzHastePct", 4.25],
+    [["player_blitz_doctrine"], { player_blitz_controlled_arrival: 5 }, "blitzHasteSeconds", 6],
+    [["player_blitz_doctrine"], {}, "blitzCapMana", 35],
+
+    // Totem — 100 − 8a + 12b health, 8 + a rate, 15 + b on death
+    [["player_vulnerable_totem"], {}, "totemHp", 100],
+    [["player_vulnerable_totem"], { player_totem_war_idol: 5 }, "totemHp", 60],
+    [["player_vulnerable_totem"], { player_totem_war_idol: 5,
+       player_totem_consecrated_stone: 5 }, "totemHp", 120],
+    [["player_vulnerable_totem"], { player_totem_war_idol: 5 }, "totemFireRatePct", 13],
+    [["player_vulnerable_totem"], { player_totem_consecrated_stone: 5 }, "totemDeathDamage", 20],
+
+    // Permis — 25 − 3r
+    [["player_crosspath_permit"], {}, "permitUpgradeSurchargePct", 25],
+    [["player_crosspath_permit"],
+     { player_crosspath_lighter_paperwork: 5 }, "permitUpgradeSurchargePct", 10],
+
+    // Prévision — the gap, rescaled to the delay this game actually has
+    [["player_tactical_forecast"], {}, "transitionSeconds", 2.5],
+    [["player_tactical_forecast"], { player_forecast_third_dossier: 1 }, "transitionSeconds", 2],
+    [["player_tactical_forecast"], { player_forecast_third_dossier: 1,
+       player_forecast_methodical_briefing: 5 }, "transitionSeconds", 4],
+    [["player_tactical_forecast"], {}, "forecastWaves", 2],
+    [["player_tactical_forecast"], { player_forecast_third_dossier: 1 }, "forecastWaves", 3]
+  ];
+
+  rows.forEach(function (row) {
+    h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+          "MetaProgress.addPlayerXp(20000)");
+    row[0].forEach(function (id, i) {
+      h.run("MetaProgress.buyModule('" + id + "', 0);" +
+            "MetaProgress.equipModule('" + id + "', " + i + ")");
+    });
+    setPlayerRanks(h, row[1]);
+    h.run("PlayerPerks.dirty()");
+    t.near(h.run("PlayerPerks.resolved()." + row[2]), row[3], 1e-9,
+      row[0].join("+") + " " + JSON.stringify(row[1]) + " → " + row[2] +
+      " = " + row[3]);
+  });
+});
+
+test("the save carries the Player, and one written before it reads as empty",
+function (t) {
+  var h = bootPlayer();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.addPlayerXp(4000);" +
+        "MetaProgress.buyModule('player_intendant_diversified_arsenal', 0);" +
+        "MetaProgress.buyPlayerRank('player_intendant_catalogued_inventory', 0, 1);" +
+        "MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
+
+  var snap = h.run("MetaProgress.snapshot().player");
+  t.eq(snap.xp, 4000, "the xp is in the profile");
+  t.eq(snap.modules.length, 1, "and the module");
+  t.eq(snap.ranks.player_intendant_catalogued_inventory, 1, "and the rank");
+  t.eq(snap.equipped[0], "player_intendant_diversified_arsenal", "and the slot");
+
+  // THE WHOLE MIGRATION IS AN ABSENT KEY.
+  var old = h.run("MetaProgress.__loadForTest({ coins: 700, owned: ['soldier']," +
+    " equipped: ['soldier', null, null, null, null]," +
+    " progress: { soldier: { xp: 3000, nodes: ['rif_n1']," +
+    "   equipped: ['rif_n1', null, null, null, null] } } })");
+  t.eq(old.player.xp, 0, "a save written before the Player reads level 0");
+  t.deep(old.player.modules, [], "with nothing bought");
+  t.deep(old.player.ranks, {}, "no ranks");
+  t.deep(old.player.equipped, [null, null, null, null, null, null, null],
+    "and seven empty slots");
+  t.eq(old.coins, 700, "keeping its coins");
+  t.eq(old.progress.soldier.nodes.length, 1, "and every tower row it had");
+  t.deep(h.run("PlayerPerks.resolved()"), h.run("PlayerPerks.neutral()"),
+    "so it plays exactly the game it played yesterday");
+
+  // HOSTILE DATA IS SHAPED, NOT TRUSTED.
+  var junk = h.run("MetaProgress.__loadForTest({ coins: 5, owned: ['soldier']," +
+    " equipped: [null, null, null, null, null], player: {" +
+    "   xp: -5, modules: ['player_scrapper', 'player_scrapper', 'nope', 7]," +
+    "   ranks: { player_scrapper_recovery_team: 99, zero: 0, bad: 'x' }," +
+    "   equipped: ['player_scrapper', 'player_scrapper', 'never_bought'," +
+    "              null, null, null, null], resetAt: -3 } })");
+  t.eq(junk.player.xp, 0, "a negative xp is zero");
+  t.deep(junk.player.modules, ["player_scrapper", "nope"],
+    "a duplicate is dropped, an unknown id is KEPT and inert");
+  t.eq(junk.player.ranks.zero, undefined, "a rank of 0 is not stored");
+  t.eq(junk.player.ranks.bad, undefined, "nor a string");
+  t.eq(junk.player.ranks.player_scrapper_recovery_team, 99,
+    "the save stores what it was told");
+  t.eq(h.run("PlayerPerks.rankOf('player_scrapper_recovery_team')"), 5,
+    "and the tree clamps it to the node's maximum");
+  t.eq(junk.player.equipped[0], "player_scrapper", "the owned module stays equipped");
+  t.eq(junk.player.equipped[1], null, "the duplicate slot is emptied");
+  t.eq(junk.player.equipped[2], null, "and a module that is not owned never sits in one");
+  t.eq(junk.player.resetAt, 0, "a nonsense stamp is zero");
+});
+
+test("a Player reset refunds every module and every rank, and counts each rank",
+function (t) {
+  var h = bootPlayer();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll();" +
+        "MetaProgress.addPlayerXp(20000)");
+  // STRAIGHT THROUGH THE MODEL at price 0: this test is about what a reset
+  // HANDS BACK, which `refundValue` reads off the authored cost, not about what
+  // was paid -- and the purchase rules have their own test above.
+  h.run("MetaProgress.buyModule('player_intendant_diversified_arsenal', 0)");  // 100
+  h.run("MetaProgress.buyModule('player_scrapper', 0)");                       // 140
+  setPlayerRanks(h, { player_scrapper_recovery_team: 3 });            // 40+60+90
+
+  t.eq(h.run("PlayerPerks.refundValue()"), 100 + 140 + 190,
+    "the refund is both modules plus every rank at the price it cost");
+
+  // **EVERY RANK IS ITS OWN NODE FOR THE COMMISSION**, which is the Player's
+  // rule and is DELIBERATELY not the towers' -- there a ranked node counts
+  // once, however many ranks it holds. Both are the owner's.
+  t.eq(h.run("PlayerPerks.resetNodeCount()"), 5,
+    "two modules and three ranks are five nodes");
+
+  var before = h.run("MetaProgress.coins()");
+  var out = h.run("PlayerPerks.reset(99999999)");
+  t.eq(out.ok, true, "the reset goes through");
+  t.eq(out.removed, 5, "five nodes");
+  t.eq(out.fee, 50, "at ten a node");
+  t.eq(out.refunded, 430, "with every coin handed back");
+  t.eq(h.run("MetaProgress.coins()"), before + 430 - 50, "and the purse agrees");
+  t.deep(h.run("MetaProgress.ownedModules()"), [], "nothing is owned");
+  t.deep(h.run("MetaProgress.playerRanks()"), {}, "no rank survives");
+  t.deep(h.run("MetaProgress.equippedModules()"),
+    [null, null, null, null, null, null, null], "and the loadout is empty");
+
+  // THE COOLDOWN IS REAL AND IS THE PLAYER'S OWN.
+  var again = h.run("PlayerPerks.reset(99999999)");
+  t.eq(again.ok, false, "a second reset on the same clock refuses");
+  t.ok(/cool/.test(again.reason), "for the cooldown: " + again.reason);
+  t.eq(h.run("MetaProgress.playerResetReadyAt()"),
+    99999999 + h.run("MetaProgress.TREE_RESET_COOLDOWN_MS"), "one hour out");
+
+  // AND IT NEVER TOUCHES A TOWER.
+  h.run("MetaProgress.buyNode('soldier', 'rif_n1', 0)");
+  h.run("PlayerPerks.reset(99999999)");
+  t.eq(h.run("MetaProgress.ownsNode('soldier', 'rif_n1')"), true,
+    "resetting the Player leaves every tower's tree alone");
+});
+
+test("a run opens on the mana and the base health the loadout resolved",
+function (t) {
+  var h = bootPlayer();
+
+  playerRun(h, ["player_advanced_treasury"], {}, { cash: false });
+  t.eq(h.run("cash"), h.run("STARTING_CASH") + 250, "Trésorerie opens on +250");
+
+  playerRun(h, ["player_guardian_bastion_pact"], {}, { cash: false });
+  t.eq(h.run("cash"), h.run("STARTING_CASH") - 100, "Gardien opens on −100");
+  t.eq(h.run("baseMaxHp"), h.run("BASE_MAX_HP") + 50, "with +50 base health");
+  t.eq(h.run("baseHp"), h.run("baseMaxHp"), "and the base opens FULL");
+
+  // THE TWO SUM, which is what "les points s'ajoutent" means for the purse.
+  playerRun(h, ["player_advanced_treasury", "player_guardian_bastion_pact"],
+    { player_guardian_thick_wall: 5, player_guardian_garrison_reserve: 5 },
+    { cash: false });
+  t.eq(h.run("cash"), h.run("STARTING_CASH") + 250 - 115,
+    "both equipped is +250 − 115");
+  t.eq(h.run("baseMaxHp"), h.run("BASE_MAX_HP") + 75, "and +75 of base health");
+});
+
+test("Intendant prices the first of each type and every one after it",
+function (t) {
+  var h = bootPlayer();
+  var COST = h.run("Soldier.COST");
+  playerRun(h, ["player_intendant_diversified_arsenal"],
+    { player_intendant_catalogued_inventory: 3 });
+
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('soldier'))"), COST - 69,
+    "the first Rifleman is 69 cheaper");
+  var first = placePlayerTower(h, 200, 200);
+  t.eq(h.run(first + ".cost"), COST - 69, "and really was built for that");
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('soldier'))"), COST + 23,
+    "every later one is 23 dearer");
+
+  // A DIFFERENT TYPE HAS ITS OWN FIRST.
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('smasher'))"),
+    h.run("Smasher.COST") - 69, "a Warbringer is still on its own discount");
+
+  // SELLING THE FIRST DOES NOT HAND THE DISCOUNT BACK -- it was spent by a
+  // COMPLETED placement, and rebuilding is not a way to farm it.
+  h.run("(function () { sellTower(" + first + "); })()");
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('soldier'))"), COST + 23,
+    "after selling it, the next Rifleman is still the dear one");
+  t.eq(h.run("PlayerRun.placedCount('soldier')"), 1, "the placement is still counted");
+
+  // THE FLOOR IS ZERO. A discount can reach the minimum and never pay the
+  // player to build.
+  t.ok(h.run("towerPrice(MetaProgress.constructorOf('soldier'))") >= 0,
+    "no price is ever negative");
+});
+
+test("Arsenal partagé pays for what is alive and charges for a duplicate",
+function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_shared_arsenal"], {});
+  var COST = h.run("Soldier.COST");
+
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('soldier'))"), COST,
+    "with nothing standing, nothing is a duplicate");
+  var a = placePlayerTower(h, 200, 200);
+  t.eq(h.run(a + ".damage"), h.run("Soldier.BASE_DAMAGE") * 1.01,
+    "one live type is +1% damage");
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('soldier'))"),
+    Math.round(COST * 1.02), "and a second Rifleman is a duplicate at +2%");
+  t.eq(h.run("towerPrice(MetaProgress.constructorOf('smasher'))"),
+    h.run("Smasher.COST"), "while a Warbringer is not");
+
+  placePlayerTower(h, 900, 200, "smasher");
+  t.near(h.run(a + ".damage"), h.run("Soldier.BASE_DAMAGE") * 1.02, 1e-9,
+    "two live types is +2%, recomputed the moment the board changed");
+
+  // THE CAP HOLDS, and the composition is what moves it -- not the count.
+  playerRun(h, ["player_shared_arsenal"], {});
+  ["soldier", "smasher", "longshot", "siphon", "blub", "farm"]
+    .forEach(function (id, i) { placePlayerTower(h, 200 + i * 120, 200, id); });
+  t.eq(h.run("(function () { var s = {}; towers.forEach(function (x) {" +
+    "  if (PlayerEffects.isCountable(x)) s[x.constructor.ID] = 1; });" +
+    "  return Object.keys(s).length; })()"), 6, "six types are standing");
+  t.near(h.run("PlayerEffects.pointsFor(towers[0]).damage"), 5, 1e-9,
+    "six live types still only pays the +5% cap");
+});
+
+test("Architecte and Opérateurs isolés read the board and recompute with it",
+function (t) {
+  var h = bootPlayer();
+  var NEAR = 40, FAR = 900;
+
+  // ALONE: no proximity bonus, and the isolated reach.
+  playerRun(h, ["player_architect_campaign_network", "player_isolated_operators"], {});
+  var solo = placePlayerTower(h, 200, 200);
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").fireRate"), 0, 1e-9,
+    "a lone tower has no neighbour of either kind");
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").range"), 10, 1e-9,
+    "and reaches 10% further for standing alone");
+
+  // A DIFFERENT TYPE NEXT DOOR: faster, and no longer alone.
+  placePlayerTower(h, 200 + NEAR, 200, "smasher");
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").fireRate"), 5, 1e-9,
+    "a different type within 70 u.l. is +5% fire rate");
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").range"), -5, 1e-9,
+    "and the isolation bonus becomes the crowded penalty");
+
+  // ONE OF ITS OWN AS WELL: BOTH halves are true at once, and each counts once.
+  placePlayerTower(h, 200 - NEAR, 200, "soldier");
+  placePlayerTower(h, 200, 200 + NEAR, "soldier");
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").fireRate"), 5 - 3, 1e-9,
+    "beside one of each it is +5 AND −3, and two of its own still count once");
+
+  // AND IT RECOMPUTES WHEN THE BOARD CHANGES BACK.
+  h.run("(function () { for (var i = towers.length - 1; i >= 0; i--)" +
+        "  if (towers[i].x !== 200 || towers[i].y !== 200) sellTower(towers[i]); })()");
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").fireRate"), 0, 1e-9,
+    "selling the neighbours takes both halves away again");
+  t.near(h.run("PlayerEffects.pointsFor(" + solo + ").range"), 10, 1e-9,
+    "and it is alone once more");
+});
+
+test("Ferrailleur pays for a destruction and never for a sale", function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_scrapper"], {});
+
+  var tw = placePlayerTower(h, 200, 200);
+  var spent = h.run(tw + ".totalSpent");
+  t.eq(h.run(tw + ".maxHp"), Math.max(1, h.run("Soldier.BASE_HP") * 0.85),
+    "every tower has 15% less health while it is equipped");
+
+  // A SALE IS NOT A DESTRUCTION.
+  var before = h.run("cash");
+  h.run("(function () { sellTower(" + tw + "); })()");
+  t.eq(h.run("cash") - before, Math.floor(spent / 2),
+    "a sale pays exactly what a sale always paid");
+
+  // A DESTRUCTION PAYS THE PROPORTION OF THE REAL INVESTMENT.
+  var tw2 = placePlayerTower(h, 300, 300);
+  var spent2 = h.run(tw2 + ".totalSpent");
+  var before2 = h.run("cash");
+  h.run("(function () { var t = " + tw2 + "; t.currentHp = 0; })()");
+  h.run("update(1 / 60)");
+  t.eq(h.run("towers.length"), 0, "the destroyed tower is swept out");
+  t.eq(h.run("cash") - before2, Math.round(spent2 * 0.5),
+    "and 50% of everything sunk into it comes back");
+
+  // ONE PAYMENT, NEVER TWO.
+  h.run("update(1 / 60); update(1 / 60)");
+  t.eq(h.run("cash") - before2, Math.round(spent2 * 0.5),
+    "and later frames pay nothing more");
+});
+
+test("the credit line stops at its limit, blocks every spend and charges interest",
+function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_emergency_credit"], {}, { cash: false });
+  h.run("cash = 100");
+
+  // A TRANSACTION MAY GO NEGATIVE, ONCE.
+  t.eq(h.run("PlayerRun.canSpend(100, 300).ok"), true, "300 out of 100 is allowed");
+  t.eq(h.run("PlayerRun.canSpend(100, 401).ok"), false,
+    "but not past the −300 ceiling");
+  t.ok(/300/.test(h.run("PlayerRun.canSpend(100, 401).reason")), "and it says so");
+
+  // ONCE THE BALANCE IS RED, NOTHING MAY BE BOUGHT.
+  var blocked = h.run("PlayerRun.canSpend(-1, 1)");
+  t.eq(blocked.ok, false, "a negative balance blocks the next purchase");
+  t.ok(/debt/.test(blocked.reason), "and says why: " + blocked.reason);
+  t.eq(h.run("PlayerRun.canSpend(0, 50).ok"), true, "back at zero it flows again");
+
+  // THE INTEREST IS CHARGED AT THE OPENING OF A WAVE and rounds up in magnitude.
+  t.eq(h.run("PlayerRun.chargeInterest(-200)"), 30, "15% of 200 is 30");
+  t.eq(h.run("PlayerRun.chargeInterest(-1)"), 1, "and a penny of debt still grows");
+  t.eq(h.run("PlayerRun.chargeInterest(50)"), 0, "a positive balance owes nothing");
+
+  playerRun(h, ["player_emergency_credit"],
+    { player_credit_extended_line: 5, player_credit_refinancing: 5 }, { cash: false });
+  t.eq(h.run("PlayerRun.canSpend(0, 500).ok"), true, "rank 5 reaches −500");
+  t.eq(h.run("PlayerRun.canSpend(0, 501).ok"), false, "and no further");
+  t.eq(h.run("PlayerRun.chargeInterest(-200)"), 35, "at 17.5% a wave");
+
+  // AND WITHOUT THE MODULE IT IS THE PLAIN OLD REFUSAL.
+  playerRun(h, [], {}, { cash: false });
+  var plain = h.run("PlayerRun.canSpend(10, 50)");
+  t.eq(plain.ok, false, "no credit, no overdraft");
+  t.eq(plain.reason, "not enough mana", "and the sentence the game always used");
+});
+
+test("base damage resolves Brèche, then the shield, then what is really lost",
+function (t) {
+  var h = bootPlayer();
+
+  // BRÈCHE HALVES THE FIRST LEAK OF A WAVE AND ONLY THE FIRST.
+  playerRun(h, ["player_controlled_breach"], {}, { wave: 0 });
+  h.run("PlayerRun.onWaveStart(1, cash)");
+  var first = h.run("PlayerRun.resolveBaseDamage(20, 1000, { leak: true })");
+  t.eq(first.toBase, 10, "the first leak of a wave costs half");
+  t.eq(first.breached, true, "and says it was breached");
+  var second = h.run("PlayerRun.resolveBaseDamage(20, 1000, { leak: true })");
+  t.eq(second.toBase, 20, "the second costs all of it");
+  h.run("PlayerRun.onWaveStart(2, cash)");
+  t.eq(h.run("PlayerRun.resolveBaseDamage(20, 1000, { leak: true }).toBase"), 10,
+    "and the next wave has its own first leak");
+
+  // THE SHIELD ABSORBS WHOLE POINTS IT CAN PAY FOR, AFTER Brèche.
+  playerRun(h, ["player_controlled_breach", "player_mana_shield"], {}, { wave: 0 });
+  h.run("PlayerRun.toggleShield(); PlayerRun.onWaveStart(1, cash)");
+  var both = h.run("PlayerRun.resolveBaseDamage(20, 1000, { leak: true })");
+  t.eq(both.toBase, 5, "20 halved to 10, then half of THAT absorbed");
+  t.eq(both.absorbed, 5, "five points prevented");
+  t.eq(both.manaCost, 125, "at 25 mana a point");
+
+  // WITH TOO LITTLE MANA IT ABSORBS ONLY WHAT IT CAN BUY, and never into debt.
+  var poor = h.run("PlayerRun.resolveBaseDamage(20, 60, { leak: false })");
+  t.eq(poor.absorbed, 2, "60 mana buys two points");
+  t.eq(poor.manaCost, 50, "and costs exactly 50");
+  t.eq(poor.toBase, 18, "the base takes the rest");
+  var broke = h.run("PlayerRun.resolveBaseDamage(20, 0, { leak: false })");
+  t.eq(broke.absorbed, 0, "an empty purse absorbs nothing");
+  t.eq(broke.manaCost, 0, "and never creates a debt");
+
+  // THE SHIELD IS OFF AT THE START OF EVERY RUN.
+  playerRun(h, ["player_mana_shield"], {}, { wave: 0 });
+  t.eq(h.run("PlayerRun.shieldActive()"), false, "off when a run opens");
+  t.eq(h.run("PlayerRun.resolveBaseDamage(20, 1000, {}).absorbed"), 0,
+    "and absorbs nothing while it is off");
+});
+
+test("the streak counts clean waves and an absorbed hit keeps it alive",
+function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_no_leak_bounty", "player_perfect_streak"], {}, { wave: 0 });
+
+  // A CLEAN WAVE BANKS A CHARGE AND SCHEDULES THE BOUNTY.
+  for (var i = 1; i <= 5; i++) {
+    h.run("PlayerRun.onWaveStart(" + i + ", 1000)");
+    var out = h.run("PlayerRun.onWaveEnd()");
+    t.eq(out.clean, true, "wave " + i + " was clean");
+    t.eq(out.charges, i, "and banks charge " + i);
+  }
+  h.run("PlayerRun.onWaveStart(6, 1000)");
+  t.eq(h.run("PlayerRun.onWaveEnd().charges"), 5, "five is the ceiling");
+
+  var opened = h.run("PlayerRun.onWaveStart(7, 1000)");
+  t.eq(opened.bounty, 25, "and each clean wave pays 25 at the START of the next");
+
+  // A LOSS CLEARS THEM, at the moment of the first loss.
+  h.run("PlayerRun.noteBaseLoss(3)");
+  t.eq(h.run("PlayerRun.streakCharges()"), 0, "one point lost clears every charge");
+  t.eq(h.run("PlayerRun.onWaveEnd().clean"), false, "and the wave is not clean");
+  t.eq(h.run("PlayerRun.onWaveStart(8, 1000).bounty"), 0, "so no bounty follows");
+
+  // A FULLY ABSORBED HIT IS NOT A LOSS.
+  playerRun(h, ["player_no_leak_bounty", "player_perfect_streak", "player_mana_shield"],
+    {}, { wave: 0 });
+  h.run("PlayerRun.toggleShield(); PlayerRun.onWaveStart(1, 100000);" +
+        "PlayerRun.onWaveEnd(); PlayerRun.onWaveStart(2, 100000)");
+  t.eq(h.run("PlayerRun.streakCharges()"), 1, "one charge banked");
+  var hit = h.run("PlayerRun.resolveBaseDamage(2, 100000, { leak: false })");
+  t.eq(hit.toBase, 1, "half of a 2-point hit is absorbed");
+  h.run("PlayerRun.noteBaseLoss(" + hit.toBase + ")");
+  t.eq(h.run("PlayerRun.streakCharges()"), 0, "the point that DID land breaks it");
+
+  // ASSURANCE DE SÉRIE KEEPS WHAT IT PROMISES.
+  playerRun(h, ["player_no_leak_bounty", "player_perfect_streak"],
+    { player_streak_insurance: 3 }, { wave: 0 });
+  for (var w = 1; w <= 5; w++) {
+    h.run("PlayerRun.onWaveStart(" + w + ", 1000); PlayerRun.onWaveEnd()");
+  }
+  h.run("PlayerRun.onWaveStart(6, 1000)");
+  t.eq(h.run("PlayerRun.streakCharges()"), 5, "five charges");
+  h.run("PlayerRun.noteBaseLoss(1)");
+  t.eq(h.run("PlayerRun.streakCharges()"), 3, "rank 3 takes at most two of them");
+  h.run("PlayerRun.noteBaseLoss(1)");
+  t.eq(h.run("PlayerRun.streakCharges()"), 3, "and only one resolution a wave");
+});
+
+test("the streak and the totem are damage and fire rate on every tower",
+function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_no_leak_bounty", "player_perfect_streak"],
+    { player_streak_victorious_cadence: 5 }, { wave: 0 });
+  var tw = placePlayerTower(h, 200, 200);
+  var base = h.run("Soldier.BASE_DAMAGE");
+  t.eq(h.run(tw + ".damage"), base, "no charges, no bonus");
+
+  h.run("PlayerRun.onWaveStart(1, 1000); PlayerRun.onWaveEnd();" +
+        "PlayerEffects.refresh(towers)");
+  t.near(h.run(tw + ".damage"), base * 1.02, 1e-9,
+    "one charge at rank 5 is +2% damage on every tower");
+
+  for (var w = 2; w <= 5; w++) {
+    h.run("PlayerRun.onWaveStart(" + w + ", 1000); PlayerRun.onWaveEnd()");
+  }
+  h.run("PlayerEffects.refresh(towers)");
+  t.near(h.run(tw + ".damage"), base * 1.10, 1e-9, "five charges is +10%");
+
+  // THE TOTEM'S AURA, AND WHAT ITS DEATH COSTS.
+  // THE TOTEM ALONE. Its module needs the beacon and Gardien BOUGHT, never
+  // equipped, so only the totem goes in a slot -- and the beacon's standing
+  // −2% is correctly not part of this test's arithmetic.
+  playerRun(h, ["player_vulnerable_totem"], {}, { wave: 0 });
+  h.run("waveIndex = 0; waveCountdown = 10");
+  var tw2 = placePlayerTower(h, 200, 200);
+  var plainRate = h.run(tw2 + ".attacksPerSecond()");
+  t.eq(h.run("PlayerRun.placeTotem(320, 320, true)"), null, "the totem is planted");
+  h.run("PlayerEffects.refresh(towers)");
+  t.near(h.run(tw2 + ".attacksPerSecond()"), plainRate * 1.08, 1e-6,
+    "every tower fires 8% faster while it stands");
+
+  var hpBefore = h.run("baseHp");
+  var owed = h.run("PlayerRun.damageTotem(100)");
+  t.eq(owed, 15, "killing it owes the base 15");
+  t.eq(h.run("PlayerRun.totem().alive"), false, "and it is gone");
+  h.run("applyBaseDamage(" + owed + ", { leak: false })");
+  t.eq(h.run("baseHp"), hpBefore - 15, "which the base really loses");
+  t.eq(h.run("PlayerRun.lostThisWaveYet()"), true, "and it counts as a loss");
+  h.run("PlayerEffects.refresh(towers)");
+  t.near(h.run(tw2 + ".attacksPerSecond()"), plainRate, 1e-6, "the buff went with it");
+  t.eq(h.run("PlayerRun.placeTotem(400, 400, true)"), "the totem is already placed",
+    "and it cannot be planted again this run");
+});
+
+test("the orders, the radar and the beacon do what they say and cost what they cost",
+function (t) {
+  var h = bootPlayer();
+
+  // ORDRE PRIORITAIRE: every tower that can reach it shoots it, softer.
+  playerRun(h, ["player_commander_priority_order"], {}, { wave: 0 });
+  h.run("enemies = [new Enemy(path, null, 'normal', {}), new Enemy(path, null, 'normal', {})];" +
+        "enemies[0].progress = path.length * 0.9; enemies[0].refreshPos();" +
+        "enemies[1].progress = path.length * 0.5; enemies[1].refreshPos()");
+  placePlayerTower(h, 200, 200);
+  // HELD BY NAME, NOT BY POSITION: this one is about to be MOVED onto the
+  // enemy, and a finder that looks it up by x would stop finding it.
+  h.run("(function () { var t = towers[0]; t.x = enemies[1].pos.x;" +
+        "  t.y = enemies[1].pos.y; t.rangePx = 1e6; })()");
+  var tw = "towers[0]";
+  t.eq(h.run("Targeting.pick(" + tw + ", enemies, false) === enemies[0]"), true,
+    "'first' picks the enemy furthest along");
+  t.eq(h.run("PlayerRun.order(enemies[1])"), null, "the order goes out");
+  t.eq(h.run("Targeting.pick(" + tw + ", enemies, false) === enemies[1]"), true,
+    "and every tower that can reach the mark shoots IT instead");
+  t.near(h.run("PlayerRun.markDamageScale(enemies[1])"), 0.95, 1e-9,
+    "for 5% less damage");
+  t.eq(h.run("PlayerRun.markDamageScale(enemies[0])"), 1,
+    "and nothing else is softened");
+
+  // THE COOLDOWN STARTS ON A SUCCESSFUL ACTIVATION.
+  t.eq(h.run("PlayerRun.markReady()"), false, "it is on cooldown now");
+  t.ok(/ready in/.test(h.run("PlayerRun.order(enemies[0])")), "and refuses until it is not");
+  h.run("PlayerRun.update(5.1, towers)");
+  t.eq(h.run("PlayerRun.markedEnemy()"), null, "the mark expires after five seconds");
+
+  // BALAYAGE RADAR: sight for everything, and it takes it back.
+  playerRun(h, ["player_radar_sweep"], {}, { wave: 0 });
+  placePlayerTower(h, 200, 200);
+  var seer = "towers[0]";
+  h.run("enemies = [new Enemy(path, null, 'normal', {})]; enemies[0].isCamo = true;" +
+        "enemies[0].isFlying = true");
+  t.eq(h.run("Targeting.sees(" + seer + ", enemies[0])"), false,
+    "a Rifleman sees neither camo nor flying");
+  t.eq(h.run("PlayerRun.startRadar()"), null, "the sweep goes up");
+  t.eq(h.run("Targeting.sees(" + seer + ", enemies[0])"), true, "and now it sees both");
+  h.run("PlayerRun.update(8.1, towers)");
+  t.eq(h.run("PlayerRun.radarActive()"), false, "eight seconds later it is over");
+  t.eq(h.run("Targeting.sees(" + seer + ", enemies[0])"), false,
+    "and the tower is back to seeing neither — never left holding an illegal target");
+  t.near(h.run("PlayerEffects.pointsFor(" + seer + ").range"), -3, 1e-9,
+    "the standing 3% range cost is paid whether or not the radar is up");
+
+  // BALISE: inside and outside, and it only moves between waves.
+  playerRun(h, ["player_commander_priority_order", "player_command_beacon"], {},
+    { wave: 0 });
+  h.run("waveCountdown = 10");
+  var near = placePlayerTower(h, 300, 300);
+  var far = placePlayerTower(h, 1100, 600);
+  t.eq(h.run("PlayerRun.placeBeacon(300, 300, false)"), null, "the beacon is set");
+  h.run("PlayerEffects.refresh(towers)");
+  t.near(h.run("PlayerEffects.pointsFor(" + near + ").range"), 5, 1e-9,
+    "a tower inside 90 u.l. reaches 5% further");
+  t.near(h.run("PlayerEffects.pointsFor(" + near + ").speed"), 8, 1e-9,
+    "with 8% more projectile speed");
+  t.near(h.run("PlayerEffects.pointsFor(" + far + ").fireRate"), -2, 1e-9,
+    "and every tower outside pays 2% of its fire rate");
+  t.eq(h.run("PlayerRun.placeBeacon(500, 500, true)"),
+    "the beacon only moves between waves", "it cannot be moved during a wave");
+  t.eq(h.run("PlayerRun.placeBeacon(500, 500, false)"), null,
+    "and can between them");
+});
+
+test("Doctrine Blitz pays for the seconds a Send really cut, and hastes that wave",
+function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_advanced_treasury", "player_commander_priority_order",
+                "player_blitz_doctrine"], {}, { wave: 0 });
+
+  // 1 MANA A FULL TWO SECONDS, CAPPED AT 35.
+  t.eq(h.run("PlayerRun.noteEarlyCall(0)"), 0, "an automatic send at zero pays nothing");
+  t.eq(h.run("PlayerRun.noteEarlyCall(1.9)"), 0, "and a part-tranche pays nothing");
+  t.eq(h.run("PlayerRun.noteEarlyCall(9)"), 4, "nine seconds is four full tranches");
+  t.eq(h.run("PlayerRun.noteEarlyCall(200)"), 35, "and the cap is 35");
+
+  // THE WAVE IT ARMED IS HASTED, AND ONLY THAT WAVE.
+  h.run("PlayerRun.onWaveStart(4, 1000); PlayerRun.noteEarlyCall(1)");
+  t.eq(h.run("PlayerRun.hasteForSpawn(5)"), null,
+    "a call that paid nothing arms no haste either");
+  var spec = h.run("(function () { PlayerRun.onWaveStart(4, 1000);" +
+    "  PlayerRun.noteEarlyCall(60); return PlayerRun.hasteForSpawn(5); })()");
+  t.near(spec.pct, 3, 1e-9, "the next wave's bodies carry +3%");
+  t.near(spec.seconds, 8, 1e-9, "for eight seconds each");
+  t.eq(h.run("PlayerRun.hasteForSpawn(6)"), null, "and the wave after it carries nothing");
+
+  // AND A BODY REALLY MOVES FASTER, FROM ITS OWN BIRTH.
+  h.run("enemies = []; waveIndex = 4; spawnEnemy(100, 'normal', path, null, 0, 'w')");
+  var fast = h.run("enemies[0].currentSpeedUlps()");
+  h.run("enemies[0].playerHasteLeft = 0");
+  var slow = h.run("enemies[0].currentSpeedUlps()");
+  t.near(fast / slow, 1.03, 1e-9, "a hasted body walks 3% faster");
+  t.near(slow, h.run("enemies[0].speedUlps"), 1e-9, "and an unhasted one is itself");
+
+  // RANKS MOVE BOTH ENDS.
+  playerRun(h, ["player_advanced_treasury", "player_commander_priority_order",
+                "player_blitz_doctrine"],
+    { player_blitz_rushed_dividend: 5, player_blitz_controlled_arrival: 5 },
+    { wave: 0 });
+  t.eq(h.run("PlayerRun.noteEarlyCall(7)"), 4,
+    "at 1.75 s a mana, seven seconds is four");
+  var deep = h.run("(function () { PlayerRun.onWaveStart(1, 1000);" +
+    "  PlayerRun.noteEarlyCall(60); return PlayerRun.hasteForSpawn(2); })()");
+  t.near(deep.pct, 4.25, 1e-9, "the haste is deeper");
+  t.near(deep.seconds, 6, 1e-9, "and two seconds shorter");
+});
+
+test("the crosspath permit buys one extra tier, on one tower, once",
+function (t) {
+  var h = bootPlayer();
+  playerRun(h, ["player_crosspath_permit"], {});
+  var tw = placePlayerTower(h, 200, 200);
+
+  // 5-2 IS THE GAME'S OWN LOCK. Climb A to 3, which caps B at 2.
+  h.run("(function () { var t = " + tw + ";" +
+        "  buyUpgrade(t, 'A1'); buyUpgrade(t, 'A2'); buyUpgrade(t, 'A3');" +
+        "  buyUpgrade(t, 'B1'); buyUpgrade(t, 'B2'); })()");
+  t.eq(h.run(tw + ".hasA3"), true, "path A is committed");
+  t.eq(h.run(tw + ".hasB2"), true, "and B is at two");
+  t.ok(/already chosen/.test(h.run(tw + ".whyCannotUpgrade('B3')")),
+    "the lock refuses B3 by itself");
+
+  // THE PERMIT COVERS EXACTLY THAT REFUSAL.
+  t.eq(h.run("PlayerRun.permitAvailable()"), true, "the permit is unspent");
+  t.eq(h.run("buyUpgrade(" + tw + ", 'B3')"), null, "so B3 goes through");
+  t.eq(h.run(tw + ".hasB3"), true, "and the tower really has 3-3... 5-3 in the making");
+  t.eq(h.run("PlayerRun.permitSpent()"), true, "the permit is spent");
+  t.eq(h.run("PlayerRun.permitHolder() === " + tw), true, "by this tower");
+
+  // AND NEVER A SECOND TIER.
+  t.ok(/already chosen/.test(String(h.run("buyUpgrade(" + tw + ", 'B4')"))),
+    "B4 is refused — one extra tier, not two");
+
+  // EVERY UPGRADE ON THAT TOWER NOW COSTS 25% MORE.
+  t.eq(h.run("playerUpgradePrice(" + tw + ", 100)"), 125, "its upgrades are +25%");
+  var other = placePlayerTower(h, 900, 200);
+  t.eq(h.run("playerUpgradePrice(" + other + ", 100)"), 100,
+    "and no other tower pays a coin of it");
+
+  // ONE TOWER A RUN.
+  h.run("(function () { var t = " + other + ";" +
+        "  buyUpgrade(t, 'A1'); buyUpgrade(t, 'A2'); buyUpgrade(t, 'A3');" +
+        "  buyUpgrade(t, 'B1'); buyUpgrade(t, 'B2'); })()");
+  t.ok(/already chosen/.test(String(h.run("buyUpgrade(" + other + ", 'B3')"))),
+    "a second tower cannot have the permit this run");
+
+  // DOSSIER ALLÉGÉ SOFTENS THE SURCHARGE; CLAUSE DE RESTITUTION HANDS AN
+  // UNSPENT PERMIT BACK.
+  playerRun(h, ["player_crosspath_permit"],
+    { player_crosspath_lighter_paperwork: 5, player_crosspath_restitution_clause: 1 });
+  var third = placePlayerTower(h, 200, 200);
+  h.run("PlayerRun.grantPermit(" + third + ")");
+  t.eq(h.run("playerUpgradePrice(" + third + ", 100)"), 110, "rank 5 leaves +10%");
+  t.eq(h.run("PlayerRun.permitAvailable()"), false, "the permit is out");
+  h.run("(function () { sellTower(" + third + "); })()");
+  t.eq(h.run("PlayerRun.permitAvailable()"), true,
+    "and an UNSPENT permit comes back when its tower is lost");
+});
+
 runner.run();
