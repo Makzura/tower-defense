@@ -738,6 +738,23 @@ Soldier.prototype.recalcStats = function () {
       this.burstCooldown /= boost;
     }
   }
+
+  // AND THE PLAYER'S LOADOUT, on the same two things and in the same shape.
+  // Attack speed is three numbers on this tower and all three are it: the
+  // automatic rate MULTIPLIES and the two intervals DIVIDE. Range comes through
+  // elevatedRangePx and health through `hpScale` below, so this is damage and
+  // rate only. See js/systems/player-effects.js.
+  if (typeof PlayerEffects !== "undefined") {
+    var pd = PlayerEffects.damageScale(this);
+    if (pd !== 1) this.damage *= pd;
+    var pr = PlayerEffects.fireRateScale(this);
+    if (pr !== 1) {
+      this.shotsPerSecond *= pr;
+      this.shotSpacing /= pr;
+      this.burstCooldown /= pr;
+    }
+    this.maxHp = PlayerEffects.scaledMaxHp(this.maxHp);
+  }
 };
 
 // THE TOWER'S OWN LAST WORD, called by js/systems/tower-perks.js after every

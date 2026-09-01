@@ -474,6 +474,21 @@ BlubTower.prototype.recalcStats = function () {
   this.hasCoagulation = this.hasA5;
 
   this.syncLines();
+
+  // AND THE PLAYER'S LOADOUT, last. Range comes through elevatedRangePx, so
+  // this is damage, rate of fire and health -- the three a Player module can
+  // move on any type. See js/systems/player-effects.js.
+  if (typeof PlayerEffects !== "undefined") {
+    var pDmg = PlayerEffects.damageScale(this);
+    if (pDmg !== 1 && typeof this.damage === "number") this.damage *= pDmg;
+    var pRate = PlayerEffects.fireRateScale(this);
+    if (pRate !== 1) {
+      if (typeof this.shotsPerSecond === "number") this.shotsPerSecond *= pRate;
+      if (typeof this.cooldownSeconds === "number") this.cooldownSeconds /= pRate;
+      if (typeof this.tickSeconds === "number") this.tickSeconds /= pRate;
+    }
+    this.maxHp = PlayerEffects.scaledMaxHp(this.maxHp);
+  }
 };
 
 // Which unit each summon line currently calls, or null for a line that is not

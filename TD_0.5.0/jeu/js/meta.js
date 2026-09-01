@@ -72,6 +72,26 @@ var MetaProgress = (function () {
   var TREE_RESET_FEE_PER_NODE = 10;
   var TREE_RESET_COOLDOWN_MS = 60 * 60 * 1000;
 
+  // --- THE PLAYER (2026-09-01) -----------------------------------------------
+  //
+  // A FOURTH FIVE, AND IT IS NOT ANY OF THE OTHER THREE. `PLAYER_SLOTS` is how
+  // many PLAYER modules fit in the Player's loadout, and it is SEVEN, not five:
+  // the Player opens with two and earns one per level, so the bar is
+  // `2 + level` wide out of a fixed seven.
+  //
+  // THE PLAYER IS NOT A TOWER and does not have a row in `progress`. It has no
+  // catalogue entry, is never owned or unowned, is never in the build bar, and
+  // its loadout is a different SHAPE from a tower's -- so giving it a row would
+  // have meant either bending PERK_SLOTS to seven for everybody or storing a
+  // seven-slot array in a five-slot field. It gets its own block instead, and
+  // js/systems/player-perks.js is the only thing that reads it.
+  //
+  // THE XP CURVE IS SHARED, DELIBERATELY. `XP_THRESHOLDS` above is the Player's
+  // ladder too -- the brief asks for exactly that, and a second curve would be
+  // a second thing to keep in step with the first.
+  var PLAYER_SLOTS = 7;
+  var PLAYER_BASE_SLOTS = 2;
+
   // How many build-bar slots a loadout has. MUST match BUILD_SLOTS.length in
   // game.js -- the bar's geometry is built from the array, and the inventory
   // screen edits the same shape. A test pins the two together.
@@ -222,8 +242,23 @@ var MetaProgress = (function () {
       // by catalogue id. Absent for a tower that has never been played, which
       // is the same thing as level 0 with nothing bought -- see progressOf,
       // which materialises that default rather than storing a row per tower.
-      progress: {}
+      progress: {},
+      // THE EIGHTH FIELD (2026-09-01): the Player's own progression. Absent on
+      // every profile written before today, which reads as level 0 with nothing
+      // bought and an empty loadout -- exactly what a fresh one holds, so the
+      // migration is the absence itself and there is nothing to rewrite.
+      player: freshPlayer()
     };
+  }
+
+  function freshPlayer() {
+    return { xp: 0, modules: [], ranks: {}, equipped: emptyPlayerSlots(), resetAt: 0 };
+  }
+
+  function emptyPlayerSlots() {
+    var out = [];
+    for (var i = 0; i < PLAYER_SLOTS; i++) out.push(null);
+    return out;
   }
 
   // Owned towers land in catalogue order, one per slot, remaining slots empty.
@@ -309,8 +344,55 @@ var MetaProgress = (function () {
       // equipped" for every tower it owns -- so a profile written before
       // 2026-08-30 keeps its coins, its towers and its build bar exactly, and
       // starts this system at the beginning like a fresh one.
-      progress: cleanProgress(raw.progress, owned)
+      progress: cleanProgress(raw.progress, owned),
+      player: cleanPlayer(raw.player)
     };
+  }
+
+  // THE PLAYER'S BLOCK, rebuilt from what is recognisable, with the same three
+  // kinds of invariant the tower rows enforce -- and no more, because the rest
+  // is content and lives in js/systems/player-perks.js.
+  //
+  //   * xp is a non-negative number;
+  //   * an equipped module must be OWNED and may sit in only one slot;
+  //   * no slot past `2 + level` may hold anything, which is what makes a
+  //     hand-edited file unable to run seven modules at level 0.
+  //
+  // MODULE AND RANK IDS ARE OPEN, exactly as node ids are: this file cannot
+  // enumerate the Player's tree without depending on it, so an id this build
+  // does not know is kept and is inert.
+  function cleanPlayer(raw) {
+    var out = freshPlayer();
+    if (!raw || typeof raw !== "object") return out;
+
+    out.xp = (typeof raw.xp === "number" && isFinite(raw.xp) && raw.xp > 0) ? raw.xp : 0;
+    out.modules = cleanStringList(raw.modules);
+    out.ranks = cleanRanks(raw.ranks);
+
+    var slots = playerSlotsFor(levelForXp(out.xp));
+    for (var i = 0; i < PLAYER_SLOTS; i++) {
+      var id = raw.equipped && raw.equipped[i];
+      var legal = i < slots &&
+        typeof id === "string" &&
+        out.modules.indexOf(id) !== -1 &&
+        out.equipped.indexOf(id) === -1;
+      out.equipped[i] = legal ? id : null;
+    }
+
+    // A STAMP IN THE FUTURE IS NOT TRUSTED, for the same reason a tower's is
+    // not: two machines whose clocks disagree would otherwise lock the reset
+    // for as long as they are apart.
+    out.resetAt = (typeof raw.resetAt === "number" && isFinite(raw.resetAt) &&
+                   raw.resetAt > 0) ? Math.floor(raw.resetAt) : 0;
+    return out;
+  }
+
+  // HOW MANY OF THE SEVEN SLOTS ARE USABLE AT A LEVEL. Two, plus one a level --
+  // 2/3/4/5/6/7 at levels 0 to 5. Derived here rather than stored, so it cannot
+  // drift from the xp the level came out of.
+  function playerSlotsFor(level) {
+    return Math.max(PLAYER_BASE_SLOTS,
+      Math.min(PLAYER_SLOTS, PLAYER_BASE_SLOTS + (level || 0)));
   }
 
   // One tower's saved progression, rebuilt from what is recognisable.
@@ -1243,6 +1325,194 @@ var MetaProgress = (function () {
     };
   }
 
+  // --- THE PLAYER (2026-09-01) ----------------------------------------------
+  //
+  // THE STORAGE HALF, and the division is the same one the tower rows have with
+  // js/systems/tower-perks.js: what a module COSTS, what it REQUIRES and what it
+  // DOES are content and live in js/systems/player-perks.js. This file owns the
+  // save format and the invariants that are about the save.
+
+  function playerRow() {
+    var s = ensure();
+    if (!s.player || typeof s.player !== "object") s.player = freshPlayer();
+    var row = s.player;
+    if (!row.modules) row.modules = [];
+    if (!row.ranks || typeof row.ranks !== "object") row.ranks = {};
+    if (!row.equipped || row.equipped.length !== PLAYER_SLOTS) {
+      row.equipped = emptyPlayerSlots();
+    }
+    return row;
+  }
+
+  // EVERYTHING A SCREEN NEEDS ABOUT THE PLAYER, in one read-only object, with
+  // the arithmetic done here rather than in each place that shows it. The same
+  // shape `progressOf` answers for a tower, plus `slots` meaning something
+  // different -- a tower's usable slots ARE its level; the Player's are two
+  // more than that.
+  function playerProgress() {
+    var row = playerRow();
+    var level = levelForXp(row.xp);
+    var floor = xpForLevel(level) || 0;
+    var next = xpForLevel(level + 1);
+    return {
+      id: "player",
+      xp: row.xp,
+      level: level,
+      slots: playerSlotsFor(level),
+      slotCount: PLAYER_SLOTS,
+      atMax: next === null,
+      nextLevelXp: next,
+      xpInto: next === null ? null : row.xp - floor,
+      xpSpan: next === null ? null : next - floor,
+      modules: row.modules.slice(),
+      ranks: copyRanks(row.ranks),
+      equipped: row.equipped.slice(),
+      resetAt: row.resetAt
+    };
+  }
+
+  // XP IS ONLY EVER ADDED, exactly as a tower's is, and a nonsense amount is a
+  // no-op rather than an error: the caller is a wave settling.
+  function addPlayerXp(amount) {
+    if (typeof amount !== "number" || !isFinite(amount) || amount <= 0) {
+      var flat = playerProgress();
+      return { ok: true, gained: 0, xp: flat.xp, level: flat.level, levelsGained: 0 };
+    }
+    var row = playerRow();
+    var before = levelForXp(row.xp);
+    row.xp += amount;
+    var after = levelForXp(row.xp);
+    save();
+    return {
+      ok: true, gained: amount, xp: row.xp,
+      level: after, levelsGained: after - before
+    };
+  }
+
+  function ownsModule(id) { return playerRow().modules.indexOf(id) !== -1; }
+  function ownedModules() { return playerRow().modules.slice(); }
+
+  function buyModule(id, price) {
+    var s = ensure();
+    if (ownsModule(id)) return { ok: false, reason: "already bought" };
+    var cost = (typeof price === "number" && isFinite(price) && price > 0)
+      ? Math.floor(price) : 0;
+    if (s.coins < cost) return { ok: false, reason: "not enough meta coins" };
+    s.coins -= cost;
+    playerRow().modules.push(id);
+    save();
+    return { ok: true, spent: cost };
+  }
+
+  function playerRankOf(id) {
+    var rank = playerRow().ranks[id];
+    return (typeof rank === "number" && rank > 0) ? rank : 0;
+  }
+
+  function playerRanks() { return copyRanks(playerRow().ranks); }
+
+  function playerRankedCount() { return Object.keys(playerRow().ranks).length; }
+
+  // ONE RANK AT A TIME AND ONLY UPWARD, the same rule `buyRank` enforces for a
+  // tower's squares.
+  function buyPlayerRank(id, price, rank) {
+    var s = ensure();
+    var have = playerRankOf(id);
+    if (typeof rank !== "number" || !isFinite(rank) || rank !== have + 1) {
+      return { ok: false, reason: "ranks are bought one at a time" };
+    }
+    var cost = (typeof price === "number" && isFinite(price) && price > 0)
+      ? Math.floor(price) : 0;
+    if (s.coins < cost) return { ok: false, reason: "not enough meta coins" };
+    s.coins -= cost;
+    playerRow().ranks[id] = rank;
+    save();
+    return { ok: true, spent: cost, rank: rank };
+  }
+
+  // Put an owned module in a slot. Refuses, in this order and with the sentence
+  // the screen prints: a slot outside the bar, a slot the level has not opened,
+  // a module that is not owned. A module already in another slot MOVES.
+  function equipModule(id, slot) {
+    if (typeof slot !== "number" || slot < 0 || slot >= PLAYER_SLOTS) {
+      return { ok: false, reason: "no such slot" };
+    }
+    var row = playerRow();
+    var slots = playerSlotsFor(levelForXp(row.xp));
+    if (slot >= slots) {
+      return { ok: false, reason: "slot " + (slot + 1) + " opens at Player level " +
+                                  (slot + 1 - PLAYER_BASE_SLOTS) };
+    }
+    if (row.modules.indexOf(id) === -1) {
+      return { ok: false, reason: "you have not bought that module" };
+    }
+    var already = row.equipped.indexOf(id);
+    if (already !== -1 && already !== slot) row.equipped[already] = null;
+    row.equipped[slot] = id;
+    save();
+    return { ok: true, slot: slot, replaced: already === -1 ? null : already };
+  }
+
+  function unequipModule(slot) {
+    if (typeof slot !== "number" || slot < 0 || slot >= PLAYER_SLOTS) {
+      return { ok: false, reason: "no such slot" };
+    }
+    var row = playerRow();
+    if (row.equipped[slot] === null) return { ok: false, reason: "that slot is empty" };
+    row.equipped[slot] = null;
+    save();
+    return { ok: true, slot: slot };
+  }
+
+  function equippedModules() { return playerRow().equipped.slice(); }
+
+  function playerResetReadyAt() {
+    var row = playerRow();
+    return row.resetAt ? row.resetAt + TREE_RESET_COOLDOWN_MS : 0;
+  }
+
+  // The Player's own reset, on the same terms as a tower's and on its OWN
+  // clock: resetting the Player does not touch the Rifleman's, and resetting
+  // the Rifleman does not touch this.
+  function resetPlayer(refund, nowMs) {
+    var s = ensure();
+    var row = playerRow();
+    var now = (typeof nowMs === "number" && isFinite(nowMs)) ? nowMs : 0;
+    var ready = playerResetReadyAt();
+    if (ready > now) {
+      return { ok: false, reason: "reset is still cooling down", readyAt: ready };
+    }
+    // EVERY RANK IS ITS OWN NODE HERE, which is the brief's rule for the Player
+    // and is deliberately NOT the rule a tower's tree follows (there a ranked
+    // node counts once). Both are the owner's, and they are different.
+    var rankTotal = 0;
+    Object.keys(row.ranks).forEach(function (id) { rankTotal += row.ranks[id]; });
+    var removed = row.modules.length + rankTotal;
+    if (!removed) return { ok: false, reason: "nothing bought to refund" };
+
+    var fee = removed * TREE_RESET_FEE_PER_NODE;
+    var back = (typeof refund === "number" && isFinite(refund) && refund > 0)
+      ? Math.floor(refund) : 0;
+    if (s.coins + back < fee) {
+      return { ok: false,
+               reason: "the reset commission is " + fee + " meta coins (" +
+                       TREE_RESET_FEE_PER_NODE + " a node)" };
+    }
+
+    s.coins += back;
+    s.coins -= fee;
+    row.modules = [];
+    row.ranks = {};
+    row.equipped = emptyPlayerSlots();
+    row.resetAt = now;
+    save();
+    return {
+      ok: true, refunded: back, removed: removed,
+      feePerNode: TREE_RESET_FEE_PER_NODE, fee: fee,
+      net: back - fee, readyAt: now + TREE_RESET_COOLDOWN_MS
+    };
+  }
+
   // --- test / sandbox hooks ------------------------------------------------
 
   // Everything owned and equipped, without spending anything.
@@ -1288,7 +1558,8 @@ var MetaProgress = (function () {
         return acc;
       }, {}),
       runs: s.runs, bestWave: s.bestWave,
-      milestones: s.milestones.slice(), routesWon: s.routesWon.slice()
+      milestones: s.milestones.slice(), routesWon: s.routesWon.slice(),
+      player: playerProgress()
     };
   }
 
@@ -1345,6 +1616,23 @@ var MetaProgress = (function () {
     ownsNode: ownsNode,
     ownedNodes: ownedNodes,
     buyNode: buyNode,
+    PLAYER_SLOTS: PLAYER_SLOTS,
+    PLAYER_BASE_SLOTS: PLAYER_BASE_SLOTS,
+    playerSlotsFor: playerSlotsFor,
+    playerProgress: playerProgress,
+    addPlayerXp: addPlayerXp,
+    ownsModule: ownsModule,
+    ownedModules: ownedModules,
+    buyModule: buyModule,
+    playerRankOf: playerRankOf,
+    playerRanks: playerRanks,
+    playerRankedCount: playerRankedCount,
+    buyPlayerRank: buyPlayerRank,
+    equipModule: equipModule,
+    unequipModule: unequipModule,
+    equippedModules: equippedModules,
+    playerResetReadyAt: playerResetReadyAt,
+    resetPlayer: resetPlayer,
     rankOfNode: rankOfNode,
     nodeRanks: nodeRanks,
     rankedNodeCount: rankedNodeCount,
@@ -1384,6 +1672,10 @@ var MetaProgress = (function () {
         bestWave: current.bestWave,
         milestones: current.milestones.slice(),
         routesWon: current.routesWon.slice(),
+        // THE PLAYER BLOCK IS CARRIED WHOLE unless the patch names one, for the
+        // same reason the tower rows are copied out first: a patch about coins
+        // must not empty a loadout.
+        player: (patch && patch.player) || playerProgress(),
         progress: {}
       };
       merged.owned.forEach(function (id) {

@@ -83,6 +83,28 @@ ConfiguredTower.prototype._refreshStats = function () {
     if (typeof resolved.attackRate === "number") resolved.attackRate *= boost;
   }
 
+  // AND THE PLAYER'S LOADOUT, on the same four names and for the same reason it
+  // is not in the resolver: it is not a purchase, it does not crosspath, and an
+  // aura that ends has to be able to take its bonus back. `playerHost` is the
+  // ADAPTER when there is one -- an Arcane Sniper's proximity is about where the
+  // adapter stands, and the core has no position of its own.
+  if (typeof PlayerEffects !== "undefined") {
+    var host = this.playerHost || this;
+    var pd = PlayerEffects.damageScale(host);
+    if (pd !== 1) {
+      if (typeof resolved.damage === "number") resolved.damage *= pd;
+      if (typeof resolved.ad === "number") resolved.ad *= pd;
+    }
+    var pr = PlayerEffects.fireRateScale(host);
+    if (pr !== 1) {
+      if (typeof resolved.fireRate === "number") resolved.fireRate *= pr;
+      if (typeof resolved.attackRate === "number") resolved.attackRate *= pr;
+    }
+    if (typeof resolved.hp === "number") {
+      resolved.hp = PlayerEffects.scaledMaxHp(resolved.hp);
+    }
+  }
+
   this.stats = resolved;
 
   if (this.maxHp === null) {

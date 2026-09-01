@@ -102,6 +102,12 @@ var Targeting = {
   // A tower with no `seesCamo` at all sees no camo, so a future tower type
   // that forgets the field fails safe rather than quietly ignoring camo.
   sees: function (tower, enemy) {
+    // BALAYAGE RADAR IS AN OVERRIDE AND CAN ONLY EVER SAY YES. For its eight
+    // seconds every tower sees camo and flying; when it ends the answer goes
+    // straight back to the tower's own fields, so a tower that never saw camo
+    // cannot be left holding an illegal target -- and one that always did keeps
+    // seeing it. See js/systems/player-effects.js.
+    if (typeof PlayerEffects !== "undefined" && PlayerEffects.grantsSight()) return true;
     if (enemy.isFlying && !tower.seesFlying) return false;
     return !enemy.isCamo || !!tower.seesCamo;
   },
@@ -187,7 +193,16 @@ var Targeting = {
       // RangeFilter, which carries the same predicate.
       if (!Targeting.hasSightTo(tower, e)) continue;
 
+      // ORDRE PRIORITAIRE OUTRANKS EVERY MODE, and it does it by scoring
+      // rather than by returning early: the mark is only obeyed by a tower
+      // that can SEE and REACH it, and both of those were tested above. A
+      // tower that cannot is left picking its own target exactly as before,
+      // which is what "l'ordre ne donne jamais camo/flying à une tour qui ne
+      // l'a pas" means -- the order is a priority, never a permission.
       var s = Targeting.score(mode, e, distanceSquared);
+      if (typeof PlayerRun !== "undefined" && PlayerRun.markedEnemy() === e) {
+        s = Infinity;
+      }
       if (s > bestScore || (s === bestScore && e.progress > bestProgress)) {
         bestScore = s;
         bestProgress = e.progress;

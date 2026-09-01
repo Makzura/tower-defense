@@ -440,6 +440,17 @@ Smasher.prototype.recalcStats = function () {
       this.cooldownSeconds /= boost;
     }
   }
+
+  // AND THE PLAYER'S LOADOUT, in the same shape: damage up, seconds per swing
+  // down. Range comes through elevatedRangePx and the arc is a shape rather
+  // than a rate. See js/systems/player-effects.js.
+  if (typeof PlayerEffects !== "undefined") {
+    var pd = PlayerEffects.damageScale(this);
+    if (pd !== 1) this.damage *= pd;
+    var pr = PlayerEffects.fireRateScale(this);
+    if (pr !== 1) this.cooldownSeconds /= pr;
+    this.maxHp = PlayerEffects.scaledMaxHp(this.maxHp);
+  }
 };
 
 // Which branch this tower has committed to, or null if it is still open.

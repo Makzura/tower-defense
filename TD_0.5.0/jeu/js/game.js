@@ -3085,6 +3085,9 @@ function openMenu() {
   // preparation screens edit -- which is what makes a perk equipped in the
   // armoury take effect on the next run rather than the one after it.
   if (typeof TowerPerks !== "undefined") TowerPerks.releaseRun();
+  // And the Player's, on the same terms -- the loadout the menu edits is the
+  // live one again the moment a run is left.
+  if (typeof PlayerRun !== "undefined") PlayerRun.endRun();
   // The run is over as far as the world is concerned: no clock on the title
   // screen. Victory and game over do NOT call this -- they freeze the board
   // they finished on, and the sky is part of that board.
@@ -3152,9 +3155,25 @@ function restartGame() {
   // paid must not be shown at the end of this one.
   if (typeof TowerXP !== "undefined") TowerXP.beginRun();
 
+  // THE PLAYER'S RUN OPENS HERE, beside the tower loadout's freeze and for the
+  // same reason: every entry onto a board comes through this function, so this
+  // is where the Player's seven slots are frozen and every scrap of in-run
+  // state -- the debt, the streak, the beacon, the totem, the permit -- is
+  // cleared. See js/systems/player-run.js.
+  if (typeof PlayerRun !== "undefined") PlayerRun.beginRun();
+
+  // AND THE TWO NUMBERS A RUN STARTS ON. Trésorerie avancée gives mana and
+  // Gardien takes some; Gardien gives the base health. Both are deltas on the
+  // authored constants, so an empty loadout starts exactly where it always did,
+  // and the base opens FULL at whatever maximum it resolved to.
   cash = STARTING_CASH;
   baseHp = BASE_MAX_HP;
   baseMaxHp = BASE_MAX_HP;
+  if (typeof PlayerRun !== "undefined") {
+    cash = Math.max(0, STARTING_CASH + PlayerRun.startingManaDelta());
+    baseMaxHp = Math.max(1, BASE_MAX_HP + PlayerRun.baseMaxHpDelta());
+    baseHp = baseMaxHp;
+  }
   // Farms are board state and a network is run state: both die with the run.
   if (typeof Farms !== "undefined") Farms.reset();
   gameOver = false;
@@ -3917,6 +3936,27 @@ function addTower(tower) {
     // would charge every tower the price of the one after it.
     TowerPerks.notePlacement(tower.constructor && tower.constructor.ID);
   }
+  // AND THE PLAYER'S SHARE OF THE PRICE, on the same terms and in the same
+  // order: the delta is read BEFORE the placement is counted, so the tower that
+  // takes the first-of-a-type discount is the one that spends it.
+  //
+  // `playerHost` is what lets an ADAPTER's core find the body: an Arcane
+  // Sniper's proximity is about where the adapter stands and the core has no
+  // position of its own (js/towers/tower-runtime.js).
+  if (typeof PlayerRun !== "undefined" && tower.constructor &&
+      tower.constructor.ID && typeof PlayerEffects !== "undefined" &&
+      PlayerEffects.isCountable(tower)) {
+    if (tower.core) tower.core.playerHost = tower;
+    var base = (typeof TowerPerks === "undefined") ? tower.constructor.COST
+                                                   : TowerPerks.priceOf(tower.constructor);
+    var priced = towerPrice(tower.constructor);
+    var delta = priced - base;
+    if (delta !== 0) {
+      if (typeof tower.cost === "number") tower.cost = priced;
+      if (typeof tower.totalSpent === "number") tower.totalSpent += delta;
+    }
+    PlayerRun.notePlacement(tower.constructor.ID);
+  }
   // A TOWER PLACED DURING A WAVE HAS ALREADY JOINED THAT WAVE. `onWaveStart` is
   // "a wave has opened with this tower on the board", and one that walks in
   // halfway through is on the board for the rest of it -- the Rifleman's First
@@ -3926,6 +3966,10 @@ function addTower(tower) {
   if (waveInPlay() && typeof tower.onWaveStart === "function") tower.onWaveStart();
   towers.push(tower);
   towers.sort(function (a, b) { return a.pathProgress - b.pathProgress; });
+  // THE BOARD'S COMPOSITION CHANGED, so every Player aura is recomputed and
+  // every tower restatted. See js/systems/player-effects.js -- proximity, the
+  // live type count and the beacon's circle all depend on who is standing.
+  if (typeof PlayerEffects !== "undefined") PlayerEffects.refresh(towers);
 }
 
 // Remove a tower and refund half its cost. Bullets it already fired are left
@@ -3950,13 +3994,40 @@ function sellTower(tower, options) {
   if (typeof tower.onRemoved === "function") tower.onRemoved();
 
   if (!options || options.refund !== false) cash += sellValue(tower);
+  else cash += playerDestroyRefund(tower);
+
+  // A TOWER CARRYING THE CROSSPATH PERMIT HAS LEFT. Clause de restitution hands
+  // an UNSPENT permit back for the rest of the run; a spent one is gone
+  // whatever happens to the tower it was spent on.
+  if (typeof PlayerRun !== "undefined") PlayerRun.noteTowerGone(tower);
 
   if (inspected === tower) inspected = null;
   if (aimingTower === tower) aimingTower = null;   // it cannot aim once sold
   // A sold farm is not paying for an investment it never landed, and a sold
   // TARGET cannot receive one. Either way the mode goes with the tower.
   if (investingFarm && (investingFarm.farm === tower)) investingFarm = null;
+  if (typeof PlayerEffects !== "undefined") PlayerEffects.refresh(towers);
   refreshBlockReason();          // the ground it stood on may now be buildable
+}
+
+// WHAT FERRAILLEUR PAYS FOR A TOWER THAT WAS DESTROYED.
+//
+// A SALE IS NOT A DESTRUCTION and gets none of this -- a sale is a decision and
+// already pays half, a destruction is a loss and this is what softens it. The
+// proportion is of `totalSpent`, which is the tower's REAL investment: the
+// price it was actually built for, after every discount and surcharge, plus
+// every tier it actually paid for.
+//
+// One payment per tower, guaranteed by where this is called: `sellTower` is the
+// one door a tower leaves the board through, and it splices the tower out
+// before anything else can reach it.
+function playerDestroyRefund(tower) {
+  if (typeof PlayerRun === "undefined" || typeof PlayerPerks === "undefined") return 0;
+  var r = PlayerPerks.resolved();
+  if (!r || !r.destroyRefundPct) return 0;
+  if (typeof PlayerEffects !== "undefined" && !PlayerEffects.isCountable(tower)) return 0;
+  var spent = (typeof tower.totalSpent === "number") ? tower.totalSpent : 0;
+  return Math.max(0, Math.round(spent * r.destroyRefundPct / 100));
 }
 
 // Buy an upgrade for a tower that has them. The TRANSACTION -- validation,
@@ -3974,13 +4045,36 @@ function buyUpgrade(tower, id) {
   var reason = tower.whyCannotUpgrade(id);
   if (reason) return reason;
 
-  var price = tower.upgradeCost(id);
-  if (cash < price) return "not enough mana";
+  var price = playerUpgradePrice(tower, tower.upgradeCost(id));
+  var allowed = playerCanSpend(price);
+  if (!allowed.ok) return allowed.reason;
 
   cash -= price;
   tower.applyUpgrade(id);
   refreshBlockReason();          // cash changed, so affordability may have too
   return null;
+}
+
+// WHAT AN IN-RUN UPGRADE COSTS ON THIS TOWER once the Player's loadout has had
+// its say. Only one thing moves it: the crosspath permit charges the tower it
+// was given to 25% more on EVERY tier, the one that consumed the permit
+// included. Rounded and floored at zero, like every other price in this file.
+function playerUpgradePrice(tower, price) {
+  if (typeof PlayerRun === "undefined" || typeof price !== "number") return price;
+  var scale = PlayerRun.upgradeCostScale(tower);
+  return scale === 1 ? price : Math.max(0, Math.round(price * scale));
+}
+
+// MAY THIS SPEND HAPPEN? The one question every purchase in a run asks, and the
+// only place Crédit d'urgence lives: a transaction may take the balance down to
+// the credit limit, and once the balance IS negative nothing may be bought at
+// all until it is back to zero. Without the module the answer is the plain
+// "not enough mana" it always was.
+function playerCanSpend(amount) {
+  if (typeof PlayerRun === "undefined") {
+    return cash >= amount ? { ok: true } : { ok: false, reason: "not enough mana" };
+  }
+  return PlayerRun.canSpend(cash, amount);
 }
 
 function hitsSellButton(x, y) {
@@ -4480,10 +4574,52 @@ function refreshBlockReason() {
 // Deciding it HERE, before the tower exists, is also what keeps the footprint
 // out of the "a perk moved it after it was standing there" trap the note in
 // js/systems/tower-perks.js describes.
+// WHAT ONE OF THESE COSTS TO BUILD RIGHT NOW, with the PLAYER's loadout folded
+// in on top of the tower's own perks.
+//
+// `TowerPerks.priceOf` is the type's price; the Player's Intendant makes the
+// FIRST of each type this run cheaper and every later one dearer, and Arsenal
+// partagé charges a percentage for duplicating a type that is already standing.
+// Every reader of a build price in a run goes through here -- the bar's label,
+// its affordability check, and `addTower`, which is what sets `built.cost` --
+// so the three cannot quote different numbers.
+//
+// Rounded and floored at zero, the same rule `priceOf` follows: a trade that
+// reads "cheaper" must never reach a price that pays the player to build.
+function towerPrice(type) {
+  var base = (typeof TowerPerks === "undefined") ? (type ? type.COST : 0)
+                                                 : TowerPerks.priceOf(type);
+  if (typeof PlayerRun === "undefined" || !type || !type.ID) return base;
+  return Math.max(0,
+    Math.round(base + PlayerRun.placementDelta(type.ID, base, liveTowerTypeIds())));
+}
+
+// Which tower TYPES are standing right now. Read by the duplicate surcharge,
+// which is a rule about the board's composition rather than about what has been
+// placed -- selling the only Warbringer makes the next one cheap again.
+function liveTowerTypeIds() {
+  var out = [];
+  for (var i = 0; i < towers.length; i++) {
+    var t = towers[i];
+    if (typeof PlayerEffects !== "undefined" && !PlayerEffects.isCountable(t)) continue;
+    if (t.isDestroyed && t.isDestroyed()) continue;
+    var id = t.constructor && t.constructor.ID;
+    if (id && out.indexOf(id) === -1) out.push(id);
+  }
+  return out;
+}
+
 function buildFootprintUl(type) {
   if (!type) return 0;
   if (typeof TowerPerks === "undefined") return type.FOOTPRINT_RADIUS_UL;
-  return TowerPerks.previewFootprintUl(type);
+  var ul = TowerPerks.previewFootprintUl(type);
+  // PLAN COMPACT SHRINKS EVERY FOOTPRINT, and it is folded in HERE, before the
+  // tower exists, for the same reason the Arcane Sniper's Compact Chassis is: a
+  // footprint that moved after placement would change where a tower may stand
+  // once it is standing there, and could leave one overlapping a neighbour it
+  // was legally placed beside. Every reader of a footprint comes through this.
+  if (typeof PlayerEffects !== "undefined") ul *= PlayerEffects.footprintScale();
+  return ul;
 }
 
 // How far a tower's CENTRE must stay from the road centre line: half the road,
@@ -4637,7 +4773,7 @@ function whyCannotBuild(x, y, type) {
     }
   }
 
-  if (cash < TowerPerks.priceOf(type)) {
+  if (cash < towerPrice(type)) {
     return "not enough mana";
   }
 
@@ -4903,6 +5039,12 @@ function update(dt) {
   // anything added to draw() or to an input handler correctly does not.
   if (frozen) return;
 
+  // THE PLAYER'S OWN CLOCK, on the same `dt` as everything else -- which is
+  // what makes the mark, Surcharge's six seconds and its stun, the radar's
+  // sweep and Blitz's haste all obey the pause button and the speed toggle
+  // without any of them reading a wall clock. See js/systems/player-run.js.
+  if (typeof PlayerRun !== "undefined") PlayerRun.update(dt, towers);
+
   // Time is being rewound (the beam tower's death denial). Everything else is
   // frozen -- no movement, no firing, no spawning -- and only the rewind
   // advances. That freeze is the effect: the save reads as time stopping, not
@@ -4997,12 +5139,20 @@ function update(dt) {
   if (destroyed) {
     towers = towers.filter(function (t) {
       if (!t.isDestroyed || !t.isDestroyed()) return true;
+      // FERRAILLEUR IS PAID HERE, and this is the one place a tower is ever
+      // DESTROYED rather than sold -- the sweep filters them out directly and
+      // never goes through `sellTower`, so a refund written only there would
+      // have paid for the one case that is not a destruction and for none that
+      // are. The permit leaves with the body for the same reason.
+      cash += playerDestroyRefund(t);
+      if (typeof PlayerRun !== "undefined") PlayerRun.noteTowerGone(t);
       // Cosmetic only, and typeof-guarded like every other Effects call.
       if (typeof Effects !== "undefined" && Effects.towerDestroyed) {
         Effects.towerDestroyed(t);
       }
       return false;
     });
+    if (typeof PlayerEffects !== "undefined") PlayerEffects.refresh(towers);
     // Selection state can outlive the thing it points at. A panel open on a
     // dead tower would offer to sell something that is not there.
     if (inspected && inspected.isDestroyed && inspected.isDestroyed()) inspected = null;
@@ -5123,13 +5273,40 @@ function update(dt) {
       // wearing, not mass it throws at the base. A Bulwark that walks in
       // untouched costs 12, the same as the body it is -- which is what makes
       // its 36 points of toughness a cost in TIME rather than a bigger leak.
-      baseHp -= gone.health;
+      var hit = applyBaseDamage(gone.health, { leak: true });
       if (typeof Effects !== "undefined") {
-        Effects.baseHit(gone.pos.x, gone.pos.y, Math.round(gone.health));
+        Effects.baseHit(gone.pos.x, gone.pos.y, Math.round(hit.toBase));
       }
     }
   }
-  // Last chance before the run ends: a tower may be holding a one-shot save
+  // THE ONE DOOR EVERY HIT ON THE BASE GOES THROUGH, and the one place three
+// Player modules meet.
+//
+//   1. Brèche contrôlée halves the FIRST LEAK of a wave -- a leak only, which
+//      is why the totem's death damage passes `leak: false` and is not reduced;
+//   2. Bouclier de mana may then absorb up to its fraction of what is left, and
+//      only as many whole points as the purse can pay for. It never spends into
+//      debt, not even with Crédit d'urgence;
+//   3. what remains is what the base ACTUALLY loses -- and it is that number,
+//      never the raw hit, that breaks Prime sans fuite and Série parfaite. A
+//      hit absorbed to nothing keeps a streak alive, which is the brief's rule.
+//
+// Returns the resolved figures so a caller can report them. With no Player
+// module equipped it is `baseHp -= raw` and nothing else, which is what the
+// neutral resolved block guarantees.
+function applyBaseDamage(raw, opts) {
+  if (typeof PlayerRun === "undefined") {
+    baseHp -= raw;
+    return { raw: raw, toBase: raw, absorbed: 0, manaCost: 0 };
+  }
+  var out = PlayerRun.resolveBaseDamage(raw, cash, opts);
+  if (out.manaCost > 0) cash -= out.manaCost;
+  baseHp -= out.toBase;
+  PlayerRun.noteBaseLoss(out.toBase);
+  return out;
+}
+
+// Last chance before the run ends: a tower may be holding a one-shot save
   // (the beam tower's death denial). The system decides whether one is
   // available and applies its whole effect -- see js/systems/death-denial.js.
   // Nothing here knows which tower it was or what the save does.
@@ -5775,6 +5952,19 @@ function skipNextWave() {
   }
   // The wave is out and the player is done with it. Survivors stay exactly
   // where they are -- see endWave, the one place a wave is ever closed.
+  //
+  // DOCTRINE BLITZ IS PAID HERE, and what it is paid for is the seconds this
+  // call really removed: a wave owns a WINDOW (`duration`, 30 to 125 seconds
+  // across the schedule) and closing it early cuts the rest of that window
+  // short. An AUTOMATIC send at zero removes nothing and so pays nothing and
+  // hastes nobody -- which falls out of the arithmetic rather than needing a
+  // flag, because no full tranche was completed.
+  if (typeof PlayerRun !== "undefined" && waveIndex < WAVES.length) {
+    var limit = WAVES[waveIndex].duration;
+    var removed = (typeof limit === "number") ? Math.max(0, limit - waveElapsed) : 0;
+    var paid = PlayerRun.noteEarlyCall(removed);
+    if (paid > 0) cash += paid;
+  }
   endWave(WAVE_CALL_DELAY);
   return true;
 }
@@ -5832,6 +6022,31 @@ function endWave(delaySeconds, overshoot) {
     TowerXP.settleWave(waveIndex + 1, WAVES.length, xpDifficultyScale());
   }
 
+  // AND THE PLAYER'S OWN XP, out of the SAME budget and through the same gate.
+  //
+  // THE PLAYER TAKES THE WHOLE BUDGET, not a share of it: the towers split
+  // theirs by what was invested in each, and the brief is explicit that the
+  // Player's does not depend on damage, kills, which towers were built or
+  // whether the run is won. A defeat therefore keeps every point already
+  // earned, because the points were banked wave by wave and never at the end.
+  //
+  // `TowerXP.isEnabled()` gates it for the same reason it gates the towers':
+  // the sandbox banks nothing.
+  if (typeof TowerXP !== "undefined" && typeof MetaProgress !== "undefined" &&
+      TowerXP.isEnabled()) {
+    MetaProgress.addPlayerXp(
+      TowerXP.waveBudget(waveIndex + 1, WAVES.length, xpDifficultyScale()));
+  }
+
+  // THE WAVE IS SETTLED FOR THE PLAYER TOO: a wave that cost the base nothing
+  // banks a charge and schedules the bounty, and one that cost something has
+  // already been dealt with the moment the health went.
+  if (typeof PlayerRun !== "undefined") {
+    PlayerRun.onWaveEnd();
+    // Série parfaite's charges are a damage aura, so the board is restatted.
+    if (typeof PlayerEffects !== "undefined") PlayerEffects.refresh(towers);
+  }
+
   // AND THE PER-WAVE STACKS ON THE BOARD, through the same one exit. A tower
   // whose permanent upgrade banks something "for the rest of the wave" -- the
   // Rifleman's Veteran Rhythm is the only one today -- clears it here, so the
@@ -5851,6 +6066,15 @@ function endWave(delaySeconds, overshoot) {
     return;
   }
 
+  // PRÉVISION TACTIQUE SHORTENS THE GAP BETWEEN WAVES, and it can only ever
+  // shorten it -- `transitionSeconds` takes the game's own delay and returns
+  // the smaller of the two, so an empty loadout gets exactly the delay it was
+  // handed. (The owner's brief wrote these nodes against a 90-second countdown
+  // this game has never had; the ratios were kept and restated against the five
+  // seconds that exist. See js/perks/player-modules.js.)
+  if (typeof PlayerRun !== "undefined") {
+    delaySeconds = PlayerRun.transitionSeconds(delaySeconds);
+  }
   var left = delaySeconds - spent;
   if (left > 0) {
     waveCountdown = left;
@@ -6032,6 +6256,16 @@ function beginWave() {
     if (typeof towers[w].onWaveStart === "function") towers[w].onWaveStart();
   }
 
+  // AND THE PLAYER'S WAVE OPENS. Two payments land here and both belong to the
+  // wave that is starting rather than to the one that ended: Prime sans fuite's
+  // bounty is DEFERRED to the next wave by design, and Crédit d'urgence's
+  // interest is charged before anything can be spent in the new wave.
+  if (typeof PlayerRun !== "undefined") {
+    var opened = PlayerRun.onWaveStart(waveIndex + 1, cash);
+    if (opened.bounty) cash += opened.bounty;
+    if (opened.interest) cash -= opened.interest;
+  }
+
   // The swell goes with the banner: same moment, same reason, and the sound is
   // timed to be over about when the banner is. One per wave, not one per route
   // -- this runs once however many entrances the map has.
@@ -6166,11 +6400,24 @@ function spawnScheduledEnemy() {
 // body must never be able to hold a wave open or close one.
 function spawnEnemy(health, typeId, routePath, routeId, tier, waveId) {
   routePath = routePath || path;
-  enemies.push(new Enemy(routePath, health, typeId, {
+  var born = new Enemy(routePath, health, typeId, {
     routeId: routeId || routePath.id || "main",
     tier: tier,
     waveId: waveId
-  }));
+  });
+  // DOCTRINE BLITZ HASTES THE WAVE THE PLAYER CALLED IN, and the eight seconds
+  // are the BODY's own from its own spawn. Stamped here, at the one door every
+  // enemy in the game comes through, so a straggler from the previous wave is
+  // untouched and a body that arrives late in a hasted wave still gets its full
+  // eight. Null on every other wave, which is every wave nobody rushed.
+  if (typeof PlayerRun !== "undefined") {
+    var haste = PlayerRun.hasteForSpawn(waveIndex + 1);
+    if (haste) {
+      born.playerHastePct = haste.pct;
+      born.playerHasteLeft = haste.seconds;
+    }
+  }
+  enemies.push(born);
 }
 
 
@@ -8242,7 +8489,7 @@ function drawBuildBar() {
     var type = BUILD_SLOTS[i];
     var r = slotRect(i);
     var armed = (i === selectedSlot);
-    var affordable = type !== null && cash >= TowerPerks.priceOf(type);
+    var affordable = type !== null && cash >= towerPrice(type);
 
     // Panel
     ctx.fillStyle = armed ? "rgba(108,230,133,0.14)" : "rgba(28,30,38,0.85)";
@@ -8297,7 +8544,7 @@ function drawBuildBar() {
 
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillStyle = affordable ? "#ffd76e" : "#e0736e";
-    ctx.fillText(TowerPerks.priceOf(type) + " mana", r.x + r.w / 2, r.y + 68);
+    ctx.fillText(towerPrice(type) + " mana", r.x + r.w / 2, r.y + 68);
   }
 
   ctx.textAlign = "left";

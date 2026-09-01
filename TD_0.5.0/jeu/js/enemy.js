@@ -404,6 +404,15 @@ function Enemy(path, health, typeId, overrides) {
   // number of pulses over any number of minutes leaves a body walking at
   // precisely the pace it was born with.
   this.hasteMultiplier = 1;          // 1 = unhastened, 1.3 = +30%
+
+  // DOCTRINE BLITZ'S HASTE, stamped at spawn by `spawnEnemy` when this body
+  // belongs to a wave the player called in early. Zero on every other body and
+  // in every run without the module, so `currentSpeedUlps` reads exactly what
+  // it always did. It is DELIBERATELY not `hasteMultiplier`: that one is a
+  // Herald's aura, refreshed and cleared by the Herald, and folding a
+  // player-side effect into it would let one erase the other.
+  this.playerHastePct = 0;
+  this.playerHasteLeft = 0;
   this.hasteTimer = 0;               // seconds of haste remaining
   this.hasteFlash = 0;               // cosmetic, 1 -> 0, set when a pulse lands
 
@@ -2063,6 +2072,13 @@ Enemy.prototype.currentSpeedUlps = function () {
   var speed = this.speedUlps * this.slowMultiplier * this.speedScale *
     this.hasteMultiplier;
 
+  // DOCTRINE BLITZ'S HASTE, and it is the body's OWN eight seconds rather than
+  // a window on the clock: the brief says "pendant leurs 8 premières secondes
+  // de présence", so it is stamped at spawn and counted down by this body. A
+  // straggler from the previous wave is therefore untouched, which a global
+  // window could not have managed.
+  if (this.playerHasteLeft > 0) speed *= 1 + this.playerHastePct / 100;
+
   // A FARM'S FIELD, and it is a THIRD channel rather than a slow. `applySlow`
   // takes the strongest and refreshes it, which is right for a timed debuff a
   // tower applies; a B4/B5 Farm projects a standing field instead, and the
@@ -2136,6 +2152,8 @@ Enemy.prototype.bounty = function () {
 };
 
 Enemy.prototype.update = function (dt) {
+  if (this.playerHasteLeft > 0) this.playerHasteLeft -= dt;
+
   // Weakening stacks age here, on this enemy's own clock. See
   // js/systems/damage-amp.js for why each stack keeps its own five seconds
   // rather than sharing one refreshed window. Guarded by typeof so an enemy
@@ -3736,6 +3754,17 @@ Enemy.prototype.applyStun = function (seconds) {
 // See js/systems/mitigation.js.
 Enemy.prototype.takeDamage = function (amount, defPierce, defenseFlatPierce, damageKind,
                                        armorPierce) {
+  // ORDRE PRIORITAIRE'S TRADE, and it is applied HERE because here is the one
+  // place every source of damage meets: a bullet, a swing, a beam and a
+  // recruit's rifle all arrive through this function. Every tower shoots the
+  // mark first and every shot at it lands softer -- that is the whole node, and
+  // putting it at one door is what stops the softer half being forgotten by
+  // whichever source is added next. Neutral (1) for every enemy that is not
+  // the mark and in every run with the module unequipped.
+  if (typeof PlayerRun !== "undefined") {
+    amount *= PlayerRun.markDamageScale(this);
+  }
+
   var effective = Mitigation.mitigate(amount, this, defPierce, defenseFlatPierce,
     armorPierce);
 

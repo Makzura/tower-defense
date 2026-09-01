@@ -91,6 +91,12 @@ function elevatedRangePx(tower, rangeUl) {
   // boost reaches the Summoner's blubs and the Siphon's beam without either
   // file knowing what a tranche is. See FarmBoost in js/farm.js.
   if (typeof FarmBoost !== "undefined") px *= FarmBoost.multiplier(tower);
+  // AND THE PLAYER'S, THROUGH THE SAME ONE DOOR. Opérateurs isolés, the
+  // beacon's circle and Balayage radar's standing cost all move reach, and they
+  // move it for EVERY type -- so they are applied here, where a range in u.l.
+  // becomes a range in pixels, rather than in six recomputes. See
+  // js/systems/player-effects.js.
+  if (typeof PlayerEffects !== "undefined") px *= PlayerEffects.rangeScale(tower);
   return px;
 }
 
