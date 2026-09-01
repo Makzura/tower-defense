@@ -116,7 +116,11 @@ TowerPerks.register({
       requires: ["rif_n2"],
       at: { x: 0, y: -3 },
       effects: {
-        set: { rhythmStartMult: 0.94, rhythmPerKill: 0.02, rhythmKillCap: 6 }
+        // THE CEILING IS IN THE SAME UNITS AS THE GAIN, not in kills
+        // (2026-09-01). 6 x 0.02 is 0.12 either way, so this is the identical
+        // node it was; Campaign Tempo and Decorated Ceiling then move the gain
+        // and the ceiling independently, which a kill count could not express.
+        set: { rhythmStartMult: 0.94, rhythmPerKill: 0.02, rhythmEarnedCap: 0.12 }
       }
     },
 
@@ -286,8 +290,14 @@ TowerPerks.register({
       requires: ["rif_b1"],
       at: { x: 2, y: 0 },
       effects: {
+        // TEN PERCENTAGE POINTS, NOT A x0.9 (2026-09-01). The same 18 and 36 it
+        // has always resolved -- 20 x (1 - 0.10) -- written in the channel that
+        // Medical Selection, Reinforced Contracts and Salvage Conscription also
+        // write to, so the four compose by SUMMING points rather than by
+        // multiplying factors in whatever order the slots happen to be in. See
+        // `Soldier.afterPerks`.
         set: { recruitCooldownRapid: 40 },
-        mul: { recruitHp: 0.9 }
+        add: { recruitHpPoints: -10 }
       }
     },
 
@@ -313,10 +323,18 @@ TowerPerks.register({
       requires: ["rif_b2"],
       at: { x: 3, y: 0 },
       effects: {
+        // ADDITIONS RATHER THAN A `set` AND A `mul` (2026-09-01), and the
+        // numbers are unchanged: 0 + 2 is the same 2, and five points off is
+        // the same x0.95 on both. Carbide Tip deepens each of them, and a `set`
+        // is last-writer-wins -- so a square landing on `armorPierce` would
+        // have been erased by the node it is supposed to improve, and a second
+        // rate multiplier could not be composed with the first without knowing
+        // its rank. Both are now sums, and sums do not care about slot order.
         when: [{
           has: "hasB3",
-          set: { armorPierce: 2, recruitArmorPierce: 2 },
-          mul: { fireRateMult: 0.95, recruitShotsPerSecond: 0.95 }
+          add: {
+            armorPierce: 2, recruitArmorPierce: 2, piercingRatePenaltyPoints: 5
+          }
         }]
       }
     },

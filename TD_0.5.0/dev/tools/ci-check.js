@@ -912,7 +912,17 @@ var BASELINE = [
     // tests now derive the chain from the layout, and the recruit-cooldown one
     // asks that neither node is the OTHER's prerequisite rather than that
     // both are roots.
-    file: "tests/content.test.js", pass: 440, fail: 0,
+    // ---- 466 on 2026-09-01, the Rifleman's upgrade-squared tree ----------
+    // 440 -> 466: twenty-six added, in one new group. The twenty-two ranked
+    // nodes and the rules under them -- sequential ranks at per-rank prices, a
+    // parent that gates the purchase and an EQUIPPED parent that gates the
+    // effect, four fusions that show 1/2 as 1/2 and refuse to be bought there,
+    // ranks in the save with an absent map reading rank 0, a reset that refunds
+    // every rank and charges ten for a ranked node however many ranks it holds,
+    // and one test each for the baseline being untouched at rank 0, the
+    // authoring rules, the rejected list staying out, and the tree screen.
+    // Nothing was removed and no existing name changed its claim.
+    file: "tests/content.test.js", pass: 466, fail: 0,
     failing: []
   },
   {

@@ -3917,6 +3917,13 @@ function addTower(tower) {
     // would charge every tower the price of the one after it.
     TowerPerks.notePlacement(tower.constructor && tower.constructor.ID);
   }
+  // A TOWER PLACED DURING A WAVE HAS ALREADY JOINED THAT WAVE. `onWaveStart` is
+  // "a wave has opened with this tower on the board", and one that walks in
+  // halfway through is on the board for the rest of it -- the Rifleman's First
+  // Deployment says in as many words that the current wave counts as its first.
+  // The same hook either way, so there is one definition of a participated wave
+  // and not one for placement and another for the announcement.
+  if (waveInPlay() && typeof tower.onWaveStart === "function") tower.onWaveStart();
   towers.push(tower);
   towers.sort(function (a, b) { return a.pathProgress - b.pathProgress; });
 }
@@ -5987,7 +5994,11 @@ function updateWaves(dt) {
   }
 }
 
-// The wave has begun. Display and audio only -- nothing here is simulated.
+// The wave has begun. The banner, the swell, the two safety nets the farms
+// need -- and, since 2026-09-01, the one place a tower is told a wave has
+// OPENED. That last one is the mirror of the `onWaveBoundary` loop in endWave
+// and exists for the same reason: a per-wave fact that has to be the same
+// instant for every tower on the board.
 function beginWave() {
   // Last chance for the PREVIOUS wave's bounty. Ordinarily a no-op, because
   // every gate pays on its way out and nothing is owed by the time a wave
@@ -6009,6 +6020,16 @@ function beginWave() {
     Effects.announce(
       "Wave " + (waveIndex + 1) + " / " + WAVES.length,
       waveSummary(WAVES[waveIndex]));
+  }
+
+  // EVERY TOWER ON THE BOARD IS TOLD, through the same one door and on the same
+  // frame. A tower whose permanent upgrade counts waves -- the Rifleman's First
+  // Deployment is the only one today -- reads this, and one that declares
+  // nothing is skipped and pays nothing. It counts OPENINGS rather than
+  // endings, which is what lets a bonus that lasts three waves survive the gaps
+  // between them and end the instant the fourth is announced.
+  for (var w = 0; w < towers.length; w++) {
+    if (typeof towers[w].onWaveStart === "function") towers[w].onWaveStart();
   }
 
   // The swell goes with the banner: same moment, same reason, and the sound is
@@ -7028,10 +7049,21 @@ function previewRangePx(type, x, y) {
   // High-Ground Doctrine). The two flags are spelled exactly as the tower
   // derives them for itself in refreshDerived, so the ring the player is shown
   // and the ring they get come out of the same condition.
+  //
+  // AND WHETHER THIS WOULD BE THE FIRST OF ITS TYPE THIS RUN, for the same
+  // reason: the Rifleman's First Deployment pays reach to the first Rifleman
+  // placed and to no other, and a ghost that drew the ordinary ring and then
+  // stood up a tower with a wider one would break this function's promise in
+  // the other direction. `placementCount` is the same tally `priceOf` picks
+  // `firstAdd` with, so the ring and the price agree about which one this is.
   var height = groundHeightUnder(x, y);
   return elevatedRangePx({ groundHeight: height },
-    TowerPerks.previewRangeUl(type,
-      { onHighGround: height > 0, onFlatGround: !(height > 0) }));
+    TowerPerks.previewRangeUl(type, {
+      onHighGround: height > 0,
+      onFlatGround: !(height > 0),
+      firstDeploymentActive:
+        !!type && TowerPerks.placementCount(type.ID) === 0
+    }));
 }
 
 // THE PATCH OF GROUND ONE OBSTACLE HIDES, as a ring of WORLD points.

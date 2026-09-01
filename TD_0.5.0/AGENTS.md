@@ -4320,6 +4320,7 @@ Upgrades screen is deliberately NOT a third armoury tab for the same reason.
 | `js/systems/tower-perks.js` | the RULES and the registry: node state, purchase, refund, the run freeze, and how a perk reaches a tower |
 | `js/systems/tower-xp.js` | the fixed per-wave budget and the investment integral that splits it |
 | `js/perks/*-perks.js` | the CONTENT: one file per tower, one tree each |
+| `js/perks/soldier-upgrades2.js` | the Rifleman's UPGRADE-SQUARED content — see its own section below |
 | `js/upgrades.js` | the Upgrades screen and the Tree screen |
 
 ### Level is DERIVED from xp and is never stored
@@ -4399,10 +4400,18 @@ unique per tower by design, so a shared stat vocabulary would buy nothing and
 would forbid exactly the tower-specific effects the system exists for.
 
 **Effects, and their order:** `preAdd` (deltas that land BEFORE the factors),
-then `mul` (all factors multiply), then `add` (all deltas sum), then `addRate`,
-then `set` (absolute; last equipped slot wins) —
-`(base + preAdd) * mul + add`. Slot order cannot change any of the first three,
-which is what makes dragging a perk between slots free of consequence.
+then `mul` (all factors multiply), then `add` (all deltas sum), then `mulAfter`
+(factors that land AFTER the deltas), then `addRate`, then `set` (absolute; last
+equipped slot wins) — `((base + preAdd) * mul + add) * mulAfter`. Slot order
+cannot change any of the first four, which is what makes dragging a perk between
+slots free of consequence.
+
+**`mulAfter` exists because "5% of the range this tower actually reached" is not
+"5% of its base range"** (2026-09-01). The Rifleman's First Deployment pays a
+percentage of the RESOLVED reach and Long Glass has already added 13 u.l. by
+then: on a 100 base that is 141.25 against 138. Like `preAdd` it is a POSITION
+IN THE ARITHMETIC, not a fourth category, and `previewStat` folds it in the same
+place so the build ghost draws the ring the placed tower gets.
 
 **A FIELD NAME MAY BE A DOTTED PATH** (`"mechanics.reload.reloadDurationSeconds"`),
 which is what lets a tree reach the MECHANIC PARAMETERS of a config-driven
@@ -4492,11 +4501,16 @@ only reachable from the title screen.
 
 ### Resetting a tree
 
-Per tower. Refunds every bought node **at its full authored price**, charges a
-commission of **`TREE_RESET_FEE_PER_NODE` = 10 coins PER NODE**, clears the
-inventory AND every slot those perks were in, and starts a **one-hour** cooldown
-that belongs to that tower alone — resetting the Rifleman does not touch the
+Per tower. Refunds every bought node **at its full authored price** AND every
+upgrade-squared rank at the price that rank cost, charges a commission of
+**`TREE_RESET_FEE_PER_NODE` = 10 coins PER NODE**, clears the inventory, every
+slot those perks were in and every rank, and starts a **one-hour** cooldown that
+belongs to that tower alone — resetting the Rifleman does not touch the
 Warbringer's clock.
+
+**A ranked upgrade-squared node counts as ONE unlocked node for the commission,
+whatever rank it holds.** The owner's rule: `removed` is a count of keys and
+never a sum of ranks.
 
 **The prices are given back; the commission is the only real loss.** Net is
 `sum(prices) − 10 × nodes`. A per-node rate rather than a flat fee scales with
@@ -4512,13 +4526,92 @@ after a reset both are true and only one is what the player is asking.
 `resetReadyAt` hands one back, so the screens and the tests decide what "now"
 is, and a saved stamp in the future is clamped by `sanitise` rather than trusted.
 
+### Upgrade² — a THIRD kind of upgrade (2026-09-01)
+
+**An upgrade² is a permanent, RANKED upgrade that improves ONE permanent
+upgrade.** It is bought with meta coins and outlives every run, exactly as a
+perk does, and it differs in exactly three ways:
+
+* it has **RANKS**, bought one at a time, each with its own price;
+* it **never occupies a loadout slot** — there is nothing to equip;
+* it belongs to one permanent upgrade and **applies only while that upgrade is
+  EQUIPPED**. Bought and dormant is an ordinary state, not an error.
+
+**A FUSION has two runtime parents and needs BOTH equipped.** There are four,
+all on the Rifleman: Series Ammunition, Salvage Conscription, Officer Supply and
+Entrenched Ammunition. A fusion also carries two rank prerequisites, and a
+half-met one is SHOWN as half met — `TowerPerks.requirementsOf` never
+short-circuits, so the card prints the satisfied one beside the missing one and
+the tree lights the arm that is paid for. It stays locked until both are there.
+
+**A PRICE IS THE PRICE OF THAT RANK ALONE, never a cumulative total.** Five
+curves, and every node uses one unaltered:
+
+| curve | prices |
+|---|---|
+| `S3` | 50, 75, 110 |
+| `S5` | 35, 50, 75, 110, 160 |
+| `X3` | 80, 120, 180 |
+| `X5` | 60, 90, 135, 200, 300 |
+| `H5` | 150, 250, 400, 650, 1000 |
+
+The node shape is `{ id, name, parent, alsoParent, requires: [{ id, rank }],
+maxRank, prices, at, upside, downside, valueAt(rank), effectsAt(rank) }`.
+**`effectsAt` returns the RESOLVED effect at that rank**, not an increment, so a
+non-linear table (Terminal Charge, Battery Setup) is written as a table and
+needs no special case. `TowerPerks.activeEffects` puts every square AFTER every
+equipped perk, and that order is load-bearing: `set` is last-writer-wins, and
+three squares exist precisely to REPLACE a value their parent set.
+
+**Rank 2 needs rank 1 of the same node** — enforced in `MetaProgress.buyRank`,
+which refuses anything but `have + 1`, so a double click cannot buy two and no
+caller can write a rank 3 onto a node sitting at rank 1.
+
+**Only the Rifleman has upgrade² content in this pass**, and it has twenty-two
+nodes in `js/perks/soldier-upgrades2.js`. That file registers against the same
+`towerId` as `soldier-perks.js`; `TowerPerks.register` merges by key rather than
+replacing, so either half may be registered on its own and the tag order does
+not matter.
+
+**Several of these nodes move a stat through PERCENTAGE POINTS rather than a
+multiplier**, folded into the real number once by `Soldier.afterPerks`. That is
+not decoration: two nodes move the same value and must not know each other's
+rank (Hard Ratchet and Polished Wheel; Rapid Muster, Medical Selection,
+Reinforced Contracts and Salvage Conscription; Piercing Orders and Carbide Tip;
+Deep Stakes and Entrenched Ammunition). Points sum, so slot order cannot change
+a result and a `set` cannot silently erase the other node's contribution. Three
+of the parent nodes were rewritten into that form on 2026-09-01 at IDENTICAL
+numbers — `mul: { recruitHp: 0.9 }` became `add: { recruitHpPoints: -10 }`, and
+so on — which is why the suite did not move a single figure.
+
+**`Soldier.rhythmKillCap` became `rhythmEarnedCap`** in the same pass: the
+ceiling is now counted in the same units as the per-kill gain rather than in
+kills. Identical at the authored 2 points a kill (6 × 0.02 = 0.12), and the only
+form that survives Campaign Tempo raising the gain and Decorated Ceiling raising
+the ceiling.
+
+**First Deployment's window is DERIVED, never stored.**
+`Soldier.firstDeploymentActive` is a prototype getter reading
+`perkFirstOfType && wavesOpened <= 3`, because `applyEffects` reads a `when`
+group's field before `afterPerks` and sometimes without a `recalcStats` in front
+of it. `wavesOpened` counts wave OPENINGS — `beginWave` tells every tower, and
+`addTower` tells one placed into a running wave — so the bonus survives the gaps
+between its three waves and is gone the instant the fourth is announced.
+
 ### The save
 
-A seventh field, `progress`, keyed by catalogue id: `{ xp, nodes, equipped,
-resetAt }`, and a row exists only for a tower that has actually done something.
-**An old save has none of it and that is not corruption** — it gets an empty
-map, keeps its coins, its towers and its build bar exactly, and starts this
-system at the beginning.
+A seventh field, `progress`, keyed by catalogue id: `{ xp, nodes, ranks,
+equipped, resetAt }`, and a row exists only for a tower that has actually done
+something. **An old save has none of it and that is not corruption** — it gets
+an empty map, keeps its coins, its towers and its build bar exactly, and starts
+this system at the beginning.
+
+**`ranks` is `{ nodeId: rank }` and an absent map IS the whole upgrade²
+migration**: a profile written before 2026-09-01 reads rank 0 everywhere and
+resolves exactly the numbers it did before. There is no version stamp and
+nothing to rewrite. A rank of 0 is never stored — absence is the one spelling of
+"not bought" — and the MAXIMUM rank is tree content, clamped by
+`TowerPerks.rankOf` and not by the save.
 
 Node ids are OPEN, like route ids and for the same reason: this file cannot
 enumerate the trees without depending on them, so an id this build does not know
@@ -4636,10 +4729,30 @@ buyable, poor, level-locked, prerequisite-locked — all come from
 `TowerPerks.stateOf`, so the ring's colour, the panel's sentence and the
 purchase's refusal cannot disagree.
 
+**THE UPGRADE² NODES ARE ON THE SAME BOARD, DRAWN SMALLER** (2026-09-01). A
+square hangs off the arm its parent sits on at two thirds the radius, so the
+spine of the tree stays the twelve permanent upgrades and the satellites read as
+belonging to them. Its RANK is a ring of pips around the rim — filled for a rank
+paid for, hollow for one not — which is the one thing about a square a player
+needs from across the board. Its links are lit one at a time, and a fusion's
+second runtime parent is dashed: that is what makes "you are halfway to this"
+readable without opening the card. `nodeAt` tests the squares FIRST, because
+they are drawn on top and are the smaller target.
+
+The card for a square prints the rank it is at, the rank it goes to, **what THAT
+rank costs on its own**, the resolved value now and the resolved value next
+(from the node's own `valueAt`, so a retune moves the card with the effect),
+which upgrade owns it and whether that upgrade is EQUIPPED, every requirement
+with the rank it has against the rank it needs, both halves of the trade — the
+downside is stated even when there is none — and, when it applies, that the node
+is **bought and DORMANT**. One buy button serves both kinds; `treeNodeKind`
+remembers which is pinned.
+
 ### The authored content
 
-**Sixty-nine confirmed nodes across SIX trees** (2026-08-31), and every number
-in them is the owner's, delivered in two batches: the Rifleman, the Warbringer
+**Sixty-nine confirmed nodes across SIX trees, plus the Rifleman's TWENTY-TWO
+upgrade² nodes** (2026-08-31 and 2026-09-01), and every number in them is the
+owner's, delivered in three batches: the Rifleman, the Warbringer
 and the Arcane Sniper first, then the Siphon, the Summoner and the Farm. The
 first batch replaced a nine-node pass whose names were placeholders (`[R-N] Base
 damage`); **those nine ids were KEPT and only their display names changed**,

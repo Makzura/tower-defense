@@ -337,6 +337,7 @@ var MetaProgress = (function () {
 
       var xp = (typeof row.xp === "number" && isFinite(row.xp) && row.xp > 0) ? row.xp : 0;
       var nodes = cleanStringList(row.nodes);
+      var ranks = cleanRanks(row.ranks);
       var level = levelForXp(xp);
 
       var equipped = [];
@@ -356,9 +357,41 @@ var MetaProgress = (function () {
       var resetAt = (typeof row.resetAt === "number" && isFinite(row.resetAt) &&
                      row.resetAt > 0) ? Math.floor(row.resetAt) : 0;
 
-      out[towerId] = { xp: xp, nodes: nodes, equipped: equipped, resetAt: resetAt };
+      out[towerId] = {
+        xp: xp, nodes: nodes, ranks: ranks, equipped: equipped, resetAt: resetAt
+      };
     });
 
+    return out;
+  }
+
+  // ONE TOWER'S UPGRADE-SQUARED RANKS, `{ nodeId: rank }`, rebuilt from what is
+  // recognisable. Added 2026-09-01 with the Rifleman's upgrade-squared tree.
+  //
+  // A MISSING `ranks` IS RANK 0 EVERYWHERE, and that is the whole migration: a
+  // profile written before this system loads with an empty map, so every
+  // upgrade-squared node reads rank 0 and the tower resolves exactly the numbers
+  // it did yesterday. There is no version stamp and nothing to rewrite.
+  //
+  // NODE IDS ARE OPEN HERE TOO, for the same reason they are open in `nodes`:
+  // this file cannot enumerate the trees without depending on them. An id this
+  // build does not know is KEPT (so a node that comes back is still paid for)
+  // and is inert, because js/systems/tower-perks.js only ever answers with
+  // nodes it can find. The MAXIMUM rank is tree content and is clamped there,
+  // not here.
+  //
+  // What IS enforced is storage shape: a rank is a whole number of at least 1,
+  // and a zero or nonsense entry is dropped rather than stored -- "not bought"
+  // has exactly one spelling, which is the absence of the key.
+  function cleanRanks(raw) {
+    var out = {};
+    if (!raw || typeof raw !== "object") return out;
+    Object.keys(raw).forEach(function (id) {
+      if (typeof id !== "string" || !id) return;
+      var rank = raw[id];
+      if (typeof rank !== "number" || !isFinite(rank) || rank < 1) return;
+      out[id] = Math.floor(rank);
+    });
     return out;
   }
 
@@ -930,13 +963,16 @@ var MetaProgress = (function () {
     var s = ensure();
     if (!s.progress) s.progress = {};
     if (!s.progress[towerId]) {
-      s.progress[towerId] = { xp: 0, nodes: [], equipped: emptyPerkSlots(), resetAt: 0 };
+      s.progress[towerId] = {
+        xp: 0, nodes: [], ranks: {}, equipped: emptyPerkSlots(), resetAt: 0
+      };
     }
     var row = s.progress[towerId];
     // A row read back from a save is already the right shape; one written by an
     // older build of THIS system might not be, and repairing here costs
     // nothing and removes a class of undefined.
     if (!row.nodes) row.nodes = [];
+    if (!row.ranks || typeof row.ranks !== "object") row.ranks = {};
     if (!row.equipped || row.equipped.length !== PERK_SLOTS) {
       row.equipped = emptyPerkSlots();
     }
@@ -968,9 +1004,16 @@ var MetaProgress = (function () {
       xpInto: next === null ? null : row.xp - floor,
       xpSpan: next === null ? null : next - floor,
       nodes: row.nodes.slice(),
+      ranks: copyRanks(row.ranks),
       equipped: row.equipped.slice(),
       resetAt: row.resetAt
     };
+  }
+
+  function copyRanks(ranks) {
+    var out = {};
+    Object.keys(ranks || {}).forEach(function (id) { out[id] = ranks[id]; });
+    return out;
   }
 
   // XP IS ONLY EVER ADDED, and a negative or nonsense amount is a no-op rather
@@ -1020,6 +1063,55 @@ var MetaProgress = (function () {
     progressRow(towerId).nodes.push(nodeId);
     save();
     return { ok: true, spent: cost };
+  }
+
+  // --- UPGRADE-SQUARED RANKS (2026-09-01) ------------------------------------
+  //
+  // THE THIRD THING A TOWER'S ROW REMEMBERS, and it is deliberately not a
+  // second copy of `nodes`. A permanent upgrade is bought once and is either
+  // owned or not; an upgrade-squared node is bought a RANK AT A TIME and the
+  // number is the whole of its state, so it is stored as `{ nodeId: rank }`
+  // rather than as an id repeated in a list.
+  //
+  // RANKS ARE NEVER EQUIPPED. `equipped` holds five permanent-upgrade ids and
+  // nothing else -- an upgrade-squared node does not occupy a loadout slot, and
+  // whether it APPLIES is decided at runtime by whether its parent is equipped
+  // (js/systems/tower-perks.js). Nothing here knows about that rule; this file
+  // only remembers what was paid for, which is what keeps the two halves apart.
+  function rankOfNode(towerId, nodeId) {
+    var rank = progressRow(towerId).ranks[nodeId];
+    return (typeof rank === "number" && rank > 0) ? rank : 0;
+  }
+
+  function nodeRanks(towerId) { return copyRanks(progressRow(towerId).ranks); }
+
+  // How many upgrade-squared nodes this tower has at least one rank of. The
+  // reset fee counts a RANKED NODE ONCE however many ranks it holds, which is
+  // the owner's rule -- so this is a count of keys and never a sum of ranks.
+  function rankedNodeCount(towerId) {
+    return Object.keys(progressRow(towerId).ranks).length;
+  }
+
+  // Spend `price` coins and move one node to `rank`. The price and the rank are
+  // the caller's -- the curves live with the trees -- but the two invariants
+  // that are about STORAGE are enforced here: ranks are bought one at a time and
+  // only ever upward, so a double click cannot buy two, and no caller can write
+  // a rank 3 onto a node sitting at rank 1.
+  function buyRank(towerId, nodeId, price, rank) {
+    var s = ensure();
+    if (!owns(towerId)) return { ok: false, reason: "you do not own that tower" };
+    var have = rankOfNode(towerId, nodeId);
+    if (typeof rank !== "number" || !isFinite(rank) || rank !== have + 1) {
+      return { ok: false, reason: "ranks are bought one at a time" };
+    }
+    var cost = (typeof price === "number" && isFinite(price) && price > 0)
+      ? Math.floor(price) : 0;
+    if (s.coins < cost) return { ok: false, reason: "not enough meta coins" };
+
+    s.coins -= cost;
+    progressRow(towerId).ranks[nodeId] = rank;
+    save();
+    return { ok: true, spent: cost, rank: rank };
   }
 
   // Put an owned node in a slot. Refuses, in this order and with the reason the
@@ -1097,8 +1189,16 @@ var MetaProgress = (function () {
     if (ready > now) {
       return { ok: false, reason: "reset is still cooling down", readyAt: ready };
     }
-    if (!row.nodes.length) return { ok: false, reason: "nothing bought to refund" };
-    var removed = row.nodes.length;
+    // A RANKED UPGRADE-SQUARED NODE IS ONE UNLOCKED NODE, whatever rank it
+    // holds -- the owner's rule, and the reason this is a key count rather than
+    // a sum of ranks. It also means a tree holding nothing but ranks still has
+    // something to refund, which is why both halves are counted before the
+    // "nothing bought" refusal.
+    var rankedIds = Object.keys(row.ranks);
+    if (!row.nodes.length && !rankedIds.length) {
+      return { ok: false, reason: "nothing bought to refund" };
+    }
+    var removed = row.nodes.length + rankedIds.length;
     var fee = removed * TREE_RESET_FEE_PER_NODE;
     var back = (typeof refund === "number" && isFinite(refund) && refund > 0)
       ? Math.floor(refund) : 0;
@@ -1117,6 +1217,11 @@ var MetaProgress = (function () {
     s.coins += back;
     s.coins -= fee;
     row.nodes = [];
+    // EVERY RANK GOES WITH THEM. An upgrade-squared node improves a permanent
+    // upgrade that has just been un-bought, so leaving its ranks behind would
+    // leave the player paying for something with nothing to attach to -- and
+    // `refund` above has already handed back every coin they cost.
+    row.ranks = {};
     // EVERY REVOKED PERK LEAVES THE LOADOUT WITH IT. A slot holding a node the
     // player no longer owns is the one shape equipPerk refuses to create, and a
     // reset must not create it by the back door.
@@ -1240,6 +1345,10 @@ var MetaProgress = (function () {
     ownsNode: ownsNode,
     ownedNodes: ownedNodes,
     buyNode: buyNode,
+    rankOfNode: rankOfNode,
+    nodeRanks: nodeRanks,
+    rankedNodeCount: rankedNodeCount,
+    buyRank: buyRank,
     equipPerk: equipPerk,
     unequipPerk: unequipPerk,
     equippedPerks: equippedPerks,
@@ -1282,6 +1391,7 @@ var MetaProgress = (function () {
         if (row) {
           merged.progress[id] = {
             xp: row.xp, nodes: (row.nodes || []).slice(),
+            ranks: copyRanks(row.ranks),
             equipped: (row.equipped || []).slice(), resetAt: row.resetAt || 0
           };
         }

@@ -14482,4 +14482,1489 @@ function (t) {
   t.eq(ranked.last, 0, "and to 'last'");
 });
 
+
+// ---------------------------------------------------------------------------
+// THE RIFLEMAN'S UPGRADE-SQUARED TREE (2026-09-01)
+//
+// TWENTY-TWO RANKED NODES, EACH IMPROVING ONE PERMANENT UPGRADE, and every
+// figure below is the owner's own — so, like the confirmed-content section
+// above, these tests DO name ids and DO assert exact numbers. A retune is meant
+// to turn them red.
+//
+// FOUR LAYERS, tested through their real entry points:
+//
+//   js/meta.js                     the ranks in the save, and the migration
+//   js/systems/tower-perks.js      the rules: parents, requirements, prices,
+//                                  and whether an owned node is doing anything
+//   js/perks/soldier-upgrades2.js  the content
+//   js/soldier.js                  what the numbers do in a run
+//
+// THE THREE QUESTIONS EVERY ONE OF THESE NODES RAISES, and each is asked at
+// least once below: does rank 0 change nothing, does a bought node whose parent
+// is on the bench change nothing, and does the resolved value match the stated
+// table at EVERY rank rather than only at the top.
+// ---------------------------------------------------------------------------
+
+group("the Rifleman's upgrade-squared tree");
+
+// A profile with every tower owned at level 5 and coins enough for any of these
+// curves. Same shape as `bootContent`, with more runs banked: H5's last rank
+// alone is a thousand coins.
+function bootSquares() {
+  var h = harness.boot();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar();" +
+        "TowerXP.setEnabled(true); openMenu()");
+  for (var i = 0; i < 120; i++) {
+    h.run("MetaProgress.awardRun({ wavesCompleted: 35, waveReached: 35, " +
+      "victory: true, mapId: Maps.DEFAULT_ID, mapName: 'x', difficultyId: 'easy' })");
+  }
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  return h;
+}
+
+// Buy and equip perks, set upgrade-squared ranks, start a run and put ONE
+// Rifleman on the board with the given tiers bought.
+//
+// STRAIGHT THROUGH THE MODEL, exactly as `towerWith` does and for the same
+// reason: these tests are about the EFFECTS, and the purchase rules have their
+// own tests above.
+//
+// It returns `towers[0]` and not `towers[towers.length - 1]`: `addTower` SORTS
+// the list by path progress, so the last slot is not reliably the tower just
+// built once a test wants two of them.
+function squareTower(h, nodeIds, ranks, tiers, x, y) {
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  (nodeIds || []).forEach(function (id, i) {
+    h.run("MetaProgress.buyNode('soldier', '" + id + "', 0);" +
+          "MetaProgress.equipPerk('soldier', '" + id + "', " + i + ")");
+  });
+  setRanks(h, ranks);
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000;" +
+        "towers = []; waveIndex = WAVES.length");
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(" + (x || 200) + ", " + (y || 200) + ", path)); })()");
+  buyTiers(h, "towers[0]", tiers);
+  return "towers[0]";
+}
+
+// Ranks up TO a target, from wherever the node is now — the only order the
+// model allows, and idempotent so a test may raise one twice.
+function setRanks(h, ranks) {
+  Object.keys(ranks || {}).forEach(function (id) {
+    var have = h.run("MetaProgress.rankOfNode('soldier', '" + id + "')");
+    for (var r = have + 1; r <= ranks[id]; r++) {
+      h.run("MetaProgress.buyRank('soldier', '" + id + "', 0, " + r + ")");
+    }
+  });
+}
+
+// What one in-run tier costs before any permanent upgrade touches it. Read out
+// of the authored table rather than typed here, so these tests assert the
+// SURCHARGE and stay green through a retune of the base price, which is not
+// what any of them are about.
+function baseTier(h, id) {
+  return h.run("Soldier.upgradeById('" + id + "').cost");
+}
+
+// Every round one Rifleman fires, in order, as the damage its Bullet carries.
+// Driven through the real `update`, because the thing under test is which shot
+// the burst calls its LAST — and that is decided by the loop, not by a stat.
+function squareBurst(h, expr, count) {
+  return h.run("(function () {" +
+    "  var tw = " + expr + ";" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = e.pos.x + 20; tw.y = e.pos.y; tw.rangePx = 1e6;" +
+    "  tw.cooldown = 0; tw.shotTimer = 0; tw.burstShotsLeft = 0;" +
+    "  var bullets = [], seen = [];" +
+    "  for (var i = 0; i < 900 && seen.length < " + count + "; i++) {" +
+    "    tw.update(1 / 60, [e], bullets);" +
+    "    while (seen.length < bullets.length) seen.push(bullets[seen.length].damage);" +
+    "  }" +
+    "  return seen; })()");
+}
+
+test("a rank is bought one at a time, at its own price, behind its parent",
+function (t) {
+  var h = bootSquares();
+  var ID = "rifleman_overloaded_reinforced_spring";
+
+  var cold = h.run("TowerPerks.buyUpgrade2('soldier', '" + ID + "')");
+  t.eq(cold.ok, false, "rank 1 refuses while Overloaded Drum is unbought");
+  t.ok(/Overloaded Drum/.test(cold.reason), "and names it: " + cold.reason);
+  t.eq(h.run("TowerPerks.upgrade2StateOf('soldier', '" + ID + "').state"), "locked",
+    "the node reads as locked");
+
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0)");
+  t.eq(h.run("TowerPerks.upgrade2StateOf('soldier', '" + ID + "').state"), "buyable",
+    "buying the parent opens rank 1");
+
+  // EACH RANK COSTS ITS OWN PRICE, never the sum of the ones before it.
+  [50, 75, 110].forEach(function (price, i) {
+    var before = h.run("MetaProgress.coins()");
+    var out = h.run("TowerPerks.buyUpgrade2('soldier', '" + ID + "')");
+    t.eq(out.ok, true, "rank " + (i + 1) + " buys");
+    t.eq(out.spent, price, "rank " + (i + 1) + " costs exactly " + price);
+    t.eq(before - h.run("MetaProgress.coins()"), price,
+      "and the purse moved by exactly that");
+    t.eq(h.run("TowerPerks.rankOf('soldier', '" + ID + "')"), i + 1,
+      "the node is at rank " + (i + 1));
+  });
+
+  var over = h.run("TowerPerks.buyUpgrade2('soldier', '" + ID + "')");
+  t.eq(over.ok, false, "a maxed node cannot be bought again");
+  var maxed = h.run("TowerPerks.upgrade2StateOf('soldier', '" + ID + "')");
+  t.eq(maxed.state, "maxed", "and reads as maxed");
+  t.eq(maxed.nextCost, null, "with no next price invented");
+  t.eq(maxed.spent, 235, "235 sunk into it — 50 + 75 + 110, not 235 for rank 3");
+
+  // THE MODEL REFUSES A SKIPPED RANK even when a caller asks for one directly.
+  t.eq(h.run("MetaProgress.buyRank('soldier', 'rifleman_breach_soft_feed', 0, 2).ok"),
+    false, "rank 2 cannot be written onto a node sitting at rank 0");
+  t.eq(h.run("MetaProgress.rankOfNode('soldier', 'rifleman_breach_soft_feed')"), 0,
+    "and nothing was stored");
+});
+
+test("a rank you cannot afford refuses, and quotes that rank's own price",
+function (t) {
+  var h = harness.boot();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.buyNode('soldier', 'rif_b4', 0)");
+
+  var ID = "rifleman_entrenchment_battery_setup";
+  var poor = h.run("TowerPerks.upgrade2StateOf('soldier', '" + ID + "')");
+  t.eq(poor.state, "poor", "a fresh profile cannot afford H5's first rank");
+  t.eq(poor.nextCost, 150, "which is 150 coins");
+  t.ok(/150/.test(poor.reason), "and the reason quotes it: " + poor.reason);
+  t.eq(h.run("TowerPerks.buyUpgrade2('soldier', '" + ID + "').ok"), false,
+    "so the purchase refuses");
+  t.eq(h.run("TowerPerks.rankOf('soldier', '" + ID + "')"), 0, "and nothing moved");
+});
+
+test("a fusion shows 0/2, 1/2 and 2/2, and cannot be bought at 1/2",
+function (t) {
+  var h = bootSquares();
+  var FUSION = "rifleman_overloaded_series_ammunition";
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0);" +
+        "MetaProgress.buyNode('soldier', 'rif_n1', 0)");
+
+  var none = h.run("TowerPerks.upgrade2StateOf('soldier', '" + FUSION + "')");
+  t.eq(none.requirementsTotal, 2, "Series Ammunition has two requirements");
+  t.eq(none.requirementsMet, 0, "0 / 2 with nothing bought");
+  t.eq(none.state, "locked", "and is locked");
+
+  // HALF WAY IS SHOWN AS HALF WAY, never as a single flat "locked".
+  setRanks(h, { rifleman_overloaded_reinforced_spring: 2 });
+  var half = h.run("TowerPerks.upgrade2StateOf('soldier', '" + FUSION + "')");
+  t.eq(half.requirementsMet, 1, "1 / 2 with Reinforced Spring at rank 2");
+  t.eq(half.requirements[0].met, true, "the satisfied one is marked satisfied");
+  t.eq(half.requirements[0].have, 2, "with the rank it actually holds");
+  t.eq(half.requirements[1].met, false, "and the missing one is marked missing");
+  t.eq(half.requirements[1].have, 0, "with its rank of 0");
+  t.eq(half.requirements[1].need, 2, "against the 2 it needs");
+  t.eq(half.state, "locked", "it is STILL locked at 1 / 2");
+  t.eq(h.run("TowerPerks.buyUpgrade2('soldier', '" + FUSION + "').ok"), false,
+    "and cannot be bought");
+  t.ok(/Premium Lot/.test(half.reason) && !/Reinforced Spring/.test(half.reason),
+    "the refusal names only the one that is short: " + half.reason);
+
+  // ONE SHORT OF THE RANK IS STILL SHORT.
+  setRanks(h, { rifleman_commissioned_premium_lot: 1 });
+  t.eq(h.run("TowerPerks.upgrade2StateOf('soldier', '" + FUSION + "').requirementsMet"),
+    1, "Premium Lot at rank 1 against a needed 2 is still 1 / 2");
+
+  setRanks(h, { rifleman_commissioned_premium_lot: 2 });
+  var both = h.run("TowerPerks.upgrade2StateOf('soldier', '" + FUSION + "')");
+  t.eq(both.requirementsMet, 2, "2 / 2 at last");
+  t.eq(both.state, "buyable", "and now it is buyable");
+  t.eq(both.nextCost, 80, "for X3's first rank, 80 coins");
+  t.eq(h.run("TowerPerks.buyUpgrade2('soldier', '" + FUSION + "').ok"), true,
+    "and it buys");
+});
+
+test("an owned square does nothing while its parent is on the bench",
+function (t) {
+  var h = bootSquares();
+
+  // BOUGHT AND NOT EQUIPPED. Overloaded Drum is in the inventory but in no
+  // slot, so its square is owned, dormant and worth exactly nothing.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0)");
+  setRanks(h, { rifleman_overloaded_reinforced_spring: 3 });
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(200, 200, path)); })()");
+
+  t.eq(h.run("towers[0].drumShotFlatDamage"), 0,
+    "rank 3 of Reinforced Spring adds nothing with Overloaded Drum unequipped");
+  t.eq(h.run("towers[0].shotsPerBurst"), h.run("Soldier.BASE_SHOTS_PER_BURST"),
+    "and the burst is the tower's own");
+  var state = h.run("TowerPerks.upgrade2StateOf('soldier', " +
+    "'rifleman_overloaded_reinforced_spring')");
+  t.eq(state.rank, 3, "the ranks are still owned");
+  t.eq(state.dormant, true, "and the model calls it dormant rather than lost");
+
+  // EQUIP THE PARENT AND IT IS BACK, with nothing bought in between.
+  var live = squareTower(h, ["rif_a1"],
+    { rifleman_overloaded_reinforced_spring: 3 }, ["A1", "A2", "A3"]);
+  t.eq(h.run(live + ".drumShotFlatDamage"), 6, "equipped, it is +6 again");
+  t.eq(h.run("TowerPerks.upgrade2StateOf('soldier', " +
+    "'rifleman_overloaded_reinforced_spring').dormant"), false, "and not dormant");
+});
+
+test("a fusion needs BOTH parents equipped, not either", function (t) {
+  var h = bootSquares();
+  var A4 = baseTier(h, "A4");
+  var B4 = baseTier(h, "B4");
+  var RANKS = {
+    rifleman_overloaded_reinforced_spring: 2,
+    rifleman_commissioned_premium_lot: 2,
+    rifleman_overloaded_series_ammunition: 3
+  };
+
+  var one = squareTower(h, ["rif_a1"], RANKS, ["A1", "A2", "A3"]);
+  t.eq(h.run(one + ".drumShotFlatDamage"), 4,
+    "Reinforced Spring rank 2 applies on its own parent");
+  t.eq(h.run(one + ".upgradeCost('A4')"), A4,
+    "and the fusion surcharges nothing with only one parent equipped");
+
+  var other = squareTower(h, ["rif_n1"], RANKS, ["A1", "A2", "A3"]);
+  t.eq(h.run(other + ".upgradeCost('A4')"), A4 + 50 + 10,
+    "the parent's own 50 and Premium Lot's 10, and not a coin of the fusion's");
+
+  // BOTH, AND IT WAKES UP.
+  var pair = squareTower(h, ["rif_a1", "rif_n1"], RANKS, ["A1", "A2", "A3"]);
+  t.near(h.run(pair + ".drumShotFlatDamage"), 4.3, 1e-9,
+    "Reinforced Spring's 4 plus Series Ammunition's 0.3");
+  t.eq(h.run(pair + ".upgradeCost('A4')"), A4 + 50 + 10 + 6,
+    "A4 carries the parent's 50, Premium Lot's 10 and the fusion's 6");
+  t.eq(h.run(pair + ".upgradeCost('B4')"), B4 + 50 + 10,
+    "while B4 carries no part of the fusion's A-only surcharge");
+});
+
+test("ranks survive a reload, and a save written before them reads rank 0",
+function (t) {
+  var h = bootSquares();
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0)");
+  setRanks(h, { rifleman_overloaded_reinforced_spring: 2 });
+
+  var snap = h.run("MetaProgress.snapshot().progress.soldier.ranks");
+  t.eq(snap.rifleman_overloaded_reinforced_spring, 2,
+    "the rank is in the profile the screens read");
+
+  // THE WHOLE MIGRATION IS AN ABSENT KEY. A profile written before this system
+  // has no `ranks` at all and must load as rank 0 everywhere, with its coins,
+  // its towers, its nodes and its loadout untouched.
+  var old = h.run("MetaProgress.__loadForTest({ coins: 900, owned: ['soldier']," +
+    " equipped: ['soldier', null, null, null, null]," +
+    " progress: { soldier: { xp: 20000, nodes: ['rif_a1']," +
+    "   equipped: ['rif_a1', null, null, null, null] } } })");
+  t.deep(old.progress.soldier.ranks, {}, "an old save has no ranks");
+  t.eq(old.progress.soldier.nodes.length, 1, "and keeps the node it bought");
+  t.eq(old.coins, 900, "and its coins");
+  t.eq(h.run("TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring')"),
+    0, "every square reads rank 0");
+
+  // HOSTILE DATA IS SHAPED, NOT TRUSTED — and an id this build does not know is
+  // KEPT rather than thrown away, exactly as an unknown node id is.
+  var junk = h.run("MetaProgress.__loadForTest({ coins: 5, owned: ['soldier']," +
+    " equipped: [null, null, null, null, null]," +
+    " progress: { soldier: { xp: 0, nodes: [], ranks: {" +
+    "   rifleman_overloaded_reinforced_spring: 99, zero: 0, negative: -3," +
+    "   text: 'x', retired_node: 2 } } } })");
+  var ranks = junk.progress.soldier.ranks;
+  t.eq(ranks.zero, undefined, "a rank of 0 is not stored — absence is 'not bought'");
+  t.eq(ranks.negative, undefined, "nor a negative one");
+  t.eq(ranks.text, undefined, "nor a string");
+  t.eq(ranks.retired_node, 2, "an id this build has dropped is kept and inert");
+  t.eq(ranks.rifleman_overloaded_reinforced_spring, 99, "the save stores what it was told");
+  t.eq(h.run("TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring')"),
+    3, "and the tree clamps it to the node's own maximum");
+});
+
+test("a reset refunds every rank and charges ten a node, whatever rank it held",
+function (t) {
+  var h = bootSquares();
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0)");
+  h.run("MetaProgress.buyNode('soldier', 'rif_a2', 0)");
+  setRanks(h, {
+    rifleman_overloaded_reinforced_spring: 3,     // 50 + 75 + 110 = 235
+    rifleman_breach_soft_feed: 1                  // 35
+  });
+
+  var nodeCost = h.run("TowerPerks.nodeOf('soldier', 'rif_a1').cost") +
+                 h.run("TowerPerks.nodeOf('soldier', 'rif_a2').cost");
+  t.eq(h.run("TowerPerks.refundValue('soldier')"), nodeCost + 235 + 35,
+    "the refund is both perks plus every rank at the price it was bought for");
+
+  t.eq(h.run("MetaProgress.rankedNodeCount('soldier')"), 2,
+    "two RANKED nodes, one at rank 3 and one at rank 1");
+
+  var out = h.run("TowerPerks.resetTree('soldier', 99999999)");
+  t.eq(out.ok, true, "the reset goes through");
+  t.eq(out.removed, 4, "four unlocked nodes — two perks and two ranked squares");
+  t.eq(out.fee, 40, "at ten a node, and a rank-3 node counts once");
+  t.eq(out.refunded, nodeCost + 270, "with every coin handed back");
+  t.deep(h.run("MetaProgress.nodeRanks('soldier')"), {}, "and no rank survives");
+  t.deep(h.run("MetaProgress.ownedNodes('soldier')"), [], "nor any node");
+
+  // THE COOLDOWN IS UNCHANGED — a second reset a moment later is refused for
+  // the reason it always was.
+  var again = h.run("TowerPerks.resetTree('soldier', 99999999)");
+  t.eq(again.ok, false, "a second reset on the same clock refuses");
+  t.ok(/cool/.test(again.reason), "for the cooldown: " + again.reason);
+
+  // A TREE HOLDING NOTHING BUT RANKS STILL HAS SOMETHING TO REFUND.
+  var h2 = bootSquares();
+  h2.run("MetaProgress.buyNode('soldier', 'rif_b4', 0)");
+  setRanks(h2, { rifleman_entrenchment_battery_setup: 2 });
+  var only = h2.run("TowerPerks.resetTree('soldier', 99999999)");
+  t.eq(only.removed, 2, "the perk and its ranked square");
+  t.eq(only.refunded,
+    h2.run("TowerPerks.nodeOf('soldier', 'rif_b4').cost") + 400,
+    "150 + 250 of H5 comes back with it");
+});
+
+test("Reinforced Spring pays only the shot Overloaded Drum created",
+function (t) {
+  var h = bootSquares();
+
+  // A3 IS FIVE SHOTS WITH THE DRUM, and the fifth is the one it created — so
+  // four rounds at the tower's damage and one at damage + 6.
+  var s = squareTower(h, ["rif_a1"],
+    { rifleman_overloaded_reinforced_spring: 3 }, ["A1", "A2", "A3"]);
+  var base = h.run(s + ".damage");
+  t.eq(h.run(s + ".shotsPerBurst"), 5, "A3 with Overloaded Drum fires five");
+  t.deep(squareBurst(h, s, 5), [base, base, base, base, base + 6],
+    "and only the last of them carries the +6");
+
+  // EVERY RANK, and the ranks are +2 apart rather than a table.
+  [[1, 2], [2, 4], [3, 6]].forEach(function (row) {
+    var tw = squareTower(h, ["rif_a1"],
+      { rifleman_overloaded_reinforced_spring: row[0] }, ["A1", "A2", "A3"]);
+    var shots = squareBurst(h, tw, 5);
+    t.eq(shots[4] - shots[0], row[1],
+      "rank " + row[0] + " puts +" + row[1] + " on the added shot");
+  });
+
+  // NOTHING BELOW A3, because Overloaded Drum grants nothing below A3.
+  var early = squareTower(h, ["rif_a1"],
+    { rifleman_overloaded_reinforced_spring: 3 }, ["A1", "A2"]);
+  t.eq(h.run(early + ".shotsPerBurst"), 4, "A2 still fires four");
+  var flat = squareBurst(h, early, 4);
+  t.eq(flat[0], flat[3], "and every round of the burst is worth the same");
+
+  // AND NOTHING ON AN AUTOMATIC RIFLEMAN, for exactly the reason its parent
+  // gains nothing there: B3 never enters the burst block.
+  var auto = squareTower(h, ["rif_a1"],
+    { rifleman_overloaded_reinforced_spring: 3 }, ["B1", "B2", "B3"]);
+  var rifle = squareBurst(h, auto, 4);
+  t.eq(rifle[0], rifle[3], "an automatic rifle's rounds are all the same");
+});
+
+test("Terminal Charge and Soft Feed use their exact tables, on shot six",
+function (t) {
+  var h = bootSquares();
+  var FIVE = ["A1", "A2", "A3", "A4", "A5"];
+
+  // OVERLOADED DRUM PLUS BREACH CHAMBER IS SIX SHOTS, and shot six is the one
+  // that doubles — the five before it take the penalty.
+  var s = squareTower(h, ["rif_a1", "rif_a2"], {}, FIVE);
+  t.eq(h.run(s + ".shotsPerBurst"), 6, "A5 with Overloaded Drum fires six");
+  var base = h.run(s + ".damage");
+  var plain = squareBurst(h, s, 6);
+  t.near(plain[0], base * 0.9, 1e-9, "shot 1 pays the parent's −10%");
+  t.near(plain[4], base * 0.9, 1e-9, "so does shot 5");
+  t.near(plain[5], base * 2, 1e-9, "and shot SIX is the doubled one");
+
+  // TERMINAL CHARGE IS A TABLE OF TOTALS, not a multiplier on top of x2.
+  [[0, 2], [1, 2.1], [2, 2.25], [3, 2.5]].forEach(function (row) {
+    var tw = squareTower(h, ["rif_a1", "rif_a2"],
+      row[0] ? { rifleman_breach_terminal_charge: row[0] } : {}, FIVE);
+    var d = h.run(tw + ".damage");
+    t.near(squareBurst(h, tw, 6)[5], d * row[1], 1e-9,
+      "rank " + row[0] + " resolves x" + row[1] + " on the final shot");
+  });
+
+  // SOFT FEED IS THE OTHER HALF, AND ITS OWN BRANCH: Terminal Charge is not a
+  // prerequisite of it.
+  t.deep(h.run("(TowerPerks.upgrade2Of('soldier', 'rifleman_breach_soft_feed')" +
+    ".requires || []).map(function (r) { return r.id; })"), [],
+    "Soft Feed requires no other square");
+  [[0, 10], [1, 9.5], [2, 9], [3, 8.5], [4, 8], [5, 7.5]].forEach(function (row) {
+    var tw = squareTower(h, ["rif_a1", "rif_a2"],
+      row[0] ? { rifleman_breach_soft_feed: row[0] } : {}, FIVE);
+    var d = h.run(tw + ".damage");
+    var shots = squareBurst(h, tw, 6);
+    t.near(shots[0], d * (1 - row[1] / 100), 1e-9,
+      "rank " + row[0] + " leaves the earlier shots at −" + row[1] + "%");
+    t.near(shots[5], d * 2, 1e-9, "and the final shot never took that penalty");
+  });
+
+  // THE TWO TOGETHER, AND REINFORCED SPRING'S FLAT GOES IN FIRST.
+  var all = squareTower(h, ["rif_a1", "rif_a2"], {
+    rifleman_overloaded_reinforced_spring: 3,
+    rifleman_breach_terminal_charge: 3,
+    rifleman_breach_soft_feed: 5
+  }, FIVE);
+  var d = h.run(all + ".damage");
+  var shots = squareBurst(h, all, 6);
+  t.near(shots[0], d * 0.925, 1e-9, "the early shots read −7.5%");
+  t.near(shots[5], (d + 6) * 2.5, 1e-9,
+    "and the last is (damage + 6) x 2.50 — the flat is inside the multiplier");
+});
+
+test("Hard Ratchet and Polished Wheel move the two outcomes, one cycle at a time",
+function (t) {
+  var h = bootSquares();
+  var THREE = ["rif_a1", "rif_a2", "rif_a3"];
+
+  var plain = squareTower(h, THREE, {}, []);
+  t.near(h.run(plain + ".ratchetGain"), 0.88, 1e-9, "the parent rewards −12%");
+  t.near(h.run(plain + ".ratchetLoss"), 1.15, 1e-9, "and punishes +15%");
+
+  [[1, 12.8, 15.8], [2, 13.6, 16.6], [3, 14.4, 17.4]].forEach(function (row) {
+    var tw = squareTower(h, THREE, { rifleman_ratchet_hard_ratchet: row[0] }, []);
+    t.near(h.run(tw + ".ratchetGain"), 1 - row[1] / 100, 1e-9,
+      "Hard Ratchet rank " + row[0] + " rewards −" + row[1] + "%");
+    t.near(h.run(tw + ".ratchetLoss"), 1 + row[2] / 100, 1e-9,
+      "and punishes +" + row[2] + "%");
+  });
+
+  // POLISHED WHEEL TOUCHES ONE END ONLY, and needs Hard Ratchet rank 2 first.
+  var locked = h.run("TowerPerks.upgrade2StateOf('soldier'," +
+    " 'rifleman_ratchet_polished_wheel')");
+  t.eq(locked.requirements[0].id, "rifleman_ratchet_hard_ratchet",
+    "Polished Wheel hangs off Hard Ratchet");
+  t.eq(locked.requirements[0].need, 2, "at rank 2");
+
+  var both = squareTower(h, THREE, {
+    rifleman_ratchet_hard_ratchet: 3,
+    rifleman_ratchet_polished_wheel: 5
+  }, []);
+  t.near(h.run(both + ".ratchetGain"), 1 - 16.4 / 100, 1e-9,
+    "3 and 5 together reward exactly −16.4%");
+  t.near(h.run(both + ".ratchetLoss"), 1.174, 1e-9,
+    "and the failure is still +17.4% — the wheel does not touch it");
+
+  // AND IT IS STILL SPENT ON EXACTLY ONE CYCLE. The classification and the
+  // one-cycle consumption are the parent's and are unchanged.
+  var cycles = h.run("(function () {" +
+    "  var tw = " + both + ";" +
+    "  tw.burstMissed = 0; tw.settleRatchet();" +
+    "  var afterClean = tw.ratchetPending;" +
+    "  tw.burstShotsLeft = 0; tw.cooldown = 0; tw.shotTimer = 0;" +
+    "  var e = new Enemy(path, null, 'normal', {});" +
+    "  e.progress = path.length * 0.5; e.refreshPos();" +
+    "  e.health = 1e9; e.maxHealth = 1e9;" +
+    "  tw.x = e.pos.x + 20; tw.y = e.pos.y; tw.rangePx = 1e6;" +
+    "  tw.update(1 / 60, [e], []);" +
+    "  return { afterClean: afterClean, spent: tw.ratchetPending," +
+    "           cooldown: tw.cooldown }; })()");
+  t.near(cycles.afterClean, 0.836, 1e-9, "a clean burst banks the reward");
+  t.eq(cycles.spent, 1, "the next burst opening spends it and leaves nothing");
+  t.ok(cycles.cooldown > 0, "and the cycle it opened really was shortened");
+
+  // A COLLAPSED BURST BANKS THE OTHER ONE.
+  var loss = h.run("(function () { var tw = " + both + ";" +
+    "  tw.burstMissed = 2; tw.settleRatchet(); return tw.ratchetPending; })()");
+  t.near(loss, 1.174, 1e-9, "two lost shots bank +17.4%");
+  var neutral = h.run("(function () { var tw = " + both + ";" +
+    "  tw.burstMissed = 1; tw.settleRatchet(); return tw.ratchetPending; })()");
+  t.eq(neutral, 1, "one lost shot is still neither");
+});
+
+test("recruit health resolves as summed percentage points, in every combination",
+function (t) {
+  var h = bootSquares();
+  var B4 = ["B1", "B2", "B3", "B4"];
+  var BASE = h.run("Soldier.RECRUIT_HP");
+
+  // POINTS SUM; THEY DO NOT MULTIPLY. Every row is (nodes, ranks, points).
+  var rows = [
+    [["rif_b1"], {}, 0],
+    [["rif_b1", "rif_b2"], {}, -10],
+    [["rif_b1", "rif_b2"], { rifleman_rapid_medical_selection: 1 }, -9],
+    [["rif_b1", "rif_b2"], { rifleman_rapid_medical_selection: 3 }, -7],
+    [["rif_b1", "rif_b2"], { rifleman_rapid_medical_selection: 5 }, -5],
+    [["rif_b1"], { rifleman_manifest_reinforced_contracts: 1 }, 2],
+    [["rif_b1"], { rifleman_manifest_reinforced_contracts: 3 }, 6],
+    [["rif_b1", "rif_b2"], {
+      rifleman_rapid_medical_selection: 5,
+      rifleman_manifest_reinforced_contracts: 3
+    }, 1]
+  ];
+  rows.forEach(function (row) {
+    var tw = squareTower(h, row[0], row[1], B4);
+    t.near(h.run(tw + ".recruitHp"), BASE * (1 + row[2] / 100), 1e-9,
+      "recruits resolve " + row[2] + " points against the base " + BASE);
+  });
+
+  // AND THE SALVAGE POINTS ARE ON ONE BODY. Sorted Parts and Reinforced
+  // Contracts at rank 2 are what opens the fusion.
+  var first = squareTower(h, ["rif_b1", "rif_s1"], {
+    rifleman_manifest_reinforced_contracts: 2,
+    rifleman_cheap_sorted_parts: 2,
+    rifleman_manifest_salvage_conscription: 3
+  }, B4);
+  t.eq(h.run(first + ".perkFirstOfType"), true, "this is the run's first Rifleman");
+  t.near(h.run(first + ".recruitHp"), BASE * 1.1, 1e-9,
+    "+4 from Reinforced Contracts and +6 from Salvage is +10 points");
+
+  // THE SECOND RIFLEMAN OF THE RUN GETS THE CONTRACTS AND NOT THE SALVAGE.
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(900, 200, path)); })()");
+  var second = h.run("(function () {" +
+    "  for (var i = 0; i < towers.length; i++)" +
+    "    if (!towers[i].perkFirstOfType) return { hp: towers[i].recruitHp," +
+    "      first: towers[i].perkFirstOfType };" +
+    "  return null; })()");
+  t.ok(second !== null, "a second Rifleman is on the board");
+  t.eq(second.first, false, "and it is not the first of its type");
+  t.near(second.hp, BASE * 1.04, 1e-9, "so it carries +4 points and no more");
+
+  // B5's LARGER RECRUIT TAKES THE SAME POINTS, on its own base.
+  var b5 = squareTower(h, ["rif_b1", "rif_b2"], {
+    rifleman_rapid_medical_selection: 5,
+    rifleman_manifest_reinforced_contracts: 3
+  }, ["B1", "B2", "B3", "B4", "B5"]);
+  t.eq(h.run(b5 + ".recruitCount"), 5, "B5 with the Manifest sends five");
+  t.near(h.run(b5 + ".recruitHp"), 40 * 1.01, 1e-9, "each on 40 plus one point");
+});
+
+test("every B4 and B5 surcharge sums once, and the till takes what the panel said",
+function (t) {
+  var h = bootSquares();
+  var B4 = baseTier(h, "B4");
+  var B5 = baseTier(h, "B5");
+
+  // ALL SIX COMPONENTS AT ONCE. Commissioned Ammunition +50, Premium Lot +15,
+  // Volume Discount −25, the Manifest +200/+350, Reinforced Contracts
+  // +30/+45 and Officer Supply +15 on each.
+  var tw = squareTower(h, ["rif_n1", "rif_b1"], {
+    rifleman_commissioned_premium_lot: 3,
+    rifleman_commissioned_volume_discount: 5,
+    rifleman_manifest_reinforced_contracts: 3,
+    rifleman_commissioned_officer_supply: 3
+  }, ["B1", "B2", "B3"]);
+
+  var wantB4 = B4 + 50 + 15 - 25 + 200 + 30 + 15;
+  var wantB5 = B5 + 50 + 15 - 25 + 350 + 45 + 15;
+  t.eq(h.run(tw + ".upgradeCost('B4')"), wantB4,
+    "B4 quotes every component exactly once");
+  t.eq(h.run(tw + ".upgradeCost('B5')"), wantB5, "and so does B5");
+
+  // THE PANEL, THE AFFORDABILITY CHECK AND THE TILL ARE THE SAME NUMBER.
+  var card = h.run("(function () { var tw = " + tw + ";" +
+    "  var acts = tw.panelActions();" +
+    "  for (var i = 0; i < acts.length; i++)" +
+    "    if (/B4/.test(acts[i].label || '') || /B4/.test(acts[i].id || ''))" +
+    "      return acts[i].detail;" +
+    "  return null; })()");
+  t.eq(card, wantB4 + " mana", "the panel button quotes it: " + card);
+
+  h.run("cash = " + (wantB4 - 1));
+  t.eq(h.run("buyUpgrade(" + tw + ", 'B4')"), "not enough mana",
+    "one mana short is refused at exactly that price");
+  h.run("cash = " + wantB4);
+  var spentBefore = h.run(tw + ".totalSpent");
+  t.eq(h.run("buyUpgrade(" + tw + ", 'B4')"), null, "and the exact price buys");
+  t.eq(h.run("cash"), 0, "the till took every coin of it");
+  t.eq(h.run(tw + ".totalSpent") - spentBefore, wantB4,
+    "and the sale value records the same sum");
+});
+
+test("Carbide Tip bypasses fractional flat armor and never percentage defence",
+function (t) {
+  var h = bootSquares();
+  var B3 = ["B1", "B2", "B3"];
+
+  [[1, 2.15, 5.3], [2, 2.30, 5.6], [3, 2.45, 5.9]].forEach(function (row) {
+    var tw = squareTower(h, ["rif_b1", "rif_b2", "rif_b3"],
+      { rifleman_piercing_carbide_tip: row[0] }, B3);
+    t.near(h.run(tw + ".armorPierce"), row[1], 1e-9,
+      "rank " + row[0] + " ignores " + row[1] + " flat armor");
+    t.near(h.run(tw + ".recruitArmorPierce"), row[1], 1e-9,
+      "and its recruits ignore the same");
+    t.near(h.run(tw + ".fireRateMult"), 1 - row[2] / 100, 1e-9,
+      "against a −" + row[2] + "% fire rate");
+    t.near(h.run(tw + ".recruitShotsPerSecond"),
+      h.run("Soldier.RECRUIT_SHOTS_PER_SECOND") * (1 - row[2] / 100), 1e-9,
+      "which the recruits pay too");
+  });
+
+  // NOTHING BELOW B3, because Piercing Orders itself gives nothing below B3.
+  var early = squareTower(h, ["rif_b1", "rif_b2", "rif_b3"],
+    { rifleman_piercing_carbide_tip: 3 }, ["B1", "B2"]);
+  t.eq(h.run(early + ".armorPierce"), 0, "no bypass at B2");
+  t.eq(h.run(early + ".fireRateMult"), 1, "and no penalty either");
+
+  // THE MITIGATION RULE ITSELF: fractional, clamped at zero, and blind to
+  // percentage defence.
+  t.near(h.run("Mitigation.mitigate(10, { armor: 3, defense: 50 }, 0, 0, 0)"),
+    3.5, 1e-9, "10 raw through 3 armor and 50% defence is 3.5");
+  t.near(h.run("Mitigation.mitigate(10, { armor: 3, defense: 50 }, 0, 0, 2.45)"),
+    4.725, 1e-9, "2.45 of bypass is a FRACTIONAL 0.55 of armor left");
+  t.near(h.run("Mitigation.mitigate(10, { armor: 1, defense: 0 }, 0, 0, 3.45)"),
+    10, 1e-9, "more bypass than armor clamps at zero and never adds damage");
+  t.near(h.run("Mitigation.mitigate(10, { armor: 0, defense: 40 }, 0, 0, 3.45)"),
+    6, 1e-9, "and percentage defence is untouched by any amount of it");
+
+  // AND THE ENEMY'S OWN NUMBER IS NEVER EDITED.
+  var kept = h.run("(function () { var e = { armor: 3, defense: 0 };" +
+    "  Mitigation.mitigate(10, e, 0, 0, 2.45); return e.armor; })()");
+  t.eq(kept, 3, "the body meets the next tower's shot at full plate");
+});
+
+test("Deep Stakes and Entrenched Ammunition resolve the dug-in numbers",
+function (t) {
+  var h = bootSquares();
+  var B4 = ["B1", "B2", "B3", "B4"];
+  var FOUR = ["rif_b1", "rif_b2", "rif_b3", "rif_b4"];
+
+  var plain = squareTower(h, FOUR, {}, B4);
+  var base = h.run(plain + ".recruitStats()");
+  t.near(base.entrenchRangeMult, 1.25, 1e-9, "the parent digs in at +25% range");
+  t.near(base.entrenchRateMult, 1.25, 1e-9, "+25% fire rate");
+  t.near(base.entrenchDamageTakenMult, 0.75, 1e-9, "and 25% less damage taken");
+
+  [1, 2, 3].forEach(function (rank) {
+    var tw = squareTower(h, FOUR, { rifleman_entrenchment_deep_stakes: rank }, B4);
+    var st = h.run(tw + ".recruitStats()");
+    t.near(st.entrenchRangeMult, 1 + (25 + rank) / 100, 1e-9,
+      "Deep Stakes rank " + rank + " digs in at +" + (25 + rank) + "% range");
+    t.near(st.entrenchRateMult, 1 + (25 + rank) / 100, 1e-9, "the same fire rate");
+    t.near(st.entrenchDamageTakenMult, 1 - (25 + rank) / 100, 1e-9,
+      "and the same damage reduction");
+    t.near(st.cooldownSeconds, 45 + 0.5 * rank, 1e-9,
+      "with Rapid Muster the cooldown is 45 + " + (0.5 * rank));
+  });
+
+  // WITHOUT RAPID MUSTER IT IS THE OTHER TABLE, 55 + 0.5r.
+  [1, 2, 3].forEach(function (rank) {
+    var tw = squareTower(h, ["rif_b1", "rif_b3", "rif_b4"],
+      { rifleman_entrenchment_deep_stakes: rank }, B4);
+    t.near(h.run(tw + ".recruitStats().cooldownSeconds"), 55 + 0.5 * rank, 1e-9,
+      "Entrenchment alone at rank " + rank + " calls every " + (55 + 0.5 * rank) + " s");
+  });
+
+  // ENTRENCHED AMMUNITION: the range points come off the SUM, so Deep Stakes'
+  // points go on before this one comes off.
+  [1, 2, 3, 4, 5].forEach(function (rank) {
+    var tw = squareTower(h, FOUR, {
+      rifleman_piercing_carbide_tip: 2,
+      rifleman_entrenchment_deep_stakes: 2,
+      rifleman_piercing_entrenched_ammunition: rank
+    }, B4);
+    var st = h.run(tw + ".recruitStats()");
+    t.near(st.entrenchArmorPierce, 2 * rank / 10, 1e-9,
+      "rank " + rank + " adds " + (2 * rank / 10) + " flat armor bypass while dug in");
+    t.near(st.entrenchRangeMult, 1 + (25 + 2 - rank) / 100, 1e-9,
+      "and takes " + rank + " points off a 27-point range bonus");
+  });
+
+  // WITHOUT DEEP STAKES' POINTS the stated table is +24 down to +20 — asserted
+  // through the resolved stat rather than through the node's arithmetic.
+  [1, 2, 3, 4, 5].forEach(function (rank) {
+    var tw = squareTower(h, FOUR,
+      { rifleman_piercing_entrenched_ammunition: rank }, B4);
+    t.near(h.run(tw + ".recruitStats().entrenchRangeMult"),
+      1 + (25 - rank) / 100, 1e-9,
+      "rank " + rank + " alone reads +" + (25 - rank) + "% range");
+  });
+
+  // THE EXTRA BYPASS IS THERE ONLY WHILE IT IS DUG IN, and goes the frame it
+  // moves. Nothing about the walking speed or the march changes.
+  var tw = squareTower(h, FOUR, {
+    rifleman_piercing_carbide_tip: 2,
+    rifleman_entrenchment_deep_stakes: 2,
+    rifleman_piercing_entrenched_ammunition: 5
+  }, B4);
+  var life = h.run("(function () { var tower = " + tw + ";" +
+    "  var r = new SoldierRecruit(path, tower, true, tower.recruitStats());" +
+    "  var walking = r.resolvedArmorPierce();" +
+    "  var speed = r.speedUlps;" +
+    "  r.holding = true; r.holdTime = 99; r.updateEntrenchment();" +
+    "  var dug = { pierce: r.resolvedArmorPierce()," +
+    "              range: r.rangePx / ul(r.rangeUl)," +
+    "              taken: r.damageTakenMult, entrenched: r.entrenched };" +
+    "  r.holding = false; r.holdTime = 0; r.updateEntrenchment();" +
+    "  return { walking: walking, speed: speed, dug: dug," +
+    "           after: r.resolvedArmorPierce()," +
+    "           afterRange: r.rangePx / ul(r.rangeUl)," +
+    "           afterTaken: r.damageTakenMult," +
+    "           afterSpeed: r.speedUlps }; })()");
+  t.near(life.walking, 2.3, 1e-9, "walking, it ignores only Piercing Orders' 2.30");
+  t.near(life.dug.pierce, 3.3, 1e-9, "dug in, another 1.00 on top");
+  t.near(life.dug.range, 1.22, 1e-9, "with 25 + 2 − 5 points of reach");
+  t.near(life.dug.taken, 0.73, 1e-9, "and 27% less damage taken");
+  t.near(life.after, 2.3, 1e-9, "one step and the extra bypass is gone");
+  t.near(life.afterRange, 1, 1e-9, "so is the reach");
+  t.near(life.afterTaken, 1, 1e-9, "and the protection");
+  t.eq(life.afterSpeed, life.speed, "and none of it ever touched how it walks");
+});
+
+test("Battery Setup replaces the threshold, and movement still clears the state",
+function (t) {
+  var h = bootSquares();
+  var B4 = ["B1", "B2", "B3", "B4"];
+  var FOUR = ["rif_b1", "rif_b2", "rif_b3", "rif_b4"];
+
+  [[0, 1.5], [1, 1.45], [2, 1.35], [3, 1.2], [4, 1], [5, 0.75]]
+    .forEach(function (row) {
+      var tw = squareTower(h, FOUR,
+        row[0] ? { rifleman_entrenchment_battery_setup: row[0] } : {}, B4);
+      t.near(h.run(tw + ".recruitStats().entrenchSeconds"), row[1], 1e-9,
+        "rank " + row[0] + " digs in after " + row[1] + " s");
+    });
+
+  // THE THRESHOLD IS THE ONLY THING IT MOVES. A recruit under it is not dug in,
+  // a recruit over it is, movement clears the state that same frame, and a
+  // break in the firing resets the progress.
+  var tw = squareTower(h, FOUR, { rifleman_entrenchment_battery_setup: 5 }, B4);
+  var probe = h.run("(function () { var tower = " + tw + ";" +
+    "  var r = new SoldierRecruit(path, tower, true, tower.recruitStats());" +
+    "  r.holding = true;" +
+    "  r.holdTime = 0.74; r.updateEntrenchment(); var under = r.entrenched;" +
+    "  r.holdTime = 0.75; r.updateEntrenchment(); var at = r.entrenched;" +
+    "  r.holding = false; r.holdTime = 0; r.updateEntrenchment();" +
+    "  var moved = r.entrenched;" +
+    "  r.holding = true; r.holdTime = 0.5; r.updateEntrenchment();" +
+    "  var restarted = r.entrenched;" +
+    "  return { under: under, at: at, moved: moved, restarted: restarted }; })()");
+  t.eq(probe.under, false, "0.74 s of standing and firing is not enough");
+  t.eq(probe.at, true, "0.75 s is");
+  t.eq(probe.moved, false, "and losing the target clears it in the same call");
+  t.eq(probe.restarted, false,
+    "the clock starts again from zero rather than resuming");
+
+  // BATTERY SETUP IS ITS OWN BRANCH — Deep Stakes is not a prerequisite.
+  t.deep(h.run("(TowerPerks.upgrade2Of('soldier'," +
+    " 'rifleman_entrenchment_battery_setup').requires || [])" +
+    ".map(function (r) { return r.id; })"), [],
+    "Battery Setup requires no other square");
+  t.deep(h.run("TowerPerks.upgrade2Of('soldier'," +
+    " 'rifleman_entrenchment_battery_setup').prices"),
+    [150, 250, 400, 650, 1000], "and keeps the H5 curve exactly");
+});
+
+test("Campaign Tempo and Decorated Ceiling move the gain and the ceiling",
+function (t) {
+  var h = bootSquares();
+  var THREE = ["rif_n1", "rif_n2", "rif_n3"];
+
+  var plain = squareTower(h, THREE, {}, []);
+  t.near(h.run(plain + ".rhythmPerKill"), 0.02, 1e-9, "the parent buys 2 points a kill");
+  t.near(h.run(plain + ".rhythmEarnedCap"), 0.12, 1e-9, "up to 12");
+
+  [[1, 2.15], [2, 2.30], [3, 2.45]].forEach(function (row) {
+    var tw = squareTower(h, THREE, { rifleman_veteran_campaign_tempo: row[0] }, []);
+    t.near(h.run(tw + ".rhythmPerKill"), row[1] / 100, 1e-9,
+      "Campaign Tempo rank " + row[0] + " buys " + row[1] + " points a kill");
+    t.near(h.run(tw + ".rhythmEarnedCap"), 0.12, 1e-9,
+      "without raising the ceiling");
+    // AND IT CANNOT CLIMB PAST THE CEILING it did not move.
+    t.near(h.run("(function () { var tw = " + tw + "; tw.kills = 40;" +
+      "  return tw.rhythmMult(); })()"), 1.06, 1e-9,
+      "forty kills still tops out at +6% net");
+  });
+
+  [[1, 12.5], [2, 13], [3, 13.5], [4, 14], [5, 14.5]].forEach(function (row) {
+    var tw = squareTower(h, THREE, {
+      rifleman_veteran_campaign_tempo: 2,
+      rifleman_veteran_decorated_ceiling: row[0]
+    }, []);
+    t.near(h.run(tw + ".rhythmEarnedCap"), row[1] / 100, 1e-9,
+      "Decorated Ceiling rank " + row[0] + " earns up to +" + row[1]);
+    t.near(h.run("(function () { var tw = " + tw + "; tw.kills = 99;" +
+      "  return tw.rhythmMult(); })()"), 0.94 + row[1] / 100, 1e-9,
+      "so the best net is " + (row[1] - 6) + "%");
+  });
+
+  // THE OPENING PENALTY IS UNTOUCHED, one kill still counts once, and the
+  // stacks still clear at the wave boundary.
+  var tw = squareTower(h, THREE, {
+    rifleman_veteran_campaign_tempo: 3,
+    rifleman_veteran_decorated_ceiling: 5
+  }, []);
+  t.near(h.run("(function () { var tw = " + tw + ";" +
+    "  tw.kills = tw.rhythmKillBase; return tw.rhythmMult(); })()"), 0.94, 1e-9,
+    "a wave still opens at −6%");
+  t.near(h.run("(function () { var tw = " + tw + ";" +
+    "  tw.kills = tw.rhythmKillBase + 1; return tw.rhythmMult(); })()"),
+    0.94 + 0.0245, 1e-9, "one kill buys exactly 2.45 points");
+  h.run("(function () { var tw = " + tw + "; tw.kills = 60; })()");
+  t.near(h.run(tw + ".rhythmMult()"), 0.94 + 0.145, 1e-9, "and the band tops at +14.5");
+  h.run("endWave(3, 0)");
+  t.near(h.run(tw + ".rhythmMult()"), 0.94, 1e-9, "the next wave opens on the penalty");
+  t.eq(h.run(tw + ".kills"), 60, "without touching the lifetime count");
+});
+
+test("Sorted Parts is spent by a completed purchase and by nothing else",
+function (t) {
+  var h = bootSquares();
+  var A1 = baseTier(h, "A1");
+  var B1 = baseTier(h, "B1");
+
+  [1, 2, 3, 4, 5].forEach(function (rank) {
+    var tw = squareTower(h, ["rif_s1"], { rifleman_cheap_sorted_parts: rank }, []);
+    t.eq(h.run(tw + ".upgradeCost('A1')"), A1 - 5 * rank,
+      "rank " + rank + " takes " + (5 * rank) + " off the first tier");
+    t.eq(h.run(tw + ".upgradeCost('B1')"), B1 - 5 * rank,
+      "whichever tier that turns out to be");
+  });
+
+  // ASKING IS FREE. A hover, a preview, a refusal and a card all read the
+  // discounted price and leave it standing.
+  var tw = squareTower(h, ["rif_s1"], { rifleman_cheap_sorted_parts: 5 }, []);
+  h.run(tw + ".upgradeCost('A1')");
+  h.run(tw + ".previewUpgrade('A1')");
+  h.run(tw + ".upgradeCard(Soldier.upgradeById('A1'), null, " +
+        tw + ".previewUpgrade('A1'))");
+  h.run("cash = 10");
+  t.eq(h.run("buyUpgrade(" + tw + ", 'A1')"), "not enough mana",
+    "a refused purchase is refused");
+  t.eq(h.run(tw + ".upgradeCost('A1')"), A1 - 25,
+    "and none of that spent the discount");
+
+  // A COMPLETED PURCHASE DOES, whichever tier it was.
+  h.run("cash = 100000");
+  var before = h.run("cash");
+  t.eq(h.run("buyUpgrade(" + tw + ", 'B1')"), null, "B1 buys");
+  t.eq(before - h.run("cash"), B1 - 25, "at the discounted price");
+  t.eq(h.run(tw + ".upgradeCost('A1')"), A1,
+    "and the NEXT tier on this body is full price");
+  t.eq(h.run(tw + ".upgradeCost('B2')"), baseTier(h, "B2"),
+    "on either path");
+
+  // ONE PER BODY, so a second Rifleman gets its own.
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(900, 200, path)); })()");
+  // FOUND BY WHERE IT STANDS, not by its index: `addTower` sorts the list by
+  // path progress, so the tower just built is not reliably the last one.
+  var other = h.run("(function () {" +
+    "  for (var i = 0; i < towers.length; i++)" +
+    "    if (towers[i].x === 900) return towers[i].upgradeCost('A1');" +
+    "  return null; })()");
+  t.eq(other, A1 - 25, "a second Rifleman has its own first-tier discount");
+
+  // AND IT CANNOT PAY THE PLAYER. Floored at the game's ordinary minimum.
+  var deep = squareTower(h, ["rif_s1", "rif_n1"], {
+    rifleman_cheap_sorted_parts: 5,
+    rifleman_commissioned_volume_discount: 5
+  }, []);
+  t.ok(h.run(deep + ".upgradeCost('A1')") >= 0,
+    "a stack of discounts never goes below zero");
+});
+
+test("Aggressive Contract prices the first Rifleman and every one after it",
+function (t) {
+  var h = bootSquares();
+  var COST = h.run("Soldier.COST");
+
+  [[1, 110, 44], [2, 120, 48], [3, 130, 52], [4, 140, 56], [5, 150, 60]]
+    .forEach(function (row) {
+      h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+      h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+            "  MetaProgress.addXp(id, 20000); })");
+      h.run("MetaProgress.buyNode('soldier', 'rif_s2', 0);" +
+            "MetaProgress.equipPerk('soldier', 'rif_s2', 0)");
+      setRanks(h, { rifleman_advance_aggressive_contract: row[0] });
+      h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); towers = []");
+      t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('soldier'))"),
+        COST - row[1], "rank " + row[0] + " puts the first at " + (COST - row[1]));
+      h.run("TowerPerks.notePlacement('soldier')");
+      t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('soldier'))"),
+        COST + row[2], "and every one after it at " + (COST + row[2]));
+    });
+
+  // WITH CHEAP RECEIVER, the owner's stated pair: 100 then 310.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  ["rif_s1", "rif_s2"].forEach(function (id, i) {
+    h.run("MetaProgress.buyNode('soldier', '" + id + "', 0);" +
+          "MetaProgress.equipPerk('soldier', '" + id + "', " + i + ")");
+  });
+  setRanks(h, { rifleman_advance_aggressive_contract: 5 });
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); towers = []");
+  t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('soldier'))"), 100,
+    "the first Rifleman costs 100 mana");
+  h.run("TowerPerks.notePlacement('soldier')");
+  t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('soldier'))"), 310,
+    "and every one after it 310");
+});
+
+test("First Deployment lasts three opened waves on one body and never transfers",
+function (t) {
+  var h = bootSquares();
+
+  // PLACED BETWEEN WAVES. The bonus is on from the moment it stands up, and it
+  // multiplies the RESOLVED reach — Long Glass and Extended Lens are already in
+  // the number by the time this lands.
+  var tw = squareTower(h, ["rif_s2", "rif_n2"], {
+    rifleman_advance_first_deployment: 5,
+    rifleman_long_glass_extended_lens: 3
+  }, []);
+  var reach = h.run("Soldier.BASE_RANGE_UL") + 10 + 3;
+  t.near(h.run(tw + ".rangeUl"), reach * 1.25, 1e-9,
+    "113 u.l. of resolved reach, plus 25% of it");
+  t.near(h.run(tw + ".rangePx"), h.run("elevatedRangePx(" + tw + ", " +
+    (reach * 1.25) + ")"), 1e-6, "and the ring the tower shoots with agrees");
+
+  // THREE OPENED WAVES, AND THE FOURTH TAKES IT AWAY.
+  h.run("waveIndex = 0");
+  var reads = [h.run(tw + ".rangeUl")];
+  for (var w = 0; w < 4; w++) {
+    h.run("beginWave()");
+    reads.push(h.run(tw + ".rangeUl"));
+  }
+  t.near(reads[1], reach * 1.25, 1e-9, "wave 1 still has it");
+  t.near(reads[2], reach * 1.25, 1e-9, "wave 2 still has it");
+  t.near(reads[3], reach * 1.25, 1e-9, "wave 3 still has it");
+  t.near(reads[4], reach, 1e-9, "and the opening of wave 4 takes it away");
+  t.eq(h.run(tw + ".wavesOpened"), 4, "four waves have opened over it");
+
+  // EVERY RANK, on its own.
+  [1, 2, 3, 4, 5].forEach(function (rank) {
+    var one = squareTower(h, ["rif_s2"],
+      { rifleman_advance_first_deployment: rank }, []);
+    t.near(h.run(one + ".rangeUl"),
+      h.run("Soldier.BASE_RANGE_UL") * (1 + 5 * rank / 100), 1e-9,
+      "rank " + rank + " reaches " + (5 * rank) + "% further");
+  });
+
+  // PLACED INTO A RUNNING WAVE, that wave counts as its first.
+  //
+  // THE RUN IS RESTARTED RATHER THAN THE BOARD CLEARED, and the difference is
+  // the point: `towers = []` leaves TowerPerks' placement tally where it was,
+  // so the next tower would be the run's SECOND Rifleman and would correctly
+  // get nothing. `startRun` is what resets the tally, exactly as it does in the
+  // game.
+  squareTower(h, ["rif_s2"], { rifleman_advance_first_deployment: 5 }, []);
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000;" +
+        "towers = []; waveIndex = 0; waveCountdown = 0");
+  t.eq(h.run("waveInPlay()"), true, "a wave really is on the clock");
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(200, 200, path)); })()");
+  t.eq(h.run("towers[0].wavesOpened"), 1,
+    "a Rifleman placed into a running wave has already joined it");
+  t.eq(h.run("towers[0].firstDeploymentActive"), true, "and carries the bonus");
+  h.run("beginWave(); beginWave(); beginWave()");
+  t.eq(h.run("towers[0].firstDeploymentActive"), false,
+    "three more openings and its fourth wave has begun");
+
+  // AND IT NEVER TRANSFERS. A second Rifleman is never the first, and selling
+  // the first does not hand the title on.
+  var again = squareTower(h, ["rif_s2"], { rifleman_advance_first_deployment: 5 }, []);
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(900, 200, path)); })()");
+  var second = h.run("(function () {" +
+    "  for (var i = 0; i < towers.length; i++)" +
+    "    if (!towers[i].perkFirstOfType)" +
+    "      return { range: towers[i].rangeUl, active: towers[i].firstDeploymentActive };" +
+    "  return null; })()");
+  t.ok(second !== null, "there is a second Rifleman");
+  t.eq(second.active, false, "and it is not carrying the bonus");
+  t.near(second.range, h.run("Soldier.BASE_RANGE_UL"), 1e-9, "so it reaches 100");
+
+  h.run("(function () { for (var i = 0; i < towers.length; i++)" +
+        "  if (towers[i].perkFirstOfType) { sellTower(towers[i]); return; } })()");
+  var left = h.run("(function () { return { n: towers.length," +
+    "  active: towers[0].firstDeploymentActive," +
+    "  range: towers[0].rangeUl }; })()");
+  t.eq(left.n, 1, "the first Rifleman is sold");
+  t.eq(left.active, false, "and the survivor did not inherit the bonus");
+  t.near(left.range, h.run("Soldier.BASE_RANGE_UL"), 1e-9, "nor the reach");
+
+  // THE GHOST DRAWS THE RING THE PLACED TOWER GETS.
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); towers = []");
+  var Type = "MetaProgress.constructorOf('soldier')";
+  t.near(h.run("TowerPerks.previewRangeUl(" + Type + ", { firstDeploymentActive: true })"),
+    h.run("Soldier.BASE_RANGE_UL") * 1.25, 1e-9,
+    "the ghost of the first Rifleman shows the wider circle");
+  t.near(h.run("TowerPerks.previewRangeUl(" + Type + ", { firstDeploymentActive: false })"),
+    h.run("Soldier.BASE_RANGE_UL"), 1e-9, "and the ghost of a later one does not");
+});
+
+test("Salvage Conscription pays the first Rifleman and delays every squad",
+function (t) {
+  var h = bootSquares();
+  var OPEN = {
+    rifleman_manifest_reinforced_contracts: 2,
+    rifleman_cheap_sorted_parts: 2
+  };
+
+  [1, 2, 3].forEach(function (rank) {
+    var ranks = { rifleman_manifest_salvage_conscription: rank };
+    Object.keys(OPEN).forEach(function (k) { ranks[k] = OPEN[k]; });
+    var tw = squareTower(h, ["rif_b1", "rif_s1"], ranks,
+      ["B1", "B2", "B3", "B4"]);
+    t.near(h.run(tw + ".recruitDeploySeconds"), 15 * rank / 100, 1e-9,
+      "rank " + rank + " delays the squad by " + (15 * rank / 100) + " s");
+
+    // ONE DELAY IN FRONT OF THE GROUP, not one between every pair.
+    var due = h.run("(function () { var tower = " + tw + ";" +
+      "  tower.recruitCooldown = 0; tower.callRecruits();" +
+      "  return tower.recruitPending.slice(); })()");
+    var stagger = h.run("Soldier.RECRUIT_STAGGER_SECONDS");
+    t.eq(due.length, 3, "three recruits at B4 with the Manifest");
+    t.near(due[0], 15 * rank / 100, 1e-9, "the first is due after the delay");
+    t.near(due[1] - due[0], stagger, 1e-9, "and the spacing inside is untouched");
+    t.near(due[2] - due[1], stagger, 1e-9, "for every pair of them");
+  });
+
+  // THE DELAY IS ON EVERY RIFLEMAN; THE HEALTH IS ON ONE.
+  var ranks = { rifleman_manifest_salvage_conscription: 3 };
+  Object.keys(OPEN).forEach(function (k) { ranks[k] = OPEN[k]; });
+  squareTower(h, ["rif_b1", "rif_s1"], ranks, ["B1", "B2", "B3", "B4"]);
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  var tw = new Type(900, 200, path); addTower(tw);" +
+        "  tw.hasB1 = tw.hasB2 = tw.hasB3 = tw.hasB4 = true; tw.recalcStats(); })()");
+  var pair = h.run("(function () { var out = [];" +
+    "  for (var i = 0; i < towers.length; i++) out.push({" +
+    "    first: towers[i].perkFirstOfType," +
+    "    delay: towers[i].recruitDeploySeconds," +
+    "    hp: towers[i].recruitHp });" +
+    "  return out; })()");
+  pair.forEach(function (row) {
+    t.near(row.delay, 0.45, 1e-9,
+      (row.first ? "the first" : "a later") + " Rifleman's squad is delayed 0.45 s");
+  });
+  var firstHp = pair.filter(function (r) { return r.first; })[0].hp;
+  var laterHp = pair.filter(function (r) { return !r.first; })[0].hp;
+  t.near(firstHp, 20 * 1.1, 1e-9, "the first Rifleman's recruits carry +10 points");
+  t.near(laterHp, 20 * 1.04, 1e-9, "a later one's carry only Reinforced Contracts' +4");
+});
+
+test("Officer Supply, Extended Lens, Premium Lot and Volume Discount",
+function (t) {
+  var h = bootSquares();
+  var B4 = baseTier(h, "B4");
+  var B5 = baseTier(h, "B5");
+
+  // OFFICER SUPPLY ARMS THE RECRUITS' RIFLES and dearens the two tiers.
+  [1, 2, 3].forEach(function (rank) {
+    var tw = squareTower(h, ["rif_n1", "rif_b1"], {
+      rifleman_commissioned_premium_lot: 2,
+      rifleman_manifest_reinforced_contracts: 2,
+      rifleman_commissioned_officer_supply: rank
+    }, ["B1", "B2", "B3", "B4"]);
+    t.near(h.run(tw + ".recruitDamage"),
+      h.run("Soldier.RECRUIT_DAMAGE") + rank / 10, 1e-9,
+      "rank " + rank + " puts +" + (rank / 10) + " on a recruit's shots");
+    t.eq(h.run(tw + ".upgradeCost('B4')"),
+      B4 + 50 + 10 + 200 + 20 + 5 * rank, "and +" + (5 * rank) + " on B4");
+    t.eq(h.run(tw + ".upgradeCost('B5')"),
+      B5 + 50 + 10 + 350 + 30 + 5 * rank, "and the same on B5");
+  });
+
+  // A RECRUIT'S BODY BLOCK IS NOT ITS RIFLE, so it gains nothing there — the
+  // contact exchange reads its health, never `stats.damage`.
+  var armed = squareTower(h, ["rif_n1", "rif_b1"], {
+    rifleman_commissioned_premium_lot: 2,
+    rifleman_manifest_reinforced_contracts: 2,
+    rifleman_commissioned_officer_supply: 3
+  }, ["B1", "B2", "B3", "B4"]);
+  t.eq(h.run("/stats\\.damage/.test(String(SoldierRecruit.prototype.takeContactDamage))"),
+    false, "the body block never reads the recruit's weapon damage");
+  t.near(h.run(armed + ".recruitStats().damage"),
+    h.run("Soldier.RECRUIT_DAMAGE") + 0.3, 1e-9, "while its rifle carries it");
+
+  // EXTENDED LENS: reach and placement, never muzzle velocity.
+  [1, 2, 3].forEach(function (rank) {
+    var tw = squareTower(h, ["rif_n2"],
+      { rifleman_long_glass_extended_lens: rank }, []);
+    t.near(h.run(tw + ".rangeUl"), h.run("Soldier.BASE_RANGE_UL") + 10 + rank, 1e-9,
+      "rank " + rank + " reaches " + (10 + rank) + " further than the base");
+    t.near(h.run(tw + ".projectileSpeedMult"), 1.25, 1e-9,
+      "and the rounds fly no faster than Long Glass already made them");
+    t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('soldier'))"),
+      h.run("Soldier.COST") + 50 + 5 * rank,
+      "for " + (50 + 5 * rank) + " more mana on the placement");
+  });
+
+  // PREMIUM LOT IS A TABLE OF TOTALS, and it touches every tier.
+  [[1, 0.05, 5], [2, 0.1, 10], [3, 0.15, 15]].forEach(function (row) {
+    var tw = squareTower(h, ["rif_n1"],
+      { rifleman_commissioned_premium_lot: row[0] }, []);
+    t.near(h.run(tw + ".damage"), 2 + row[1], 1e-9,
+      "rank " + row[0] + " reads +" + row[1] + " damage in TOTAL");
+    ["A1", "A5", "B1", "B5"].forEach(function (id) {
+      t.eq(h.run(tw + ".upgradeCost('" + id + "')"),
+        baseTier(h, id) + 50 + row[2], id + " pays the parent's 50 and " + row[2]);
+    });
+  });
+
+  // VOLUME DISCOUNT REACHES ONE SURCHARGE ONLY.
+  [1, 2, 3, 4, 5].forEach(function (rank) {
+    var tw = squareTower(h, ["rif_n1"],
+      { rifleman_commissioned_volume_discount: rank }, []);
+    t.eq(h.run(tw + ".upgradeCost('A1')"), baseTier(h, "A1") + 50 - 5 * rank,
+      "rank " + rank + " leaves Commissioned Ammunition charging +" + (50 - 5 * rank));
+  });
+  var mixed = squareTower(h, ["rif_n1", "rif_b1"], {
+    rifleman_commissioned_premium_lot: 3,
+    rifleman_commissioned_volume_discount: 5,
+    rifleman_manifest_reinforced_contracts: 3
+  }, []);
+  t.eq(h.run(mixed + ".upgradeCost('B4')"),
+    baseTier(h, "B4") + 25 + 15 + 200 + 30,
+    "beside the others it discounts its own surcharge and nobody else's");
+});
+
+test("rank 0 and an empty loadout leave the Rifleman exactly as it was",
+function (t) {
+  var h = bootSquares();
+
+  // A FRESH PROFILE. Every square is at rank 0, and the tower resolves the
+  // authored numbers to the bit.
+  var plain = squareTower(h, [], {}, []);
+  var snap = h.run("(function () { var tw = " + plain + "; return {" +
+    "  damage: tw.damage, range: tw.rangeUl, shots: tw.shotsPerBurst," +
+    "  fireRate: tw.fireRateMult, pierce: tw.armorPierce," +
+    "  gain: tw.ratchetGain, loss: tw.ratchetLoss," +
+    "  early: tw.burstEarlyShotMult, last: tw.burstFinalShotMult," +
+    "  recruitHp: tw.recruitHp, recruitDamage: tw.recruitDamage," +
+    "  cooldown: tw.resolvedRecruitCooldown(), entrench: tw.recruitEntrenchSeconds," +
+    "  perKill: tw.rhythmPerKill, cap: tw.rhythmEarnedCap," +
+    "  a1: tw.upgradeCost('A1'), b5: tw.upgradeCost('B5') }; })()");
+
+  t.eq(snap.damage, h.run("Soldier.BASE_DAMAGE"), "base damage");
+  t.eq(snap.range, h.run("Soldier.BASE_RANGE_UL"), "base range");
+  t.eq(snap.shots, h.run("Soldier.BASE_SHOTS_PER_BURST"), "base burst");
+  t.eq(snap.fireRate, 1, "no fire-rate multiplier");
+  t.eq(snap.pierce, 0, "no armor bypass");
+  t.eq(snap.gain, 1, "no ratchet reward");
+  t.eq(snap.loss, 1, "no ratchet penalty");
+  t.eq(snap.early, 1, "no early-shot penalty");
+  t.eq(snap.last, 1, "no final-shot bonus");
+  t.eq(snap.recruitHp, h.run("Soldier.RECRUIT_HP"), "the authored recruit health");
+  t.eq(snap.recruitDamage, h.run("Soldier.RECRUIT_DAMAGE"), "and its damage");
+  t.eq(snap.cooldown, h.run("Soldier.RECRUIT_COOLDOWN_SECONDS"), "and its cooldown");
+  t.eq(snap.entrench, 0, "no entrenchment at all");
+  t.eq(snap.perKill, 0, "no rhythm");
+  t.eq(snap.cap, 0, "and no ceiling to reach");
+  t.eq(snap.a1, baseTier(h, "A1"), "A1 is its authored price");
+  t.eq(snap.b5, baseTier(h, "B5"), "and so is B5");
+  t.eq(h.run("TowerPerks.priceOf(MetaProgress.constructorOf('soldier'))"),
+    h.run("Soldier.COST"), "and the tower costs what it costs");
+
+  // EVERY SQUARE AT MAXIMUM WITH AN EMPTY LOADOUT IS THE SAME TOWER. Nothing
+  // is equipped, so nothing applies, however much was paid for.
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); rebuildBuildBar()");
+  h.run("MetaProgress.snapshot().owned.forEach(function (id) {" +
+        "  MetaProgress.addXp(id, 20000); })");
+  h.run("TowerPerks.nodes('soldier').forEach(function (n) {" +
+        "  MetaProgress.buyNode('soldier', n.id, 0); })");
+  h.run("TowerPerks.upgrades2('soldier').forEach(function (n) {" +
+        "  for (var r = 1; r <= n.maxRank; r++)" +
+        "    MetaProgress.buyRank('soldier', n.id, 0, r); })");
+  h.run("openMenu(); startRun(Maps.byId(Maps.DEFAULT_ID)); cash = 100000000; towers = []");
+  h.run("(function () { var Type = MetaProgress.constructorOf('soldier');" +
+        "  addTower(new Type(200, 200, path)); })()");
+  var loaded = h.run("(function () { var tw = towers[0]; return {" +
+    "  damage: tw.damage, range: tw.rangeUl, fireRate: tw.fireRateMult," +
+    "  pierce: tw.armorPierce, recruitHp: tw.recruitHp," +
+    "  a1: tw.upgradeCost('A1'), b5: tw.upgradeCost('B5')," +
+    "  price: TowerPerks.priceOf(MetaProgress.constructorOf('soldier')) }; })()");
+  t.eq(loaded.damage, snap.damage, "every rank owned, nothing equipped: same damage");
+  t.eq(loaded.range, snap.range, "same reach");
+  t.eq(loaded.fireRate, snap.fireRate, "same rate of fire");
+  t.eq(loaded.pierce, snap.pierce, "same bypass");
+  t.eq(loaded.recruitHp, snap.recruitHp, "same recruits");
+  t.eq(loaded.a1, snap.a1, "same tier prices");
+  t.eq(loaded.b5, snap.b5, "on both paths");
+  t.eq(loaded.price, h.run("Soldier.COST"), "and the same placement price");
+});
+
+test("every upgrade-squared node is authored legally", function (t) {
+  var h = bootSquares();
+
+  var problems = h.run("(function () {" +
+    "  var out = [], ids = {};" +
+    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
+    "    TowerPerks.nodes(towerId).forEach(function (n) { ids[towerId + '/' + n.id] = 'perk'; });" +
+    "    TowerPerks.upgrades2(towerId).forEach(function (n) {" +
+    "      var key = towerId + '/' + n.id;" +
+    "      if (ids[key]) out.push(key + ' collides with a ' + ids[key]);" +
+    "      ids[key] = 'square';" +
+    "      if (!n.parent) out.push(key + ' has no parent');" +
+    "      if (n.parent && !TowerPerks.nodeOf(towerId, n.parent))" +
+    "        out.push(key + ' names an unknown parent ' + n.parent);" +
+    "      if (n.alsoParent && !TowerPerks.nodeOf(towerId, n.alsoParent))" +
+    "        out.push(key + ' names an unknown second parent ' + n.alsoParent);" +
+    "      if (n.alsoParent === n.parent) out.push(key + ' fuses with itself');" +
+    "      if (!n.maxRank || n.maxRank < 1) out.push(key + ' has no ranks');" +
+    "      if (!n.prices || n.prices.length !== n.maxRank)" +
+    "        out.push(key + ' has ' + (n.prices || []).length + ' prices for ' +" +
+    "          n.maxRank + ' ranks');" +
+    "      (n.prices || []).forEach(function (p, i) {" +
+    "        if (typeof p !== 'number' || !(p > 0))" +
+    "          out.push(key + ' rank ' + (i + 1) + ' has no price');" +
+    "        if (i > 0 && p <= n.prices[i - 1])" +
+    "          out.push(key + ' rank ' + (i + 1) + ' is not dearer than the last'); });" +
+    "      if (typeof n.effectsAt !== 'function') out.push(key + ' does nothing');" +
+    "      if (typeof n.valueAt !== 'function') out.push(key + ' states no value');" +
+    "      if (!n.upside) out.push(key + ' states no upside');" +
+    "      if (!n.at) out.push(key + ' has no place in the tree');" +
+    "      (n.requires || []).forEach(function (r) {" +
+    "        if (r.id === n.id) out.push(key + ' requires itself');" +
+    "        if (!TowerPerks.upgrade2Of(towerId, r.id))" +
+    "          out.push(key + ' requires unknown square ' + r.id);" +
+    "        if (!(r.rank >= 1)) out.push(key + ' requires a rank of ' + r.rank); });" +
+    "      if (n.effectsAt) for (var rank = 1; rank <= n.maxRank; rank++) {" +
+    "        var fx = n.effectsAt(rank);" +
+    "        if (!fx) { out.push(key + ' resolves nothing at rank ' + rank); continue; }" +
+    "        if (fx.onlyIf && fx.price) out.push(key + ' has a conditional price'); }" +
+    "    });" +
+    "  });" +
+    "  return out; })()");
+  t.deep(problems, [], "no square has a bad parent, a short price curve, a " +
+    "self-reference, a missing effect or a conditional price");
+
+  // NO CYCLE. A `requires` graph that pointed back at an ancestor would be a
+  // node nobody could ever buy, and no test of a single node could see it.
+  var cycles = h.run("(function () {" +
+    "  var out = [];" +
+    "  TowerPerks.towersWithTrees().forEach(function (towerId) {" +
+    "    var list = TowerPerks.upgrades2(towerId);" +
+    "    list.forEach(function (n) {" +
+    "      var seen = {}, stack = [n.id];" +
+    "      while (stack.length) {" +
+    "        var id = stack.pop();" +
+    "        if (seen[id]) continue;" +
+    "        seen[id] = true;" +
+    "        var node = TowerPerks.upgrade2Of(towerId, id);" +
+    "        (node && node.requires ? node.requires : []).forEach(function (r) {" +
+    "          if (r.id === n.id) out.push(towerId + '/' + n.id + ' is in a cycle');" +
+    "          stack.push(r.id); });" +
+    "      }" +
+    "    });" +
+    "  });" +
+    "  return out; })()");
+  t.deep(cycles, [], "the requirement graph is acyclic");
+
+  // THE RIFLEMAN'S OWN SHAPE: twenty-two nodes and exactly four fusions.
+  var squares = h.run("TowerPerks.upgrades2('soldier')");
+  t.eq(squares.length, 22, "the Rifleman has twenty-two squares");
+  var fusions = h.run("TowerPerks.upgrades2('soldier').filter(function (n) {" +
+    "  return TowerPerks.isFusion(n); }).map(function (n) { return n.id; })");
+  t.deep(fusions.sort(), [
+    "rifleman_commissioned_officer_supply",
+    "rifleman_manifest_salvage_conscription",
+    "rifleman_overloaded_series_ammunition",
+    "rifleman_piercing_entrenched_ammunition"
+  ], "and exactly four fusions, the ones the owner named");
+  var twoReqs = h.run("TowerPerks.upgrades2('soldier').filter(function (n) {" +
+    "  return (n.requires || []).length === 2; }).map(function (n) { return n.id; })");
+  t.deep(twoReqs.sort(), fusions.sort(),
+    "and only a fusion carries two rank requirements");
+
+  // EVERY SQUARE IS ON THE RIFLEMAN, and no other tower grew one by accident.
+  var elsewhere = h.run("TowerPerks.towersWithTrees().filter(function (id) {" +
+    "  return id !== 'soldier' && TowerPerks.upgrades2(id).length; })");
+  t.deep(elsewhere, [], "no other tower has upgrade-squared content in this pass");
+
+  // AND THE SQUARES ARE NOT IN THE PERK LIST, which is what keeps them out of
+  // the five loadout slots and out of the chain rule the arms are held to.
+  var leaked = h.run("TowerPerks.nodes('soldier').filter(function (n) {" +
+    "  return /^rifleman_/.test(n.id); }).map(function (n) { return n.id; })");
+  t.deep(leaked, [], "not one square is in the equippable tree");
+  t.deep(chainProblems(h, "soldier"), [],
+    "and the twelve permanent upgrades are still four clean chains");
+});
+
+test("no rejected upgrade-squared proposal is purchasable", function (t) {
+  var h = bootSquares();
+
+  // THE OWNER'S REJECTED LIST, VERBATIM. None of these may exist as a node, by
+  // name or by id, in either list of any tree — a rejected concept that shipped
+  // under a different id would be exactly as wrong as one that shipped.
+  var REJECTED = [
+    "Adjusted Cartridge", "Polished Feed Lips", "Closing Striker", "Long Closure",
+    "Forgiving Teeth", "Veteran Timing", "Wide Formation", "Budget Clerk",
+    "Hasty Levy", "Marching Orders", "Advanced Mobilization", "Plate Reading",
+    "Balanced Breech", "Field Logistics", "Covering Fire", "Uniform Powder",
+    "Clear Powder", "Lean Mount", "Muster Sight", "Morning Briefing",
+    "Armored Trophy", "Thinned Receiver", "Salvage Stock", "Budget Breech",
+    "Staggered Order", "First Ratchet"
+  ];
+
+  var names = h.run("(function () { var out = [];" +
+    "  TowerPerks.towersWithTrees().forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) { out.push(n.name); });" +
+    "    TowerPerks.upgrades2(id).forEach(function (n) { out.push(n.name); });" +
+    "  }); return out; })()");
+  var ids = h.run("(function () { var out = [];" +
+    "  TowerPerks.towersWithTrees().forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) { out.push(n.id); });" +
+    "    TowerPerks.upgrades2(id).forEach(function (n) { out.push(n.id); });" +
+    "  }); return out; })()");
+
+  var found = REJECTED.filter(function (name) {
+    var slug = name.toLowerCase().replace(/ /g, "_");
+    return names.indexOf(name) !== -1 ||
+      ids.some(function (id) { return id.indexOf(slug) !== -1; });
+  });
+  t.deep(found, [], "not one rejected proposal is in any tree");
+
+  // AND NOTHING BUT THE CONFIRMED TWENTY-TWO IS ON THE RIFLEMAN.
+  var CONFIRMED = [
+    "Reinforced Spring", "Series Ammunition", "Terminal Charge", "Soft Feed",
+    "Hard Ratchet", "Polished Wheel", "Reinforced Contracts",
+    "Salvage Conscription", "Medical Selection", "Carbide Tip",
+    "Entrenched Ammunition", "Deep Stakes", "Battery Setup", "Premium Lot",
+    "Volume Discount", "Officer Supply", "Extended Lens", "Campaign Tempo",
+    "Decorated Ceiling", "Sorted Parts", "Aggressive Contract", "First Deployment"
+  ];
+  var mine = h.run("TowerPerks.upgrades2('soldier').map(function (n) { return n.name; })");
+  t.deep(mine.slice().sort(), CONFIRMED.slice().sort(),
+    "the Rifleman carries the confirmed list and nothing else");
+});
+
+test("what an upgrade-squared card says is what the tower resolves",
+function (t) {
+  var h = bootSquares();
+
+  // EVERY NODE STATES A VALUE AT EVERY RANK, and the card reads the CURRENT one
+  // and the NEXT one — which is the only way the two table nodes can be honest,
+  // because "per rank" is a lie for both of them.
+  var blanks = h.run("(function () { var out = [];" +
+    "  TowerPerks.upgrades2('soldier').forEach(function (n) {" +
+    "    for (var r = 0; r <= n.maxRank; r++) {" +
+    "      var text = n.valueAt(r);" +
+    "      if (typeof text !== 'string' || text.length < 8)" +
+    "        out.push(n.id + ' says nothing at rank ' + r); }" +
+    "    if (n.downside !== null && typeof n.downside !== 'string')" +
+    "      out.push(n.id + ' has a downside that is neither text nor null');" +
+    "  }); return out; })()");
+  t.deep(blanks, [], "every node states a resolved value at every rank");
+
+  // THE TWO NON-LINEAR ONES PRINT THEIR OWN TABLE, rank by rank.
+  ["2.00", "2.10", "2.25", "2.50"].forEach(function (want, rank) {
+    t.ok(h.run("TowerPerks.upgrade2Of('soldier', 'rifleman_breach_terminal_charge')" +
+      ".valueAt(" + rank + ")").indexOf(want) !== -1,
+      "Terminal Charge at rank " + rank + " prints " + want);
+  });
+  ["1.50", "1.45", "1.35", "1.20", "1.00", "0.75"].forEach(function (want, rank) {
+    t.ok(h.run("TowerPerks.upgrade2Of('soldier', 'rifleman_entrenchment_battery_setup')" +
+      ".valueAt(" + rank + ")").indexOf(want) !== -1,
+      "Battery Setup at rank " + rank + " prints " + want);
+  });
+
+  // THE STATE THE CARD DRAWS FROM CARRIES ALL OF IT: the rank, the maximum, the
+  // next rank, that rank's own price, both parents and every requirement.
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0);" +
+        "MetaProgress.buyNode('soldier', 'rif_n1', 0);" +
+        "MetaProgress.equipPerk('soldier', 'rif_a1', 0)");
+  setRanks(h, { rifleman_overloaded_reinforced_spring: 1 });
+  var card = h.run("TowerPerks.upgrade2StateOf('soldier'," +
+    " 'rifleman_overloaded_series_ammunition')");
+  t.eq(card.rank, 0, "the fusion is at rank 0");
+  t.eq(card.maxRank, 3, "of three");
+  t.eq(card.nextRank, 1, "so the next rank is 1");
+  t.eq(card.nextCost, 80, "at 80 coins, which is X3's first price and not its sum");
+  t.eq(card.parents.length, 2, "two runtime parents");
+  t.eq(card.parents[0].equipped, true, "one of them equipped");
+  t.eq(card.parents[1].equipped, false, "and one of them not");
+  t.eq(card.requirementsTotal, 2, "two requirements");
+  t.eq(card.requirementsMet, 0, "neither met — Reinforced Spring is only at 1");
+
+  // AND THE SCREEN PINS EITHER KIND AND BUYS THE ONE IT PINNED.
+  h.run("Upgrades.open(); Upgrades.selectTower('soldier'); Upgrades.openTree()");
+  var pinnedSquare = h.run("Upgrades.selectNode('rifleman_overloaded_reinforced_spring')");
+  t.eq(h.run("Upgrades.state().nodeKind"), "square",
+    "clicking a square tells the card it is reading a square");
+  t.eq(pinnedSquare.name, "Reinforced Spring", "and pins the right one");
+  var was = h.run("TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring')");
+  h.run("(function () { var r = Upgrades.buyRect();" +
+        "  Upgrades.onClick(r.x + 4, r.y + 4); })()");
+  t.eq(h.run("TowerPerks.rankOf('soldier', 'rifleman_overloaded_reinforced_spring')"),
+    was + 1, "the buy button buys the next rank of it");
+
+  h.run("Upgrades.selectNode('rif_a1')");
+  t.eq(h.run("Upgrades.state().nodeKind"), "perk",
+    "and pinning a permanent upgrade goes back to the perk card");
+
+  // THE RESET QUOTE COUNTS THE RANKS, so the button and the transaction agree.
+  t.eq(h.run("Upgrades.resetNodeCount()"),
+    h.run("MetaProgress.ownedNodes('soldier').length +" +
+          " MetaProgress.rankedNodeCount('soldier')"),
+    "the reset control counts perks and ranked squares alike");
+});
+
+test("the tree screen places, hits and frames every square", function (t) {
+  var h = bootSquares();
+  h.run("Upgrades.open(); Upgrades.selectTower('soldier'); Upgrades.openTree()");
+
+  // NO TWO NODES SHARE A SPOT, of either kind — a square drawn on top of an arm
+  // node would be a node nobody could click.
+  var collisions = h.run("(function () {" +
+    "  var all = TowerPerks.nodes('soldier').map(function (n) {" +
+    "      return { id: n.id, at: n.at, r: 30 }; })" +
+    "    .concat(TowerPerks.upgrades2('soldier').map(function (n) {" +
+    "      return { id: n.id, at: n.at, r: 20 }; }));" +
+    "  var out = [];" +
+    "  for (var i = 0; i < all.length; i++)" +
+    "    for (var j = i + 1; j < all.length; j++) {" +
+    "      var dx = (all[i].at.x - all[j].at.x) * 132;" +
+    "      var dy = (all[i].at.y - all[j].at.y) * 132;" +
+    "      var need = all[i].r + all[j].r + 8;" +
+    "      if (dx * dx + dy * dy < need * need)" +
+    "        out.push(all[i].id + ' overlaps ' + all[j].id); }" +
+    "  return out; })()");
+  t.deep(collisions, [], "every node has room of its own");
+
+  // AND EVERY SQUARE IS HITTABLE where it is drawn.
+  var unreachable = h.run("(function () {" +
+    "  Upgrades.selectNode(null);" +
+    "  var out = [];" +
+    "  TowerPerks.upgrades2('soldier').forEach(function (n) {" +
+    "    var p = Upgrades.nodeScreenPoint(n);" +
+    "    var hit = Upgrades.nodeAtPoint(p.x, p.y);" +
+    "    if (!hit || hit.id !== n.id || hit.kind !== 'square')" +
+    "      out.push(n.id + ' is not where it is drawn'); });" +
+    "  return out; })()");
+  t.deep(unreachable, [], "clicking a square's centre selects that square");
+
+  // THE PERKS ARE STILL HITTABLE TOO — the squares are tested first and must
+  // not have stolen the arm nodes' clicks.
+  var lostPerks = h.run("(function () { var out = [];" +
+    "  TowerPerks.nodes('soldier').forEach(function (n) {" +
+    "    var p = Upgrades.nodeScreenPoint(n);" +
+    "    var hit = Upgrades.nodeAtPoint(p.x, p.y);" +
+    "    if (!hit || hit.id !== n.id || hit.kind !== 'perk')" +
+    "      out.push(n.id + ' is no longer clickable'); });" +
+    "  return out; })()");
+  t.deep(lostPerks, [], "and every permanent upgrade still takes its own click");
+
+  // A RECENTRE FRAMES THE WHOLE TREE, squares included.
+  var framed = h.run("(function () {" +
+    "  var all = TowerPerks.nodes('soldier').concat(TowerPerks.upgrades2('soldier'));" +
+    "  var b = Upgrades.boardRect(), out = [];" +
+    "  all.forEach(function (n) {" +
+    "    var p = Upgrades.nodeScreenPoint(n);" +
+    "    if (p.x < b.x || p.x > b.x + b.w || p.y < b.y || p.y > b.y + b.h)" +
+    "      out.push(n.id + ' is off the board after a recentre'); });" +
+    "  return out; })()");
+  t.deep(framed, [], "a recentre shows every node of both kinds");
+
+  // AND THE SCREEN DRAWS WITHOUT THROWING, with a square pinned and with a
+  // fusion half met — the two states the new card has to render.
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0);" +
+        "MetaProgress.buyNode('soldier', 'rif_n1', 0)");
+  setRanks(h, { rifleman_overloaded_reinforced_spring: 2 });
+  h.run("Upgrades.selectNode('rifleman_overloaded_series_ammunition'); Upgrades.draw(ctx)");
+  h.run("Upgrades.selectNode('rifleman_entrenchment_battery_setup'); Upgrades.draw(ctx)");
+  h.run("Upgrades.selectNode('rif_a1'); Upgrades.draw(ctx)");
+  t.ok(true, "the tree draws a square, a fusion and a perk without throwing");
+});
+
 runner.run();

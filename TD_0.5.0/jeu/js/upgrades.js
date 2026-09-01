@@ -64,6 +64,16 @@
 // above the list and is ALWAYS the red UNEQUIP -- a slot only ever holds an
 // equipped module, so there is no state in which it could offer to equip.
 //
+// THE TREE SCREEN ALSO DRAWS THE UPGRADE-SQUARED NODES (2026-09-01), smaller,
+// hanging off the arm their parent sits on. A square has RANKS and no slot, so
+// its rank is a ring of pips round the rim and its card prints the rank it is
+// at, the rank it goes to, what THAT rank costs on its own, the resolved value
+// now and next, which upgrade owns it and whether that upgrade is equipped,
+// every requirement with the rank it has against the rank it needs, and both
+// halves of the trade. Its links are lit one at a time, so a fusion you are
+// halfway to has one bright arm and one dim one. `treeNodeKind` remembers which
+// kind the card is reading; one buy button serves both.
+//
 // DRAG AND DROP STILL WORKS, and is the way to choose WHICH slot: a perk
 // pressed and dropped on a slot goes there, and one dragged from a slot back
 // onto the list comes out. A drop that lands nowhere legal puts the perk back
@@ -105,10 +115,39 @@ var Upgrades = (function () {
   var confirmReset = false;
   var pan = null;             // { startX, startY, viewX, viewY }
 
+  // IS THE CARD READING A PERK OR ONE OF THE SQUARES? Two node formats, two
+  // sets of rules, one card -- so the kind is remembered beside the node rather
+  // than sniffed from its fields every time something wants to draw it.
+  var treeNodeKind = "perk";  // "perk" | "square"
+
   var NODE_PITCH = 132;       // world units between two node coordinates
   var NODE_R = 30;            // node radius at zoom 1
+  // AN UPGRADE-SQUARED NODE IS DRAWN SMALLER, and that is the whole of how the
+  // two are told apart at a glance: a square hangs off the arm its parent sits
+  // on, at two thirds the radius, so the spine of the tree stays the twelve
+  // permanent upgrades and the satellites read as belonging to them.
+  var SQUARE_R = 20;
   var MIN_ZOOM = 0.45;
   var MAX_ZOOM = 1.8;
+
+  // BELOW THIS ZOOM THE NAMES COME OFF, and the number is about OVERLAP rather
+  // than about type size: the labels are drawn at a fixed 10px however far out
+  // the camera is, so what makes them unreadable is neighbours colliding, not
+  // small letters. It was 0.62 until 2026-09-01, which was a fine floor for a
+  // twelve-node tree and hid every name on the thirty-four-node one — a
+  // recentre framed the whole Rifleman tree at 0.605 and printed nothing.
+  // `labelWidth` now clips each name to the space its own node actually has, so
+  // the floor could come down to where the nodes themselves stop being
+  // distinguishable.
+  var LABEL_ZOOM = 0.5;
+
+  // How wide one node's name may be, in pixels, at the current zoom. Capped at
+  // the old fixed widths so nothing got WIDER, and floored by the on-screen
+  // pitch so two names can never run into each other. `fitText` ellipsises what
+  // will not fit, and the detail card is where the full name always is.
+  function labelWidth(cap) {
+    return Math.min(cap, NODE_PITCH * view.zoom * 0.92);
+  }
 
   // --- geometry --------------------------------------------------------------
   //
@@ -371,6 +410,7 @@ var Upgrades = (function () {
   function openTree() {
     if (!selected) return;
     treeNode = null;
+    treeNodeKind = "perk";
     confirmReset = false;
     // The last screen's message does not follow the player onto this one. A
     // refusal about a loadout slot read as a refusal about the node they are
@@ -401,7 +441,11 @@ var Upgrades = (function () {
     view = { x: 0, y: 0, zoom: 1 };
     if (!selected) return;
 
-    var list = TowerPerks.nodes(selected);
+    // BOTH LISTS, for the same reason `clampView` reads both: a recentre that
+    // framed only the twelve permanent upgrades would leave the Rifleman's
+    // squares hanging off three edges of a board that says it is showing the
+    // whole tree.
+    var list = TowerPerks.nodes(selected).concat(TowerPerks.upgrades2(selected));
     if (!list.length) return;
 
     // The centre node counts too: a tree whose nodes all sit north of it must
@@ -431,6 +475,7 @@ var Upgrades = (function () {
     selected = towerId;
     invScroll = 0;
     treeNode = null;
+    treeNodeKind = "perk";
     detailNode = null;
     hoverNode = null;
     confirmReset = false;
@@ -693,7 +738,10 @@ var Upgrades = (function () {
   // box is a point and the pitch is the whole limit.
   function clampView() {
     if (!selected) return;
-    var list = TowerPerks.nodes(selected);
+    // BOTH LISTS, because a square sits further out than any perk on three of
+    // the four arms -- clamping to the perks alone would put half the Rifleman's
+    // squares permanently off the edge of a fully panned board.
+    var list = TowerPerks.nodes(selected).concat(TowerPerks.upgrades2(selected));
     if (!list.length) return;
 
     var minX = 0, maxX = 0, minY = 0, maxY = 0;
@@ -751,13 +799,24 @@ var Upgrades = (function () {
   function endPan() { pan = null; }
   function panning() { return pan !== null; }
 
+  // WHICH NODE IS UNDER THE CURSOR, of either kind. The squares are tested
+  // FIRST and with their own smaller radius: they are drawn on top of the
+  // links and are the smaller target, so a click that could be read either way
+  // belongs to the one that is harder to hit.
   function nodeAt(x, y) {
     if (!selected || !pointInRect(x, y, boardRect())) return null;
-    var list = TowerPerks.nodes(selected);
+    var hit = hitList(x, y, TowerPerks.upgrades2(selected), SQUARE_R);
+    if (hit) return { node: hit, kind: "square" };
+    hit = hitList(x, y, TowerPerks.nodes(selected), NODE_R);
+    return hit ? { node: hit, kind: "perk" } : null;
+  }
+
+  function hitList(x, y, list, radius) {
+    var r = radius * view.zoom;
     for (var i = 0; i < list.length; i++) {
       var p = treeToScreen(nodePoint(list[i]).x, nodePoint(list[i]).y);
       var dx = x - p.x, dy = y - p.y;
-      if (dx * dx + dy * dy <= (NODE_R * view.zoom) * (NODE_R * view.zoom)) return list[i];
+      if (dx * dx + dy * dy <= r * r) return list[i];
     }
     return null;
   }
@@ -771,14 +830,29 @@ var Upgrades = (function () {
     if (pointInRect(x, y, resetTreeRect())) { resetPressed(); return; }
 
     if (treeNode && pointInRect(x, y, buyRect())) {
-      var result = TowerPerks.buy(selected, treeNode.id);
-      say(result.ok ? "Bought — it is in the tower's inventory." : result.reason,
+      // TWO PURCHASES, ONE BUTTON, AND THE MODEL DECIDES WHICH. A perk is
+      // bought once; a square buys its next rank. Both refuse with the same
+      // sentence the card is already printing.
+      var result = treeNodeKind === "square"
+        ? TowerPerks.buyUpgrade2(selected, treeNode.id)
+        : TowerPerks.buy(selected, treeNode.id);
+      say(result.ok
+        ? (treeNodeKind === "square"
+            ? ("Rank " + result.rank + " bought — it applies while " +
+               parentLabel(treeNode) + " is equipped.")
+            : "Bought — it is in the tower's inventory.")
+        : result.reason,
         result.ok ? "good" : "bad");
       return;
     }
 
     var hit = nodeAt(x, y);
-    if (hit) { treeNode = hit; confirmReset = false; return; }
+    if (hit) {
+      treeNode = hit.node;
+      treeNodeKind = hit.kind;
+      confirmReset = false;
+      return;
+    }
     // A press on the board that was not a node clears the card, the same way
     // right-click clears a selection on the battlefield.
     if (pointInRect(x, y, boardRect())) treeNode = null;
@@ -799,7 +873,7 @@ var Upgrades = (function () {
         say("Reset cools down for another " + coolingText(ready) + ".", "bad");
         return;
       }
-      if (!MetaProgress.ownedNodes(selected).length) {
+      if (!resetNodeCount(selected)) {
         say("Nothing bought on this tree yet.", "bad");
         return;
       }
@@ -810,9 +884,27 @@ var Upgrades = (function () {
     var out = TowerPerks.resetTree(selected, Date.now());
     if (!out.ok) { say(out.reason, "bad"); return; }
     treeNode = null;
+    treeNodeKind = "perk";
     say("Tree reset — " + out.removed + " node" + (out.removed === 1 ? "" : "s") +
         " refunded for " + out.refunded + " ⬡, commission " + out.fee +
         " ⬡, net " + (out.net >= 0 ? "+" : "") + out.net + " ⬡.", "good");
+  }
+
+  // HOW MANY NODES A RESET WOULD REVOKE, and therefore what it is charged for.
+  // A ranked upgrade-squared node counts ONCE however many ranks it holds --
+  // the owner's rule, and the same count `MetaProgress.resetTree` charges, so
+  // the quote on the button and the transaction cannot be different sums.
+  function resetNodeCount(towerId) {
+    return MetaProgress.ownedNodes(towerId).length +
+      MetaProgress.rankedNodeCount(towerId);
+  }
+
+  // "Overloaded Drum", or "Overloaded Drum and Commissioned Ammunition" for a
+  // fusion. One phrasing, so the card, the flash and the refusal all name the
+  // same thing the same way.
+  function parentLabel(node) {
+    var parents = TowerPerks.parentStatesOf(selected, node);
+    return parents.map(function (p) { return p.name; }).join(" and ");
   }
 
   function coolingText(readyAt) {
@@ -1443,9 +1535,16 @@ var Upgrades = (function () {
     ctx.clip();
 
     var list = TowerPerks.nodes(selected);
+    var squares = TowerPerks.upgrades2(selected);
+    // EVERY LINK FIRST, THEN THE TOWER, THEN THE NODES ON TOP. The squares are
+    // drawn last of all so a satellite is never hidden under the arm it hangs
+    // off, and their links are drawn with the rest so nothing crosses a node it
+    // does not belong to.
     drawTreeLinks(list);
+    drawSquareLinks(squares);
     drawTreeCentre(Type);
     list.forEach(drawTreeNode);
+    squares.forEach(drawSquareNode);
 
     ctx.restore();
 
@@ -1465,7 +1564,7 @@ var Upgrades = (function () {
     ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
     ctx.textAlign = "center";
     drawMenuText("RIGHT-DRAG OR TWO-FINGER SLIDE TO PAN   ·   PINCH OR WHEEL TO ZOOM   " +
-      "·   ◉ RECENTRE   ·   ESC BACK",
+      "·   SMALL NODES ARE RANKED UPGRADES² — THEY NEED NO SLOT   ·   ESC BACK",
       board.x + board.w / 2, VIEW_HEIGHT - 26, 1.3);
     ctx.textAlign = "left";
 
@@ -1513,6 +1612,129 @@ var Upgrades = (function () {
     ctx.stroke();
   }
 
+  // A SQUARE'S LINKS, AND EACH ONE IS LIT ON ITS OWN.
+  //
+  // THIS IS HOW "PARTIALLY CONTRIBUTES" IS DRAWN. A fusion has two rank
+  // prerequisites and each gets its own line: satisfied is lit, short is dark,
+  // and a node you are halfway to is a node with one bright arm and one dim
+  // one -- readable without opening the card. A square with no rank
+  // prerequisite draws one line to the permanent upgrade it improves, lit when
+  // that upgrade is bought.
+  //
+  // A FUSION ALSO DRAWS ITS SECOND RUNTIME PARENT, dimmer and dashed: those two
+  // upgrades are what it needs EQUIPPED, which is a different question from what
+  // it needs bought, and both belong on the picture.
+  function drawSquareLinks(squares) {
+    squares.forEach(function (node) {
+      var to = treeToScreen(nodePoint(node).x, nodePoint(node).y);
+      var reqs = node.requires || [];
+
+      if (!reqs.length) {
+        var parent = TowerPerks.nodeOf(selected, node.parent);
+        if (parent) {
+          var from = treeToScreen(nodePoint(parent).x, nodePoint(parent).y);
+          strokeLink(from, to, MetaProgress.ownsNode(selected, node.parent));
+        }
+      }
+
+      reqs.forEach(function (req) {
+        var other = TowerPerks.upgrade2Of(selected, req.id);
+        if (!other) return;
+        var at = treeToScreen(nodePoint(other).x, nodePoint(other).y);
+        strokeLink(at, to, TowerPerks.rankOf(selected, req.id) >= (req.rank || 1));
+      });
+
+      // The equip requirement, for a fusion only -- an ordinary square's single
+      // parent is already the line above.
+      if (!node.alsoParent) return;
+      var other = TowerPerks.nodeOf(selected, node.alsoParent);
+      if (!other) return;
+      var start = treeToScreen(nodePoint(other).x, nodePoint(other).y);
+      ctx.save();
+      ctx.setLineDash([5 * view.zoom, 5 * view.zoom]);
+      strokeLink(start, to, MetaProgress.ownsNode(selected, node.alsoParent));
+      ctx.restore();
+    });
+  }
+
+  // THE FIVE STATES A SQUARE CAN BE IN, drawn the same way a perk's are and
+  // read off the same one answer. `maxed` gets the ley colour a perk uses for
+  // "equipped", because a square that is finished is the same kind of good news
+  // -- and a DORMANT one, owned with its parent on the bench, is drawn hollow
+  // so the player can see at a glance which of their squares are doing nothing.
+  function drawSquareNode(node) {
+    var p = treeToScreen(nodePoint(node).x, nodePoint(node).y);
+    var r = SQUARE_R * view.zoom;
+    var info = TowerPerks.upgrade2StateOf(selected, node.id);
+    var chosen = treeNode && treeNode.id === node.id && treeNodeKind === "square";
+
+    var accent, alpha;
+    if (info.state === "maxed") { accent = ASH_LEY; alpha = 1; }
+    else if (info.rank > 0) { accent = ASH_EMBER; alpha = 1; }
+    else if (info.state === "buyable") { accent = ASH_BONE; alpha = 0.95; }
+    else if (info.state === "poor") { accent = ASH_EMBER; alpha = 0.5; }
+    else { accent = ASH_DUST; alpha = 0.3; }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = info.rank > 0
+      ? (info.dormant ? "rgba(14,11,16,0.9)" : "rgba(34,24,20,0.96)")
+      : "rgba(14,11,16,0.9)";
+    ctx.fill();
+    ctx.lineWidth = chosen ? 3 : (info.rank > 0 ? 2.2 : 1.4);
+    ctx.strokeStyle = "rgba(" + accent + "," + (chosen ? 1 : alpha) + ")";
+    ctx.stroke();
+
+    sigil(node.id, p.x, p.y, r * 0.44, "rgba(" + accent + "," + alpha + ")", node.icon);
+
+    // THE RANK, AS PIPS AROUND THE RIM. It is the one thing about a square that
+    // a player needs from across the board -- how far along it is -- and a ring
+    // of filled and hollow marks says it without any type to read.
+    drawRankPips(p, r, info, accent);
+
+    if (view.zoom < LABEL_ZOOM) return;
+    ctx.textAlign = "center";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(" + ASH_BONE + "," + Math.min(1, alpha + 0.25) + ")";
+    ctx.fillText(fitText(ctx, node.name, labelWidth(118)), p.x, p.y + r + 12);
+
+    ctx.font = "9px " + MENU_TECH_FONT;
+    if (info.state === "maxed") {
+      ctx.fillStyle = "rgba(" + ASH_LEY + ",0.8)";
+      drawMenuText("MAX " + info.rank + "/" + info.maxRank, p.x, p.y + r + 26, 1);
+    } else {
+      ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.7)";
+      drawMenuText(info.rank + "/" + info.maxRank + "  ·  " +
+        (info.nextCost || 0) + " ⬡", p.x, p.y + r + 26, 1);
+    }
+    ctx.textAlign = "left";
+  }
+
+  // One small mark per rank, spread over the top arc of the node. Filled for a
+  // rank that is paid for, hollow for one that is not.
+  function drawRankPips(p, r, info, accent) {
+    var max = info.maxRank || 0;
+    if (max <= 0) return;
+    var spread = Math.PI * 0.9;
+    var start = -Math.PI / 2 - spread / 2;
+    var step = max > 1 ? spread / (max - 1) : 0;
+    var reach = r + 5 * view.zoom;
+    var dot = Math.max(1.2, 2.4 * view.zoom);
+    for (var i = 0; i < max; i++) {
+      var a = max > 1 ? start + i * step : -Math.PI / 2;
+      ctx.beginPath();
+      ctx.arc(p.x + Math.cos(a) * reach, p.y + Math.sin(a) * reach, dot, 0, Math.PI * 2);
+      if (i < info.rank) {
+        ctx.fillStyle = "rgba(" + accent + ",0.95)";
+        ctx.fill();
+      } else {
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(" + accent + ",0.45)";
+        ctx.stroke();
+      }
+    }
+  }
+
   function drawTreeCentre(Type) {
     var p = treeToScreen(0, 0);
     var r = 46 * view.zoom;
@@ -1556,11 +1778,11 @@ var Upgrades = (function () {
 
     // The name under the node, and the price under that when it is not bought.
     // Hidden when zoomed far out: unreadable type over a big tree is noise.
-    if (view.zoom < 0.62) return;
+    if (view.zoom < LABEL_ZOOM) return;
     ctx.textAlign = "center";
     ctx.font = "10px system-ui, sans-serif";
     ctx.fillStyle = "rgba(" + ASH_BONE + "," + Math.min(1, alpha + 0.25) + ")";
-    ctx.fillText(fitText(ctx, node.name, 128), p.x, p.y + r + 12);
+    ctx.fillText(fitText(ctx, node.name, labelWidth(128)), p.x, p.y + r + 12);
     if (info.state !== "owned") {
       ctx.font = "9px " + MENU_TECH_FONT;
       ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.7)";
@@ -1593,6 +1815,8 @@ var Upgrades = (function () {
         MetaProgress.coins() + " ⬡", d.x + 20, d.y + d.h - 40, 1.4);
       return;
     }
+
+    if (treeNodeKind === "square") { drawSquareDetail(d); return; }
 
     var info = TowerPerks.stateOf(selected, treeNode.id);
 
@@ -1659,9 +1883,147 @@ var Upgrades = (function () {
     }
   }
 
+  // THE CARD FOR ONE UPGRADE-SQUARED NODE, and it prints everything the brief
+  // asks a player to be able to read before spending: the rank it is at, the
+  // rank it goes to, what THAT rank costs on its own, the resolved value now
+  // and the resolved value next, which permanent upgrade owns it, every rank
+  // requirement with the rank it has against the rank it needs, and both halves
+  // of the trade in the node's own words.
+  //
+  // EVERY FIGURE IS DERIVED FROM THE MODEL, never re-computed here. `valueAt`
+  // is the content file's own sentence, so a retune moves the card with the
+  // effect; `upgrade2StateOf` answers the rank, the price and the reason, so
+  // the button, the ring and the refusal cannot disagree.
+  function drawSquareDetail(d) {
+    var info = TowerPerks.upgrade2StateOf(selected, treeNode.id);
+    var node = treeNode;
+
+    sigil(node.id, d.x + 34, d.y + 38, 16,
+      "rgba(" + ASH_EMBER + ",0.95)", node.icon);
+    ctx.font = "16px " + MENU_DISPLAY_FONT;
+    ctx.fillStyle = "#f6d9b4";
+    drawMenuText(fitText(ctx, node.name.toUpperCase(), d.w - 84), d.x + 60,
+      d.y + 24, 1.5);
+
+    // WHICH UPGRADE OWNS IT, and whether that upgrade is in the loadout right
+    // now -- two different facts, both on the same line, because "bought" is
+    // what unlocks the purchase and "equipped" is what makes it do anything.
+    var parents = TowerPerks.parentStatesOf(selected, node);
+    ctx.font = "10px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.85)";
+    drawMenuText(parents.length > 1 ? "FUSION — NEEDS BOTH EQUIPPED"
+                                    : "IMPROVES", d.x + 60, d.y + 44, 1.2);
+
+    var y = d.y + 62;
+    ctx.font = "11px system-ui, sans-serif";
+    parents.forEach(function (p) {
+      ctx.fillStyle = p.equipped ? "rgba(" + ASH_LEY + ",0.95)"
+        : p.owned ? "rgba(" + ASH_EMBER + ",0.85)" : "rgba(240,120,110,0.9)";
+      ctx.fillText(fitText(ctx, (p.owned ? "✓ " : "✗ ") + p.name +
+        (p.equipped ? "  · equipped" : p.owned ? "  · NOT EQUIPPED" : "  · not bought"),
+        d.w - 40), d.x + 20, y);
+      y += 15;
+    });
+
+    // RANK, AND WHAT THE NEXT ONE COSTS ON ITS OWN. Never a running total: the
+    // price beside a rank is what that rank costs, and the line below says what
+    // has been sunk in so far so the two can never be confused.
+    y += 6;
+    ctx.font = "11px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.9)";
+    // THE PURSE IS NOT REPEATED HERE. It is already in the top-right corner of
+    // this screen in 24px type, and spelling it again pushed this line past the
+    // card's right edge, where it was simply cut off.
+    drawMenuText("RANK " + info.rank + " / " + info.maxRank +
+      (info.state === "maxed" ? "   ·   MAXIMUM RANK"
+        : "   ·   NEXT RANK COSTS " + (info.nextCost || 0) + " ⬡"),
+      d.x + 20, y, 1.2);
+    y += 20;
+
+    // THE RESOLVED VALUE NOW AND THE RESOLVED VALUE NEXT, both spelled out --
+    // including the two nodes whose ranks are a table rather than a step, where
+    // "per rank" would be a lie.
+    ctx.font = "11px system-ui, sans-serif";
+    if (info.rank > 0) {
+      ctx.fillStyle = "rgba(" + ASH_BONE + ",0.9)";
+      y += wrapLeft("NOW  " + valueText(node, info.rank),
+        d.x + 20, y, d.w - 40, 14, 3) * 14 + 2;
+    }
+    if (info.nextRank) {
+      ctx.fillStyle = "rgba(" + ASH_LEY + ",0.9)";
+      y += wrapLeft("RANK " + info.nextRank + "  " + valueText(node, info.nextRank),
+        d.x + 20, y, d.w - 40, 14, 3) * 14 + 2;
+    }
+
+    // BOTH HALVES OF THE TRADE, and the downside is STATED even when there is
+    // none -- "no downside" is information, and a blank line is not.
+    y += 6;
+    ctx.fillStyle = "rgba(" + ASH_BONE + ",0.8)";
+    y += wrapLeft(node.upside || "", d.x + 20, y, d.w - 40, 14, 3) * 14 + 2;
+    ctx.fillStyle = node.downside
+      ? "rgba(230,150,120,0.9)" : "rgba(" + ASH_DUST + ",0.65)";
+    y += wrapLeft(node.downside || "No downside.", d.x + 20, y, d.w - 40, 14, 3) * 14;
+
+    // EVERY REQUIREMENT, MET OR NOT, WITH ITS OWN PROGRESS. Never a summary and
+    // never short-circuited: a fusion at one of two shows the one it has beside
+    // the one it lacks, which is what "partially contributes" means.
+    if (info.requirementsTotal) {
+      y += 8;
+      ctx.font = "10px " + MENU_TECH_FONT;
+      ctx.fillStyle = "rgba(" + ASH_DUST + ",0.8)";
+      drawMenuText("REQUIRES " + info.requirementsMet + " / " +
+        info.requirementsTotal + " — NEEDS ALL", d.x + 20, y, 1.2);
+      y += 16;
+      ctx.font = "11px system-ui, sans-serif";
+      info.requirements.forEach(function (req) {
+        ctx.fillStyle = req.met
+          ? "rgba(" + ASH_LEY + ",0.9)" : "rgba(240,120,110,0.9)";
+        ctx.fillText(fitText(ctx, (req.met ? "✓ " : "✗ ") + req.name +
+          " — rank " + req.have + " / " + req.need, d.w - 48), d.x + 28, y);
+        y += 15;
+      });
+    }
+
+    // OWNED AND DOING NOTHING, which is a legal state and has to be said out
+    // loud -- a player who cannot see it would read the tree as broken.
+    if (info.dormant) {
+      y += 6;
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(230,180,110,0.95)";
+      wrapLeft("Bought and DORMANT — it applies again the moment " +
+        parentLabel(node) + " is back in the loadout.",
+        d.x + 20, y, d.w - 40, 14, 3);
+      y += 34;
+    }
+
+    if (info.reason) {
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(240,150,120,0.9)";
+      wrapLeft(info.reason, d.x + 20, y + 4, d.w - 40, 14, 3);
+    }
+
+    var button = buyRect();
+    if (info.state === "maxed") {
+      drawAshControl(button, "MAXIMUM RANK",
+        { disabled: true, detail: info.maxRank + " / " + info.maxRank });
+    } else if (info.state === "buyable") {
+      drawAshControl(button, "BUY RANK " + info.nextRank + "  " +
+        info.nextCost + " ⬡", { primary: true });
+    } else {
+      drawAshControl(button, "LOCKED", { disabled: true });
+    }
+  }
+
+  // The content file's own sentence for a rank, with a fallback so a node
+  // authored without `valueAt` still prints something honest.
+  function valueText(node, rank) {
+    if (typeof node.valueAt !== "function") return "rank " + rank;
+    return node.valueAt(rank);
+  }
+
   function drawResetControl() {
     var r = resetTreeRect();
-    var owned = MetaProgress.ownedNodes(selected).length;
+    var owned = resetNodeCount(selected);
     var ready = MetaProgress.resetReadyAt(selected);
     var cooling = ready > Date.now();
 
@@ -1783,13 +2145,26 @@ var Upgrades = (function () {
       return treeToScreen(p.x, p.y);
     },
     selectTower: select,
+    // EITHER KIND, BY ID, and the kind is remembered exactly as a click would
+    // have set it -- so a test that pins a square and presses the buy button is
+    // pressing the button a player presses.
     selectNode: function (nodeId) {
-      treeNode = selected ? TowerPerks.nodeOf(selected, nodeId) : null;
+      if (!selected) { treeNode = null; return null; }
+      var square = TowerPerks.upgrade2Of(selected, nodeId);
+      if (square) { treeNode = square; treeNodeKind = "square"; return square; }
+      treeNode = TowerPerks.nodeOf(selected, nodeId);
+      treeNodeKind = "perk";
       return treeNode;
     },
+    nodeAtPoint: function (x, y) {
+      var hit = nodeAt(x, y);
+      return hit ? { id: hit.node.id, kind: hit.kind } : null;
+    },
+    resetNodeCount: function () { return selected ? resetNodeCount(selected) : 0; },
     state: function () {
       return {
         selected: selected, flash: flash, node: treeNode ? treeNode.id : null,
+        nodeKind: treeNode ? treeNodeKind : null,
         detail: detailNode, hover: hoverNode,
         confirmReset: confirmReset, view: { x: view.x, y: view.y, zoom: view.zoom },
         scroll: invScroll, dragging: drag ? drag.nodeId : null

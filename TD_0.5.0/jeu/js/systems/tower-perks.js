@@ -13,6 +13,12 @@
 //   bought    the node is paid for. It is in the type's inventory forever
 //   equipped  it is in one of the level's slots, so runs will feel it
 //
+// AND SINCE 2026-09-01 THERE IS A THIRD KIND, in this same file: an
+// UPGRADE-SQUARED. It is meta coins and permanent too, and it differs from a
+// perk in exactly three ways -- it has RANKS bought one at a time, it NEVER
+// occupies a loadout slot, and it belongs to one permanent upgrade and applies
+// only while that upgrade is EQUIPPED. See the UPGRADE-SQUARED block below.
+//
 // THREE FIVES IN THIS GAME AND THEY ARE ALL DIFFERENT. `MetaProgress.SLOT_COUNT`
 // is how many TYPES fit in the build bar. `MetaProgress.PERK_SLOTS` is how many
 // PERKS fit in one type's loadout. A tower's in-run tiers go to five as well.
@@ -26,6 +32,7 @@
 //                         requires, what it does, and how a perk reaches a
 //                         tower that is being built
 //   js/perks/*-perks.js   the CONTENT: one file per tower, one tree each
+//   js/perks/soldier-upgrades2.js  the Rifleman's upgrade-squared content
 //   js/upgrades.js        the two screens
 //
 // HOW A PERK REACHES A TOWER, and why no tower file had to change for it.
@@ -89,12 +96,24 @@ var TowerPerks = (function () {
 
   function register(tree) {
     if (!tree || !tree.towerId) return;
+    var have = TREES[tree.towerId];
     TREES[tree.towerId] = {
       towerId: tree.towerId,
       // A tree with no nodes is a tower whose content has not been authored
       // yet, and it is a legal state: the screens show it as empty rather than
       // as broken. Nothing else in the system cares.
-      nodes: (tree.nodes || []).slice()
+      //
+      // EITHER HALF MAY BE REGISTERED ON ITS OWN and the other is kept. The
+      // Rifleman's upgrade-squared content is a SECOND FILE
+      // (js/perks/soldier-upgrades2.js) registering against the same towerId,
+      // so a call carrying only `upgrades2` must not delete the tree the
+      // parent file just registered -- and a probe tree in a test that carries
+      // only `nodes` must not delete the squares. A key that is absent from
+      // this call is inherited; a key that is present replaces.
+      nodes: tree.nodes ? tree.nodes.slice()
+        : (have ? have.nodes.slice() : []),
+      upgrades2: tree.upgrades2 ? tree.upgrades2.slice()
+        : (have ? have.upgrades2.slice() : [])
     };
   }
 
@@ -117,6 +136,245 @@ var TowerPerks = (function () {
   // authoring checks; the screens iterate OWNED towers instead, because a tree
   // for a tower you have not bought is not yours to look at.
   function towersWithTrees() { return Object.keys(TREES); }
+
+  // --- UPGRADE-SQUARED (2026-09-01) ------------------------------------------
+  //
+  // A THIRD KIND OF UPGRADE, AND IT IS NOT A PERK. The A/B/C tiers are mana,
+  // in a run, on one body. A PERK is meta coins, permanent, and occupies one of
+  // five loadout slots. An UPGRADE-SQUARED is meta coins and permanent too, and
+  // it differs from a perk in exactly three ways:
+  //
+  //   * it has RANKS, bought one at a time, each with its own price;
+  //   * it NEVER occupies a loadout slot -- there is nothing to equip;
+  //   * it is owned by ONE permanent upgrade and applies only while that
+  //     upgrade is EQUIPPED. Bought and dormant is a legal, ordinary state.
+  //
+  // THE SHAPE, and every field except `id`, `name`, `parent`, `maxRank` and
+  // `prices` is optional:
+  //
+  //   id         stable and unique across BOTH lists. A PERSISTENCE FORMAT --
+  //              it is the key `MetaProgress` writes the rank under
+  //   name       what the player reads
+  //   parent     the permanent-upgrade node id this improves. Must be OWNED
+  //              before rank 1 can be bought, and EQUIPPED for any rank to do
+  //              anything
+  //   alsoParent a SECOND runtime parent. A FUSION node applies only while both
+  //              are equipped, and is dormant -- still owned -- when either is
+  //              missing from the loadout
+  //   requires   [{ id, rank }] -- other upgrade-squared nodes that must have
+  //              reached at least that rank. AND, never OR, exactly as
+  //              `requires` on a perk
+  //   maxRank    how many ranks exist
+  //   prices     one price per rank, in meta coins. `prices[0]` buys rank 1.
+  //              NEVER cumulative: buying rank 3 costs `prices[2]` and not the
+  //              sum of what came before
+  //   at         { x, y } in node units, for the tree screen
+  //   upside     what it gives, in the player's words
+  //   downside   what it costs, in the player's words. `null` when there is
+  //              genuinely none, which is stated rather than left blank
+  //   valueAt    (rank) -> the resolved value at that rank, as text. Called for
+  //              the current rank AND the next one, so a card can show both
+  //   effectsAt  (rank) -> an effects block in the SAME vocabulary a perk uses
+  //              (preAdd / mul / add / addRate / set / price / tiers / when /
+  //              onlyIf). The whole block is the resolved effect AT that rank,
+  //              not a per-rank increment, so a non-linear table is written as
+  //              a table and needs no special case
+  //
+  // WHY `effectsAt` IS A FUNCTION AND NOT A LIST OF BLOCKS. Three of these
+  // nodes replace a resolved value rather than moving it -- Terminal Charge's
+  // multiplier and Battery Setup's threshold are authored tables with no
+  // arithmetic between the steps -- and every other one is a plain multiple of
+  // the rank. One function covers both without the content file having to say
+  // which kind it is.
+  function upgrades2(towerId) {
+    var tree = treeOf(towerId);
+    return tree ? tree.upgrades2.slice() : [];
+  }
+
+  function upgrade2Of(towerId, nodeId) {
+    var list = upgrades2(towerId);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === nodeId) return list[i];
+    }
+    return null;
+  }
+
+  // Both runtime parents of a node, in order, with the second dropped when
+  // there is none. One reader, so "a fusion needs both" is spelled once.
+  function parentsOf(node) {
+    if (!node) return [];
+    var out = [];
+    if (node.parent) out.push(node.parent);
+    if (node.alsoParent) out.push(node.alsoParent);
+    return out;
+  }
+
+  function isFusion(node) { return parentsOf(node).length > 1; }
+
+  // THE RANK THIS BUILD WILL HONOUR, clamped to the node's own maximum.
+  //
+  // The save stores whatever it was told and cannot know a maximum -- node ids
+  // are open there on purpose (see js/meta.js) -- so a profile carrying a rank 5
+  // of a node this build has retuned down to 3 resolves as 3 rather than
+  // reaching past the end of `prices`. The stored number is left alone: retune
+  // it back up and the rank is still there.
+  function rankOf(towerId, nodeId) {
+    var node = upgrade2Of(towerId, nodeId);
+    if (!node) return 0;
+    var raw = MetaProgress.rankOfNode(towerId, nodeId);
+    return Math.max(0, Math.min(node.maxRank || 0, raw));
+  }
+
+  // What the NEXT rank costs, or null at the top. Read off `prices`, so
+  // retuning a curve retunes the purchase, the card and the refund together.
+  function rankPrice(node, rank) {
+    if (!node || !node.prices) return null;
+    if (rank < 1 || rank > node.prices.length) return null;
+    var price = node.prices[rank - 1];
+    return typeof price === "number" ? price : null;
+  }
+
+  // Every rank prerequisite of a node, ANSWERED WHETHER OR NOT IT IS MET.
+  //
+  // THIS IS WHAT MAKES "PARTIALLY CONTRIBUTES" VISIBLE. The brief asks that a
+  // node with two requirements show one satisfied and one missing rather than a
+  // single "locked" -- so this never short-circuits on the first failure, and
+  // the screen draws a line per entry with the rank it has against the rank it
+  // needs.
+  function requirementsOf(towerId, node) {
+    return (node && node.requires ? node.requires : []).map(function (req) {
+      var need = req.rank || 1;
+      var have = rankOf(towerId, req.id);
+      var other = upgrade2Of(towerId, req.id);
+      return {
+        id: req.id,
+        name: other ? other.name : req.id,
+        need: need,
+        have: have,
+        met: have >= need
+      };
+    });
+  }
+
+  // The runtime parents, each with whether it is OWNED and whether it is
+  // EQUIPPED. Two different questions and both are shown: ownership is what
+  // gates the purchase, and being equipped is what gates the effect.
+  function parentStatesOf(towerId, node) {
+    var equipped = activeIds(towerId);
+    return parentsOf(node).map(function (id) {
+      var parent = nodeOf(towerId, id);
+      return {
+        id: id,
+        name: parent ? parent.name : id,
+        owned: MetaProgress.ownsNode(towerId, id),
+        equipped: equipped.indexOf(id) !== -1
+      };
+    });
+  }
+
+  // THE STATE OF ONE UPGRADE-SQUARED NODE, in one object, for the same reason
+  // `stateOf` exists: the ring, the card and the purchase must agree.
+  //
+  //   maxed    every rank bought
+  //   locked   a parent is not owned, or a rank requirement is short
+  //   poor     nothing missing but the coins
+  //   buyable  the next rank may be bought now
+  //
+  // `dormant` is NOT a state -- it is a fact about a node that may be in any of
+  // them. A node at rank 3 whose parent is out of the loadout is `maxed` or
+  // `buyable` exactly as before and simply does nothing, which is what the
+  // brief means by "remains owned but dormant".
+  function upgrade2StateOf(towerId, nodeId) {
+    var node = upgrade2Of(towerId, nodeId);
+    if (!node) return { state: "locked", reason: "no such upgrade" };
+
+    var rank = rankOf(towerId, nodeId);
+    var max = node.maxRank || 0;
+    var next = rank + 1;
+    var parents = parentStatesOf(towerId, node);
+    var reqs = requirementsOf(towerId, node);
+    var out = {
+      node: node,
+      rank: rank,
+      maxRank: max,
+      nextRank: rank < max ? next : null,
+      nextCost: rank < max ? rankPrice(node, next) : null,
+      parents: parents,
+      requirements: reqs,
+      // The two counts the card prints beside a fusion: "1 / 2 requirements".
+      requirementsMet: reqs.filter(function (r) { return r.met; }).length,
+      requirementsTotal: reqs.length,
+      // Owned, and doing nothing right now because a parent is on the bench.
+      dormant: rank > 0 && parents.some(function (p) { return !p.equipped; }),
+      spent: rankSpend(node, rank)
+    };
+
+    if (rank >= max) {
+      out.state = "maxed";
+      out.reason = null;
+      return out;
+    }
+
+    var missingParents = parents.filter(function (p) { return !p.owned; });
+    if (missingParents.length) {
+      out.state = "locked";
+      out.reason = "needs " + missingParents.map(function (p) { return p.name; })
+        .join(" and ") + " bought first";
+      return out;
+    }
+
+    var short = reqs.filter(function (r) { return !r.met; });
+    if (short.length) {
+      out.state = "locked";
+      out.reason = "needs " + short.map(function (r) {
+        return r.name + " rank " + r.need + " (you have " + r.have + ")";
+      }).join(" and ");
+      return out;
+    }
+
+    var progress = MetaProgress.progressOf(towerId);
+    var needLevel = node.minLevel || 0;
+    if (progress.level < needLevel) {
+      out.state = "level";
+      out.reason = "needs tower level " + needLevel + " (you are " + progress.level + ")";
+      return out;
+    }
+
+    var cost = out.nextCost || 0;
+    if (MetaProgress.coins() < cost) {
+      out.state = "poor";
+      out.reason = "rank " + next + " costs " + cost + " meta coins, you have " +
+        MetaProgress.coins();
+      return out;
+    }
+
+    out.state = "buyable";
+    out.reason = null;
+    return out;
+  }
+
+  // What has been SPENT on a node that has reached `rank` -- the sum of every
+  // rank price up to it, which is what a reset hands back. Summed here and
+  // charged one rank at a time by `buyUpgrade2`, so the two cannot drift.
+  function rankSpend(node, rank) {
+    var total = 0;
+    for (var i = 1; i <= rank; i++) {
+      var price = rankPrice(node, i);
+      if (typeof price === "number") total += price;
+    }
+    return total;
+  }
+
+  // THE ONLY CALLER OF MetaProgress.buyRank, the same division `buy` has with
+  // `buyNode`: the tree rules are checked here and the spend happens there.
+  function buyUpgrade2(towerId, nodeId) {
+    var state = upgrade2StateOf(towerId, nodeId);
+    if (state.state === "maxed") {
+      return { ok: false, reason: "already at maximum rank" };
+    }
+    if (state.state !== "buyable") return { ok: false, reason: state.reason };
+    return MetaProgress.buyRank(towerId, nodeId, state.nextCost, state.nextRank);
+  }
 
   // --- what state a node is in ----------------------------------------------
   //
@@ -203,6 +461,15 @@ var TowerPerks = (function () {
       var node = nodeOf(towerId, id);
       if (node && typeof node.cost === "number") total += node.cost;
     });
+    // AND EVERY RANK, at the price each rank was bought for. Read off `prices`
+    // for the same reason the line above reads `cost`: retuning a curve retunes
+    // the refund, and a rank whose node this build has dropped refunds nothing
+    // because this build cannot know what it cost.
+    var ranks = MetaProgress.nodeRanks(towerId);
+    Object.keys(ranks).forEach(function (id) {
+      var node = upgrade2Of(towerId, id);
+      if (node) total += rankSpend(node, rankOf(towerId, id));
+    });
     return total;
   }
 
@@ -266,6 +533,55 @@ var TowerPerks = (function () {
     }).filter(Boolean);
   }
 
+  // EVERY EFFECTS BLOCK IN FORCE FOR A TYPE, IN THE ORDER THEY RESOLVE.
+  //
+  // The four readers of an effect -- `applyEffects`, `tierCostDelta`,
+  // `priceOf` and `previewStat` -- all go through here, so an upgrade-squared
+  // node reaches a stat, a tier price and the build ghost through exactly the
+  // same three lines a perk does, and there is no fifth place to forget.
+  //
+  // **THE EQUIPPED PERKS COME FIRST AND THE SQUARES COME AFTER, ALWAYS.** For
+  // `mul` and `add` the order is immaterial -- they fold commutatively -- but
+  // `set` is last-writer-wins, and three of these nodes exist precisely to
+  // REPLACE a value their parent set: Terminal Charge replaces Breach Chamber's
+  // final-shot multiplier, Soft Feed replaces its penalty, Battery Setup
+  // replaces Entrenchment Protocol's threshold. A square that landed before its
+  // parent would be silently overwritten by the thing it is supposed to
+  // improve, so this order is load-bearing and not a convention.
+  function activeEffects(towerId) {
+    var out = [];
+    activeNodes(towerId).forEach(function (node) {
+      if (node.effects) out.push(node.effects);
+    });
+    upgrade2Effects(towerId).forEach(function (fx) { out.push(fx); });
+    return out;
+  }
+
+  // The blocks the OWNED, NON-DORMANT upgrade-squared nodes contribute.
+  //
+  // A node is skipped unless every one of its runtime parents is in the
+  // loadout -- one for an ordinary square, both for a fusion. That is the whole
+  // of "owned but dormant": nothing is removed from the save, nothing is
+  // refunded, and the node simply contributes no block this pass. It comes back
+  // the moment the parent is equipped again, with no state in between.
+  function upgrade2Effects(towerId) {
+    var list = upgrades2(towerId);
+    if (!list.length) return [];
+    var equipped = activeIds(towerId);
+    var out = [];
+    list.forEach(function (node) {
+      var rank = rankOf(towerId, node.id);
+      if (rank <= 0) return;
+      var parents = parentsOf(node);
+      for (var i = 0; i < parents.length; i++) {
+        if (equipped.indexOf(parents[i]) === -1) return;
+      }
+      var fx = typeof node.effectsAt === "function" ? node.effectsAt(rank) : null;
+      if (fx) out.push(fx);
+    });
+    return out;
+  }
+
   // --- effects ---------------------------------------------------------------
   //
   // SEVEN KINDS, AND AN ORDER THAT IS STATED RATHER THAN EMERGENT:
@@ -273,13 +589,24 @@ var TowerPerks = (function () {
   //   preAdd   a delta that lands BEFORE the multipliers -- see below
   //   mul      every factor for a field multiplies together
   //   add      every delta for a field sums, on top of that
+  //   mulAfter a factor that lands AFTER the deltas -- see below
   //   addRate  a PERIOD field raised by a RATE -- see below
   //   set      an absolute value; the last equipped slot holding one wins
   //   price    the placement cost -- { mul, add, firstAdd, laterAdd }
   //   tiers    { A1: { cost: +50 }, ... } -- what an IN-RUN tier costs
   //
-  //   final = (base + all preAdds) * (all muls) + (all adds),
+  //   final = ((base + all preAdds) * (all muls) + (all adds)) * (all mulAfters),
   //           then addRate, then any set
+  //
+  // `mulAfter` EXISTS BECAUSE "FIVE PER CENT OF THE RANGE THIS TOWER ACTUALLY
+  // REACHED" IS A DIFFERENT NUMBER FROM "FIVE PER CENT OF ITS BASE RANGE"
+  // (2026-09-01). The Rifleman's First Deployment pays a percentage of the
+  // RESOLVED reach, and Long Glass and Extended Lens have already added 13 u.l.
+  // to it by then: on a 100 base that is 141.25 against 138, and only one of
+  // them is what the node says it does. It is the mirror of `preAdd` -- a
+  // POSITION IN THE ARITHMETIC, not a new category -- and a tree that never
+  // writes one is unaffected. Like `mul`, it is commutative, so slot order
+  // cannot change a result.
   //
   // `preAdd` EXISTS BECAUSE "PLUS A THIRD OF A SECOND, BEFORE THE LATER
   // MULTIPLIERS" IS A DIFFERENT NUMBER FROM "PLUS A THIRD OF A SECOND". The
@@ -396,16 +723,15 @@ var TowerPerks = (function () {
 
   function applyEffects(tower) {
     var towerId = tower.constructor && tower.constructor.ID;
-    var list = activeNodes(towerId);
+    var list = activeEffects(towerId);
     if (!list.length) return;
 
     var target = statTarget(tower);
-    var muls = {}, adds = {}, sets = {}, pre = {};
+    var muls = {}, adds = {}, sets = {}, pre = {}, post = {};
 
     var rates = {};
 
-    list.forEach(function (node) {
-      var fx = node.effects;
+    list.forEach(function (fx) {
       if (!fx) return;
       if (fx.onlyIf && !tower[fx.onlyIf]) return;
 
@@ -420,6 +746,7 @@ var TowerPerks = (function () {
       collect(block.preAdd, pre, function (have, v) { return have + v; }, 0);
       collect(block.mul, muls, function (have, v) { return have * v; }, 1);
       collect(block.add, adds, function (have, v) { return have + v; }, 0);
+      collect(block.mulAfter, post, function (have, v) { return have * v; }, 1);
       collect(block.addRate, rates, function (have, v) { return have + v; }, 0);
       collect(block.set, sets, function (have, v) { return v; }, null);
     }
@@ -438,6 +765,7 @@ var TowerPerks = (function () {
     bump(pre, function (have, v) { return have + v; });
     bump(muls, function (have, v) { return have * v; });
     bump(adds, function (have, v) { return have + v; });
+    bump(post, function (have, v) { return have * v; });
     bump(rates, function (period, rate) {
       if (!(period > 0)) return period;
       var raised = 1 / period + rate;
@@ -470,8 +798,8 @@ var TowerPerks = (function () {
   // than needing a rule.
   function tierCostDelta(towerId, tierId) {
     var delta = 0;
-    activeNodes(towerId).forEach(function (node) {
-      var tiers = node.effects && node.effects.tiers;
+    activeEffects(towerId).forEach(function (fx) {
+      var tiers = fx && fx.tiers;
       var row = tiers && tiers[tierId];
       if (row && typeof row.cost === "number") delta += row.cost;
     });
@@ -577,11 +905,11 @@ var TowerPerks = (function () {
   function priceOf(Type) {
     if (!Type || typeof Type.COST !== "number") return 0;
     var base = Type.COST;
-    var list = activeNodes(Type.ID);
+    var list = activeEffects(Type.ID);
     var later = placementCount(Type.ID) > 0;
     var mul = 1, add = 0;
-    list.forEach(function (node) {
-      var price = node.effects && node.effects.price;
+    list.forEach(function (fx) {
+      var price = fx && fx.price;
       if (!price) return;
       if (typeof price.mul === "number") mul *= price.mul;
       if (typeof price.add === "number") add += price.add;
@@ -640,7 +968,7 @@ var TowerPerks = (function () {
   // ones. Only one of them is ever present in a given tree.
   function previewStat(Type, fields, base, context) {
     if (!Type || typeof base !== "number") return base;
-    var mul = 1, preAdd = 0, add = 0, set = null;
+    var mul = 1, preAdd = 0, add = 0, post = 1, set = null;
 
     function fold(block) {
       fields.forEach(function (field) {
@@ -649,12 +977,14 @@ var TowerPerks = (function () {
         }
         if (block.mul && typeof block.mul[field] === "number") mul *= block.mul[field];
         if (block.add && typeof block.add[field] === "number") add += block.add[field];
+        if (block.mulAfter && typeof block.mulAfter[field] === "number") {
+          post *= block.mulAfter[field];
+        }
         if (block.set && typeof block.set[field] === "number") set = block.set[field];
       });
     }
 
-    activeNodes(Type.ID).forEach(function (node) {
-      var fx = node.effects;
+    activeEffects(Type.ID).forEach(function (fx) {
       if (!fx) return;
       if (fx.onlyIf && !(context && context[fx.onlyIf])) return;
       fold(fx);
@@ -665,7 +995,7 @@ var TowerPerks = (function () {
       });
     });
     if (set !== null) return set;
-    return (base + preAdd) * mul + add;
+    return ((base + preAdd) * mul + add) * post;
   }
 
   // The reach a freshly placed tower of this type would have, in u.l. Read by
@@ -710,6 +1040,18 @@ var TowerPerks = (function () {
     if (!towerId || !MetaProgress.entry(towerId)) return;
 
     tower.perkIds = activeIds(towerId);
+
+    // IS THIS THE FIRST OF ITS TYPE PLACED THIS RUN? Asked here, once, and
+    // never again: `notePlacement` is called by the caller AFTER this, so the
+    // tally still reads the board as it was when this tower was decided on --
+    // the same instant, and the same fact, `priceOf` below uses to pick between
+    // `firstAdd` and `laterAdd`.
+    //
+    // IT IS A PROPERTY OF THE BODY AND NOT OF THE BOARD, which is exactly what
+    // the Rifleman's Salvage Conscription and First Deployment ask for: selling
+    // the first Rifleman does not hand the title to the next one, because
+    // nothing recomputes this and the count never goes down.
+    tower.perkFirstOfType = placementCount(towerId) === 0;
 
     // The price, and the record of it. `cost` is what the panel shows and
     // `totalSpent` is what a sale refunds half of; both were set from the raw
@@ -816,6 +1158,19 @@ var TowerPerks = (function () {
     isLocked: isLocked,
     activeIds: activeIds,
     activeNodes: activeNodes,
+    activeEffects: activeEffects,
+    upgrades2: upgrades2,
+    upgrade2Of: upgrade2Of,
+    upgrade2StateOf: upgrade2StateOf,
+    upgrade2Effects: upgrade2Effects,
+    buyUpgrade2: buyUpgrade2,
+    rankOf: rankOf,
+    rankPrice: rankPrice,
+    rankSpend: rankSpend,
+    parentsOf: parentsOf,
+    isFusion: isFusion,
+    requirementsOf: requirementsOf,
+    parentStatesOf: parentStatesOf,
     priceOf: priceOf,
     previewStat: previewStat,
     previewRangeUl: previewRangeUl,

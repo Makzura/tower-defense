@@ -133,6 +133,29 @@ function Soldier(x, y, path) {
   this.ratchetPending = 1;
   this.rhythmKillBase = 0;
 
+  // --- run state the UPGRADE-SQUARED nodes read (2026-09-01) ----------------
+  //
+  // HERE AND NOT IN recalcStats() FOR THE SAME REASON THE THREE ABOVE ARE:
+  // these are facts about this body's history, not stats derived from its
+  // flags, and a hover that calls recalcStats twice must not be able to move
+  // them.
+  //
+  //   firstTierBought   has this Rifleman completed its first in-run tier
+  //                     purchase? Sorted Parts discounts exactly one, and only
+  //                     a purchase that actually happened spends it -- a hover,
+  //                     a preview or a refused click leaves it false
+  //   wavesOpened       how many waves have OPENED with this body on the board,
+  //                     counted by onWaveStart(). First Deployment reads it,
+  //                     and it counts openings rather than endings so the bonus
+  //                     lasts through the gaps between its three waves and is
+  //                     gone the instant the fourth is announced
+  //   perkFirstOfType   is this the first Rifleman PLACED this run? Stamped by
+  //                     TowerPerks.applyTo, before the placement is counted,
+  //                     and never moved again -- selling this one does not hand
+  //                     the title to the next
+  this.firstTierBought = false;
+  this.wavesOpened = 0;
+
   this.targeting = "first";
 
   // Recruits (B5). They live on the tower rather than in a global list, so
@@ -455,6 +478,16 @@ Soldier.ENTRENCH_RANGE_MULT = 1.25;
 Soldier.ENTRENCH_RATE_MULT = 1.25;
 Soldier.ENTRENCH_DAMAGE_TAKEN_MULT = 0.75;
 
+// THE SAME 25 THE THREE ABOVE ARE, WRITTEN ONCE AND IN POINTS (2026-09-01).
+//
+// Deep Stakes moves all three together and Entrenched Ammunition moves one of
+// them back, so the three have to be resolvable rather than constant -- and
+// they are +25%, +25% and -25%, which is one number said three ways. The three
+// multipliers above are KEPT and are still the fallback a recruit born without
+// resolved stats uses (see the SoldierRecruit constructor), so nothing that
+// reads them had to change.
+Soldier.ENTRENCH_POINTS = 25;
+
 // Where a recruit's shot leaves its rifle, in u.l. forward of the body. Same
 // derivation as the tower's -- the Blender muzzle in world units times 30.58 --
 // off tools/blender/summon_recruit.py. B4's carbine is short and mended; B5
@@ -530,9 +563,15 @@ Soldier.prototype.recalcStats = function () {
   //   projectileSpeedMult   how fast this tower's rounds fly. Reach is NOT
   //                         derived from it -- a faster bullet is a bullet that
   //                         arrives sooner, not one that goes further
-  //   rhythmStartMult / rhythmPerKill / rhythmKillCap
+  //   rhythmStartMult / rhythmPerKill / rhythmEarnedCap
   //                         Veteran Rhythm: the penalty a wave opens on, what
-  //                         one kill buys back, and how many kills count
+  //                         one kill buys back, and the CEILING on what kills
+  //                         may buy back -- in the same units as the per-kill
+  //                         gain, not in kills. It was a kill COUNT until
+  //                         2026-09-01 and the two are identical at 2 points a
+  //                         kill (6 x 0.02 = 0.12); Decorated Ceiling raises the
+  //                         ceiling and Campaign Tempo raises the per-kill gain,
+  //                         and only a cap in points can hold both honestly
   this.fireRateMult = 1;
   this.burstEarlyShotMult = 1;
   this.burstFinalShotMult = 1;
@@ -546,7 +585,69 @@ Soldier.prototype.recalcStats = function () {
   this.projectileSpeedMult = 1;
   this.rhythmStartMult = 1;
   this.rhythmPerKill = 0;
-  this.rhythmKillCap = 0;
+  this.rhythmEarnedCap = 0;
+
+  // --- and what the UPGRADE-SQUARED nodes write (2026-09-01) ----------------
+  //
+  // NEUTRAL EXACTLY AS THE BLOCK ABOVE IS, and for the same contract: a
+  // Rifleman whose squares are all at rank 0 -- or whose parents are on the
+  // bench -- resolves the identical numbers it did before this system existed.
+  // Every one of them is folded into a real stat by `afterPerks()`, which runs
+  // last and derives rather than accumulates.
+  //
+  //   drumShotFlatDamage   FLAT damage added to the ONE shot Overloaded Drum
+  //                        created -- the last of the burst. Reinforced Spring
+  //                        and Series Ammunition both write it, and they sum
+  //   ratchetGainPoints    percentage POINTS added to Ratchet Pressure's
+  //                        completed-burst reward (Hard Ratchet, Polished
+  //                        Wheel). Points rather than a multiplier so two nodes
+  //                        can move the same number without either knowing the
+  //                        other's rank
+  //   ratchetLossPoints    the same, for the failed-burst penalty
+  //   recruitHpPoints      percentage POINTS of a recruit's maximum health,
+  //                        summed across Rapid Muster, Medical Selection and
+  //                        Reinforced Contracts and applied ONCE. See the note
+  //                        on afterPerks: percentage points compose by summing,
+  //                        which is what "-10 then +6" being -4 means
+  //   recruitHpFirstPoints the same, but only on the first Rifleman placed
+  //                        (Salvage Conscription)
+  //   recruitDeploySeconds one delay added to the WHOLE recruit group before
+  //                        its stagger, so the spacing inside the group is
+  //                        unchanged
+  //   piercingRatePenaltyPoints  Piercing Orders' fire-rate penalty, in points,
+  //                        deepened by Carbide Tip. Folded into fireRateMult
+  //                        and recruitShotsPerSecond together
+  //   entrenchRangePoints / entrenchRatePoints / entrenchDamageCutPoints
+  //                        points ON TOP of the base 25 a dug-in recruit gets.
+  //                        Deep Stakes adds to all three; Entrenched Ammunition
+  //                        takes range back off, and the order is a sum so it
+  //                        cannot depend on which slot each sits in
+  //   recruitEntrenchArmorPierce  extra FLAT armor a recruit ignores WHILE dug
+  //                        in, and only while dug in
+  //   recruitCooldownEntrenchExtra  seconds Deep Stakes adds to the recruit
+  //                        cooldown, on top of whichever absolute the pair rule
+  //                        resolved
+  //   firstTierDiscount    mana off this Rifleman's FIRST completed tier
+  //                        purchase (Sorted Parts)
+  //
+  // First Deployment is NOT in this list. Its reach is a `when` group keyed on
+  // `firstDeploymentActive`, which is DERIVED (see the getter below) rather
+  // than resolved -- it has to be readable before the perk pass and correct
+  // without one, because the build ghost asks the same question about a tower
+  // that does not exist yet.
+  this.drumShotFlatDamage = 0;
+  this.ratchetGainPoints = 0;
+  this.ratchetLossPoints = 0;
+  this.recruitHpPoints = 0;
+  this.recruitHpFirstPoints = 0;
+  this.recruitDeploySeconds = 0;
+  this.piercingRatePenaltyPoints = 0;
+  this.entrenchRangePoints = 0;
+  this.entrenchRatePoints = 0;
+  this.entrenchDamageCutPoints = 0;
+  this.recruitEntrenchArmorPierce = 0;
+  this.recruitCooldownEntrenchExtra = 0;
+  this.firstTierDiscount = 0;
 
   // The base recruit, before B5's boost. Resolved here rather than read from
   // the constants at spawn time so that a recruit is handed finished numbers and
@@ -639,10 +740,110 @@ Soldier.prototype.recalcStats = function () {
   }
 };
 
+// THE TOWER'S OWN LAST WORD, called by js/systems/tower-perks.js after every
+// perk pass and after every one of the squares (2026-09-01).
+//
+// WHY ANY OF THIS IS HERE RATHER THAN IN THE EFFECTS VOCABULARY. Four of the
+// numbers an upgrade-squared node moves are shared by two nodes that must not
+// know each other's rank -- Ratchet Pressure's two outcomes, the recruit's
+// health, Piercing Orders' rate penalty and the dug-in bonuses -- and the
+// vocabulary's `set` is last-writer-wins, which would let one silently erase
+// the other. So each of those is accumulated as PERCENTAGE POINTS by plain
+// `add`, which is commutative and therefore free of slot order, and folded into
+// the real stat exactly once, here.
+//
+// IT MUST BE IDEMPOTENT and it is: `recalcStats` has already rebuilt every
+// stat from the base and zeroed every points field, and the perk pass has
+// re-collected them, so this derives rather than accumulates. It runs on every
+// restat, including the two a hover causes.
+Soldier.prototype.afterPerks = function () {
+  // RATCHET PRESSURE'S TWO OUTCOMES. `ratchetGain` is a multiplier BELOW one
+  // (a shorter cycle) and `ratchetLoss` one above it, so the reward's points
+  // come off and the failure's points go on. Untouched when the parent is not
+  // equipped: both are 1 and both point totals are 0.
+  if (this.ratchetGainPoints) this.ratchetGain -= this.ratchetGainPoints / 100;
+  if (this.ratchetLossPoints) this.ratchetLoss += this.ratchetLossPoints / 100;
+
+  // PIERCING ORDERS' RATE PENALTY, on the tower and its recruits together --
+  // one statement rather than the two multipliers it used to be, because
+  // Carbide Tip deepens it and a second multiplier could not be composed with
+  // the first without knowing its rank.
+  if (this.piercingRatePenaltyPoints) {
+    var slower = 1 - this.piercingRatePenaltyPoints / 100;
+    this.fireRateMult *= slower;
+    this.recruitShotsPerSecond *= slower;
+  }
+
+  // A RECRUIT'S HEALTH, ONCE, FROM THE SUM OF EVERY POINT MOVING IT. Rapid
+  // Muster's -10 and Reinforced Contracts' +6 are -4 and not x0.9 x1.06, which
+  // is what "compose as percentage-point modifiers" means and is the only
+  // reading under which Medical Selection can state its penalty as `10 - rank`.
+  //
+  // Salvage Conscription's points are on the FIRST Rifleman placed and nobody
+  // else, so they are added here rather than in the effects block -- the block
+  // cannot see which body it is landing on.
+  var hpPoints = this.recruitHpPoints +
+    (this.perkFirstOfType ? this.recruitHpFirstPoints : 0);
+  if (hpPoints) this.recruitHp = this.recruitHp * (1 + hpPoints / 100);
+};
+
+// HOW MANY OPENED WAVES FIRST DEPLOYMENT LASTS FOR. Three, and the bonus is
+// gone at the OPENING OF THE FOURTH -- which is why `wavesOpened` counts
+// openings rather than endings.
+//
+// THE TEST IS `<=` AND NOT `<`, and the off-by-one is worth the sentence: the
+// count reaches 1 as the tower's FIRST wave opens, so it is 3 all through the
+// third wave and only becomes 4 when the fourth is announced. A `<` would have
+// switched the bonus off at the start of the third wave, which is two waves and
+// not three. A tower placed between waves sits at 0 and is inside the window
+// waiting for its first, which is the same answer the build ghost gives.
+Soldier.FIRST_DEPLOYMENT_WAVES = 3;
+
+// IS FIRST DEPLOYMENT'S WINDOW OPEN? A DERIVED PROPERTY AND NOT A STAT, which
+// is the whole reason it is a getter.
+//
+// `applyEffects` reads a `when` group's field straight off the tower, and it
+// does that BEFORE `afterPerks` and sometimes without a `recalcStats` in front
+// of it -- `TowerPerks.applyTo` folds the perks in directly as a tower joins
+// the board. A plain field written in `recalcStats` would therefore be one pass
+// stale exactly at placement, which is the one moment this bonus is supposed to
+// be live. Derived, it is right whenever it is asked and there is no ordering
+// to remember.
+//
+// It is also the same question the BUILD GHOST asks about a tower that does not
+// exist yet -- `previewRangePx` answers it from the placement tally -- so the
+// ring the player is shown while choosing a spot is the ring the placed tower
+// gets, which is that function's whole promise.
+Object.defineProperty(Soldier.prototype, "firstDeploymentActive", {
+  get: function () {
+    return !!this.perkFirstOfType &&
+      this.wavesOpened <= Soldier.FIRST_DEPLOYMENT_WAVES;
+  }
+});
+
+// A wave has OPENED with this tower on the board. Called from beginWave in
+// js/game.js -- the one place a wave is announced -- and from `addTower` for a
+// tower placed into a wave already running, because that wave has opened with
+// it on the board too. It is the mirror of `onWaveBoundary` at the other end.
+Soldier.prototype.onWaveStart = function () {
+  var was = this.firstDeploymentActive;
+  this.wavesOpened++;
+  // REACH IS A RESOLVED STAT, so the wave that closes the window has to make
+  // the tower resolve it again -- otherwise the bonus would still be on the
+  // number until the next tier was bought. Only when the answer actually
+  // changed, so an ordinary Rifleman pays nothing for this on any wave.
+  if (was !== this.firstDeploymentActive) this.recalcStats();
+};
+
 // The resolved numbers and visual tier a recruit is born with, as one object.
 // It exists so
 // callRecruits, the panel button and the hover card all read one resolution of
 // them rather than three copies of the same lookups.
+//
+// THE DUG-IN NUMBERS ARE RESOLVED HERE TOO (2026-09-01) and handed over with
+// the rest, for exactly the reason the note below this one gives: a recruit
+// already in the road keeps what it was called with, so a Deep Stakes bought
+// between two squads improves the next one and not the one already standing.
 Soldier.prototype.recruitStats = function () {
   return {
     count: this.recruitCount,
@@ -653,7 +854,12 @@ Soldier.prototype.recruitStats = function () {
     speedUlps: Soldier.RECRUIT_SPEED_ULPS,
     cooldownSeconds: this.resolvedRecruitCooldown(),
     armorPierce: this.recruitArmorPierce,
+    entrenchArmorPierce: this.recruitEntrenchArmorPierce,
     entrenchSeconds: this.recruitEntrenchSeconds,
+    entrenchRangeMult: 1 + (Soldier.ENTRENCH_POINTS + this.entrenchRangePoints) / 100,
+    entrenchRateMult: 1 + (Soldier.ENTRENCH_POINTS + this.entrenchRatePoints) / 100,
+    entrenchDamageTakenMult:
+      1 - (Soldier.ENTRENCH_POINTS + this.entrenchDamageCutPoints) / 100,
     visualTier: this.recruitVisualTier
   };
 };
@@ -675,9 +881,15 @@ Soldier.prototype.recruitStats = function () {
 Soldier.prototype.resolvedRecruitCooldown = function () {
   var rapid = this.recruitCooldownRapid;
   var dug = this.recruitCooldownEntrench;
-  if (rapid > 0 && dug > 0) return this.recruitCooldownSeconds;
+  // DEEP STAKES' SECONDS GO ON WHATEVER THE PAIR RULE ANSWERED, which is what
+  // makes its two stated tables -- 55 + 0.5r alone, 45 + 0.5r beside Rapid
+  // Muster -- one line rather than two cases. Only Entrenchment Protocol can be
+  // carrying them: the extra is zero unless that node is equipped, because it
+  // is the parent of the node that writes it.
+  var extra = dug > 0 ? this.recruitCooldownEntrenchExtra : 0;
+  if (rapid > 0 && dug > 0) return this.recruitCooldownSeconds + extra;
   if (rapid > 0) return rapid;
-  if (dug > 0) return dug;
+  if (dug > 0) return dug + extra;
   return this.recruitCooldownSeconds;
 };
 
@@ -700,9 +912,16 @@ Soldier.prototype.fireRateScale = function () {
 // to its owner" count exactly once -- there is only ever one number to move.
 Soldier.prototype.rhythmMult = function () {
   if (this.rhythmStartMult === 1 && this.rhythmPerKill === 0) return 1;
-  var earned = Math.max(0, (this.kills || 0) - this.rhythmKillBase);
-  if (this.rhythmKillCap > 0) earned = Math.min(earned, this.rhythmKillCap);
-  return this.rhythmStartMult + this.rhythmPerKill * earned;
+  var kills = Math.max(0, (this.kills || 0) - this.rhythmKillBase);
+  // THE CEILING IS ON WHAT WAS EARNED, NOT ON HOW MANY KILLS EARNED IT
+  // (2026-09-01). Identical at the authored rate -- six kills at 2 points is
+  // the same 12 points either way -- and the only form that survives Campaign
+  // Tempo raising the per-kill gain and Decorated Ceiling raising the ceiling:
+  // a cap counted in KILLS would have let 2.45 a kill reach +14.7 while the
+  // node says +12, and would have stopped a raised ceiling being reachable.
+  var earned = this.rhythmPerKill * kills;
+  if (this.rhythmEarnedCap > 0) earned = Math.min(earned, this.rhythmEarnedCap);
+  return this.rhythmStartMult + earned;
 };
 
 // A wave has ended. Veteran Rhythm's stacks are per-wave, so the baseline moves
@@ -748,9 +967,23 @@ Soldier.prototype.nextUpgrade = function (branch) {
   return null;
 };
 
+// SORTED PARTS DISCOUNTS EXACTLY ONE TIER ON THIS BODY, and it is applied here
+// -- inside the tower's own price -- so that every reader of a tier price gets
+// it without being told: the panel button, the hover card, the affordability
+// check in `buyUpgrade`, the till and the `totalSpent` a sale refunds half of.
+// js/systems/tower-perks.js wraps this to add the surcharges and floors the sum
+// at zero, so a discount can reach the minimum and never below it.
+//
+// ASKING IS FREE. The discount is spent by `applyUpgrade`, which only a
+// completed purchase reaches -- a hover, a preview, a refusal or a cancelled
+// click all read the discounted price and leave it standing.
 Soldier.prototype.upgradeCost = function (id) {
   var u = Soldier.upgradeById(id);
-  return u ? u.cost : 0;
+  var cost = u ? u.cost : 0;
+  if (!this.firstTierBought && this.firstTierDiscount > 0) {
+    cost -= this.firstTierDiscount;
+  }
+  return cost;
 };
 
 // null if this upgrade may be bought, otherwise a short human-readable reason.
@@ -962,7 +1195,12 @@ Soldier.prototype.applyUpgrade = function (id) {
   var maxHpBefore = this.maxHp;
 
   this["has" + id] = true;
+  // The price INCLUDING the discount, read before it is spent, so a sale
+  // refunds half of what was actually paid.
   this.totalSpent += this.upgradeCost(id);
+  // AND THE DISCOUNT IS GONE. One completed purchase per body, whether it was
+  // an A1 or a B1 -- the node says "the first tier", not "the first A tier".
+  this.firstTierBought = true;
   this.recalcStats();
 
   // A health tier GRANTS ITS DELTA rather than healing to the new maximum.
@@ -1092,8 +1330,17 @@ Soldier.prototype.update = function (dt, enemies, bullets) {
       // A burst that ends early promotes nobody: if the last shot has nothing
       // to shoot at it is not fired, so the doubling is simply not collected
       // and the earlier shots keep the reduction they already paid.
-      this.fire(shotTarget, bullets, this.burstShotsLeft === 1
-        ? this.burstFinalShotMult : this.burstEarlyShotMult);
+      //
+      // REINFORCED SPRING'S FLAT DAMAGE LANDS ON THE SAME SHOT, and only when
+      // Overloaded Drum is actually granting one: the shot it created is the
+      // shot the burst now owes LAST, which is number six at A5 and number five
+      // at A3. `hasA3` is the gate the parent itself uses, so the two can never
+      // disagree about whether there is an extra shot to pay for; an automatic
+      // Rifleman never reaches this line at all.
+      var last = this.burstShotsLeft === 1;
+      this.fire(shotTarget, bullets,
+        last ? this.burstFinalShotMult : this.burstEarlyShotMult,
+        (last && this.hasA3) ? this.drumShotFlatDamage : 0);
     } else {
       this.burstMissed++;
     }
@@ -1201,13 +1448,22 @@ Soldier.prototype.muzzle = function () {
 // makes the last round of a burst worth double and the ones before it worth a
 // tenth less, and nothing about the tower has changed between them. Absent on
 // every other call site, which is what keeps an unperked shot byte-for-byte
-// what it always was.
-Soldier.prototype.fire = function (target, bullets, damageMult) {
+// what it always was. `flatAdd` is the same idea for a flat amount -- Reinforced
+// Spring pays it to the one round Overloaded Drum created and to no other.
+Soldier.prototype.fire = function (target, bullets, damageMult, flatAdd) {
   var muzzle = this.muzzle();
   var reach = ul(muzzle.forward);
   var muzzleX = this.x + Math.cos(this.aim) * reach;
   var muzzleY = this.y + Math.sin(this.aim) * reach;
-  var damage = this.damage * (typeof damageMult === "number" ? damageMult : 1);
+  // `flatAdd` IS PART OF THE ROUND'S RAW DAMAGE AND GOES IN BEFORE THE
+  // MULTIPLIER, which is what "before ordinary shot multipliers" means: at
+  // Breach Chamber a +6 on the last round of the burst is doubled with the rest
+  // of it. It reaches the enemy through the ordinary Bullet, so mitigation
+  // applies to the total exactly as it does to any other shot. Absent on every
+  // other call site, so an unperked round is byte-for-byte what it was.
+  var flat = typeof flatAdd === "number" ? flatAdd : 0;
+  var damage = (this.damage + flat) *
+    (typeof damageMult === "number" ? damageMult : 1);
 
   // An ordinary homing Bullet, identical to the gunner's, which is what claims
   // its damage on the target and credits the kill back to this tower. The last
@@ -1277,9 +1533,15 @@ Soldier.prototype.callRecruits = function () {
   // special case for the first one: recruit 0 is due in 0 s, recruit 1 in
   // 0.25 s, and updateRecruits() deploys each when its timer runs out. The
   // count is the TOWER's, not the constant -- B5 sends four.
+  //
+  // SALVAGE CONSCRIPTION DELAYS THE WHOLE GROUP AND NOT THE SPACING INSIDE IT.
+  // The delay is added to every timer equally, so recruit 1 still follows
+  // recruit 0 by exactly the stagger and the squad arrives late as a squad.
+  // Zero unless that node is owned with both its parents equipped.
   this.recruitPending = [];
   for (var i = 0; i < this.recruitCount; i++) {
-    this.recruitPending.push(i * Soldier.RECRUIT_STAGGER_SECONDS);
+    this.recruitPending.push(
+      this.recruitDeploySeconds + i * Soldier.RECRUIT_STAGGER_SECONDS);
   }
   return null;
 };
@@ -2099,12 +2361,13 @@ SoldierRecruit.prototype.update = function (dt, enemies, bullets) {
     ? SoldierRecruit.MUZZLE_B5_UL : SoldierRecruit.MUZZLE_B4_UL);
   var shot = new Bullet(this.x + Math.cos(this.facing) * reach,
     this.y + Math.sin(this.facing) * reach, target, this.stats.damage,
-    null, this.owner, 0, this.stats.armorPierce || 0);
+    null, this.owner, 0, this.resolvedArmorPierce());
   shot.liftUl = SoldierRecruit.MUZZLE_HEIGHT_UL;
   shot.shotBody = this.visualTier === "B5" ? "recruit-b5" : "recruit-b4";
   bullets.push(shot);
   var rate = this.stats.shotsPerSecond *
-    (this.entrenched ? Soldier.ENTRENCH_RATE_MULT : 1);
+    (this.entrenched
+      ? (this.stats.entrenchRateMult || Soldier.ENTRENCH_RATE_MULT) : 1);
   this.cooldown = rate > 0 ? 1 / rate : Infinity;
   return landed;
 };
@@ -2118,10 +2381,27 @@ SoldierRecruit.prototype.updateEntrenchment = function () {
   var dug = seconds > 0 && this.holding && this.holdTime >= seconds;
   if (dug === this.entrenched) return;
   this.entrenched = dug;
-  this.rangePx = ul(this.rangeUl) * (dug ? Soldier.ENTRENCH_RANGE_MULT : 1);
+  // THE THREE NUMBERS ARE THE SQUAD'S, NOT THE CONSTANTS'. Deep Stakes moves
+  // all three and Entrenched Ammunition takes range back off, and both were
+  // resolved by the parent at the moment this recruit was called -- so a body
+  // already in the road keeps what it was born with. The constants are the
+  // fallback for a recruit built without resolved stats.
+  this.rangePx = ul(this.rangeUl) *
+    (dug ? (this.stats.entrenchRangeMult || Soldier.ENTRENCH_RANGE_MULT) : 1);
   // Read by SummonContact when an enemy walks through it -- the third of the
   // three things digging in buys, and the only one that is not this file's.
-  this.damageTakenMult = dug ? Soldier.ENTRENCH_DAMAGE_TAKEN_MULT : 1;
+  this.damageTakenMult = dug
+    ? (this.stats.entrenchDamageTakenMult || Soldier.ENTRENCH_DAMAGE_TAKEN_MULT) : 1;
+};
+
+// THE FLAT ARMOR THIS RECRUIT'S NEXT ROUND IGNORES. Piercing Orders' points are
+// always there; Entrenched Ammunition's are there only while it is dug in, and
+// go the instant it takes a step -- `updateEntrenchment` clears `entrenched` in
+// the same frame a recruit starts moving, so nothing has to expire them.
+SoldierRecruit.prototype.resolvedArmorPierce = function () {
+  var base = this.stats.armorPierce || 0;
+  if (!this.entrenched) return base;
+  return base + (this.stats.entrenchArmorPierce || 0);
 };
 
 // Is the cursor over this recruit? Padded exactly like an enemy's hover test

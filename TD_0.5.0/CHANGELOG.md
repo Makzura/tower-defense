@@ -13,6 +13,89 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — Upgrade²: the Rifleman's twenty-two ranked nodes.**
+
+A THIRD KIND OF UPGRADE. The A/B/C tiers are mana, in a run, on one body. A
+PERK is meta coins, permanent, and occupies one of five loadout slots. An
+UPGRADE² is meta coins and permanent too, and differs in exactly three ways: it
+has RANKS bought one at a time, it never occupies a slot, and it belongs to one
+permanent upgrade and applies only while that upgrade is EQUIPPED. Bought and
+dormant is an ordinary state, not an error — the ranks stay in the save and the
+node simply contributes nothing that run.
+
+Twenty-two nodes, all on the Rifleman, all the owner's own numbers, in the new
+`js/perks/soldier-upgrades2.js`. It registers against the same `towerId` as
+`soldier-perks.js`; `register` now merges by key rather than replacing, so
+either half may be registered alone and the tag order does not matter.
+
+**Four FUSIONS, and a fusion needs BOTH parents equipped**: Series Ammunition,
+Salvage Conscription, Officer Supply and Entrenched Ammunition. Each also
+carries two rank prerequisites, and a half-met one is SHOWN as half met —
+`requirementsOf` never short-circuits, the card prints the satisfied one beside
+the missing one, and the tree lights the arm that is paid for. It stays locked
+until both are there, and the refusal names only what is short.
+
+**A price is the price of THAT RANK, never a cumulative total.** Five curves
+(S3, S5, X3, X5, H5), each used unaltered. `effectsAt(rank)` returns the
+RESOLVED effect at that rank rather than an increment, which is what lets
+Terminal Charge and Battery Setup be written as the tables they are.
+`activeEffects` puts every square AFTER every equipped perk, and that order is
+load-bearing: `set` is last-writer-wins and three squares exist precisely to
+REPLACE a value their parent set.
+
+**`ranks` in the save, and the migration is an ABSENT KEY.** A profile written
+before today reads rank 0 everywhere and resolves exactly what it did
+yesterday. No version stamp, nothing to rewrite. A rank of 0 is never stored,
+because absence is the one spelling of "not bought"; the MAXIMUM rank is tree
+content and is clamped by `TowerPerks.rankOf`, so a profile carrying a rank this
+build has retuned away still holds its number and comes back if the node does.
+`buyRank` refuses anything but `have + 1`, so a double click cannot buy two.
+
+**A reset refunds every rank at what that rank cost and charges ten for a ranked
+node whatever rank it holds** — the owner's rule, so `removed` is a count of
+keys and never a sum. The one-hour cooldown is untouched.
+
+**`mulAfter` joined the effect vocabulary**, between `add` and `addRate`: "5% of
+the range this tower actually reached" is not "5% of its base range", and on the
+Rifleman that is 141.25 against 138. Like `preAdd` it is a POSITION IN THE
+ARITHMETIC and not a fourth category, and `previewStat` folds it in the same
+place so the build ghost keeps its promise — the ring the player is shown while
+choosing a spot is the ring the placed tower gets, First Deployment included.
+
+**Three PARENT nodes were rewritten at identical numbers**, and that is the
+paragraph worth keeping. `mul: { recruitHp: 0.9 }` became
+`add: { recruitHpPoints: -10 }`; Piercing Orders' `set` and two `mul`s became
+three `add`s; Veteran Rhythm's `rhythmKillCap: 6` became `rhythmEarnedCap: 0.12`.
+Each is the same figure said differently, and each had to change form for the
+same reason: two nodes now move the same value and must not know each other's
+rank. `set` is last-writer-wins, so a square landing on `armorPierce` would have
+been erased by the node it is supposed to improve; a second rate multiplier
+could not be composed with the first without knowing its rank; and a ceiling
+counted in KILLS cannot hold both a raised per-kill gain and a raised ceiling.
+Percentage POINTS sum, so slot order cannot change a result. The suite did not
+move a single figure across the rewrite, which is the evidence the forms are
+equal.
+
+**First Deployment's window is DERIVED, never stored.**
+`Soldier.firstDeploymentActive` is a prototype getter, because `applyEffects`
+reads a `when` group's field before `afterPerks` and sometimes without a
+`recalcStats` in front of it — a plain field would have been one pass stale
+exactly at placement, which is the one moment the bonus is meant to be live.
+`wavesOpened` counts wave OPENINGS: `beginWave` now tells every tower, and
+`addTower` tells one placed into a running wave, so the bonus survives the gaps
+between its three waves and is gone the instant the fourth is announced. The
+test is `<= 3` and not `< 3`, and the off-by-one is worth the line: the count
+reaches 1 as the FIRST wave opens.
+
+`perkFirstOfType` is stamped by `applyTo` before `notePlacement` counts the
+placement, so it is the same instant `priceOf` uses to pick between `firstAdd`
+and `laterAdd`. It is a property of the BODY and never of the board: selling the
+first Rifleman does not hand the title to the next one.
+
+Twenty-six tests added, content.test.js 440 → 466, and the ci-check baseline
+tightened in the same commit. Nothing was weakened or removed, and no existing
+name changed its claim.
+
 **2026-08-31 — The folder is in two halves: `jeu/` and `dev/`.**
 
 Owner: separate what is needed to play from what is not, and keep both in the
