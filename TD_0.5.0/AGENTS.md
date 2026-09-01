@@ -4825,11 +4825,26 @@ What a player asks a module is three questions, so the card answers three:
    the same call gives with every rank forced to zero**. Green means "an upgrade
    moved this" and nothing else on the card is green;
 3. **what moved them** — every square under the module, by rank, as
-   `label base → now`.
+   `label +delta`. **The row is the CHANGE, not both sides of it**: `−10% →
+   −5%` is written `+5%`, which is the number being bought and half the width.
+   The signed change is what a player reads a purchase in, whichever way the
+   underlying figure moves.
 
 **Block 3 is DERIVED, so no square describes itself twice.** A square's effect
 is measured by resolving the PARENT's stats twice — once with that square's rank
-and once without — and printing the rows that differ. It is measured from where
+and once without — and printing the rows that differ, as a delta: the NUMBERS in
+the two rendered values are paired off positionally, subtracted, and given back
+their surrounding text, so `+8% speed, +5% range` against `+12% speed, +9% range`
+is `+4% speed, +4% range`. **A clause that did not move is dropped** — `3
+recruits, +200 mana` against `3 recruits, +230 mana` is `+30 mana`, because the
+three was never what changed and repeating it in a delta row invites it to be
+read as one.
+
+A value with no number in it, or one whose WORDING changes between ranks rather
+than its figures, falls back to `before → after` — longer, but never wrong. An
+authored `stats` should not be taking that path for anything numeric, so every
+value states its figure at every rank even when it is zero (`+0 s late`, not
+"on time"), and a test asserts no row carrying a digit falls back. It is measured from where
 everything else stands, which is what makes the row answer the question actually
 being asked: what would I lose if I un-bought this one? A square added later is
 covered with nothing changed in the drawing.

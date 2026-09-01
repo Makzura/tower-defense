@@ -185,7 +185,7 @@ TowerPerks.register({
         var so = 5 * r("rifleman_cheap_sorted_parts");
         return [
           { label: "placement", value: "250 mana" },
-          { label: "first tier bought", value: so ? ("−" + so + " mana") : "unchanged" }
+          { label: "first tier bought", value: "−" + so + " mana" }
         ];
       },
       effects: { price: { add: -50 } }
@@ -218,8 +218,7 @@ TowerPerks.register({
         return [
           { label: "first Rifleman", value: "−" + (100 + 10 * a) + " mana" },
           { label: "each one after", value: "+" + (40 + 4 * a) + " mana" },
-          { label: "the first reaches", value: d ? ("+" + (5 * d) + "% for 3 waves")
-                                                 : "unchanged" }
+          { label: "the first reaches", value: "+" + (5 * d) + "% for 3 waves" }
         ];
       },
       effects: { price: { firstAdd: -100, laterAdd: 40 } }
@@ -360,10 +359,12 @@ TowerPerks.register({
         return [
           { label: "B4", value: "3 recruits, +" + (200 + 10 * c) + " mana" },
           { label: "B5", value: "5 recruits, +" + (350 + 15 * c) + " mana" },
-          { label: "recruit health", value: "+" + (2 * c) + "%" +
-            (sa ? (", +" + (2 * sa) + "% on the first Rifleman") : "") },
-          { label: "squad arrives", value: sa ? ("+" + (15 * sa / 100) + " s late")
-                                              : "on time" }
+          // BOTH CLAUSES ALWAYS, even at zero. A value whose WORDING changes
+          // with the rank cannot be diffed into a delta and falls back to
+          // "before → after", which is twice as long to say the same thing.
+          { label: "recruit health", value: "+" + (2 * c) + "%, +" + (2 * sa) +
+            "% on the first Rifleman" },
+          { label: "squad arrives", value: "+" + (15 * sa / 100) + " s late" }
         ];
       },
       effects: {

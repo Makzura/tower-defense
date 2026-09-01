@@ -13,6 +13,27 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — An upgrade's row is the change, not both sides of it.**
+
+Owner: in a module's upgrade rows don't show what it changes FROM, only how
+much -- not "−10hp → −5hp", just "+5hp".
+
+The rows now subtract. The NUMBERS in the two rendered values are paired off
+positionally, subtracted, and given back their surrounding text: "+8% speed, +5%
+range" against "+12% speed, +9% range" is "+4% speed, +4% range", and "×2.00"
+against "×2.50" is "+0.5". A clause that did not move is DROPPED -- "3 recruits,
++200 mana" against "3 recruits, +230 mana" is "+30 mana", because the three was
+never what changed and repeating it in a delta row invites it to be read as one.
+
+Four authored values were reworded to state their figure at every rank even when
+it is zero -- "+0 s late" rather than "on time", "5 charges" rather than "every
+charge". A value whose WORDING changes with the rank cannot be subtracted and
+falls back to "before → after", which is honest but twice the width to say one
+number. The fallback is kept for the one thing that genuinely has no number to
+subtract -- Clause de restitution's "unspent, it returns no → yes" -- and a test
+asserts that no row carrying a DIGIT takes that path, on every square of every
+tree, so a future `stats` cannot quietly revert to the long form.
+
 **2026-09-01 — A module's card, cut down to three blocks.**
 
 Owner: way too much written in each description -- it should be a very short

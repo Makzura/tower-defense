@@ -1711,12 +1711,17 @@ var Upgrades = (function () {
     });
   }
 
-  // WHAT ONE SQUARE IS DOING TO THIS MODULE, as `label base → now` rows.
+  // WHAT ONE SQUARE IS DOING TO THIS MODULE, as `label +delta` rows.
   //
   // Derived rather than authored: the parent's stats are resolved with this
   // square held at one rank and then at another, and the rows that differ are
   // the answer. A bought square is measured from 0 to its rank -- what it HAS
   // done; an unbought one from 0 to 1 -- what its first rank WOULD do.
+  //
+  // **THE ROW IS THE CHANGE, NOT BOTH SIDES OF IT** (2026-09-01, at the owner's
+  // word: "don't show −10hp → −5hp, just show +5hp"). Restating the before and
+  // the after doubled the width of every row to say one number twice, and the
+  // number a player wants is the one they are buying.
   function squareRows(node, sqId, from, to) {
     function at(rank) {
       return statsWith(node, function (id) {
@@ -1728,9 +1733,54 @@ var Upgrades = (function () {
     var out = [];
     for (var i = 0; i < b.length; i++) {
       if (!a[i] || a[i].value === b[i].value) continue;
-      out.push(b[i].label + " " + a[i].value + " → " + b[i].value);
+      out.push(b[i].label + " " + deltaText(a[i].value, b[i].value));
     }
     return out;
+  }
+
+  // THE SIGNED CHANGE BETWEEN TWO RENDERED VALUES.
+  //
+  // Both come from one template with different numbers in it, so this pairs the
+  // NUMBERS off positionally, subtracts, and keeps whatever text surrounded
+  // them: "+8% speed, +5% range" against "+12% speed, +9% range" is "+4% speed,
+  // +4% range", and "−10%" against "−5%" is "+5%" -- which is the direction a
+  // player reads a purchase in, whichever way the underlying figure moves.
+  //
+  // A CLAUSE THAT DID NOT MOVE IS DROPPED. "3 recruits, +200 mana" against "3
+  // recruits, +230 mana" is "+30 mana" and not "3 recruits, +30 mana": the
+  // three was never what changed, and repeating it in a delta row invites it to
+  // be read as one.
+  //
+  // ANYTHING THIS CANNOT PARSE FALLS BACK TO `base → now`, which is longer but
+  // never wrong. A value with no number in it, or one whose wording changes
+  // between ranks rather than its figures, takes that path.
+  var NUMBER = /[+\-−]?\d+(?:\.\d+)?/;
+
+  function deltaText(base, now) {
+    var was = String(base).split(", "), is = String(now).split(", ");
+    if (was.length !== is.length) return base + " → " + now;
+    var out = [];
+    for (var i = 0; i < is.length; i++) {
+      if (was[i] === is[i]) continue;                  // this clause held still
+      var one = deltaClause(was[i], is[i]);
+      if (one === null) return base + " → " + now;
+      out.push(one);
+    }
+    return out.length ? out.join(", ") : (base + " → " + now);
+  }
+
+  function deltaClause(was, is) {
+    var a = was.match(NUMBER), b = is.match(NUMBER);
+    if (!a || !b) return null;
+    var from = parseFloat(a[0].replace("−", "-"));
+    var to = parseFloat(b[0].replace("−", "-"));
+    if (!isFinite(from) || !isFinite(to)) return null;
+
+    var at = is.indexOf(b[0]);
+    var head = is.slice(0, at).replace(/×$/, "");      // a multiplier's sign is its delta
+    var tail = is.slice(at + b[0].length);
+    var d = Math.round((to - from) * 1000) / 1000;
+    return head + (d >= 0 ? "+" : "−") + Math.abs(d) + tail;
   }
 
   // Every square under this module, with its rank and what it moves.

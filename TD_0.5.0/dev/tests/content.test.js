@@ -16328,13 +16328,11 @@ function (t) {
   var inv = ups.filter(function (u) { return u.rank === 4; })[0];
   t.ok(!!inv, "Inventaire catalogué is at rank 4");
   t.eq(inv.active, true, "and is applying");
-  // MEASURED FROM WHERE EVERYTHING ELSE STANDS, which is what makes the row
-  // answer the question a player is really asking: what would I lose if I
-  // un-bought THIS square? The surcharge reads 18 → 22 rather than 20 → 22
-  // because Tolérance logistique is holding two ranks of it down either way.
-  t.deep(inv.rows, ["first of a type −60 mana → −72 mana",
-                    "each one after +18 mana → +22 mana"],
-    "stated as without-it → with-it, on the rows it actually moves");
+  // **THE ROW IS THE CHANGE, NOT BOTH SIDES OF IT.** Four ranks of Inventaire
+  // are three mana of discount and one of surcharge each -- so −12 and +4, and
+  // not "−60 mana → −72 mana", which is twice the width to say one number.
+  t.deep(inv.rows, ["first of a type −12 mana", "each one after +4 mana"],
+    "stated as the signed change, on the rows it actually moves");
 
   // AN UNBOUGHT SQUARE IS STILL LISTED, showing what its FIRST rank would do.
   h.run("MetaProgress.debugPatch({ player: (function () {" +
@@ -16345,8 +16343,8 @@ function (t) {
   var offer = h.run("Upgrades.improvedBy('player_intendant_diversified_arsenal')")
     .filter(function (u) { return u.rank === 0; })[0];
   t.ok(!!offer, "the unbought one is listed rather than hidden");
-  t.deep(offer.rows, ["each one after +24 mana → +23 mana"],
-    "showing what rank 1 would do from where the module stands now");
+  t.deep(offer.rows, ["each one after −1 mana"],
+    "showing what its FIRST rank would give, as a change");
 
   // AND THE SAME THREE BLOCKS ANSWER FOR A TOWER'S PERK.
   h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0);" +
@@ -16364,8 +16362,31 @@ function (t) {
     "and only the one Terminal Charge moved is green");
   var tc = h.run("Upgrades.improvedBy('rif_a2')")
     .filter(function (u) { return u.rank === 3; })[0];
-  t.deep(tc.rows, ["final shot ×2.00 → ×2.50"],
+  t.deep(tc.rows, ["final shot +0.5"],
     "with the square's contribution derived, not authored twice");
+
+  // **A NUMBER ALWAYS BECOMES A DELTA.** The `before → after` fallback exists
+  // and is honest -- a yes/no has nothing to subtract, and "unspent, it returns
+  // no → yes" is the clearest thing to say about one -- but no row carrying a
+  // FIGURE may take that path, because it is twice the width to say one number.
+  // Every square on every tree is checked, which is what stops an authored
+  // `stats` quietly reverting to the long form by wording a value differently
+  // at different ranks.
+  var wordy = h.run("(function () { var out = [];" +
+    "  function scan(ids) { ids.forEach(function (nodeId) {" +
+    "    Upgrades.improvedBy(nodeId).forEach(function (u) {" +
+    "      u.rows.forEach(function (row) {" +
+    "        if (row.indexOf('→') !== -1 && /[0-9]/.test(row))" +
+    "          out.push(nodeId + ' / ' + u.id + ': ' + row);" +
+    "      }); }); }); }" +
+    "  Upgrades.selectTower('player');" +
+    "  scan(PlayerPerks.modules().map(function (m) { return m.id; }));" +
+    "  TowerPerks.towersWithTrees().forEach(function (t) {" +
+    "    Upgrades.selectTower(t);" +
+    "    scan(TowerPerks.nodes(t).map(function (n) { return n.id; })); });" +
+    "  return out; })()");
+  t.deep(wordy, [],
+    "every square that moves a NUMBER states it as a delta, never as before → after");
 
   // A MODULE NOTHING IMPROVES LISTS NOTHING.
   var bare = h.run("(function () {" +

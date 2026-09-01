@@ -676,8 +676,8 @@
           return [
             { label: "per charge", value: pct(c) + " damage" },
             { label: "at five charges", value: pct(c * 5) },
-            { label: "a loss takes", value: keep ? ((5 - keep) + " charges")
-                                                 : "every charge" }
+            // ALWAYS A NUMBER: "every charge" cannot be diffed into a delta.
+            { label: "a loss takes", value: (5 - keep) + " charges" }
           ];
         },
       },
