@@ -946,7 +946,13 @@ var BASELINE = [
     // Player could not be reached at all. Found by playing, not by the suite --
     // the new name clicks every row where it is drawn and asserts what it
     // selects, and asserts the seven-slot band and its 2 + level opening.
-    file: "tests/content.test.js", pass: 489, fail: 0,
+    // ---- 490 on 2026-09-01, "improved by" on a module's card -------------
+    // 489 -> 490: one added. A module's card now lists every upgrade-squared
+    // node under it and what each is contributing, with only the ones actually
+    // APPLYING marked -- an unbought one is still listed, and is not dimmed for
+    // being unbought. The new name asserts the three states (applying, dormant,
+    // unbought) are told apart, for a Player module and for a tower's perk.
+    file: "tests/content.test.js", pass: 490, fail: 0,
     failing: []
   },
   {

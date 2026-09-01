@@ -16273,6 +16273,75 @@ function (t) {
   t.ok(true, "which draws without throwing");
 });
 
+test("a module's card lists what improves it, and marks only what is applying",
+function (t) {
+  var h = bootPlayer();
+  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); MetaProgress.addPlayerXp(20000);" +
+        "MetaProgress.buyModule('player_intendant_diversified_arsenal', 0);" +
+        "MetaProgress.buyModule('player_scrapper', 0)");
+  setPlayerRanks(h, { player_intendant_catalogued_inventory: 3,
+                      player_scrapper_recovery_team: 4 });
+  h.run("MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
+  h.run("Upgrades.open(); Upgrades.selectTower('player')");
+
+  var rows = h.run("Upgrades.improvedBy('player_intendant_diversified_arsenal')");
+  t.eq(rows.length, 2, "Intendant is improved by two squares");
+
+  // **AN UNBOUGHT ONE IS STILL LISTED.** Hiding it would answer "what improves
+  // this?" with "nothing", which is the question the card exists to answer.
+  var bought = rows.filter(function (r) { return r.rank > 0; })[0];
+  var unbought = rows.filter(function (r) { return r.rank === 0; })[0];
+  t.ok(!!unbought, "including the one that has not been bought");
+  t.eq(unbought.maxRank, 5, "with its rank ceiling");
+  t.ok(unbought.text.indexOf("rank 1 would give") === 0,
+    "and what its FIRST rank would give: " + unbought.text);
+
+  // **APPLYING IS THE ONLY THING MARKED.** Bought AND its module equipped.
+  t.eq(bought.rank, 3, "the bought one is at rank 3");
+  t.eq(bought.active, true, "and is applying");
+  t.eq(bought.dormant, false, "so it is not dormant");
+  t.eq(unbought.active, false, "the unbought one is not applying");
+  t.eq(unbought.dormant, false,
+    "and is NOT called dormant — unbought is a different thing from dormant");
+
+  // A MODULE ON THE BENCH MAKES ITS SQUARES DORMANT, not unbought.
+  var idle = h.run("Upgrades.improvedBy('player_scrapper')");
+  var ranked = idle.filter(function (r) { return r.rank > 0; })[0];
+  t.eq(ranked.rank, 4, "Ferrailleur's square is at rank 4");
+  t.eq(ranked.active, false, "and is not applying, because Ferrailleur is in no slot");
+  t.eq(ranked.dormant, true, "which is dormant rather than unbought");
+
+  // AND THE SAME BLOCK ANSWERS FOR A TOWER'S PERK.
+  h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0);" +
+        "MetaProgress.buyNode('soldier', 'rif_a2', 0);" +
+        "MetaProgress.addXp('soldier', 20000);" +
+        "MetaProgress.buyRank('soldier', 'rifleman_breach_terminal_charge', 0, 1);" +
+        "MetaProgress.equipPerk('soldier', 'rif_a2', 0)");
+  h.run("Upgrades.selectTower('soldier')");
+  var breach = h.run("Upgrades.improvedBy('rif_a2')");
+  t.eq(breach.length, 2, "Breach Chamber is improved by two squares");
+  t.eq(breach.filter(function (r) { return r.active; }).length, 1,
+    "one of which is applying");
+
+  // A MODULE NOTHING IMPROVES LISTS NOTHING, rather than an empty heading. Every
+  // one of the Rifleman's twelve has a square under it, so this asks a tower
+  // whose tree has none at all -- which is five of the six today.
+  var bare = h.run("(function () {" +
+    "  var ids = TowerPerks.towersWithTrees();" +
+    "  for (var i = 0; i < ids.length; i++) {" +
+    "    if (TowerPerks.upgrades2(ids[i]).length) continue;" +
+    "    var n = TowerPerks.nodes(ids[i]);" +
+    "    if (n.length) return { tower: ids[i], node: n[0].id }; }" +
+    "  return null; })()");
+  t.ok(bare !== null, "a tower with a tree and no squares exists");
+  h.run("Upgrades.selectTower('" + bare.tower + "')");
+  t.deep(h.run("Upgrades.improvedBy('" + bare.node + "')"), [],
+    "and a node with no squares under it lists none");
+
+  h.run("Upgrades.draw(ctx)");
+  t.ok(true, "the card draws with the block on it");
+});
+
 test("the Player levels on the wave budget alone, and a defeat keeps it",
 function (t) {
   var h = bootPlayer();

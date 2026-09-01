@@ -13,6 +13,34 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — A module's card says what improves it.**
+
+Owner: add what upgrades affect a module and how, and do not grey one out for
+being unpurchased -- only for not currently applying.
+
+Under the equipped line a module's card now lists every upgrade-squared node
+whose parent it is, with its rank and what it is contributing. The figures come
+from the content file's own `valueAt`, so there is no second copy of any of them
+here and a retune moves the card with the effect. The tree card carries the same
+block, capped at three rows because the buy button is under it.
+
+**AN UNBOUGHT ONE IS STILL LISTED AND IS NOT DIMMED FOR BEING UNBOUGHT.** Hiding
+it, or greying it to the point of being unreadable, would answer "what improves
+this?" with "nothing" -- which is exactly the question a player reading the card
+is asking, and the one it could not answer before. For an unbought square the
+line reads what its FIRST rank would give, so it is an offer rather than a gap.
+
+**Dim means "not applying right now" and only that**, and the two ways of not
+applying are told apart in words as well as in colour: a rank of zero, and a
+square that is owned while the module it improves sits in no slot. The heading
+counts them -- `IMPROVED BY 2 · 1 APPLYING`, or `NONE APPLYING`.
+
+Two things fixed while in there: a Player module's card said "NEEDS TOWER LEVEL
+0" (it has no level gate -- it needs a free slot, which is what a Player level
+buys), and the line under the name printed the band a module is grouped under,
+so "Intendant" sat under a heading reading INTENDANT and said the same word
+twice. It prints the module's own subtitle when it has one.
+
 **2026-09-01 — The cheat panel knows about the Player, and the zoom reaches the
 whole tree.**
 

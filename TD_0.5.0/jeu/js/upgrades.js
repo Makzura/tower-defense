@@ -1665,6 +1665,78 @@ var Upgrades = (function () {
   // the module `readingNode` answers -- a hover when nothing is pinned, the
   // pinned one otherwise -- and the BUTTON is drawn only for a pinned one, so
   // moving the cursor over the list cannot arm an action.
+  // --- WHAT IMPROVES THIS MODULE, AND BY HOW MUCH ----------------------------
+  //
+  // Every upgrade² whose parent is this node, whether it is bought or not.
+  //
+  // **AN UNBOUGHT ONE IS STILL LISTED, AND IS NOT DIMMED FOR BEING UNBOUGHT**
+  // (2026-09-01, at the owner's word). Hiding it, or greying it to the point of
+  // being unreadable, would answer "what improves this?" with "nothing" -- which
+  // is exactly the question a player reading a module card is asking, and the
+  // one the card could not answer before. What it shows for an unbought one is
+  // what its FIRST rank would give, so the line is an offer rather than a
+  // gap.
+  //
+  // **DIM MEANS "NOT APPLYING RIGHT NOW", and only that.** Two things are not
+  // applying: a rank of zero, and a square that is owned while the module it
+  // improves sits in no slot. Both are stated in words as well as in colour, so
+  // the distinction never rests on a shade.
+  function improvedBy(node) {
+    if (!node) return [];
+    var equipped = E().equipped().indexOf(node.id) !== -1;
+    return E().squares().filter(function (sq) {
+      return sq.parent === node.id;
+    }).map(function (sq) {
+      var rank = E().rankOf(sq.id);
+      var max = sq.maxRank || 0;
+      var active = rank > 0 && equipped;
+      return {
+        node: sq, rank: rank, maxRank: max,
+        active: active,
+        dormant: rank > 0 && !equipped,
+        // WHAT IT IS DOING, or what it WOULD do. Both come from the content
+        // file's own `valueAt`, so a retune moves this line with the effect and
+        // there is no second copy of any figure here.
+        text: rank > 0 ? valueText(sq, rank)
+                       : ("rank 1 would give " + valueText(sq, 1))
+      };
+    });
+  }
+
+  // The block itself, drawn from `y` and answering how far it got. Shared by
+  // the inventory card and the tree card, so the two cannot describe the same
+  // module differently.
+  function drawImprovedBy(x, y, width, node, maxRows) {
+    var list = improvedBy(node);
+    if (!list.length) return y;
+
+    var live = list.filter(function (r) { return r.active; }).length;
+    ctx.font = "10px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.85)";
+    drawMenuText("IMPROVED BY " + list.length +
+      (live ? ("   ·   " + live + " APPLYING") : "   ·   NONE APPLYING"),
+      x, y, 1.3);
+    y += 17;
+
+    list.slice(0, maxRows || list.length).forEach(function (row) {
+      ctx.font = "600 11px system-ui, sans-serif";
+      ctx.fillStyle = row.active ? "rgba(" + ASH_LEY + ",0.95)"
+        : row.dormant ? "rgba(" + ASH_EMBER + ",0.85)"
+        : "rgba(" + ASH_BONE + ",0.8)";
+      ctx.fillText(fitText(ctx, (row.active ? "✓ " : "· ") + row.node.name +
+        "   " + row.rank + " / " + row.maxRank, width), x + 6, y);
+      y += 14;
+
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = row.active ? "rgba(" + ASH_BONE + ",0.85)"
+                                 : "rgba(" + ASH_DUST + ",0.75)";
+      y += wrapLeft(row.dormant
+        ? (row.text + "  —  dormant, this module is in no slot")
+        : row.text, x + 16, y, width - 16, 13, 3) * 13 + 5;
+    });
+    return y;
+  }
+
   function drawPerkDetail() {
     var d = perkDetailRect();
     drawAshPlate(d, { live: 0.18, cut: 16 });
@@ -1697,7 +1769,12 @@ var Upgrades = (function () {
     // THE BRANCH IT CAME OFF, in the same words the list groups by.
     ctx.font = "9px " + MENU_TECH_FONT;
     ctx.fillStyle = "rgba(" + ASH_DUST + ",0.7)";
-    drawMenuText(BRANCH_LABEL[branchOf(selected, node)], d.x + 60, d.y + 48, 1.4);
+    // THE MODULE'S OWN SUBTITLE WHEN IT HAS ONE, and the band it is grouped
+    // under otherwise. Three of the Player's roots ARE their band -- "Intendant"
+    // sitting under a heading reading INTENDANT said the same word twice and
+    // told the reader nothing.
+    drawMenuText((node.subtitle || BRANCH_LABEL[E().branchOf(node)]).toUpperCase(),
+      d.x + 60, d.y + 48, 1.4);
 
     var y = d.y + 78;
     ctx.font = "12px system-ui, sans-serif";
@@ -1712,10 +1789,18 @@ var Upgrades = (function () {
     ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.9)";
     drawMenuText("COST " + (node.cost || 0) + " \u2b21   ·   OWNED", d.x + 20, y, 1.3);
     y += 20;
+    // A TOWER'S NODE STATES ITS LEVEL GATE EITHER WAY; A PLAYER MODULE HAS
+    // NONE, so it says what it does need instead -- a slot to sit in, which is
+    // the thing a Player level actually buys. Same rule the tree card follows.
     ctx.fillStyle = "rgba(" + ASH_LEY + ",0.8)";
-    drawMenuText(node.minLevel
-      ? "NEEDS TOWER LEVEL " + node.minLevel
-      : "NEEDS TOWER LEVEL 0", d.x + 20, y, 1.3);
+    if (isPlayerSelected()) {
+      drawMenuText("NEEDS A FREE SLOT  ·  " + E().openSlots() + " OF " +
+        E().slotCount() + " OPEN", d.x + 20, y, 1.3);
+    } else {
+      drawMenuText(node.minLevel
+        ? "NEEDS TOWER LEVEL " + node.minLevel
+        : "NEEDS TOWER LEVEL 0", d.x + 20, y, 1.3);
+    }
     y += 20;
 
     ctx.fillStyle = equippedAt !== -1
@@ -1725,12 +1810,14 @@ var Upgrades = (function () {
       : "IN THE INVENTORY, DOING NOTHING", d.x + 20, y, 1.3);
     y += 24;
 
+    y = drawImprovedBy(d.x + 20, y, d.w - 40, node);
+
     // AN UNEQUIPPED MODULE CHANGES NOTHING AT ALL, said once where it matters.
     if (equippedAt === -1) {
       ctx.font = "11px system-ui, sans-serif";
       ctx.fillStyle = "rgba(" + ASH_DUST + ",0.6)";
       wrapLeft("Owning it is not using it — a module only affects a run while " +
-        "it is in one of this tower's slots.", d.x + 20, y, d.w - 40, 14, 3);
+        "it is in one of its slots.", d.x + 20, y, d.w - 40, 14, 3);
     }
 
     var button = perkActionRect();
@@ -2183,6 +2270,11 @@ var Upgrades = (function () {
       });
     }
 
+    // AND WHAT IMPROVES IT, in the same words the inventory card uses. Capped at
+    // three rows here: this card is shorter and the buy button is under it, so a
+    // module with four squares shows three and the inventory card shows them all.
+    y = drawImprovedBy(d.x + 20, y + 4, d.w - 40, treeNode, 3);
+
     // WHY IT IS DARK, in the node's own words. The same sentence the refusal
     // returns, so the panel and the click can never say different things.
     if (info.reason) {
@@ -2479,6 +2571,15 @@ var Upgrades = (function () {
       return hit ? { id: hit.node.id, kind: hit.kind } : null;
     },
     resetNodeCount: function () { return selected ? E().resetCount() : 0; },
+    // What the "IMPROVED BY" block on a module's card is listing, as data --
+    // so a test can assert what the card says without reading pixels.
+    improvedBy: function (nodeId) {
+      var node = selected ? E().nodeOf(nodeId) : null;
+      return improvedBy(node).map(function (row) {
+        return { id: row.node.id, rank: row.rank, maxRank: row.maxRank,
+                 active: row.active, dormant: row.dormant, text: row.text };
+      });
+    },
     state: function () {
       return {
         selected: selected, flash: flash, node: treeNode ? treeNode.id : null,

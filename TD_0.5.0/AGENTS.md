@@ -4811,6 +4811,20 @@ holds an equipped module. The pinned module is lit green in its slot as well, so
 the strip reads as belonging to the module rather than to whichever slot the
 cursor is near.
 
+**A MODULE'S CARD SAYS WHAT IMPROVES IT** (2026-09-01). Under the equipped line
+it lists every upgrade² whose parent is that module, with its rank and what it
+is contributing — read from the content file's own `valueAt`, so a retune moves
+the card with the effect. `IMPROVED BY 2 · 1 APPLYING` heads it, and the tree
+card carries the same block capped at three rows.
+
+**An unbought one is still listed and is NOT dimmed for being unbought.** Hiding
+it would answer "what improves this?" with "nothing", which is the question the
+card exists to answer; it shows what its FIRST rank would give instead, so the
+line is an offer rather than a gap. **Dim means "not applying right now" and
+only that**, and the two ways of not applying are stated in words as well as in
+colour: a rank of zero, and a square that is owned while the module it improves
+sits in no slot (`dormant`).
+
 **Dragging still works and is how a player picks WHICH slot** — a module dropped
 on a slot goes there, one dragged from a slot back onto the list comes out — and
 a drop that lands nowhere legal puts the module back and says why.
