@@ -194,12 +194,15 @@
           out.firstTowerDiscount += 60;
           out.laterTowerSurcharge += 20;
         },
-        valueOf: function (r) {
-          return "first of a type −" + (60 + 3 * r("player_intendant_catalogued_inventory")) +
-                 " mana · every later one +" +
-                 (20 + r("player_intendant_catalogued_inventory") -
-                       r("player_intendant_logistics_tolerance")) + " mana";
-        }
+        short: "The first tower of each type is cheaper; the rest cost more.",
+        stats: function (r) {
+          var inv = r("player_intendant_catalogued_inventory");
+          return [
+            { label: "first of a type", value: "−" + (60 + 3 * inv) + " mana" },
+            { label: "each one after", value: "+" +
+              (20 + inv - r("player_intendant_logistics_tolerance")) + " mana" }
+          ];
+        },
       },
 
       {
@@ -218,12 +221,15 @@
           out.startingManaBonus += 250;
           out.fixedWaveRewardPenaltyPct += 8;
         },
-        valueOf: function (r) {
-          return "+" + (250 + 20 * r("player_treasury_larger_advance")) +
-                 " starting mana · wave rewards " +
-                 pct(-(8 + 0.75 * r("player_treasury_larger_advance") -
-                           0.4 * r("player_treasury_soft_amortization")));
-        }
+        short: "More mana to open with, smaller wave payouts.",
+        stats: function (r) {
+          var a = r("player_treasury_larger_advance");
+          return [
+            { label: "starting mana", value: "+" + (250 + 20 * a) },
+            { label: "wave rewards", value: pct(-(8 + 0.75 * a -
+              0.4 * r("player_treasury_soft_amortization"))) }
+          ];
+        },
       },
 
       // A CREDIT LINE, AND THE POINT OF IT IS THAT IT STOPS EVERYTHING. Going
@@ -246,12 +252,16 @@
           out.debtLimit += 300;
           out.debtInterestPct += 15;
         },
-        valueOf: function (r) {
-          return "down to −" + (300 + 40 * r("player_credit_extended_line")) +
-                 " mana · interest " +
-                 round(15 + r("player_credit_extended_line") -
-                            0.5 * r("player_credit_refinancing")) + "% a wave";
-        }
+        short: "Overdraw once; nothing may be bought until you are back at zero.",
+        stats: function (r) {
+          return [
+            { label: "debt floor", value: "−" +
+              (300 + 40 * r("player_credit_extended_line")) + " mana" },
+            { label: "interest a wave", value: round(15 +
+              r("player_credit_extended_line") -
+              0.5 * r("player_credit_refinancing")) + "%" }
+          ];
+        },
       },
 
       // DESTRUCTION IS NOT A SALE, and the whole node turns on the difference:
@@ -273,12 +283,15 @@
           out.destroyRefundPct += 50;
           out.towerHpPenaltyPct += 15;
         },
-        valueOf: function (r) {
-          return round(50 + 2 * r("player_scrapper_recovery_team")) +
-                 "% back on destruction · tower health " +
-                 pct(-(15 + r("player_scrapper_recovery_team") -
-                            0.5 * r("player_scrapper_recycled_bracing")));
-        }
+        short: "A destroyed tower pays back; every tower is frailer.",
+        stats: function (r) {
+          var t = r("player_scrapper_recovery_team");
+          return [
+            { label: "destroyed refund", value: (50 + 2 * t) + "%" },
+            { label: "tower health", value: pct(-(15 + t -
+              0.5 * r("player_scrapper_recycled_bracing"))) }
+          ];
+        },
       },
 
       // PROXIMITY, AND BOTH HALVES CAN BE TRUE AT ONCE. A tower beside one of
@@ -302,13 +315,15 @@
           out.archDifferentBonusPct += 5;
           out.archSamePenaltyPct += 3;
         },
-        valueOf: function (r) {
-          return "different neighbour " +
-                 pct(5 + 0.5 * r("player_architect_dense_network")) +
-                 " · same neighbour " +
-                 pct(-(3 + 0.25 * r("player_architect_dense_network") -
-                           0.25 * r("player_architect_tolerant_connectors")));
-        }
+        short: "Faster beside a different type, slower beside its own. 70 u.l.",
+        stats: function (r) {
+          var d = r("player_architect_dense_network");
+          return [
+            { label: "different neighbour", value: pct(5 + 0.5 * d) + " fire rate" },
+            { label: "same neighbour", value: pct(-(3 + 0.25 * d -
+              0.25 * r("player_architect_tolerant_connectors"))) + " fire rate" }
+          ];
+        },
       },
 
       {
@@ -326,13 +341,15 @@
           out.footprintPenaltyPct += 10;
           out.towerHpPenaltyPct += 15;
         },
-        valueOf: function (r) {
-          return "footprint " +
-                 pct(-(10 + r("player_compact_tighter_template"))) +
-                 " · health " +
-                 pct(-(15 + 0.75 * r("player_compact_tighter_template") -
-                           0.5 * r("player_compact_internal_bracing")));
-        }
+        short: "Towers stand closer together, and break sooner.",
+        stats: function (r) {
+          var g = r("player_compact_tighter_template");
+          return [
+            { label: "footprint", value: pct(-(10 + g)) },
+            { label: "tower health", value: pct(-(15 + 0.75 * g -
+              0.5 * r("player_compact_internal_bracing"))) }
+          ];
+        },
       },
 
       {
@@ -352,14 +369,16 @@
           out.sharedCapPct += 5;
           out.duplicateSurchargePct += 2;
         },
-        valueOf: function (r) {
-          return "+" + round(1 + 0.1 * r("player_arsenal_combined_doctrine")) +
-                 "% a live type, cap +" +
-                 round(5 + 0.5 * r("player_arsenal_combined_doctrine")) +
-                 "% · duplicate placement +" +
-                 round(2 + 0.2 * r("player_arsenal_combined_doctrine") -
-                           0.2 * r("player_arsenal_secondary_licenses")) + "%";
-        }
+        short: "Damage for every live type; a duplicate costs more to place.",
+        stats: function (r) {
+          var d = r("player_arsenal_combined_doctrine");
+          return [
+            { label: "per live type", value: pct(1 + 0.1 * d) + " damage" },
+            { label: "cap", value: pct(5 + 0.5 * d) },
+            { label: "duplicate placement", value: pct(2 + 0.2 * d -
+              0.2 * r("player_arsenal_secondary_licenses")) }
+          ];
+        },
       },
 
       {
@@ -378,12 +397,15 @@
           out.isolatedBonusPct += 10;
           out.crowdedPenaltyPct += 5;
         },
-        valueOf: function (r) {
-          return "alone " + pct(10 + 0.75 * r("player_operators_prepared_solitude")) +
-                 " range · crowded " +
-                 pct(-(5 + 0.25 * r("player_operators_prepared_solitude") -
-                           0.4 * r("player_operators_measured_coexistence")));
-        }
+        short: "Longer reach alone, shorter with a neighbour. 70 u.l.",
+        stats: function (r) {
+          var s2 = r("player_operators_prepared_solitude");
+          return [
+            { label: "alone", value: pct(10 + 0.75 * s2) + " range" },
+            { label: "with a neighbour", value: pct(-(5 + 0.25 * s2 -
+              0.4 * r("player_operators_measured_coexistence"))) + " range" }
+          ];
+        },
       },
 
       // --- COMMANDANT -----------------------------------------------------
@@ -407,13 +429,16 @@
           out.markCooldownSeconds += 25;
           out.markDamagePenaltyPct += 5;
         },
-        valueOf: function (r) {
-          return "mark " + round(5 + 0.4 * r("player_commander_extended_signal")) +
-                 " s · damage on it " +
-                 pct(-(5 + 0.25 * r("player_commander_extended_signal") -
-                           0.25 * r("player_commander_rules_of_engagement"))) +
-                 " · 25 s cooldown";
-        }
+        short: "Mark an enemy: every tower that can reach it shoots it first.",
+        stats: function (r) {
+          var g = r("player_commander_extended_signal");
+          return [
+            { label: "mark lasts", value: round(5 + 0.4 * g) + " s" },
+            { label: "damage on it", value: pct(-(5 + 0.25 * g -
+              0.25 * r("player_commander_rules_of_engagement"))) },
+            { label: "cooldown", value: "25 s" }
+          ];
+        },
       },
 
       {
@@ -433,11 +458,15 @@
           out.overdriveSeconds += 6;
           out.overdriveStunSeconds += 2.5;
         },
-        valueOf: function (r) {
-          return pct(30 + 3 * r("player_overdrive_redline")) + " fire rate for 6 s · stun " +
-                 round(2.5 + 0.15 * r("player_overdrive_redline") -
-                             0.1 * r("player_overdrive_disciplined_recovery")) + " s";
-        }
+        short: "One tower fires faster, then cannot act. Once a wave.",
+        stats: function (r) {
+          var l = r("player_overdrive_redline");
+          return [
+            { label: "fire rate", value: pct(30 + 3 * l) + " for 6 s" },
+            { label: "stun after", value: round(2.5 + 0.15 * l -
+              0.1 * r("player_overdrive_disciplined_recovery")) + " s" }
+          ];
+        },
       },
 
       {
@@ -457,11 +486,16 @@
           out.radarCooldownSeconds += 45;
           out.radarRangePenaltyPct += 3;
         },
-        valueOf: function (r) {
-          return round(8 + 0.8 * r("player_radar_long_echo")) + " s of sight · " +
-                 round(45 + 2 * r("player_radar_long_echo")) + " s cooldown · range " +
-                 pct(-Math.max(0, 3 - 0.25 * r("player_radar_calibrated_optics")));
-        }
+        short: "Every tower sees camo and flying for a moment; shorter reach always.",
+        stats: function (r) {
+          var e = r("player_radar_long_echo");
+          return [
+            { label: "sight", value: round(8 + 0.8 * e) + " s" },
+            { label: "cooldown", value: (45 + 2 * e) + " s" },
+            { label: "range, always", value: pct(-Math.max(0,
+              3 - 0.25 * r("player_radar_calibrated_optics"))) }
+          ];
+        },
       },
 
       {
@@ -479,10 +513,13 @@
           out.forecastWaves = Math.max(out.forecastWaves, 2);
           out.transitionSeconds = 2.5;
         },
-        valueOf: function (r) {
-          return (r("player_forecast_third_dossier") ? 3 : 2) +
-                 " waves shown · gap " + transitionText(r) + " s";
-        }
+        short: "Read the coming waves; less breathing room between them.",
+        stats: function (r) {
+          return [
+            { label: "waves shown", value: r("player_forecast_third_dossier") ? "3" : "2" },
+            { label: "gap between waves", value: transitionText(r) + " s" }
+          ];
+        },
       },
 
       // THE BEACON IS NOT A TOWER. It does not shoot, does not block, cannot be
@@ -506,13 +543,15 @@
           out.beaconRangePct += 5;
           out.beaconFarFireRatePenaltyPct += 2;
         },
-        valueOf: function (r) {
-          return "inside 90 u.l. " + pct(8 + r("player_beacon_amplified_signal")) +
-                 " speed, " + pct(5 + r("player_beacon_amplified_signal")) +
-                 " range · outside " +
-                 pct(-(2 + 0.25 * r("player_beacon_amplified_signal") -
-                           0.2 * r("player_beacon_directional_antenna"))) + " fire rate";
-        }
+        short: "One free beacon: better inside its 90 u.l., worse outside.",
+        stats: function (r) {
+          var a = r("player_beacon_amplified_signal");
+          return [
+            { label: "inside", value: pct(8 + a) + " speed, " + pct(5 + a) + " range" },
+            { label: "outside", value: pct(-(2 + 0.25 * a -
+              0.2 * r("player_beacon_directional_antenna"))) + " fire rate" }
+          ];
+        },
       },
 
       // --- GARDIEN --------------------------------------------------------
@@ -532,12 +571,15 @@
           out.baseHpBonus += 50;
           out.startingManaPenalty += 100;
         },
-        valueOf: function (r) {
-          return "+" + (50 + 5 * r("player_guardian_thick_wall")) +
-                 " base health · starting mana −" +
-                 round(100 + 8 * r("player_guardian_thick_wall") -
-                             5 * r("player_guardian_garrison_reserve"));
-        }
+        short: "A tougher base for a lighter purse.",
+        stats: function (r) {
+          var w = r("player_guardian_thick_wall");
+          return [
+            { label: "base health", value: "+" + (50 + 5 * w) },
+            { label: "starting mana", value: "−" + round(100 + 8 * w -
+              5 * r("player_guardian_garrison_reserve")) }
+          ];
+        },
       },
 
       {
@@ -554,9 +596,11 @@
         resolve: function (out) {
           out.firstLeakPct = Math.min(out.firstLeakPct, 50);
         },
-        valueOf: function (r) {
-          return "first leak of a wave costs " +
-                 (50 - 2 * r("player_breach_reinforced_gate")) + "% of its damage";
+        short: "The first leak of every wave costs the base less.",
+        stats: function (r) {
+          return [{ label: "first leak of a wave",
+                    value: (50 - 2 * r("player_breach_reinforced_gate")) +
+                           "% of its damage" }];
         }
       },
 
@@ -577,12 +621,16 @@
           out.shieldManaPerDamage += 25;
           out.shieldRewardPenaltyPct += 5;
         },
-        valueOf: function (r) {
-          return "absorbs up to " +
-                 (50 + 2 * r("player_shield_protective_capacitor")) + "% of a hit at " +
-                 (25 + r("player_shield_protective_capacitor") -
-                       r("player_shield_efficient_circuit")) + " mana a point";
-        }
+        short: "A toggle that buys off part of every hit with mana.",
+        stats: function (r) {
+          var c = r("player_shield_protective_capacitor");
+          return [
+            { label: "absorbs up to", value: (50 + 2 * c) + "% of a hit" },
+            { label: "cost", value: (25 + c -
+              r("player_shield_efficient_circuit")) + " mana a point" },
+            { label: "wave rewards", value: "−5%" }
+          ];
+        },
       },
 
       {
@@ -598,9 +646,11 @@
                 "a loss and keeps the streak.",
         downside: null,
         resolve: function (out) { out.noLeakBounty += 25; },
-        valueOf: function (r) {
-          return "+" + (25 + 5 * r("player_bounty_perfect_bonus")) +
-                 " mana at the start of the wave after a clean one";
+        short: "A wave that costs no health pays at the start of the next.",
+        stats: function (r) {
+          return [{ label: "after a clean wave",
+                    value: "+" + (25 + 5 * r("player_bounty_perfect_bonus")) +
+                           " mana" }];
         }
       },
 
@@ -619,13 +669,17 @@
           out.streakPerChargePct += 1;
           out.streakMaxCharges = Math.max(out.streakMaxCharges, 5);
         },
-        valueOf: function (r) {
-          var per = 1 + 0.2 * r("player_streak_victorious_cadence");
-          var cap = r("player_streak_insurance");
-          return round(per) + "% a charge, up to " + round(per * 5) + "% · " +
-                 (cap ? ("a loss takes at most " + (5 - cap) + " charges")
-                      : "a loss clears every charge");
-        }
+        short: "Clean waves stack damage; losing health spends them.",
+        stats: function (r) {
+          var c = 1 + 0.2 * r("player_streak_victorious_cadence");
+          var keep = r("player_streak_insurance");
+          return [
+            { label: "per charge", value: pct(c) + " damage" },
+            { label: "at five charges", value: pct(c * 5) },
+            { label: "a loss takes", value: keep ? ((5 - keep) + " charges")
+                                                 : "every charge" }
+          ];
+        },
       },
 
       // --- THE TWO FUSIONS ------------------------------------------------
@@ -649,12 +703,16 @@
           out.blitzHastePct += 3;
           out.blitzHasteSeconds = 8;
         },
-        valueOf: function (r) {
-          return "1 mana per " +
-                 round(2 - 0.05 * r("player_blitz_rushed_dividend")) + " s cut, cap 35 · haste " +
-                 pct(3 + 0.25 * r("player_blitz_rushed_dividend")) + " for " +
-                 round(8 - 0.4 * r("player_blitz_controlled_arrival")) + " s";
-        }
+        short: "Calling a wave in early pays, and hastens that wave.",
+        stats: function (r) {
+          var d = r("player_blitz_rushed_dividend");
+          return [
+            { label: "1 mana per", value: round(2 - 0.05 * d) + " s cut" },
+            { label: "cap", value: "35 mana" },
+            { label: "that wave", value: pct(3 + 0.25 * d) + " speed for " +
+              round(8 - 0.4 * r("player_blitz_controlled_arrival")) + " s" }
+          ];
+        },
       },
 
       {
@@ -675,12 +733,17 @@
           out.totemFireRatePct += 8;
           out.totemDeathDamage += 15;
         },
-        valueOf: function (r) {
-          return (100 - 8 * r("player_totem_war_idol") +
-                        12 * r("player_totem_consecrated_stone")) + " HP totem · " +
-                 pct(8 + r("player_totem_war_idol")) + " fire rate · death costs " +
-                 (15 + r("player_totem_consecrated_stone")) + " base health";
-        }
+        short: "A fragile totem hurries every tower. Its death hurts the base.",
+        stats: function (r) {
+          var i = r("player_totem_war_idol");
+          return [
+            { label: "totem health", value: String(100 - 8 * i +
+              12 * r("player_totem_consecrated_stone")) },
+            { label: "all towers", value: pct(8 + i) + " fire rate" },
+            { label: "its death costs", value: (15 +
+              r("player_totem_consecrated_stone")) + " base health" }
+          ];
+        },
       },
 
       // --- THE SECRET -----------------------------------------------------
@@ -711,12 +774,16 @@
         downside: "+25% on every in-run upgrade that tower buys, for the rest " +
                   "of the run. One tower a run, and never two tiers.",
         resolve: function (out) { out.permitUpgradeSurchargePct += 25; },
-        valueOf: function (r) {
-          return "one extra secondary tier · that tower's upgrades +" +
-                 (25 - 3 * r("player_crosspath_lighter_paperwork")) + "%" +
-                 (r("player_crosspath_restitution_clause")
-                   ? " · unspent, it comes back if the tower is lost" : "");
-        }
+        short: "One tower a run may buy one tier past the crosspath lock.",
+        stats: function (r) {
+          return [
+            { label: "extra tier", value: "1, on one tower" },
+            { label: "that tower's upgrades", value: "+" +
+              (25 - 3 * r("player_crosspath_lighter_paperwork")) + "%" },
+            { label: "unspent, it returns",
+              value: r("player_crosspath_restitution_clause") ? "yes" : "no" }
+          ];
+        },
       }
     ],
 

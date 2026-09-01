@@ -1665,105 +1665,81 @@ var Upgrades = (function () {
   // the module `readingNode` answers -- a hover when nothing is pinned, the
   // pinned one otherwise -- and the BUTTON is drawn only for a pinned one, so
   // moving the cursor over the list cannot arm an action.
-  // --- WHAT THIS MODULE IS WORTH RIGHT NOW -----------------------------------
+  // --- WHAT A MODULE'S CARD SAYS, AND NOTHING ELSE ---------------------------
   //
-  // A module's `blurb` is the authored sentence and it states the BASE numbers,
-  // which stop being true the moment a square under it is bought: Intendant
-  // reads "60 mana less" for the whole life of the profile even at Inventaire
-  // catalogué rank 5, where it is 75.
+  // THREE BLOCKS AND NO PROSE (2026-09-01, at the owner's word: "way too much
+  // written in each description"). A card had grown a four-line blurb, a
+  // resolved sentence, a cost line, a level line, an equipped line, a paragraph
+  // per square and a closing remark -- all of it true and almost none of it
+  // read. What a player actually asks a module is three questions:
   //
-  // So the card also prints the RESOLVED line, from the content file's own
-  // `valueOf(rankOf)` -- the same authored prose with the live ranks in it. It
-  // is computed twice, once with the real ranks and once with every rank forced
-  // to zero, and **the words that differ between the two are drawn green**.
-  // That is the whole readout: green is "an upgrade moved this number", and
-  // nothing else in the card is green.
+  //   1. what is this?          one line, authored as `short`
+  //   2. what does it do NOW?   the resolved stats, as label/value rows
+  //   3. what changes them?     the squares, by rank, as base → now
   //
-  // Comparing rendered text rather than fields is deliberate. Both strings come
-  // out of one template with different numbers, so a token-by-token diff marks
-  // exactly the figures that moved and needs no list of which field belongs to
-  // which phrase -- and a node that grows a new square is covered with nothing
-  // added here.
-  function resolvedLine(node) {
-    if (!node || typeof node.valueOf !== "function") return null;
-    var now, base;
-    try {
-      now = String(node.valueOf(function (id) { return E().rankOf(id); }));
-      base = String(node.valueOf(function () { return 0; }));
-    } catch (e) {
-      return null;                       // an author error must not blank a card
-    }
-    return { now: now, base: base, changed: now !== base };
+  // **GREEN IS "AN UPGRADE MOVED THIS" AND NOTHING ELSE IS GREEN.** A stat row
+  // is green when its value differs from the value the same `stats()` gives
+  // with every rank forced to zero.
+  //
+  // `stats(rankOf)` RETURNS DATA, not a sentence, and that is what makes block 3
+  // possible at all: a square's effect is DERIVED by resolving the parent's
+  // stats twice, once with that square's rank and once without, and printing
+  // the rows that differ. No square has to describe itself twice, and one added
+  // later is covered with nothing changed here.
+
+  function statsWith(node, rankFn) {
+    if (!node || typeof node.stats !== "function") return null;
+    try { return node.stats(rankFn); } catch (e) { return null; }
   }
 
-  // Draw `text`, wrapped, with every word that differs from `base` in green.
-  //
-  // The two strings come from one template, so they tokenise to the same
-  // length and the diff is positional. When they do not -- a `valueOf` that
-  // changes its wording rather than its numbers -- the whole line goes green,
-  // which is the honest fallback: something in it moved.
-  function drawDiffLine(text, base, x, y, width, lh, maxLines, plain) {
-    var words = String(text).split(" ");
-    var was = String(base).split(" ");
-    var aligned = words.length === was.length;
-    var line = [], drawn = 0;
+  function liveRank(id) { return E().rankOf(id); }
+  function zeroRank() { return 0; }
 
-    function flush() {
-      var cx = x;
-      for (var i = 0; i < line.length; i++) {
-        var changed = aligned ? (line[i].was !== line[i].word) : (text !== base);
-        ctx.fillStyle = changed ? "rgba(" + ASH_GO + ",0.95)" : plain;
-        ctx.fillText(line[i].word, cx, y + drawn * lh);
-        cx += ctx.measureText(line[i].word + " ").width;
-      }
-      drawn++;
-      line = [];
-    }
-
-    for (var i = 0; i < words.length && drawn < maxLines; i++) {
-      var next = line.map(function (t) { return t.word; }).concat(words[i]).join(" ");
-      if (ctx.measureText(next).width > width && line.length) flush();
-      if (drawn >= maxLines) break;
-      line.push({ word: words[i], was: aligned ? was[i] : null });
-    }
-    if (line.length && drawn < maxLines) flush();
-    return drawn;
+  // The stat rows as they resolve right now, each marked with whether an
+  // upgrade moved it off its base value.
+  function statRows(node) {
+    var now = statsWith(node, liveRank);
+    if (!now) return [];
+    var base = statsWith(node, zeroRank) || [];
+    return now.map(function (row, i) {
+      var was = base[i];
+      return {
+        label: row.label, value: row.value,
+        base: was ? was.value : null,
+        moved: !!was && was.value !== row.value
+      };
+    });
   }
 
-  // The block, drawn from `y` and answering how far it got. Nothing at all when
-  // the node states no resolved value -- an authored `valueOf` is what opts a
-  // module in, so a tree without them is unchanged.
-  function drawResolvedLine(x, y, width, node, maxLines) {
-    var v = resolvedLine(node);
-    if (!v) return y;
-    ctx.font = "10px " + MENU_TECH_FONT;
-    ctx.fillStyle = v.changed ? "rgba(" + ASH_GO + ",0.9)"
-                              : "rgba(" + ASH_DUST + ",0.8)";
-    drawMenuText(v.changed ? "RIGHT NOW   ·   GREEN IS WHAT AN UPGRADE MOVED"
-                           : "RIGHT NOW   ·   NOTHING HAS MOVED IT", x, y, 1.3);
-    y += 16;
-    ctx.font = "12px system-ui, sans-serif";
-    y += drawDiffLine(v.now, v.base, x, y, width, 16, maxLines || 4,
-      "rgba(" + ASH_BONE + ",0.9)") * 16 + 6;
-    return y;
+  // WHAT ONE SQUARE IS DOING TO THIS MODULE, as `label base → now` rows.
+  //
+  // Derived rather than authored: the parent's stats are resolved with this
+  // square held at one rank and then at another, and the rows that differ are
+  // the answer. A bought square is measured from 0 to its rank -- what it HAS
+  // done; an unbought one from 0 to 1 -- what its first rank WOULD do.
+  function squareRows(node, sqId, from, to) {
+    function at(rank) {
+      return statsWith(node, function (id) {
+        return id === sqId ? rank : liveRank(id);
+      });
+    }
+    var a = at(from), b = at(to);
+    if (!a || !b) return [];
+    var out = [];
+    for (var i = 0; i < b.length; i++) {
+      if (!a[i] || a[i].value === b[i].value) continue;
+      out.push(b[i].label + " " + a[i].value + " → " + b[i].value);
+    }
+    return out;
   }
 
-  // --- WHAT IMPROVES THIS MODULE, AND BY HOW MUCH ----------------------------
+  // Every square under this module, with its rank and what it moves.
   //
-  // Every upgrade² whose parent is this node, whether it is bought or not.
-  //
-  // **AN UNBOUGHT ONE IS STILL LISTED, AND IS NOT DIMMED FOR BEING UNBOUGHT**
-  // (2026-09-01, at the owner's word). Hiding it, or greying it to the point of
-  // being unreadable, would answer "what improves this?" with "nothing" -- which
-  // is exactly the question a player reading a module card is asking, and the
-  // one the card could not answer before. What it shows for an unbought one is
-  // what its FIRST rank would give, so the line is an offer rather than a
-  // gap.
-  //
-  // **DIM MEANS "NOT APPLYING RIGHT NOW", and only that.** Two things are not
-  // applying: a rank of zero, and a square that is owned while the module it
-  // improves sits in no slot. Both are stated in words as well as in colour, so
-  // the distinction never rests on a shade.
+  // AN UNBOUGHT ONE IS STILL LISTED and is not dimmed for being unbought:
+  // hiding it would answer "what changes this?" with "nothing", which is the
+  // question the block exists to answer. Dim means "not applying right now",
+  // and the two ways of not applying -- rank zero, and a module sitting in no
+  // slot -- are told apart in the row itself.
   function improvedBy(node) {
     if (!node) return [];
     var equipped = E().equipped().indexOf(node.id) !== -1;
@@ -1771,51 +1747,65 @@ var Upgrades = (function () {
       return sq.parent === node.id;
     }).map(function (sq) {
       var rank = E().rankOf(sq.id);
-      var max = sq.maxRank || 0;
-      var active = rank > 0 && equipped;
       return {
-        node: sq, rank: rank, maxRank: max,
-        active: active,
+        node: sq, rank: rank, maxRank: sq.maxRank || 0,
+        active: rank > 0 && equipped,
         dormant: rank > 0 && !equipped,
-        // WHAT IT IS DOING, or what it WOULD do. Both come from the content
-        // file's own `valueAt`, so a retune moves this line with the effect and
-        // there is no second copy of any figure here.
-        text: rank > 0 ? valueText(sq, rank)
-                       : ("rank 1 would give " + valueText(sq, 1))
+        rows: rank > 0 ? squareRows(node, sq.id, 0, rank)
+                       : squareRows(node, sq.id, 0, 1)
       };
     });
   }
 
-  // The block itself, drawn from `y` and answering how far it got. Shared by
-  // the inventory card and the tree card, so the two cannot describe the same
-  // module differently.
+  var STAT_LABEL_W = 128;
+
+  // Block 2: the stats, one row each, green where an upgrade moved the value.
+  function drawStatRows(x, y, width, node) {
+    var rows = statRows(node);
+    if (!rows.length) return y;
+    rows.forEach(function (row) {
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(" + ASH_DUST + ",0.8)";
+      ctx.fillText(fitText(ctx, row.label, STAT_LABEL_W), x, y);
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.fillStyle = row.moved ? "rgba(" + ASH_GO + ",0.98)"
+                                : "rgba(" + ASH_BONE + ",0.92)";
+      y += wrapLeft(row.value, x + STAT_LABEL_W + 8, y,
+        width - STAT_LABEL_W - 8, 15, 3) * 15 + 2;
+    });
+    return y + 6;
+  }
+
+  // Block 3: the squares, by rank, numerically.
   function drawImprovedBy(x, y, width, node, maxRows) {
     var list = improvedBy(node);
     if (!list.length) return y;
 
-    var live = list.filter(function (r) { return r.active; }).length;
-    ctx.font = "10px " + MENU_TECH_FONT;
-    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.85)";
-    drawMenuText("IMPROVED BY " + list.length +
-      (live ? ("   ·   " + live + " APPLYING") : "   ·   NONE APPLYING"),
-      x, y, 1.3);
-    y += 17;
+    ctx.font = "9px " + MENU_TECH_FONT;
+    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.7)";
+    drawMenuText("UPGRADES", x, y, 1.3);
+    y += 15;
 
+    // NAME OVER ROWS RATHER THAN BESIDE THEM. A two-column form was tighter for
+    // a short name and clipped "Antenne directionnelle 0/5" to "Antenne
+    // directionnelle 0..." -- and a truncated rank is worse than a line break.
+    // Stacked, the name never truncates and the rows get the card's full width,
+    // so they wrap less often and the block is usually no taller.
     list.slice(0, maxRows || list.length).forEach(function (row) {
       ctx.font = "600 11px system-ui, sans-serif";
-      ctx.fillStyle = row.active ? "rgba(" + ASH_LEY + ",0.95)"
+      ctx.fillStyle = row.active ? "rgba(" + ASH_GO + ",0.95)"
         : row.dormant ? "rgba(" + ASH_EMBER + ",0.85)"
-        : "rgba(" + ASH_BONE + ",0.8)";
-      ctx.fillText(fitText(ctx, (row.active ? "✓ " : "· ") + row.node.name +
-        "   " + row.rank + " / " + row.maxRank, width), x + 6, y);
+        : "rgba(" + ASH_BONE + ",0.75)";
+      ctx.fillText(fitText(ctx, row.node.name + "  " + row.rank + "/" +
+        row.maxRank + (row.dormant ? "  · dormant" : ""), width), x, y);
       y += 14;
 
       ctx.font = "11px system-ui, sans-serif";
-      ctx.fillStyle = row.active ? "rgba(" + ASH_BONE + ",0.85)"
-                                 : "rgba(" + ASH_DUST + ",0.75)";
-      y += wrapLeft(row.dormant
-        ? (row.text + "  —  dormant, this module is in no slot")
-        : row.text, x + 16, y, width - 16, 13, 3) * 13 + 5;
+      ctx.fillStyle = row.active ? "rgba(" + ASH_BONE + ",0.9)"
+                                 : "rgba(" + ASH_DUST + ",0.72)";
+      y += wrapLeft(row.rows.length ? row.rows.join("  ·  ")
+                                    : (row.rank ? "no change" : "not bought"),
+        x + 12, y, width - 12, 14, 3) * 14 + 5;
     });
     return y;
   }
@@ -1841,103 +1831,28 @@ var Upgrades = (function () {
     }
 
     var equippedAt = slotOf(node.id);
-    var pinned = detailNode === node.id;
 
-    sigil(node.id, d.x + 34, d.y + 36, 16,
+    sigil(node.id, d.x + 34, d.y + 34, 15,
       "rgba(" + (equippedAt !== -1 ? ASH_GO : ASH_EMBER) + ",0.95)", node.icon);
-    ctx.font = "17px " + MENU_DISPLAY_FONT;
+    ctx.font = "16px " + MENU_DISPLAY_FONT;
     ctx.fillStyle = "#f6d9b4";
-    drawMenuText(fitText(ctx, node.name.toUpperCase(), d.w - 96), d.x + 60, d.y + 26, 1.5);
+    drawMenuText(fitText(ctx, node.name.toUpperCase(), d.w - 92), d.x + 58, d.y + 25, 1.5);
 
-    // THE BRANCH IT CAME OFF, in the same words the list groups by.
-    ctx.font = "9px " + MENU_TECH_FONT;
-    ctx.fillStyle = "rgba(" + ASH_DUST + ",0.7)";
-    // THE MODULE'S OWN SUBTITLE WHEN IT HAS ONE, and the band it is grouped
-    // under otherwise. Three of the Player's roots ARE their band -- "Intendant"
-    // sitting under a heading reading INTENDANT said the same word twice and
-    // told the reader nothing.
-    drawMenuText((node.subtitle || BRANCH_LABEL[E().branchOf(node)]).toUpperCase(),
-      d.x + 60, d.y + 48, 1.4);
-
-    var y = d.y + 78;
+    // 1. WHAT IT IS, in one line. `short` is authored; the long `blurb` is not
+    // drawn here at all any more -- it stated the base numbers, which block 2
+    // resolves properly, and it pushed everything worth reading off the card.
+    var y = d.y + 56;
     ctx.font = "12px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(" + ASH_BONE + ",0.9)";
-    var lines = wrapLeft(node.blurb || "No description written for this one yet.",
-      d.x + 20, y, d.w - 40, 17, 12);
-    y += lines * 17 + 12;
+    ctx.fillStyle = "rgba(" + ASH_BONE + ",0.85)";
+    y += wrapLeft(node.short || node.blurb || "", d.x + 20, y, d.w - 40, 16, 3) * 16 + 12;
 
-    // AND WHAT IT IS WORTH RIGHT NOW, with the figures an upgrade moved in
-    // green. The blurb above states the BASE numbers and goes on saying so
-    // forever; this is the same sentence with the live ranks in it.
-    y = drawResolvedLine(d.x + 20, y, d.w - 40, node);
+    // 2. WHAT IT DOES NOW, green where an upgrade moved it.
+    y = drawStatRows(d.x + 20, y, d.w - 40, node);
 
-    // THE FACTS, one per line and every one of them resolved rather than
-    // repeated from the tree: what it cost, what it needs, and where it is.
-    ctx.font = "10px " + MENU_TECH_FONT;
-    ctx.fillStyle = "rgba(" + ASH_EMBER + ",0.9)";
-    drawMenuText("COST " + (node.cost || 0) + " \u2b21   ·   OWNED", d.x + 20, y, 1.3);
-    y += 20;
-    // A TOWER'S NODE STATES ITS LEVEL GATE EITHER WAY; A PLAYER MODULE HAS
-    // NONE, so it says what it does need instead -- a slot to sit in, which is
-    // the thing a Player level actually buys. Same rule the tree card follows.
-    ctx.fillStyle = "rgba(" + ASH_LEY + ",0.8)";
-    if (isPlayerSelected()) {
-      drawMenuText("NEEDS A FREE SLOT  ·  " + E().openSlots() + " OF " +
-        E().slotCount() + " OPEN", d.x + 20, y, 1.3);
-    } else {
-      drawMenuText(node.minLevel
-        ? "NEEDS TOWER LEVEL " + node.minLevel
-        : "NEEDS TOWER LEVEL 0", d.x + 20, y, 1.3);
-    }
-    y += 20;
-
-    ctx.fillStyle = equippedAt !== -1
-      ? "rgba(" + ASH_GO + ",0.95)" : "rgba(" + ASH_DUST + ",0.7)";
-    drawMenuText(equippedAt !== -1
-      ? "EQUIPPED — SLOT " + (equippedAt + 1)
-      : "IN THE INVENTORY, DOING NOTHING", d.x + 20, y, 1.3);
-    y += 24;
-
-    y = drawImprovedBy(d.x + 20, y, d.w - 40, node);
-
-    // AN UNEQUIPPED MODULE CHANGES NOTHING AT ALL, said once where it matters.
-    if (equippedAt === -1) {
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(" + ASH_DUST + ",0.6)";
-      wrapLeft("Owning it is not using it — a module only affects a run while " +
-        "it is in one of its slots.", d.x + 20, y, d.w - 40, 14, 3);
-    }
-
-    var button = perkActionRect();
-    if (!pinned) {
-      ctx.textAlign = "center";
-      ctx.font = "10px " + MENU_TECH_FONT;
-      ctx.fillStyle = "rgba(" + ASH_DUST + ",0.45)";
-      drawMenuText("CLICK IT TO EQUIP OR UNEQUIP",
-        button.x + button.w / 2, button.y + button.h / 2 - 5, 1.3);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      return;
-    }
-
-    if (equippedAt !== -1) {
-      drawAshControl(button, "UNEQUIP", {
-        accent: ASH_STOP, active: true,
-        detail: "SLOT " + (equippedAt + 1) + " — STILL OWNED"
-      });
-    } else {
-      var progress = E().progress();
-      drawAshControl(button, "EQUIP", {
-        accent: ASH_GO, active: true,
-        detail: progress.level === 0 ? "NO SLOT OPEN YET" : "INTO THE FIRST FREE SLOT"
-      });
-    }
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
+    // 3. WHAT CHANGES THOSE, by rank and numerically.
+    drawImprovedBy(d.x + 20, y, d.w - 40, node);
   }
 
-  // The perk following the cursor while it is being dragged. Drawn last so it
-  // is over everything, which is also the order it is hit-tested in.
   function drawHeldPerk() {
     if (!drag || !drag.moved || !selected) return;
     var node = E().nodeOf(drag.nodeId);
@@ -2358,7 +2273,7 @@ var Upgrades = (function () {
       });
     }
 
-    y = drawResolvedLine(d.x + 20, y, d.w - 40, treeNode, 3);
+    y = drawStatRows(d.x + 20, y, d.w - 40, treeNode);
 
     // AND WHAT IMPROVES IT, in the same words the inventory card uses. Capped at
     // three rows here: this card is shorter and the buy button is under it, so a
@@ -2661,20 +2576,12 @@ var Upgrades = (function () {
       return hit ? { id: hit.node.id, kind: hit.kind } : null;
     },
     resetNodeCount: function () { return selected ? E().resetCount() : 0; },
-    // The "RIGHT NOW" line, as data: the resolved sentence, the same sentence
-    // with every rank at zero, and the words between them that differ -- which
-    // are exactly the words the card draws green.
-    resolvedLine: function (nodeId) {
+    // Block 2 as data: one row a stat, with the value it resolves to now, the
+    // value it would have with every rank at zero, and whether an upgrade moved
+    // it -- which is exactly what the card draws green.
+    statRows: function (nodeId) {
       var node = selected ? E().nodeOf(nodeId) : null;
-      var v = resolvedLine(node);
-      if (!v) return null;
-      var now = v.now.split(" "), was = v.base.split(" "), green = [];
-      var aligned = now.length === was.length;
-      for (var i = 0; i < now.length; i++) {
-        if (!aligned || now[i] !== was[i]) green.push(now[i]);
-      }
-      return { now: v.now, base: v.base, changed: v.changed,
-               aligned: aligned, green: green };
+      return statRows(node);
     },
     // What the "IMPROVED BY" block on a module's card is listing, as data --
     // so a test can assert what the card says without reading pixels.
@@ -2682,7 +2589,7 @@ var Upgrades = (function () {
       var node = selected ? E().nodeOf(nodeId) : null;
       return improvedBy(node).map(function (row) {
         return { id: row.node.id, rank: row.rank, maxRank: row.maxRank,
-                 active: row.active, dormant: row.dormant, text: row.text };
+                 active: row.active, dormant: row.dormant, rows: row.rows };
       });
     },
     state: function () {

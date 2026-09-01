@@ -16273,59 +16273,101 @@ function (t) {
   t.ok(true, "which draws without throwing");
 });
 
-test("a module's card lists what improves it, and marks only what is applying",
+test("a module's card is a short line, its live stats, and what moved them",
 function (t) {
   var h = bootPlayer();
   h.run("MetaProgress.reset(); MetaProgress.unlockAll(); MetaProgress.addPlayerXp(20000);" +
         "MetaProgress.buyModule('player_intendant_diversified_arsenal', 0);" +
-        "MetaProgress.buyModule('player_scrapper', 0)");
-  setPlayerRanks(h, { player_intendant_catalogued_inventory: 3,
-                      player_scrapper_recovery_team: 4 });
-  h.run("MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
+        "MetaProgress.buyModule('player_guardian_bastion_pact', 0);" +
+        "MetaProgress.buyModule('player_scrapper', 0);" +
+        "MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
   h.run("Upgrades.open(); Upgrades.selectTower('player')");
 
-  var rows = h.run("Upgrades.improvedBy('player_intendant_diversified_arsenal')");
-  t.eq(rows.length, 2, "Intendant is improved by two squares");
+  // 1. ONE SHORT LINE. The card draws `short` and never the long blurb, so a
+  // node without one would show a module with no description at all.
+  var missing = h.run("(function () { var out = [];" +
+    "  PlayerPerks.modules().forEach(function (m) {" +
+    "    if (!m.short || m.short.length > 90) out.push('player/' + m.id); });" +
+    "  TowerPerks.towersWithTrees().forEach(function (id) {" +
+    "    TowerPerks.nodes(id).forEach(function (n) {" +
+    "      var has = TowerPerks.upgrades2(id).some(function (sq) {" +
+    "        return sq.parent === n.id; });" +
+    "      if (has && (!n.short || n.short.length > 90))" +
+    "        out.push(id + '/' + n.id); }); });" +
+    "  return out; })()");
+  t.deep(missing, [], "every improvable node states a SHORT description");
 
-  // **AN UNBOUGHT ONE IS STILL LISTED.** Hiding it would answer "what improves
-  // this?" with "nothing", which is the question the card exists to answer.
-  var bought = rows.filter(function (r) { return r.rank > 0; })[0];
-  var unbought = rows.filter(function (r) { return r.rank === 0; })[0];
-  t.ok(!!unbought, "including the one that has not been bought");
-  t.eq(unbought.maxRank, 5, "with its rank ceiling");
-  t.ok(unbought.text.indexOf("rank 1 would give") === 0,
-    "and what its FIRST rank would give: " + unbought.text);
+  // 2. THE STATS, AS ROWS, GREEN ONLY WHERE AN UPGRADE MOVED ONE.
+  var cold = h.run("Upgrades.statRows('player_intendant_diversified_arsenal')");
+  t.eq(cold.length, 2, "Intendant resolves two stats");
+  t.deep(cold.map(function (r) { return r.label; }),
+    ["first of a type", "each one after"], "labelled, not prose");
+  t.deep(cold.map(function (r) { return r.value; }), ["−60 mana", "+20 mana"],
+    "at their authored values with nothing bought");
+  t.deep(cold.map(function (r) { return r.moved; }), [false, false],
+    "so neither row is green");
 
-  // **APPLYING IS THE ONLY THING MARKED.** Bought AND its module equipped.
-  t.eq(bought.rank, 3, "the bought one is at rank 3");
-  t.eq(bought.active, true, "and is applying");
-  t.eq(bought.dormant, false, "so it is not dormant");
-  t.eq(unbought.active, false, "the unbought one is not applying");
-  t.eq(unbought.dormant, false,
-    "and is NOT called dormant — unbought is a different thing from dormant");
+  setPlayerRanks(h, { player_intendant_catalogued_inventory: 4,
+                      player_intendant_logistics_tolerance: 2 });
+  var warm = h.run("Upgrades.statRows('player_intendant_diversified_arsenal')");
+  t.deep(warm.map(function (r) { return r.value; }), ["−72 mana", "+22 mana"],
+    "four ranks of Inventaire and two of Tolérance: 60 + 3x4, and 20 + 4 − 2");
+  t.deep(warm.map(function (r) { return r.moved; }), [true, true],
+    "and both rows are green");
+  t.deep(warm.map(function (r) { return r.base; }), ["−60 mana", "+20 mana"],
+    "each carrying the value it would have had");
 
-  // A MODULE ON THE BENCH MAKES ITS SQUARES DORMANT, not unbought.
-  var idle = h.run("Upgrades.improvedBy('player_scrapper')");
-  var ranked = idle.filter(function (r) { return r.rank > 0; })[0];
-  t.eq(ranked.rank, 4, "Ferrailleur's square is at rank 4");
-  t.eq(ranked.active, false, "and is not applying, because Ferrailleur is in no slot");
-  t.eq(ranked.dormant, true, "which is dormant rather than unbought");
+  var still = h.run("Upgrades.statRows('player_guardian_bastion_pact')");
+  t.deep(still.map(function (r) { return r.moved; }), [false, false],
+    "a module with no rank under it greens nothing");
 
-  // AND THE SAME BLOCK ANSWERS FOR A TOWER'S PERK.
+  // 3. WHAT MOVED THEM, BY RANK AND NUMERICALLY -- and DERIVED, so no square
+  // has to describe itself twice.
+  var ups = h.run("Upgrades.improvedBy('player_intendant_diversified_arsenal')");
+  t.eq(ups.length, 2, "two squares, two rows");
+  var inv = ups.filter(function (u) { return u.rank === 4; })[0];
+  t.ok(!!inv, "Inventaire catalogué is at rank 4");
+  t.eq(inv.active, true, "and is applying");
+  // MEASURED FROM WHERE EVERYTHING ELSE STANDS, which is what makes the row
+  // answer the question a player is really asking: what would I lose if I
+  // un-bought THIS square? The surcharge reads 18 → 22 rather than 20 → 22
+  // because Tolérance logistique is holding two ranks of it down either way.
+  t.deep(inv.rows, ["first of a type −60 mana → −72 mana",
+                    "each one after +18 mana → +22 mana"],
+    "stated as without-it → with-it, on the rows it actually moves");
+
+  // AN UNBOUGHT SQUARE IS STILL LISTED, showing what its FIRST rank would do.
+  h.run("MetaProgress.debugPatch({ player: (function () {" +
+        "  var p = MetaProgress.playerProgress();" +
+        "  return { xp: p.xp, modules: p.modules.slice()," +
+        "    ranks: { player_intendant_catalogued_inventory: 4 }," +
+        "    equipped: p.equipped.slice(), resetAt: 0 }; })() })");
+  var offer = h.run("Upgrades.improvedBy('player_intendant_diversified_arsenal')")
+    .filter(function (u) { return u.rank === 0; })[0];
+  t.ok(!!offer, "the unbought one is listed rather than hidden");
+  t.deep(offer.rows, ["each one after +24 mana → +23 mana"],
+    "showing what rank 1 would do from where the module stands now");
+
+  // AND THE SAME THREE BLOCKS ANSWER FOR A TOWER'S PERK.
   h.run("MetaProgress.buyNode('soldier', 'rif_a1', 0);" +
         "MetaProgress.buyNode('soldier', 'rif_a2', 0);" +
         "MetaProgress.addXp('soldier', 20000);" +
         "MetaProgress.buyRank('soldier', 'rifleman_breach_terminal_charge', 0, 1);" +
+        "MetaProgress.buyRank('soldier', 'rifleman_breach_terminal_charge', 0, 2);" +
+        "MetaProgress.buyRank('soldier', 'rifleman_breach_terminal_charge', 0, 3);" +
         "MetaProgress.equipPerk('soldier', 'rif_a2', 0)");
   h.run("Upgrades.selectTower('soldier')");
-  var breach = h.run("Upgrades.improvedBy('rif_a2')");
-  t.eq(breach.length, 2, "Breach Chamber is improved by two squares");
-  t.eq(breach.filter(function (r) { return r.active; }).length, 1,
-    "one of which is applying");
+  var breach = h.run("Upgrades.statRows('rif_a2')");
+  t.deep(breach.map(function (r) { return r.value; }), ["×2.50", "−10%"],
+    "Breach Chamber resolves its two shots");
+  t.deep(breach.map(function (r) { return r.moved; }), [true, false],
+    "and only the one Terminal Charge moved is green");
+  var tc = h.run("Upgrades.improvedBy('rif_a2')")
+    .filter(function (u) { return u.rank === 3; })[0];
+  t.deep(tc.rows, ["final shot ×2.00 → ×2.50"],
+    "with the square's contribution derived, not authored twice");
 
-  // A MODULE NOTHING IMPROVES LISTS NOTHING, rather than an empty heading. Every
-  // one of the Rifleman's twelve has a square under it, so this asks a tower
-  // whose tree has none at all -- which is five of the six today.
+  // A MODULE NOTHING IMPROVES LISTS NOTHING.
   var bare = h.run("(function () {" +
     "  var ids = TowerPerks.towersWithTrees();" +
     "  for (var i = 0; i < ids.length; i++) {" +
@@ -16333,73 +16375,13 @@ function (t) {
     "    var n = TowerPerks.nodes(ids[i]);" +
     "    if (n.length) return { tower: ids[i], node: n[0].id }; }" +
     "  return null; })()");
-  t.ok(bare !== null, "a tower with a tree and no squares exists");
   h.run("Upgrades.selectTower('" + bare.tower + "')");
   t.deep(h.run("Upgrades.improvedBy('" + bare.node + "')"), [],
-    "and a node with no squares under it lists none");
+    "a node with no squares under it lists none");
 
-  h.run("Upgrades.draw(ctx)");
-  t.ok(true, "the card draws with the block on it");
-});
-
-test("a module's card shows its LIVE numbers, and greens the ones an upgrade moved",
-function (t) {
-  var h = bootPlayer();
-  h.run("MetaProgress.reset(); MetaProgress.unlockAll(); MetaProgress.addPlayerXp(20000);" +
-        "MetaProgress.buyModule('player_intendant_diversified_arsenal', 0);" +
-        "MetaProgress.buyModule('player_guardian_bastion_pact', 0);" +
-        "MetaProgress.equipModule('player_intendant_diversified_arsenal', 0)");
-  h.run("Upgrades.open(); Upgrades.selectTower('player')");
-
-  // WITH NOTHING BOUGHT UNDER IT the line is the base line and nothing is green.
-  var cold = h.run("Upgrades.resolvedLine('player_intendant_diversified_arsenal')");
-  t.ok(cold !== null, "the module states a resolved value");
-  t.eq(cold.changed, false, "nothing has moved it yet");
-  t.deep(cold.green, [], "so no word is green");
-  t.ok(cold.now.indexOf("−60") !== -1, "and it reads the authored 60: " + cold.now);
-
-  // A RANK MOVES IT, AND ONLY THE FIGURES THAT MOVED GO GREEN.
-  setPlayerRanks(h, { player_intendant_catalogued_inventory: 4,
-                      player_intendant_logistics_tolerance: 2 });
-  var warm = h.run("Upgrades.resolvedLine('player_intendant_diversified_arsenal')");
-  t.eq(warm.changed, true, "four ranks of Inventaire and two of Tolérance move it");
-  t.eq(warm.aligned, true, "the sentence keeps its shape, so the diff is per word");
-  t.deep(warm.green, ["−72", "+22"],
-    "and exactly the two figures that moved are green — 60 + 3x4, and 20 + 4 − 2");
-  t.ok(warm.now.indexOf("−72") !== -1 && warm.now.indexOf("+22") !== -1,
-    "the line itself carries the live numbers: " + warm.now);
-
-  // A MODULE WITH NO RANK BOUGHT IS UNTOUCHED, even beside one that is.
-  var other = h.run("Upgrades.resolvedLine('player_guardian_bastion_pact')");
-  t.eq(other.changed, false, "Gardien has no rank under it");
-  t.deep(other.green, [], "so nothing on its card is green");
-
-  // EVERY NODE THAT CAN BE IMPROVED SAYS WHAT IT IS WORTH, on both entities --
-  // a card that could change and does not say so is the thing this is for.
-  var silent = h.run("(function () {" +
-    "  var out = [];" +
-    "  PlayerPerks.modules().forEach(function (m) {" +
-    "    var has = PlayerPerks.upgrades2().some(function (sq) { return sq.parent === m.id; });" +
-    "    if (has && typeof m.valueOf !== 'function') out.push('player/' + m.id); });" +
-    "  TowerPerks.towersWithTrees().forEach(function (id) {" +
-    "    TowerPerks.nodes(id).forEach(function (n) {" +
-    "      var has = TowerPerks.upgrades2(id).some(function (sq) { return sq.parent === n.id; });" +
-    "      if (has && typeof n.valueOf !== 'function') out.push(id + '/' + n.id); }); });" +
-    "  return out; })()");
-  t.deep(silent, [], "every improvable node states a resolved value");
-
-  // AND IT REALLY IS DYNAMIC: maxing every square under a node moves its line.
-  var frozen = h.run("(function () {" +
-    "  var out = [];" +
-    "  TowerPerks.nodes('soldier').forEach(function (n) {" +
-    "    if (typeof n.valueOf !== 'function') return;" +
-    "    var base = n.valueOf(function () { return 0; });" +
-    "    var full = n.valueOf(function (id) {" +
-    "      var sq = TowerPerks.upgrade2Of('soldier', id);" +
-    "      return sq ? sq.maxRank : 0; });" +
-    "    if (base === full) out.push(n.id); });" +
-    "  return out; })()");
-  t.deep(frozen, [], "and every one of them changes when its squares are maxed");
+  h.run("Upgrades.selectTower('soldier'); Upgrades.draw(ctx)");
+  h.run("Upgrades.openTree(); Upgrades.selectNode('rif_a2'); Upgrades.draw(ctx)");
+  t.ok(true, "and both cards draw without throwing");
 });
 
 test("the Player levels on the wave budget alone, and a defeat keeps it",

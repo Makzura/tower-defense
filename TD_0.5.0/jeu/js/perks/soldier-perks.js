@@ -77,12 +77,15 @@ TowerPerks.register({
       // fields only -- Premium Lot and Volume Discount are the two whose parent
       // this is, and Officer Supply's B4/B5 surcharge belongs to ITS parent's
       // card, not to this one.
-      valueOf: function (r) {
+      short: "Twice the base damage; every tier costs more.",
+      stats: function (r) {
         var lot = [0, 0.05, 0.1, 0.15][r("rifleman_commissioned_premium_lot")];
-        var tier = [0, 5, 10, 15][r("rifleman_commissioned_premium_lot")] -
-                   5 * r("rifleman_commissioned_volume_discount");
-        return "+" + (1 + lot) + " base damage · every A and B tier costs +" +
-               (50 + tier) + " mana · placement unchanged";
+        return [
+          { label: "base damage", value: String(1 + lot) },
+          { label: "every A and B tier", value: "+" + (50 +
+            [0, 5, 10, 15][r("rifleman_commissioned_premium_lot")] -
+            5 * r("rifleman_commissioned_volume_discount")) + " mana" }
+        ];
       },
       effects: {
         add: { damage: 1 },
@@ -109,10 +112,14 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_n1"],
       at: { x: 0, y: -3 },
-      valueOf: function (r) {
-        var lens = r("rifleman_long_glass_extended_lens");
-        return "+" + (10 + lens) + " u.l. range · rounds 25% faster · placement +" +
-               (50 + 5 * lens) + " mana";
+      short: "Further, faster rounds; dearer to place.",
+      stats: function (r) {
+        var l = r("rifleman_long_glass_extended_lens");
+        return [
+          { label: "range", value: "+" + (10 + l) + " u.l." },
+          { label: "projectile speed", value: "+25%" },
+          { label: "placement", value: "+" + (50 + 5 * l) + " mana" }
+        ];
       },
       effects: {
         add: { rangeUl: 10 },
@@ -140,12 +147,15 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_n2"],
       at: { x: 0, y: -4.5 },
-      valueOf: function (r) {
-        var per = 2 + 0.15 * r("rifleman_veteran_campaign_tempo");
-        var cap = 12 + 0.5 * r("rifleman_veteran_decorated_ceiling");
-        return "opens every wave at −6% fire rate · +" + Math.round(per * 100) / 100 +
-               " points a kill · up to +" + Math.round(cap * 100) / 100 +
-               " points, so at best +" + Math.round((cap - 6) * 100) / 100 + "%";
+      short: "Opens each wave slow and earns it back on kills.",
+      stats: function (r) {
+        return [
+          { label: "wave opens at", value: "−6% fire rate" },
+          { label: "per kill", value: "+" + ((200 + 15 *
+            r("rifleman_veteran_campaign_tempo")) / 100) + " points" },
+          { label: "ceiling", value: "+" + ((1200 + 50 *
+            r("rifleman_veteran_decorated_ceiling")) / 100) + " points" }
+        ];
       },
       effects: {
         // THE CEILING IS IN THE SAME UNITS AS THE GAIN, not in kills
@@ -170,11 +180,13 @@ TowerPerks.register({
       cost: 60,
       minLevel: 0,
       at: { x: 0, y: 1.5 },
-      valueOf: function (r) {
-        var sorted = 5 * r("rifleman_cheap_sorted_parts");
-        return "placement 300 → 250 · " + (sorted
-          ? ("the first tier bought on each Rifleman costs " + sorted + " less")
-          : "no tier price changes");
+      short: "Cheaper to place.",
+      stats: function (r) {
+        var so = 5 * r("rifleman_cheap_sorted_parts");
+        return [
+          { label: "placement", value: "250 mana" },
+          { label: "first tier bought", value: so ? ("−" + so + " mana") : "unchanged" }
+        ];
       },
       effects: { price: { add: -50 } }
     },
@@ -199,13 +211,16 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_s1"],
       at: { x: 0, y: 3 },
-      valueOf: function (r) {
-        var deal = r("rifleman_advance_aggressive_contract");
-        var dep = r("rifleman_advance_first_deployment");
-        return "first Rifleman −" + (100 + 10 * deal) + " mana · every later one +" +
-               (40 + 4 * deal) + " mana · " + (dep
-                 ? ("the first reaches +" + (5 * dep) + "% for three waves")
-                 : "no reach bonus");
+      short: "The first of the run is cheap, the rest are not.",
+      stats: function (r) {
+        var a = r("rifleman_advance_aggressive_contract");
+        var d = r("rifleman_advance_first_deployment");
+        return [
+          { label: "first Rifleman", value: "−" + (100 + 10 * a) + " mana" },
+          { label: "each one after", value: "+" + (40 + 4 * a) + " mana" },
+          { label: "the first reaches", value: d ? ("+" + (5 * d) + "% for 3 waves")
+                                                 : "unchanged" }
+        ];
       },
       effects: { price: { firstAdd: -100, laterAdd: 40 } }
     },
@@ -238,12 +253,15 @@ TowerPerks.register({
       cost: 120,
       minLevel: 0,
       at: { x: -1.5, y: 0 },
-      valueOf: function (r) {
-        var flat = 2 * r("rifleman_overloaded_reinforced_spring") +
-                   r("rifleman_overloaded_series_ammunition") / 10;
-        var tier = 2 * r("rifleman_overloaded_series_ammunition");
-        return "A3+ only: +1 shot per burst · that shot hits for +" +
-               Math.round(flat * 100) / 100 + " flat · A tiers cost +" + tier + " mana";
+      short: "A3+: one more shot per burst.",
+      stats: function (r) {
+        var sp = r("rifleman_overloaded_reinforced_spring");
+        var se = r("rifleman_overloaded_series_ammunition");
+        return [
+          { label: "shots per burst", value: "+1" },
+          { label: "that shot", value: "+" + (2 * sp + se / 10) + " flat" },
+          { label: "A tiers", value: "+" + (2 * se) + " mana" }
+        ];
       },
       effects: {
         when: [{ has: "hasA3", add: { shotsPerBurst: 1 } }]
@@ -270,11 +288,14 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_a1"],
       at: { x: -3, y: 0 },
-      valueOf: function (r) {
-        var last = [2, 2.1, 2.25, 2.5][r("rifleman_breach_terminal_charge")];
-        var early = 10 - 0.5 * r("rifleman_breach_soft_feed");
-        return "A5 only: the last shot of a completed burst ×" + last.toFixed(2) +
-               " · every earlier shot −" + Math.round(early * 100) / 100 + "%";
+      short: "A5: the burst's last shot hits hard, the rest soft.",
+      stats: function (r) {
+        return [
+          { label: "final shot", value: "×" +
+            [2, 2.1, 2.25, 2.5][r("rifleman_breach_terminal_charge")].toFixed(2) },
+          { label: "earlier shots", value: "−" +
+            (10 - 0.5 * r("rifleman_breach_soft_feed")) + "%" }
+        ];
       },
       effects: {
         when: [{ has: "hasA5", set: { burstFinalShotMult: 2, burstEarlyShotMult: 0.9 } }]
@@ -299,13 +320,14 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_a2"],
       at: { x: -4.5, y: 0 },
-      valueOf: function (r) {
-        var hard = r("rifleman_ratchet_hard_ratchet");
-        var clean = 12 + 0.8 * hard + 0.4 * r("rifleman_ratchet_polished_wheel");
-        var lost = 15 + 0.8 * hard;
-        return "burst only: a clean burst shortens the next cycle " +
-               Math.round(clean * 100) / 100 + "% · one that loses two or more " +
-               "lengthens it " + Math.round(lost * 100) / 100 + "%";
+      short: "Burst only: a clean burst is paid, a broken one charged.",
+      stats: function (r) {
+        var h = r("rifleman_ratchet_hard_ratchet");
+        return [
+          { label: "after a clean burst", value: "−" + ((120 + 8 * h +
+            4 * r("rifleman_ratchet_polished_wheel")) / 10) + "% cycle" },
+          { label: "after a collapsed one", value: "+" + ((150 + 8 * h) / 10) + "% cycle" }
+        ];
       },
       effects: {
         set: { ratchetGain: 0.88, ratchetLoss: 1.15 }
@@ -331,13 +353,18 @@ TowerPerks.register({
       cost: 120,
       minLevel: 0,
       at: { x: 1.5, y: 0 },
-      valueOf: function (r) {
-        var con = r("rifleman_manifest_reinforced_contracts");
-        var sal = r("rifleman_manifest_salvage_conscription");
-        return "B4 sends 3 and costs +" + (200 + 10 * con) + " mana · B5 sends 5 " +
-               "and costs +" + (350 + 15 * con) + " · recruits +" + (2 * con) +
-               "% health" + (sal ? (", +" + (2 * sal) + "% more on the first " +
-               "Rifleman, and every squad " + (15 * sal / 100) + " s later") : "");
+      short: "B4 sends 3 recruits, B5 sends 5. Both cost more.",
+      stats: function (r) {
+        var c = r("rifleman_manifest_reinforced_contracts");
+        var sa = r("rifleman_manifest_salvage_conscription");
+        return [
+          { label: "B4", value: "3 recruits, +" + (200 + 10 * c) + " mana" },
+          { label: "B5", value: "5 recruits, +" + (350 + 15 * c) + " mana" },
+          { label: "recruit health", value: "+" + (2 * c) + "%" +
+            (sa ? (", +" + (2 * sa) + "% on the first Rifleman") : "") },
+          { label: "squad arrives", value: sa ? ("+" + (15 * sa / 100) + " s late")
+                                              : "on time" }
+        ];
       },
       effects: {
         when: [{ has: "hasRecruitAbility", add: { recruitCount: 1 } }],
@@ -364,10 +391,13 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_b1"],
       at: { x: 3, y: 0 },
-      valueOf: function (r) {
-        var med = r("rifleman_rapid_medical_selection");
-        return "recruit cooldown 45 s → 40 s · every recruit −" + (10 - med) +
-               "% health · 45 s again beside Entrenchment Protocol";
+      short: "Recruits sooner, and weaker.",
+      stats: function (r) {
+        return [
+          { label: "recruit cooldown", value: "40 s" },
+          { label: "recruit health", value: "−" +
+            (10 - r("rifleman_rapid_medical_selection")) + "%" }
+        ];
       },
       effects: {
         // TEN PERCENTAGE POINTS, NOT A x0.9 (2026-09-01). The same 18 and 36 it
@@ -402,11 +432,13 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_b2"],
       at: { x: 4.5, y: 0 },
-      valueOf: function (r) {
-        var tip = r("rifleman_piercing_carbide_tip");
-        return "B3+ only: ignores " + Math.round((2 + 0.15 * tip) * 100) / 100 +
-               " flat armor, never percentage defence · this Rifleman and its " +
-               "recruits fire " + Math.round((5 + 0.3 * tip) * 100) / 100 + "% slower";
+      short: "B3+: ignores flat armor, fires slower.",
+      stats: function (r) {
+        var t = r("rifleman_piercing_carbide_tip");
+        return [
+          { label: "flat armor ignored", value: String(2 + 15 * t / 100) },
+          { label: "fire rate", value: "−" + (5 + 3 * t / 10) + "%" }
+        ];
       },
       effects: {
         // ADDITIONS RATHER THAN A `set` AND A `mul` (2026-09-01), and the
@@ -442,16 +474,18 @@ TowerPerks.register({
       minLevel: 0,
       requires: ["rif_b3"],
       at: { x: 6, y: 0 },
-      valueOf: function (r) {
-        var stakes = r("rifleman_entrenchment_deep_stakes");
-        var ammo = r("rifleman_piercing_entrenched_ammunition");
-        var wait = [1.5, 1.45, 1.35, 1.2, 1, 0.75][
-          r("rifleman_entrenchment_battery_setup")];
-        return "a recruit that holds " + wait.toFixed(2) + " s digs in: +" +
-               (25 + stakes - ammo) + "% range, +" + (25 + stakes) + "% fire rate, " +
-               (25 + stakes) + "% less damage taken · cooldown " +
-               (55 + 0.5 * stakes) + " s, or " + (45 + 0.5 * stakes) +
-               " s with Rapid Muster";
+      short: "A recruit that stands and fires digs in.",
+      stats: function (r) {
+        var st = r("rifleman_entrenchment_deep_stakes");
+        var am = r("rifleman_piercing_entrenched_ammunition");
+        return [
+          { label: "digs in after", value: [1.5, 1.45, 1.35, 1.2, 1, 0.75][
+            r("rifleman_entrenchment_battery_setup")].toFixed(2) + " s" },
+          { label: "dug in", value: "+" + (25 + st - am) + "% range, +" +
+            (25 + st) + "% fire rate, −" + (25 + st) + "% damage taken" },
+          { label: "recruit cooldown", value: (55 + 0.5 * st) + " s, or " +
+            (45 + 0.5 * st) + " s with Rapid Muster" }
+        ];
       },
       effects: {
         set: { recruitCooldownEntrench: 55, recruitEntrenchSeconds: 1.5 }

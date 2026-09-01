@@ -13,58 +13,42 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
-**2026-09-01 — A module's card shows its live numbers, and greens what moved.**
+**2026-09-01 — A module's card, cut down to three blocks.**
 
-Owner: make the value shown in a module's description dynamic, and show what an
-upgrade changed by making it green.
+Owner: way too much written in each description -- it should be a very short
+description, then the changed stats with the upgraded ones green, then what
+upgrades at what level affect it and how, very concisely and numerically. Every
+useless bit deleted.
 
-The description was the authored `blurb`, which states the BASE figures and goes
-on saying so forever: Intendant read "60 mana less" at Inventaire catalogué rank
-5, where it is 75. The card now also prints a RESOLVED line from the node's own
-`valueOf(rankOf)` -- the same authored prose with the live ranks in it -- and the
-twelve Rifleman perks were given one, so both entities read the same way.
+It was: a four-line blurb, a resolved sentence, a cost line, a level line, an
+equipped line, a paragraph per square and a closing remark. All true, almost
+none of it read. It is now three blocks, because a player asks a module three
+questions:
 
-**GREEN IS "AN UPGRADE MOVED THIS NUMBER" AND NOTHING ELSE IS GREEN.** The line
-is rendered twice, once with the real ranks and once with every rank forced to
-zero, and the WORDS that differ are drawn green. Comparing rendered text rather
-than fields is the point: both strings come out of one template, so a positional
-token diff marks exactly the figures that moved and needs no map of which field
-belongs to which phrase -- and a node that grows a new square is covered with
-nothing added to the drawing. Where a `valueOf` changes its wording rather than
-its numbers the tokens do not align and the whole line goes green, which is the
-honest fallback.
+  1. WHAT IS THIS -- one authored line, `short`. The long blurb is not drawn on
+     the card at all any more: it states the BASE figures, which block 2
+     resolves properly, and it pushed everything worth reading off the panel.
+  2. WHAT DOES IT DO NOW -- `stats(rankOf)` returns label/value ROWS rather than
+     a sentence, and a row is GREEN when its value differs from the value the
+     same call gives with every rank forced to zero. Green means "an upgrade
+     moved this" and nothing else on the card is green.
+  3. WHAT MOVED THEM -- every square under it, by rank, as `base → now`.
 
-Measured on Breach Chamber at Terminal Charge 3 and Soft Feed 2: the line reads
-"the last shot of a completed burst x2.50 · every earlier shot −9%" with exactly
-`x2.50` and `−9%` green, and the prose around them left alone.
+**BLOCK 3 IS DERIVED, so no square describes itself twice.** A square's effect
+is measured by resolving the PARENT's stats twice, once with that square's rank
+and once without, and printing the rows that differ -- measured from where
+everything else stands, which is what makes the row answer the question actually
+being asked: what would I lose if I un-bought this one? Balise de commandement
+at Signal amplifié 4/5 reads "inside +12% speed, +9% range" in green, over
+"Signal amplifié 4/5 · inside +8% speed, +5% range → +12% speed, +9% range".
 
-**2026-09-01 — A module's card says what improves it.**
+The content had to become data for any of this: `valueOf`, which returned a
+sentence and lasted a few hours, is now `stats`, which returns rows. Both
+entities carry it -- twenty-one Player modules and the twelve Rifleman perks --
+along with a `short` line each.
 
-Owner: add what upgrades affect a module and how, and do not grey one out for
-being unpurchased -- only for not currently applying.
-
-Under the equipped line a module's card now lists every upgrade-squared node
-whose parent it is, with its rank and what it is contributing. The figures come
-from the content file's own `valueAt`, so there is no second copy of any of them
-here and a retune moves the card with the effect. The tree card carries the same
-block, capped at three rows because the buy button is under it.
-
-**AN UNBOUGHT ONE IS STILL LISTED AND IS NOT DIMMED FOR BEING UNBOUGHT.** Hiding
-it, or greying it to the point of being unreadable, would answer "what improves
-this?" with "nothing" -- which is exactly the question a player reading the card
-is asking, and the one it could not answer before. For an unbought square the
-line reads what its FIRST rank would give, so it is an offer rather than a gap.
-
-**Dim means "not applying right now" and only that**, and the two ways of not
-applying are told apart in words as well as in colour: a rank of zero, and a
-square that is owned while the module it improves sits in no slot. The heading
-counts them -- `IMPROVED BY 2 · 1 APPLYING`, or `NONE APPLYING`.
-
-Two things fixed while in there: a Player module's card said "NEEDS TOWER LEVEL
-0" (it has no level gate -- it needs a free slot, which is what a Player level
-buys), and the line under the name printed the band a module is grouped under,
-so "Intendant" sat under a heading reading INTENDANT and said the same word
-twice. It prints the module's own subtitle when it has one.
+Two tests written earlier the same day were replaced by one that asserts all
+three blocks, on a Player module and on a tower's perk. 491 -> 490.
 
 **2026-09-01 — The cheat panel knows about the Player, and the zoom reaches the
 whole tree.**
