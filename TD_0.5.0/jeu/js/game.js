@@ -6774,10 +6774,6 @@ function draw() {
   // screen-edge flash and banner do not.
   if (typeof Effects !== "undefined") {
     if (Effects.drawWorld) Effects.drawWorld(ctx);
-    // THE PLAYER'S OWN MARKS ON THE BOARD, in the world layer with the rest of
-    // the feedback: the beacon's circle, the totem and its health, the mark
-    // over its enemy and the ring round the tower carrying the permit.
-    if (typeof PlayerBar !== "undefined") PlayerBar.drawWorld();
     else Effects.draw(ctx);
   }
 
@@ -6804,6 +6800,18 @@ function draw() {
     drawInvestPreview();
     World3D.drawOverlays(ctx, worldRenderState());
   }
+
+  // THE PLAYER'S OWN MARKS ON THE BOARD -- the beacon's circle, the totem and
+  // its health, the mark over its enemy, the ring round the tower carrying the
+  // permit.
+  //
+  // HERE, ON BOTH BRANCHES, and that is the whole point of the placement: the
+  // 2D block above is inside `if (!world3D)` and never runs on the shipping
+  // board, which is exactly the trap `drawInvestPreview` records having fallen
+  // into -- a ring that stroked and put nothing on screen. `PlayerBar.drawWorld`
+  // projects through the camera when there is one, so the same call is correct
+  // in both places.
+  if (typeof PlayerBar !== "undefined") PlayerBar.drawWorld();
 
   ctx.restore();
 

@@ -319,35 +319,66 @@ var PlayerBar = (function () {
     if (holder) drawRing(holder.x, holder.y, ul(14), "230,190,110");
   }
 
+  // THROUGH THE CAMERA, like every other world ring on this board. A plain
+  // `ctx.arc` at a world coordinate is only correct on the flat fallback: on
+  // the 3D board the world transform is a projection the 2D context cannot
+  // express, and the ring lands somewhere else entirely. `projectRing` is the
+  // one helper every other world circle in this game already goes through.
+  function camera() {
+    return (typeof World3D !== "undefined" && World3D.isEnabled() && World3D.camera)
+      ? World3D.camera() : null;
+  }
+
   function drawRing(x, y, radius, rgb) {
+    var ring = [];
+    for (var k = 0; k <= 48; k++) {
+      var a = k / 48 * Math.PI * 2;
+      ring.push([x + Math.cos(a) * radius, y + Math.sin(a) * radius]);
+    }
+    var pts = (typeof projectRing === "function") ? projectRing(ring, camera()) : ring;
+    if (!pts || !pts.length) return;
     ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
     ctx.strokeStyle = "rgba(" + rgb + ",0.55)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
 
+  // Where a world point lands on screen, for the flat shapes below. The
+  // identity on the 2D fallback, which is what makes one code path correct on
+  // both boards.
+  function at(x, y) {
+    var cam = camera();
+    if (!cam) return { x: x, y: y };
+    var h = (typeof World3D !== "undefined" && World3D.groundHeightAt)
+      ? World3D.groundHeightAt(x, y) : 0;
+    return cam.worldToScreen(x, y, h) || { x: -9999, y: -9999 };
+  }
+
   function drawTotem(totem) {
-    var w = ul(6), h = ul(16);
+    var p = at(totem.x, totem.y);
+    var w = 12, h = 30;
     ctx.fillStyle = "rgba(90,70,110,0.95)";
-    ctx.fillRect(totem.x - w / 2, totem.y - h, w, h);
+    ctx.fillRect(p.x - w / 2, p.y - h, w, h);
     ctx.strokeStyle = "rgba(200,170,240,0.8)";
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(totem.x - w / 2, totem.y - h, w, h);
+    ctx.strokeRect(p.x - w / 2, p.y - h, w, h);
     var frac = Math.max(0, Math.min(1, totem.hp / totem.maxHp));
     ctx.fillStyle = "rgba(20,16,20,0.85)";
-    ctx.fillRect(totem.x - w, totem.y - h - 8, w * 2, 4);
+    ctx.fillRect(p.x - w, p.y - h - 9, w * 2, 4);
     ctx.fillStyle = "rgba(150,230,150,0.9)";
-    ctx.fillRect(totem.x - w, totem.y - h - 8, w * 2 * frac, 4);
+    ctx.fillRect(p.x - w, p.y - h - 9, w * 2 * frac, 4);
   }
 
   function drawMark(x, y) {
-    var s = ul(9);
+    var p = at(x, y), s = 11;
     ctx.strokeStyle = "rgba(255,180,90,0.95)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(x - s, y - s * 2); ctx.lineTo(x, y - s);
-    ctx.lineTo(x + s, y - s * 2);
+    ctx.moveTo(p.x - s, p.y - s * 2.4); ctx.lineTo(p.x, p.y - s * 1.2);
+    ctx.lineTo(p.x + s, p.y - s * 2.4);
     ctx.stroke();
   }
 
