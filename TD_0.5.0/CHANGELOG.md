@@ -13,6 +13,47 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — The Rifleman's tree, untangled.**
+
+Owner: the tree is well implemented but very tangled -- spread it out, size is
+not a problem. It was: thirty-four nodes on a 1.0 lattice, so everything within
+a node pitch of the tower sat on top of everything else, and the fusion links --
+which necessarily join two DIFFERENT arms -- had to thread through the pile.
+
+**The arms moved to a 1.5 lattice and each family took a quadrant**: path A
+north-west, general upper north-east, path B south-east, general lower
+south-west. One family per quadrant, so no two are ever interleaved.
+**Siblings fan, chains extend** -- two squares off one parent that do not
+require each other sit either side of it, one that requires the other sits a
+step further out along the same line -- so the picture is now the rule.
+
+**Three crossings remain and all three are forced.** A fusion joins two families
+on opposite sides of one arm; there is no placement that avoids crossing it. Each
+is aimed at the middle of the gap between two spine nodes, so it reads as a line
+passing through rather than as a node with an extra parent. A test now asserts
+that no link passes within 14 px of a node it does not belong to, which is
+"untangled" stated as an assertion rather than as a look.
+
+**A fusion's dashed second-parent line is gone, and it was redundant in every
+case that exists**: the fusion's second requirement is itself a child of that
+second parent, so the solid chain already ran back to it. Four long lines saying
+what four short ones said.
+
+**Names are drawn at every legal zoom now.** The 0.62 floor was about OVERLAP,
+not type size -- a label is a fixed 10px however far out the camera is -- and it
+hid every name on a tree that recentres at 0.48. `labelWidth` clips each name to
+the room its own ROW has, derived from the tree, so overlap is impossible.
+
+**The reset control moved under the detail card.** Its 232-wide paragraph of
+small print reached x 260, well inside the board's left edge of 96; that cost
+nothing while the trees were narrow and centred, and drew a tower's modules
+through a paragraph about commissions once one was not.
+
+`chainProblems` in the suite ranks an arm's nodes BY DISTANCE instead of looking
+the previous one up at `distance - 1`. Same claim -- "every node further out
+requires the one before it on its arm" -- with the assumption of a 1.0 step
+removed, which is what let the spacing change at all.
+
 **2026-09-01 — Upgrade²: the Rifleman's twenty-two ranked nodes.**
 
 A THIRD KIND OF UPGRADE. The A/B/C tiers are mana, in a run, on one body. A

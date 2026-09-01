@@ -29,6 +29,15 @@
 // only their display names changed; the new eight follow the same
 // branch-and-index scheme. The name and the icon are free at any time.
 //
+// **THE ARMS ARE ON A 1.5 LATTICE** (2026-09-01), where they were on a 1.0 one.
+// The upgrade-squared nodes hang off these twelve, and at one node pitch there
+// was no room between two arms for a satellite to sit in: everything within a
+// pitch of the tower was on top of everything else, and the fusion links -- which
+// necessarily join two DIFFERENT arms -- had to thread through it. Spreading the
+// spine costs nothing (the board pans and zooms) and is what gives every arm its
+// own clear quadrant. `at` is layout only; nothing but the tree screen and the
+// tests that derive the chain rule from it reads these numbers.
+//
 // EVERY NODE IS minLevel 0. All twelve can be bought the moment the tower is
 // owned and the coins are there. None can be EQUIPPED until the Rifleman
 // reaches level 1, because a level-0 tower has no slots -- buying and equipping
@@ -63,7 +72,7 @@ TowerPerks.register({
              "more mana. Placement unchanged.",
       cost: 100,
       minLevel: 0,
-      at: { x: 0, y: -1 },
+      at: { x: 0, y: -1.5 },
       effects: {
         add: { damage: 1 },
         tiers: {
@@ -88,7 +97,7 @@ TowerPerks.register({
       cost: 90,
       minLevel: 0,
       requires: ["rif_n1"],
-      at: { x: 0, y: -2 },
+      at: { x: 0, y: -3 },
       effects: {
         add: { rangeUl: 10 },
         mul: { projectileSpeedMult: 1.25 },
@@ -114,7 +123,7 @@ TowerPerks.register({
       cost: 130,
       minLevel: 0,
       requires: ["rif_n2"],
-      at: { x: 0, y: -3 },
+      at: { x: 0, y: -4.5 },
       effects: {
         // THE CEILING IS IN THE SAME UNITS AS THE GAIN, not in kills
         // (2026-09-01). 6 x 0.02 is 0.12 either way, so this is the identical
@@ -137,7 +146,7 @@ TowerPerks.register({
       blurb: "Placement 300 → 250. No tier price changes.",
       cost: 60,
       minLevel: 0,
-      at: { x: 0, y: 1 },
+      at: { x: 0, y: 1.5 },
       effects: { price: { add: -50 } }
     },
 
@@ -160,7 +169,7 @@ TowerPerks.register({
       cost: 100,
       minLevel: 0,
       requires: ["rif_s1"],
-      at: { x: 0, y: 2 },
+      at: { x: 0, y: 3 },
       effects: { price: { firstAdd: -100, laterAdd: 40 } }
     },
 
@@ -191,7 +200,7 @@ TowerPerks.register({
              "gains nothing.",
       cost: 120,
       minLevel: 0,
-      at: { x: -1, y: 0 },
+      at: { x: -1.5, y: 0 },
       effects: {
         when: [{ has: "hasA3", add: { shotsPerBurst: 1 } }]
       }
@@ -216,7 +225,7 @@ TowerPerks.register({
       cost: 160,
       minLevel: 0,
       requires: ["rif_a1"],
-      at: { x: -2, y: 0 },
+      at: { x: -3, y: 0 },
       effects: {
         when: [{ has: "hasA5", set: { burstFinalShotMult: 2, burstEarlyShotMult: 0.9 } }]
       }
@@ -239,7 +248,7 @@ TowerPerks.register({
       cost: 150,
       minLevel: 0,
       requires: ["rif_a2"],
-      at: { x: -3, y: 0 },
+      at: { x: -4.5, y: 0 },
       effects: {
         set: { ratchetGain: 0.88, ratchetLoss: 1.15 }
       }
@@ -263,7 +272,7 @@ TowerPerks.register({
              "instead of 4 and costs +350. No other recruit stat changes.",
       cost: 120,
       minLevel: 0,
-      at: { x: 1, y: 0 },
+      at: { x: 1.5, y: 0 },
       effects: {
         when: [{ has: "hasRecruitAbility", add: { recruitCount: 1 } }],
         tiers: { B4: { cost: 200 }, B5: { cost: 350 } }
@@ -288,7 +297,7 @@ TowerPerks.register({
       cost: 110,
       minLevel: 0,
       requires: ["rif_b1"],
-      at: { x: 2, y: 0 },
+      at: { x: 3, y: 0 },
       effects: {
         // TEN PERCENTAGE POINTS, NOT A x0.9 (2026-09-01). The same 18 and 36 it
         // has always resolved -- 20 x (1 - 0.10) -- written in the channel that
@@ -321,7 +330,7 @@ TowerPerks.register({
       cost: 150,
       minLevel: 0,
       requires: ["rif_b2"],
-      at: { x: 3, y: 0 },
+      at: { x: 4.5, y: 0 },
       effects: {
         // ADDITIONS RATHER THAN A `set` AND A `mul` (2026-09-01), and the
         // numbers are unchanged: 0 + 2 is the same 2, and five points off is
@@ -355,7 +364,7 @@ TowerPerks.register({
       cost: 160,
       minLevel: 0,
       requires: ["rif_b3"],
-      at: { x: 4, y: 0 },
+      at: { x: 6, y: 0 },
       effects: {
         set: { recruitCooldownEntrench: 55, recruitEntrenchSeconds: 1.5 }
       }

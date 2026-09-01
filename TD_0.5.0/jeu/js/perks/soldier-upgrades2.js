@@ -60,6 +60,27 @@
 // every equipped perk for exactly this reason: `set` is last-writer-wins, and a
 // square that landed first would be overwritten by the node it improves.
 //
+// **WHERE THEY SIT, AND WHY THE TREE IS SO WIDE.** The twelve permanent
+// upgrades are the SPINE, on a 1.5-node lattice out from the tower along four
+// arms; every square hangs off the arm its parent sits on, in the quadrant that
+// arm owns -- path A north-west, general upper north-east, path B south-east,
+// general lower south-west. One family per quadrant, so no two families are ever
+// interleaved.
+//
+// SIBLINGS FAN, CHAINS EXTEND. Two squares off the same parent that do not
+// require each other sit either side of it (Terminal Charge and Soft Feed;
+// Deep Stakes and Battery Setup) -- and one that REQUIRES the other sits one
+// step further out along the same line (Reinforced Spring then Series
+// Ammunition; Hard Ratchet then Polished Wheel). The picture is the rule.
+//
+// THE THREE CROSSINGS ARE FORCED AND ARE DELIBERATELY MID-GAP. A fusion joins
+// two families that live on opposite sides of one arm, so its second link has
+// to cross that arm -- there is no placement that avoids it. Each one is aimed
+// at the middle of the gap between two spine nodes rather than at a node, so it
+// reads as a line passing through and never as a node with an extra parent.
+// Nothing else in the tree crosses anything, and no link passes within 14 px of
+// a node it does not belong to.
+//
 // THE ARITHMETIC IS WRITTEN AS INTEGER FRACTIONS (`15 * rank / 100`, not
 // `0.15 * rank`) wherever the decimal form does not land exactly in binary.
 // `0.15 * 3` is 0.44999999999999996 and `45 / 100` is 0.45; the tests assert
@@ -126,7 +147,7 @@
         parent: "rif_a1",
         maxRank: 3,
         prices: S3,
-        at: { x: -0.95, y: -1.15 },
+        at: { x: -1.5, y: -1.5 },
         upside: "The one shot Overloaded Drum added hits for +2 flat more a rank.",
         downside: null,
         valueAt: function (rank) {
@@ -157,7 +178,7 @@
         ],
         maxRank: 3,
         prices: X3,
-        at: { x: -0.95, y: -2.3 },
+        at: { x: -1.5, y: -3 },
         upside: "The Overloaded Drum shot gains another +0.10 flat a rank.",
         downside: "Every A tier costs +2 mana a rank. B tiers are untouched.",
         valueAt: function (rank) {
@@ -187,7 +208,7 @@
         parent: "rif_a2",
         maxRank: 3,
         prices: S3,
-        at: { x: -1.8, y: -1.1 },
+        at: { x: -3, y: -1.5 },
         upside: "Breach Chamber's final shot hits harder: ×2.10, ×2.25, ×2.50.",
         downside: null,
         valueAt: function (rank) {
@@ -216,7 +237,7 @@
         parent: "rif_a2",
         maxRank: 5,
         prices: S5,
-        at: { x: -2.8, y: -1.1 },
+        at: { x: -3, y: 1.5 },
         upside: "Breach Chamber's penalty on the earlier shots eases by " +
                 "0.5 points a rank.",
         downside: null,
@@ -249,7 +270,7 @@
         parent: "rif_a3",
         maxRank: 3,
         prices: S3,
-        at: { x: -3.8, y: -1.1 },
+        at: { x: -4.5, y: -1.5 },
         upside: "A clean burst shortens the next cycle by another 0.8 points " +
                 "a rank.",
         downside: "A collapsed burst lengthens it by another 0.8 points a rank.",
@@ -278,7 +299,7 @@
         requires: [{ id: "rifleman_ratchet_hard_ratchet", rank: 2 }],
         maxRank: 5,
         prices: S5,
-        at: { x: -3.8, y: -2.2 },
+        at: { x: -4.5, y: -3 },
         upside: "A clean burst shortens the next cycle by another 0.4 points " +
                 "a rank.",
         downside: null,
@@ -308,7 +329,7 @@
         parent: "rif_b1",
         maxRank: 3,
         prices: S3,
-        at: { x: 1, y: 1.1 },
+        at: { x: 1.5, y: 1.5 },
         upside: "Every recruit carries +2 points of maximum health a rank.",
         downside: "The Manifest's surcharge grows: B4 +10 mana a rank, " +
                   "B5 +15 mana a rank.",
@@ -346,7 +367,7 @@
         ],
         maxRank: 3,
         prices: X3,
-        at: { x: 1, y: 2.2 },
+        at: { x: 1.5, y: 3 },
         upside: "The FIRST Rifleman placed sends recruits with +2% maximum " +
                 "health a rank.",
         downside: "Every Rifleman's squad arrives 0.15 s later a rank. The " +
@@ -376,7 +397,7 @@
         parent: "rif_b2",
         maxRank: 5,
         prices: S5,
-        at: { x: 2, y: 1.1 },
+        at: { x: 3, y: 1.5 },
         upside: "Rapid Muster's health penalty eases by 1 point a rank.",
         downside: null,
         valueAt: function (rank) {
@@ -402,7 +423,7 @@
         parent: "rif_b3",
         maxRank: 3,
         prices: S3,
-        at: { x: 3, y: 1.1 },
+        at: { x: 4.5, y: 1.5 },
         upside: "The Rifleman and its recruits ignore another 0.15 flat " +
                 "armor a rank.",
         downside: "Piercing Orders' fire-rate penalty deepens by 0.3 points " +
@@ -447,7 +468,7 @@
         ],
         maxRank: 5,
         prices: X5,
-        at: { x: 3.6, y: 2.2 },
+        at: { x: 5.25, y: 3 },
         upside: "A DUG-IN recruit ignores another 0.20 flat armor a rank.",
         downside: "That recruit's dug-in range bonus drops by 1 point a rank.",
         valueAt: function (rank) {
@@ -476,7 +497,7 @@
         parent: "rif_b4",
         maxRank: 3,
         prices: S3,
-        at: { x: 4, y: 1.1 },
+        at: { x: 6, y: 1.5 },
         upside: "A dug-in recruit gains a point a rank on all three: range, " +
                 "fire rate and damage reduction.",
         downside: "The recruit cooldown grows by 0.5 s a rank.",
@@ -514,7 +535,7 @@
         parent: "rif_b4",
         maxRank: 5,
         prices: H5,
-        at: { x: 5, y: 1.1 },
+        at: { x: 6, y: -1.5 },
         upside: "A recruit digs in sooner: 1.45 s, 1.35, 1.20, 1.00, 0.75.",
         downside: null,
         valueAt: function (rank) {
@@ -544,7 +565,7 @@
         parent: "rif_n1",
         maxRank: 3,
         prices: S3,
-        at: { x: 1.15, y: -0.75 },
+        at: { x: 1.5, y: -2.1 },
         upside: "Every Rifleman shot gains flat base damage: +0.05, +0.10, +0.15.",
         downside: "Every A and B tier costs more: +5, +10, +15 mana.",
         valueAt: function (rank) {
@@ -574,7 +595,7 @@
         parent: "rif_n1",
         maxRank: 5,
         prices: S5,
-        at: { x: 2.25, y: -0.75 },
+        at: { x: 1.5, y: -0.9 },
         upside: "Commissioned Ammunition's own surcharge falls by 5 mana a " +
                 "rank: +45 down to +25.",
         downside: null,
@@ -603,7 +624,7 @@
         ],
         maxRank: 3,
         prices: X3,
-        at: { x: 1.7, y: -1.75 },
+        at: { x: 3.6, y: -2.1 },
         upside: "Every recruit's shots gain +0.10 flat damage a rank.",
         downside: "The Manifest's B4 and B5 surcharges each grow by +5 mana " +
                   "a rank.",
@@ -631,7 +652,7 @@
         parent: "rif_n2",
         maxRank: 3,
         prices: S3,
-        at: { x: 1.15, y: -2.1 },
+        at: { x: 1.5, y: -3.6 },
         upside: "+1 u.l. of range a rank.",
         downside: "+5 mana on the placement price a rank.",
         valueAt: function (rank) {
@@ -654,7 +675,7 @@
         parent: "rif_n3",
         maxRank: 3,
         prices: S3,
-        at: { x: 1.15, y: -3.1 },
+        at: { x: 1.5, y: -4.8 },
         upside: "Each qualifying kill buys back 0.15 points more: +2.15, " +
                 "+2.30, +2.45.",
         downside: null,
@@ -680,7 +701,7 @@
         requires: [{ id: "rifleman_veteran_campaign_tempo", rank: 2 }],
         maxRank: 5,
         prices: S5,
-        at: { x: 2.25, y: -3.1 },
+        at: { x: 3, y: -4.8 },
         upside: "Kills may earn 0.5 points more a rank: +12.5 up to +14.5.",
         downside: null,
         valueAt: function (rank) {
@@ -710,7 +731,7 @@
         parent: "rif_s1",
         maxRank: 5,
         prices: S5,
-        at: { x: -1.1, y: 1.1 },
+        at: { x: -1.5, y: 1.5 },
         upside: "Each Rifleman's FIRST tier purchase costs 5 mana less a rank.",
         downside: null,
         valueAt: function (rank) {
@@ -734,7 +755,7 @@
         parent: "rif_s2",
         maxRank: 5,
         prices: S5,
-        at: { x: -1.1, y: 2.2 },
+        at: { x: -1.5, y: 2.4 },
         upside: "The first Rifleman of a run costs another 10 mana less a rank.",
         downside: "Every Rifleman after it costs another 4 mana more a rank.",
         valueAt: function (rank) {
@@ -768,7 +789,7 @@
         parent: "rif_s2",
         maxRank: 5,
         prices: S5,
-        at: { x: -2.2, y: 2.2 },
+        at: { x: -1.5, y: 3.6 },
         upside: "The FIRST Rifleman placed reaches 5% further a rank for its " +
                 "first three waves.",
         downside: null,

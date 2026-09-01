@@ -4734,10 +4734,42 @@ square hangs off the arm its parent sits on at two thirds the radius, so the
 spine of the tree stays the twelve permanent upgrades and the satellites read as
 belonging to them. Its RANK is a ring of pips around the rim — filled for a rank
 paid for, hollow for one not — which is the one thing about a square a player
-needs from across the board. Its links are lit one at a time, and a fusion's
-second runtime parent is dashed: that is what makes "you are halfway to this"
-readable without opening the card. `nodeAt` tests the squares FIRST, because
-they are drawn on top and are the smaller target.
+needs from across the board. Its links are lit one at a time, which is what makes
+"you are halfway to this" readable without opening the card. `nodeAt` tests the
+squares FIRST, because they are drawn on top and are the smaller target.
+
+**THE RIFLEMAN'S ARMS ARE ON A 1.5-NODE LATTICE and each owns one quadrant** —
+path A north-west, general upper north-east, path B south-east, general lower
+south-west. At the 1.0 lattice every other tree uses there was no room between
+two arms for a satellite to sit in, and the tree was a knot. **Siblings fan and
+chains extend**: two squares off one parent that do not require each other sit
+either side of it, and one that requires the other sits a step further out along
+the same line, so the picture IS the rule.
+
+**Exactly three links cross, and every one is a fusion crossing its own arm
+mid-gap.** A fusion joins two families that live on opposite sides of one arm, so
+there is no placement that avoids it; aiming the crossing at the middle of the
+gap between two spine nodes is what keeps it reading as a line passing through
+rather than as a node with an extra parent. A test asserts that no link passes
+within 14 px of a node it does not belong to.
+
+**A fusion's second runtime parent gets no line.** It had a dashed one and the
+line was redundant in every case that exists: the fusion's second requirement is
+itself a child of that second parent, so the solid chain already runs back to it.
+The card states both parents and whether each is equipped.
+
+**Names are drawn at every legal zoom.** There was a 0.62 floor, and the number
+was about OVERLAP rather than type size — a label is a fixed 10 px however far
+out the camera is. That floor was right for a twelve-node tree and hid every name
+on the thirty-four-node one, which recentres at 0.48. `labelWidth` now clips each
+name to the room its own ROW has (the tightest horizontal gap among nodes whose
+labels would land within 30 px vertically, derived from the tree), so overlap is
+impossible and the floor had nothing left to protect.
+
+**The reset control lives under the detail card**, at x 900, not on the left
+rail. Its 232-wide paragraph of small print reached x 260 — well inside the
+board, whose left edge is 96 — which cost nothing while the trees were narrow and
+put a tower's modules behind a paragraph about commissions once one was not.
 
 The card for a square prints the rank it is at, the rank it goes to, **what THAT
 rank costs on its own**, the resolved value now and the resolved value next

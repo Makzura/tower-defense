@@ -10820,12 +10820,19 @@ function bootContent() {
 
 // EVERY ARM IS A CHAIN, and this is what says so for a whole tree at once.
 //
-// The rule is derived from the LAYOUT rather than from a list of ids: a node one
-// step from the tower is that branch's root and requires nothing, and a node
-// further out requires EXACTLY the node one step closer on the same arm. So a
-// retune that moves a node, adds one to a branch or re-points a prerequisite is
-// checked by the same three lines, and the tree screen -- which draws its links
+// The rule is derived from the LAYOUT rather than from a list of ids: the node
+// NEAREST the tower on an arm is that branch's root and requires nothing, and
+// every node further out requires EXACTLY the one before it on the same arm. So
+// a retune that moves a node, adds one to a branch or re-points a prerequisite
+// is checked by the same few lines, and the tree screen -- which draws its links
 // straight off `requires` -- cannot drift away from what is purchasable.
+//
+// **IT RANKS BY DISTANCE RATHER THAN ASSUMING A STEP OF ONE** (2026-09-01). It
+// used to look the previous node up at `distance - 1`, which quietly required
+// every arm to be on a 1.0 lattice; the Rifleman's arms moved to a 1.5 one when
+// its upgrade-squared nodes needed room between them. Sorting says the same
+// thing -- "the one before it on this arm" -- without an opinion about how far
+// apart they are, so the claim is unchanged and the spacing is now free.
 //
 // Returns a list of complaints, empty when the tree is a clean set of chains.
 function chainProblems(h, towerId) {
@@ -10837,10 +10844,14 @@ function chainProblems(h, towerId) {
     "    var arm = at.x < 0 ? 'W' : at.x > 0 ? 'E' : at.y < 0 ? 'N' : 'S';" +
     "    var d = Math.abs(at.x) + Math.abs(at.y);" +
     "    if (at.x !== 0 && at.y !== 0) out.push(n.id + ' is diagonal');" +
-    "    (byArm[arm] = byArm[arm] || {})[d] = n.id;" +
-    "    n.__arm = arm; n.__d = d; });" +
+    "    (byArm[arm] = byArm[arm] || []).push({ id: n.id, d: d });" +
+    "    n.__arm = arm; });" +
+    "  Object.keys(byArm).forEach(function (arm) {" +
+    "    byArm[arm].sort(function (a, b) { return a.d - b.d; }); });" +
     "  list.forEach(function (n) {" +
-    "    var want = n.__d > 1 ? byArm[n.__arm][n.__d - 1] : null;" +
+    "    var arm = byArm[n.__arm], i = 0;" +
+    "    while (i < arm.length && arm[i].id !== n.id) i++;" +
+    "    var want = i > 0 ? arm[i - 1].id : null;" +
     "    var got = (n.requires || []).join('+');" +
     "    if (want === null && got) out.push(n.id + ' sits beside the tower but requires ' + got);" +
     "    if (want !== null && got !== want) out.push(n.id + ' requires ' + (got || 'nothing') + ', not ' + want);" +
@@ -15921,6 +15932,44 @@ test("the tree screen places, hits and frames every square", function (t) {
     "        out.push(all[i].id + ' overlaps ' + all[j].id); }" +
     "  return out; })()");
   t.deep(collisions, [], "every node has room of its own");
+
+  // AND NO LINK PASSES THROUGH A NODE IT DOES NOT BELONG TO. This is what
+  // "untangled" means as an assertion rather than as a look: the tree may have
+  // any shape, but a line that grazes a node it is not attached to reads as an
+  // edge that is not there, which is the one drawing mistake a player cannot
+  // tell from a real prerequisite.
+  var grazed = h.run("(function () {" +
+    "  var pts = TowerPerks.nodes('soldier').map(function (n) {" +
+    "      return { id: n.id, at: n.at, r: 30 }; })" +
+    "    .concat(TowerPerks.upgrades2('soldier').map(function (n) {" +
+    "      return { id: n.id, at: n.at, r: 20 }; }))" +
+    "    .concat([{ id: 'TOWER', at: { x: 0, y: 0 }, r: 46 }]);" +
+    "  function at(id) {" +
+    "    for (var i = 0; i < pts.length; i++) if (pts[i].id === id) return pts[i];" +
+    "    return null; }" +
+    "  var links = [];" +
+    "  TowerPerks.nodes('soldier').forEach(function (n) {" +
+    "    var reqs = n.requires || [];" +
+    "    if (!reqs.length) links.push(['TOWER', n.id]);" +
+    "    else reqs.forEach(function (r) { links.push([r, n.id]); }); });" +
+    "  TowerPerks.upgrades2('soldier').forEach(function (n) {" +
+    "    var reqs = n.requires || [];" +
+    "    if (!reqs.length) links.push([n.parent, n.id]);" +
+    "    else reqs.forEach(function (r) { links.push([r.id, n.id]); }); });" +
+    "  var out = [];" +
+    "  links.forEach(function (l) {" +
+    "    var A = at(l[0]), B = at(l[1]);" +
+    "    if (!A || !B) { out.push(l[0] + '->' + l[1] + ' has no end'); return; }" +
+    "    pts.forEach(function (p) {" +
+    "      if (p.id === l[0] || p.id === l[1]) return;" +
+    "      var vx = (B.at.x - A.at.x) * 132, vy = (B.at.y - A.at.y) * 132;" +
+    "      var px = (p.at.x - A.at.x) * 132, py = (p.at.y - A.at.y) * 132;" +
+    "      var t = Math.max(0, Math.min(1, (px * vx + py * vy) / (vx * vx + vy * vy)));" +
+    "      var d = Math.sqrt(Math.pow(t * vx - px, 2) + Math.pow(t * vy - py, 2));" +
+    "      if (d < p.r + 14)" +
+    "        out.push(l[0] + '->' + l[1] + ' passes through ' + p.id); }); });" +
+    "  return out; })()");
+  t.deep(grazed, [], "no link passes through a node it does not belong to");
 
   // AND EVERY SQUARE IS HITTABLE where it is drawn.
   var unreachable = h.run("(function () {" +

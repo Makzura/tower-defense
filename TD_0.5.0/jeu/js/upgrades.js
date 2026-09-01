@@ -130,23 +130,49 @@ var Upgrades = (function () {
   var MIN_ZOOM = 0.45;
   var MAX_ZOOM = 1.8;
 
-  // BELOW THIS ZOOM THE NAMES COME OFF, and the number is about OVERLAP rather
-  // than about type size: the labels are drawn at a fixed 10px however far out
-  // the camera is, so what makes them unreadable is neighbours colliding, not
-  // small letters. It was 0.62 until 2026-09-01, which was a fine floor for a
-  // twelve-node tree and hid every name on the thirty-four-node one — a
-  // recentre framed the whole Rifleman tree at 0.605 and printed nothing.
-  // `labelWidth` now clips each name to the space its own node actually has, so
-  // the floor could come down to where the nodes themselves stop being
-  // distinguishable.
-  var LABEL_ZOOM = 0.5;
+  // NAMES ARE DRAWN AT EVERY LEGAL ZOOM (2026-09-01). There was a 0.62 floor
+  // below which they came off, and the number was about OVERLAP rather than type
+  // size -- a label is a fixed 10px however far out the camera is, so what makes
+  // one unreadable is the neighbour's label running into it, not small letters.
+  // That floor was right for a twelve-node tree at zoom 1 and wrong for a
+  // thirty-four-node one: a recentre framed the whole Rifleman tree at 0.48 and
+  // printed not one name. `labelWidth` now clips each name to the room its own
+  // row actually has, so overlap is impossible and the floor had nothing left to
+  // protect.
+  var LABEL_ZOOM = MIN_ZOOM;
 
-  // How wide one node's name may be, in pixels, at the current zoom. Capped at
-  // the old fixed widths so nothing got WIDER, and floored by the on-screen
-  // pitch so two names can never run into each other. `fitText` ellipsises what
-  // will not fit, and the detail card is where the full name always is.
+  // HOW WIDE A NAME MAY BE, in pixels at the current zoom.
+  //
+  // TWO LABELS COLLIDE ONLY IF THEY SHARE A ROW. They are drawn centred under
+  // their node, so a node 30 px higher or lower is on its own line and its
+  // width is nobody's business; what constrains a name is the nearest node on
+  // roughly the SAME row. So the lane is the tightest horizontal gap among
+  // nodes whose labels would land within 30 px of each other vertically, and it
+  // is derived from the tree rather than typed in -- a tree authored on a
+  // different lattice gets its own answer with nothing else changed.
+  //
+  // Capped at the caller's fixed width so nothing ever got WIDER than it was,
+  // and `fitText` ellipsises what still will not fit. The full name is always on
+  // the detail card.
+  var laneCache = { id: null, zoom: 0, lane: NODE_PITCH };
+
+  function labelLane() {
+    if (laneCache.id === selected && laneCache.zoom === view.zoom) return laneCache.lane;
+    var list = TowerPerks.nodes(selected).concat(TowerPerks.upgrades2(selected));
+    var lane = NODE_PITCH * 2;
+    for (var i = 0; i < list.length; i++) {
+      for (var j = i + 1; j < list.length; j++) {
+        var a = nodePoint(list[i]), b = nodePoint(list[j]);
+        if (Math.abs(a.y - b.y) * view.zoom >= 30) continue;   // different rows
+        lane = Math.min(lane, Math.abs(a.x - b.x));
+      }
+    }
+    laneCache = { id: selected, zoom: view.zoom, lane: lane };
+    return lane;
+  }
+
   function labelWidth(cap) {
-    return Math.min(cap, NODE_PITCH * view.zoom * 0.92);
+    return Math.min(cap, labelLane() * view.zoom * 0.92);
   }
 
   // --- geometry --------------------------------------------------------------
@@ -377,7 +403,15 @@ var Upgrades = (function () {
   function recentreRect() { return { x: 28, y: 96, w: 44, h: 44 }; }
   function zoomInRect() { return { x: 28, y: 148, w: 44, h: 34 }; }
   function zoomOutRect() { return { x: 28, y: 186, w: 44, h: 34 }; }
-  function resetTreeRect() { return { x: 28, y: 640, w: 214, h: 46 }; }
+  // THE RESET CONTROL LIVES UNDER THE DETAIL CARD, NOT ON THE LEFT RAIL
+  // (2026-09-01). It was at x 28 with a 232-wide paragraph of small print above
+  // it, which reached to x 260 -- well inside the board, whose left edge is 96.
+  // That cost nothing while the trees were narrow and centred; the Rifleman's is
+  // now wide enough to put nodes there, and a tower's modules drawn through a
+  // paragraph about commissions is exactly the tangle this pass is undoing. The
+  // right column below the card is empty, the same width, and already the place
+  // a player looks for the buttons that spend coins.
+  function resetTreeRect() { return { x: 900, y: 648, w: 352, h: 46 }; }
   function detailRect() { return { x: 900, y: 96, w: 352, h: 470 }; }
   function buyRect() {
     var d = detailRect();
@@ -1643,19 +1677,18 @@ var Upgrades = (function () {
         var at = treeToScreen(nodePoint(other).x, nodePoint(other).y);
         strokeLink(at, to, TowerPerks.rankOf(selected, req.id) >= (req.rank || 1));
       });
-
-      // The equip requirement, for a fusion only -- an ordinary square's single
-      // parent is already the line above.
-      if (!node.alsoParent) return;
-      var other = TowerPerks.nodeOf(selected, node.alsoParent);
-      if (!other) return;
-      var start = treeToScreen(nodePoint(other).x, nodePoint(other).y);
-      ctx.save();
-      ctx.setLineDash([5 * view.zoom, 5 * view.zoom]);
-      strokeLink(start, to, MetaProgress.ownsNode(selected, node.alsoParent));
-      ctx.restore();
     });
   }
+
+  // A FUSION'S SECOND RUNTIME PARENT GETS NO LINE OF ITS OWN, and that is not
+  // an omission (2026-09-01). It had a dashed one until the tree was spread out,
+  // and the line turned out to be REDUNDANT in every case that exists: each
+  // fusion's second requirement is itself a child of that second parent, so the
+  // solid chain already runs back to it -- Series Ammunition needs Premium Lot,
+  // and Premium Lot hangs off Commissioned Ammunition, which is the very node
+  // the dashed line went to. Four long lines that said what four short ones
+  // already said. The card states both parents and whether each is equipped,
+  // which is the half a line could not say anyway.
 
   // THE FIVE STATES A SQUARE CAN BE IN, drawn the same way a perk's are and
   // read off the same one answer. `maxed` gets the ley colour a perk uses for
@@ -2067,7 +2100,7 @@ var Upgrades = (function () {
          MetaProgress.TREE_RESET_FEE_PER_NODE + " ⬡ commission a node. Clears " +
          "the loadout and cools down for " + hours + " hour" +
          (hours === 1 ? "" : "s") + ". Level and XP are never touched."),
-      r.x, r.y - 92, 232, 13, 7);
+      r.x, r.y - 68, r.w, 13, 5);
   }
 
   // --- small text helpers ----------------------------------------------------
