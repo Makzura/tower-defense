@@ -811,7 +811,14 @@ var Upgrades = (function () {
   function onClick(x, y) {
     if (screen === "tree") return treeClick(x, y);
 
-    var list = ownedTowers();
+    // **THE SAME LIST THE ROWS ARE DRAWN FROM.** This walked `ownedTowers()`
+    // while `drawTowerList` walked `entityList()`, so once the Player took the
+    // first row every click was off by one -- row 1 selected the tower drawn on
+    // row 2, and the Player could not be reached at all. That is exactly the
+    // "drawn somewhere other than where it is clickable" failure the geometry
+    // note at the top of this file exists to prevent, and the fix is the rule
+    // it states: one source for both.
+    var list = entityList();
     for (var i = 0; i < list.length; i++) {
       if (pointInRect(x, y, towerRowRect(i))) { select(list[i]); return; }
     }
@@ -1446,9 +1453,16 @@ var Upgrades = (function () {
         : (E().slotCount() + " slots   ·   click a module to read it")),
       286, 230);
 
-    for (var i = 0; i < MetaProgress.PERK_SLOTS; i++) {
+    // HOWEVER MANY THE ENTITY HAS -- five for a tower, seven for the Player.
+    // It was `PERK_SLOTS` and so drew five of the Player's seven, which made
+    // the caption above it ("6 of 7 slots open") a lie about the row under it.
+    for (var i = 0; i < E().slotCount(); i++) {
       var r = slotRect(i);
-      var open = i < progress.level;
+      // OPEN IS `openSlots()`, NOT THE LEVEL. A tower's usable slots ARE its
+      // level; the Player's are `2 + level`. This read the level for both, so a
+      // level-4 Player was shown four open slots and three locked ones under a
+      // caption that correctly said six of seven.
+      var open = i < E().openSlots();
       var node = loadout[i];
       var held = drag && drag.nodeId;
       var hot = pointInRect(mouse.x, mouse.y, r);

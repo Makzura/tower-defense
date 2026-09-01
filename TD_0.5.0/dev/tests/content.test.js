@@ -16160,6 +16160,69 @@ function (t) {
     h.run("Soldier.COST"), "and the next one costs what it costs");
 });
 
+test("every row in the entity list selects the entity drawn on it",
+function (t) {
+  var h = bootPlayer();
+  h.run("openMenu(); Upgrades.open()");
+
+  // ROW BY ROW, CLICKED WHERE IT IS DRAWN. The list draws the Player first and
+  // then every owned tower; the hit test walked a DIFFERENT list until
+  // 2026-09-01, so every row selected the entity below it and the Player -- the
+  // first row -- could not be reached at all.
+  var expected = ["player"].concat(h.run("MetaProgress.snapshot().owned"));
+  expected.forEach(function (id, i) {
+    var r = h.run("Upgrades.towerRowRect(" + i + ")");
+    h.run("Upgrades.onClick(" + (r.x + 20) + ", " + (r.y + 20) + ")");
+    t.eq(h.run("Upgrades.state().selected"), id,
+      "row " + i + " selects " + id);
+  });
+
+  // AND THE PLAYER'S OWN SCREEN REALLY OPENS ON IT.
+  var top = h.run("Upgrades.towerRowRect(0)");
+  h.run("Upgrades.onClick(" + (top.x + 20) + ", " + (top.y + 20) + ")");
+  t.eq(h.run("Upgrades.state().selected"), "player", "the Player is selectable");
+  t.eq(h.run("Upgrades.slotPipState('player', 0)"), "empty",
+    "its first slot is open from level 0");
+  t.eq(h.run("Upgrades.slotPipState('player', 2)"), "empty",
+    "and at level 5 so is its third");
+
+  // ALL SEVEN SLOTS ARE DRAWN, and each is where it is clickable. The loop
+  // counted `PERK_SLOTS` and so drew five of the Player's seven, which made the
+  // caption above the band ("6 of 7 slots open") a lie about the row under it.
+  var band = h.run("(function () { var out = [];" +
+    "  for (var i = 0; i < MetaProgress.PLAYER_SLOTS; i++) out.push(Upgrades.slotRect(i));" +
+    "  return out; })()");
+  t.eq(band.length, 7, "seven slot rectangles");
+
+  // AND `2 + LEVEL` OF THEM ARE OPEN, at every level. The band read the LEVEL
+  // for both entities, so a level-4 Player was shown four open slots and three
+  // locked ones under a caption that correctly said six of seven.
+  var thresholds = h.game.MetaProgress.XP_THRESHOLDS;
+  [0, 1, 2, 3, 4, 5].forEach(function (level) {
+    h.run("MetaProgress.reset(); MetaProgress.unlockAll()");
+    if (level > 0) h.run("MetaProgress.addPlayerXp(" + thresholds[level - 1] + ")");
+    h.run("Upgrades.open(); Upgrades.selectTower('player')");
+    var states = h.run("(function () { var out = [];" +
+      "  for (var i = 0; i < 7; i++) out.push(Upgrades.slotPipState('player', i));" +
+      "  return out; })()");
+    var openCount = states.filter(function (x) { return x !== "locked"; }).length;
+    t.eq(openCount, 2 + level, "at level " + level + ", " + (2 + level) + " open");
+  });
+  h.run("MetaProgress.addPlayerXp(20000); Upgrades.open(); Upgrades.selectTower('player')");
+  t.ok(band[6].x + band[6].w <= h.run("Upgrades.inventoryRect().x") +
+       h.run("Upgrades.inventoryRect().w"),
+    "and the seventh still ends inside the band the five used");
+  for (var i = 1; i < 7; i++) {
+    t.ok(band[i].x >= band[i - 1].x + band[i - 1].w,
+      "slot " + (i + 1) + " starts after slot " + i + " ends");
+  }
+  h.run("Upgrades.openTree()");
+  t.eq(h.game.screen, "tree", "and its tree opens");
+  t.eq(h.run("Upgrades.state().selected"), "player", "still on the Player");
+  h.run("Upgrades.draw(ctx)");
+  t.ok(true, "which draws without throwing");
+});
+
 test("the Player levels on the wave budget alone, and a defeat keeps it",
 function (t) {
   var h = bootPlayer();

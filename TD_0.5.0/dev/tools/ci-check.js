@@ -939,7 +939,14 @@ var BASELINE = [
     // Brèche-then-shield order, the streak, the beacon, the totem, the orders,
     // the radar, Blitz and the crosspath permit. Nothing was removed and no
     // existing name changed its claim.
-    file: "tests/content.test.js", pass: 488, fail: 0,
+    // ---- 489 on 2026-09-01, the Player row was unclickable ---------------
+    // 488 -> 489: one added. `drawTowerList` walked `entityList()` and
+    // `onClick` still walked `ownedTowers()`, so once the Player took the first
+    // row every click selected the entity BELOW the one it landed on and the
+    // Player could not be reached at all. Found by playing, not by the suite --
+    // the new name clicks every row where it is drawn and asserts what it
+    // selects, and asserts the seven-slot band and its 2 + level opening.
+    file: "tests/content.test.js", pass: 489, fail: 0,
     failing: []
   },
   {
