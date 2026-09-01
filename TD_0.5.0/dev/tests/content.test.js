@@ -14834,6 +14834,35 @@ function (t) {
   t.eq(dropped, 0, "and a row that leaves them out clears them");
   t.eq(h.run("MetaProgress.ownsNode('soldier', 'rif_a1')"), true,
     "without touching what the row DID carry");
+
+  // THE PLAYER'S BLOCK TRAVELS THE SAME WAY, and js/debug-cheats.js copies it
+  // into every draft for the same reason it copies the tower rows: a patch that
+  // named only the purse would otherwise have emptied the whole Player
+  // progression, which is the half a playtest most needs to set up.
+  h.run("MetaProgress.buyModule('player_scrapper', 0);" +
+        "MetaProgress.buyPlayerRank('player_scrapper_recovery_team', 0, 1);" +
+        "MetaProgress.addPlayerXp(3000);" +
+        "MetaProgress.equipModule('player_scrapper', 0)");
+  h.run("MetaProgress.debugPatch({ coins: 77 })");
+  t.eq(h.run("MetaProgress.coins()"), 77, "the coins moved");
+  t.eq(h.run("MetaProgress.ownsModule('player_scrapper')"), true,
+    "and the Player still owns its module");
+  t.eq(h.run("MetaProgress.playerRankOf('player_scrapper_recovery_team')"), 1,
+    "its rank");
+  t.eq(h.run("MetaProgress.equippedModules()[0]"), "player_scrapper",
+    "and its loadout");
+
+  var carried = h.run("(function () {" +
+    "  var p = MetaProgress.snapshot().player;" +
+    "  MetaProgress.debugPatch({ player: { xp: p.xp, modules: p.modules.slice()," +
+    "    ranks: p.ranks, equipped: p.equipped.slice(), resetAt: p.resetAt } });" +
+    "  return MetaProgress.playerRankOf('player_scrapper_recovery_team'); })()");
+  t.eq(carried, 1, "a Player block that carries its ranks keeps them");
+  var lost = h.run("(function () {" +
+    "  MetaProgress.debugPatch({ player: { xp: 0, modules: [], ranks: {}," +
+    "    equipped: [], resetAt: 0 } });" +
+    "  return MetaProgress.ownedModules().length; })()");
+  t.eq(lost, 0, "and one that names an empty row really empties it");
 });
 
 test("a reset refunds every rank and charges ten a node, whatever rank it held",

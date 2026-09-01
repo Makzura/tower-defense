@@ -5266,6 +5266,13 @@ the ranks with the nodes, for the same reason `resetTree` does. The readout
 prints `n/m ranks` beside `n/m nodes`, and nothing at all for the five towers
 that have no upgrade² content.
 
+**THE PLAYER IS ONE OF THE PANEL'S ENTITIES** (2026-09-01), first in the scope
+dropdown and in "all". Every command asks `isPlayer(id)` and branches once —
+buying the whole tree, clearing it, setting the level, adding xp, filling and
+emptying the loadout (`2 + level` slots, not the level), and clearing the reset
+cooldown. Without that the panel silently did nothing to the entire Player
+progression. Its row is first in the readout, with `n/m modules` and `n/m ranks`.
+
 ---
 
 **The test harness calls `MetaProgress.unlockAll()`** before `init()`. That is

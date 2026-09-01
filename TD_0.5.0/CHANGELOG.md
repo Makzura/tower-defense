@@ -13,6 +13,40 @@ Add an entry here for every change, and fix the rule in `AGENTS.md` in the
 same edit. An entry that records a new invariant without writing it into
 `AGENTS.md` is how the two drift apart.
 
+**2026-09-01 — The cheat panel knows about the Player, and the zoom reaches the
+whole tree.**
+
+Owner, on the same afternoon: the Player screen could not be clicked, the zoom
+could not reach the whole tree, and "buy all nodes" did not buy the upgrades.
+Three separate faults and all three were found by playing.
+
+**THE ROW WAS UNCLICKABLE.** `drawTowerList` walked `entityList()` and `onClick`
+still walked `ownedTowers()`, so once the Player took the first row every click
+selected the entity BELOW the one it landed on -- and the Player, being first,
+could not be reached at all. Exactly the "drawn somewhere other than where it is
+clickable" failure the geometry note at the top of js/upgrades.js exists to
+prevent. Two more faults were hiding behind it: the slot loop counted
+`PERK_SLOTS` and drew five of the Player's seven, and the open/locked test read
+the LEVEL for both entities when the Player's open slots are `2 + level`.
+
+**THE ZOOM FLOOR WAS SET FOR A TWELVE-NODE TREE.** `MIN_ZOOM` was 0.45 and the
+Player's sixty-two nodes need 0.26 to frame, so a recentre clamped and showed
+about half. It is 0.2 now, with headroom for a tree half again as large.
+Labels are decided by WIDTH rather than by zoom -- which is what the question
+was always about, since `labelWidth` already clips a name to the room its own
+row has, and a fixed zoom floor got it wrong in both directions.
+
+**AND THE CHEAT PANEL NEVER LEARNED ABOUT THE PLAYER.** "Buy every node" bought
+both tower lists and nothing of the Player's twenty-one modules or hundred and
+ninety ranks; so did clearing, levelling, filling a loadout and clearing a
+cooldown. The Player is an entity in the scope dropdown now and every command
+branches on it once. Its row is first in the readout.
+
+A test clicks every row where it is drawn and asserts what it selects, walks the
+seven-slot band at every level, recentres EVERY tree in the game and asserts no
+node lands off the board, and pins the Player half of `debugPatch` from both
+sides.
+
 **2026-09-01 — The Player has a progression of its own.**
 
 A THIRD PROGRESSION, and it is neither of the other two. The A/B/C tiers are

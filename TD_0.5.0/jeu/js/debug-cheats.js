@@ -91,10 +91,24 @@
         equipped: row.equipped.slice(), resetAt: row.resetAt
       };
     });
-    var draft = { coins: current.coins, progress: progress };
+    // THE PLAYER'S BLOCK TRAVELS WITH THE ROWS, for the same reason they are
+    // copied out first: `debugPatch` rebuilds what it is handed, so a command
+    // that named only the towers would have emptied the Player's loadout.
+    var draft = { coins: current.coins, progress: progress,
+                  player: playerDraft(current) };
     build(draft, current);
     MetaProgress.debugPatch(draft);
     refresh();
+  }
+
+  // The Player's row in the shape `sanitise` reads back -- the five storage
+  // fields and nothing derived.
+  function playerDraft(current) {
+    var p = (current && current.player) || MetaProgress.playerProgress();
+    return {
+      xp: p.xp, modules: p.modules.slice(), ranks: copyRanks(p.ranks),
+      equipped: p.equipped.slice(), resetAt: p.resetAt
+    };
   }
 
   function copyRanks(ranks) {
@@ -115,6 +129,10 @@
     var xp = level <= 0 ? 0 : thresholds[Math.min(level, thresholds.length) - 1];
     patch(function (draft) {
       ids.forEach(function (id) {
+        // THE PLAYER'S LEVEL IS THE SAME CURVE, so the same xp is the same
+        // level -- what differs is only how many slots it opens (2 + level).
+        // `sanitise` closes any slot past that, exactly as it does for a tower.
+        if (isPlayer(id)) { draft.player.xp = xp; return; }
         if (!draft.progress[id]) return;
         draft.progress[id].xp = xp;
         // Slots close when a level drops, and `sanitise` is what enforces that
@@ -125,7 +143,10 @@
   }
 
   function addXp(ids, amount) {
-    ids.forEach(function (id) { MetaProgress.addXp(id, amount); });
+    ids.forEach(function (id) {
+      if (isPlayer(id)) MetaProgress.addPlayerXp(amount);
+      else MetaProgress.addXp(id, amount);
+    });
     refresh();
   }
 
@@ -142,6 +163,18 @@
   function buyWholeTree(ids) {
     patch(function (draft) {
       ids.forEach(function (id) {
+        // THE PLAYER'S TREE IS A DIFFERENT TREE and lives in a different place.
+        // Its modules and its squares were untouched by this button, so
+        // "buy every node" bought two thirds of what a playtest wanted.
+        if (isPlayer(id)) {
+          draft.player.modules = PlayerPerks.modules().map(function (n) { return n.id; });
+          var pRanks = {};
+          PlayerPerks.upgrades2().forEach(function (n) {
+            pRanks[n.id] = n.maxRank || 0;
+          });
+          draft.player.ranks = pRanks;
+          return;
+        }
         if (!draft.progress[id]) return;
         draft.progress[id].nodes = TowerPerks.nodes(id).map(function (n) {
           return n.id;
@@ -158,6 +191,12 @@
   function clearTrees(ids) {
     patch(function (draft) {
       ids.forEach(function (id) {
+        if (isPlayer(id)) {
+          draft.player.modules = [];
+          draft.player.ranks = {};
+          draft.player.equipped = [];
+          return;
+        }
         if (!draft.progress[id]) return;
         draft.progress[id].nodes = [];
         // AND THE RANKS, for the same reason `resetTree` clears them: a square
@@ -171,6 +210,7 @@
 
   function clearCooldowns() {
     patch(function (draft) {
+      draft.player.resetAt = 0;
       Object.keys(draft.progress).forEach(function (id) {
         draft.progress[id].resetAt = 0;
       });
@@ -182,6 +222,16 @@
   // `equipPerk` so a slot the level has not opened still refuses.
   function fillLoadouts(ids) {
     ids.forEach(function (id) {
+      if (isPlayer(id)) {
+        // `2 + level` OPEN SLOTS, not the level -- and through the real
+        // `equipModule`, so a slot the level has not opened still refuses.
+        var open = MetaProgress.playerProgress().slots;
+        var mine = PlayerPerks.inventory();
+        for (var i = 0; i < open && i < mine.length; i++) {
+          MetaProgress.equipModule(mine[i].id, i);
+        }
+        return;
+      }
       var level = MetaProgress.progressOf(id).level;
       var have = TowerPerks.inventory(id);
       for (var slot = 0; slot < level && slot < have.length; slot++) {
@@ -193,8 +243,10 @@
 
   function clearLoadouts(ids) {
     ids.forEach(function (id) {
-      for (var slot = 0; slot < MetaProgress.PERK_SLOTS; slot++) {
-        MetaProgress.unequipPerk(id, slot);
+      var n = isPlayer(id) ? MetaProgress.PLAYER_SLOTS : MetaProgress.PERK_SLOTS;
+      for (var slot = 0; slot < n; slot++) {
+        if (isPlayer(id)) MetaProgress.unequipModule(slot);
+        else MetaProgress.unequipPerk(id, slot);
       }
     });
     refresh();
@@ -284,13 +336,22 @@
     parent.appendChild(make("div", LABEL, text));
   }
 
-  // Which towers a command applies to: the one picked in the dropdown, or all
+  // WHICH ENTITIES A COMMAND APPLIES TO: the one picked in the dropdown, or all
   // of them. One control rather than a pair of buttons per command.
+  //
+  // **THE PLAYER IS ONE OF THEM** (2026-09-01). It is not a tower -- no
+  // catalogue entry, seven slots, its own tree -- so every command below asks
+  // `isPlayer(id)` and branches once. Without that the panel silently did
+  // nothing to the whole Player progression, which is exactly the half a
+  // playtest most needs to set up.
   var scopeSelect = null;
+  var PLAYER = "player";
+
+  function isPlayer(id) { return id === PLAYER; }
 
   function scope() {
     var pick = scopeSelect && scopeSelect.value;
-    return (!pick || pick === "*") ? owned() : [pick];
+    return (!pick || pick === "*") ? [PLAYER].concat(owned()) : [pick];
   }
 
   function build() {
@@ -448,9 +509,12 @@
     if (!scopeSelect) return;
     var keep = scopeSelect.value;
     scopeSelect.innerHTML = "";
-    var all = make("option", null, "every owned tower");
+    var all = make("option", null, "the Player and every owned tower");
     all.value = "*";
     scopeSelect.appendChild(all);
+    var me = make("option", null, "Player  (player)");
+    me.value = PLAYER;
+    scopeSelect.appendChild(me);
     owned().forEach(function (id) {
       var Type = MetaProgress.constructorOf(id);
       var opt = make("option", null, (Type ? Type.DISPLAY_NAME : id) + "  (" + id + ")");
@@ -485,6 +549,26 @@
     var lines = [];
     var s = snap();
     lines.push("coins  " + s.coins);
+
+    // THE PLAYER FIRST, in the same columns as the towers so the block reads as
+    // one table: level, xp, its seven-slot bar, what is bought and how many
+    // ranks are paid for. `2 + level` slots are open, so the bar is longer than
+    // a tower's and its locked half is at the end.
+    var pl = s.player;
+    var plBar = pl.equipped.map(function (n, i) {
+      return i < pl.slots ? (n ? "#" : ".") : "x";
+    }).join("");
+    var plRanks = 0, plAll = 0;
+    PlayerPerks.upgrades2().forEach(function (n) {
+      plAll += n.maxRank || 0;
+      plRanks += Math.min(n.maxRank || 0, pl.ranks[n.id] || 0);
+    });
+    lines.push(
+      pad("Player", 14) + "L" + pl.level +
+      "  " + pad(String(Math.floor(pl.xp)), 6) + "xp" +
+      "  " + plBar +
+      "  " + pl.modules.length + "/" + PlayerPerks.modules().length + " modules" +
+      "  " + plRanks + "/" + plAll + " ranks");
 
     s.owned.forEach(function (id) {
       var p = s.progress[id];
