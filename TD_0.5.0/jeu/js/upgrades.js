@@ -158,7 +158,7 @@ var Upgrades = (function () {
 
   function labelLane() {
     if (laneCache.id === selected && laneCache.zoom === view.zoom) return laneCache.lane;
-    var list = TowerPerks.nodes(selected).concat(TowerPerks.upgrades2(selected));
+    var list = E().nodes().concat(E().squares());
     var lane = NODE_PITCH * 2;
     for (var i = 0; i < list.length; i++) {
       for (var j = i + 1; j < list.length; j++) {
@@ -199,10 +199,19 @@ var Upgrades = (function () {
   }
 
   function slotRect(i) {
-    var size = 92, gap = 16;
-    var total = MetaProgress.PERK_SLOTS * size + (MetaProgress.PERK_SLOTS - 1) * gap;
+    // SEVEN SLOTS ARE NARROWER THAN FIVE and have to fit the same band: the
+    // Player carries seven where a tower carries five, so the size is derived
+    // from the count rather than typed in. Five still resolves to the 92 it
+    // always was, so no tower screen moved a pixel.
+    var count = E().slotCount();
+    var band = 574, gap = count > 5 ? 10 : 16;
+    // CAPPED AT THE 92 A TOWER'S SLOT HAS ALWAYS BEEN, so five slots resolve to
+    // exactly the geometry they did before the Player existed -- the band is
+    // wide enough for bigger ones and growing them would have pushed the strip
+    // that opens under a slot down into the inventory box.
+    var size = Math.min(92, Math.floor((band - (count - 1) * gap) / count));
     return { x: 286 + i * (size + gap), y: 250, w: size, h: size,
-             _total: total };
+             _total: band };
   }
 
   function inventoryRect() {
@@ -257,8 +266,12 @@ var Upgrades = (function () {
   var ACTION_H = 24, ACTION_GAP = 4;
   var ROW_PITCH = CARD_H + ACTION_GAP + ACTION_H + CARD_GAP_Y;
 
-  var BRANCH_ORDER = ["A", "B", "C", "G"];
-  var BRANCH_LABEL = { A: "PATH A", B: "PATH B", C: "PATH C", G: "GENERAL" };
+  var BRANCH_ORDER = ["A", "B", "C", "G", "I", "C2", "D", "X"];
+  var BRANCH_LABEL = {
+    A: "PATH A", B: "PATH B", C: "PATH C", G: "GENERAL",
+    // The Player's three trunks and the pair that answers to none of them.
+    I: "INTENDANT", C2: "COMMANDANT", D: "GARDIEN", X: "FUSIONS & SECRET"
+  };
 
   // WHICH IN-RUN PATHS THIS TOWER HAS, asked of the tower itself. A
   // config-driven one keeps them in `CONFIG.paths`; a hand-written one names a
@@ -290,10 +303,10 @@ var Upgrades = (function () {
     var out = { headers: [], items: [], byId: {}, action: null, height: 0 };
     if (!selected) return out;
 
-    var list = TowerPerks.inventory(selected);
-    var equipped = MetaProgress.equippedPerks(selected);
-    var groups = { A: [], B: [], C: [], G: [] };
-    list.forEach(function (n) { groups[branchOf(selected, n)].push(n); });
+    var list = E().inventory();
+    var equipped = E().equipped();
+    var groups = { A: [], B: [], C: [], G: [], I: [], C2: [], D: [], X: [] };
+    list.forEach(function (n) { groups[E().branchOf(n)].push(n); });
 
     var cardW = Math.floor((box.w - CARD_GAP_X) / 2);
     var top = box.y + INV_TOP;
@@ -345,7 +358,7 @@ var Upgrades = (function () {
   // is what it has always meant, and stays true now that the cards are grouped
   // rather than laid out in one grid.
   function inventoryCardRect(i) {
-    var list = selected ? TowerPerks.inventory(selected) : [];
+    var list = selected ? E().inventory() : [];
     var layout = inventoryLayout();
     var node = list[i];
     var item = node ? layout.byId[node.id] : null;
@@ -431,11 +444,143 @@ var Upgrades = (function () {
     });
   }
 
+  // --- THE ENTITY ADAPTER (2026-09-01) ---------------------------------------
+  //
+  // THIS SCREEN NOW HOLDS TWO KINDS OF THING, and they are genuinely different:
+  // a TOWER TYPE has five perk slots opened one per level, a tree of nodes and a
+  // catalogue entry; the PLAYER has seven slots of which `2 + level` are open,
+  // a tree of MODULES, no constructor and no catalogue entry at all.
+  //
+  // Every question this file asks is one of the fifteen below, so they are asked
+  // through an adapter rather than by branching at each of the ninety call
+  // sites. `E()` answers for whatever is selected, and the drawing, the hit
+  // tests, the purchases and the tree all read the same fifteen names.
+  //
+  // The alternative -- a second screen for the Player -- was rejected because
+  // the tree, the inventory, the slot strip and the reset control are the same
+  // controls doing the same job, and two copies of them would drift apart the
+  // first time either was touched.
+  var PLAYER_ID = "player";
+
+  function isPlayerSelected() { return selected === PLAYER_ID; }
+
+  // Every entity the list offers, Player first: it is the one thing a profile
+  // always has, and putting it at the top means the screen is never empty.
+  function entityList() {
+    return [PLAYER_ID].concat(ownedTowers());
+  }
+
+  var TOWER_API = {
+    isPlayer: false,
+    name: function () {
+      var Type = MetaProgress.constructorOf(selected);
+      return Type ? Type.DISPLAY_NAME : selected;
+    },
+    heading: function () { return "PERMANENT UPGRADES"; },
+    progress: function () { return MetaProgress.progressOf(selected); },
+    slotCount: function () { return MetaProgress.PERK_SLOTS; },
+    openSlots: function () { return MetaProgress.progressOf(selected).level; },
+    equipped: function () { return MetaProgress.equippedPerks(selected); },
+    equip: function (id, slot) { return MetaProgress.equipPerk(selected, id, slot); },
+    unequip: function (slot) { return MetaProgress.unequipPerk(selected, slot); },
+    inventory: function () { return TowerPerks.inventory(selected); },
+    nodes: function () { return TowerPerks.nodes(selected); },
+    squares: function () { return TowerPerks.upgrades2(selected); },
+    nodeOf: function (id) { return TowerPerks.nodeOf(selected, id); },
+    squareOf: function (id) { return TowerPerks.upgrade2Of(selected, id); },
+    stateOf: function (id) { return TowerPerks.stateOf(selected, id); },
+    squareStateOf: function (id) { return TowerPerks.upgrade2StateOf(selected, id); },
+    owns: function (id) { return MetaProgress.ownsNode(selected, id); },
+    rankOf: function (id) { return TowerPerks.rankOf(selected, id); },
+    buy: function (id) { return TowerPerks.buy(selected, id); },
+    buyRank: function (id) { return TowerPerks.buyUpgrade2(selected, id); },
+    parentsOf: function (node) { return TowerPerks.parentStatesOf(selected, node); },
+    refundValue: function () { return TowerPerks.refundValue(selected); },
+    resetCount: function () {
+      return MetaProgress.ownedNodes(selected).length +
+             MetaProgress.rankedNodeCount(selected);
+    },
+    resetReadyAt: function () { return MetaProgress.resetReadyAt(selected); },
+    reset: function (now) { return TowerPerks.resetTree(selected, now); },
+    branchOf: function (node) { return branchOf(selected, node); }
+  };
+
+  var PLAYER_API = {
+    isPlayer: true,
+    name: function () { return "Player"; },
+    heading: function () { return "PERMANENT PLAYER MODULES"; },
+    progress: function () { return MetaProgress.playerProgress(); },
+    slotCount: function () { return MetaProgress.PLAYER_SLOTS; },
+    openSlots: function () { return MetaProgress.playerProgress().slots; },
+    equipped: function () { return MetaProgress.equippedModules(); },
+    equip: function (id, slot) { return PlayerPerks.equip(id, slot); },
+    unequip: function (slot) { return PlayerPerks.unequip(slot); },
+    inventory: function () { return PlayerPerks.inventory(); },
+    nodes: function () { return PlayerPerks.modules(); },
+    squares: function () { return PlayerPerks.upgrades2(); },
+    nodeOf: function (id) { return PlayerPerks.moduleOf(id); },
+    squareOf: function (id) { return PlayerPerks.upgrade2Of(id); },
+    stateOf: function (id) { return PlayerPerks.stateOf(id); },
+    squareStateOf: function (id) { return PlayerPerks.upgrade2StateOf(id); },
+    owns: function (id) { return MetaProgress.ownsModule(id); },
+    rankOf: function (id) { return PlayerPerks.rankOf(id); },
+    buy: function (id) { return PlayerPerks.buy(id); },
+    buyRank: function (id) { return PlayerPerks.buyRank(id); },
+    parentsOf: function (node) {
+      return PlayerPerks.parentsOf(node).map(function (pid) {
+        var equipped = MetaProgress.equippedModules().indexOf(pid) !== -1;
+        return { id: pid, name: PlayerPerks.labelOf(pid),
+                 owned: MetaProgress.ownsModule(pid), equipped: equipped };
+      });
+    },
+    refundValue: function () { return PlayerPerks.refundValue(); },
+    resetCount: function () { return PlayerPerks.resetNodeCount(); },
+    resetReadyAt: function () { return MetaProgress.playerResetReadyAt(); },
+    reset: function (now) { return PlayerPerks.reset(now); },
+    // THE PLAYER'S INVENTORY IS GROUPED BY ITS ROOT, not by an arm: its tree is
+    // three trunks and a pair of fusions rather than four arms, so "which root
+    // does this descend from" is the grouping that means something. Derived by
+    // walking `requires` up, so a module added under a root picks up its band
+    // with nothing else changed.
+    branchOf: function (node) { return playerRootOf(node); }
+  };
+
+  function E() { return isPlayerSelected() ? PLAYER_API : TOWER_API; }
+
+  var PLAYER_ROOTS = {
+    player_intendant_diversified_arsenal: "I",
+    player_commander_priority_order: "C2",
+    player_guardian_bastion_pact: "D"
+  };
+
+  function playerRootOf(node) {
+    var seen = {}, stack = [node.id];
+    while (stack.length) {
+      var id = stack.pop();
+      if (seen[id]) continue;
+      seen[id] = true;
+      if (PLAYER_ROOTS[id]) return PLAYER_ROOTS[id];
+      var n = PlayerPerks.moduleOf(id);
+      (n && n.requires ? n.requires : []).forEach(function (p) { stack.push(p); });
+    }
+    return "X";                                  // a fusion, or the secret
+  }
+
   function open() {
-    var list = ownedTowers();
-    // Keep the tower that was already open if it is still owned, so coming
+    var list = entityList();
+    // Keep the entity that was already open if it is still there, so coming
     // back from the tree -- or from a run -- lands where the player left off.
-    if (list.indexOf(selected) === -1) selected = list.length ? list[0] : null;
+    //
+    // THE DEFAULT IS THE FIRST TOWER, NOT THE PLAYER, even though the Player is
+    // the first ROW. The Player sits at the top of the list because it is the
+    // profile's own progression and belongs above the things it equips; the
+    // screen still opens on a tower because that is what it opened on before
+    // the Player existed, and a screen that quietly lands somewhere else after
+    // an update is a screen that lost the player's place.
+    if (list.indexOf(selected) === -1) {
+      var towers = ownedTowers();
+      selected = towers.length ? towers[0] : (list.length ? list[0] : null);
+    }
     flash = null;
     invScroll = 0;
     screen = "upgrades";
@@ -479,7 +624,7 @@ var Upgrades = (function () {
     // framed only the twelve permanent upgrades would leave the Rifleman's
     // squares hanging off three edges of a board that says it is showing the
     // whole tree.
-    var list = TowerPerks.nodes(selected).concat(TowerPerks.upgrades2(selected));
+    var list = E().nodes().concat(E().squares());
     if (!list.length) return;
 
     // The centre node counts too: a tree whose nodes all sit north of it must
@@ -523,12 +668,12 @@ var Upgrades = (function () {
   function readingNode() {
     if (!selected) return null;
     var id = detailNode || hoverNode;
-    return id ? TowerPerks.nodeOf(selected, id) : null;
+    return id ? E().nodeOf(id) : null;
   }
 
   // WHICH SLOT THIS MODULE IS IN, or -1.
   function slotOf(nodeId) {
-    return selected ? MetaProgress.equippedPerks(selected).indexOf(nodeId) : -1;
+    return selected ? E().equipped().indexOf(nodeId) : -1;
   }
 
   // --- the upgrades screen: input --------------------------------------------
@@ -538,7 +683,7 @@ var Upgrades = (function () {
   function perkAt(x, y) {
     if (!selected) return null;
 
-    var loadout = TowerPerks.loadout(selected);
+    var loadout = E().equipped().map(function (id) { return id === null ? null : E().nodeOf(id); });
     for (var s = 0; s < loadout.length; s++) {
       if (!pointInRect(x, y, slotRect(s))) continue;
       return { kind: "slot", index: s, nodeId: loadout[s] ? loadout[s].id : null };
@@ -612,16 +757,16 @@ var Upgrades = (function () {
       return true;
     }
 
-    for (var s = 0; s < MetaProgress.PERK_SLOTS; s++) {
+    for (var s = 0; s < E().slotCount(); s++) {
       if (!pointInRect(x, y, slotRect(s))) continue;
-      var put = MetaProgress.equipPerk(selected, held.nodeId, s);
+      var put = E().equip(held.nodeId, s);
       say(put.ok ? "Loadout updated." : put.reason, put.ok ? "good" : "bad");
       if (put.ok) detailNode = held.nodeId;
       return true;
     }
 
     if (held.fromSlot !== null && pointInRect(x, y, inventoryRect())) {
-      var back = MetaProgress.unequipPerk(selected, held.fromSlot);
+      var back = E().unequip(held.fromSlot);
       say(back.ok ? "Unequipped." : back.reason, back.ok ? "good" : "bad");
       return true;
     }
@@ -638,12 +783,12 @@ var Upgrades = (function () {
 
     var at = slotOf(detailNode);
     if (at !== -1) {
-      var out = MetaProgress.unequipPerk(selected, at);
+      var out = E().unequip(at);
       say(out.ok ? "Unequipped." : out.reason, out.ok ? "good" : "bad");
       return;
     }
 
-    var progress = MetaProgress.progressOf(selected);
+    var progress = E().progress();
     if (progress.level === 0) {
       say("This tower is level 0 — no slots yet. Play with it to earn XP.", "bad");
       return;
@@ -652,13 +797,13 @@ var Upgrades = (function () {
     // rule the drop used to fall back on.
     var free = -1;
     for (var f = 0; f < progress.level; f++) {
-      if (MetaProgress.equippedPerks(selected)[f] === null) { free = f; break; }
+      if (E().equipped()[f] === null) { free = f; break; }
     }
     if (free === -1) {
       say("Every open slot is full — take one out first.", "bad");
       return;
     }
-    var into = MetaProgress.equipPerk(selected, detailNode, free);
+    var into = E().equip(detailNode, free);
     say(into.ok ? "Equipped in slot " + (free + 1) + "." : into.reason,
       into.ok ? "good" : "bad");
   }
@@ -775,7 +920,7 @@ var Upgrades = (function () {
     // BOTH LISTS, because a square sits further out than any perk on three of
     // the four arms -- clamping to the perks alone would put half the Rifleman's
     // squares permanently off the edge of a fully panned board.
-    var list = TowerPerks.nodes(selected).concat(TowerPerks.upgrades2(selected));
+    var list = E().nodes().concat(E().squares());
     if (!list.length) return;
 
     var minX = 0, maxX = 0, minY = 0, maxY = 0;
@@ -839,9 +984,9 @@ var Upgrades = (function () {
   // belongs to the one that is harder to hit.
   function nodeAt(x, y) {
     if (!selected || !pointInRect(x, y, boardRect())) return null;
-    var hit = hitList(x, y, TowerPerks.upgrades2(selected), SQUARE_R);
+    var hit = hitList(x, y, E().squares(), SQUARE_R);
     if (hit) return { node: hit, kind: "square" };
-    hit = hitList(x, y, TowerPerks.nodes(selected), NODE_R);
+    hit = hitList(x, y, E().nodes(), NODE_R);
     return hit ? { node: hit, kind: "perk" } : null;
   }
 
@@ -868,8 +1013,8 @@ var Upgrades = (function () {
       // bought once; a square buys its next rank. Both refuse with the same
       // sentence the card is already printing.
       var result = treeNodeKind === "square"
-        ? TowerPerks.buyUpgrade2(selected, treeNode.id)
-        : TowerPerks.buy(selected, treeNode.id);
+        ? E().buyRank(treeNode.id)
+        : E().buy(treeNode.id);
       say(result.ok
         ? (treeNodeKind === "square"
             ? ("Rank " + result.rank + " bought — it applies while " +
@@ -902,12 +1047,12 @@ var Upgrades = (function () {
       // SAME ORDER AS THE MODEL'S: the cooldown outranks "nothing bought",
       // because after a reset both are true and only one of them is what the
       // player is actually asking about.
-      var ready = MetaProgress.resetReadyAt(selected);
+      var ready = E().resetReadyAt();
       if (ready > Date.now()) {
         say("Reset cools down for another " + coolingText(ready) + ".", "bad");
         return;
       }
-      if (!resetNodeCount(selected)) {
+      if (!E().resetCount()) {
         say("Nothing bought on this tree yet.", "bad");
         return;
       }
@@ -915,7 +1060,7 @@ var Upgrades = (function () {
       return;
     }
     confirmReset = false;
-    var out = TowerPerks.resetTree(selected, Date.now());
+    var out = E().reset(Date.now());
     if (!out.ok) { say(out.reason, "bad"); return; }
     treeNode = null;
     treeNodeKind = "perk";
@@ -928,6 +1073,11 @@ var Upgrades = (function () {
   // A ranked upgrade-squared node counts ONCE however many ranks it holds --
   // the owner's rule, and the same count `MetaProgress.resetTree` charges, so
   // the quote on the button and the transaction cannot be different sums.
+  // HOW MANY NODES A RESET WOULD REVOKE. Deliberately NOT the same rule for
+  // both entities, and both are the owner's: a tower's ranked square counts
+  // ONCE however many ranks it holds, and every one of the Player's ranks
+  // counts on its own. `E().resetCount()` is what asks, so the button's quote
+  // and the model's transaction cannot be different sums.
   function resetNodeCount(towerId) {
     return MetaProgress.ownedNodes(towerId).length +
       MetaProgress.rankedNodeCount(towerId);
@@ -937,7 +1087,7 @@ var Upgrades = (function () {
   // fusion. One phrasing, so the card, the flash and the refusal all name the
   // same thing the same way.
   function parentLabel(node) {
-    var parents = TowerPerks.parentStatesOf(selected, node);
+    var parents = E().parentsOf(node);
     return parents.map(function (p) { return p.name; }).join(" and ");
   }
 
@@ -1018,6 +1168,32 @@ var Upgrades = (function () {
     ctx.restore();
   }
 
+  // THE PLAYER'S PORTRAIT -- a PLACEHOLDER, and deliberately one that could not
+  // be mistaken for finished art: a hooded silhouette drawn from four strokes
+  // in the same ash palette as everything else on this screen. It exists so the
+  // Player's row reads as an entity beside the towers rather than as a gap, and
+  // so the rest of this screen could be built and tested before anybody drew
+  // anything. Replacing it is a one-function change and takes no save with it.
+  function drawPlayerPortrait(cx, cy, size) {
+    var s = size / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = "rgba(" + ASH_EMBER + ",0.85)";
+    ctx.lineWidth = Math.max(1.4, size * 0.055);
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.28, s * 0.34, 0, Math.PI * 2);          // the head
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.72, s * 0.78);                           // the shoulders
+    ctx.quadraticCurveTo(0, -s * 0.10, s * 0.72, s * 0.78);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(" + ASH_LEY + ",0.5)";
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.94, Math.PI * 1.15, Math.PI * 1.85);   // the hood's arc
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // The tower's own body, through the same fallback contract the armoury and
   // the build bar use: the real mesh when the renderer has one, the flat glyph
   // when it does not.
@@ -1064,7 +1240,7 @@ var Upgrades = (function () {
 
     drawSelectBackdrop();
     drawBackButton();
-    drawAshHeading("UPGRADES", "PERMANENT TOWER PROGRESSION", 26, true);
+    drawAshHeading("UPGRADES", "PERMANENT PROGRESSION", 26, true);
 
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
@@ -1105,36 +1281,42 @@ var Upgrades = (function () {
   }
 
   function drawTowerList() {
-    var list = ownedTowers();
+    var list = entityList();
     ctx.textBaseline = "middle";
 
     list.forEach(function (id, i) {
       var r = towerRowRect(i);
-      var entry = MetaProgress.entry(id);
-      var Type = MetaProgress.constructorOf(id);
+      var player = id === PLAYER_ID;
+      var Type = player ? null : MetaProgress.constructorOf(id);
       var active = id === selected;
       var hot = pointInRect(mouse.x, mouse.y, r);
 
       drawAshPlate(r, { live: active ? 0.8 : (hot ? 0.5 : 0), cut: 10 });
 
-      drawTowerIcon(Type, r.x + 30, r.y + r.h / 2, 42);
+      if (player) drawPlayerPortrait(r.x + 30, r.y + r.h / 2, 42);
+      else drawTowerIcon(Type, r.x + 30, r.y + r.h / 2, 42);
 
-      var progress = MetaProgress.progressOf(id);
+      var progress = player ? MetaProgress.playerProgress()
+                            : MetaProgress.progressOf(id);
+      var bought = player ? MetaProgress.ownedModules().length
+                          : MetaProgress.ownedNodes(id).length;
       ctx.textAlign = "left";
       ctx.font = "600 14px system-ui, sans-serif";
       ctx.fillStyle = active ? "#ffe6c4" : "rgba(" + ASH_BONE + ",0.85)";
-      ctx.fillText(fitText(ctx, Type ? Type.DISPLAY_NAME : entry.id, 130),
+      ctx.fillText(fitText(ctx, player ? "Player"
+                             : (Type ? Type.DISPLAY_NAME : id), 120),
         r.x + 58, r.y + 20);
 
       ctx.font = "11px system-ui, sans-serif";
       ctx.fillStyle = "rgba(" + ASH_DUST + ",0.75)";
-      ctx.fillText("Lv " + progress.level + "  ·  " +
-        MetaProgress.ownedNodes(id).length + " bought", r.x + 58, r.y + 38);
+      ctx.fillText("Lv " + progress.level + "  ·  " + bought + " bought",
+        r.x + 58, r.y + 38);
 
       // The slot pips: five, one per perk slot, so the list itself shows every
       // tower's LOADOUT without opening any of them.
-      for (var p = 0; p < MetaProgress.PERK_SLOTS; p++) {
-        drawSlotPip(pipRect(r, p), slotPipState(id, p));
+      var pips = id === PLAYER_ID ? MetaProgress.PLAYER_SLOTS : MetaProgress.PERK_SLOTS;
+      for (var p = 0; p < pips; p++) {
+        drawSlotPip(pipRect(r, p, pips), slotPipState(id, p));
       }
     });
     ctx.textBaseline = "top";
@@ -1157,18 +1339,28 @@ var Upgrades = (function () {
   //
   // One function answering the state and one drawing it, so the list and a test
   // read the same three words rather than the same pixels.
-  function slotPipState(towerId, index) {
-    if (index >= MetaProgress.progressOf(towerId).level) return "locked";
-    return MetaProgress.equippedPerks(towerId)[index] ? "filled" : "empty";
+  // THE PLAYER'S OPEN SLOTS ARE `2 + level`; A TOWER'S ARE ITS LEVEL. That is
+  // the one place the two entities genuinely differ on this screen, and both
+  // sides read the model's own answer -- so the pips, the slot band and the
+  // refusal `equipModule` gives cannot disagree about how many are open.
+  function slotPipState(id, index) {
+    if (id === PLAYER_ID) {
+      var p = MetaProgress.playerProgress();
+      if (index >= p.slots) return "locked";
+      return p.equipped[index] ? "filled" : "empty";
+    }
+    if (index >= MetaProgress.progressOf(id).level) return "locked";
+    return MetaProgress.equippedPerks(id)[index] ? "filled" : "empty";
   }
 
   // Eight pixels rather than the old six, because a diagonal inside six reads
   // as a smudge. The band ends where it always did, so nothing else moved.
   var PIP = 8, PIP_PITCH = 10;
 
-  function pipRect(row, index) {
+  function pipRect(row, index, count) {
+    var n = count || MetaProgress.PERK_SLOTS;
     return {
-      x: row.x + row.w - 12 - (MetaProgress.PERK_SLOTS - index) * PIP_PITCH,
+      x: row.x + row.w - 12 - (n - index) * PIP_PITCH,
       y: row.y + 11, w: PIP, h: PIP
     };
   }
@@ -1198,7 +1390,7 @@ var Upgrades = (function () {
 
   function drawPanel() {
     var Type = MetaProgress.constructorOf(selected);
-    var progress = MetaProgress.progressOf(selected);
+    var progress = E().progress();
 
     var panel = headerRect();
     drawAshPlate(panel, { live: 0.25, cut: 14 });
@@ -1210,14 +1402,15 @@ var Upgrades = (function () {
     ctx.beginPath();
     ctx.rect(panel.x + 6, panel.y + 6, 92, panel.h - 12);
     ctx.clip();
-    drawTowerIcon(Type, panel.x + 52, panel.y + 66, 64);
+    if (isPlayerSelected()) drawPlayerPortrait(panel.x + 52, panel.y + 60, 64);
+    else drawTowerIcon(Type, panel.x + 52, panel.y + 66, 64);
     ctx.restore();
 
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = "24px " + MENU_DISPLAY_FONT;
     ctx.fillStyle = "#f6d9b4";
-    drawMenuText(Type ? Type.DISPLAY_NAME : selected, panel.x + 106, panel.y + 14, 2);
+    drawMenuText(E().name(), panel.x + 106, panel.y + 14, 2);
 
     ctx.font = "11px " + MENU_TECH_FONT;
     ctx.fillStyle = progress.atMax
@@ -1231,23 +1424,26 @@ var Upgrades = (function () {
     ctx.fillText(fitText(ctx, xpLine(progress), 236), panel.x + 106, panel.y + 82);
 
     var tree = treeButtonRect();
-    var count = TowerPerks.nodes(selected).length;
+    var count = E().nodes().length;
     drawAshControl(tree, "TREE", {
       primary: true,
-      detail: count ? (MetaProgress.ownedNodes(selected).length + " / " + count + " BOUGHT")
+      detail: count ? (E().inventory().length + " / " + count + " BOUGHT")
                     : "NOTHING AUTHORED YET"
     });
   }
 
   function drawSlots() {
-    var progress = MetaProgress.progressOf(selected);
-    var loadout = TowerPerks.loadout(selected);
+    var progress = E().progress();
+    var loadout = E().equipped().map(function (id) { return id === null ? null : E().nodeOf(id); });
 
     ctx.textAlign = "left";
     ctx.font = "600 12px system-ui, sans-serif";
     ctx.fillStyle = "rgba(" + ASH_DUST + ",0.7)";
     ctx.fillText("PERMANENT LOADOUT — " + progress.level + " of " +
-      MetaProgress.PERK_SLOTS + " slots open   ·   click a module to read it",
+      (isPlayerSelected()
+        ? ("2 + LEVEL " + E().progress().level + " = " + E().openSlots() +
+           " OF " + E().slotCount() + " SLOTS OPEN")
+        : (E().slotCount() + " slots   ·   click a module to read it")),
       286, 230);
 
     for (var i = 0; i < MetaProgress.PERK_SLOTS; i++) {
@@ -1277,7 +1473,14 @@ var Upgrades = (function () {
         drawMenuText("✖", r.x + r.w / 2, r.y + 34, 0);
         ctx.font = "9px " + MENU_TECH_FONT;
         ctx.fillStyle = "rgba(" + ASH_DUST + ",0.45)";
-        drawMenuText("LEVEL " + (i + 1), r.x + r.w / 2, r.y + 62, 1.1);
+        // WHICH LEVEL OPENS THIS SLOT, and the two entities answer differently:
+        // a tower's slot `i` opens at level `i + 1`, and the Player's at
+        // `i + 1 − 2` because its first two are open from the start. Derived
+        // from the same `2 + level` rule the band's caption prints, so the two
+        // cannot say different things.
+        var opensAt = isPlayerSelected()
+          ? (i + 1 - MetaProgress.PLAYER_BASE_SLOTS) : (i + 1);
+        drawMenuText("LEVEL " + opensAt, r.x + r.w / 2, r.y + 62, 1.1);
         ctx.textAlign = "left";
         continue;
       }
@@ -1315,7 +1518,7 @@ var Upgrades = (function () {
 
   function drawInventory() {
     var box = inventoryRect();
-    var list = TowerPerks.inventory(selected);
+    var list = E().inventory();
     var reading = readingNode();
 
     ctx.textAlign = "left";
@@ -1511,7 +1714,7 @@ var Upgrades = (function () {
         detail: "SLOT " + (equippedAt + 1) + " — STILL OWNED"
       });
     } else {
-      var progress = MetaProgress.progressOf(selected);
+      var progress = E().progress();
       drawAshControl(button, "EQUIP", {
         accent: ASH_GO, active: true,
         detail: progress.level === 0 ? "NO SLOT OPEN YET" : "INTO THE FIRST FREE SLOT"
@@ -1525,7 +1728,7 @@ var Upgrades = (function () {
   // is over everything, which is also the order it is hit-tested in.
   function drawHeldPerk() {
     if (!drag || !drag.moved || !selected) return;
-    var node = TowerPerks.nodeOf(selected, drag.nodeId);
+    var node = E().nodeOf(drag.nodeId);
     if (!node) return;
     var r = { x: drag.x - 46, y: drag.y - 30, w: 92, h: 60 };
     ctx.globalAlpha = 0.92;
@@ -1546,9 +1749,8 @@ var Upgrades = (function () {
     drawSelectBackdrop();
 
     var Type = MetaProgress.constructorOf(selected);
-    var progress = MetaProgress.progressOf(selected);
-    drawAshHeading((Type ? Type.DISPLAY_NAME : selected).toUpperCase() + " TREE",
-      "PERMANENT UPGRADES", 26, true);
+    var progress = E().progress();
+    drawAshHeading(E().name().toUpperCase() + " TREE", E().heading(), 26, true);
 
     drawAshControl(treeBackRect(), "← UPGRADES", {});
     drawAshControl(recentreRect(), "◉", {});
@@ -1568,8 +1770,8 @@ var Upgrades = (function () {
     ctx.rect(board.x, board.y, board.w, board.h);
     ctx.clip();
 
-    var list = TowerPerks.nodes(selected);
-    var squares = TowerPerks.upgrades2(selected);
+    var list = E().nodes();
+    var squares = E().squares();
     // EVERY LINK FIRST, THEN THE TOWER, THEN THE NODES ON TOP. The squares are
     // drawn last of all so a satellite is never hidden under the arm it hangs
     // off, and their links are drawn with the rest so nothing crosses a node it
@@ -1622,16 +1824,21 @@ var Upgrades = (function () {
       var to = treeToScreen(nodePoint(node).x, nodePoint(node).y);
       var parents = node.requires || [];
 
+      // THE SECRET NODE HAS NO LINK AT ALL. It is neither a root nor a child:
+      // what gates it is a set of conditions spread across the whole tree, and
+      // a line to any one of them would be a lie about the other four. It
+      // floats, and until it is revealed it floats as a `???`.
+      if (node.secret) return;
       if (!parents.length) {
         var centre = treeToScreen(0, 0);
         strokeLink(centre, to, true);
         return;
       }
       parents.forEach(function (parentId) {
-        var parent = TowerPerks.nodeOf(selected, parentId);
+        var parent = E().nodeOf(parentId);
         if (!parent) return;
         var from = treeToScreen(nodePoint(parent).x, nodePoint(parent).y);
-        strokeLink(from, to, MetaProgress.ownsNode(selected, parentId));
+        strokeLink(from, to, E().owns(parentId));
       });
     });
   }
@@ -1663,19 +1870,30 @@ var Upgrades = (function () {
       var to = treeToScreen(nodePoint(node).x, nodePoint(node).y);
       var reqs = node.requires || [];
 
-      if (!reqs.length) {
-        var parent = TowerPerks.nodeOf(selected, node.parent);
+      // **THE PLAYER'S SQUARES ALWAYS LINK TO THEIR MODULE**, whatever they
+      // require; a tower's link to their requirement when they have one.
+      //
+      // The difference is a fact about the two trees rather than a choice. A
+      // tower's square requires another square on the SAME arm, so that link is
+      // short and says something the parent link would only repeat. Four of the
+      // Player's need a rank from a completely different branch -- Réserve de
+      // garnison wants Amortissement doux, three trunks away -- and drawing
+      // those would put long lines straight across the tree to say what the
+      // card already says with a tick and a cross.
+      if (isPlayerSelected() || !reqs.length) {
+        var parent = E().nodeOf(node.parent);
         if (parent) {
           var from = treeToScreen(nodePoint(parent).x, nodePoint(parent).y);
-          strokeLink(from, to, MetaProgress.ownsNode(selected, node.parent));
+          strokeLink(from, to, E().owns(node.parent));
         }
+        if (isPlayerSelected()) return;
       }
 
       reqs.forEach(function (req) {
-        var other = TowerPerks.upgrade2Of(selected, req.id);
+        var other = E().squareOf(req.id);
         if (!other) return;
         var at = treeToScreen(nodePoint(other).x, nodePoint(other).y);
-        strokeLink(at, to, TowerPerks.rankOf(selected, req.id) >= (req.rank || 1));
+        strokeLink(at, to, E().rankOf(req.id) >= (req.rank || 1));
       });
     });
   }
@@ -1698,7 +1916,7 @@ var Upgrades = (function () {
   function drawSquareNode(node) {
     var p = treeToScreen(nodePoint(node).x, nodePoint(node).y);
     var r = SQUARE_R * view.zoom;
-    var info = TowerPerks.upgrade2StateOf(selected, node.id);
+    var info = E().squareStateOf(node.id);
     var chosen = treeNode && treeNode.id === node.id && treeNodeKind === "square";
 
     var accent, alpha;
@@ -1778,7 +1996,8 @@ var Upgrades = (function () {
     ctx.lineWidth = 2;
     ctx.strokeStyle = "rgba(" + ASH_EMBER + ",0.6)";
     ctx.stroke();
-    drawTowerIcon(Type, p.x, p.y, r * 1.5);
+    if (isPlayerSelected()) drawPlayerPortrait(p.x, p.y, r * 1.5);
+    else drawTowerIcon(Type, p.x, p.y, r * 1.5);
   }
 
   // THE FIVE STATES THE BRIEF NAMES, EACH ITS OWN COLOUR AND EACH READ OFF
@@ -1787,12 +2006,13 @@ var Upgrades = (function () {
   function drawTreeNode(node) {
     var p = treeToScreen(nodePoint(node).x, nodePoint(node).y);
     var r = NODE_R * view.zoom;
-    var info = TowerPerks.stateOf(selected, node.id);
+    var info = E().stateOf(node.id);
     var chosen = treeNode && treeNode.id === node.id;
-    var equipped = MetaProgress.equippedPerks(selected).indexOf(node.id) !== -1;
+    var equipped = E().equipped().indexOf(node.id) !== -1;
 
     var accent, alpha;
-    if (info.state === "owned") { accent = equipped ? ASH_LEY : ASH_EMBER; alpha = 1; }
+    if (info.state === "hidden") { accent = ASH_DUST; alpha = 0.35; }
+    else if (info.state === "owned") { accent = equipped ? ASH_LEY : ASH_EMBER; alpha = 1; }
     else if (info.state === "buyable") { accent = ASH_BONE; alpha = 0.95; }
     else if (info.state === "poor") { accent = ASH_EMBER; alpha = 0.5; }
     else if (info.state === "level") { accent = ASH_LEY; alpha = 0.4; }
@@ -1806,6 +2026,22 @@ var Upgrades = (function () {
     ctx.lineWidth = chosen ? 3 : (info.state === "owned" ? 2.2 : 1.4);
     ctx.strokeStyle = "rgba(" + accent + "," + (chosen ? 1 : alpha) + ")";
     ctx.stroke();
+
+    // A HIDDEN NODE IS A QUESTION MARK AND NOTHING ELSE -- no name, no price,
+    // no prerequisite, no icon of its own. `stateOf` answers `hidden` only for a
+    // node carrying a `secret` block whose conditions are not all met, and those
+    // are recomputed from the save every time they are asked, so a reset
+    // correctly hides it again.
+    if (info.state === "hidden") {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = Math.round(r * 0.9) + "px " + MENU_DISPLAY_FONT;
+      ctx.fillStyle = "rgba(" + ASH_DUST + ",0.55)";
+      ctx.fillText("?", p.x, p.y + 1);
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
+      return;
+    }
 
     sigil(node.id, p.x, p.y, r * 0.44, "rgba(" + accent + "," + alpha + ")", node.icon);
 
@@ -1851,7 +2087,7 @@ var Upgrades = (function () {
 
     if (treeNodeKind === "square") { drawSquareDetail(d); return; }
 
-    var info = TowerPerks.stateOf(selected, treeNode.id);
+    var info = E().stateOf(treeNode.id);
 
     sigil(treeNode.id, d.x + 34, d.y + 38, 16,
       "rgba(" + ASH_EMBER + ",0.95)", treeNode.icon);
@@ -1876,10 +2112,20 @@ var Upgrades = (function () {
     // node authored so far is buyable at level 0, and a card that simply says
     // nothing leaves the player to infer it. It still has to be EQUIPPED into a
     // slot the level opens, which is the distinction this line keeps visible.
+    // A TOWER'S NODE STATES ITS LEVEL GATE EITHER WAY, the zero case included --
+    // every authored node is buyable at level 0 and a card that said nothing
+    // would leave the player to infer it. A PLAYER MODULE has no level gate at
+    // all (the brief: nothing beyond its parents' requirements), so it says
+    // what it DOES need: a slot to sit in, which is what a Player level buys.
     ctx.fillStyle = "rgba(" + ASH_LEY + ",0.85)";
-    drawMenuText(treeNode.minLevel
-      ? "NEEDS TOWER LEVEL " + treeNode.minLevel
-      : "NEEDS TOWER LEVEL 0", d.x + 20, y, 1.3);
+    if (isPlayerSelected()) {
+      drawMenuText("NEEDS A FREE SLOT TO APPLY  ·  " + E().openSlots() +
+        " OF " + E().slotCount() + " OPEN", d.x + 20, y, 1.3);
+    } else {
+      drawMenuText(treeNode.minLevel
+        ? "NEEDS TOWER LEVEL " + treeNode.minLevel
+        : "NEEDS TOWER LEVEL 0", d.x + 20, y, 1.3);
+    }
     y += 20;
     if (treeNode.requires && treeNode.requires.length) {
       ctx.fillStyle = "rgba(" + ASH_DUST + ",0.8)";
@@ -1888,8 +2134,8 @@ var Upgrades = (function () {
       y += 18;
       ctx.font = "11px system-ui, sans-serif";
       treeNode.requires.forEach(function (req) {
-        var parent = TowerPerks.nodeOf(selected, req);
-        var have = MetaProgress.ownsNode(selected, req);
+        var parent = E().nodeOf(req);
+        var have = E().owns(req);
         ctx.fillStyle = have
           ? "rgba(" + ASH_LEY + ",0.9)" : "rgba(240,120,110,0.9)";
         ctx.fillText((have ? "✓ " : "✗ ") + (parent ? parent.name : req),
@@ -1928,7 +2174,7 @@ var Upgrades = (function () {
   // effect; `upgrade2StateOf` answers the rank, the price and the reason, so
   // the button, the ring and the refusal cannot disagree.
   function drawSquareDetail(d) {
-    var info = TowerPerks.upgrade2StateOf(selected, treeNode.id);
+    var info = E().squareStateOf(treeNode.id);
     var node = treeNode;
 
     sigil(node.id, d.x + 34, d.y + 38, 16,
@@ -1941,7 +2187,7 @@ var Upgrades = (function () {
     // WHICH UPGRADE OWNS IT, and whether that upgrade is in the loadout right
     // now -- two different facts, both on the same line, because "bought" is
     // what unlocks the purchase and "equipped" is what makes it do anything.
-    var parents = TowerPerks.parentStatesOf(selected, node);
+    var parents = E().parentsOf(node);
     ctx.font = "10px " + MENU_TECH_FONT;
     ctx.fillStyle = "rgba(" + ASH_DUST + ",0.85)";
     drawMenuText(parents.length > 1 ? "FUSION — NEEDS BOTH EQUIPPED"
@@ -2056,8 +2302,8 @@ var Upgrades = (function () {
 
   function drawResetControl() {
     var r = resetTreeRect();
-    var owned = resetNodeCount(selected);
-    var ready = MetaProgress.resetReadyAt(selected);
+    var owned = E().resetCount();
+    var ready = E().resetReadyAt();
     var cooling = ready > Date.now();
 
     // EVERY FIGURE, BEFORE THE SECOND PRESS. The brief is explicit that the
@@ -2065,7 +2311,7 @@ var Upgrades = (function () {
     // and the delay before confirming -- and all five are derived from the same
     // rate the model charges, so the quote cannot be a different sum from the
     // transaction.
-    var gross = TowerPerks.refundValue(selected);
+    var gross = E().refundValue();
     var fee = owned * MetaProgress.TREE_RESET_FEE_PER_NODE;
     var net = gross - fee;
     var hours = Math.round(MetaProgress.TREE_RESET_COOLDOWN_MS / 3600000);
@@ -2094,7 +2340,7 @@ var Upgrades = (function () {
       ? ("Refunds " + owned + " node" + (owned === 1 ? "" : "s") + " for " +
          gross + " ⬡ gross, less a " + MetaProgress.TREE_RESET_FEE_PER_NODE +
          " ⬡ commission a node (" + fee + " ⬡) — net " + (net >= 0 ? "+" : "") +
-         net + " ⬡. Clears this tower's loadout and cools down for " + hours +
+         net + " ⬡. Clears this loadout and cools down for " + hours +
          " hour" + (hours === 1 ? "" : "s") + ". Level and XP are never touched.")
       : ("Refunds every node bought here at its full price, less a " +
          MetaProgress.TREE_RESET_FEE_PER_NODE + " ⬡ commission a node. Clears " +
@@ -2162,7 +2408,7 @@ var Upgrades = (function () {
     slotActionRect: slotActionRect,
     slotPipState: slotPipState,
     branchOf: function (nodeId) {
-      var node = selected ? TowerPerks.nodeOf(selected, nodeId) : null;
+      var node = selected ? E().nodeOf(nodeId) : null;
       return node ? branchOf(selected, node) : null;
     },
     inventoryGroups: function () {
@@ -2183,9 +2429,9 @@ var Upgrades = (function () {
     // pressing the button a player presses.
     selectNode: function (nodeId) {
       if (!selected) { treeNode = null; return null; }
-      var square = TowerPerks.upgrade2Of(selected, nodeId);
+      var square = E().squareOf(nodeId);
       if (square) { treeNode = square; treeNodeKind = "square"; return square; }
-      treeNode = TowerPerks.nodeOf(selected, nodeId);
+      treeNode = E().nodeOf(nodeId);
       treeNodeKind = "perk";
       return treeNode;
     },
@@ -2193,7 +2439,7 @@ var Upgrades = (function () {
       var hit = nodeAt(x, y);
       return hit ? { id: hit.node.id, kind: hit.kind } : null;
     },
-    resetNodeCount: function () { return selected ? resetNodeCount(selected) : 0; },
+    resetNodeCount: function () { return selected ? E().resetCount() : 0; },
     state: function () {
       return {
         selected: selected, flash: flash, node: treeNode ? treeNode.id : null,
